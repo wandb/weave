@@ -8,7 +8,7 @@ import {
   TextField,
 } from '@mui/material';
 import moment from 'moment';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
 import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
@@ -66,7 +66,7 @@ export const FilterableOpVersionsTable: React.FC<{
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
   const getInitialData = useCallback(
-    (filter: WFHighLevelOpVersionFilter) => {
+    (innerFilter: WFHighLevelOpVersionFilter) => {
       return orm.projectConnection.opVersions().map(o => {
         return {id: o.version(), obj: o};
       });
@@ -75,10 +75,33 @@ export const FilterableOpVersionsTable: React.FC<{
   );
 
   const getFilterPopoutTargetUrl = useCallback(
-    (filter: WFHighLevelOpVersionFilter) => {
-      return baseRouter.opVersionsUIUrl(props.entity, props.project, filter);
+    (innerFilter: WFHighLevelOpVersionFilter) => {
+      return baseRouter.opVersionsUIUrl(
+        props.entity,
+        props.project,
+        innerFilter
+      );
     },
     [props.entity, props.project, baseRouter]
+  );
+
+  // Initialize the filter
+  const [filterState, setFilterState] = useState(props.initialFilter ?? {});
+  // Update the filter when the initial filter changes
+  useEffect(() => {
+    if (props.initialFilter) {
+      setFilterState(props.initialFilter);
+    }
+  }, [props.initialFilter]);
+
+  // If the caller is controlling the filter, use the caller's filter state
+  const filter = useMemo(
+    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
+    [filterState, props.initialFilter, props.onFilterUpdate]
+  );
+  const setFilter = useMemo(
+    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
+    [props.onFilterUpdate]
   );
 
   const columns = useMemo(() => {
@@ -164,11 +187,11 @@ export const FilterableOpVersionsTable: React.FC<{
           },
         },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (filter.opCategory == null) {
+          filterPredicate: ({obj}, innerFilter) => {
+            if (innerFilter.opCategory == null) {
               return true;
             }
-            return obj.opCategory() === filter.opCategory;
+            return obj.opCategory() === innerFilter.opCategory;
           },
           filterControlListItem: cellProps => {
             return (
@@ -218,27 +241,30 @@ export const FilterableOpVersionsTable: React.FC<{
         columnId: 'opName',
         // This grid display does not match the data for the column
         // ... a bit of a hack
-        gridDisplay: {
-          columnLabel: 'Versions',
-          columnValue: obj => obj.obj.op().name(),
-          gridColDefOptions: {
-            renderCell: params => {
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.row.obj.op().opVersions().length}
-                  filter={{
-                    opName: params.row.obj.op().name(),
-                  }}
-                />
-              );
+        gridDisplay: !filter.isLatest
+          ? undefined
+          : {
+              columnLabel: 'Versions',
+              columnValue: obj => obj.obj.op().name(),
+              gridColDefOptions: {
+                renderCell: params => {
+                  return (
+                    <OpVersionsLink
+                      entity={params.row.obj.entity()}
+                      project={params.row.obj.project()}
+                      versionCount={params.row.obj.op().opVersions().length}
+                      filter={{
+                        opName: params.row.obj.op().name(),
+                      }}
+                      neverPeek
+                    />
+                  );
+                },
+                width: 100,
+                minWidth: 100,
+                maxWidth: 100,
+              },
             },
-            width: 100,
-            minWidth: 100,
-            maxWidth: 100,
-          },
-        },
         // gridDisplay: {
         //   columnLabel: 'Op',
         //   columnValue: obj => obj.obj.op().name(),
@@ -255,11 +281,11 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (filter.opName == null) {
+          filterPredicate: ({obj}, innerFilter) => {
+            if (innerFilter.opName == null) {
               return true;
             }
-            return obj.op().name() === filter.opName;
+            return obj.op().name() === innerFilter.opName;
           },
           filterControlListItem: cellProps => {
             return (
@@ -307,15 +333,15 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
+          filterPredicate: ({obj}, innerFilter) => {
             if (
-              filter.invokedByOpVersions == null ||
-              filter.invokedByOpVersions.length === 0
+              innerFilter.invokedByOpVersions == null ||
+              innerFilter.invokedByOpVersions.length === 0
             ) {
               return true;
             }
             return obj.invokedBy().some(version => {
-              return filter.invokedByOpVersions?.includes(
+              return innerFilter.invokedByOpVersions?.includes(
                 version.op().name() + ':' + version.version()
               );
             });
@@ -366,15 +392,15 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
+          filterPredicate: ({obj}, innerFilter) => {
             if (
-              filter.invokesOpVersions == null ||
-              filter.invokesOpVersions.length === 0
+              innerFilter.invokesOpVersions == null ||
+              innerFilter.invokesOpVersions.length === 0
             ) {
               return true;
             }
             return obj.invokes().some(version => {
-              return filter.invokesOpVersions?.includes(
+              return innerFilter.invokesOpVersions?.includes(
                 version.op().name() + ':' + version.version()
               );
             });
@@ -425,15 +451,15 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
+          filterPredicate: ({obj}, innerFilter) => {
             if (
-              filter.consumesTypeVersions == null ||
-              filter.consumesTypeVersions.length === 0
+              innerFilter.consumesTypeVersions == null ||
+              innerFilter.consumesTypeVersions.length === 0
             ) {
               return true;
             }
             return obj.inputTypesVersions().some(version => {
-              return filter.consumesTypeVersions?.includes(
+              return innerFilter.consumesTypeVersions?.includes(
                 version.type().name() + ':' + version.version()
               );
             });
@@ -484,15 +510,15 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
+          filterPredicate: ({obj}, innerFilter) => {
             if (
-              filter.producesTypeVersions == null ||
-              filter.producesTypeVersions.length === 0
+              innerFilter.producesTypeVersions == null ||
+              innerFilter.producesTypeVersions.length === 0
             ) {
               return true;
             }
             return obj.outputTypeVersions().some(version => {
-              return filter.producesTypeVersions?.includes(
+              return innerFilter.producesTypeVersions?.includes(
                 version.type().name() + ':' + version.version()
               );
             });
@@ -606,7 +632,7 @@ export const FilterableOpVersionsTable: React.FC<{
         WFHighLevelOpVersionFilter
       >, // filter me
     };
-  }, [props.entity, props.frozenFilter, props.project]);
+  }, [filter.isLatest, props.entity, props.frozenFilter, props.project]);
 
   return (
     <FilterableTable
@@ -614,8 +640,8 @@ export const FilterableOpVersionsTable: React.FC<{
       columns={columns}
       getFilterPopoutTargetUrl={getFilterPopoutTargetUrl}
       frozenFilter={props.frozenFilter}
-      initialFilter={props.initialFilter}
-      onFilterUpdate={props.onFilterUpdate}
+      initialFilter={filter}
+      onFilterUpdate={setFilter}
     />
   );
 };
@@ -639,7 +665,7 @@ const OpCategoryFilterControlListItem: React.FC<{
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'opCategory'
           )}
-          renderInput={params => <TextField {...params} label="Op Category" />}
+          renderInput={params => <TextField {...params} label="Category" />}
           value={props.filter.opCategory ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
@@ -670,7 +696,7 @@ const OpNameFilterControlListItem: React.FC<{
         <Autocomplete
           size={'small'}
           disabled={Object.keys(props.frozenFilter ?? {}).includes('opName')}
-          renderInput={params => <TextField {...params} label="Op Name" />}
+          renderInput={params => <TextField {...params} label="Name" />}
           value={props.filter.opName ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
@@ -705,11 +731,12 @@ const InvokedByFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'invokedByOpVersions'
           )}
-          renderInput={params => <TextField {...params} label="Invoked By" />}
+          renderInput={params => <TextField {...params} label="Calls" />}
           value={props.filter.invokedByOpVersions ?? []}
           onChange={(event, newValue) => {
             props.updateFilter({
@@ -744,11 +771,12 @@ const InvokesFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'invokesOpVersions'
           )}
-          renderInput={params => <TextField {...params} label="Invokes" />}
+          renderInput={params => <TextField {...params} label="Called By" />}
           value={props.filter.invokesOpVersions ?? []}
           onChange={(event, newValue) => {
             props.updateFilter({
@@ -783,13 +811,12 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'consumesTypeVersions'
           )}
-          renderInput={params => (
-            <TextField {...params} label="Consumes Type Versions" />
-          )}
+          renderInput={params => <TextField {...params} label="Parameters" />}
           value={props.filter.consumesTypeVersions ?? []}
           onChange={(event, newValue) => {
             props.updateFilter({
@@ -825,13 +852,12 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'producesTypeVersions'
           )}
-          renderInput={params => (
-            <TextField {...params} label="Produces Type Versions" />
-          )}
+          renderInput={params => <TextField {...params} label="Returns" />}
           value={props.filter.producesTypeVersions ?? []}
           onChange={(event, newValue) => {
             props.updateFilter({
