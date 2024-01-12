@@ -20,6 +20,7 @@ import {
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
+import _ from 'lodash';
 
 export type WFHighLevelOpVersionFilter = {
   opCategory?: HackyOpCategory | null;
@@ -718,13 +719,18 @@ const InvokedByFilterControlListItem: React.FC<{
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection
-      .opVersions()
-      .filter(o => o.invokedBy().length > 0)
-      .map(o => {
-        return o.op().name() + ':' + o.version();
-      });
+  const optionsDict = useMemo(() => {
+    return _.fromPairs(
+      orm.projectConnection
+        .opVersions()
+        .filter(o => o.invokedBy().length > 0)
+        .map(o => {
+          return [
+            o.op().name() + ':' + o.version(),
+            o.op().name() + ':v' + o.versionIndex(),
+          ];
+        })
+    );
   }, [orm.projectConnection]);
   return (
     <ListItem>
@@ -743,7 +749,10 @@ const InvokedByFilterControlListItem: React.FC<{
               invokedByOpVersions: newValue,
             });
           }}
-          options={options}
+          getOptionLabel={option => {
+            return optionsDict[option];
+          }}
+          options={Object.keys(optionsDict)}
         />
       </FormControl>
     </ListItem>
