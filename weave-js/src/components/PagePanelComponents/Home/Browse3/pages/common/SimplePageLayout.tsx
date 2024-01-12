@@ -26,6 +26,7 @@ export const SimplePageLayout: React.FC<{
     onClick: () => void;
   }>;
   leftSidebar?: React.ReactNode;
+  headerContent?: React.ReactNode;
 }> = props => {
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
   const [tabId, setTabId] = React.useState(0);
@@ -53,16 +54,20 @@ export const SimplePageLayout: React.FC<{
           pb: 0,
           pl: 2,
           pr: 2,
-          height: 65, // manual to match sidebar
+          height: props.headerContent ? undefined : 65, // manual to match sidebar
+          maxHeight: props.headerContent ? '50%' : undefined,
+
           borderBottom: '1px solid #e0e0e0',
           display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
+          flexDirection: props.headerContent ? 'column' : 'row',
+          alignItems: props.headerContent ? 'flex-start' : 'flex-end',
+          justifyContent: props.headerContent ? 'flex-start' : 'space-between',
           flex: '0 0 auto',
         }}>
         <Box
           sx={{
+            height: 65, // manual to match sidebar
+            flex: '0 0 65px',
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'flex-end',
@@ -88,7 +93,19 @@ export const SimplePageLayout: React.FC<{
             {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
           </Box>
         </Box>
-
+        {props.headerContent && (
+          <Box
+            sx={{
+              width: '100%',
+              overflow: 'auto',
+              borderTop: '1px solid #e0e0e0',
+              borderBottom: '1px solid #e0e0e0',
+              pt: 1,
+              pb: 1,
+            }}>
+            {props.headerContent}
+          </Box>
+        )}
         <Tabs
           variant="scrollable"
           scrollButtons="auto"

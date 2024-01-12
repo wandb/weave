@@ -11,7 +11,7 @@ import moment from 'moment';
 import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
-import {OpVersionLink, OpVersionsLink} from './common/Links';
+import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   FilterableTable,
@@ -107,6 +107,45 @@ export const FilterableOpVersionsTable: React.FC<{
         any,
         string,
         'version',
+        WFHighLevelOpVersionFilter
+      >,
+
+      calls: {
+        columnId: 'calls',
+        gridDisplay: {
+          columnLabel: 'Calls',
+          columnValue: obj => obj.obj.calls().length,
+          gridColDefOptions: {
+            renderCell: params => {
+              if (params.value === 0) {
+                return '';
+              }
+              return (
+                <CallsLink
+                  neverPeek
+                  entity={params.row.obj.entity()}
+                  project={params.row.obj.project()}
+                  callCount={params.value as number}
+                  filter={{
+                    opVersions: [
+                      params.row.obj.op().name() +
+                        ':' +
+                        params.row.obj.version(),
+                    ],
+                  }}
+                />
+              );
+            },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
+          },
+        },
+      } as WFHighLevelDataColumn<
+        {obj: WFOpVersion},
+        string[],
+        number,
+        'calls',
         WFHighLevelOpVersionFilter
       >,
 
@@ -238,43 +277,6 @@ export const FilterableOpVersionsTable: React.FC<{
         string,
         string,
         'opName',
-        WFHighLevelOpVersionFilter
-      >,
-      calls: {
-        columnId: 'calls',
-        // gridDisplay: {
-        //   columnLabel: 'Calls',
-        //   columnValue: obj => obj.obj.calls().length,
-        //   gridColDefOptions: {
-        //     renderCell: params => {
-        //       if (params.value === 0) {
-        //         return '';
-        //       }
-        //       return (
-        //         <CallsLink
-        //           entity={params.row.obj.entity()}
-        //           project={params.row.obj.project()}
-        //           callCount={params.value as number}
-        //           filter={{
-        //             opVersions: [
-        //               params.row.obj.op().name() +
-        //                 ':' +
-        //                 params.row.obj.version(),
-        //             ],
-        //           }}
-        //         />
-        //       );
-        //     },
-        //     width: 100,
-        //     minWidth: 100,
-        //     maxWidth: 100,
-        //   },
-        // },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string[],
-        number,
-        'calls',
         WFHighLevelOpVersionFilter
       >,
       invokedByOpVersions: {

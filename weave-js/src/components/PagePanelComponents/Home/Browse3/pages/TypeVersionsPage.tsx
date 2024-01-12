@@ -208,7 +208,7 @@ export const FilterableTypeVersionsTable: React.FC<{
                 <ObjectVersionsLink
                   entity={params.row.obj.entity()}
                   project={params.row.obj.project()}
-                  versionsCount={params.value}
+                  versionCount={params.value}
                   filter={{
                     typeVersions: [
                       params.row.obj.type().name() +

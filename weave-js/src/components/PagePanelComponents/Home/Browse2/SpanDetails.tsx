@@ -65,7 +65,10 @@ const ObjectView: FC<{obj: any}> = ({obj}) => {
   return <Typography>{JSON.stringify(obj)}</Typography>;
 };
 
-export const SpanDetails: FC<{call: Call}> = ({call}) => {
+export const SpanDetails: FC<{
+  call: Call;
+  hackyInjectionBelowFunction?: React.ReactNode;
+}> = ({call, hackyInjectionBelowFunction}) => {
   const inputKeys =
     call.inputs._keys ??
     Object.entries(call.inputs)
@@ -110,6 +113,7 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
         <Typography variant="body2" gutterBottom>
           Status: {call.status_code}
         </Typography>
+        {hackyInjectionBelowFunction}
         {call.exception != null && (
           <Typography variant="body2" gutterBottom>
             {call.exception}
