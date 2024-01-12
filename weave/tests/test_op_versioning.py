@@ -175,6 +175,191 @@ def test_op_versioning_closure_contant(strict_op_saving):
     assert saved_code == EXPECTED_CLOSURE_CONTANT_OP_CODE
 
 
+EXPECTED_CLOSURE_CONTANT_DICT_OP_CODE = """import typing
+import weave
+
+
+x = {
+    "a": 5,
+    "b": 10
+}
+import weave.api as weave
+@weave.op()
+def versioned_op_closure_constant(a: int) -> float:
+    return a + x["a"]
+"""
+
+
+def test_op_versioning_closure_dict(strict_op_saving):
+    x = {"a": 5, "b": 10}
+
+    @weave.op()
+    def versioned_op_closure_constant(a: int) -> float:
+        return a + x["a"]
+
+    ref = weave.obj_ref(versioned_op_closure_constant)
+    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+
+    with ref.artifact.open("obj.py") as f:
+        saved_code = f.read()
+
+    print("SAVED CODE", saved_code)
+
+    assert saved_code == EXPECTED_CLOSURE_CONTANT_DICT_OP_CODE
+
+
+EXPECTED_CLOSURE_CONTANT_DICT_NP_OP_CODE = """import typing
+import weave
+
+
+x = {
+    "a": 5,
+    "b": weave.storage.artifact_path_ref('x/b#0').get()
+}
+import weave.api as weave
+@weave.op()
+def versioned_op_closure_constant(a: int) -> float:
+    return a + x["b"].mean() + x["a"]
+"""
+
+
+def test_op_versioning_closure_dict_np(strict_op_saving, eager_mode):
+    x = {"a": 5, "b": np.array([1, 2, 3])}
+
+    @weave.op()
+    def versioned_op_closure_constant(a: int) -> float:
+        return a + x["b"].mean() + x["a"]
+
+    ref = weave.obj_ref(versioned_op_closure_constant)
+    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+
+    with ref.artifact.open("obj.py") as f:
+        saved_code = f.read()
+
+    print("SAVED CODE", saved_code)
+
+    assert saved_code == EXPECTED_CLOSURE_CONTANT_DICT_NP_OP_CODE
+    op2 = weave.ref(str(ref)).get()
+    assert op2(1) == 8
+
+
+EXPECTED_CLOSURE_CONTANT_DICT_OPS_OP_CODE = """import typing
+import weave
+
+
+x = {
+    "a": weave.ref('local-artifact:///op-cat:7dfb9a69dc75d47fa618/obj').get(),
+    "b": weave.ref('local-artifact:///op-dog:5b1dba2d0802ab99a3c9/obj').get(),
+    "c": weave.ref('local-artifact:///op-dog:5b1dba2d0802ab99a3c9/obj').get()
+}
+import weave.api as weave
+@weave.op()
+def pony(v: int):
+    v = x["a"](v)
+    v = x["b"](v)
+    v = x["c"](v)
+    print("hello from pony()")
+    return v + 99
+"""
+
+
+def test_op_versioning_closure_dict_ops(strict_op_saving, eager_mode):
+    with weave.local_client():
+
+        @weave.op()
+        def cat(v: int):
+            print("hello from cat()")
+            return v + 1
+
+        @weave.op()
+        def dog(v: int):
+            print("hello from dog()")
+            return v - 1
+
+        x = {"a": cat, "b": dog, "c": dog}
+
+        @weave.op()
+        def pony(v: int):
+            v = x["a"](v)
+            v = x["b"](v)
+            v = x["c"](v)
+            print("hello from pony()")
+            return v + 99
+
+        ref = weave.obj_ref(pony)
+        print("REF", ref)
+        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+
+        with ref.artifact.open("obj.py") as f:
+            saved_code = f.read()
+
+        print("SAVED CODE", saved_code)
+
+        assert saved_code == EXPECTED_CLOSURE_CONTANT_DICT_OPS_OP_CODE
+        op2 = weave.ref(str(ref)).get()
+        assert op2(1) == 99
+
+
+EXPECTED_MIXED_OP_CODE = """import typing
+import weave
+
+
+dog = weave.ref('local-artifact:///op-dog:5b1dba2d0802ab99a3c9/obj').get()
+x = {
+    "a": weave.ref('local-artifact:///op-cat:7dfb9a69dc75d47fa618/obj').get(),
+    "b": weave.storage.artifact_path_ref('x/b#0').get()
+}
+import numpy as np
+import weave.api as weave
+@weave.op()
+def pony(v: int):
+    v = dog(v)
+    v = x["a"](v) + x["b"].mean()
+    v = np.array([v, v, v]).mean()
+
+    print("hello from pony()")
+    return v + 99
+"""
+
+
+def test_op_versioning_mixed(strict_op_saving, eager_mode):
+    with weave.local_client():
+
+        @weave.op()
+        def cat(v: int):
+            print("hello from cat()")
+            return v + 1
+
+        @weave.op()
+        def dog(v: int):
+            print("hello from dog()")
+            return v - 1
+
+        x = {"a": cat, "b": np.array([1, 2, 3])}
+
+        @weave.op()
+        def pony(v: int):
+            v = dog(v)
+            v = x["a"](v) + x["b"].mean()
+            v = np.array([v, v, v]).mean()
+
+            print("hello from pony()")
+            return v + 99
+
+        ref = weave.obj_ref(pony)
+        print("REF", ref)
+        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+
+        with ref.artifact.open("obj.py") as f:
+            saved_code = f.read()
+
+        print("SAVED CODE", saved_code)
+
+        assert saved_code == EXPECTED_MIXED_OP_CODE
+        op2 = weave.ref(str(ref)).get()
+        assert op2(1) == 102.0
+
+
 def test_op_versioning_exception(strict_op_saving):
     # Just ensure this doesn't raise by running it.
     @weave.op()
@@ -185,3 +370,25 @@ def test_op_versioning_exception(strict_op_saving):
             print("E", e)
             return 9999
         return x
+
+
+def test_op_versioning_2ops(strict_op_saving):
+    with weave.local_client():
+
+        @weave.op()
+        def dog():
+            print("hello from dog()")
+
+        @weave.op()
+        def cat():
+            print("hello from cat()")
+            dog()
+            dog()
+
+        cat()
+
+        ref = weave.obj_ref(cat)
+        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+
+        with ref.artifact.open("obj.py") as f:
+            saved_code = f.read()

@@ -1,4 +1,5 @@
 import contextlib
+import contextvars
 import dataclasses
 import typing
 import json
@@ -113,7 +114,9 @@ class FilesystemArtifact(artifact_base.Artifact):
     def writeable_file_path(self, path: str) -> typing.Generator[str, None, None]:
         raise NotImplementedError
 
-    def ref_from_local_str(self, s: str, type: "types.Type") -> "FilesystemArtifactRef":
+    def ref_from_local_str(
+        self, s: str, type: typing.Optional["types.Type"] = None
+    ) -> "FilesystemArtifactRef":
         path, extra = ref_util.parse_local_ref_str(s)
         return self.RefClass(self, path=path, extra=extra, type=type)
 
@@ -201,6 +204,23 @@ class FilesystemArtifact(artifact_base.Artifact):
 
 FilesystemArtifactType.instance_classes = FilesystemArtifact
 
+_loading_artifact: contextvars.ContextVar[
+    typing.Optional[FilesystemArtifact]
+] = contextvars.ContextVar("_loading_artifact", default=None)
+
+
+@contextlib.contextmanager
+def loading_artifact(artifact: FilesystemArtifact):
+    token = _loading_artifact.set(artifact)
+    try:
+        yield _loading_artifact.get()
+    finally:
+        _loading_artifact.reset(token)
+
+
+def get_loading_artifact() -> typing.Optional[FilesystemArtifact]:
+    return _loading_artifact.get()
+
 
 class FilesystemArtifactRef(artifact_base.ArtifactRef):
     FileType: typing.ClassVar[typing.Type[types.Type]]
@@ -217,7 +237,6 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
     @property
     def _outer_type(self) -> types.Type:
-
         if self.path is None:
             return types.TypeRegistry.type_of(self.artifact)
 
@@ -340,9 +359,10 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         # since they break idempotency. When we figure that out, we may
         # be able to remove this.
         with tag_store.isolated_tagging_context():
-            return self._outer_type.load_instance(
-                self.artifact, self.path, extra=self.extra
-            )
+            with loading_artifact(self.artifact):
+                return self._outer_type.load_instance(
+                    self.artifact, self.path, extra=self.extra
+                )
 
     def local_ref_str(self) -> str:
         if self.path is None:

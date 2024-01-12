@@ -493,8 +493,8 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
             with run_context.current_run(run):
                 res = op_def.resolve_fn(**inputs)
         except BaseException as e:
-            client.fail_run(run, e)
             print("Error running ", op_def.name)
+            client.fail_run(run, e)
             raise
         if isinstance(res, box.BoxedNone):
             res = None
