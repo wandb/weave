@@ -23,7 +23,7 @@ import {URL_BROWSE3} from '../../../urls';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
-import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
+// import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
   baseContext,
   browse2Context,
@@ -63,6 +63,7 @@ import {
   fnNaiveBootstrapRuns,
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
+import {SideNav} from './Browse3/SideNav';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -244,9 +245,10 @@ const Browse3Mounted: FC<{
               display: 'flex',
               flexDirection: 'row',
             }}>
-            <RouteAwareBrowse3ProjectSideNav
+            <SideNav />
+            {/* <RouteAwareBrowse3ProjectSideNav
               navigateAwayFromProject={props.navigateAwayFromProject}
-            />
+            /> */}
             <Box
               component="main"
               sx={{
