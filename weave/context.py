@@ -58,6 +58,13 @@ def use_frontend_devmode():
     context_state.set_frontend_url("http://localhost:3000")
 
 
+def use_lazy_execution():
+    context_state._eager_mode.set(False)
+
+
+lazy_execution = context_state.lazy_execution
+
+
 def _make_default_client():
     if util.is_notebook():
         serv = context_state.get_server()

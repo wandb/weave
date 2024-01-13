@@ -174,7 +174,7 @@ def set_frontend_url(url: str):
 
 
 _eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "eager_mode", default=False
+    "eager_mode", default=True
 )
 
 

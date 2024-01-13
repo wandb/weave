@@ -1,5 +1,8 @@
 import random
 import weave
+
+# Weave package now defaults to eager mode, but lazy mode required for this example notebook for now.
+weave.use_lazy_execution()
 from weave.ecosystem import wandb
 
 weave.use_fixed_server_port()
