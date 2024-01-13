@@ -457,6 +457,8 @@ def to_json_with_refs(
         path = []
     if isinstance(wb_type, (types.Number, types.String, types.NoneType, types.Boolean)):
         return obj
+    elif isinstance(wb_type, types.UnknownType):
+        raise errors.WeaveTypeError(f"Can't serialize {obj}. Type is UnknownType.")
     elif isinstance(wb_type, types.TypedDict):
         if not isinstance(obj, dict):
             raise ValueError("Expected dict for TypedDict, got %s" % type(obj).__name__)
