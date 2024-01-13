@@ -4,6 +4,7 @@ from . import graph_client_local
 from . import graph_client_wandb_art_st
 from . import context_state
 from . import errors
+from . import autopatch
 
 
 class InitializedClient:
@@ -15,6 +16,7 @@ class InitializedClient:
         self.serverless_io_service_token = context_state._serverless_io_service.set(
             True
         )
+        autopatch.autopatch()
 
     def reset(self) -> None:
         context_state._graph_client.reset(self.graph_client_token)
