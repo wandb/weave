@@ -145,7 +145,13 @@ class ChatCompletions:
         return self._create(*args, **kwargs)
 
     def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
-        with span_context(self.monitor, self.context, "request", *args, **kwargs):
+        with span_context(
+            self.monitor,
+            self.context,
+            "openai.chat.completions.create",
+            *args,
+            **kwargs,
+        ):
             self._use_callbacks("before_send_request", *args, **kwargs)
 
             result = self._base_create(*args, **kwargs)
@@ -158,7 +164,13 @@ class ChatCompletions:
     def _streaming_create(
         self, *args: Any, **kwargs: Any
     ) -> Stream[ChatCompletionChunk]:
-        with span_context(self.monitor, self.context, "request", *args, **kwargs):
+        with span_context(
+            self.monitor,
+            self.context,
+            "openai.chat.completions.create",
+            *args,
+            **kwargs,
+        ):
             self._use_callbacks("before_send_request", *args, **kwargs)
 
             stream = self._base_create(*args, **kwargs)
