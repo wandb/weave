@@ -13,9 +13,9 @@ import {
   GridColumnGroupingModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
-import moment from 'moment';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {basicField} from './common/DataTable';
 import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
@@ -359,8 +359,12 @@ const ObjectVersionsTable: React.FC<{
     basicField('createdAt', 'Created', {
       width: 100,
       renderCell: params => {
-        // return moment(params.value as number).format('YYYY-MM-DD HH:mm:ss');
-        return moment(params.value as number).fromNow();
+        return (
+          <Timestamp
+            value={(params.value as number) / 1000}
+            format="relative"
+          />
+        );
       },
     }),
     // basicField('object', 'Object', {
