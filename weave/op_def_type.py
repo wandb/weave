@@ -304,7 +304,7 @@ def get_code_deps(
                     )
                 except (errors.WeaveTypeError, errors.WeaveSerializeError) as e:
                     warnings.append(
-                        f"Didn't serialize value of {var_name} needed by {fn}. Encountered: {e}"
+                        f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
                     )
                 else:
                     code_paragraph = (
@@ -398,10 +398,9 @@ class OpDefType(types.Type):
             code = result["code"]
             warnings = result["warnings"]
             if warnings:
-                message = (
-                    f"Did not fully serialize op {obj}. This op may not be reloadable, but calls to it will be versioned.\n"
-                    + "\n  ".join(warnings)
-                )
+                message = f"Partial serialization failure for op {obj}. This op may not be reloadable"
+                for warning in warnings:
+                    message += "\n  " + warning
                 if context_state.get_strict_op_saving():
                     raise errors.WeaveOpSerializeError(message)
                 else:
