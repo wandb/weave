@@ -575,8 +575,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self._validate_arrow_data()
 
     def _validate_weave_type(self) -> None:
-        # PR: Enabled validation for debugging in this PR. Should be turned back
-        # off for prod as I believe there are still some broken cases.
+        return
 
         # Validation disabled
         arr = self._arrow_data

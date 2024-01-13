@@ -157,7 +157,7 @@ def _get_history3(run: wdt.Run, columns=None):
     )
 
     # Make AWLs for each Parquet file
-    parquet_awls = []
+    parquet_awls: list[ArrowWeaveList] = []
     for table in processed_history_pa_tables:
         # For each table, include the subset of keys from flattend_object_type
         # that are present in the table.
