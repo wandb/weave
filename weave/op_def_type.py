@@ -214,11 +214,11 @@ def get_code_deps(
     - import any modules that are referenced within the function body or any referenced function bodies
 
     Current issues (to fix):
-    - only handles json serializable constants in function closures. We need to use Weave serialization
-      to save other values into the artifact and have a way of fetching them in the generated code
     - imported modules may be within the function's package, which doesn't work (any imported modules need
       to be present in the loading code)
     - doesn't serialize python requirements and other necessary system information
+    - type annotations are not well handled, and may cause errors
+    - refering to @weave.type() objects will cause errors
 
     Args:
         fn: The Python function to analyze.
@@ -386,8 +386,7 @@ class OpDefType(types.Type):
             with artifact.new_file(f"{name}.json") as f:
                 json.dump({"name": obj.name}, f)
         else:
-            # import_code = ["import typing\nimport weave\n"]
-
+            # Type annotations are not well handled at the moment.
             # Get import statements for any annotations
             # code += (
             #     "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
@@ -408,16 +407,8 @@ class OpDefType(types.Type):
                 else:
                     print(message)
 
-            # Note the above two stanzas are in the order they are to ensure
-            # this case works.
-            # from PIL import Image
-            # def sin_image(f: int) -> Image.Image:
-            #     pass
-            # The first stanza will create "from PIL.Image import Image"
-            # and the second will create "from PIL import Image". In this case
-            # we want the latter.
-            # This is a major hack to get a notebook working.
-
+            # This is hacky handling of TypedDict annotations. Fixes
+            # 2_images_gen notebook test.
             # Create TypedDict types for referenced TypedDicts
             resolve_annotations = obj.raw_resolve_fn.__annotations__
             for k, type_ in resolve_annotations.items():
