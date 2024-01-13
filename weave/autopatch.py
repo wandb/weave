@@ -5,9 +5,9 @@ check if libraries are installed and imported and patch in the case that they ar
 """
 
 
-def autopatch_openai():
+def autopatch_openai() -> None:
     try:
-        import openai
+        import openai  # type: ignore
     except ImportError:
         pass
     else:
@@ -21,6 +21,6 @@ def autopatch_openai():
         patch()
 
 
-def autopatch():
+def autopatch() -> None:
     print("AUTOPATCHING")
     autopatch_openai()
