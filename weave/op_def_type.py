@@ -198,9 +198,15 @@ class RefJSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
+class GetCodeDepsResult(typing.TypedDict):
+    import_code: list[str]
+    code: list[str]
+    warnings: list[str]
+
+
 def get_code_deps(
     fn: typing.Callable, artifact: artifact_fs.FilesystemArtifact
-) -> typing.Tuple[str, list[str]]:
+) -> GetCodeDepsResult:
     """Given a python function, return source code that contains the dependencies of that function.
 
     This will:
@@ -208,11 +214,11 @@ def get_code_deps(
     - import any modules that are referenced within the function body or any referenced function bodies
 
     Current issues (to fix):
-    - only handles json serializable constants in function closures. We need to use Weave serialization
-      to save other values into the artifact and have a way of fetching them in the generated code
     - imported modules may be within the function's package, which doesn't work (any imported modules need
       to be present in the loading code)
     - doesn't serialize python requirements and other necessary system information
+    - type annotations are not well handled, and may cause errors
+    - refering to @weave.type() objects will cause errors
 
     Args:
         fn: The Python function to analyze.
@@ -231,13 +237,14 @@ def get_code_deps(
         parsed = ast.parse(source)
     except SyntaxError:
         warnings.append(f"Could not parse source of function {fn}.")
-        return "", warnings
+        return {"import_code": [], "code": [], "warnings": warnings}
 
     visitor = ExternalVariableFinder()
     visitor.visit(parsed)
     external_vars = list(visitor.external_vars)
 
-    import_code = ""
+    import_code = []
+    code = []
     for var_name in external_vars:
         var_value = resolve_var(fn, var_name)
         # var_value = fn.__globals__.get(var_name)
@@ -249,26 +256,36 @@ def get_code_deps(
                 f'Could not resolve var "{var_name}" declared in body of fn {fn}. This op will not be reloadable, but calls to it will be tracked'
             )
         elif isinstance(var_value, py_types.ModuleType):
-            import_code += f"import {var_value.__name__} as {var_name}\n"
+            import_line = f"import {var_value.__name__}"
+            if var_value.__name__ != var_name:
+                import_line += f" as {var_name}"
+            import_code.append(import_line)
         elif isinstance(var_value, py_types.FunctionType):
             if var_value.__module__ == fn.__module__:
                 # For now, if the function is in another module.
                 # we just import it. This is ok for libraries, but not
                 # if the user has functions declared within their
                 # package but outside of the op module.
-                fn_code_deps, fn_warnings = get_code_deps(var_value, artifact)
+                result = get_code_deps(var_value, artifact)
+                fn_warnings = result["warnings"]
+                fn_import_code = result["import_code"]
+                fn_code = result["code"]
+
+                import_code += fn_import_code
+
+                code += fn_code
+                code.append(inspect.getsource(var_value))
+
                 warnings += fn_warnings
-                import_code += fn_code_deps
-                import_code += inspect.getsource(var_value)
             else:
                 if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
                     pass
-                import_code += (
-                    f"from {var_value.__module__} import {var_value.__name__}"
-                )
+
+                import_line = f"from {var_value.__module__} import {var_value.__name__}"
                 if var_value.__name__ != var_name:
-                    import_code += f"as {var_name}"
-                import_code += "\n"
+                    import_line += f"as {var_name}"
+
+                import_code.append(import_line)
 
         else:
             if (
@@ -276,12 +293,10 @@ def get_code_deps(
                 and hasattr(var_value, "__module__")
                 and var_value.__module__ != fn.__module__
             ):
-                import_code += (
-                    f"from {var_value.__module__} import {var_value.__name__}"
-                )
+                import_line = f"from {var_value.__module__} import {var_value.__name__}"
                 if var_value.__name__ != var_name:
-                    import_code += f"as {var_name}"
-                import_code += "\n"
+                    import_line += f"as {var_name}"
+                import_code.append(import_line)
             else:
                 try:
                     json_val = storage.to_json_with_refs(
@@ -292,18 +307,19 @@ def get_code_deps(
                         f"Didn't serialize value of {var_name} needed by {fn}. Encountered: {e}"
                     )
                 else:
-                    import_code += (
+                    code_paragraph = (
                         f"{var_name} = "
                         + json.dumps(json_val, cls=RefJSONEncoder, indent=4)
                         + "\n"
                     )
-                    import_code = import_code.replace(
+                    code_paragraph = code_paragraph.replace(
                         f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', ""
                     )
-                    import_code = import_code.replace(
+                    code_paragraph = code_paragraph.replace(
                         f'{RefJSONEncoder.SPECIAL_REF_TOKEN}"', ""
                     )
-    return import_code, warnings
+                    code.append(code_paragraph)
+    return {"import_code": import_code, "code": code, "warnings": warnings}
 
 
 def get_import_statements_for_annotations(func) -> list[str]:
@@ -348,6 +364,16 @@ def find_last_weave_op_function(source_code: str):
     return last_function
 
 
+def dedupe_list(original_list: list[str]) -> list[str]:
+    seen = set()
+    deduped = []
+    for x in original_list:
+        if x not in seen:
+            deduped.append(x)
+            seen.add(x)
+    return deduped
+
+
 class OpDefType(types.Type):
     instance_class = op_def.OpDef
     instance_classes = op_def.OpDef
@@ -360,15 +386,17 @@ class OpDefType(types.Type):
             with artifact.new_file(f"{name}.json") as f:
                 json.dump({"name": obj.name}, f)
         else:
-            code = "import typing\nimport weave\n"
-
+            # Type annotations are not well handled at the moment.
             # Get import statements for any annotations
-            code += (
-                "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
-                + "\n\n"
-            )
+            # code += (
+            #     "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
+            #     + "\n\n"
+            # )
 
-            code_deps, warnings = get_code_deps(obj.raw_resolve_fn, artifact)
+            result = get_code_deps(obj.raw_resolve_fn, artifact)
+            import_code = result["import_code"]
+            code = result["code"]
+            warnings = result["warnings"]
             if warnings:
                 message = (
                     f"Did not fully serialize op {obj}. This op may not be reloadable, but calls to it will be versioned.\n"
@@ -379,28 +407,26 @@ class OpDefType(types.Type):
                 else:
                     print(message)
 
-            code += code_deps
-
-            # Note the above two stanzas are in the order they are to ensure
-            # this case works.
-            # from PIL import Image
-            # def sin_image(f: int) -> Image.Image:
-            #     pass
-            # The first stanza will create "from PIL.Image import Image"
-            # and the second will create "from PIL import Image". In this case
-            # we want the latter.
-            # This is a major hack to get a notebook working.
-
+            # This is hacky handling of TypedDict annotations. Fixes
+            # 2_images_gen notebook test.
             # Create TypedDict types for referenced TypedDicts
             resolve_annotations = obj.raw_resolve_fn.__annotations__
             for k, type_ in resolve_annotations.items():
                 gen_type_code = generate_referenced_type_code(type_)
                 if gen_type_code is not None:
-                    code += gen_type_code
+                    code.append(gen_type_code)
+                    if "typing" in gen_type_code:
+                        import_code.insert(0, "import typing")
 
-            code += textwrap.dedent(inspect.getsource(obj.raw_resolve_fn))
+            code.append(textwrap.dedent(inspect.getsource(obj.raw_resolve_fn)))
             with artifact.new_file(f"{name}.py") as f:
-                f.write(code)
+                import_block = "\n".join(import_code)
+                import_lines = ["import weave"] + import_block.split("\n")
+                import_lines = dedupe_list(import_lines)
+                import_lines = [l for l in import_lines if "weave.api" not in l]
+                import_block = "\n".join(import_lines)
+                code_block = "\n".join(code)
+                f.write(f"{import_block}\n\n{code_block}")
 
     def load_instance(cls, artifact, name, extra=None):
         if environment.wandb_production():
