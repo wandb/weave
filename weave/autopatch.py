@@ -19,8 +19,8 @@ def autopatch_openai() -> None:
         from weave.monitoring.openai import patch
 
         patch()
+        print("Automatically tracking openai calls")
 
 
 def autopatch() -> None:
-    print("AUTOPATCHING")
     autopatch_openai()
