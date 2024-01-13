@@ -219,6 +219,11 @@ class _StreamTableSync:
         if "timestamp" not in row_copy:
             row_copy["timestamp"] = datetime.datetime.now()
         payload = row_to_weave(row_copy, self._artifact)
+        # We just flatten everything at this point, which isn't really right.
+        # We should include weave objects in the flattening algorithm, and we also
+        # maybe don't really need to include the _type _val fields for custom objects.
+        # Those will always be weave.ref and we can get the type from any ref.
+        payload = dict(flatten_dict(payload))
         self._lite_run.log(payload)
 
     def finish(self) -> None:
@@ -405,3 +410,40 @@ def leaf_to_weave(leaf: typing.Any, artifact: WandbLiveRunFiles) -> typing.Any:
             "_weave_type": w_type,
             "_val": res["_val"],
         }
+
+
+def flatten_dict(d, parent_key="", sep="."):
+    """Flattens dict d
+
+    Dict keys are flattened with "." separate. Array indexes are flattened with
+    "[i]" index notation. A flattened dict will also have _keys, ex if there is
+    a dict at a.b, we'll have a.b._keys. A flattend list will have _len.
+    """
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+
+        if isinstance(v, dict):
+            if v:
+                items.extend(flatten_dict(v, new_key, sep=sep))
+                dict_keys = list(v.keys())
+                items.append((f"{new_key}._keys", dict_keys))
+            else:
+                items.append((new_key, {}))
+                items.append((f"{new_key}._keys", []))
+
+        elif isinstance(v, list):
+            if v:
+                for i, item in enumerate(v):
+                    if isinstance(item, dict):
+                        items.extend(flatten_dict(item, f"{new_key}[{i}]", sep=sep))
+                    else:
+                        items.append((f"{new_key}[{i}]", item))
+                items.append((f"{new_key}._len", len(v)))
+            else:
+                items.append((new_key, []))
+                items.append((f"{new_key}._len", 0))
+
+        else:
+            items.append((new_key, v))
+    return items
