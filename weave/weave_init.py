@@ -16,7 +16,6 @@ class InitializedClient:
         self.serverless_io_service_token = context_state._serverless_io_service.set(
             True
         )
-        autopatch.autopatch()
 
     def reset(self) -> None:
         context_state._graph_client.reset(self.graph_client_token)
@@ -50,7 +49,14 @@ def init_wandb(project_name: str) -> InitializedClient:
         entity_name, project_name
     )
 
-    return InitializedClient(client)
+    init_client = InitializedClient(client)
+
+    # autopatching is only supporte for the wandb client, because OpenAI calls are not
+    # logged in local mode currently. When that's fixed, this autopatch call can be
+    # moved to InitializedClient.__init__
+    autopatch.autopatch()
+
+    return init_client
 
 
 def init_local() -> InitializedClient:
