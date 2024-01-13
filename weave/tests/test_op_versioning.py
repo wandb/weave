@@ -5,6 +5,7 @@ from .. import artifact_fs
 from .. import op_def
 from .. import derive_op
 import numpy as np
+import typing
 
 
 def test_op_versioning():
@@ -409,3 +410,41 @@ def test_op_return_weave_obj(strict_op_saving):
         print("SAVED_CODE")
         print(saved_code)
         breakpoint()
+
+
+EXPECTED_TYPEDICT_ANNO_CODE = """import weave
+import typing
+
+class SomeDict(typing.TypedDict):
+    val: int
+
+@weave.op()
+def some_d(v: int) -> SomeDict:
+    return SomeDict(val=v)
+"""
+
+
+def test_op_return_typeddict_annotation():
+    with weave.local_client():
+
+        class SomeDict(typing.TypedDict):
+            val: int
+
+        @weave.op()
+        def some_d(v: int) -> SomeDict:
+            return SomeDict(val=v)
+
+        assert some_d(1) == {"val": 1}
+
+        ref = weave.obj_ref(some_d)
+        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+
+        with ref.artifact.open("obj.py") as f:
+            saved_code = f.read()
+        print("SAVED_CODE")
+        print(saved_code)
+
+        assert saved_code == EXPECTED_TYPEDICT_ANNO_CODE
+
+        op2 = weave.ref(str(ref)).get()
+        assert op2(2) == {"val": 2}

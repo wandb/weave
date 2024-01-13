@@ -419,11 +419,13 @@ class OpDefType(types.Type):
             # This is a major hack to get a notebook working.
 
             # Create TypedDict types for referenced TypedDicts
-            # resolve_annotations = obj.raw_resolve_fn.__annotations__
-            # for k, type_ in resolve_annotations.items():
-            #     gen_type_code = generate_referenced_type_code(type_)
-            #     if gen_type_code is not None:
-            #         code += gen_type_code
+            resolve_annotations = obj.raw_resolve_fn.__annotations__
+            for k, type_ in resolve_annotations.items():
+                gen_type_code = generate_referenced_type_code(type_)
+                if gen_type_code is not None:
+                    code.append(gen_type_code)
+                    if "typing" in gen_type_code:
+                        import_code.insert(0, "import typing")
 
             code.append(textwrap.dedent(inspect.getsource(obj.raw_resolve_fn)))
             with artifact.new_file(f"{name}.py") as f:
