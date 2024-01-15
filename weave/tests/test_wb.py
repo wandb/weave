@@ -390,7 +390,7 @@ def test_map_gql_op(fake_wandb):
     assert weave.use(node) == "test_res_1fwmcd3q:v0"
 
 
-def test_legacy_run_file_table_format(fake_wandb):
+def test_legacy_run_file_table_format(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
@@ -427,7 +427,7 @@ def test_mapped_table_empty(fake_wandb):
     assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
-def test_mapped_table_tags(fake_wandb):
+def test_mapped_table_tags(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(table_mock1)
     cell_node = (
         ops.project("stacey", "mendeleev")
@@ -622,7 +622,7 @@ def test_domain_gql_fragments(fake_wandb):
     assert weave.use(node) == "amber-glade-100"
 
 
-def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb):
+def test_domain_gql_through_dicts_with_fn_nodes(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(lambda q, ndx: workspace_response())
     project_node = ops.project("stacey", "mendeleev")
     project_name_node = project_node.name()
@@ -895,7 +895,7 @@ def test_loading_artifact_browser_request_2(fake_wandb):
     assert weave.use(mem_detail_node) != None
 
 
-def test_loading_artifact_browser_request_3(fake_wandb):
+def test_loading_artifact_browser_request_3(fake_wandb, cache_mode_minimal):
     ac_node = ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q")
     mem_node = ac_node.membershipForAlias("v0")
     # Leaf 5: Get the specific artifact version details
@@ -1571,7 +1571,7 @@ def test_arrow_groupby_external_tag(fake_wandb):
     assert run_names_res == "amber-glade-100"
 
 
-def test_join_all_tables(fake_wandb):
+def test_join_all_tables(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(table_mock_filtered)
     joined_row = (
         ops.project("stacey", "mendeleev")
