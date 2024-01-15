@@ -158,13 +158,6 @@ def error_handler() -> Generator[None, None, None]:
         print(f"problem with callback: {e}")
 
 
-def match_signature(func: Callable, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+def bind_params(func: Callable, *args: Any, **kwargs: Any) -> Dict[str, Any]:
     sig = inspect.signature(func)
-    params = sig.parameters
-    param_names = list(params.keys())
-
-    # Combine args with their respective parameter names
-    kwargs_from_args = dict(zip(param_names, args))
-
-    # Override with explicit kwargs and add any missing defaults
-    return {**kwargs_from_args, **kwargs}
+    return sig.bind_partial(*args, **kwargs).arguments
