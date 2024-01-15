@@ -66,6 +66,24 @@ class BoxedStr(str):
 class BoxedDict(dict):
     _id: typing.Optional[int] = None
 
+    def _lookup_path(self, path: typing.List[str]):
+        res = self[path[0]]
+        remaining_path = path[1:]
+        if remaining_path:
+            return res._lookup_path(remaining_path)
+        return res
+
+    def __getitem__(self, __key: typing.Any) -> typing.Any:
+        from . import ref_base
+
+        val = super().__getitem__(__key)
+        self_ref = ref_base.get_ref(self)
+        if self_ref is not None:
+            val = box(val)
+            sub_ref = self_ref.with_extra(None, val, [__key])
+            ref_base._put_ref(val, sub_ref)
+        return val
+
 
 class BoxedList(list):
     pass

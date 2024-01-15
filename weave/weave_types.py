@@ -1772,6 +1772,21 @@ def union(*members: Type) -> Type:
     return UnionType(*final_members)
 
 
+def unwrap_type(t: Type) -> Type:
+    """Removes any transparent types from the type."""
+    if isinstance(t, RefType):
+        return t.object_type
+    # TODO: TaggedValue
+    return t
+
+
+def simple_type(t: Type) -> Type:
+    """Type without nullable and transparent types"""
+    t = unwrap_type(t)
+    _, non_none_t = split_none(t)
+    return non_none_t
+
+
 def is_list_like(t: Type) -> bool:
     return List().assign_type(non_none(t))
 

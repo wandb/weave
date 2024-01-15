@@ -70,9 +70,21 @@ class Ref:
             return None
             raise errors.WeaveArtifactVersionNotFound
 
-        obj = self._get()
+        outer_obj = self._get()
 
-        obj = box.box(obj)
+        outer_obj = box.box(outer_obj)
+
+        if self.extra is None:
+            obj = outer_obj
+        else:
+            ref_without_extra = self.without_extra(None, outer_obj)
+            _put_ref(outer_obj, ref_without_extra)
+            try:
+                obj = outer_obj._lookup_path(self.extra)  # type: ignore
+            except AttributeError:
+                raise errors.WeaveInternalError(
+                    f"Ref has extra {self.extra} but object of type {type(outer_obj)} does not support _lookup_path"
+                )
 
         # Don't put a ref if the object is tagged, it leads to failures in a couple
         # of the test_arrow.py tests. I don't have the exact rationale, but it's something
@@ -132,6 +144,16 @@ class Ref:
         return self.obj
 
     def _get(self) -> typing.Any:
+        raise NotImplementedError
+
+    def without_extra(
+        self, new_type: typing.Optional[types.Type], obj: typing.Any
+    ) -> "Ref":
+        raise NotImplementedError
+
+    def with_extra(
+        self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
+    ) -> "Ref":
         raise NotImplementedError
 
     def __str__(self) -> str:

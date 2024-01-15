@@ -20,3 +20,4 @@ from .anyscale import *
 from .huggingface import *
 
 from .faiss import *
+from . import evaluate2

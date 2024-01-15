@@ -362,9 +362,7 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         # be able to remove this.
         with tag_store.isolated_tagging_context():
             with loading_artifact(self.artifact):
-                return self._outer_type.load_instance(
-                    self.artifact, self.path, extra=self.extra
-                )
+                return self._outer_type.load_instance(self.artifact, self.path)
 
     def local_ref_str(self) -> str:
         if self.path is None:
