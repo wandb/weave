@@ -831,6 +831,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
         return cls(
             WandbArtifact(uri.name, uri=uri),
             path=uri.path,
+            extra=uri.extra,
         )
 
     @property
@@ -987,6 +988,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
     # wandb-logged-artifact://afdsjaksdjflkasjdf12341234hv12h3v4k12j3hv41kh4v1423k14v1k2j3hv1k2j3h4v1k23h4v:[version|latest]/path
     #  scheme                                 name                                                              version      path
     path: typing.Optional[str] = None
+    extra: typing.Optional[list[str]] = None
 
     # private attrs
 

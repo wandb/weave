@@ -47,8 +47,10 @@ class ArtifactRef(ref_base.Ref):
         self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
     ) -> "ArtifactRef":
         new_extra = self.extra
-        if new_extra is None:
+        if self.extra is None:
             new_extra = []
+        else:
+            new_extra = self.extra.copy()
         new_extra += extra
         return self.__class__(
             artifact=self.artifact,

@@ -32,6 +32,17 @@ def test_evaluate_basic():
         model = EvalModel()
         result = asyncio.run(evaluation.evaluate(model))
 
+        example_to_model_input0_run = evaluation.example_to_model_input.runs()[0]
+        example_to_model_input0_run_example = example_to_model_input0_run.inputs[
+            "example"
+        ]
+        assert isinstance(example_to_model_input0_run_example, ref_base.Ref)
+        assert example_to_model_input0_run_example.extra == ["0"]
+        assert example_to_model_input0_run_example.get() == {
+            "input": "1 + 2",
+            "output": "3",
+        }
+
         predict0_run = EvalModel.predict.runs()[0]
         predict0_run_input = predict0_run.inputs["input"]
         assert isinstance(predict0_run_input, ref_base.Ref)

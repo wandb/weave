@@ -1,6 +1,5 @@
 from .. import context_state as _context_state
 
-_context_state._eager_mode.set(True)
 from .. import logs
 
 # If there is no WEAVE_LOG_LEVEL, this will set to ERROR

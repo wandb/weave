@@ -99,10 +99,7 @@ class Evaluation:
         summary = {}
         for scorer in self.scores:
             scorer_name = scorer.name
-            try:
-                scorer_scores = eval_table.column("scores").column(scorer_name)
-            except:
-                breakpoint()
+            scorer_scores = eval_table.column("scores").column(scorer_name)
             summary[scorer_name] = auto_summarize(scorer_scores)
         return summary
 

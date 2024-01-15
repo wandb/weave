@@ -286,9 +286,6 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
                 # TODO: fix
                 self._type = ot
             else:
-                print(
-                    "SELF TYPE",
-                )
                 raise errors.WeaveInternalError(
                     f"Cannot get type of {self} with extra {self.extra}"
                 )
