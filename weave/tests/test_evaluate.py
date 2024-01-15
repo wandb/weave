@@ -1,12 +1,13 @@
 import asyncio
 import pytest
 import weave
-from weave import weaveflow
 from weave import ref_base
 
 
 def test_evaluate_basic():
     with weave.local_client():
+        from weave import weaveflow
+
         dataset = weaveflow.Dataset(
             [{"input": "1 + 2", "output": "3"}, {"input": "2**4", "output": "16"}]
         )

@@ -31,7 +31,6 @@ def auto_summarize(data: weave.WeaveList) -> Optional[dict]:
             return None
         # Just avg and none_fraction for now. The others make the UI
         # too noisy. And all of these can be derived.
-        breakpoint()
         return {
             # "min": float(np.min(valid_data)),
             # "p25": float(np.percentile(valid_data, 25)),
