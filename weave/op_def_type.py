@@ -344,7 +344,7 @@ def find_last_weave_op_function(source_code: str):
     last_function = None
 
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, ast.FunctionDef) or isinstance(node, AsyncFunctionDef):
             for decorator in node.decorator_list:
                 # Check if the decorator is 'weave.op'
                 if isinstance(decorator, ast.Name) and decorator.id == "weave.op":
@@ -468,7 +468,7 @@ class OpDefType(types.Type):
             )
 
         sys.path.insert(0, os.path.abspath(module_dir))
-        with context_state.loading_op_location(artifact.uri_obj.with_path(name)):
+        with context_state.no_op_register():
             try:
                 mod = __import__(import_name, fromlist=[module_dir])
             except Exception as e:
@@ -494,7 +494,11 @@ class OpDefType(types.Type):
             raise errors.WeaveInternalError(
                 f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=} "
             )
-        od = getattr(mod, last_op_function.name)
+        od: op_def.OpDef = getattr(mod, last_op_function.name)
+
+        location = artifact.uri_obj.with_path(name)
+        registry_mem.memory_registry.register_op(od, location=location)
+
         return od
 
 

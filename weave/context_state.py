@@ -55,7 +55,7 @@ if patch_context:
 
 # Set to the op uri if we're in the process of loading
 # an op from an artifact.
-_loading_op_location: contextvars.ContextVar[
+_no_op_register: contextvars.ContextVar[
     typing.Optional["uris.WeaveURI"]
 ] = contextvars.ContextVar("loading_op_location", default=None)
 
@@ -77,16 +77,16 @@ def loading_builtins(builtins):
 
 
 @contextlib.contextmanager
-def loading_op_location(location):
-    token = _loading_op_location.set(location)
+def no_op_register():
+    token = _no_op_register.set(False)
     try:
-        yield _loading_op_location.get()
+        yield _no_op_register.get()
     finally:
-        _loading_op_location.reset(token)
+        _no_op_register.reset(token)
 
 
-def get_loading_op_location():
-    return _loading_op_location.get()
+def get_no_op_register():
+    return _no_op_register.get()
 
 
 def set_loading_built_ins(val=True) -> contextvars.Token:

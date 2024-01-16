@@ -46,13 +46,12 @@ class Registry:
     def updated_at(self) -> float:
         return self._updated_at
 
-    def register_op(self, op: op_def.OpDef):
+    def register_op(self, op: op_def.OpDef, location=None):
+        if context_state.get_no_op_register():
+            return
         self.mark_updated()
-        # Always save OpDefs any time they are declared
-        location = context_state.get_loading_op_location()
-        is_loading = location is not None
         # do not save built-in ops today
-        should_save = not is_loading and not op.is_builtin
+        should_save = not location and not op.is_builtin
         if should_save:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=op.name + ":latest")
