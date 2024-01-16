@@ -500,6 +500,7 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
             raise
         if isinstance(res, box.BoxedNone):
             res = None
+
         # Don't use asyncio.iscoroutine. It returns True for non-async
         # generators sometimes. Use inspect.iscoroutine instead.
         if inspect.iscoroutine(res):
@@ -507,12 +508,13 @@ def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
             async def _run_async():
                 try:
                     awaited_res = res
-                    with run_context.current_run(run):
-                        # Need to do this in a loop for some reason to handle
-                        # async streaming openai. Like we get two co-routines
-                        # in a row.
-                        while inspect.iscoroutine(awaited_res):
-                            awaited_res = await awaited_res
+                    with object_context.object_context():
+                        with run_context.current_run(run):
+                            # Need to do this in a loop for some reason to handle
+                            # async streaming openai. Like we get two co-routines
+                            # in a row.
+                            while inspect.iscoroutine(awaited_res):
+                                awaited_res = await awaited_res
                     output, output_refs = auto_publish(awaited_res)
                     # TODO: boxing enables full ref-tracking of run outputs
                     # to other run inputs, but its not working yet.
