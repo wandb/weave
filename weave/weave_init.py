@@ -4,6 +4,7 @@ from . import graph_client_local
 from . import graph_client_wandb_art_st
 from . import context_state
 from . import errors
+from . import autopatch
 
 
 class InitializedClient:
@@ -48,7 +49,14 @@ def init_wandb(project_name: str) -> InitializedClient:
         entity_name, project_name
     )
 
-    return InitializedClient(client)
+    init_client = InitializedClient(client)
+
+    # autopatching is only supporte for the wandb client, because OpenAI calls are not
+    # logged in local mode currently. When that's fixed, this autopatch call can be
+    # moved to InitializedClient.__init__
+    autopatch.autopatch()
+
+    return init_client
 
 
 def init_local() -> InitializedClient:

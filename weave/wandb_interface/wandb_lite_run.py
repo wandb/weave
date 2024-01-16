@@ -227,7 +227,7 @@ class InMemoryLazyLiteRun:
                 description=artifact.description,
                 aliases=["latest"] + additional_aliases,
                 use_after_commit=False,
-            )
+            )  # type: ignore
             # wait for the artifact to be committed before returning the result
             if future is not None:
                 future.result()

@@ -169,3 +169,7 @@ class WeaveMergeArtifactSpecError(WeaveBaseError):
 
 class WeaveOpSerializeError(WeaveBaseError):
     pass
+
+
+class WeaveInitError(WeaveBaseError):
+    pass

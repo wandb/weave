@@ -9,10 +9,10 @@ import {
 import {parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
-import moment from 'moment';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {useParams} from 'react-router-dom';
 
+import {Timestamp} from '../../../Timestamp';
 import {CallLink, opVersionText} from '../Browse3/pages/common/Links';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {flattenObject} from './browse2Util';
@@ -251,10 +251,12 @@ export const RunsTable: FC<{
         minWidth: 100,
         maxWidth: 100,
         renderCell: cellParams => {
-          // return moment(cellParams.row.timestampMs).format(
-          //   'YYYY-MM-DD HH:mm:ss'
-          // );
-          return moment(cellParams.row.timestampMs).fromNow();
+          return (
+            <Timestamp
+              value={cellParams.row.timestampMs / 1000}
+              format="relative"
+            />
+          );
         },
       },
 

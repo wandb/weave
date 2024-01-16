@@ -6,6 +6,7 @@ import pathlib
 import functools
 import contextvars
 import contextlib
+import json
 
 from . import errors
 from . import ref_base
@@ -19,6 +20,7 @@ from . import mappers_python
 from . import box
 from . import errors
 from . import graph
+from . import graph_client_context
 from . import timestamp
 
 Ref = ref_base.Ref
@@ -431,6 +433,63 @@ def from_python(obj: dict, wb_type: typing.Optional[types.Type] = None) -> typin
     return res
 
 
+def to_json_with_refs(
+    obj: typing.Any,
+    artifact: artifact_base.Artifact,
+    path: typing.Optional[list[str]] = None,
+    wb_type: typing.Optional[types.Type] = None,
+):
+    """Convert an object to a JSON-serializable object, with refs to any custom objects.
+
+    Contains business logic:
+      - OpDef are always saved as top-level artifacts.
+      - All other custom objects are saved as refs within the provided artifact
+        if there is not are a ref available for them.
+    """
+
+    # This is newer than to_python, save and publish above, and doesn't use the "mapper"
+    # pattern, which is overkill. Much better to just write a simple function like this.
+    from . import op_def
+
+    if wb_type is None:
+        wb_type = types.TypeRegistry.type_of(obj)
+    if path is None:
+        path = []
+    if isinstance(wb_type, (types.Number, types.String, types.NoneType, types.Boolean)):
+        return obj
+    elif isinstance(wb_type, types.UnknownType):
+        raise errors.WeaveTypeError(f"Can't serialize {obj}. Type is UnknownType.")
+    elif isinstance(wb_type, types.TypedDict):
+        if not isinstance(obj, dict):
+            raise ValueError("Expected dict for TypedDict, got %s" % type(obj).__name__)
+        return {
+            k: to_json_with_refs(
+                v, artifact, path + [k], wb_type=wb_type.property_types[k]
+            )
+            for (k, v) in obj.items()
+        }
+    elif isinstance(wb_type, types.List):
+        if not isinstance(obj, list):
+            raise ValueError("Expected list for List, got %s" % type(obj).__name__)
+        return [
+            to_json_with_refs(v, artifact, path + [str(i)], wb_type=wb_type.object_type)
+            for i, v in enumerate(obj)
+        ]
+    elif isinstance(obj, op_def.OpDef):
+        try:
+            gc = graph_client_context.require_graph_client()
+        except errors.WeaveInitError:
+            raise errors.WeaveSerializeError(
+                "Can't serialize OpDef with a client initialization"
+            )
+        return gc.save_object(obj, obj.name, "latest")
+    else:
+        res = artifact.set("/".join(path), wb_type, obj)
+        if res.artifact == artifact:
+            res.serialize_as_path_ref = True
+        return res
+
+
 def make_js_serializer():
     artifact = artifact_mem.MemArtifact()
     return functools.partial(to_weavejs, artifact=artifact)
@@ -468,3 +527,18 @@ def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
         wb_type, artifact, mapper_options={"use_stable_refs": False}
     )
     return mapper.apply(obj)
+
+
+def artifact_path_ref(artifact_path: str) -> artifact_base.ArtifactRef:
+    """Return a reference to an object in the current artifact based on its path.
+
+    This is only callable during artifact loading, and should not generally be
+    called by user code.
+    """
+    loading_artifact = artifact_fs.get_loading_artifact()
+    if loading_artifact is None:
+        raise errors.WeaveSerializeError(
+            "artifact_path_ref can only be used while loading an artifact."
+        )
+
+    return loading_artifact.ref_from_local_str(artifact_path)

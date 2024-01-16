@@ -14,7 +14,7 @@ from weave.monitoring import init_monitor
 from weave.monitoring.openai import util
 from weave.monitoring.openai.models import *
 from weave.monitoring.openai.models import Context
-from weave.monitoring.openai.openai import Callback, ReassembleStream, patch, unpatch
+from weave.monitoring.openai.openai import patch, unpatch
 from weave.monitoring.openai.util import Context
 from weave.wandb_interface.wandb_stream_table import StreamTable
 
@@ -294,7 +294,6 @@ def reassembled_chat_completion_message():
         created=1700686161,
         model="gpt-3.5-turbo-0613",
         object="chat.completion",
-        system_fingerprint=None,
         usage=CompletionUsage(completion_tokens=19, prompt_tokens=10, total_tokens=29),
     )
 
@@ -339,21 +338,6 @@ def make_stream_table(*args, **kwargs):
     return StreamTable(*args, **kwargs, _disable_async_file_stream=True)
 
 
-class TestingCallback(Callback):
-    def before_send_request(self, context: Context, *args, **kwargs):
-        context.testing = []
-        context.testing.append("before_send_request")
-
-    def before_end(self, context: Context, *args, **kwargs):
-        context.testing.append("before_end")
-
-    def before_yield_chunk(self, context: Context, *args, **kwargs):
-        context.testing.append("before_yield_chunk")
-
-    def after_yield_chunk(self, context: Context, *args, **kwargs):
-        context.testing.append("after_yield_chunk")
-
-
 ##########
 
 
@@ -370,57 +354,34 @@ def test_reconstruct_completion(
     )
 
 
-def test_callback_reassemble_stream(
-    mocked_streaming_create, teardown, reassembled_chat_completion_message
-):
-    cb = ReassembleStream()
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-        mocked_streaming_create, callbacks=[cb]
-    )
-    stream = chat_completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "Tell me a joke"}],
-        stream=True,
-    )
-    for x in stream:
-        ...
-
-    assert chat_completions.context.outputs == reassembled_chat_completion_message
-
-
-def test_log_to_span(
+def test_log_to_span_basic(
     user_by_api_key_in_env, mocked_create, teardown, reassembled_chat_completion_message
 ):
-    stream_name = "monitoring"
-    project = "openai"
-    entity = user_by_api_key_in_env.username
+    with weave.local_client() as client:
+        stream_name = "monitoring"
+        project = "openai"
+        entity = user_by_api_key_in_env.username
 
-    streamtable = make_stream_table(
-        stream_name, project_name=project, entity_name=entity
-    )
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-        mocked_create, streamtable=streamtable
-    )
-    create_input = dict(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "Tell me a joke"}],
-    )
-    result = chat_completions.create(**create_input)
-    streamtable.finish()
+        streamtable = make_stream_table(
+            stream_name, project_name=project, entity_name=entity
+        )
+        chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_create)
+        create_input = dict(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": "Tell me a joke"}],
+        )
+        result = chat_completions.create(**create_input)
+        streamtable.finish()
 
-    hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, project)
-        .run(stream_name)
-        .history3()
-    )
+        run = client.runs()[0]
+        inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
+        outputs = {k: v for k, v in run.output.get().items() if not k.startswith("_")}
 
-    inputs_st = weave.use(hist_node["inputs"]).to_pylist_tagged()[0]
-    inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
-    assert inputs_st == inputs_expected
+        inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
+        assert inputs == inputs_expected
 
-    outputs_st = weave.use(hist_node["output"]).to_pylist_tagged()[0]
-    outputs_expected = reassembled_chat_completion_message.dict()
-    assert outputs_st == outputs_expected
+        outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)
+        assert outputs == outputs_expected
 
 
 def test_log_to_span_streaming(
@@ -429,86 +390,28 @@ def test_log_to_span_streaming(
     teardown,
     reassembled_chat_completion_message,
 ):
-    stream_name = "monitoring"
-    project = "openai"
-    entity = user_by_api_key_in_env.username
+    with weave.local_client() as client:
+        chat_completions = weave.monitoring.openai.openai.ChatCompletions(
+            mocked_streaming_create
+        )
+        create_input = dict(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": "Tell me a joke"}],
+            stream=True,
+        )
+        stream = chat_completions.create(**create_input)
+        for x in stream:
+            ...
 
-    streamtable = make_stream_table(
-        stream_name, project_name=project, entity_name=entity
-    )
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-        mocked_streaming_create,
-        callbacks=[ReassembleStream()],
-        streamtable=streamtable,
-    )
-    create_input = dict(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "Tell me a joke"}],
-        stream=True,
-    )
-    stream = chat_completions.create(**create_input)
-    for x in stream:
-        ...
+        run = client.runs()[0]
+        inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
+        outputs = {k: v for k, v in run.output.get().items() if not k.startswith("_")}
 
-    streamtable.finish()
+        inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
+        assert inputs == inputs_expected
 
-    hist_node = (
-        weave.ops.project(user_by_api_key_in_env.username, project)
-        .run(stream_name)
-        .history3()
-    )
-
-    inputs_st = weave.use(hist_node["inputs"]).to_pylist_tagged()[0]
-    inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
-    assert inputs_st == inputs_expected
-
-    outputs_st = weave.use(hist_node["output"]).to_pylist_tagged()[0]
-    outputs_expected = reassembled_chat_completion_message.dict()
-    assert outputs_st == outputs_expected
-
-
-def test_callback_ordering(mocked_streaming_create):
-    cb = TestingCallback()
-    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-        mocked_streaming_create, callbacks=[ReassembleStream(), cb]
-    )
-    stream = chat_completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "Tell me a joke"}],
-        stream=True,
-    )
-
-    for i, x in enumerate(stream, 1):
-        ...
-
-    chunk_messages = [
-        "before_yield_chunk",
-        "after_yield_chunk",
-    ] * i  # 1 pair for each SSE received
-    expected = ["before_send_request", *chunk_messages, "before_end"]
-
-    assert expected == chat_completions.context.testing
-
-
-def test_patching(user_by_api_key_in_env):
-    og_create = openai.resources.chat.completions.Completions.create
-    og_acreate = openai.resources.chat.completions.AsyncCompletions.create
-
-    patch(callbacks=[])
-    assert openai.resources.chat.completions.Completions.create is og_create
-    assert openai.resources.chat.completions.AsyncCompletions.create is og_acreate
-
-    init_monitor(
-        f"{user_by_api_key_in_env.username}/test_patching/test_patching_stream"
-    )
-
-    patch(callbacks=[])
-    assert openai.resources.chat.completions.Completions.create is not og_create
-    assert openai.resources.chat.completions.AsyncCompletions.create is not og_acreate
-
-    unpatch()
-    assert openai.resources.chat.completions.Completions.create is og_create
-    assert openai.resources.chat.completions.AsyncCompletions.create is og_acreate
+        outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)
+        assert outputs == outputs_expected
 
 
 @contextlib.contextmanager

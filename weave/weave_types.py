@@ -158,8 +158,8 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        # return UnknownType()
-        raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
+        # No TypeError here, return UnknownType
+        return UnknownType()
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
