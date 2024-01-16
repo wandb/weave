@@ -2,12 +2,11 @@ import asyncio
 import pytest
 import weave
 from weave import ref_base
+from weave import weaveflow
 
 
 def test_evaluate_basic():
     with weave.local_client():
-        from weave import weaveflow
-
         dataset = weaveflow.Dataset(
             [{"input": "1 + 2", "output": "3"}, {"input": "2**4", "output": "16"}]
         )
@@ -56,3 +55,9 @@ def test_evaluate_basic():
         assert predict1_run_input.get() == "2**4"
 
         # TODO: exhaustively check all graph relationships
+
+        # TODO:
+        #   - add row to dataset
+        #     - fetch all preds from row
+        #   - add col to dataset
+        #   - update row in dataset
