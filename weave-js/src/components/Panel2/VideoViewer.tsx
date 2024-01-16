@@ -206,7 +206,7 @@ const VideoViewer = (props: VideoViewerProps) => {
                   if (v.paused) {
                     v.play()
                       .catch(() => {
-                        // Browsers have their own implementations of how to handle auto-play and m
+                        // Browsers have their own implementations of how to handle auto-play and
                         // many disallow it, for example: https://goo.gl/xX8pDD
                       })
                       .then(() => {
