@@ -1837,7 +1837,7 @@ def test_filesystem_artifact_dir_dict(fake_wandb):
     }
 
 
-def test_non_const_input_node(fake_wandb):
+def test_non_const_input_node(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(table_mock1)
     data_obj = weave.save({"project_name": "mendeleev"})
     cell_node = (
