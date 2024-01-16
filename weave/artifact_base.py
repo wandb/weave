@@ -27,9 +27,13 @@ class ArtifactRef(ref_base.Ref):
         type: typing.Optional[types.Type] = None,
         obj: typing.Optional[typing.Any] = None,
         extra: typing.Optional[list[str]] = None,
+        # Denotes that the ref should be saved as a path ref (just the path and extra)
+        # without the full uri, because its a reference within an artifact
+        serialize_as_path_ref: bool = False,
     ):
         self.artifact = artifact
         self.path = path
+        self.serialize_as_path_ref = serialize_as_path_ref
         super().__init__(obj=obj, type=type, extra=extra)
 
     def with_extra(

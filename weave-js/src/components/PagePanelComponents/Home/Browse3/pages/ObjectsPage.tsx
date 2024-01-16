@@ -1,14 +1,14 @@
 import React, {useEffect} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowPeekAwareRouteContext} from '../context';
+import {useWeaveflowCurrentRouteContext} from '../context';
 
 export const ObjectsPage: React.FC<{
   entity: string;
   project: string;
 }> = props => {
   // TODO: Implement in due time if needed
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const history = useHistory();
   useEffect(() => {
     history.push(routerContext.projectUrl(props.entity, props.project));

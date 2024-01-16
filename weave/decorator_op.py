@@ -80,7 +80,6 @@ def op(
             pure=pure,
             plugins=plugins,
             mutation=mutation,
-            _decl_locals=inspect.currentframe().f_back.f_locals,
         )
         if weavify:
             from .weavify import op_to_weave_fn

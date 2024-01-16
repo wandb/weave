@@ -1,4 +1,4 @@
-import {Box, Chip, ListItemText} from '@material-ui/core';
+import {ListItemText} from '@material-ui/core';
 import {
   Autocomplete,
   Checkbox,
@@ -7,17 +7,11 @@ import {
   ListItemButton,
   TextField,
 } from '@mui/material';
-import moment from 'moment';
 import React, {useCallback, useMemo} from 'react';
 
+import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
-import {
-  CallsLink,
-  OpLink,
-  OpVersionLink,
-  OpVersionsLink,
-  TypeVersionsLink,
-} from './common/Links';
+import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   FilterableTable,
@@ -47,7 +41,8 @@ export const OpVersionsPage: React.FC<{
 }> = props => {
   return (
     <SimplePageLayout
-      title="Op Versions"
+      // title="Op Versions"
+      title="Operations"
       tabs={[
         {
           label: 'All',
@@ -88,30 +83,10 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const columns = useMemo(() => {
     return {
-      createdAt: {
-        columnId: 'createdAt',
-        gridDisplay: {
-          columnLabel: 'Created At',
-          columnValue: obj => obj.obj.createdAtMs(),
-          gridColDefOptions: {
-            renderCell: params => {
-              return moment(params.value as number).format(
-                'YYYY-MM-DD HH:mm:ss'
-              );
-            },
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        any,
-        number,
-        'createdAt',
-        WFHighLevelOpVersionFilter
-      >,
       version: {
         columnId: 'version',
         gridDisplay: {
-          columnLabel: 'Version',
+          columnLabel: 'Op',
           columnValue: obj => obj.obj.version(),
           gridColDefOptions: {
             renderCell: params => {
@@ -121,7 +96,7 @@ export const FilterableOpVersionsTable: React.FC<{
                   projectName={params.row.obj.project()}
                   opName={params.row.obj.op().name()}
                   version={params.row.obj.version()}
-                  hideName
+                  versionIndex={params.row.obj.versionIndex()}
                 />
               );
             },
@@ -134,15 +109,58 @@ export const FilterableOpVersionsTable: React.FC<{
         'version',
         WFHighLevelOpVersionFilter
       >,
+
+      calls: {
+        columnId: 'calls',
+        gridDisplay: {
+          columnLabel: 'Calls',
+          columnValue: obj => obj.obj.calls().length,
+          gridColDefOptions: {
+            renderCell: params => {
+              if (params.value === 0) {
+                return '';
+              }
+              return (
+                <CallsLink
+                  neverPeek
+                  entity={params.row.obj.entity()}
+                  project={params.row.obj.project()}
+                  callCount={params.value as number}
+                  filter={{
+                    opVersions: [
+                      params.row.obj.op().name() +
+                        ':' +
+                        params.row.obj.version(),
+                    ],
+                  }}
+                />
+              );
+            },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
+          },
+        },
+      } as WFHighLevelDataColumn<
+        {obj: WFOpVersion},
+        string[],
+        number,
+        'calls',
+        WFHighLevelOpVersionFilter
+      >,
+
       opCategory: {
         columnId: 'opCategory',
         gridDisplay: {
-          columnLabel: 'Op Category',
+          columnLabel: 'Category',
           columnValue: obj => obj.obj.opCategory(),
           gridColDefOptions: {
             renderCell: params => {
               return <OpVersionCategoryChip opCategory={params.value as any} />;
             },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
           },
         },
         filterControls: {
@@ -170,23 +188,74 @@ export const FilterableOpVersionsTable: React.FC<{
         'opCategory',
         WFHighLevelOpVersionFilter
       >,
+
+      createdAt: {
+        columnId: 'createdAt',
+        gridDisplay: {
+          columnLabel: 'Created',
+          columnValue: obj => obj.obj.createdAtMs(),
+          gridColDefOptions: {
+            renderCell: params => {
+              return (
+                <Timestamp
+                  value={(params.value as number) / 1000}
+                  format="relative"
+                />
+              );
+            },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
+          },
+        },
+      } as WFHighLevelDataColumn<
+        {obj: WFOpVersion},
+        any,
+        number,
+        'createdAt',
+        WFHighLevelOpVersionFilter
+      >,
+
       opName: {
         columnId: 'opName',
+        // This grid display does not match the data for the column
+        // ... a bit of a hack
         gridDisplay: {
-          columnLabel: 'Op',
+          columnLabel: 'Versions',
           columnValue: obj => obj.obj.op().name(),
           gridColDefOptions: {
             renderCell: params => {
               return (
-                <OpLink
-                  entityName={params.row.obj.entity()}
-                  projectName={params.row.obj.project()}
-                  opName={params.value as any}
+                <OpVersionsLink
+                  entity={params.row.obj.entity()}
+                  project={params.row.obj.project()}
+                  versionCount={params.row.obj.op().opVersions().length}
+                  filter={{
+                    opName: params.row.obj.op().name(),
+                  }}
                 />
               );
             },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
           },
         },
+        // gridDisplay: {
+        //   columnLabel: 'Op',
+        //   columnValue: obj => obj.obj.op().name(),
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       return (
+        //         <OpLink
+        //           entityName={params.row.obj.entity()}
+        //           projectName={params.row.obj.project()}
+        //           opName={params.value as any}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (filter.opName == null) {
@@ -212,67 +281,33 @@ export const FilterableOpVersionsTable: React.FC<{
         'opName',
         WFHighLevelOpVersionFilter
       >,
-      calls: {
-        columnId: 'calls',
-        gridDisplay: {
-          columnLabel: 'Calls',
-          columnValue: obj => obj.obj.calls().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <CallsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  callCount={params.value as number}
-                  filter={{
-                    opVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string[],
-        number,
-        'calls',
-        WFHighLevelOpVersionFilter
-      >,
       invokedByOpVersions: {
         columnId: 'invokedByOpVersions',
-        gridDisplay: {
-          columnLabel: 'Invoked By',
-          columnValue: obj => obj.obj.invokedBy().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    invokesOpVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Invoked By',
+        //   columnValue: obj => obj.obj.invokedBy().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <OpVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             invokesOpVersions: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (
@@ -307,31 +342,31 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       invokesOpVersions: {
         columnId: 'invokesOpVersions',
-        gridDisplay: {
-          columnLabel: 'Invokes',
-          columnValue: obj => obj.obj.invokes().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    invokedByOpVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Invokes',
+        //   columnValue: obj => obj.obj.invokes().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <OpVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             invokedByOpVersions: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (
@@ -366,31 +401,31 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       consumesTypeVersions: {
         columnId: 'consumesTypeVersions',
-        gridDisplay: {
-          columnLabel: 'Consumes Types',
-          columnValue: obj => obj.obj.inputTypesVersions().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <TypeVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    inputTo: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Consumes Types',
+        //   columnValue: obj => obj.obj.inputTypesVersions().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <TypeVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             inputTo: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (
@@ -425,31 +460,31 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       producesTypeVersions: {
         columnId: 'producesTypeVersions',
-        gridDisplay: {
-          columnLabel: 'Produces Types',
-          columnValue: obj => obj.obj.outputTypeVersions().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <TypeVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    outputFrom: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Produces Types',
+        //   columnValue: obj => obj.obj.outputTypeVersions().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <TypeVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             outputFrom: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, filter) => {
             if (
@@ -499,11 +534,11 @@ export const FilterableOpVersionsTable: React.FC<{
       // >,
       versionIndex: {
         columnId: 'versionIndex',
-        gridDisplay: {
-          columnLabel: 'Version Index',
-          columnValue: obj => obj.obj.versionIndex(),
-          gridColDefOptions: {},
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Version Index',
+        //   columnValue: obj => obj.obj.versionIndex(),
+        //   gridColDefOptions: {},
+        // },
       } as WFHighLevelDataColumn<
         {obj: WFOpVersion},
         any,
@@ -513,29 +548,29 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       isLatest: {
         columnId: 'isLatest',
-        gridDisplay: {
-          columnLabel: 'Latest',
-          columnValue: obj => obj.obj.aliases().includes('latest'),
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value) {
-                return (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      width: '100%',
-                    }}>
-                    <Chip label="Yes" size="small" />
-                  </Box>
-                );
-              }
-              return '';
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Latest',
+        //   columnValue: obj => obj.obj.aliases().includes('latest'),
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value) {
+        //         return (
+        //           <Box
+        //             sx={{
+        //               display: 'flex',
+        //               alignItems: 'center',
+        //               justifyContent: 'center',
+        //               height: '100%',
+        //               width: '100%',
+        //             }}>
+        //             <Chip label="Yes" size="small" />
+        //           </Box>
+        //         );
+        //       }
+        //       return '';
+        //     },
+        //   },
+        // },
         filterControls: {
           filterPredicate: ({obj}, {isLatest}) => {
             return !isLatest || obj.aliases().includes('latest') === isLatest;

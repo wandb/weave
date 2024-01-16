@@ -827,7 +827,7 @@ def filter_node_to_selection(
                 and isinstance(selection_min, (int, float))
                 and isinstance(selection_max, (int, float))
             ):
-                target = target.toNumber() * 1000
+                target = target.toNumber()
 
             return boolean.Boolean.bool_and(
                 target >= selection_min, target <= selection_max

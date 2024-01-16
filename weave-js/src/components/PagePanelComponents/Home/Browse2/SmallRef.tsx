@@ -3,7 +3,7 @@ import {SmartToy as SmartToyIcon} from '@mui/icons-material';
 import {TableRows as TableRowsIcon} from '@mui/icons-material';
 import {DataObject as DataObjectIcon} from '@mui/icons-material';
 import {Spoke as SpokeIcon} from '@mui/icons-material';
-import {Box, Typography} from '@mui/material';
+import {Box} from '@mui/material';
 import {
   callOpVeryUnsafe,
   constString,
@@ -58,20 +58,22 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
   const rootType = getRootType(refType);
   const label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
   const rootTypeName = getTypeName(rootType);
-  let icon = <SpokeIcon />;
+  let icon = <SpokeIcon sx={{height: '100%'}} />;
   if (rootTypeName === 'Dataset') {
-    icon = <DatasetIcon />;
+    icon = <DatasetIcon sx={{height: '100%'}} />;
   } else if (rootTypeName === 'Model') {
-    icon = <SmartToyIcon />;
+    icon = <SmartToyIcon sx={{height: '100%'}} />;
   } else if (rootTypeName === 'list') {
-    icon = <TableRowsIcon />;
+    icon = <TableRowsIcon sx={{height: '100%'}} />;
   } else if (rootTypeName === 'OpDef') {
-    icon = <DataObjectIcon />;
+    icon = <DataObjectIcon sx={{height: '100%'}} />;
   }
   const Item = (
     <Box display="flex" alignItems="center">
-      <Box mr={1}>{icon}</Box>
-      <Typography variant="body1">{label}</Typography>
+      <Box mr={1} sx={{height: '1rem'}}>
+        {icon}
+      </Box>
+      {label}
     </Box>
   );
   if (refTypeQuery.loading) {

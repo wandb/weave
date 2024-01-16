@@ -18,7 +18,6 @@ import {
   useParams,
 } from 'react-router-dom';
 
-import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
 import {URL_BROWSE3} from '../../../urls';
 import {ErrorBoundary} from '../../ErrorBoundary';
@@ -29,7 +28,7 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
-  useWeaveflowPeekAwareRouteContext,
+  useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
 } from './Browse3/context';
@@ -131,14 +130,14 @@ export const Browse3: FC<{
   navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
-  const weaveContext = useWeaveContext();
-  useEffect(() => {
-    const previousPolling = weaveContext.client.isPolling();
-    weaveContext.client.setPolling(true);
-    return () => {
-      weaveContext.client.setPolling(previousPolling);
-    };
-  }, [props.projectRoot, weaveContext]);
+  // const weaveContext = useWeaveContext();
+  // useEffect(() => {
+  //   const previousPolling = weaveContext.client.isPolling();
+  //   weaveContext.client.setPolling(true);
+  //   return () => {
+  //     weaveContext.client.setPolling(previousPolling);
+  //   };
+  // }, [props.projectRoot, weaveContext]);
   return (
     <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
       <Switch>
@@ -402,7 +401,10 @@ const useNaiveProjectDataConnection = (entity: string, project: string) => {
     if (
       objectsValue.result == null &&
       runsValue.result == null &&
-      feedbackValue.result == null
+      feedbackValue.result == null &&
+      objectsValue.loading &&
+      runsValue.loading &&
+      feedbackValue.loading
     ) {
       return null;
     }
@@ -414,9 +416,12 @@ const useNaiveProjectDataConnection = (entity: string, project: string) => {
     return connection;
   }, [
     entity,
+    feedbackValue.loading,
     feedbackValue.result,
+    objectsValue.loading,
     objectsValue.result,
     project,
+    runsValue.loading,
     runsValue.result,
   ]);
 };
@@ -445,9 +450,12 @@ const ProjectRedirect: FC = () => {
   useEffect(() => {
     if (params.tab == null) {
       history.replace(
-        baseRouter.callsUIUrl(params.entity ?? '', params.project ?? '', {
-          traceRootsOnly: true,
+        baseRouter.opVersionsUIUrl(params.entity, params.project, {
+          isLatest: true,
         })
+        // baseRouter.callsUIUrl(params.entity ?? '', params.project ?? '', {
+        //   traceRootsOnly: true,
+        // })
       );
     }
   }, [baseRouter, history, params.entity, params.project, params.tab]);
@@ -549,7 +557,7 @@ const ObjectVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -587,7 +595,7 @@ const ObjectVersionRoutePageBinding = () => {
 const OpVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -621,7 +629,7 @@ const TypeVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
 
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   useEffect(() => {
     if (!params.version) {
       history.replace(
@@ -724,7 +732,7 @@ const CallsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -760,7 +768,7 @@ const ObjectVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -796,7 +804,7 @@ const TypeVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(
@@ -832,7 +840,7 @@ const OpVersionsPageBinding = () => {
     }
   }, [query.filter]);
   const history = useHistory();
-  const routerContext = useWeaveflowPeekAwareRouteContext();
+  const routerContext = useWeaveflowCurrentRouteContext();
   const onFilterUpdate = useCallback(
     filter => {
       history.push(

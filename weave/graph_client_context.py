@@ -2,6 +2,7 @@ import contextlib
 import typing
 
 from . import context_state
+from . import errors
 
 if typing.TYPE_CHECKING:
     from .graph_client import GraphClient
@@ -25,5 +26,5 @@ def get_graph_client() -> typing.Optional["GraphClient"]:
 def require_graph_client() -> "GraphClient":
     client = get_graph_client()
     if not client:
-        raise ValueError("You must call `weave.init(<project_name>)` first")
+        raise errors.WeaveInitError("You must call `weave.init(<project_name>)` first")
     return client

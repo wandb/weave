@@ -6,6 +6,7 @@ import functools
 import keyword
 import contextvars
 import json
+import pydantic
 from collections.abc import Iterable
 
 
@@ -157,8 +158,8 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        # return UnknownType()
-        raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
+        # No TypeError here, return UnknownType
+        return UnknownType()
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
@@ -170,19 +171,12 @@ class TypeRegistry:
         type_name = d["type"] if isinstance(d, dict) else d
         type_ = type_name_to_type(type_name)
         if type_ is None:
-            # Normally, we should just raise the error. However, the core team
-            # used earlier versions of Weaveflow ( before
-            # dc48fa16263d49d5accaca37515ab4c80efef1b6) which serialized
-            # "relocatable" objects without the "_relocatable" flag was added.
-            # As a result, we will hit this branch in such cases. In order to
-            # maintain backwards compat for these situations, we perform a less
-            # constrained check here. We use `is_serialized_object_type` instead
-            # of `is_relocatable_object_type` since it explicitly does not
-            # require the `_relocatable` flag.  This can be removed if we are ok
-            # breaking these early versions
-            # if isinstance(d, dict) and is_serialized_object_type(d):
-            #     return deserialize_relocatable_object_type(d)
-            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
+            # We used to raise WeaveServializeError here. Now we return UnknownType
+            # instead, so the server can load types that have types that are not
+            # present on the server within them (e.g. a user has defined a type in their
+            # code and published a top level object containing an attribute of that type,
+            # we want to be able to load the outer object without crashing)
+            return UnknownType()
         return type_.from_dict(d)
 
 
@@ -1014,6 +1008,7 @@ class ObjectType(Type):
     # and loaded in another. (reloctable false means that we need the original
     # object definition to load the object, ie it's a built-in)
     _relocatable = False
+    instance_classes = pydantic.BaseModel
 
     def __init__(self, **attr_types: Type):
         self.__dict__["attr_types"] = attr_types
@@ -1043,6 +1038,20 @@ class ObjectType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
+        if isinstance(obj, pydantic.BaseModel):
+            from . import weave_pydantic
+
+            schema = obj.schema()
+            schema_type = weave_pydantic.json_schema_to_weave_type(schema)
+            assert isinstance(schema_type, TypedDict), "Bad schema type"
+
+            res = cls(**schema_type.property_types)
+
+            # Hack to get around frozen dataclass
+            res.__dict__["_relocatable"] = True
+
+            return res
+
         variable_prop_types = {}
         for prop_name in cls.type_attrs():
             prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
@@ -1075,6 +1084,12 @@ class ObjectType(Type):
         mapper = mappers_python.map_from_python(self, artifact)
         return mapper.apply(result)
 
+    def __eq__(self, other) -> bool:
+        return (
+            type(self) == type(other)
+            and self.property_types() == other.property_types()
+        )
+
 
 def is_serialized_object_type(t: dict) -> bool:
     if "_base_type" not in t:
@@ -1089,6 +1104,9 @@ def is_relocatable_object_type(t: typing.Union[str, dict]) -> bool:
         return False
     if not t.get("_relocatable"):
         return False
+    if t.get("_relocatable") and t.get("_is_object"):
+        # relocatable base object case
+        return True
     return is_serialized_object_type(t)
 
 
@@ -1143,8 +1161,26 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     )
     exec(object_init_code)
 
+    # Weave objects must auto-dereference refs when they are accessed.
+    def object_getattribute(self, name):
+        attribute = object.__getattribute__(self, name)
+        attr_type = type_attr_types.get(name)
+        if attr_type is None:
+            return attribute
+        from . import ref_base
+
+        if isinstance(attribute, ref_base.Ref):
+            # TODO: This should put a new ref as well, for ref-tracking
+            return attribute.get()
+        return attribute
+
     new_object_class = type(
-        object_class_name, (), {"__init__": locals()["loaded_object_init"]}
+        object_class_name,
+        (),
+        {
+            "__init__": locals()["loaded_object_init"],
+            "__getattribute__": object_getattribute,
+        },
     )
 
     all_attr_types: dict[str, typing.Union[Type, type[Type]]] = {

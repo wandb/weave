@@ -804,7 +804,8 @@ class WFNaiveOpVersion implements WFOpVersion {
     this.opVersionDict = opVersionDict;
   }
   opCategory(): HackyOpCategory | null {
-    const opName = this.opVersionDict.name;
+    const opNames = this.opVersionDict.name.split('-');
+    const opName = opNames[opNames.length - 1];
     const categories = ['train', 'predict', 'score', 'evaluate', 'tune'];
     for (const category of categories) {
       if (opName.toLocaleLowerCase().includes(category)) {
@@ -945,5 +946,8 @@ class WFNaiveCall implements WFCall {
   }
   spanName(): string {
     return this.opVersion()?.op().name() ?? this.callDict.callSpan.name;
+  }
+  rawCallSpan(): Call {
+    return this.callDict.callSpan;
   }
 }

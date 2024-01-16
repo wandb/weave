@@ -22,7 +22,7 @@ class RefToPyRef(mappers.Mapper):
         if ref is None:
             raise errors.WeaveSerializeError(f"Ref mapper encountered non-ref: {obj}")
         if _uri_is_local_artifact(ref.uri):
-            ref = _local_ref_to_published_ref(ref)
+            ref = _ref_to_published_ref(ref)
 
         return ref
 
@@ -82,29 +82,7 @@ class TaggedValueToPy(tagged_value_type.TaggedValueToPy):
 
 
 class DefaultToPy(mappers.Mapper):
-    def apply(self, obj: typing.Any) -> dict:
-        existing_ref = storage._get_ref(obj)
-        if not existing_ref:
-            return obj
-
-        if not isinstance(existing_ref, artifact_local.LocalArtifactRef):
-            return obj
-
-        from . import op_def
-
-        # Recursively do a top-level publish for OpDef objects. This is a Weaveflow
-        # hack. Weaveflow publishes the entire available graph in the execute.py
-        # prior to executing it. There are often ops inside top-level Objects, like
-        # ChatModel. We want to not publish those later, so we maintain a mapping
-        # from local artifact ref to published ref in storage.py. If we don't do
-        # a top level publish here, these ops will be published inside of their
-        # artifact instead of a new top-level one, and we won't trigger the
-        # local->publish ref cache (since that happens in _direct_publish).
-        if isinstance(obj, op_def.OpDef):
-            from . import api
-
-            storage._direct_publish(obj, f"{obj.name}")
-
+    def apply(self, obj: typing.Any) -> typing.Any:
         return obj
 
 
@@ -205,9 +183,23 @@ def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
     return new_node
 
 
-def _local_ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
+def _ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
+    if isinstance(ref, artifact_local.LocalArtifactRef):
+        return _local_ref_to_published_ref(ref)
+
     node = ref_to_node(ref)
 
     if node is None:
         raise errors.WeaveSerializeError(f"Failed to serialize {ref} to published ref")
     return _local_op_get_to_pub_ref(node)
+
+
+def _local_ref_to_published_ref(ref: artifact_local.LocalArtifactRef) -> ref_base.Ref:
+    obj = ref.get()
+    name = ref.name
+    version = None
+    if not likely_commit_hash(ref.version):
+        version = ref.version
+    return storage._direct_publish(
+        obj, name, branch_name=version, assume_weave_type=ref.type
+    )
