@@ -117,11 +117,16 @@ export const OpLink: React.FC<{
   );
 };
 
-export const opVersionText = (opName: string, versionIndex: number) => {
+export const opNiceName = (opName: string) => {
   let text = opName;
   if (text.startsWith('op-')) {
     text = text.slice(3);
   }
+  return text;
+};
+
+export const opVersionText = (opName: string, versionIndex: number) => {
+  let text = opNiceName(opName);
   text += ':v' + versionIndex;
   return text;
 };
