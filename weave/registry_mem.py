@@ -48,7 +48,7 @@ class Registry:
 
     def register_op(self, op: op_def.OpDef, location=None):
         if context_state.get_no_op_register():
-            return
+            return op
         self.mark_updated()
         # do not save built-in ops today
         should_save = not location and not op.is_builtin
