@@ -75,6 +75,7 @@ const ALLOWED_CJS_MODULES = [
   '@radix-ui/react-slider',
   '@radix-ui/react-switch',
   '@radix-ui/react-tabs',
+  '@radix-ui/react-tooltip',
   '@redux-saga/core',
   '@redux-saga/deferred',
   '@redux-saga/delay-p',
