@@ -16,7 +16,10 @@ import {RunsTable} from '../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../context';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useWeaveflowORMContext} from './wfInterface/context';
+import {
+  useWeaveflowORMContext,
+  WeaveflowORMContextType,
+} from './wfInterface/context';
 import {HackyOpCategory} from './wfInterface/types';
 
 export type WFHighLevelCallFilter = {
@@ -85,48 +88,8 @@ export const CallsTable: React.FC<{
   }, [filter, props.frozenFilter]);
 
   const lowLevelFilter: CallFilter = useMemo(() => {
-    const opUrisFromVersions =
-      (effectiveFilter.opVersions
-        ?.map(uri => {
-          const [opName, version] = uri.split(':');
-          const opVersion = orm.projectConnection.opVersion(opName, version);
-          return opVersion?.refUri();
-        })
-        .filter(item => item != null) as string[]) ?? [];
-    let opUrisFromCategory = orm.projectConnection
-      .opVersions()
-      .filter(ov => ov.opCategory() === effectiveFilter.opCategory)
-      .map(ov => ov.refUri());
-    if (opUrisFromCategory.length === 0 && effectiveFilter.opCategory) {
-      opUrisFromCategory = ['DOES_NOT_EXIST:VALUE'];
-    }
-    return {
-      traceRootsOnly: effectiveFilter.traceRootsOnly,
-      opUris: Array.from(
-        new Set([...opUrisFromVersions, ...opUrisFromCategory])
-      ),
-      inputUris: effectiveFilter.inputObjectVersions
-        ?.map(uri => {
-          const [objectName, version] = uri.split(':');
-          const objectVersion = orm.projectConnection.objectVersion(
-            objectName,
-            version
-          );
-          return objectVersion?.refUri();
-        })
-        .filter(item => item != null) as string[],
-      traceId: effectiveFilter.traceId ?? undefined,
-      parentId: effectiveFilter.parentId ?? undefined,
-    };
-  }, [
-    effectiveFilter.inputObjectVersions,
-    effectiveFilter.opCategory,
-    effectiveFilter.opVersions,
-    effectiveFilter.parentId,
-    effectiveFilter.traceId,
-    effectiveFilter.traceRootsOnly,
-    orm.projectConnection,
-  ]);
+    return convertHighLevelFilterToLowLevelFilter(orm, effectiveFilter);
+  }, [effectiveFilter, orm]);
   const runs = useRunsWithFeedback(
     {
       entityName: props.entity,
@@ -138,81 +101,42 @@ export const CallsTable: React.FC<{
 
   // # TODO: All of these need to be handled much more logically since
   // we need to calculate the options based on everything except a specific filter.
-  const opVersionOptions = useMemo(() => {
-    if (runs.loading) {
-      const versions = orm.projectConnection.opVersions();
-      // Note: this excludes the named ones without op versions
-      const options = versions.map(v => v.op().name() + ':' + v.version());
-      return options;
-    }
-    return _.uniq(
-      runs.result.map(r => {
-        const version = orm.projectConnection.call(r.span_id)?.opVersion();
-        if (!version) {
-          return null;
-        }
-        return version.op().name() + ':' + version.version();
-      })
-    ).filter(v => v != null) as string[];
-  }, [orm.projectConnection, runs.loading, runs.result]);
-  const consumesObjectVersionOptions = useMemo(() => {
-    if (runs.loading) {
-      const versions = orm.projectConnection.objectVersions();
-      const options = versions.map(v => v.object().name() + ':' + v.version());
-      return options;
-    }
-    return _.uniq(
-      runs.result.flatMap(r => {
-        const inputs = orm.projectConnection.call(r.span_id)?.inputs();
-        if (!inputs) {
-          return null;
-        }
-        return inputs.map(i => i.object().name() + ':' + i.version());
-      })
-    ).filter(v => v != null);
-  }, [orm.projectConnection, runs.loading, runs.result]);
-  const parentIdOptions = useMemo(() => {
-    if (runs.loading) {
-      const calls = orm.projectConnection.calls();
-      const options = calls
-        .map(v => v.parentCall()?.callID())
-        .filter(v => v != null);
-      return options;
-    }
-    return _.uniq(
-      runs.result.map(r =>
-        orm.projectConnection.call(r.span_id)?.parentCall()?.callID()
-      )
-    ).filter(v => v != null);
-  }, [orm.projectConnection, runs.loading, runs.result]);
-  const traceIdOptions = useMemo(() => {
-    if (runs.loading) {
-      const calls = orm.projectConnection.calls();
-      const options = Array.from(
-        new Set(calls.map(v => v.traceID()).filter(v => v != null))
-      );
-      return options;
-    }
-    return _.uniq(
-      runs.result.map(r => orm.projectConnection.call(r.span_id)?.traceID())
-    ).filter(v => v != null);
-  }, [orm.projectConnection, runs.loading, runs.result]);
-  const opCategoryOptions = useMemo(() => {
-    if (runs.loading) {
-      return orm.projectConnection.opCategories();
-    }
-    return _.uniq(
-      runs.result.map(r =>
-        orm.projectConnection.call(r.span_id)?.opVersion()?.opCategory()
-      )
-    ).filter(v => v != null);
-  }, [orm.projectConnection, runs.loading, runs.result]);
-  const traceRootsEnabled = useMemo(() => {
-    if (runs.loading) {
-      return true;
-    }
-    return runs.result.some(r => r.parent_id == null);
-  }, [runs.loading, runs.result]);
+  const opVersionOptions = useOpVersionOptions(
+    orm,
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
+  const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
+    orm,
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
+  const parentIdOptions = useParentIdOptions(
+    orm,
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
+  const traceIdOptions = useTraceIdOptions(
+    orm,
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
+  const opCategoryOptions = useOpCategoryOptions(
+    orm,
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
+  const traceRootOptions = useTraceRootOptions(
+    orm,
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
 
   return (
     <FilterLayoutTemplate
@@ -336,7 +260,10 @@ export const CallsTable: React.FC<{
             secondaryAction={
               <Checkbox
                 edge="end"
-                checked={!!effectiveFilter.traceRootsOnly}
+                checked={
+                  !!effectiveFilter.traceRootsOnly ||
+                  (traceRootOptions.length === 1 && traceRootOptions[0])
+                }
                 onChange={() => {
                   setFilter({
                     ...filter,
@@ -346,7 +273,7 @@ export const CallsTable: React.FC<{
               />
             }
             disabled={
-              !traceRootsEnabled ||
+              traceRootOptions.length <= 1 ||
               Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
             }
             disablePadding>
@@ -359,4 +286,264 @@ export const CallsTable: React.FC<{
       <RunsTable loading={runs.loading} spans={runs.result} />
     </FilterLayoutTemplate>
   );
+};
+
+const convertHighLevelFilterToLowLevelFilter = (
+  orm: WeaveflowORMContextType,
+  effectiveFilter: WFHighLevelCallFilter
+): CallFilter => {
+  const opUrisFromVersions =
+    (effectiveFilter.opVersions
+      ?.map(uri => {
+        const [opName, version] = uri.split(':');
+        const opVersion = orm.projectConnection.opVersion(opName, version);
+        return opVersion?.refUri();
+      })
+      .filter(item => item != null) as string[]) ?? [];
+  let opUrisFromCategory = orm.projectConnection
+    .opVersions()
+    .filter(ov => ov.opCategory() === effectiveFilter.opCategory)
+    .map(ov => ov.refUri());
+  if (opUrisFromCategory.length === 0 && effectiveFilter.opCategory) {
+    opUrisFromCategory = ['DOES_NOT_EXIST:VALUE'];
+  }
+
+  let finalURISet = new Set<string>([]);
+  const opUrisFromVersionsSet = new Set<string>(opUrisFromVersions);
+  const opUrisFromCategorySet = new Set<string>(opUrisFromCategory);
+  const includeVersions =
+    effectiveFilter.opVersions != null &&
+    effectiveFilter.opVersions.length >= 0;
+  const includeCategories = effectiveFilter.opCategory != null;
+
+  if (includeVersions && includeCategories) {
+    // intersect the two sets
+    finalURISet = new Set<string>(
+      [...opUrisFromVersionsSet].filter(x => opUrisFromCategorySet.has(x))
+    );
+  } else if (includeVersions) {
+    finalURISet = opUrisFromVersionsSet;
+  } else if (includeCategories) {
+    finalURISet = opUrisFromCategorySet;
+  } else {
+    finalURISet = new Set<string>([]);
+  }
+
+  return {
+    traceRootsOnly: effectiveFilter.traceRootsOnly,
+    opUris: Array.from(finalURISet),
+    inputUris: effectiveFilter.inputObjectVersions
+      ?.map(uri => {
+        const [objectName, version] = uri.split(':');
+        const objectVersion = orm.projectConnection.objectVersion(
+          objectName,
+          version
+        );
+        return objectVersion?.refUri();
+      })
+      .filter(item => item != null) as string[],
+    traceId: effectiveFilter.traceId ?? undefined,
+    parentId: effectiveFilter.parentId ?? undefined,
+  };
+};
+
+const useOpVersionOptions = (
+  orm: WeaveflowORMContextType,
+  entity: string,
+  project: string,
+  highLevelFilter: WFHighLevelCallFilter
+) => {
+  const runs = useRunsWithFeedback(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    useMemo(() => {
+      return convertHighLevelFilterToLowLevelFilter(
+        orm,
+        _.omit(highLevelFilter, ['opVersions'])
+      );
+    }, [highLevelFilter, orm])
+  );
+  return useMemo(() => {
+    if (runs.loading) {
+      const versions = orm.projectConnection.opVersions();
+      // Note: this excludes the named ones without op versions
+      const options = versions.map(v => v.op().name() + ':' + v.version());
+      return options;
+    }
+    return _.uniq(
+      runs.result.map(r => {
+        const version = orm.projectConnection.call(r.span_id)?.opVersion();
+        if (!version) {
+          return null;
+        }
+        return version.op().name() + ':' + version.version();
+      })
+    ).filter(v => v != null) as string[];
+  }, [orm.projectConnection, runs.loading, runs.result]);
+};
+
+const useConsumesObjectVersionOptions = (
+  orm: WeaveflowORMContextType,
+  entity: string,
+  project: string,
+  highLevelFilter: WFHighLevelCallFilter
+) => {
+  const runs = useRunsWithFeedback(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    useMemo(() => {
+      return convertHighLevelFilterToLowLevelFilter(
+        orm,
+        _.omit(highLevelFilter, ['inputObjectVersions'])
+      );
+    }, [highLevelFilter, orm])
+  );
+  return useMemo(() => {
+    if (runs.loading) {
+      const versions = orm.projectConnection.objectVersions();
+      const options = versions.map(v => v.object().name() + ':' + v.version());
+      return options;
+    }
+    return _.uniq(
+      runs.result.flatMap(r => {
+        const inputs = orm.projectConnection.call(r.span_id)?.inputs();
+        if (!inputs) {
+          return null;
+        }
+        return inputs.map(i => i.object().name() + ':' + i.version());
+      })
+    ).filter(v => v != null) as string[];
+  }, [orm.projectConnection, runs.loading, runs.result]);
+};
+
+const useParentIdOptions = (
+  orm: WeaveflowORMContextType,
+  entity: string,
+  project: string,
+  highLevelFilter: WFHighLevelCallFilter
+) => {
+  const runs = useRunsWithFeedback(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    useMemo(() => {
+      return convertHighLevelFilterToLowLevelFilter(
+        orm,
+        _.omit(highLevelFilter, ['traceId'])
+      );
+    }, [highLevelFilter, orm])
+  );
+  return useMemo(() => {
+    if (runs.loading) {
+      const calls = orm.projectConnection.calls();
+      const options = Array.from(
+        new Set(calls.map(v => v.traceID()).filter(v => v != null))
+      );
+      return options;
+    }
+    return _.uniq(
+      runs.result.map(r => orm.projectConnection.call(r.span_id)?.traceID())
+    ).filter(v => v != null) as string[];
+  }, [orm.projectConnection, runs.loading, runs.result]);
+};
+
+const useTraceIdOptions = (
+  orm: WeaveflowORMContextType,
+  entity: string,
+  project: string,
+  highLevelFilter: WFHighLevelCallFilter
+) => {
+  const runs = useRunsWithFeedback(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    useMemo(() => {
+      return convertHighLevelFilterToLowLevelFilter(
+        orm,
+        _.omit(highLevelFilter, ['parentId'])
+      );
+    }, [highLevelFilter, orm])
+  );
+  return useMemo(() => {
+    if (runs.loading) {
+      const calls = orm.projectConnection.calls();
+      const options = calls
+        .map(v => v.parentCall()?.callID())
+        .filter(v => v != null);
+      return options;
+    }
+    return _.uniq(
+      runs.result.map(r =>
+        orm.projectConnection.call(r.span_id)?.parentCall()?.callID()
+      )
+    ).filter(v => v != null) as string[];
+  }, [orm.projectConnection, runs.loading, runs.result]);
+};
+
+const useOpCategoryOptions = (
+  orm: WeaveflowORMContextType,
+  entity: string,
+  project: string,
+  highLevelFilter: WFHighLevelCallFilter
+) => {
+  const runs = useRunsWithFeedback(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    useMemo(() => {
+      return convertHighLevelFilterToLowLevelFilter(
+        orm,
+        _.omit(highLevelFilter, ['opCategory'])
+      );
+    }, [highLevelFilter, orm])
+  );
+  return useMemo(() => {
+    if (runs.loading) {
+      return orm.projectConnection.opCategories();
+    }
+    return _.uniq(
+      runs.result.map(r =>
+        orm.projectConnection.call(r.span_id)?.opVersion()?.opCategory()
+      )
+    ).filter(v => v != null) as HackyOpCategory[];
+  }, [orm.projectConnection, runs.loading, runs.result]);
+};
+
+const useTraceRootOptions = (
+  orm: WeaveflowORMContextType,
+  entity: string,
+  project: string,
+  highLevelFilter: WFHighLevelCallFilter
+) => {
+  const runs = useRunsWithFeedback(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    useMemo(() => {
+      return convertHighLevelFilterToLowLevelFilter(
+        orm,
+        _.omit(highLevelFilter, ['traceRootsOnly'])
+      );
+    }, [highLevelFilter, orm])
+  );
+  return useMemo(() => {
+    if (runs.loading) {
+      return [true, false];
+    }
+    return _.uniq(runs.result.map(r => r.parent_id == null));
+  }, [runs.loading, runs.result]);
 };
