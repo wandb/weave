@@ -13,6 +13,7 @@ import {
   GridColumnGroupingModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
+import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
@@ -22,8 +23,13 @@ import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
+import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
-import {HackyTypeCategory, WFObjectVersion} from './wfInterface/types';
+import {
+  HackyTypeCategory,
+  WFObjectVersion,
+  WFOpVersion,
+} from './wfInterface/types';
 
 // TODO: This file follows the older pattern - need to update it to use the same
 // one as TypeVersionsPage or OpVersionsPage
@@ -69,29 +75,10 @@ export const FilterableObjectVersionsTable: React.FC<{
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
-
-  const objectOptions = useMemo(() => {
-    const objects = orm.projectConnection.objects();
-    const options = objects.map(v => v.name());
-    return options;
+  const allObjectVersions = useMemo(() => {
+    return orm.projectConnection.objectVersions();
   }, [orm.projectConnection]);
 
-  const opVersionOptions = useMemo(() => {
-    const versions = orm.projectConnection.opVersions();
-    // Note: this excludes the named ones without op versions
-    const options = versions.map(v => v.op().name() + ':' + v.version());
-    return options;
-  }, [orm.projectConnection]);
-  const typeCategoryOptions = useMemo(() => {
-    return orm.projectConnection.typeCategories();
-  }, [orm.projectConnection]);
-  const typeVersionOptions = useMemo(() => {
-    const versions = orm.projectConnection.typeVersions();
-    const options = versions.map(
-      v => v.type().name() + ':' + v.version().toString()
-    );
-    return options;
-  }, [orm]);
   const [filterState, setFilterState] =
     useState<WFHighLevelObjectVersionFilter>(props.initialFilter ?? {});
   useEffect(() => {
@@ -113,67 +100,54 @@ export const FilterableObjectVersionsTable: React.FC<{
   const effectiveFilter = useMemo(() => {
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);
-  const allObjectVersions = useMemo(() => {
-    return orm.projectConnection.objectVersions();
-  }, [orm.projectConnection]);
+
   const filteredObjectVersions = useMemo(() => {
-    return allObjectVersions.filter(ov => {
-      if (
-        effectiveFilter.typeVersions &&
-        effectiveFilter.typeVersions.length > 0
-      ) {
-        if (
-          !effectiveFilter.typeVersions.includes(
-            ov.typeVersion().type().name() +
-              ':' +
-              ov.typeVersion().version().toString()
-          )
-        ) {
-          return false;
-        }
-      }
-      if (effectiveFilter.latest) {
-        if (!ov.aliases().includes('latest')) {
-          return false;
-        }
-      }
-      if (effectiveFilter.typeCategory) {
-        if (effectiveFilter.typeCategory !== ov.typeVersion().typeCategory()) {
-          return false;
-        }
-      }
-      if (
-        effectiveFilter.inputToOpVersions &&
-        effectiveFilter.inputToOpVersions.length > 0
-      ) {
-        const inputToOpVersions = ov.inputTo().map(i => i.opVersion());
-        if (
-          !inputToOpVersions.some(
-            ovInner =>
-              ovInner &&
-              effectiveFilter.inputToOpVersions?.includes(
-                ovInner.op().name() + ':' + ovInner.version()
-              )
-          )
-        ) {
-          return false;
-        }
-      }
-      if (effectiveFilter.objectName) {
-        if (effectiveFilter.objectName !== ov.object().name()) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [
+    return applyFilter(allObjectVersions, effectiveFilter);
+  }, [allObjectVersions, effectiveFilter]);
+
+  // const objectOptions = useMemo(() => {
+  //   const objects = orm.projectConnection.objects();
+  //   const options = objects.map(v => v.name());
+  //   return options;
+  // }, [orm.projectConnection]);
+  const objectOptions = useObjectOptions(allObjectVersions, effectiveFilter);
+
+  // const typeCategoryOptions = useMemo(() => {
+  //   return orm.projectConnection.typeCategories();
+  // }, [orm.projectConnection]);
+  const typeCategoryOptions = useTypeCategoryOptions(
     allObjectVersions,
-    effectiveFilter.inputToOpVersions,
-    effectiveFilter.latest,
-    effectiveFilter.objectName,
-    effectiveFilter.typeCategory,
-    effectiveFilter.typeVersions,
-  ]);
+    effectiveFilter
+  );
+
+  // const typeVersionOptions = useMemo(() => {
+  //   const versions = orm.projectConnection.typeVersions();
+  //   const options = versions.map(
+  //     v => v.type().name() + ':' + v.version().toString()
+  //   );
+  //   return options;
+  // }, [orm]);
+  const typeVersionOptions = useTypeVersionOptions(
+    allObjectVersions,
+    effectiveFilter
+  );
+
+  // const opVersionOptions = useMemo(() => {
+  //   const versions = orm.projectConnection.opVersions();
+  //   // Note: this excludes the named ones without op versions
+  //   const options = versions.map(v => v.op().name() + ':' + v.version());
+  //   return options;
+  // }, [orm.projectConnection]);
+  const opVersionOptions = useOpVersionOptions(
+    allObjectVersions,
+    effectiveFilter
+  );
+
+  const latestOnlyOptions = useLatestOnlyOptions(
+    allObjectVersions,
+    effectiveFilter
+  );
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -248,7 +222,10 @@ export const FilterableObjectVersionsTable: React.FC<{
                   });
                 }}
                 renderInput={params => <TextField {...params} label="Type" />}
-                options={typeVersionOptions}
+                getOptionLabel={option => {
+                  return typeVersionOptions[option];
+                }}
+                options={Object.keys(typeVersionOptions)}
               />
             </FormControl>
           </ListItem>
@@ -271,7 +248,10 @@ export const FilterableObjectVersionsTable: React.FC<{
                     inputToOpVersions: newValue,
                   });
                 }}
-                options={opVersionOptions}
+                getOptionLabel={option => {
+                  return opVersionOptions[option];
+                }}
+                options={Object.keys(opVersionOptions)}
               />
             </FormControl>
           </ListItem>
@@ -279,7 +259,10 @@ export const FilterableObjectVersionsTable: React.FC<{
             secondaryAction={
               <Checkbox
                 edge="end"
-                checked={!!effectiveFilter.latest}
+                checked={
+                  !!effectiveFilter.latest ||
+                  (latestOnlyOptions.length === 1 && latestOnlyOptions[0])
+                }
                 onChange={() => {
                   setFilter({
                     ...filter,
@@ -288,7 +271,10 @@ export const FilterableObjectVersionsTable: React.FC<{
                 }}
               />
             }
-            disabled={Object.keys(props.frozenFilter ?? {}).includes('latest')}
+            disabled={
+              Object.keys(props.frozenFilter ?? {}).includes('latest') ||
+              latestOnlyOptions.length <= 1
+            }
             disablePadding>
             <ListItemButton>
               <ListItemText primary={`Latest Only`} />
@@ -505,4 +491,156 @@ const ObjectVersionsTable: React.FC<{
       columnGroupingModel={columnGroupingModel}
     />
   );
+};
+
+const applyFilter = (
+  allObjectVersions: WFObjectVersion[],
+  effectiveFilter: WFHighLevelObjectVersionFilter
+) => {
+  return allObjectVersions.filter(ov => {
+    if (
+      effectiveFilter.typeVersions &&
+      effectiveFilter.typeVersions.length > 0
+    ) {
+      if (
+        !effectiveFilter.typeVersions.includes(
+          ov.typeVersion().type().name() +
+            ':' +
+            ov.typeVersion().version().toString()
+        )
+      ) {
+        return false;
+      }
+    }
+    if (effectiveFilter.latest) {
+      if (!ov.aliases().includes('latest')) {
+        return false;
+      }
+    }
+    if (effectiveFilter.typeCategory) {
+      if (effectiveFilter.typeCategory !== ov.typeVersion().typeCategory()) {
+        return false;
+      }
+    }
+    if (
+      effectiveFilter.inputToOpVersions &&
+      effectiveFilter.inputToOpVersions.length > 0
+    ) {
+      const inputToOpVersions = ov.inputTo().map(i => i.opVersion());
+      if (
+        !inputToOpVersions.some(
+          ovInner =>
+            ovInner &&
+            effectiveFilter.inputToOpVersions?.includes(
+              ovInner.op().name() + ':' + ovInner.version()
+            )
+        )
+      ) {
+        return false;
+      }
+    }
+    if (effectiveFilter.objectName) {
+      if (effectiveFilter.objectName !== ov.object().name()) {
+        return false;
+      }
+    }
+    return true;
+  });
+};
+
+const useObjectOptions = (
+  allObjectVersions: WFObjectVersion[],
+  highLevelFilter: WFHighLevelObjectVersionFilter
+) => {
+  const filtered = useMemo(() => {
+    return applyFilter(
+      allObjectVersions,
+      _.omit(highLevelFilter, ['objectName'])
+    );
+  }, [allObjectVersions, highLevelFilter]);
+
+  return useMemo(() => {
+    return filtered.map(item => item.object().name());
+  }, [filtered]);
+};
+
+const useTypeVersionOptions = (
+  allObjectVersions: WFObjectVersion[],
+  highLevelFilter: WFHighLevelObjectVersionFilter
+) => {
+  const filtered = useMemo(() => {
+    return applyFilter(
+      allObjectVersions,
+      _.omit(highLevelFilter, ['typeVersions'])
+    );
+  }, [allObjectVersions, highLevelFilter]);
+
+  return useMemo(() => {
+    const versions = filtered.map(item => item.typeVersion());
+
+    return _.fromPairs(
+      versions.map(v => {
+        return [
+          v.type().name() + ':' + v.version(),
+          v.type().name() + ' (' + truncateID(v.version()) + ')',
+        ];
+      })
+    );
+  }, [filtered]);
+};
+
+const useOpVersionOptions = (
+  allObjectVersions: WFObjectVersion[],
+  highLevelFilter: WFHighLevelObjectVersionFilter
+) => {
+  const filtered = useMemo(() => {
+    return applyFilter(
+      allObjectVersions,
+      _.omit(highLevelFilter, ['inputToOpVersions'])
+    );
+  }, [allObjectVersions, highLevelFilter]);
+
+  return useMemo(() => {
+    const versions = filtered
+      .flatMap(item => item.inputTo().map(i => i.opVersion()))
+      .filter(v => v != null) as WFOpVersion[];
+
+    return _.fromPairs(
+      versions.map(v => {
+        return [
+          v.op().name() + ':' + v.version(),
+          v.op().name() + ' (' + truncateID(v.version()) + ')',
+        ];
+      })
+    );
+  }, [filtered]);
+};
+
+const useTypeCategoryOptions = (
+  allObjectVersions: WFObjectVersion[],
+  highLevelFilter: WFHighLevelObjectVersionFilter
+) => {
+  const filtered = useMemo(() => {
+    return applyFilter(
+      allObjectVersions,
+      _.omit(highLevelFilter, ['typeCategory'])
+    );
+  }, [allObjectVersions, highLevelFilter]);
+
+  return useMemo(() => {
+    return _.uniq(filtered.map(item => item.typeVersion().typeCategory()));
+  }, [filtered]);
+};
+
+const useLatestOnlyOptions = (
+  allObjectVersions: WFObjectVersion[],
+  highLevelFilter: WFHighLevelObjectVersionFilter
+) => {
+  const filtered = useMemo(() => {
+    return applyFilter(allObjectVersions, _.omit(highLevelFilter, ['latest']));
+  }, [allObjectVersions, highLevelFilter]);
+
+  return useMemo(() => {
+    return _.uniq(filtered.map(item => item.aliases().includes('latest')));
+  }, [filtered]);
 };
