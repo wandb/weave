@@ -250,7 +250,7 @@ const CallPageInnerVertical: React.FC<{
 }> = ({call, setVerticalLayout}) => {
   const callId = call.callID();
   const spanName = call.spanName();
-  const title = `${spanName}: ${truncateID(callId)}`;
+  const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   return (
     <SimplePageLayout

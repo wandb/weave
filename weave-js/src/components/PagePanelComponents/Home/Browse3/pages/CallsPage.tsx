@@ -20,7 +20,13 @@ import {
   useWeaveflowORMContext,
   WeaveflowORMContextType,
 } from './wfInterface/context';
-import {HackyOpCategory} from './wfInterface/types';
+import {
+  HackyOpCategory,
+  WFCall,
+  WFObjectVersion,
+  WFOpVersion,
+} from './wfInterface/types';
+import {truncateID} from './util';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -190,7 +196,10 @@ export const CallsTable: React.FC<{
                   <TextField {...params} label="Op" />
                   // <TextField {...params} label="Op Version" />
                 )}
-                options={opVersionOptions}
+                getOptionLabel={option => {
+                  return opVersionOptions[option];
+                }}
+                options={Object.keys(opVersionOptions)}
               />
             </FormControl>
           </ListItem>
@@ -214,7 +223,10 @@ export const CallsTable: React.FC<{
                     inputObjectVersions: newValue,
                   });
                 }}
-                options={consumesObjectVersionOptions}
+                getOptionLabel={option => {
+                  return consumesObjectVersionOptions[option];
+                }}
+                options={Object.keys(consumesObjectVersionOptions)}
               />
             </FormControl>
           </ListItem>
@@ -233,7 +245,10 @@ export const CallsTable: React.FC<{
                     traceId: newValue,
                   });
                 }}
-                options={traceIdOptions}
+                getOptionLabel={option => {
+                  return traceIdOptions[option];
+                }}
+                options={Object.keys(traceIdOptions)}
               />
             </FormControl>
           </ListItem>
@@ -252,7 +267,10 @@ export const CallsTable: React.FC<{
                     parentId: newValue,
                   });
                 }}
-                options={parentIdOptions}
+                getOptionLabel={option => {
+                  return parentIdOptions[option];
+                }}
+                options={Object.keys(parentIdOptions)}
               />
             </FormControl>
           </ListItem>
@@ -367,21 +385,23 @@ const useOpVersionOptions = (
     }, [highLevelFilter, orm])
   );
   return useMemo(() => {
+    let versions: WFOpVersion[] = [];
     if (runs.loading) {
-      const versions = orm.projectConnection.opVersions();
-      // Note: this excludes the named ones without op versions
-      const options = versions.map(v => v.op().name() + ':' + v.version());
-      return options;
+      versions = orm.projectConnection.opVersions();
+    } else {
+      versions = runs.result
+        .map(r => orm.projectConnection.call(r.span_id)?.opVersion())
+        .filter(v => v != null) as WFOpVersion[];
     }
-    return _.uniq(
-      runs.result.map(r => {
-        const version = orm.projectConnection.call(r.span_id)?.opVersion();
-        if (!version) {
-          return null;
-        }
-        return version.op().name() + ':' + version.version();
+
+    return _.fromPairs(
+      versions.map(v => {
+        return [
+          v.op().name() + ':' + v.version(),
+          v.op().name() + ':v' + v.versionIndex(),
+        ];
       })
-    ).filter(v => v != null) as string[];
+    );
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 
@@ -405,24 +425,26 @@ const useConsumesObjectVersionOptions = (
     }, [highLevelFilter, orm])
   );
   return useMemo(() => {
+    let versions: WFObjectVersion[] = [];
     if (runs.loading) {
-      const versions = orm.projectConnection.objectVersions();
-      const options = versions.map(v => v.object().name() + ':' + v.version());
-      return options;
+      versions = orm.projectConnection.objectVersions();
+    } else {
+      versions = runs.result.flatMap(
+        r => orm.projectConnection.call(r.span_id)?.inputs() ?? []
+      );
     }
-    return _.uniq(
-      runs.result.flatMap(r => {
-        const inputs = orm.projectConnection.call(r.span_id)?.inputs();
-        if (!inputs) {
-          return null;
-        }
-        return inputs.map(i => i.object().name() + ':' + i.version());
+    return _.fromPairs(
+      versions.map(v => {
+        return [
+          v.object().name() + ':' + v.version(),
+          v.object().name() + ':v' + v.versionIndex(),
+        ];
       })
-    ).filter(v => v != null) as string[];
+    );
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 
-const useParentIdOptions = (
+const useTraceIdOptions = (
   orm: WeaveflowORMContextType,
   entity: string,
   project: string,
@@ -442,20 +464,34 @@ const useParentIdOptions = (
     }, [highLevelFilter, orm])
   );
   return useMemo(() => {
+    let roots: WFCall[] = [];
     if (runs.loading) {
-      const calls = orm.projectConnection.calls();
-      const options = Array.from(
-        new Set(calls.map(v => v.traceID()).filter(v => v != null))
-      );
-      return options;
+      roots = orm.projectConnection.calls().filter(v => v.parentCall() == null);
+    } else {
+      roots = runs.result
+        .map(r => orm.projectConnection.call(r.span_id)?.traceID())
+        .filter(trace_id => trace_id != null)
+        .flatMap(trace_id =>
+          orm.projectConnection.traceRoots(trace_id!)
+        ) as WFCall[];
     }
-    return _.uniq(
-      runs.result.map(r => orm.projectConnection.call(r.span_id)?.traceID())
-    ).filter(v => v != null) as string[];
+
+    return _.fromPairs(
+      roots.map(c => {
+        const version = c.opVersion();
+        if (!version) {
+          return [c.traceID(), c.spanName()];
+        }
+        return [
+          c.traceID(),
+          version.op().name() + ' (' + truncateID(c.callID()) + ')',
+        ];
+      })
+    );
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 
-const useTraceIdOptions = (
+const useParentIdOptions = (
   orm: WeaveflowORMContextType,
   entity: string,
   project: string,
@@ -475,18 +511,29 @@ const useTraceIdOptions = (
     }, [highLevelFilter, orm])
   );
   return useMemo(() => {
+    let parents: WFCall[] = [];
     if (runs.loading) {
-      const calls = orm.projectConnection.calls();
-      const options = calls
-        .map(v => v.parentCall()?.callID())
-        .filter(v => v != null);
-      return options;
+      parents = orm.projectConnection
+        .calls()
+        .map(c => c.parentCall())
+        .filter(v => v != null) as WFCall[];
+    } else {
+      parents = runs.result
+        .map(r => orm.projectConnection.call(r.span_id)?.parentCall())
+        .filter(v => v != null) as WFCall[];
     }
-    return _.uniq(
-      runs.result.map(r =>
-        orm.projectConnection.call(r.span_id)?.parentCall()?.callID()
-      )
-    ).filter(v => v != null) as string[];
+    return _.fromPairs(
+      parents.map(c => {
+        const version = c.opVersion();
+        if (!version) {
+          return [c.traceID(), c.spanName()];
+        }
+        return [
+          c.callID(),
+          version.op().name() + ' (' + truncateID(c.callID()) + ')',
+        ];
+      })
+    );
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 

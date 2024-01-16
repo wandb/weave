@@ -855,7 +855,7 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
         o.obj.inputTypesVersions().map(tv => {
           return [
             tv.type().name() + ':' + tv.version(),
-            tv.type().name() + ':' + truncateID(tv.version()),
+            tv.type().name() + ' (' + truncateID(tv.version()) + ')',
           ];
         })
       )
@@ -911,7 +911,7 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
         o.obj.outputTypeVersions().map(tv => {
           return [
             tv.type().name() + ':' + tv.version(),
-            tv.type().name() + ':' + truncateID(tv.version()),
+            tv.type().name() + ' (' + truncateID(tv.version()) + ')',
           ];
         })
       )
