@@ -59,14 +59,11 @@ export const FilterableTypeVersionsTable: React.FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
-  const getInitialData = useCallback(
-    (filter: WFHighLevelTypeVersionFilter) => {
-      return orm.projectConnection.typeVersions().map(o => {
-        return {id: o.version(), obj: o};
-      });
-    },
-    [orm.projectConnection]
-  );
+  const getInitialData = useCallback(() => {
+    return orm.projectConnection.typeVersions().map(o => {
+      return {id: o.version(), obj: o};
+    });
+  }, [orm.projectConnection]);
 
   const getFilterPopoutTargetUrl = useCallback(
     (filter: WFHighLevelTypeVersionFilter) => {

@@ -1,12 +1,13 @@
 import {Box} from '@mui/material';
 import {DataGridPro, GridColDef, GridValidRowModel} from '@mui/x-data-grid-pro';
+import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 type FilterableTablePropsType<
   DataRowType extends GridValidRowModel,
   CompositeFilterType extends {[key: string]: any} = {[key: string]: any}
 > = {
-  getInitialData: (filter: CompositeFilterType) => DataRowType[];
+  getInitialData: () => DataRowType[];
   columns: WFHighLevelDataColumnDictType<DataRowType, CompositeFilterType>;
   getFilterPopoutTargetUrl?: (filter: CompositeFilterType) => string;
   frozenFilter?: Partial<CompositeFilterType>;
@@ -48,6 +49,7 @@ export type WFHighLevelDataColumn<
   };
   // If present, filtering for this column is enabled
   filterControls?: {
+    filterKeys: string[];
     filterPredicate: (
       obj: DataRowType,
       filter: Partial<CompositeFilterType>
@@ -55,6 +57,7 @@ export type WFHighLevelDataColumn<
     filterControlListItem: React.FC<{
       filter: Partial<CompositeFilterType>;
       updateFilter: (update: Partial<CompositeFilterType>) => void;
+      frozenData: DataRowType[];
     }>;
   };
 };
@@ -89,25 +92,48 @@ export const FilterableTable = <
     return {...filter, ...props.frozenFilter} as CompositeFilterType;
   }, [filter, props.frozenFilter]);
 
-  // Get the initial data from the caller (note that we pass the filter in in case
-  // the caller wants to use it)
-  const initialPreFilteredData = useMemo(
-    () => props.getInitialData(effectiveFilter),
-    [effectiveFilter, props]
-  );
+  // Get the initial data from the caller
+  const initialPreFilteredData = useMemo(() => props.getInitialData(), [props]);
+  const {filteredData: frozenData} = useMemo(() => {
+    let data = initialPreFilteredData;
+    const ff = props.frozenFilter;
+    if (ff != null) {
+      Object.values(props.columns).forEach(column => {
+        if (column.filterControls) {
+          data = data.filter(obj =>
+            column.filterControls!.filterPredicate(obj, ff)
+          );
+        }
+      });
+    }
+    return {filteredData: data};
+  }, [initialPreFilteredData, props.columns, props.frozenFilter]);
 
   // Apply the filter controls
-  const filteredData = useMemo(() => {
-    let data = initialPreFilteredData;
-    Object.values(props.columns).forEach(column => {
+  const {filteredData, filteredColData} = useMemo(() => {
+    let data = frozenData;
+    const colData = _.mapValues(props.columns, () => frozenData);
+    Object.entries(props.columns).forEach(([key, column]) => {
       if (column.filterControls) {
         data = data.filter(obj =>
-          column.filterControls!.filterPredicate(obj, effectiveFilter)
+          column.filterControls!.filterPredicate(obj, filter)
         );
+        // UG, nasty n^2 loop
+        Object.entries(props.columns).forEach(([innerKey, innerColumn]) => {
+          if (innerKey === key || !innerColumn.filterControls) {
+            return;
+          }
+          colData[key] = colData[key].filter(obj =>
+            innerColumn.filterControls!.filterPredicate(
+              obj,
+              _.omit(filter, column.filterControls!.filterKeys)
+            )
+          );
+        });
       }
     });
-    return data;
-  }, [effectiveFilter, initialPreFilteredData, props.columns]);
+    return {filteredData: data, filteredColData: colData};
+  }, [filter, frozenData, props.columns]);
 
   // Apply the data transformations
   const dataGridRowData = useMemo(() => {
@@ -150,13 +176,14 @@ export const FilterableTable = <
               updateFilter: update => {
                 setFilter({...filter, ...update} as CompositeFilterType);
               },
+              frozenData: filteredColData[key],
             });
           }
           return <React.Fragment key={key}>{col}</React.Fragment>;
         })}
       </>
     );
-  }, [effectiveFilter, filter, props.columns, setFilter]);
+  }, [effectiveFilter, filter, filteredColData, props.columns, setFilter]);
 
   return (
     <FilterLayoutTemplate

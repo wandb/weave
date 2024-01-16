@@ -19,6 +19,7 @@ import {
   WFHighLevelDataColumn,
 } from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
 
@@ -66,14 +67,11 @@ export const FilterableOpVersionsTable: React.FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
-  const getInitialData = useCallback(
-    (innerFilter: WFHighLevelOpVersionFilter) => {
-      return orm.projectConnection.opVersions().map(o => {
-        return {id: o.version(), obj: o};
-      });
-    },
-    [orm.projectConnection]
-  );
+  const getInitialData = useCallback(() => {
+    return orm.projectConnection.opVersions().map(o => {
+      return {id: o.version(), obj: o};
+    });
+  }, [orm.projectConnection]);
 
   const getFilterPopoutTargetUrl = useCallback(
     (innerFilter: WFHighLevelOpVersionFilter) => {
@@ -188,6 +186,7 @@ export const FilterableOpVersionsTable: React.FC<{
           },
         },
         filterControls: {
+          filterKeys: ['opCategory'],
           filterPredicate: ({obj}, innerFilter) => {
             if (innerFilter.opCategory == null) {
               return true;
@@ -284,6 +283,7 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
+          filterKeys: ['opName'],
           filterPredicate: ({obj}, innerFilter) => {
             if (innerFilter.opName == null) {
               return true;
@@ -336,6 +336,7 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
+          filterKeys: ['invokedByOpVersions'],
           filterPredicate: ({obj}, innerFilter) => {
             if (
               innerFilter.invokedByOpVersions == null ||
@@ -395,6 +396,7 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
+          filterKeys: ['invokesOpVersions'],
           filterPredicate: ({obj}, innerFilter) => {
             if (
               innerFilter.invokesOpVersions == null ||
@@ -454,6 +456,7 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
+          filterKeys: ['consumesTypeVersions'],
           filterPredicate: ({obj}, innerFilter) => {
             if (
               innerFilter.consumesTypeVersions == null ||
@@ -513,6 +516,7 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
+          filterKeys: ['producesTypeVersions'],
           filterPredicate: ({obj}, innerFilter) => {
             if (
               innerFilter.producesTypeVersions == null ||
@@ -599,31 +603,18 @@ export const FilterableOpVersionsTable: React.FC<{
         //   },
         // },
         filterControls: {
+          filterKeys: ['isLatest'],
           filterPredicate: ({obj}, {isLatest}) => {
             return !isLatest || obj.aliases().includes('latest') === isLatest;
           },
-          filterControlListItem: colProps => {
+          filterControlListItem: cellProps => {
             return (
-              <ListItem
-                secondaryAction={
-                  <Checkbox
-                    edge="end"
-                    checked={!!colProps.filter?.isLatest}
-                    onChange={() => {
-                      colProps.updateFilter({
-                        isLatest: !colProps.filter?.isLatest,
-                      });
-                    }}
-                  />
-                }
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'isLatest'
-                )}
-                disablePadding>
-                <ListItemButton>
-                  <ListItemText primary={`Latest Only`} />
-                </ListItemButton>
-              </ListItem>
+              <LatestOnlyControlListItem
+                entity={props.entity}
+                project={props.project}
+                frozenFilter={props.frozenFilter}
+                {...cellProps}
+              />
             );
           },
         },
@@ -655,11 +646,17 @@ const OpCategoryFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection.opCategories();
+  // }, [orm.projectConnection]);
   const options = useMemo(() => {
-    return orm.projectConnection.opCategories();
-  }, [orm.projectConnection]);
+    return _.uniq(props.frozenData.map(item => item.obj.opCategory())).filter(
+      item => item != null
+    ) as HackyOpCategory[];
+  }, [props.frozenData]);
   return (
     <ListItem>
       <FormControl fullWidth>
@@ -688,11 +685,15 @@ const OpNameFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection.ops().map(o => o.name());
+  // }, [orm.projectConnection]);
   const options = useMemo(() => {
-    return orm.projectConnection.ops().map(o => o.name());
-  }, [orm.projectConnection]);
+    return _.uniq(props.frozenData.map(item => item.obj.op().name()));
+  }, [props.frozenData]);
   return (
     <ListItem>
       <FormControl fullWidth>
@@ -719,21 +720,34 @@ const InvokedByFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const optionsDict = useMemo(() => {
+  //   return _.fromPairs(
+  //     orm.projectConnection
+  //       .opVersions()
+  //       .filter(o => o.invokedBy().length > 0)
+  //       .map(o => {
+  //         return [
+  //           o.op().name() + ':' + o.version(),
+  //           o.op().name() + ':v' + o.versionIndex(),
+  //         ];
+  //       })
+  //   );
+  // }, [orm.projectConnection]);
   const optionsDict = useMemo(() => {
     return _.fromPairs(
-      orm.projectConnection
-        .opVersions()
-        .filter(o => o.invokedBy().length > 0)
-        .map(o => {
+      props.frozenData.flatMap(o =>
+        o.obj.invokedBy().map(v => {
           return [
-            o.op().name() + ':' + o.version(),
-            o.op().name() + ':v' + o.versionIndex(),
+            v.op().name() + ':' + v.version(),
+            v.op().name() + ':v' + v.versionIndex(),
           ];
         })
+      )
     );
-  }, [orm.projectConnection]);
+  }, [props.frozenData]);
   return (
     <ListItem>
       <FormControl fullWidth>
@@ -744,7 +758,7 @@ const InvokedByFilterControlListItem: React.FC<{
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'invokedByOpVersions'
           )}
-          renderInput={params => <TextField {...params} label="Calls" />}
+          renderInput={params => <TextField {...params} label="Called By" />}
           value={props.filter.invokedByOpVersions ?? []}
           onChange={(event, newValue) => {
             props.updateFilter({
@@ -767,16 +781,30 @@ const InvokesFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection
-      .opVersions()
-      .filter(o => o.invokes().length > 0)
-      .map(o => {
-        return o.op().name() + ':' + o.version();
-      });
-  }, [orm.projectConnection]);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection
+  //     .opVersions()
+  //     .filter(o => o.invokes().length > 0)
+  //     .map(o => {
+  //       return o.op().name() + ':' + o.version();
+  //     });
+  // }, [orm.projectConnection]);
+  const optionsDict = useMemo(() => {
+    return _.fromPairs(
+      props.frozenData
+        .filter(o => o.obj.invokes().length > 0)
+        .map(o => {
+          return [
+            o.obj.op().name() + ':' + o.obj.version(),
+            o.obj.op().name() + ':v' + o.obj.versionIndex(),
+          ];
+        })
+    );
+  }, [props.frozenData]);
+
   return (
     <ListItem>
       <FormControl fullWidth>
@@ -787,14 +815,17 @@ const InvokesFilterControlListItem: React.FC<{
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'invokesOpVersions'
           )}
-          renderInput={params => <TextField {...params} label="Called By" />}
+          renderInput={params => <TextField {...params} label="Calls" />}
           value={props.filter.invokesOpVersions ?? []}
           onChange={(event, newValue) => {
             props.updateFilter({
               invokesOpVersions: newValue,
             });
           }}
-          options={options}
+          getOptionLabel={option => {
+            return optionsDict[option];
+          }}
+          options={Object.keys(optionsDict)}
         />
       </FormControl>
     </ListItem>
@@ -807,16 +838,29 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection
-      .typeVersions()
-      .filter(o => o.inputTo().length > 0)
-      .map(o => {
-        return o.type().name() + ':' + o.version();
-      });
-  }, [orm.projectConnection]);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection
+  //     .typeVersions()
+  //     .filter(o => o.inputTo().length > 0)
+  //     .map(o => {
+  //       return o.type().name() + ':' + o.version();
+  //     });
+  // }, [orm.projectConnection]);
+  const optionsDict = useMemo(() => {
+    return _.fromPairs(
+      props.frozenData.flatMap(o =>
+        o.obj.inputTypesVersions().map(tv => {
+          return [
+            tv.type().name() + ':' + tv.version(),
+            tv.type().name() + ':' + truncateID(tv.version()),
+          ];
+        })
+      )
+    );
+  }, [props.frozenData]);
   return (
     <ListItem>
       <FormControl fullWidth>
@@ -834,7 +878,10 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
               consumesTypeVersions: newValue,
             });
           }}
-          options={options}
+          getOptionLabel={option => {
+            return optionsDict[option];
+          }}
+          options={Object.keys(optionsDict)}
         />
       </FormControl>
     </ListItem>
@@ -847,16 +894,29 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection
-      .typeVersions()
-      .filter(o => o.outputFrom().length > 0)
-      .map(o => {
-        return o.type().name() + ':' + o.version();
-      });
-  }, [orm.projectConnection]);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection
+  //     .typeVersions()
+  //     .filter(o => o.outputFrom().length > 0)
+  //     .map(o => {
+  //       return o.type().name() + ':' + o.version();
+  //     });
+  // }, [orm.projectConnection]);
+  const optionsDict = useMemo(() => {
+    return _.fromPairs(
+      props.frozenData.flatMap(o =>
+        o.obj.outputTypeVersions().map(tv => {
+          return [
+            tv.type().name() + ':' + tv.version(),
+            tv.type().name() + ':' + truncateID(tv.version()),
+          ];
+        })
+      )
+    );
+  }, [props.frozenData]);
 
   return (
     <ListItem>
@@ -875,9 +935,54 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
               producesTypeVersions: newValue,
             });
           }}
-          options={options}
+          getOptionLabel={option => {
+            return optionsDict[option];
+          }}
+          options={Object.keys(optionsDict)}
         />
       </FormControl>
+    </ListItem>
+  );
+};
+
+const LatestOnlyControlListItem: React.FC<{
+  entity: string;
+  project: string;
+  frozenFilter?: WFHighLevelOpVersionFilter;
+  filter: WFHighLevelOpVersionFilter;
+  updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
+}> = props => {
+  const options = useMemo(() => {
+    return _.uniq(
+      props.frozenData.map(o => o.obj.aliases().includes('latest'))
+    );
+  }, [props.frozenData]);
+
+  return (
+    <ListItem
+      secondaryAction={
+        <Checkbox
+          edge="end"
+          checked={
+            !!props.filter?.isLatest ||
+            (options.length === 1 && options[0] === true)
+          }
+          onChange={() => {
+            props.updateFilter({
+              isLatest: !props.filter?.isLatest,
+            });
+          }}
+        />
+      }
+      disabled={
+        Object.keys(props.frozenFilter ?? {}).includes('isLatest') ||
+        options.length <= 1
+      }
+      disablePadding>
+      <ListItemButton>
+        <ListItemText primary={`Latest Only`} />
+      </ListItemButton>
     </ListItem>
   );
 };
