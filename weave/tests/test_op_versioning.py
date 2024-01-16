@@ -8,7 +8,7 @@ import numpy as np
 import typing
 
 
-def test_op_versioning():
+def test_op_versioning_saveload():
     @weave.op()
     def versioned_op(a: int, b: int) -> int:
         return a + b
