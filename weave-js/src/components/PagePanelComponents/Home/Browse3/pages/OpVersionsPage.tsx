@@ -308,126 +308,126 @@ export const FilterableOpVersionsTable: React.FC<{
         'opName',
         WFHighLevelOpVersionFilter
       >,
-      invokedByOpVersions: {
-        columnId: 'invokedByOpVersions',
-        // gridDisplay: {
-        //   columnLabel: 'Invoked By',
-        //   columnValue: obj => obj.obj.invokedBy().length,
-        //   gridColDefOptions: {
-        //     renderCell: params => {
-        //       if (params.value === 0) {
-        //         return '';
-        //       }
-        //       return (
-        //         <OpVersionsLink
-        //           entity={params.row.obj.entity()}
-        //           project={params.row.obj.project()}
-        //           versionCount={params.value as number}
-        //           filter={{
-        //             invokesOpVersions: [
-        //               params.row.obj.op().name() +
-        //                 ':' +
-        //                 params.row.obj.version(),
-        //             ],
-        //           }}
-        //         />
-        //       );
-        //     },
-        //   },
-        // },
-        filterControls: {
-          filterKeys: ['invokedByOpVersions'],
-          filterPredicate: ({obj}, innerFilter) => {
-            if (
-              innerFilter.invokedByOpVersions == null ||
-              innerFilter.invokedByOpVersions.length === 0
-            ) {
-              return true;
-            }
-            return obj.invokedBy().some(version => {
-              return innerFilter.invokedByOpVersions?.includes(
-                version.op().name() + ':' + version.version()
-              );
-            });
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <InvokedByFilterControlListItem
-                entity={props.entity}
-                project={props.project}
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string[],
-        number,
-        'invokedByOpVersions',
-        WFHighLevelOpVersionFilter
-      >,
-      invokesOpVersions: {
-        columnId: 'invokesOpVersions',
-        // gridDisplay: {
-        //   columnLabel: 'Invokes',
-        //   columnValue: obj => obj.obj.invokes().length,
-        //   gridColDefOptions: {
-        //     renderCell: params => {
-        //       if (params.value === 0) {
-        //         return '';
-        //       }
-        //       return (
-        //         <OpVersionsLink
-        //           entity={params.row.obj.entity()}
-        //           project={params.row.obj.project()}
-        //           versionCount={params.value as number}
-        //           filter={{
-        //             invokedByOpVersions: [
-        //               params.row.obj.op().name() +
-        //                 ':' +
-        //                 params.row.obj.version(),
-        //             ],
-        //           }}
-        //         />
-        //       );
-        //     },
-        //   },
-        // },
-        filterControls: {
-          filterKeys: ['invokesOpVersions'],
-          filterPredicate: ({obj}, innerFilter) => {
-            if (
-              innerFilter.invokesOpVersions == null ||
-              innerFilter.invokesOpVersions.length === 0
-            ) {
-              return true;
-            }
-            return obj.invokes().some(version => {
-              return innerFilter.invokesOpVersions?.includes(
-                version.op().name() + ':' + version.version()
-              );
-            });
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <InvokesFilterControlListItem
-                entity={props.entity}
-                project={props.project}
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string[],
-        number,
-        'invokesOpVersions',
-        WFHighLevelOpVersionFilter
-      >,
+      // invokedByOpVersions: {
+      //   columnId: 'invokedByOpVersions',
+      //   gridDisplay: {
+      //     columnLabel: 'Invoked By',
+      //     columnValue: obj => obj.obj.invokedBy().length,
+      //     gridColDefOptions: {
+      //       renderCell: params => {
+      //         if (params.value === 0) {
+      //           return '';
+      //         }
+      //         return (
+      //           <OpVersionsLink
+      //             entity={params.row.obj.entity()}
+      //             project={params.row.obj.project()}
+      //             versionCount={params.value as number}
+      //             filter={{
+      //               invokesOpVersions: [
+      //                 params.row.obj.op().name() +
+      //                   ':' +
+      //                   params.row.obj.version(),
+      //               ],
+      //             }}
+      //           />
+      //         );
+      //       },
+      //     },
+      //   },
+      //   filterControls: {
+      //     filterKeys: ['invokedByOpVersions'],
+      //     filterPredicate: ({obj}, innerFilter) => {
+      //       if (
+      //         innerFilter.invokedByOpVersions == null ||
+      //         innerFilter.invokedByOpVersions.length === 0
+      //       ) {
+      //         return true;
+      //       }
+      //       return obj.invokedBy().some(version => {
+      //         return innerFilter.invokedByOpVersions?.includes(
+      //           version.op().name() + ':' + version.version()
+      //         );
+      //       });
+      //     },
+      //     filterControlListItem: cellProps => {
+      //       return (
+      //         <InvokedByFilterControlListItem
+      //           entity={props.entity}
+      //           project={props.project}
+      //           frozenFilter={props.frozenFilter}
+      //           {...cellProps}
+      //         />
+      //       );
+      //     },
+      //   },
+      // } as WFHighLevelDataColumn<
+      //   {obj: WFOpVersion},
+      //   string[],
+      //   number,
+      //   'invokedByOpVersions',
+      //   WFHighLevelOpVersionFilter
+      // >,
+      // invokesOpVersions: {
+      //   columnId: 'invokesOpVersions',
+      //   gridDisplay: {
+      //     columnLabel: 'Invokes',
+      //     columnValue: obj => obj.obj.invokes().length,
+      //     gridColDefOptions: {
+      //       renderCell: params => {
+      //         if (params.value === 0) {
+      //           return '';
+      //         }
+      //         return (
+      //           <OpVersionsLink
+      //             entity={params.row.obj.entity()}
+      //             project={params.row.obj.project()}
+      //             versionCount={params.value as number}
+      //             filter={{
+      //               invokedByOpVersions: [
+      //                 params.row.obj.op().name() +
+      //                   ':' +
+      //                   params.row.obj.version(),
+      //               ],
+      //             }}
+      //           />
+      //         );
+      //       },
+      //     },
+      //   },
+      //   filterControls: {
+      //     filterKeys: ['invokesOpVersions'],
+      //     filterPredicate: ({obj}, innerFilter) => {
+      //       if (
+      //         innerFilter.invokesOpVersions == null ||
+      //         innerFilter.invokesOpVersions.length === 0
+      //       ) {
+      //         return true;
+      //       }
+      //       return obj.invokes().some(version => {
+      //         return innerFilter.invokesOpVersions?.includes(
+      //           version.op().name() + ':' + version.version()
+      //         );
+      //       });
+      //     },
+      //     filterControlListItem: cellProps => {
+      //       return (
+      //         <InvokesFilterControlListItem
+      //           entity={props.entity}
+      //           project={props.project}
+      //           frozenFilter={props.frozenFilter}
+      //           {...cellProps}
+      //         />
+      //       );
+      //     },
+      //   },
+      // } as WFHighLevelDataColumn<
+      //   {obj: WFOpVersion},
+      //   string[],
+      //   number,
+      //   'invokesOpVersions',
+      //   WFHighLevelOpVersionFilter
+      // >,
       consumesTypeVersions: {
         columnId: 'consumesTypeVersions',
         // gridDisplay: {
