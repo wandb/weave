@@ -79,6 +79,7 @@ const OpVersionPageInner: React.FC<{
                     opName,
                   }}
                   versionCount={opVersionCount}
+                  neverPeek
                 />
                 ]
               </>
@@ -99,42 +100,44 @@ const OpVersionPageInner: React.FC<{
               <OpVersionCategoryChip opCategory={opVersion.opCategory()} />
             ),
 
-            ...(opInputTypes.length > 0
-              ? {
-                  'Input Types': (
-                    <ul style={{margin: 0}}>
-                      {opInputTypes.map((t, i) => (
-                        <li key={i}>
-                          <TypeVersionLink
-                            entityName={t.entity()}
-                            projectName={t.project()}
-                            typeName={t.type().name()}
-                            version={t.version()}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  ),
-                }
-              : {}),
-            ...(opOutputTypes.length > 0
-              ? {
-                  'Output Types': (
-                    <ul style={{margin: 0}}>
-                      {opOutputTypes.map((t, i) => (
-                        <li key={i}>
-                          <TypeVersionLink
-                            entityName={t.entity()}
-                            projectName={t.project()}
-                            typeName={t.type().name()}
-                            version={t.version()}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  ),
-                }
-              : {}),
+            // Dropping input types and output types for the time being since
+            // we have de-prioritized type version navigation.
+            // ...(opInputTypes.length > 0
+            //   ? {
+            //       'Input Types': (
+            //         <ul style={{margin: 0}}>
+            //           {opInputTypes.map((t, i) => (
+            //             <li key={i}>
+            //               <TypeVersionLink
+            //                 entityName={t.entity()}
+            //                 projectName={t.project()}
+            //                 typeName={t.type().name()}
+            //                 version={t.version()}
+            //               />
+            //             </li>
+            //           ))}
+            //         </ul>
+            //       ),
+            //     }
+            //   : {}),
+            // ...(opOutputTypes.length > 0
+            //   ? {
+            //       'Output Types': (
+            //         <ul style={{margin: 0}}>
+            //           {opOutputTypes.map((t, i) => (
+            //             <li key={i}>
+            //               <TypeVersionLink
+            //                 entityName={t.entity()}
+            //                 projectName={t.project()}
+            //                 typeName={t.type().name()}
+            //                 version={t.version()}
+            //               />
+            //             </li>
+            //           ))}
+            //         </ul>
+            //       ),
+            //     }
+            //   : {}),
             ...(opInvokes.length > 0
               ? {'Call Tree': <OpVersionOpTree opVersion={opVersion} />}
               : {}),
