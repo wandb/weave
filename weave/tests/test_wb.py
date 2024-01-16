@@ -409,7 +409,7 @@ def test_legacy_run_file_table_format(fake_wandb, cache_mode_minimal):
     assert weave.use(cell_node.project().name()) == "mendeleev"
 
 
-def test_mapped_table_empty(fake_wandb):
+def test_mapped_table_empty(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(table_mock_empty_workspace)
     cell_node = (
         ops.project("stacey", "mendeleev")
@@ -790,7 +790,7 @@ def test_loading_artifact_browser_request_1(fake_wandb):
     assert weave.use(ac_node) != None
 
 
-def test_loading_artifact_browser_request_2(fake_wandb):
+def test_loading_artifact_browser_request_2(fake_wandb, cache_mode_minimal):
     ac_node = ops.project("stacey", "mendeleev").artifact("test_res_1fwmcd3q")
     # Leaf 2: Get collection details
     fake_wandb.fake_api.add_mock(
