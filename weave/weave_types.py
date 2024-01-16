@@ -954,8 +954,6 @@ class TypedDict(Type):
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
         mapped_result = mapper.apply(result)
-        if extra is not None:
-            return mapped_result[extra[0]]
         return mapped_result
 
 

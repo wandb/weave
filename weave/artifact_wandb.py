@@ -436,7 +436,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             # TODO: we could technically support writable artifacts by creating a new version?
             self._unresolved_read_artifact_or_client_uri = uri
         self._local_path: dict[str, str] = {}
-        self._path_handlers: dict[str, typing.Any] = {}
+        # self._path_handlers: dict[str, typing.Any] = {}
 
     @property
     def branch(self) -> typing.Optional[str]:
@@ -648,12 +648,12 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         with file_util.safe_open(p, mode) as f:
             yield f
 
-    def get_path_handler(self, path, handler_constructor):
-        handler = self._path_handlers.get(path)
-        if handler is None:
-            handler = handler_constructor(self, path)
-            self._path_handlers[path] = handler
-        return handler
+    # def get_path_handler(self, path, handler_constructor):
+    #     handler = self._path_handlers.get(path)
+    #     if handler is None:
+    #         handler = handler_constructor(self, path)
+    #         self._path_handlers[path] = handler
+    #     return handler
 
     def read_metadata(self):
         raise NotImplementedError()
@@ -670,8 +670,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     ):
-        for handler in self._path_handlers.values():
-            handler.close()
+        # for handler in self._path_handlers.values():
+        #     handler.close()
         additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
             self._writeable_artifact,
