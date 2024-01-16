@@ -4,6 +4,8 @@ import datetime
 import numpy as np
 import pytz
 
+from . import context_state
+
 
 def make_id() -> int:
     return random.randint(-(2**63), 2**63 - 1)
@@ -74,14 +76,17 @@ class BoxedDict(dict):
         return res
 
     def __getitem__(self, __key: typing.Any) -> typing.Any:
-        from . import ref_base
-
         val = super().__getitem__(__key)
-        self_ref = ref_base.get_ref(self)
-        if self_ref is not None:
-            val = box(val)
-            sub_ref = self_ref.with_extra(None, val, [__key])
-            ref_base._put_ref(val, sub_ref)
+        # Only do this if ref_tracking_enabled right now. I just want to
+        # avoid introducing new behavior into W&B prod for the moment.
+        if context_state.ref_tracking_enabled():
+            from . import ref_base
+
+            self_ref = ref_base.get_ref(self)
+            if self_ref is not None:
+                val = box(val)
+                sub_ref = self_ref.with_extra(None, val, [__key])
+                ref_base._put_ref(val, sub_ref)
         return val
 
 
