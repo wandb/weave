@@ -223,7 +223,6 @@ export class WFNaiveProject implements WFProject {
     return ['model', 'dataset'];
   }
 
-
   private bootstrapFromData(
     weaveObjectsValue?: ObjectVersionDictType[],
     runsValue?: Call[],

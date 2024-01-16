@@ -16,6 +16,7 @@ import {RunsTable} from '../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../context';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {truncateID} from './util';
 import {
   useWeaveflowORMContext,
   WeaveflowORMContextType,
@@ -26,7 +27,6 @@ import {
   WFObjectVersion,
   WFOpVersion,
 } from './wfInterface/types';
-import {truncateID} from './util';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -470,9 +470,9 @@ const useTraceIdOptions = (
     } else {
       roots = runs.result
         .map(r => orm.projectConnection.call(r.span_id)?.traceID())
-        .filter(trace_id => trace_id != null)
-        .flatMap(trace_id =>
-          orm.projectConnection.traceRoots(trace_id!)
+        .filter(traceId => traceId != null)
+        .flatMap(traceId =>
+          orm.projectConnection.traceRoots(traceId!)
         ) as WFCall[];
     }
 
