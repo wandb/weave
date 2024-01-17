@@ -180,16 +180,17 @@ export const CallsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                multiple
+                // Temp disable multiple for simplicity - may want to re-enable
+                // multiple
                 limitTags={1}
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'opVersions'
                 )}
-                value={effectiveFilter.opVersions ?? []}
+                value={effectiveFilter.opVersions?.[0]}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    opVersions: newValue,
+                    opVersions: newValue ? [newValue] : [],
                   });
                 }}
                 renderInput={params => (
@@ -208,7 +209,8 @@ export const CallsTable: React.FC<{
               <Autocomplete
                 size={'small'}
                 limitTags={1}
-                multiple
+                // Temp disable multiple for simplicity - may want to re-enable
+                // multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'inputObjectVersions'
                 )}
@@ -216,11 +218,11 @@ export const CallsTable: React.FC<{
                   <TextField {...params} label="Inputs" />
                   // <TextField {...params} label="Consumes Objects" />
                 )}
-                value={effectiveFilter.inputObjectVersions ?? []}
+                value={effectiveFilter.inputObjectVersions?.[0]}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    inputObjectVersions: newValue,
+                    inputObjectVersions: newValue ? [newValue] : [],
                   });
                 }}
                 getOptionLabel={option => {

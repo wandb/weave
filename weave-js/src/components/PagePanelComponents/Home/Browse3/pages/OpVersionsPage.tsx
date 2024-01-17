@@ -714,123 +714,102 @@ const OpNameFilterControlListItem: React.FC<{
   );
 };
 
-const InvokedByFilterControlListItem: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelOpVersionFilter;
-  filter: WFHighLevelOpVersionFilter;
-  updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
-  frozenData: Array<{obj: WFOpVersion}>;
-}> = props => {
-  // const orm = useWeaveflowORMContext(props.entity, props.project);
-  // const optionsDict = useMemo(() => {
-  //   return _.fromPairs(
-  //     orm.projectConnection
-  //       .opVersions()
-  //       .filter(o => o.invokedBy().length > 0)
-  //       .map(o => {
-  //         return [
-  //           o.op().name() + ':' + o.version(),
-  //           o.op().name() + ':v' + o.versionIndex(),
-  //         ];
-  //       })
-  //   );
-  // }, [orm.projectConnection]);
-  const optionsDict = useMemo(() => {
-    return _.fromPairs(
-      props.frozenData.flatMap(o =>
-        o.obj.invokedBy().map(v => {
-          return [
-            v.op().name() + ':' + v.version(),
-            v.op().name() + ':v' + v.versionIndex(),
-          ];
-        })
-      )
-    );
-  }, [props.frozenData]);
-  return (
-    <ListItem>
-      <FormControl fullWidth>
-        <Autocomplete
-          size={'small'}
-          limitTags={1}
-          multiple
-          disabled={Object.keys(props.frozenFilter ?? {}).includes(
-            'invokedByOpVersions'
-          )}
-          renderInput={params => <TextField {...params} label="Called By" />}
-          value={props.filter.invokedByOpVersions ?? []}
-          onChange={(event, newValue) => {
-            props.updateFilter({
-              invokedByOpVersions: newValue,
-            });
-          }}
-          getOptionLabel={option => {
-            return optionsDict[option];
-          }}
-          options={Object.keys(optionsDict)}
-        />
-      </FormControl>
-    </ListItem>
-  );
-};
+// const InvokedByFilterControlListItem: React.FC<{
+//   entity: string;
+//   project: string;
+//   frozenFilter?: WFHighLevelOpVersionFilter;
+//   filter: WFHighLevelOpVersionFilter;
+//   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+//   frozenData: Array<{obj: WFOpVersion}>;
+// }> = props => {
+//   const optionsDict = useMemo(() => {
+//     return _.fromPairs(
+//       props.frozenData.flatMap(o =>
+//         o.obj.invokedBy().map(v => {
+//           return [
+//             v.op().name() + ':' + v.version(),
+//             v.op().name() + ':v' + v.versionIndex(),
+//           ];
+//         })
+//       )
+//     );
+//   }, [props.frozenData]);
+//   return (
+//     <ListItem>
+//       <FormControl fullWidth>
+//         <Autocomplete
+//           size={'small'}
+//           limitTags={1}
+//           // Temp disable multiple for simplicity - may want to re-enable
+//           // multiple
+//           disabled={Object.keys(props.frozenFilter ?? {}).includes(
+//             'invokedByOpVersions'
+//           )}
+//           renderInput={params => <TextField {...params} label="Called By" />}
+//           value={props.filter.invokedByOpVersions?.[0]}
+//           onChange={(event, newValue) => {
+//             props.updateFilter({
+//               invokedByOpVersions: newValue ? [newValue] : [],
+//             });
+//           }}
+//           getOptionLabel={option => {
+//             return optionsDict[option];
+//           }}
+//           options={Object.keys(optionsDict)}
+//         />
+//       </FormControl>
+//     </ListItem>
+//   );
+// };
 
-const InvokesFilterControlListItem: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelOpVersionFilter;
-  filter: WFHighLevelOpVersionFilter;
-  updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
-  frozenData: Array<{obj: WFOpVersion}>;
-}> = props => {
-  // const orm = useWeaveflowORMContext(props.entity, props.project);
-  // const options = useMemo(() => {
-  //   return orm.projectConnection
-  //     .opVersions()
-  //     .filter(o => o.invokes().length > 0)
-  //     .map(o => {
-  //       return o.op().name() + ':' + o.version();
-  //     });
-  // }, [orm.projectConnection]);
-  const optionsDict = useMemo(() => {
-    return _.fromPairs(
-      props.frozenData
-        .filter(o => o.obj.invokes().length > 0)
-        .map(o => {
-          return [
-            o.obj.op().name() + ':' + o.obj.version(),
-            o.obj.op().name() + ':v' + o.obj.versionIndex(),
-          ];
-        })
-    );
-  }, [props.frozenData]);
+// const InvokesFilterControlListItem: React.FC<{
+//   entity: string;
+//   project: string;
+//   frozenFilter?: WFHighLevelOpVersionFilter;
+//   filter: WFHighLevelOpVersionFilter;
+//   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+//   frozenData: Array<{obj: WFOpVersion}>;
+// }> = props => {
+//   const optionsDict = useMemo(() => {
+//     return _.fromPairs(
+//       props.frozenData
+//         .filter(o => o.obj.invokes().length > 0)
+//         .map(o => {
+//           return [
+//             o.obj.op().name() + ':' + o.obj.version(),
+//             o.obj.op().name() + ':v' + o.obj.versionIndex(),
+//           ];
+//         })
+//     );
+//   }, [props.frozenData]);
 
-  return (
-    <ListItem>
-      <FormControl fullWidth>
-        <Autocomplete
-          size={'small'}
-          limitTags={1}
-          multiple
-          disabled={Object.keys(props.frozenFilter ?? {}).includes(
-            'invokesOpVersions'
-          )}
-          renderInput={params => <TextField {...params} label="Calls" />}
-          value={props.filter.invokesOpVersions ?? []}
-          onChange={(event, newValue) => {
-            props.updateFilter({
-              invokesOpVersions: newValue,
-            });
-          }}
-          getOptionLabel={option => {
-            return optionsDict[option];
-          }}
-          options={Object.keys(optionsDict)}
-        />
-      </FormControl>
-    </ListItem>
-  );
-};
+//   return (
+//     <ListItem>
+//       <FormControl fullWidth>
+//         <Autocomplete
+//           size={'small'}
+//           limitTags={1}
+//           // Temp disable multiple for simplicity - may want to re-enable
+//           // multiple
+//           disabled={Object.keys(props.frozenFilter ?? {}).includes(
+//             'invokesOpVersions'
+//           )}
+//           renderInput={params => <TextField {...params} label="Calls" />}
+//           value={props.filter.invokesOpVersions?.[0]}
+//           onChange={(event, newValue) => {
+//             props.updateFilter({
+//               invokesOpVersions: newValue ? [newValue] : [],
+//             });
+//           }}
+//           getOptionLabel={option => {
+//             return optionsDict[option];
+//           }}
+//           options={Object.keys(optionsDict)}
+//         />
+//       </FormControl>
+//     </ListItem>
+//   );
+// };
 
 const ConsumesTypeVersionFilterControlListItem: React.FC<{
   entity: string;
@@ -867,15 +846,16 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
         <Autocomplete
           size={'small'}
           limitTags={1}
-          multiple
+          // Temp disable multiple for simplicity - may want to re-enable
+          // multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'consumesTypeVersions'
           )}
           renderInput={params => <TextField {...params} label="Parameters" />}
-          value={props.filter.consumesTypeVersions ?? []}
+          value={props.filter.consumesTypeVersions?.[0]}
           onChange={(event, newValue) => {
             props.updateFilter({
-              consumesTypeVersions: newValue,
+              consumesTypeVersions: newValue ? [newValue] : [],
             });
           }}
           getOptionLabel={option => {
@@ -924,15 +904,16 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
         <Autocomplete
           size={'small'}
           limitTags={1}
-          multiple
+          // Temp disable multiple for simplicity - may want to re-enable
+          // multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'producesTypeVersions'
           )}
           renderInput={params => <TextField {...params} label="Returns" />}
-          value={props.filter.producesTypeVersions ?? []}
+          value={props.filter.producesTypeVersions?.[0]}
           onChange={(event, newValue) => {
             props.updateFilter({
-              producesTypeVersions: newValue,
+              producesTypeVersions: newValue ? [newValue] : [],
             });
           }}
           getOptionLabel={option => {

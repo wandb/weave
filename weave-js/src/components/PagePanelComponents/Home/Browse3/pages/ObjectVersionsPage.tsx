@@ -210,15 +210,16 @@ export const FilterableObjectVersionsTable: React.FC<{
               <Autocomplete
                 size={'small'}
                 limitTags={1}
-                multiple
+                // Temp disable multiple for simplicity - may want to re-enable
+                // multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'typeVersions'
                 )}
-                value={effectiveFilter.typeVersions ?? []}
+                value={effectiveFilter.typeVersions?.[0]}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    typeVersions: newValue,
+                    typeVersions: newValue ? [newValue] : [],
                   });
                 }}
                 renderInput={params => <TextField {...params} label="Type" />}
@@ -234,18 +235,19 @@ export const FilterableObjectVersionsTable: React.FC<{
               <Autocomplete
                 size={'small'}
                 limitTags={1}
-                multiple
+                // Temp disable multiple for simplicity - may want to re-enable
+                // multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'inputToOpVersions'
                 )}
                 renderInput={params => (
                   <TextField {...params} label="Input To" />
                 )}
-                value={effectiveFilter.inputToOpVersions ?? []}
+                value={effectiveFilter.inputToOpVersions?.[0]}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    inputToOpVersions: newValue,
+                    inputToOpVersions: newValue ? [newValue] : [],
                   });
                 }}
                 getOptionLabel={option => {

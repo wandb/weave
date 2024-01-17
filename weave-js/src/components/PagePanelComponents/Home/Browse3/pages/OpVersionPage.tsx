@@ -7,7 +7,6 @@ import {
   OpVersionLink,
   OpVersionsLink,
   opVersionText,
-  TypeVersionLink,
 } from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
@@ -44,8 +43,8 @@ const OpVersionPageInner: React.FC<{
   const opVersionHash = opVersion.version();
   const opVersionCallCount = opVersion.calls().length;
   const opVersionIndex = opVersion.versionIndex();
-  const opInputTypes = opVersion.inputTypesVersions();
-  const opOutputTypes = opVersion.outputTypeVersions();
+  // const opInputTypes = opVersion.inputTypesVersions();
+  // const opOutputTypes = opVersion.outputTypeVersions();
   const opInvokes = opVersion.invokes();
   const opVersionFilterId = opName + ':' + opVersionHash;
 
