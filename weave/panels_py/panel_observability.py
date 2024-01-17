@@ -124,16 +124,17 @@ def observability(
                 "trace_id": row["trace_id"],
                 "state": display_states.pick(row["state"]),
                 "error": row["error"],
-                "priority": weave.ops.cond(
-                    weave.ops.dict_(
-                        a=row["priority"].isNone(),
-                        b=row["priority"].isNone() == False,
-                    ),
-                    weave.ops.dict_(
-                        a=priority_names[2],
-                        b=priority_names[row["priority"]],
-                    ),
-                ),
+                # "priority": weave.ops.cond(
+                #     weave.ops.dict_(
+                #         a=row["priority"].isNone(),
+                #         b=row["priority"].isNone() == False,
+                #     ),
+                #     weave.ops.dict_(
+                #         a=priority_names[2],
+                #         b=priority_names[row["priority"]],
+                #     ),
+                # ),
+                # "priority": row["priority"],
                 "metrics": row["metrics"],
             }
         )
@@ -231,7 +232,7 @@ def observability(
     )
 
     state_color_func = weave_internal.define_fn(
-        {"row": input_node.type.object_type},
+        {"row": source_data.type.object_type},
         lambda row: colors_node.pick(row["state"]),
     )
 
@@ -247,7 +248,7 @@ def observability(
     )
 
     is_start_stop_state = weave_internal.define_fn(
-        {"row": input_node.type.object_type},
+        {"row": source_data.type.object_type},
         lambda row: weave.ops.Boolean.bool_or(
             row["state"] == "running",
             weave.ops.Boolean.bool_or(
@@ -307,7 +308,7 @@ def observability(
                     ),
                     60,
                 ),
-                "priority": row["priority"][0],
+                # "priority": row["priority"][0],
             }
         ),
     )
@@ -336,7 +337,7 @@ def observability(
                 "Project (s)": weave.ops.join_to_str(row["project_name"].unique(), ","),
                 "Duration (m)": row["duration"].sum(),
                 "Run count": row.count(),
-                "Priority (s)": weave.ops.join_to_str(row["priority"].unique(), ","),
+                # "Priority (s)": weave.ops.join_to_str(row["priority"].unique(), ","),
             }
         ),
         color_title="Grouping",
@@ -442,7 +443,7 @@ def observability(
         ),
         "Runtime (m)",
     )
-    jobs_table.add_column(lambda row: row["priority"][0], "Priority")
+    # jobs_table.add_column(lambda row: row["priority"][0], "Priority")
     jobs_table.add_column(
         lambda row: weave.ops.cond(
             weave.ops.dict_(
@@ -587,7 +588,7 @@ def observability(
                     "entity_name": row["entity_name"][0],
                     "project_name": row["project_name"][0],
                     "job": row["job"][0],
-                    "priority": row["priority"][0],
+                    # "priority": row["priority"][0],
                     "duration": weave.ops.Number.__truediv__(
                         weave.ops.Number.__mul__(
                             weave.ops.timedelta_total_seconds(
@@ -622,7 +623,7 @@ def observability(
                 "Project": row["project_name"],
                 "User": row["entity_name"],
                 "Job": row["job"],
-                "Priority": row["priority"],
+                # "Priority": row["priority"],
                 "Duration (m)": row["duration"],
                 "GPU util %": row["GPU util %"],
             }
@@ -647,7 +648,7 @@ def observability(
                 "Project": row["project_name"],
                 "User": row["entity_name"],
                 "Job": row["job"],
-                "Priority": row["priority"],
+                # "Priority": row["priority"],
                 "Duration (m)": row["duration"],
                 "CPU util %": row["CPU util %"],
             }
@@ -672,7 +673,7 @@ def observability(
                 "Project": row["project_name"],
                 "User": row["entity_name"],
                 "Job": row["job"],
-                "Priority": row["priority"],
+                # "Priority": row["priority"],
                 "Duration (m)": row["duration"],
                 "GPU memory (%)": row["GPU memory %"],
             }
@@ -697,7 +698,7 @@ def observability(
                 "Project": row["project_name"],
                 "User": row["entity_name"],
                 "Job": row["job"],
-                "Priority": row["priority"],
+                # "Priority": row["priority"],
                 "Duration (m)": row["duration"],
                 "Memory (MB)": row["Memory (MB)"],
             }
