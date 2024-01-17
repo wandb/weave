@@ -7,6 +7,7 @@ import {
   GridColDef,
   GridRenderCellParams,
   useGridApiContext,
+  useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
@@ -274,6 +275,7 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
   call,
   treeOnly,
 }) => {
+  const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
   const {rows, expandKeys: forcedExpandKeys} = useCallFlattenedTraceTree(call);
@@ -405,8 +407,22 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
     [callClass]
   );
 
+  // Scroll selected call into view
+  useEffect(() => {
+    // The setTimeout here is a hack; without it scrollToIndexes will throw an error
+    // because virtualScrollerRef.current inside the grid is undefined.
+    // See https://github.com/mui/mui-x/issues/6411#issuecomment-1271556519
+    setTimeout(() => {
+      const rowIndex = apiRef.current.getRowIndexRelativeToVisibleRows(
+        call.callID()
+      );
+      apiRef.current.scrollToIndexes({rowIndex});
+    }, 0);
+  }, [apiRef, call]);
+
   return (
     <DataGridPro
+      apiRef={apiRef}
       rowHeight={38}
       treeData
       onRowClick={onRowClick}
