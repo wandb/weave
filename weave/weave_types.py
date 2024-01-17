@@ -158,8 +158,8 @@ class TypeRegistry:
             obj_type = type_.type_of(obj)
             if obj_type is not None:
                 return obj_type
-        # return UnknownType()
-        raise errors.WeaveTypeError("no Type for obj: (%s) %s" % (type(obj), obj))
+        # No TypeError here, return UnknownType
+        return UnknownType()
 
     @staticmethod
     def type_from_dict(d: typing.Union[str, dict]) -> "Type":
@@ -171,19 +171,12 @@ class TypeRegistry:
         type_name = d["type"] if isinstance(d, dict) else d
         type_ = type_name_to_type(type_name)
         if type_ is None:
-            # Normally, we should just raise the error. However, the core team
-            # used earlier versions of Weaveflow ( before
-            # dc48fa16263d49d5accaca37515ab4c80efef1b6) which serialized
-            # "relocatable" objects without the "_relocatable" flag was added.
-            # As a result, we will hit this branch in such cases. In order to
-            # maintain backwards compat for these situations, we perform a less
-            # constrained check here. We use `is_serialized_object_type` instead
-            # of `is_relocatable_object_type` since it explicitly does not
-            # require the `_relocatable` flag.  This can be removed if we are ok
-            # breaking these early versions
-            # if isinstance(d, dict) and is_serialized_object_type(d):
-            #     return deserialize_relocatable_object_type(d)
-            raise errors.WeaveSerializeError("Can't deserialize type from: %s" % d)
+            # We used to raise WeaveServializeError here. Now we return UnknownType
+            # instead, so the server can load types that have types that are not
+            # present on the server within them (e.g. a user has defined a type in their
+            # code and published a top level object containing an attribute of that type,
+            # we want to be able to load the outer object without crashing)
+            return UnknownType()
         return type_.from_dict(d)
 
 
@@ -961,8 +954,6 @@ class TypedDict(Type):
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
         mapped_result = mapper.apply(result)
-        if extra is not None:
-            return mapped_result[extra[0]]
         return mapped_result
 
 
@@ -1045,7 +1036,6 @@ class ObjectType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-
         if isinstance(obj, pydantic.BaseModel):
             from . import weave_pydantic
 
@@ -1169,8 +1159,26 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     )
     exec(object_init_code)
 
+    # Weave objects must auto-dereference refs when they are accessed.
+    def object_getattribute(self, name):
+        attribute = object.__getattribute__(self, name)
+        attr_type = type_attr_types.get(name)
+        if attr_type is None:
+            return attribute
+        from . import ref_base
+
+        if isinstance(attribute, ref_base.Ref):
+            # TODO: This should put a new ref as well, for ref-tracking
+            return attribute.get()
+        return attribute
+
     new_object_class = type(
-        object_class_name, (), {"__init__": locals()["loaded_object_init"]}
+        object_class_name,
+        (),
+        {
+            "__init__": locals()["loaded_object_init"],
+            "__getattribute__": object_getattribute,
+        },
     )
 
     all_attr_types: dict[str, typing.Union[Type, type[Type]]] = {
@@ -1760,6 +1768,21 @@ def union(*members: Type) -> Type:
     if len(final_members) == 1:
         return final_members[0]
     return UnionType(*final_members)
+
+
+def unwrap_type(t: Type) -> Type:
+    """Removes any transparent types from the type."""
+    if isinstance(t, RefType):
+        return t.object_type
+    # TODO: TaggedValue
+    return t
+
+
+def simple_type(t: Type) -> Type:
+    """Type without nullable and transparent types"""
+    t = unwrap_type(t)
+    _, non_none_t = split_none(t)
+    return non_none_t
 
 
 def is_list_like(t: Type) -> bool:

@@ -1,4 +1,4 @@
-import {Box, Button} from '@material-ui/core';
+import {Box, Button, Typography} from '@material-ui/core';
 import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import {
@@ -17,7 +17,6 @@ import {Call} from '../../Browse2/callTree';
 import {SmallRef} from '../../Browse2/SmallRef';
 import {SpanDetails} from '../../Browse2/SpanDetails';
 import {useWeaveflowCurrentRouteContext} from '../context';
-import {CallsTable} from './CallsPage';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
@@ -25,6 +24,7 @@ import {
   SimplePageLayoutContext,
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
+import {GroupedCalls} from './ObjectVersionPage';
 import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
@@ -65,9 +65,13 @@ export const CallPage: React.FC<{
 };
 
 const useCallTabs = (call: WFCall) => {
-  const entityName = call.entity();
-  const projectName = call.project();
-  const callId = call.callID();
+  // const entityName = call.entity();
+  // const projectName = call.project();
+  // const callId = call.callID();
+  const childCalls = call.childCalls().filter(c => {
+    return call.opVersion() != null;
+  });
+
   return [
     {
       label: 'Call',
@@ -80,22 +84,39 @@ const useCallTabs = (call: WFCall) => {
             overflow: 'auto',
             p: 8,
           }}>
-          <SpanDetails call={call.rawCallSpan()} />
+          <SpanDetails
+            call={call.rawCallSpan()}
+            hackyInjectionBelowFunction={
+              childCalls.length > 0 && (
+                <>
+                  <Typography variant="h6" gutterBottom>
+                    Child Calls
+                  </Typography>
+                  <GroupedCalls
+                    calls={childCalls}
+                    partialFilter={{
+                      parentId: call.callID(),
+                    }}
+                  />
+                </>
+              )
+            }
+          />
         </Box>
       ),
     },
-    {
-      label: 'Child Calls',
-      content: (
-        <CallsTable
-          entity={entityName}
-          project={projectName}
-          frozenFilter={{
-            parentId: callId,
-          }}
-        />
-      ),
-    },
+    // {
+    //   label: 'Child Calls',
+    //   content: (
+    //     <CallsTable
+    //       entity={entityName}
+    //       project={projectName}
+    //       frozenFilter={{
+    //         parentId: callId,
+    //       }}
+    //     />
+    //   ),
+    // },
     {
       label: 'Feedback',
       content: (
@@ -138,20 +159,20 @@ const useCallTabs = (call: WFCall) => {
   ];
 };
 
-const callMenuItems = [
-  {
-    label: '(Under Construction) Open in Board',
-    onClick: () => {
-      console.log('TODO: Open in Board');
-    },
-  },
-  {
-    label: '(Under Construction) Compare',
-    onClick: () => {
-      console.log('TODO: Compare');
-    },
-  },
-];
+// const callMenuItems = [
+//   {
+//     label: '(Under Construction) Open in Board',
+//     onClick: () => {
+//       console.log('TODO: Open in Board');
+//     },
+//   },
+//   {
+//     label: '(Under Construction) Compare',
+//     onClick: () => {
+//       console.log('TODO: Compare');
+//     },
+//   },
+// ];
 
 const CallPageInnerHorizontal: React.FC<{
   call: WFCall;
@@ -210,7 +231,7 @@ const CallPageInnerHorizontal: React.FC<{
                 <SimplePageLayoutContext.Provider value={{}}>
                   <SimplePageLayout
                     title={title}
-                    menuItems={callMenuItems}
+                    // menuItems={callMenuItems}
                     tabs={callTabs}
                   />
                 </SimplePageLayoutContext.Provider>
@@ -229,7 +250,7 @@ const CallPageInnerVertical: React.FC<{
 }> = ({call, setVerticalLayout}) => {
   const callId = call.callID();
   const spanName = call.spanName();
-  const title = `${spanName}: ${truncateID(callId)}`;
+  const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   return (
     <SimplePageLayout
@@ -241,7 +262,7 @@ const CallPageInnerVertical: React.FC<{
             setVerticalLayout(false);
           },
         },
-        ...callMenuItems,
+        // ...callMenuItems,
       ]}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}

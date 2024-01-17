@@ -257,9 +257,6 @@ class ArrowWeaveListType(types.Type):
 
         res.validate()
 
-        if extra is not None:
-            return res[int(extra[0])]
-
         return res
 
 

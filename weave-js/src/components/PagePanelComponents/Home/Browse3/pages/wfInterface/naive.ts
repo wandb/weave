@@ -204,6 +204,17 @@ export class WFNaiveProject implements WFProject {
     });
   }
 
+  traceRoots(traceID: string): WFCall[] {
+    const rootCalls = Array.from(this.state.callsMap.values()).filter(
+      callDict => {
+        return callDict.callSpan.trace_id === traceID;
+      }
+    );
+    return rootCalls.map(callDict => {
+      return new WFNaiveCall(this.state, callDict.callSpan.span_id);
+    });
+  }
+
   opCategories(): HackyOpCategory[] {
     return ['train', 'predict', 'score', 'evaluate', 'tune'];
   }
@@ -804,7 +815,8 @@ class WFNaiveOpVersion implements WFOpVersion {
     this.opVersionDict = opVersionDict;
   }
   opCategory(): HackyOpCategory | null {
-    const opName = this.opVersionDict.name;
+    const opNames = this.opVersionDict.name.split('-');
+    const opName = opNames[opNames.length - 1];
     const categories = ['train', 'predict', 'score', 'evaluate', 'tune'];
     for (const category of categories) {
       if (opName.toLocaleLowerCase().includes(category)) {

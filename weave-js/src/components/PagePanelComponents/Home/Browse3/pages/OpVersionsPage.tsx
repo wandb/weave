@@ -1,4 +1,4 @@
-import {Box, Chip, ListItemText} from '@material-ui/core';
+import {ListItemText} from '@material-ui/core';
 import {
   Autocomplete,
   Checkbox,
@@ -7,23 +7,19 @@ import {
   ListItemButton,
   TextField,
 } from '@mui/material';
-import moment from 'moment';
-import React, {useCallback, useMemo} from 'react';
+import _ from 'lodash';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
-import {
-  CallsLink,
-  OpLink,
-  OpVersionLink,
-  OpVersionsLink,
-  TypeVersionsLink,
-} from './common/Links';
+import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   FilterableTable,
   WFHighLevelDataColumn,
 } from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
 
@@ -47,7 +43,8 @@ export const OpVersionsPage: React.FC<{
 }> = props => {
   return (
     <SimplePageLayout
-      title="Op Versions"
+      // title="Op Versions"
+      title="Operations"
       tabs={[
         {
           label: 'All',
@@ -70,48 +67,48 @@ export const FilterableOpVersionsTable: React.FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
-  const getInitialData = useCallback(
-    (filter: WFHighLevelOpVersionFilter) => {
-      return orm.projectConnection.opVersions().map(o => {
-        return {id: o.version(), obj: o};
-      });
-    },
-    [orm.projectConnection]
-  );
+  const getInitialData = useCallback(() => {
+    return orm.projectConnection.opVersions().map(o => {
+      return {id: o.version(), obj: o};
+    });
+  }, [orm.projectConnection]);
 
   const getFilterPopoutTargetUrl = useCallback(
-    (filter: WFHighLevelOpVersionFilter) => {
-      return baseRouter.opVersionsUIUrl(props.entity, props.project, filter);
+    (innerFilter: WFHighLevelOpVersionFilter) => {
+      return baseRouter.opVersionsUIUrl(
+        props.entity,
+        props.project,
+        innerFilter
+      );
     },
     [props.entity, props.project, baseRouter]
   );
 
+  // Initialize the filter
+  const [filterState, setFilterState] = useState(props.initialFilter ?? {});
+  // Update the filter when the initial filter changes
+  useEffect(() => {
+    if (props.initialFilter) {
+      setFilterState(props.initialFilter);
+    }
+  }, [props.initialFilter]);
+
+  // If the caller is controlling the filter, use the caller's filter state
+  const filter = useMemo(
+    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
+    [filterState, props.initialFilter, props.onFilterUpdate]
+  );
+  const setFilter = useMemo(
+    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
+    [props.onFilterUpdate]
+  );
+
   const columns = useMemo(() => {
     return {
-      createdAt: {
-        columnId: 'createdAt',
-        gridDisplay: {
-          columnLabel: 'Created At',
-          columnValue: obj => obj.obj.createdAtMs(),
-          gridColDefOptions: {
-            renderCell: params => {
-              return moment(params.value as number).format(
-                'YYYY-MM-DD HH:mm:ss'
-              );
-            },
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        any,
-        number,
-        'createdAt',
-        WFHighLevelOpVersionFilter
-      >,
       version: {
         columnId: 'version',
         gridDisplay: {
-          columnLabel: 'Version',
+          columnLabel: 'Op',
           columnValue: obj => obj.obj.version(),
           gridColDefOptions: {
             renderCell: params => {
@@ -121,7 +118,7 @@ export const FilterableOpVersionsTable: React.FC<{
                   projectName={params.row.obj.project()}
                   opName={params.row.obj.op().name()}
                   version={params.row.obj.version()}
-                  hideName
+                  versionIndex={params.row.obj.versionIndex()}
                 />
               );
             },
@@ -134,23 +131,67 @@ export const FilterableOpVersionsTable: React.FC<{
         'version',
         WFHighLevelOpVersionFilter
       >,
+
+      calls: {
+        columnId: 'calls',
+        gridDisplay: {
+          columnLabel: 'Calls',
+          columnValue: obj => obj.obj.calls().length,
+          gridColDefOptions: {
+            renderCell: params => {
+              if (params.value === 0) {
+                return '';
+              }
+              return (
+                <CallsLink
+                  neverPeek
+                  entity={params.row.obj.entity()}
+                  project={params.row.obj.project()}
+                  callCount={params.value as number}
+                  filter={{
+                    opVersions: [
+                      params.row.obj.op().name() +
+                        ':' +
+                        params.row.obj.version(),
+                    ],
+                  }}
+                />
+              );
+            },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
+          },
+        },
+      } as WFHighLevelDataColumn<
+        {obj: WFOpVersion},
+        string[],
+        number,
+        'calls',
+        WFHighLevelOpVersionFilter
+      >,
+
       opCategory: {
         columnId: 'opCategory',
         gridDisplay: {
-          columnLabel: 'Op Category',
+          columnLabel: 'Category',
           columnValue: obj => obj.obj.opCategory(),
           gridColDefOptions: {
             renderCell: params => {
               return <OpVersionCategoryChip opCategory={params.value as any} />;
             },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
           },
         },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (filter.opCategory == null) {
+          filterKeys: ['opCategory'],
+          filterPredicate: ({obj}, innerFilter) => {
+            if (innerFilter.opCategory == null) {
               return true;
             }
-            return obj.opCategory() === filter.opCategory;
+            return obj.opCategory() === innerFilter.opCategory;
           },
           filterControlListItem: cellProps => {
             return (
@@ -170,29 +211,84 @@ export const FilterableOpVersionsTable: React.FC<{
         'opCategory',
         WFHighLevelOpVersionFilter
       >,
-      opName: {
-        columnId: 'opName',
+
+      createdAt: {
+        columnId: 'createdAt',
         gridDisplay: {
-          columnLabel: 'Op',
-          columnValue: obj => obj.obj.op().name(),
+          columnLabel: 'Created',
+          columnValue: obj => obj.obj.createdAtMs(),
           gridColDefOptions: {
             renderCell: params => {
               return (
-                <OpLink
-                  entityName={params.row.obj.entity()}
-                  projectName={params.row.obj.project()}
-                  opName={params.value as any}
+                <Timestamp
+                  value={(params.value as number) / 1000}
+                  format="relative"
                 />
               );
             },
+            width: 100,
+            minWidth: 100,
+            maxWidth: 100,
           },
         },
+      } as WFHighLevelDataColumn<
+        {obj: WFOpVersion},
+        any,
+        number,
+        'createdAt',
+        WFHighLevelOpVersionFilter
+      >,
+
+      opName: {
+        columnId: 'opName',
+        // This grid display does not match the data for the column
+        // ... a bit of a hack
+        gridDisplay: !filter.isLatest
+          ? undefined
+          : {
+              columnLabel: 'Versions',
+              columnValue: obj => obj.obj.op().name(),
+              gridColDefOptions: {
+                renderCell: params => {
+                  return (
+                    <OpVersionsLink
+                      entity={params.row.obj.entity()}
+                      project={params.row.obj.project()}
+                      versionCount={params.row.obj.op().opVersions().length}
+                      filter={{
+                        opName: params.row.obj.op().name(),
+                      }}
+                      neverPeek
+                    />
+                  );
+                },
+                width: 100,
+                minWidth: 100,
+                maxWidth: 100,
+              },
+            },
+        // gridDisplay: {
+        //   columnLabel: 'Op',
+        //   columnValue: obj => obj.obj.op().name(),
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       return (
+        //         <OpLink
+        //           entityName={params.row.obj.entity()}
+        //           projectName={params.row.obj.project()}
+        //           opName={params.value as any}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (filter.opName == null) {
+          filterKeys: ['opName'],
+          filterPredicate: ({obj}, innerFilter) => {
+            if (innerFilter.opName == null) {
               return true;
             }
-            return obj.op().name() === filter.opName;
+            return obj.op().name() === innerFilter.opName;
           },
           filterControlListItem: cellProps => {
             return (
@@ -212,195 +308,164 @@ export const FilterableOpVersionsTable: React.FC<{
         'opName',
         WFHighLevelOpVersionFilter
       >,
-      calls: {
-        columnId: 'calls',
-        gridDisplay: {
-          columnLabel: 'Calls',
-          columnValue: obj => obj.obj.calls().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <CallsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  callCount={params.value as number}
-                  filter={{
-                    opVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string[],
-        number,
-        'calls',
-        WFHighLevelOpVersionFilter
-      >,
-      invokedByOpVersions: {
-        columnId: 'invokedByOpVersions',
-        gridDisplay: {
-          columnLabel: 'Invoked By',
-          columnValue: obj => obj.obj.invokedBy().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    invokesOpVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
-        filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (
-              filter.invokedByOpVersions == null ||
-              filter.invokedByOpVersions.length === 0
-            ) {
-              return true;
-            }
-            return obj.invokedBy().some(version => {
-              return filter.invokedByOpVersions?.includes(
-                version.op().name() + ':' + version.version()
-              );
-            });
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <InvokedByFilterControlListItem
-                entity={props.entity}
-                project={props.project}
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string[],
-        number,
-        'invokedByOpVersions',
-        WFHighLevelOpVersionFilter
-      >,
-      invokesOpVersions: {
-        columnId: 'invokesOpVersions',
-        gridDisplay: {
-          columnLabel: 'Invokes',
-          columnValue: obj => obj.obj.invokes().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    invokedByOpVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
-        filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (
-              filter.invokesOpVersions == null ||
-              filter.invokesOpVersions.length === 0
-            ) {
-              return true;
-            }
-            return obj.invokes().some(version => {
-              return filter.invokesOpVersions?.includes(
-                version.op().name() + ':' + version.version()
-              );
-            });
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <InvokesFilterControlListItem
-                entity={props.entity}
-                project={props.project}
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string[],
-        number,
-        'invokesOpVersions',
-        WFHighLevelOpVersionFilter
-      >,
+      // invokedByOpVersions: {
+      //   columnId: 'invokedByOpVersions',
+      //   gridDisplay: {
+      //     columnLabel: 'Invoked By',
+      //     columnValue: obj => obj.obj.invokedBy().length,
+      //     gridColDefOptions: {
+      //       renderCell: params => {
+      //         if (params.value === 0) {
+      //           return '';
+      //         }
+      //         return (
+      //           <OpVersionsLink
+      //             entity={params.row.obj.entity()}
+      //             project={params.row.obj.project()}
+      //             versionCount={params.value as number}
+      //             filter={{
+      //               invokesOpVersions: [
+      //                 params.row.obj.op().name() +
+      //                   ':' +
+      //                   params.row.obj.version(),
+      //               ],
+      //             }}
+      //           />
+      //         );
+      //       },
+      //     },
+      //   },
+      //   filterControls: {
+      //     filterKeys: ['invokedByOpVersions'],
+      //     filterPredicate: ({obj}, innerFilter) => {
+      //       if (
+      //         innerFilter.invokedByOpVersions == null ||
+      //         innerFilter.invokedByOpVersions.length === 0
+      //       ) {
+      //         return true;
+      //       }
+      //       return obj.invokedBy().some(version => {
+      //         return innerFilter.invokedByOpVersions?.includes(
+      //           version.op().name() + ':' + version.version()
+      //         );
+      //       });
+      //     },
+      //     filterControlListItem: cellProps => {
+      //       return (
+      //         <InvokedByFilterControlListItem
+      //           entity={props.entity}
+      //           project={props.project}
+      //           frozenFilter={props.frozenFilter}
+      //           {...cellProps}
+      //         />
+      //       );
+      //     },
+      //   },
+      // } as WFHighLevelDataColumn<
+      //   {obj: WFOpVersion},
+      //   string[],
+      //   number,
+      //   'invokedByOpVersions',
+      //   WFHighLevelOpVersionFilter
+      // >,
+      // invokesOpVersions: {
+      //   columnId: 'invokesOpVersions',
+      //   gridDisplay: {
+      //     columnLabel: 'Invokes',
+      //     columnValue: obj => obj.obj.invokes().length,
+      //     gridColDefOptions: {
+      //       renderCell: params => {
+      //         if (params.value === 0) {
+      //           return '';
+      //         }
+      //         return (
+      //           <OpVersionsLink
+      //             entity={params.row.obj.entity()}
+      //             project={params.row.obj.project()}
+      //             versionCount={params.value as number}
+      //             filter={{
+      //               invokedByOpVersions: [
+      //                 params.row.obj.op().name() +
+      //                   ':' +
+      //                   params.row.obj.version(),
+      //               ],
+      //             }}
+      //           />
+      //         );
+      //       },
+      //     },
+      //   },
+      //   filterControls: {
+      //     filterKeys: ['invokesOpVersions'],
+      //     filterPredicate: ({obj}, innerFilter) => {
+      //       if (
+      //         innerFilter.invokesOpVersions == null ||
+      //         innerFilter.invokesOpVersions.length === 0
+      //       ) {
+      //         return true;
+      //       }
+      //       return obj.invokes().some(version => {
+      //         return innerFilter.invokesOpVersions?.includes(
+      //           version.op().name() + ':' + version.version()
+      //         );
+      //       });
+      //     },
+      //     filterControlListItem: cellProps => {
+      //       return (
+      //         <InvokesFilterControlListItem
+      //           entity={props.entity}
+      //           project={props.project}
+      //           frozenFilter={props.frozenFilter}
+      //           {...cellProps}
+      //         />
+      //       );
+      //     },
+      //   },
+      // } as WFHighLevelDataColumn<
+      //   {obj: WFOpVersion},
+      //   string[],
+      //   number,
+      //   'invokesOpVersions',
+      //   WFHighLevelOpVersionFilter
+      // >,
       consumesTypeVersions: {
         columnId: 'consumesTypeVersions',
-        gridDisplay: {
-          columnLabel: 'Consumes Types',
-          columnValue: obj => obj.obj.inputTypesVersions().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <TypeVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    inputTo: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Consumes Types',
+        //   columnValue: obj => obj.obj.inputTypesVersions().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <TypeVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             inputTo: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
+          filterKeys: ['consumesTypeVersions'],
+          filterPredicate: ({obj}, innerFilter) => {
             if (
-              filter.consumesTypeVersions == null ||
-              filter.consumesTypeVersions.length === 0
+              innerFilter.consumesTypeVersions == null ||
+              innerFilter.consumesTypeVersions.length === 0
             ) {
               return true;
             }
             return obj.inputTypesVersions().some(version => {
-              return filter.consumesTypeVersions?.includes(
+              return innerFilter.consumesTypeVersions?.includes(
                 version.type().name() + ':' + version.version()
               );
             });
@@ -425,41 +490,42 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       producesTypeVersions: {
         columnId: 'producesTypeVersions',
-        gridDisplay: {
-          columnLabel: 'Produces Types',
-          columnValue: obj => obj.obj.outputTypeVersions().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <TypeVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value as number}
-                  filter={{
-                    outputFrom: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Produces Types',
+        //   columnValue: obj => obj.obj.outputTypeVersions().length,
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value === 0) {
+        //         return '';
+        //       }
+        //       return (
+        //         <TypeVersionsLink
+        //           entity={params.row.obj.entity()}
+        //           project={params.row.obj.project()}
+        //           versionCount={params.value as number}
+        //           filter={{
+        //             outputFrom: [
+        //               params.row.obj.op().name() +
+        //                 ':' +
+        //                 params.row.obj.version(),
+        //             ],
+        //           }}
+        //         />
+        //       );
+        //     },
+        //   },
+        // },
         filterControls: {
-          filterPredicate: ({obj}, filter) => {
+          filterKeys: ['producesTypeVersions'],
+          filterPredicate: ({obj}, innerFilter) => {
             if (
-              filter.producesTypeVersions == null ||
-              filter.producesTypeVersions.length === 0
+              innerFilter.producesTypeVersions == null ||
+              innerFilter.producesTypeVersions.length === 0
             ) {
               return true;
             }
             return obj.outputTypeVersions().some(version => {
-              return filter.producesTypeVersions?.includes(
+              return innerFilter.producesTypeVersions?.includes(
                 version.type().name() + ':' + version.version()
               );
             });
@@ -499,11 +565,11 @@ export const FilterableOpVersionsTable: React.FC<{
       // >,
       versionIndex: {
         columnId: 'versionIndex',
-        gridDisplay: {
-          columnLabel: 'Version Index',
-          columnValue: obj => obj.obj.versionIndex(),
-          gridColDefOptions: {},
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Version Index',
+        //   columnValue: obj => obj.obj.versionIndex(),
+        //   gridColDefOptions: {},
+        // },
       } as WFHighLevelDataColumn<
         {obj: WFOpVersion},
         any,
@@ -513,55 +579,42 @@ export const FilterableOpVersionsTable: React.FC<{
       >,
       isLatest: {
         columnId: 'isLatest',
-        gridDisplay: {
-          columnLabel: 'Latest',
-          columnValue: obj => obj.obj.aliases().includes('latest'),
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value) {
-                return (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      width: '100%',
-                    }}>
-                    <Chip label="Yes" size="small" />
-                  </Box>
-                );
-              }
-              return '';
-            },
-          },
-        },
+        // gridDisplay: {
+        //   columnLabel: 'Latest',
+        //   columnValue: obj => obj.obj.aliases().includes('latest'),
+        //   gridColDefOptions: {
+        //     renderCell: params => {
+        //       if (params.value) {
+        //         return (
+        //           <Box
+        //             sx={{
+        //               display: 'flex',
+        //               alignItems: 'center',
+        //               justifyContent: 'center',
+        //               height: '100%',
+        //               width: '100%',
+        //             }}>
+        //             <Chip label="Yes" size="small" />
+        //           </Box>
+        //         );
+        //       }
+        //       return '';
+        //     },
+        //   },
+        // },
         filterControls: {
+          filterKeys: ['isLatest'],
           filterPredicate: ({obj}, {isLatest}) => {
             return !isLatest || obj.aliases().includes('latest') === isLatest;
           },
-          filterControlListItem: colProps => {
+          filterControlListItem: cellProps => {
             return (
-              <ListItem
-                secondaryAction={
-                  <Checkbox
-                    edge="end"
-                    checked={!!colProps.filter?.isLatest}
-                    onChange={() => {
-                      colProps.updateFilter({
-                        isLatest: !colProps.filter?.isLatest,
-                      });
-                    }}
-                  />
-                }
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'isLatest'
-                )}
-                disablePadding>
-                <ListItemButton>
-                  <ListItemText primary={`Latest Only`} />
-                </ListItemButton>
-              </ListItem>
+              <LatestOnlyControlListItem
+                entity={props.entity}
+                project={props.project}
+                frozenFilter={props.frozenFilter}
+                {...cellProps}
+              />
             );
           },
         },
@@ -573,7 +626,7 @@ export const FilterableOpVersionsTable: React.FC<{
         WFHighLevelOpVersionFilter
       >, // filter me
     };
-  }, [props.entity, props.frozenFilter, props.project]);
+  }, [filter.isLatest, props.entity, props.frozenFilter, props.project]);
 
   return (
     <FilterableTable
@@ -581,8 +634,8 @@ export const FilterableOpVersionsTable: React.FC<{
       columns={columns}
       getFilterPopoutTargetUrl={getFilterPopoutTargetUrl}
       frozenFilter={props.frozenFilter}
-      initialFilter={props.initialFilter}
-      onFilterUpdate={props.onFilterUpdate}
+      initialFilter={filter}
+      onFilterUpdate={setFilter}
     />
   );
 };
@@ -593,11 +646,17 @@ const OpCategoryFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection.opCategories();
+  // }, [orm.projectConnection]);
   const options = useMemo(() => {
-    return orm.projectConnection.opCategories();
-  }, [orm.projectConnection]);
+    return _.uniq(props.frozenData.map(item => item.obj.opCategory())).filter(
+      item => item != null
+    ) as HackyOpCategory[];
+  }, [props.frozenData]);
   return (
     <ListItem>
       <FormControl fullWidth>
@@ -606,7 +665,7 @@ const OpCategoryFilterControlListItem: React.FC<{
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'opCategory'
           )}
-          renderInput={params => <TextField {...params} label="Op Category" />}
+          renderInput={params => <TextField {...params} label="Category" />}
           value={props.filter.opCategory ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
@@ -626,18 +685,22 @@ const OpNameFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection.ops().map(o => o.name());
+  // }, [orm.projectConnection]);
   const options = useMemo(() => {
-    return orm.projectConnection.ops().map(o => o.name());
-  }, [orm.projectConnection]);
+    return _.uniq(props.frozenData.map(item => item.obj.op().name()));
+  }, [props.frozenData]);
   return (
     <ListItem>
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
           disabled={Object.keys(props.frozenFilter ?? {}).includes('opName')}
-          renderInput={params => <TextField {...params} label="Op Name" />}
+          renderInput={params => <TextField {...params} label="Name" />}
           value={props.filter.opName ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
@@ -651,83 +714,102 @@ const OpNameFilterControlListItem: React.FC<{
   );
 };
 
-const InvokedByFilterControlListItem: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelOpVersionFilter;
-  filter: WFHighLevelOpVersionFilter;
-  updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
-}> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection
-      .opVersions()
-      .filter(o => o.invokedBy().length > 0)
-      .map(o => {
-        return o.op().name() + ':' + o.version();
-      });
-  }, [orm.projectConnection]);
-  return (
-    <ListItem>
-      <FormControl fullWidth>
-        <Autocomplete
-          size={'small'}
-          multiple
-          disabled={Object.keys(props.frozenFilter ?? {}).includes(
-            'invokedByOpVersions'
-          )}
-          renderInput={params => <TextField {...params} label="Invoked By" />}
-          value={props.filter.invokedByOpVersions ?? []}
-          onChange={(event, newValue) => {
-            props.updateFilter({
-              invokedByOpVersions: newValue,
-            });
-          }}
-          options={options}
-        />
-      </FormControl>
-    </ListItem>
-  );
-};
+// const InvokedByFilterControlListItem: React.FC<{
+//   entity: string;
+//   project: string;
+//   frozenFilter?: WFHighLevelOpVersionFilter;
+//   filter: WFHighLevelOpVersionFilter;
+//   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+//   frozenData: Array<{obj: WFOpVersion}>;
+// }> = props => {
+//   const optionsDict = useMemo(() => {
+//     return _.fromPairs(
+//       props.frozenData.flatMap(o =>
+//         o.obj.invokedBy().map(v => {
+//           return [
+//             v.op().name() + ':' + v.version(),
+//             v.op().name() + ':v' + v.versionIndex(),
+//           ];
+//         })
+//       )
+//     );
+//   }, [props.frozenData]);
+//   return (
+//     <ListItem>
+//       <FormControl fullWidth>
+//         <Autocomplete
+//           size={'small'}
+//           limitTags={1}
+//           // Temp disable multiple for simplicity - may want to re-enable
+//           // multiple
+//           disabled={Object.keys(props.frozenFilter ?? {}).includes(
+//             'invokedByOpVersions'
+//           )}
+//           renderInput={params => <TextField {...params} label="Called By" />}
+//           value={props.filter.invokedByOpVersions?.[0]  ?? null}
+//           onChange={(event, newValue) => {
+//             props.updateFilter({
+//               invokedByOpVersions: newValue ? [newValue] : [],
+//             });
+//           }}
+//           getOptionLabel={option => {
+//             return optionsDict[option];
+//           }}
+//           options={Object.keys(optionsDict)}
+//         />
+//       </FormControl>
+//     </ListItem>
+//   );
+// };
 
-const InvokesFilterControlListItem: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelOpVersionFilter;
-  filter: WFHighLevelOpVersionFilter;
-  updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
-}> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection
-      .opVersions()
-      .filter(o => o.invokes().length > 0)
-      .map(o => {
-        return o.op().name() + ':' + o.version();
-      });
-  }, [orm.projectConnection]);
-  return (
-    <ListItem>
-      <FormControl fullWidth>
-        <Autocomplete
-          size={'small'}
-          multiple
-          disabled={Object.keys(props.frozenFilter ?? {}).includes(
-            'invokesOpVersions'
-          )}
-          renderInput={params => <TextField {...params} label="Invokes" />}
-          value={props.filter.invokesOpVersions ?? []}
-          onChange={(event, newValue) => {
-            props.updateFilter({
-              invokesOpVersions: newValue,
-            });
-          }}
-          options={options}
-        />
-      </FormControl>
-    </ListItem>
-  );
-};
+// const InvokesFilterControlListItem: React.FC<{
+//   entity: string;
+//   project: string;
+//   frozenFilter?: WFHighLevelOpVersionFilter;
+//   filter: WFHighLevelOpVersionFilter;
+//   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+//   frozenData: Array<{obj: WFOpVersion}>;
+// }> = props => {
+//   const optionsDict = useMemo(() => {
+//     return _.fromPairs(
+//       props.frozenData
+//         .filter(o => o.obj.invokes().length > 0)
+//         .map(o => {
+//           return [
+//             o.obj.op().name() + ':' + o.obj.version(),
+//             o.obj.op().name() + ':v' + o.obj.versionIndex(),
+//           ];
+//         })
+//     );
+//   }, [props.frozenData]);
+
+//   return (
+//     <ListItem>
+//       <FormControl fullWidth>
+//         <Autocomplete
+//           size={'small'}
+//           limitTags={1}
+//           // Temp disable multiple for simplicity - may want to re-enable
+//           // multiple
+//           disabled={Object.keys(props.frozenFilter ?? {}).includes(
+//             'invokesOpVersions'
+//           )}
+//           renderInput={params => <TextField {...params} label="Calls" />}
+//           value={props.filter.invokesOpVersions?.[0] ?? null}
+//           onChange={(event, newValue) => {
+//             props.updateFilter({
+//               invokesOpVersions: newValue ? [newValue] : [],
+//             });
+//           }}
+//           getOptionLabel={option => {
+//             return optionsDict[option];
+//           }}
+//           options={Object.keys(optionsDict)}
+//         />
+//       </FormControl>
+//     </ListItem>
+//   );
+// };
 
 const ConsumesTypeVersionFilterControlListItem: React.FC<{
   entity: string;
@@ -735,35 +817,51 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection
-      .typeVersions()
-      .filter(o => o.inputTo().length > 0)
-      .map(o => {
-        return o.type().name() + ':' + o.version();
-      });
-  }, [orm.projectConnection]);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection
+  //     .typeVersions()
+  //     .filter(o => o.inputTo().length > 0)
+  //     .map(o => {
+  //       return o.type().name() + ':' + o.version();
+  //     });
+  // }, [orm.projectConnection]);
+  const optionsDict = useMemo(() => {
+    return _.fromPairs(
+      props.frozenData.flatMap(o =>
+        o.obj.inputTypesVersions().map(tv => {
+          return [
+            tv.type().name() + ':' + tv.version(),
+            tv.type().name() + ' (' + truncateID(tv.version()) + ')',
+          ];
+        })
+      )
+    );
+  }, [props.frozenData]);
   return (
     <ListItem>
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
-          multiple
+          limitTags={1}
+          // Temp disable multiple for simplicity - may want to re-enable
+          // multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'consumesTypeVersions'
           )}
-          renderInput={params => (
-            <TextField {...params} label="Consumes Type Versions" />
-          )}
-          value={props.filter.consumesTypeVersions ?? []}
+          renderInput={params => <TextField {...params} label="Parameters" />}
+          value={props.filter.consumesTypeVersions?.[0] ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
-              consumesTypeVersions: newValue,
+              consumesTypeVersions: newValue ? [newValue] : [],
             });
           }}
-          options={options}
+          getOptionLabel={option => {
+            return optionsDict[option];
+          }}
+          options={Object.keys(optionsDict)}
         />
       </FormControl>
     </ListItem>
@@ -776,38 +874,96 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
   frozenFilter?: WFHighLevelOpVersionFilter;
   filter: WFHighLevelOpVersionFilter;
   updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection
-      .typeVersions()
-      .filter(o => o.outputFrom().length > 0)
-      .map(o => {
-        return o.type().name() + ':' + o.version();
-      });
-  }, [orm.projectConnection]);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const options = useMemo(() => {
+  //   return orm.projectConnection
+  //     .typeVersions()
+  //     .filter(o => o.outputFrom().length > 0)
+  //     .map(o => {
+  //       return o.type().name() + ':' + o.version();
+  //     });
+  // }, [orm.projectConnection]);
+  const optionsDict = useMemo(() => {
+    return _.fromPairs(
+      props.frozenData.flatMap(o =>
+        o.obj.outputTypeVersions().map(tv => {
+          return [
+            tv.type().name() + ':' + tv.version(),
+            tv.type().name() + ' (' + truncateID(tv.version()) + ')',
+          ];
+        })
+      )
+    );
+  }, [props.frozenData]);
 
   return (
     <ListItem>
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
-          multiple
+          limitTags={1}
+          // Temp disable multiple for simplicity - may want to re-enable
+          // multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'producesTypeVersions'
           )}
-          renderInput={params => (
-            <TextField {...params} label="Produces Type Versions" />
-          )}
-          value={props.filter.producesTypeVersions ?? []}
+          renderInput={params => <TextField {...params} label="Returns" />}
+          value={props.filter.producesTypeVersions?.[0] ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
-              producesTypeVersions: newValue,
+              producesTypeVersions: newValue ? [newValue] : [],
             });
           }}
-          options={options}
+          getOptionLabel={option => {
+            return optionsDict[option];
+          }}
+          options={Object.keys(optionsDict)}
         />
       </FormControl>
+    </ListItem>
+  );
+};
+
+const LatestOnlyControlListItem: React.FC<{
+  entity: string;
+  project: string;
+  frozenFilter?: WFHighLevelOpVersionFilter;
+  filter: WFHighLevelOpVersionFilter;
+  updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
+  frozenData: Array<{obj: WFOpVersion}>;
+}> = props => {
+  const options = useMemo(() => {
+    return _.uniq(
+      props.frozenData.map(o => o.obj.aliases().includes('latest'))
+    );
+  }, [props.frozenData]);
+
+  return (
+    <ListItem
+      secondaryAction={
+        <Checkbox
+          edge="end"
+          checked={
+            !!props.filter?.isLatest ||
+            (options.length === 1 && options[0] === true)
+          }
+          onChange={() => {
+            props.updateFilter({
+              isLatest: !props.filter?.isLatest,
+            });
+          }}
+        />
+      }
+      disabled={
+        Object.keys(props.frozenFilter ?? {}).includes('isLatest') ||
+        options.length <= 1
+      }
+      disablePadding>
+      <ListItemButton>
+        <ListItemText primary={`Latest Only`} />
+      </ListItemButton>
     </ListItem>
   );
 };

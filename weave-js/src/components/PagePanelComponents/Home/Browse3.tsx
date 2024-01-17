@@ -18,13 +18,12 @@ import {
   useParams,
 } from 'react-router-dom';
 
-import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
 import {URL_BROWSE3} from '../../../urls';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
-import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
+// import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
   baseContext,
   browse2Context,
@@ -64,6 +63,7 @@ import {
   fnNaiveBootstrapRuns,
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
+import {SideNav} from './Browse3/SideNav';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -131,14 +131,14 @@ export const Browse3: FC<{
   navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
-  const weaveContext = useWeaveContext();
-  useEffect(() => {
-    const previousPolling = weaveContext.client.isPolling();
-    weaveContext.client.setPolling(true);
-    return () => {
-      weaveContext.client.setPolling(previousPolling);
-    };
-  }, [props.projectRoot, weaveContext]);
+  // const weaveContext = useWeaveContext();
+  // useEffect(() => {
+  //   const previousPolling = weaveContext.client.isPolling();
+  //   weaveContext.client.setPolling(true);
+  //   return () => {
+  //     weaveContext.client.setPolling(previousPolling);
+  //   };
+  // }, [props.projectRoot, weaveContext]);
   return (
     <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
       <Switch>
@@ -197,6 +197,9 @@ const Browse3Mounted: FC<{
         height: `calc(100vh - ${props.headerOffset ?? 0}px)`,
         overflow: 'auto',
         flexDirection: 'column',
+        a: {
+          color: '#038194',
+        },
       }}>
       {!props.hideHeader && (
         <AppBar
@@ -245,9 +248,10 @@ const Browse3Mounted: FC<{
               display: 'flex',
               flexDirection: 'row',
             }}>
-            <RouteAwareBrowse3ProjectSideNav
+            <SideNav />
+            {/* <RouteAwareBrowse3ProjectSideNav
               navigateAwayFromProject={props.navigateAwayFromProject}
-            />
+            /> */}
             <Box
               component="main"
               sx={{
@@ -402,7 +406,10 @@ const useNaiveProjectDataConnection = (entity: string, project: string) => {
     if (
       objectsValue.result == null &&
       runsValue.result == null &&
-      feedbackValue.result == null
+      feedbackValue.result == null &&
+      objectsValue.loading &&
+      runsValue.loading &&
+      feedbackValue.loading
     ) {
       return null;
     }
@@ -414,9 +421,12 @@ const useNaiveProjectDataConnection = (entity: string, project: string) => {
     return connection;
   }, [
     entity,
+    feedbackValue.loading,
     feedbackValue.result,
+    objectsValue.loading,
     objectsValue.result,
     project,
+    runsValue.loading,
     runsValue.result,
   ]);
 };
@@ -445,9 +455,12 @@ const ProjectRedirect: FC = () => {
   useEffect(() => {
     if (params.tab == null) {
       history.replace(
-        baseRouter.callsUIUrl(params.entity ?? '', params.project ?? '', {
-          traceRootsOnly: true,
+        baseRouter.opVersionsUIUrl(params.entity, params.project, {
+          isLatest: true,
         })
+        // baseRouter.callsUIUrl(params.entity ?? '', params.project ?? '', {
+        //   traceRootsOnly: true,
+        // })
       );
     }
   }, [baseRouter, history, params.entity, params.project, params.tab]);

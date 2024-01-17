@@ -19,5 +19,12 @@ export const OpVersionCategoryChip: React.FC<{
   }
   const color = colorMap[props.opCategory];
   // The color seems to be borked
-  return <Chip label={props.opCategory} size="small" color={color as any} />;
+  return (
+    <Chip
+      label={props.opCategory}
+      size="small"
+      sx={{height: '20px', lineHeight: 2}}
+      color={color as any}
+    />
+  );
 };

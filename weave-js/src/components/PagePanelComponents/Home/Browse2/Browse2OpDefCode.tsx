@@ -12,13 +12,15 @@ export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
   const text = opPyContentsQuery.result ?? '';
   return (
     <Editor
-      height={500}
+      height={'100%'}
       defaultLanguage="python"
       loading={opPyContentsQuery.loading}
       value={text}
       options={{
         readOnly: true,
         minimap: {enabled: false},
+        scrollBeyondLastLine: false,
+        padding: {top: 10, bottom: 10},
       }}
     />
   );

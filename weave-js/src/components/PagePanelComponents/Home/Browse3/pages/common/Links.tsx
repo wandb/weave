@@ -68,17 +68,24 @@ export const ObjectLink: React.FC<{
   );
 };
 
+export const objectVersionText = (opName: string, versionIndex: number) => {
+  let text = opName;
+  text += ':v' + versionIndex;
+  return text;
+};
+
 export const ObjectVersionLink: React.FC<{
   entityName: string;
   projectName: string;
   objectName: string;
   version: string;
-  hideName?: boolean;
+  versionIndex: number;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const text = props.hideName
-    ? props.version
-    : props.objectName + ': ' + truncateID(props.version);
+  // const text = props.hideName
+  //   ? props.version
+  //   : props.objectName + ': ' + truncateID(props.version);
+  const text = objectVersionText(props.objectName, props.versionIndex);
   return (
     <Link
       to={peekingRouter.objectVersionUIUrl(
@@ -110,17 +117,32 @@ export const OpLink: React.FC<{
   );
 };
 
+export const opNiceName = (opName: string) => {
+  let text = opName;
+  if (text.startsWith('op-')) {
+    text = text.slice(3);
+  }
+  return text;
+};
+
+export const opVersionText = (opName: string, versionIndex: number) => {
+  let text = opNiceName(opName);
+  text += ':v' + versionIndex;
+  return text;
+};
+
 export const OpVersionLink: React.FC<{
   entityName: string;
   projectName: string;
   opName: string;
   version: string;
-  hideName?: boolean;
+  versionIndex: number;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const text = props.hideName
-    ? props.version
-    : props.opName + ': ' + truncateID(props.version);
+  // const text = props.hideName
+  //   ? props.version
+  //   : props.opName + ': ' + truncateID(props.version);
+  const text = opVersionText(props.opName, props.versionIndex);
   return (
     <Link
       to={peekingRouter.opVersionUIUrl(
@@ -138,9 +160,19 @@ export const CallLink: React.FC<{
   entityName: string;
   projectName: string;
   callId: string;
+  simpleText?: {
+    opName: string;
+    versionIndex: number;
+  };
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-
+  let text = truncateID(props.callId);
+  if (props.simpleText) {
+    text = opVersionText(
+      props.simpleText.opName,
+      props.simpleText.versionIndex
+    );
+  }
   return (
     <Link
       to={peekingRouter.callUIUrl(
@@ -149,7 +181,7 @@ export const CallLink: React.FC<{
         '',
         props.callId
       )}>
-      {truncateID(props.callId)}
+      {text}
     </Link>
   );
 };
@@ -159,11 +191,12 @@ export const CallsLink: React.FC<{
   project: string;
   callCount: number;
   filter?: WFHighLevelCallFilter;
+  neverPeek?: boolean;
 }> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
+  const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
+  const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
-    <Link
-      to={peekingRouter.callsUIUrl(props.entity, props.project, props.filter)}>
+    <Link to={router.callsUIUrl(props.entity, props.project, props.filter)}>
       {props.callCount} calls
     </Link>
   );
@@ -172,18 +205,20 @@ export const CallsLink: React.FC<{
 export const ObjectVersionsLink: React.FC<{
   entity: string;
   project: string;
-  versionsCount: number;
+  versionCount: number;
   filter?: WFHighLevelObjectVersionFilter;
+  neverPeek?: boolean;
 }> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
+  const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
+  const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
     <Link
-      to={peekingRouter.objectVersionsUIUrl(
+      to={router.objectVersionsUIUrl(
         props.entity,
         props.project,
         props.filter
       )}>
-      {props.versionsCount} objects
+      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
@@ -193,16 +228,14 @@ export const OpVersionsLink: React.FC<{
   project: string;
   versionCount: number;
   filter?: WFHighLevelOpVersionFilter;
+  neverPeek?: boolean;
 }> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
+  const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
+  const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
     <Link
-      to={peekingRouter.opVersionsUIUrl(
-        props.entity,
-        props.project,
-        props.filter
-      )}>
-      {props.versionCount} versions
+      to={router.opVersionsUIUrl(props.entity, props.project, props.filter)}>
+      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
@@ -221,7 +254,7 @@ export const TypeVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount} versions
+      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
