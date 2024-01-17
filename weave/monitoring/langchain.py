@@ -113,12 +113,13 @@ def lc_run_dict_to_weave_span(
 
     ref = lc_serialized_to_refs(run["serialized"], client)
 
-    op_def_ref = (str(run["name"]) + "-run",)
+    op_def_ref = str(run["name"]) + "-run"
     # This is def not going to work in all cases
     try:
 
-        def build_resolver(name, lc, cid):
+        def build_resolver(rn, lc, cid):
             def resolver(*args, **kwargs):
+                name = rn
                 langchain_version = lc
                 component_id = cid
 
