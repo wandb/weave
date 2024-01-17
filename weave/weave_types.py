@@ -954,8 +954,6 @@ class TypedDict(Type):
             result = json.load(f)
         mapper = mappers_python.map_from_python(self, artifact)
         mapped_result = mapper.apply(result)
-        if extra is not None:
-            return mapped_result[extra[0]]
         return mapped_result
 
 
@@ -1770,6 +1768,21 @@ def union(*members: Type) -> Type:
     if len(final_members) == 1:
         return final_members[0]
     return UnionType(*final_members)
+
+
+def unwrap_type(t: Type) -> Type:
+    """Removes any transparent types from the type."""
+    if isinstance(t, RefType):
+        return t.object_type
+    # TODO: TaggedValue
+    return t
+
+
+def simple_type(t: Type) -> Type:
+    """Type without nullable and transparent types"""
+    t = unwrap_type(t)
+    _, non_none_t = split_none(t)
+    return non_none_t
 
 
 def is_list_like(t: Type) -> bool:

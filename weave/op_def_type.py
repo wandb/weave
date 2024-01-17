@@ -491,9 +491,11 @@ class OpDefType(types.Type):
         # so we resort to looking at the source ast.
         last_op_function = find_last_weave_op_function(inspect.getsource(mod))
         if last_op_function is None:
-            raise errors.WeaveInternalError(
-                f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=} "
+            print(
+                f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
             )
+            return None
+
         od: op_def.OpDef = getattr(mod, last_op_function.name)
 
         location = artifact.uri_obj.with_path(name)

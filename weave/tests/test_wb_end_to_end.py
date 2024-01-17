@@ -78,7 +78,7 @@ def test_run_histories(user_by_api_key_in_env):
 
 
 # Example of end to end integration test
-def test_run_history_count(user_by_api_key_in_env):
+def test_run_history_count(user_by_api_key_in_env, cache_mode_minimal):
     run = wandb.init(project="project_exists")
     run.log({"a": 1})
     run.log({"a": 2})
