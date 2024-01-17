@@ -196,7 +196,6 @@ const Browse3Mounted: FC<{
   useEffect(() => {
     const obs = weaveContext.client.loadingObservable();
     const sub = obs.subscribe(loading => {
-      console.log(loading);
       setWeaveLoading(loading);
     });
     return () => sub.unsubscribe();
