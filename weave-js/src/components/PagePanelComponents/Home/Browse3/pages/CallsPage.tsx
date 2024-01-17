@@ -1,3 +1,5 @@
+import {CircularProgress, IconButton} from '@material-ui/core';
+import {DashboardCustomize} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
@@ -11,9 +13,10 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {CallFilter} from '../../Browse2/callTree';
-import {useRunsWithFeedback} from '../../Browse2/callTreeHooks';
+import {fnRunsNode, useRunsWithFeedback} from '../../Browse2/callTreeHooks';
 import {RunsTable} from '../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../context';
+import {useMakeNewBoard} from './common/hooks';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {truncateID} from './util';
@@ -143,7 +146,11 @@ export const CallsTable: React.FC<{
     props.project,
     effectiveFilter
   );
-
+  const {onMakeBoard, isGenerating} = useMakeBoardForCalls(
+    props.entity,
+    props.project,
+    lowLevelFilter
+  );
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -155,6 +162,18 @@ export const CallsTable: React.FC<{
       )}
       filterListItems={
         <>
+          <IconButton
+            style={{width: '37px', height: '37px'}}
+            size="small"
+            onClick={() => {
+              onMakeBoard();
+            }}>
+            {isGenerating ? (
+              <CircularProgress size={25} />
+            ) : (
+              <DashboardCustomize />
+            )}
+          </IconButton>
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete
@@ -298,7 +317,7 @@ export const CallsTable: React.FC<{
             }
             disablePadding>
             <ListItemButton>
-              <ListItemText primary={`Trace Roots Only`} />
+              <ListItemText primary={`Roots Only`} />
             </ListItemButton>
           </ListItem>
         </>
@@ -306,6 +325,29 @@ export const CallsTable: React.FC<{
       <RunsTable loading={runs.loading} spans={runs.result} />
     </FilterLayoutTemplate>
   );
+};
+
+const useMakeBoardForCalls = (
+  entityName: string,
+  projectName: string,
+  lowLevelFilter: CallFilter
+) => {
+  // TODO: Make a generator on the python side that is more robust.
+  // 1. Make feedback a join in weave
+  // 2. Control the column selection like we do in the current table
+  // 3. Map column processing to weave (example timestamps)
+  // 4. Handle references more cleanly
+  // 5. Probably control ordering.
+
+  const runsNode = fnRunsNode(
+    {
+      entityName,
+      projectName,
+      streamName: 'stream',
+    },
+    lowLevelFilter
+  );
+  return useMakeNewBoard(runsNode);
 };
 
 const convertHighLevelFilterToLowLevelFilter = (

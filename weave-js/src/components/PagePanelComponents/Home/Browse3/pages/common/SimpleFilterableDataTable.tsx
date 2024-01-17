@@ -241,6 +241,7 @@ export const FilterLayoutTemplate: React.FC<{
           flexDirection: 'row',
           overflowX: 'auto',
           overflowY: 'hidden',
+          alignItems: 'center',
           gap: '8px',
           p: 1,
           '& li': {
