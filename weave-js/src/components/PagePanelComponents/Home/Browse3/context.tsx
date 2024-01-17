@@ -363,7 +363,6 @@ const browse3ContextGen = (
       // is the case, we should not be asking the user for
       // an expression most likely.
       let base = 'https://weave.wandb.ai';
-      console.log(window); // https://app.wandb.test/
       if (window.location.host === 'app.wandb.test') {
         base = 'https://weave.wandb.test';
       }

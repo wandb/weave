@@ -28,6 +28,7 @@ import {GroupedCalls} from './ObjectVersionPage';
 import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
+import {opNiceName} from './common/Links';
 
 // % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
@@ -565,7 +566,7 @@ const CustomGridTreeDataGroupingCell: React.FC<
           fontWeight: 'bold',
         }}>
         {/* {call.spanName() + ': ' + truncateID(call.callID())} */}
-        {call.spanName().split('-').slice(-1)[0]}
+        {opNiceName(call.spanName())}
       </Box>
       {opCategory && (
         <Box

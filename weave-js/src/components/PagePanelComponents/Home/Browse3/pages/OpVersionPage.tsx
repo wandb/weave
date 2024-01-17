@@ -138,7 +138,11 @@ const OpVersionPageInner: React.FC<{
             //     }
             //   : {}),
             ...(opInvokes.length > 0
-              ? {'Call Tree': <OpVersionOpTree opVersion={opVersion} />}
+              ? {
+                  'Call Tree': (
+                    <OpVersionOpTree opVersion={opVersion} parents={[]} />
+                  ),
+                }
               : {}),
           }}
         />
@@ -289,10 +293,16 @@ const OpVersionPageInner: React.FC<{
   // return ;
 };
 
-const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
+const OpVersionOpTree: React.FC<{
+  opVersion: WFOpVersion;
+  parents: WFOpVersion[];
+}> = ({opVersion, parents}) => {
   return (
     <ul style={{margin: 0}}>
       {opVersion.invokes().map((v, i) => {
+        if (parents.some(p => p.version() === v.version())) {
+          return null;
+        }
         return (
           <li key={i}>
             <OpVersionLink
@@ -302,7 +312,10 @@ const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
               version={v.version()}
               versionIndex={v.versionIndex()}
             />
-            <OpVersionOpTree opVersion={v} />
+            <OpVersionOpTree
+              opVersion={v}
+              parents={parents.concat([opVersion])}
+            />
           </li>
         );
       })}
