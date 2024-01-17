@@ -62,7 +62,7 @@ def test_nested_object_deref(ref_tracking):
     assert b.a.val == 5
 
 
-def test_ref_tracking_dict():
+def test_ref_tracking_dict(ref_tracking):
     obj_ref = storage.save({"a": 5})
     obj = obj_ref.get()
     sub_obj = obj["a"]
