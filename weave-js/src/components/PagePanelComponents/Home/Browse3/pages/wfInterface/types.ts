@@ -17,7 +17,7 @@ export interface WFProject extends ProjectOwned {
   call: (callID: string) => WFCall | null;
   calls: () => WFCall[];
   // a bit hacky here:
-  traceRoots(traceID: string): WFCall[];
+  traceRoots: (traceID: string) => WFCall[];
   opCategories: () => HackyOpCategory[];
   typeCategories: () => HackyTypeCategory[];
 }
