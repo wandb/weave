@@ -31,7 +31,7 @@ def test_evaluate_basic():
         model = EvalModel()
         result = asyncio.run(evaluation.evaluate(model))
 
-        assert result == {"score": {"mean": 0.0}}
+        assert result == {"prediction": {"mean": 9.5}, "score": {"mean": 0.0}}
 
         example_to_model_input0_run = evaluation.example_to_model_input.runs()[0]
         example_to_model_input0_run_example = example_to_model_input0_run.inputs[

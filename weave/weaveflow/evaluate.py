@@ -110,6 +110,9 @@ class Evaluation:
     @weave.op()
     async def summarize(self, eval_table: weave.WeaveList) -> dict:
         summary = {}
+        prediction_summary = auto_summarize(eval_table.column("prediction"))
+        if prediction_summary:
+            summary["prediction"] = prediction_summary
         for scorer in self.scores:
             scorer_name = scorer.common_name
             scorer_scores = eval_table.column("scores").column(scorer_name)
