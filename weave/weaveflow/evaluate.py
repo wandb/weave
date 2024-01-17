@@ -10,6 +10,7 @@ import inspect
 import traceback
 
 from rich.console import Console
+from rich import print
 
 console = Console()
 
@@ -110,15 +111,13 @@ class Evaluation:
     @weave.op()
     async def summarize(self, eval_table: weave.WeaveList) -> dict:
         summary = {}
-        prediction_summary: Optional[dict] = auto_summarize(
-            eval_table.column("prediction")
-        )
+        prediction_summary = auto_summarize(eval_table.column("prediction"))
         if prediction_summary:
             summary["prediction"] = prediction_summary
         for scorer in self.scores:
             scorer_name = scorer.common_name
             scorer_scores = eval_table.column("scores").column(scorer_name)
-            summary[scorer_name] = auto_summarize(scorer_scores)
+            summary[scorer_name] = auto_summarize(scorer_scores)  # type: ignore
         return summary
 
     @weave.op()
