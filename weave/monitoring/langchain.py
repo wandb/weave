@@ -128,7 +128,7 @@ def lc_run_dict_to_weave_span(
         resolver = build_resolver(
             op_def_ref,
             run["serialized"].get("lc", 1),
-            str(run["serialized"].get("lc", [])),
+            str(run["serialized"].get("id", [])),
         )
         dynamic_op_def = op_def.OpDef(
             str(run["name"]) + "-run",
