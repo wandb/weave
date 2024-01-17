@@ -186,7 +186,7 @@ export const CallsTable: React.FC<{
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'opVersions'
                 )}
-                value={effectiveFilter.opVersions?.[0]}
+                value={effectiveFilter.opVersions?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
@@ -218,7 +218,7 @@ export const CallsTable: React.FC<{
                   <TextField {...params} label="Inputs" />
                   // <TextField {...params} label="Consumes Objects" />
                 )}
-                value={effectiveFilter.inputObjectVersions?.[0]}
+                value={effectiveFilter.inputObjectVersions?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,

@@ -746,7 +746,7 @@ const OpNameFilterControlListItem: React.FC<{
 //             'invokedByOpVersions'
 //           )}
 //           renderInput={params => <TextField {...params} label="Called By" />}
-//           value={props.filter.invokedByOpVersions?.[0]}
+//           value={props.filter.invokedByOpVersions?.[0]  ?? null}
 //           onChange={(event, newValue) => {
 //             props.updateFilter({
 //               invokedByOpVersions: newValue ? [newValue] : [],
@@ -795,7 +795,7 @@ const OpNameFilterControlListItem: React.FC<{
 //             'invokesOpVersions'
 //           )}
 //           renderInput={params => <TextField {...params} label="Calls" />}
-//           value={props.filter.invokesOpVersions?.[0]}
+//           value={props.filter.invokesOpVersions?.[0] ?? null}
 //           onChange={(event, newValue) => {
 //             props.updateFilter({
 //               invokesOpVersions: newValue ? [newValue] : [],
@@ -852,7 +852,7 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
             'consumesTypeVersions'
           )}
           renderInput={params => <TextField {...params} label="Parameters" />}
-          value={props.filter.consumesTypeVersions?.[0]}
+          value={props.filter.consumesTypeVersions?.[0] ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
               consumesTypeVersions: newValue ? [newValue] : [],
@@ -910,7 +910,7 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
             'producesTypeVersions'
           )}
           renderInput={params => <TextField {...params} label="Returns" />}
-          value={props.filter.producesTypeVersions?.[0]}
+          value={props.filter.producesTypeVersions?.[0] ?? null}
           onChange={(event, newValue) => {
             props.updateFilter({
               producesTypeVersions: newValue ? [newValue] : [],

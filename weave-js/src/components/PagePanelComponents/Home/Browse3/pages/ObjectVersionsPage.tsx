@@ -215,7 +215,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'typeVersions'
                 )}
-                value={effectiveFilter.typeVersions?.[0]}
+                value={effectiveFilter.typeVersions?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
@@ -243,7 +243,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                 renderInput={params => (
                   <TextField {...params} label="Input To" />
                 )}
-                value={effectiveFilter.inputToOpVersions?.[0]}
+                value={effectiveFilter.inputToOpVersions?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
