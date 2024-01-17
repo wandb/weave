@@ -48,7 +48,10 @@ import {
 } from 'react';
 
 import {PanelCompContext} from './components/Panel2/PanelComp';
-import {usePanelContext} from './components/Panel2/PanelContext';
+import {
+  StackWithHandlers,
+  usePanelContext,
+} from './components/Panel2/PanelContext';
 import {toWeaveType} from './components/Panel2/toWeaveType';
 import {
   ClientContext,
@@ -242,6 +245,7 @@ export const useNodeValue = <T extends Type>(
     skip?: boolean;
   }
 ): {loading: boolean; result: TypeToTSTypeInner<T>} => {
+  GlobalCGReactTracker.useNodeValue++;
   const memoCacheId = options?.memoCacheId ?? 0;
   const callSite = options?.callSite;
   const skip = options?.skip;
@@ -255,20 +259,8 @@ export const useNodeValue = <T extends Type>(
   // consoleLog('USE NODE VALUE PRE CLIENT EVAL', weave.expToString(node), stack);
 
   const origNode = node;
+  node = useQueryReadyNode(node, stack, enableClientEval, memoCacheId);
 
-  node = useMemo(() => {
-    return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
-  }, [node, stack]);
-
-  node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
-
-  node = useMemo(
-    () => (enableClientEval ? clientEval(node, stack) : node),
-    [enableClientEval, node, stack]
-  ) as NodeOrVoidNode<T>;
-
-  GlobalCGReactTracker.useNodeValue++;
-  node = useDeepMemo({node, memoCacheId}).node;
   const [error, setError] = useState<ErrorStateType | undefined>();
   const [result, setResult] = useState<{
     node: NodeOrVoidNode;
@@ -329,7 +321,9 @@ export const useNodeValue = <T extends Type>(
           // if (callSite != null) {
           //   console.log('useNodeValue resolve', callSite, node);
           // }
-          setResult({node, value: nodeRes});
+          if (nodeRes.state === 'DONE') {
+            setResult({node, value: nodeRes.value});
+          }
         },
         caughtError => {
           setError(caughtError);
@@ -377,6 +371,202 @@ export const useNodeValue = <T extends Type>(
     // Throw NullResult for PanelMaybe to catch.
     throw new NullResult(result.node);
   }
+
+  return finalResult;
+};
+
+type UNVLResult<T extends Type> = {
+  source: 'CACHE' | 'ENGINE';
+  value: TypeToTSTypeInner<T>;
+  updatedAtMs: number;
+};
+type UNVLError = {
+  error: ErrorStateType;
+  updatedAtMs: number;
+};
+type UNVLResponse<T extends Type> =
+  | {
+      // we're loading the node value. Transitions to DONE or ERROR.
+      state: 'LOADING';
+    }
+  | {
+      // we've successfully loaded the node value. Transitions to REFRESHING
+      state: 'DONE';
+      result: UNVLResult<T>;
+      refresh: () => void;
+    }
+  | {
+      // we're refreshing the node value. Transitions to DONE or ERROR.
+      state: 'REFRESHING';
+      result: UNVLResult<T>;
+    }
+  | {
+      // we have an error loading the node value. Transitions to RETRYING
+      state: 'ERROR';
+      error: UNVLError;
+      retry: () => void;
+      // Optional last-known-good value.
+      result?: UNVLResult<T>;
+    }
+  | {
+      // we're retrying the node value after an error. Transitions to DONE or ERROR.
+      state: 'RETRYING';
+      error: UNVLError;
+      // Optional last-known-good value.
+      result?: UNVLResult<T>;
+    };
+
+const useQueryReadyNode = <T extends Type>(
+  node: NodeOrVoidNode<T>,
+  stack: StackWithHandlers,
+  enableClientEval?: boolean,
+  memoCacheId?: number
+): NodeOrVoidNode<T> => {
+  node = useMemo(() => {
+    return dereferenceAllVars(node, stack).node as NodeOrVoidNode<T>;
+  }, [node, stack]);
+
+  node = useRefEqualWithoutTypes(node) as NodeOrVoidNode<T>;
+
+  node = useMemo(
+    () => (enableClientEval ? clientEval(node, stack) : node),
+    [enableClientEval, node, stack]
+  ) as NodeOrVoidNode<T>;
+
+  node = useDeepMemo({node, memoCacheId}).node;
+
+  return node;
+};
+
+export const useNodeValueLifecycle = <T extends Type>(
+  origNode: NodeOrVoidNode<T>
+): UNVLResponse<T> => {
+  const enableClientEval = useWeaveClientEvalInUseNodeValueEnabled();
+  const {client} = useClientContext();
+  const {stack} = usePanelContext();
+
+  const [error, setError] = useState<
+    {error: UNVLError; forNode: NodeOrVoidNode<T>} | undefined
+  >();
+  const [result, setResult] = useState<
+    {result: UNVLResult<T>; forNode: NodeOrVoidNode<T>} | undefined
+  >();
+  const queryNode = useQueryReadyNode(origNode, stack, enableClientEval);
+
+  const setResultFromEngine = useCallback(
+    (forNode: NodeOrVoidNode<T>, value: TypeToTSTypeInner<T>) => {
+      setResult({
+        forNode,
+        result: {
+          source: 'ENGINE',
+          value,
+          updatedAtMs: Date.now(),
+        },
+      });
+    },
+    []
+  );
+
+  const setErrorFromEngine = useCallback(
+    (forNode: NodeOrVoidNode<T>, errorState: ErrorStateType) => {
+      setError({
+        forNode,
+        error: {
+          error: errorState,
+          updatedAtMs: Date.now(),
+        },
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (isConstNode(queryNode)) {
+      if (isFunction(queryNode.type)) {
+        setResultFromEngine(queryNode, queryNode as TypeToTSTypeInner<T>);
+      } else {
+        setResultFromEngine(queryNode, queryNode.val);
+      }
+      return;
+    } else if (isVoidNode(queryNode)) {
+      setResultFromEngine(queryNode, undefined as TypeToTSTypeInner<T>);
+      return;
+    }
+
+    const unresolvedVarNodes = getUnresolvedVarNodes(queryNode);
+    if (unresolvedVarNodes.length > 0) {
+      // Unresolved variables, cannot evaluate this graph.
+      setErrorFromEngine(queryNode, {
+        message: `Unknown variable${
+          unresolvedVarNodes.length > 1 ? 's' : ''
+        } ${unresolvedVarNodes.join(', ')}.`,
+        traceback: [],
+      });
+      return;
+    } else {
+      if (client == null) {
+        throw new Error('client not initialized!');
+      }
+      const obs = client.subscribe(queryNode);
+      const sub = obs.subscribe(
+        nodeRes => {
+          setResultFromEngine(queryNode, nodeRes);
+        },
+        caughtError => {
+          setErrorFromEngine(queryNode, caughtError);
+        }
+      );
+      return () => sub.unsubscribe();
+    }
+  }, [client, queryNode, setResultFromEngine, setErrorFromEngine]);
+
+  const finalResult = useMemo(() => {
+    const useableError = error?.forNode === queryNode ? error : undefined;
+    const useableResult = result?.forNode === queryNode ? result : undefined;
+    if (useableError != null && useableResult != null) {
+      // Need to decide which one to use.
+      if (useableError.error.updatedAtMs > useableResult.result.updatedAtMs) {
+        // Use the error.
+        return {
+          state: 'ERROR' as const,
+          error: useableError.error,
+          retry: () => {
+            throw new Error('not implemented');
+          },
+          result: useableResult.result,
+        };
+      } else {
+        // Use the result.
+        return {
+          state: 'DONE' as const,
+          result: useableResult.result,
+          refresh: () => {
+            throw new Error('not implemented');
+          },
+        };
+      }
+    } else if (useableError != null) {
+      return {
+        state: 'ERROR' as const,
+        error: useableError.error,
+        retry: () => {
+          throw new Error('not implemented');
+        },
+      };
+    } else if (useableResult != null) {
+      return {
+        state: 'DONE' as const,
+        result: useableResult.result,
+        refresh: () => {
+          throw new Error('not implemented');
+        },
+      };
+    } else {
+      return {
+        state: 'LOADING' as const,
+      };
+    }
+  }, [error, queryNode, result]);
 
   return finalResult;
 };

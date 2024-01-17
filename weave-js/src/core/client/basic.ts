@@ -13,13 +13,27 @@ import {ID} from '../util/id';
 import {defaultCachePolicy} from './cachePolicy';
 import {Client} from './types';
 
+type CallerObservableResult<T extends any> = {
+  source: 'CACHE' | 'ENGINE';
+  state: 'DONE';
+  value: T;
+} | {
+  state: 'LOADING';
+}
 interface ObservableNode<T extends Model.Type = Model.Type> {
   id: string;
-  observable: Observable<T>;
+  observable: Observable<
+    CallerObservableResult<GraphTypes.TypeToTSTypeInner<T>>
+  >;
   node: GraphTypes.Node<T>;
-  observers: Set<ZenObservable.SubscriptionObserver<T>>;
-  hasResult: boolean;
-  lastResult: any;
+  observers: Set<
+    ZenObservable.SubscriptionObserver<
+      CallerObservableResult<GraphTypes.TypeToTSTypeInner<T>>
+    >
+  >;
+  hasEngineResult: boolean;
+  lastResultError?: any;
+  lastResult: GraphTypes.TypeToTSTypeInner<T>;
   inFlight: boolean;
 }
 
@@ -92,31 +106,50 @@ export class BasicClient implements Client {
 
   public subscribe<T extends Model.Type>(
     node: GraphTypes.Node<T>
-  ): Observable<any> {
+  ): Observable<CallerObservableResult<T>> {
     const shouldCache = defaultCachePolicy(node);
     GlobalCGEventTracker.basicClientSubscriptions++;
     const observableId = this.hasher.typedNodeId(node);
     if (this.observables.has(observableId)) {
-      const obs = this.observables.get(observableId);
+      const obs = this.observables.get(observableId) as ObservableNode<T>;
       if (obs == null) {
         throw new Error('This should never happen');
       }
       return obs.observable;
     }
-    const observable = new Observable<Model.Type>(observer => {
-      const obs = this.observables.get(observableId);
+    const observable = new Observable<CallerObservableResult<T>>(observer => {
+      const obs = this.observables.get(observableId) as ObservableNode<T>;
       // console.log('SUB', observableId, obs);
       if (obs == null) {
         return;
       }
       obs.observers.add(observer);
-      if (shouldCache && (obs.hasResult || obs.lastResult !== undefined)) {
-        observer.next(obs.lastResult);
+      if (
+        shouldCache &&
+        (obs.hasEngineResult || obs.lastResult !== undefined)
+      ) {
+        if (obs.hasEngineResult) {
+          if (obs.lastResultError != null) {
+            observer.error(obs.lastResultError);
+          } else {
+            observer.next({
+              source: 'ENGINE',
+              state: 'DONE' as const,
+              value: obs.lastResult,
+            });
+          }
+        } else {
+          observer.next({
+            source: 'CACHE',
+            state: 'DONE' as const,
+            value: obs.lastResult,
+          });
+        }
       } else {
         // If this node is not intended to be cached, then we should
         // mark it as not having a result, so that we can re-request
         // the value on the next batch.
-        obs.hasResult = false;
+        obs.hasEngineResult = false;
         this.scheduleRequest();
         this.setIsLoading(true);
       }
@@ -143,7 +176,7 @@ export class BasicClient implements Client {
       observable,
       observers: new Set(),
       node,
-      hasResult: false,
+      hasEngineResult: false,
       inFlight: false,
       lastResult,
     });
@@ -162,8 +195,10 @@ export class BasicClient implements Client {
     return new Promise((resolve, reject) => {
       const sub = obs.subscribe(
         nodeRes => {
-          resolve(nodeRes);
-          sub.unsubscribe();
+          if (nodeRes.state === 'DONE') {
+            resolve(nodeRes.value);
+            sub.unsubscribe();
+          }
         },
         caughtError => {
           reject(caughtError);
@@ -216,7 +251,8 @@ export class BasicClient implements Client {
       if (obs == null) {
         throw new Error('This should never happen');
       }
-      obs.hasResult = false;
+      obs.hasEngineResult = false;
+      obs.lastResultError = undefined;
       obs.lastResult = undefined;
     }
     this.localStorageLRU.del(observableId);
@@ -273,7 +309,7 @@ export class BasicClient implements Client {
     this.resolveRefreshRequest = undefined;
 
     const notDoneObservables = Array.from(this.observables.values()).filter(
-      l => !l.inFlight && (!l.hasResult || resolveRefreshRequest != null)
+      l => !l.inFlight && (!l.hasEngineResult || resolveRefreshRequest != null)
     );
     notDoneObservables.map(o => (o.inFlight = true));
     if (notDoneObservables.length > 0) {
@@ -282,9 +318,17 @@ export class BasicClient implements Client {
       //   notDoneObservables,
       //   Array.from(this.observables.entries()).map(([k, l]) => [k, l.hasResult])
       // );
+      for (const observable of notDoneObservables) {
+        for (const observer of observable.observers) {
+          observer.next({
+            state: 'LOADING',
+          });
+        }
+      }
 
       const rejectObservable = (observable: ObservableNode<any>, e: any) => {
-        observable.hasResult = true;
+        observable.hasEngineResult = true;
+        observable.lastResultError = e;
         if (this.isRemoteServer) {
           this.localStorageLRU.del(observable.id);
         }
@@ -298,7 +342,8 @@ export class BasicClient implements Client {
         observable: ObservableNode<any>,
         result: any
       ) => {
-        observable.hasResult = true;
+        observable.hasEngineResult = true;
+        observable.lastResultError = undefined;
         observable.lastResult = result;
         if (this.isRemoteServer) {
           if (result !== undefined) {
@@ -307,7 +352,11 @@ export class BasicClient implements Client {
           }
         }
         for (const observer of observable.observers) {
-          observer.next(result);
+          observer.next({
+            source: 'ENGINE',
+            state: 'DONE' as const,
+            value: result,
+          });
         }
         observable.inFlight = false;
       };
@@ -361,7 +410,9 @@ export class BasicClient implements Client {
       }
     }
 
-    if (Array.from(this.observables.values()).every(obs => obs.hasResult)) {
+    if (
+      Array.from(this.observables.values()).every(obs => obs.hasEngineResult)
+    ) {
       this.setIsLoading(false);
     }
 
