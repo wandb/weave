@@ -1,19 +1,16 @@
-__all__ = ["ReassembleStream", "patch", "unpatch"]
+__all__ = ["patch", "unpatch"]
 
-import asyncio
 import functools
 from contextlib import contextmanager
-from typing import Callable, List, Union
+from typing import Callable, Union
 
 import openai
 from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion
 from packaging import version
 
-from weave.monitoring.monitor import Monitor, Span, StatusCode, default_monitor
-from weave.monitoring.openai.models import Context
-from weave.monitoring.openai.util import Any, Context
-from weave.wandb_interface.wandb_stream_table import StreamTable
+from weave import graph_client_context
+from weave import run_context
 
 from .models import *
 from .util import *
@@ -23,186 +20,103 @@ from ..monitor import _get_global_monitor
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
 
-Callbacks = List[Callable]
-
-
-class Callback:
-    def before_send_request(self, context: Context, *args: Any, **kwargs: Any) -> None:
-        ...
-
-    def before_end(self, context: Context, *args: Any, **kwargs: Any) -> None:
-        ...
-
-    def before_yield_chunk(self, context: Context, *args: Any, **kwargs: Any) -> None:
-        ...
-
-    def after_yield_chunk(self, context: Context, *args: Any, **kwargs: Any) -> None:
-        ...
-
-
-class ReassembleStream(Callback):
-    def before_send_request(self, context: Context, *args: Any, **kwargs: Any) -> None:
-        sig = match_signature(old_create, *args, **kwargs)
-        context.inputs = ChatCompletionRequest.parse_obj(sig)
-
-    def before_end(self, context: Context, *args: Any, **kwargs: Any) -> None:
-        if hasattr(context, "chunks") and context.inputs is not None:
-            input_messages = context.inputs.messages
-            context.outputs = reconstruct_completion(input_messages, context.chunks)  # type: ignore
-
 
 class AsyncChatCompletions:
-    def __init__(
-        self,
-        base_create: Callable,
-        callbacks: Optional[List[Callback]] = None,
-        streamtable: Optional[StreamTable] = None,
-    ) -> None:
+    def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
-        if callbacks is None:
-            callbacks = make_default_callbacks()
-        self.callbacks = callbacks
-        self.monitor = Monitor(streamtable)
 
     async def create(
         self, *args: Any, **kwargs: Any
     ) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
-        self.context = Context()
         if kwargs.get("stream", False):
             return self._streaming_create(*args, **kwargs)
         return await self._create(*args, **kwargs)
 
     async def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
-        with span_context(self.monitor, self.context, "request", *args, **kwargs):
-            await self._use_callbacks("before_send_request", *args, **kwargs)
-
+        named_args = bind_params(old_create, *args, **kwargs)
+        inputs = ChatCompletionRequest.parse_obj(named_args).dict()
+        with log_run("openai.chat.completions.create", inputs) as finish_run:
             result = await self._base_create(*args, **kwargs)
-            self.context.outputs = result
-
-            await self._use_callbacks("before_end", *args, **kwargs)
-
-            return result
+            finish_run(result.model_dump(exclude_unset=True))
+        return result
 
     async def _streaming_create(
         self, *args: Any, **kwargs: Any
     ) -> AsyncStream[ChatCompletionChunk]:
-        with span_context(self.monitor, self.context, "request", *args, **kwargs):
-            await self._use_callbacks("before_send_request", *args, **kwargs)
-            for callback in self.callbacks:
-                await self._use_callback(
-                    callback.before_send_request, self.context, *args, **kwargs
-                )
+        named_args = bind_params(old_create, *args, **kwargs)
+        inputs = ChatCompletionRequest.parse_obj(named_args)
+        with log_run(
+            "openai.chat.completions.create", inputs.model_dump()
+        ) as finish_run:
+            # Need to put in a function so the outer function is not a
+            # generator. Generators don't execute any of their body's
+            # code until next() is called. But we want to create the run
+            # as a child of whatever the parent is, at function call time,
+            # not generator start time.
+            async def _stream_create_gen():  # type: ignore
+                chunks = []
+                stream = await self._base_create(*args, **kwargs)
+                async for chunk in stream:
+                    chunks.append(chunk)
+                    yield chunk
+                result = reconstruct_completion(inputs.messages, chunks)  # type: ignore
+                finish_run(result.model_dump(exclude_unset=True))
 
-            stream = await self._base_create(*args, **kwargs)
-            self.context.chunks = []  # type: ignore
-            async for chunk in stream:
-                await self._use_callbacks("before_yield_chunk", *args, **kwargs)
-                yield chunk
-                self.context.chunks.append(chunk)  # type: ignore
-                await self._use_callbacks("after_yield_chunk", *args, **kwargs)
-            await self._use_callbacks("before_end", *args, **kwargs)
-
-    @staticmethod
-    async def _use_callback(
-        f: Callable, context: Context, *args: Any, **kwargs: Any
-    ) -> None:
-        if asyncio.iscoroutinefunction(f):
-            await f(context, *args, **kwargs)
-        else:
-            f(context, *args, **kwargs)
-
-    async def _use_callbacks(self, step: str, *args: Any, **kwargs: Any) -> None:
-        for callback in self.callbacks:
-            try:
-                method = getattr(callback, step)
-            except AttributeError:
-                error("Invalid callback.  Did you forget to inherit from Callback?")
-                return
-
-            await self._use_callback(method, self.context, *args, **kwargs)
+        return _stream_create_gen()  # type: ignore
 
 
 class ChatCompletions:
-    def __init__(
-        self,
-        base_create: Callable,
-        callbacks: Optional[List[Callback]] = None,
-        streamtable: Optional[StreamTable] = None,
-    ) -> None:
+    def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
-        if callbacks is None:
-            callbacks = make_default_callbacks()
-        self.callbacks = callbacks
-        self.monitor = Monitor(streamtable)
 
     def create(
         self, *args: Any, **kwargs: Any
     ) -> Union[ChatCompletion, Stream[ChatCompletionChunk]]:
-        self.context = Context()
         if kwargs.get("stream", False):
             result = self._streaming_create(*args, **kwargs)
             return result
         return self._create(*args, **kwargs)
 
     def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
-        with span_context(self.monitor, self.context, "request", *args, **kwargs):
-            self._use_callbacks("before_send_request", *args, **kwargs)
-
+        named_args = bind_params(old_create, *args, **kwargs)
+        inputs = ChatCompletionRequest.parse_obj(named_args).dict()
+        with log_run("openai.chat.completions.create", inputs) as finish_run:
             result = self._base_create(*args, **kwargs)
-            self.context.outputs = result
-
-            self._use_callbacks("before_end", *args, **kwargs)
-
-            return result
+            finish_run(result.model_dump(exclude_unset=True))
+        return result
 
     def _streaming_create(
         self, *args: Any, **kwargs: Any
     ) -> Stream[ChatCompletionChunk]:
-        with span_context(self.monitor, self.context, "request", *args, **kwargs):
-            self._use_callbacks("before_send_request", *args, **kwargs)
+        named_args = bind_params(old_create, *args, **kwargs)
+        inputs = ChatCompletionRequest.parse_obj(named_args)
+        with log_run(
+            "openai.chat.completions.create", inputs.model_dump()
+        ) as finish_run:
 
-            stream = self._base_create(*args, **kwargs)
-            self.context.chunks = []  # type: ignore
-            for chunk in stream:
-                self._use_callbacks("before_yield_chunk", *args, **kwargs)
-                yield chunk
-                self.context.chunks.append(chunk)  # type: ignore
-                self._use_callbacks("after_yield_chunk", *args, **kwargs)
+            def _stream_create_gen():  # type: ignore
+                chunks = []
+                stream = self._base_create(*args, **kwargs)
+                for chunk in stream:
+                    chunks.append(chunk)
+                    yield chunk
+                result = reconstruct_completion(inputs.messages, chunks)  # type: ignore
+                finish_run(result.model_dump(exclude_unset=True))
 
-            self._use_callbacks("before_end", *args, **kwargs)
-
-    def _use_callbacks(self, step: str, *args: Any, **kwargs: Any) -> None:
-        for callback in self.callbacks:
-            try:
-                method = getattr(callback, step)
-            except AttributeError:
-                error("Invalid callback.  Did you forget to inherit from Callback?")
-                return
-
-            try:
-                method(self.context, *args, **kwargs)
-            except Exception as exception:
-                warn(f"problem with {callback=}, {exception=}")
+        return _stream_create_gen()  # type: ignore
 
 
-def patch(
-    *,
-    callbacks: Optional[List[Callback]] = None,
-) -> None:
+def patch() -> None:
     def _patch() -> None:
         unpatch_fqn = f"{unpatch.__module__}.{unpatch.__qualname__}()"
 
         if _get_global_monitor() is not None:
             # info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
 
-            mon = default_monitor()
+            gc = graph_client_context.require_graph_client()
 
-            hooks = ChatCompletions(
-                old_create, callbacks=callbacks, streamtable=mon.streamtable
-            )
-            async_hooks = AsyncChatCompletions(
-                old_async_create, callbacks=callbacks, streamtable=mon.streamtable
-            )
+            hooks = ChatCompletions(old_create)
+            async_hooks = AsyncChatCompletions(old_async_create)
             openai.resources.chat.completions.Completions.create = (
                 functools.partialmethod(hooks.create)
             )
@@ -231,23 +145,21 @@ def unpatch() -> None:
         openai.resources.chat.completions.AsyncCompletions.create = old_async_create
 
 
-def make_default_callbacks() -> List[Callback]:
-    return [ReassembleStream()]
-
-
+# TODO: centralize
 @contextmanager
-def span_context(
-    monitor: Monitor, context: Context, span_name: str, *args: Any, **kwargs: Any
-) -> Iterator[Span]:
-    with monitor.span(span_name) as span:
-        context.span = span
-        try:
-            yield span
-        except Exception as e:
-            span.status_code = StatusCode.ERROR
-            span.exception = e
-        finally:
-            sig = match_signature(old_create, *args, **kwargs)
-            span.inputs = ChatCompletionRequest.parse_obj(sig).dict()
-            if context.outputs is not None:
-                span.output = context.outputs.dict()
+def log_run(call_name: str, inputs: dict[str, Any]) -> Iterator[Callable]:
+    client = graph_client_context.require_graph_client()
+    parent_run = run_context.get_current_run()
+    # TODO: client should not need refs passed in.
+    run = client.create_run(call_name, parent_run, inputs, [])
+
+    def finish_run(output: Any) -> None:
+        # TODO: client should not need refs passed in.
+        client.finish_run(run, output, [])
+
+    try:
+        with run_context.current_run(run):
+            yield finish_run
+    except Exception as e:
+        client.fail_run(run, e)
+        raise

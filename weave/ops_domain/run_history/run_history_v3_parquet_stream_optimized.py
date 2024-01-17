@@ -409,12 +409,20 @@ def _build_array_from_tree(tree: PathTree) -> pa.Array:
         )
         children_struct_array = [children_struct]
     children_arrays = [*(tree.data or []), *children_struct_array]
-
     if len(children_arrays) == 0:
         raise errors.WeaveWBHistoryTranslationError(
             "Cannot build array from empty tree"
         )
-    elif len(children_arrays) == 1:
+
+    children_arrays_nonnull = [
+        x for x in children_arrays if not isinstance(x, pa.NullArray)
+    ]
+    if not children_arrays_nonnull:
+        children_arrays = [children_arrays[0]]
+    else:
+        children_arrays = children_arrays_nonnull
+
+    if len(children_arrays) == 1:
         return children_arrays[0]
 
     num_rows = len(children_arrays[0])

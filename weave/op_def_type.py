@@ -19,6 +19,8 @@ from . import weave_types as types
 from . import registry_mem
 from . import errors
 from . import environment
+from . import storage
+from . import artifact_fs
 
 from . import infer_types
 
@@ -177,7 +179,34 @@ def resolve_var(fn: typing.Callable, var_name: str):
     return None
 
 
-def get_code_deps(fn: typing.Callable) -> typing.Tuple[str, list[str]]:
+class RefJSONEncoder(json.JSONEncoder):
+    """Json encoder used for convert storage.to_json_with_refs result to python code"""
+
+    SPECIAL_REF_TOKEN = "__WEAVE_REF__"
+
+    def default(self, o):
+        if isinstance(o, artifact_fs.FilesystemArtifactRef):
+            if o.serialize_as_path_ref:
+                ref_code = f"weave.storage.artifact_path_ref('{o.local_ref_str()}')"
+            else:
+                ref_code = f"weave.ref('{str(o)}')"
+
+            # This will be a quoted json string in the json.dumps result. We put special
+            # tokens in so we can remove the quotes in the final result
+            return f"{self.SPECIAL_REF_TOKEN}{ref_code}.get(){self.SPECIAL_REF_TOKEN}"
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, o)
+
+
+class GetCodeDepsResult(typing.TypedDict):
+    import_code: list[str]
+    code: list[str]
+    warnings: list[str]
+
+
+def get_code_deps(
+    fn: typing.Callable, artifact: artifact_fs.FilesystemArtifact
+) -> GetCodeDepsResult:
     """Given a python function, return source code that contains the dependencies of that function.
 
     This will:
@@ -185,11 +214,11 @@ def get_code_deps(fn: typing.Callable) -> typing.Tuple[str, list[str]]:
     - import any modules that are referenced within the function body or any referenced function bodies
 
     Current issues (to fix):
-    - only handles json serializable constants in function closures. We need to use Weave serialization
-      to save other values into the artifact and have a way of fetching them in the generated code
     - imported modules may be within the function's package, which doesn't work (any imported modules need
       to be present in the loading code)
     - doesn't serialize python requirements and other necessary system information
+    - type annotations are not well handled, and may cause errors
+    - refering to @weave.type() objects will cause errors
 
     Args:
         fn: The Python function to analyze.
@@ -208,13 +237,14 @@ def get_code_deps(fn: typing.Callable) -> typing.Tuple[str, list[str]]:
         parsed = ast.parse(source)
     except SyntaxError:
         warnings.append(f"Could not parse source of function {fn}.")
-        return "", warnings
+        return {"import_code": [], "code": [], "warnings": warnings}
 
     visitor = ExternalVariableFinder()
     visitor.visit(parsed)
     external_vars = list(visitor.external_vars)
 
-    import_code = ""
+    import_code = []
+    code = []
     for var_name in external_vars:
         var_value = resolve_var(fn, var_name)
         # var_value = fn.__globals__.get(var_name)
@@ -226,26 +256,36 @@ def get_code_deps(fn: typing.Callable) -> typing.Tuple[str, list[str]]:
                 f'Could not resolve var "{var_name}" declared in body of fn {fn}. This op will not be reloadable, but calls to it will be tracked'
             )
         elif isinstance(var_value, py_types.ModuleType):
-            import_code += f"import {var_value.__name__} as {var_name}\n"
+            import_line = f"import {var_value.__name__}"
+            if var_value.__name__ != var_name:
+                import_line += f" as {var_name}"
+            import_code.append(import_line)
         elif isinstance(var_value, py_types.FunctionType):
             if var_value.__module__ == fn.__module__:
                 # For now, if the function is in another module.
                 # we just import it. This is ok for libraries, but not
                 # if the user has functions declared within their
                 # package but outside of the op module.
-                fn_code_deps, fn_warnings = get_code_deps(var_value)
+                result = get_code_deps(var_value, artifact)
+                fn_warnings = result["warnings"]
+                fn_import_code = result["import_code"]
+                fn_code = result["code"]
+
+                import_code += fn_import_code
+
+                code += fn_code
+                code.append(inspect.getsource(var_value))
+
                 warnings += fn_warnings
-                import_code += fn_code_deps
-                import_code += inspect.getsource(var_value)
             else:
                 if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
                     pass
-                import_code += (
-                    f"from {var_value.__module__} import {var_value.__name__}"
-                )
+
+                import_line = f"from {var_value.__module__} import {var_value.__name__}"
                 if var_value.__name__ != var_name:
-                    import_code += f"as {var_name}"
-                import_code += "\n"
+                    import_line += f"as {var_name}"
+
+                import_code.append(import_line)
 
         else:
             if (
@@ -253,24 +293,33 @@ def get_code_deps(fn: typing.Callable) -> typing.Tuple[str, list[str]]:
                 and hasattr(var_value, "__module__")
                 and var_value.__module__ != fn.__module__
             ):
-                import_code += (
-                    f"from {var_value.__module__} import {var_value.__name__}"
-                )
+                import_line = f"from {var_value.__module__} import {var_value.__name__}"
                 if var_value.__name__ != var_name:
-                    import_code += f"as {var_name}"
-                import_code += "\n"
+                    import_line += f"as {var_name}"
+                import_code.append(import_line)
             else:
                 try:
-                    import_code += f"{var_name} = " + json.dumps(var_value) + "\n"
-                except TypeError:
-                    # TODO: This should use weave artifact serialization for non-json serializable objects.
-                    #     That way we can store numpy arrays, pytorch models, etc, that are captured by
-                    #     function closures. We'll need a special weave.local_ref() to see to look an
-                    #     object up from the current artifact context.
-                    warnings.append(
-                        f"Didn't serialize value of {var_name} needed by {fn}."
+                    json_val = storage.to_json_with_refs(
+                        var_value, artifact, path=[var_name]
                     )
-    return import_code, warnings
+                except (errors.WeaveTypeError, errors.WeaveSerializeError) as e:
+                    warnings.append(
+                        f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
+                    )
+                else:
+                    code_paragraph = (
+                        f"{var_name} = "
+                        + json.dumps(json_val, cls=RefJSONEncoder, indent=4)
+                        + "\n"
+                    )
+                    code_paragraph = code_paragraph.replace(
+                        f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', ""
+                    )
+                    code_paragraph = code_paragraph.replace(
+                        f'{RefJSONEncoder.SPECIAL_REF_TOKEN}"', ""
+                    )
+                    code.append(code_paragraph)
+    return {"import_code": import_code, "code": code, "warnings": warnings}
 
 
 def get_import_statements_for_annotations(func) -> list[str]:
@@ -288,6 +337,43 @@ def get_import_statements_for_annotations(func) -> list[str]:
     return list(imports_needed)
 
 
+def find_last_weave_op_function(source_code: str):
+    """Given a string of python source code, find the last function that is decorated with 'weave.op'."""
+    tree = ast.parse(source_code)
+
+    last_function = None
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) or isinstance(node, AsyncFunctionDef):
+            for decorator in node.decorator_list:
+                # Check if the decorator is 'weave.op'
+                if isinstance(decorator, ast.Name) and decorator.id == "weave.op":
+                    last_function = node
+                    break  # Break the inner loop, continue with the next function
+                # Check if the decorator is a call to 'weave.op()'
+                elif (
+                    isinstance(decorator, ast.Call)
+                    and isinstance(decorator.func, ast.Attribute)
+                    and decorator.func.attr == "op"
+                    and isinstance(decorator.func.value, ast.Name)
+                    and decorator.func.value.id == "weave"
+                ):
+                    last_function = node
+                    break  # Break the inner loop, continue with the next function
+
+    return last_function
+
+
+def dedupe_list(original_list: list[str]) -> list[str]:
+    seen = set()
+    deduped = []
+    for x in original_list:
+        if x not in seen:
+            deduped.append(x)
+            seen.add(x)
+    return deduped
+
+
 class OpDefType(types.Type):
     instance_class = op_def.OpDef
     instance_classes = op_def.OpDef
@@ -300,56 +386,52 @@ class OpDefType(types.Type):
             with artifact.new_file(f"{name}.json") as f:
                 json.dump({"name": obj.name}, f)
         else:
-            code = "import typing\nimport weave\n"
-
+            # Type annotations are not well handled at the moment.
             # Get import statements for any annotations
-            code += (
-                "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
-                + "\n\n"
-            )
+            # code += (
+            #     "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
+            #     + "\n\n"
+            # )
 
-            code_deps, warnings = get_code_deps(obj.raw_resolve_fn)
+            result = get_code_deps(obj.raw_resolve_fn, artifact)
+            import_code = result["import_code"]
+            code = result["code"]
+            warnings = result["warnings"]
             if warnings:
-                message = (
-                    f"Did not fully serialize op {obj}. This op may not be reloadable, but calls to it will be versioned.\n"
-                    + "\n  ".join(warnings)
-                )
+                message = f"Partial serialization failure for op {obj}. This op may not be reloadable"
+                for warning in warnings:
+                    message += "\n  " + warning
                 if context_state.get_strict_op_saving():
                     raise errors.WeaveOpSerializeError(message)
                 else:
                     print(message)
 
-            code += code_deps
-
-            # Note the above two stanzas are in the order they are to ensure
-            # this case works.
-            # from PIL import Image
-            # def sin_image(f: int) -> Image.Image:
-            #     pass
-            # The first stanza will create "from PIL.Image import Image"
-            # and the second will create "from PIL import Image". In this case
-            # we want the latter.
-            # This is a major hack to get a notebook working.
-
+            # This is hacky handling of TypedDict annotations. Fixes
+            # 2_images_gen notebook test.
             # Create TypedDict types for referenced TypedDicts
             resolve_annotations = obj.raw_resolve_fn.__annotations__
             for k, type_ in resolve_annotations.items():
                 gen_type_code = generate_referenced_type_code(type_)
                 if gen_type_code is not None:
-                    code += gen_type_code
+                    code.append(gen_type_code)
+                    if "typing" in gen_type_code:
+                        import_code.insert(0, "import typing")
 
-            code += textwrap.dedent(inspect.getsource(obj.raw_resolve_fn))
+            code.append(textwrap.dedent(inspect.getsource(obj.raw_resolve_fn)))
             with artifact.new_file(f"{name}.py") as f:
-                f.write(code)
+                import_block = "\n".join(import_code)
+                import_lines = ["import weave"] + import_block.split("\n")
+                import_lines = dedupe_list(import_lines)
+                import_lines = [l for l in import_lines if "weave.api" not in l]
+                import_block = "\n".join(import_lines)
+                code_block = "\n".join(code)
+                f.write(f"{import_block}\n\n{code_block}")
 
     def load_instance(cls, artifact, name, extra=None):
         if environment.wandb_production():
             # Returning None here instead of erroring allows the Weaveflow app
             # to reference op defs without crashing.
             return None
-            # raise errors.WeaveInternalError(
-            #     "Loading ops from artifacts is not supported in production mode."
-            # )
         try:
             with artifact.open(f"{name}.json") as f:
                 op_spec = json.load(f)
@@ -376,7 +458,6 @@ class OpDefType(types.Type):
             # the version in the module name to avoid this. Since version names
             # are content hashes, this is correct.
             #
-            # module_path = {WEAVE_CACHE_DIR}/{USER}/local-artifacts/{ARTIFACT_NAME}/{ARTIFACT_VERSION}/{NAME_INCLUDING_SUB_PATHS}.py
             art_and_version_dir = module_path[: -(1 + len(file_name))]
             art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
             module_dir = art_dir
@@ -386,21 +467,9 @@ class OpDefType(types.Type):
                 + ".".join(os.path.splitext(file_name)[0].split("/"))
             )
 
-        # path_with_ext = os.path.relpath(
-        #     artifact.path(f"{name}.py"), start=artifact_local.local_artifact_dir()
-        # )
-        # # remove the .py extension
-        # path = os.path.splitext(path_with_ext)[0]
-        # # convert filename into module path
-        # parts = path.split("/")
-        # module_path = ".".join(parts)
-
         sys.path.insert(0, os.path.abspath(module_dir))
-        with context_state.loading_op_location(artifact.uri_obj.with_path(name)):
-            # This has a side effect of registering the op
-            # PR: Return None if we can't load the op?
+        with context_state.no_op_register():
             try:
-                # Weaveflow Merge: fromlist correctly imports submodules
                 mod = __import__(import_name, fromlist=[module_dir])
             except Exception as e:
                 print("Op loading exception. This might be fine!", e)
@@ -409,25 +478,29 @@ class OpDefType(types.Type):
                 traceback.print_exc()
                 return None
         sys.path.pop(0)
-        # We justed imported e.g. 'op-number-add.xaybjaa._obj'. Navigate from
-        # Weaveflow Merge: Commenting out, this does not look correct to me (tim), but
-        # leaving it here in case I'm wrong.
-        # if not is_wandb_artifact:
-        #     try:
-        #         mod = getattr(mod, "obj")
-        #     except:
-        #         raise errors.WeaveInternalError(f"{import_name=} {name=} {module_dir=}")
 
-        # mod down to _obj.
-        # for part in parts[1:]:
-        #     mod = getattr(mod, part)
-
-        op_defs = inspect.getmembers(mod, op_def.is_op_def)
-        if len(op_defs) != 1:
-            raise errors.WeaveInternalError(
-                f"Unexpected Weave module saved in: {module_path}. Found {len(op_defs)} op defs, expected 1. All members: {dir(mod)}. {module_dir=} {import_name=} t={type(mod.call)}"
+        # In the case where the saved op calls another op, we will have multiple
+        # ops in the file. The file will look like
+        # op1 = weave.ref('...').get()
+        # @weave.op()
+        # def op2():
+        #     op1()
+        #
+        # We need to get the last declared op in the module. We can't do this
+        # simply by iterating module attributes, because order is not guaranteed,
+        # so we resort to looking at the source ast.
+        last_op_function = find_last_weave_op_function(inspect.getsource(mod))
+        if last_op_function is None:
+            print(
+                f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
             )
-        _, od = op_defs[0]
+            return None
+
+        od: op_def.OpDef = getattr(mod, last_op_function.name)
+
+        location = artifact.uri_obj.with_path(name)
+        registry_mem.memory_registry.register_op(od, location=location)
+
         return od
 
 
