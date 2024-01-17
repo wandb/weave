@@ -17,6 +17,7 @@ import {Call} from '../../Browse2/callTree';
 import {SmallRef} from '../../Browse2/SmallRef';
 import {SpanDetails} from '../../Browse2/SpanDetails';
 import {useWeaveflowCurrentRouteContext} from '../context';
+import {opNiceName} from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
@@ -28,7 +29,6 @@ import {GroupedCalls} from './ObjectVersionPage';
 import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
-import {opNiceName} from './common/Links';
 
 // % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
