@@ -2,7 +2,6 @@ import {constNumber, opIndex} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {useMemo} from 'react';
 
-import {useWeaveContext} from '../../../../context';
 import {
   Call,
   CallFilter,
@@ -35,15 +34,6 @@ export const useRuns = (
     [filters, streamId]
   );
 
-  // Here we invalidate the cache for the node, so that we can re-run the query
-  // on every load. This is certainly not ideal nor a long term solution. We
-  // should build-out a more complete lifecycle for weave queries and have more
-  // nuanced loading states. However, in practice, this will only effect small
-  // projects which should load quickly anyway. This is because the memory limit
-  // for the cache is small per node and this query will be invalid for caching
-  // anyway for not tiny projects.
-  const {client} = useWeaveContext();
-  client.clearCacheForNode(traceSpansNode);
   const traceSpansQuery = useNodeValue(traceSpansNode);
 
   return useMemo(

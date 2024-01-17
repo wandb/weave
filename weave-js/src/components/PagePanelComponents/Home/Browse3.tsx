@@ -1,3 +1,4 @@
+import {LinearProgress} from '@material-ui/core';
 import {Close, Fullscreen, Home} from '@mui/icons-material';
 import {
   AppBar,
@@ -9,7 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC, useCallback, useEffect, useMemo} from 'react';
+import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Link as RouterLink,
   Route,
@@ -18,6 +19,7 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
 import {URL_BROWSE3} from '../../../urls';
 import {ErrorBoundary} from '../../ErrorBoundary';
@@ -189,7 +191,16 @@ const Browse3Mounted: FC<{
   navigateAwayFromProject?: () => void;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
-
+  const weaveContext = useWeaveContext();
+  const [weaveLoading, setWeaveLoading] = useState(false);
+  useEffect(() => {
+    const obs = weaveContext.client.loadingObservable();
+    const sub = obs.subscribe(loading => {
+      console.log(loading);
+      setWeaveLoading(loading);
+    });
+    return () => sub.unsubscribe();
+  }, [weaveContext.client]);
   return (
     <Box
       sx={{
@@ -201,6 +212,16 @@ const Browse3Mounted: FC<{
           color: '#038194',
         },
       }}>
+      {weaveLoading && (
+        <Box
+          sx={{
+            width: '100%',
+            position: 'absolute',
+            zIndex: 2,
+          }}>
+          <LinearProgress />
+        </Box>
+      )}
       {!props.hideHeader && (
         <AppBar
           sx={{
