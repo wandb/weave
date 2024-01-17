@@ -4,29 +4,31 @@ sidebar_position: 1
 
 # Quickstart
 
-You will learn:
-- How to using tracing to debug inputs & outputs of each function
-- How to log models & datasets and see when they're used
-- How to use the Weave UI to gain insights
+Weave is a flexible toolkit to evaluate and iterate on complex LLM-applications. 
+Use simple APIs to capture the entire evaluation-driven development workflow. 
+
+- build evaluation datasets
+- evaluate model performance
+- inspect LLM behaviour
+
+In this quickstart, you will learn how to use tracing to debug inputs & outputs of each function.
 
 ## Installation
 
 `pip install weave`
 
-## Start logging
+## Track inputs & outputs of functions
+
+- Import weave
+- Call `weave.init('project-name')` to start logging
+- Add the `@weave.op()` decorator to the functions you want to track
 
 ```python
-import weave
-
-weave.init('my-first-project')
-```
-
-## Add tracing
-
-```python
+# highlight-next-line
 import weave
 from openai import OpenAI
 
+# highlight-next-line
 @weave.op()
 def correct_grammar(sentence: str) -> str:
     client = OpenAI()
@@ -44,17 +46,25 @@ def correct_grammar(sentence: str) -> str:
         ],
         temperature=0.7,
         max_tokens=64,
-        top_p=1
     )
     return response.choices[0].message.content
 
-
+# highlight-next-line
+weave.init('intro-example')
+correct_grammar('she no went to the market')
 ```
 
-# Continue Learning!
+Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code. 
+Run this application and your console will output a link to view it within W&B.
+
+:::note
+OpenAI calls are automatically tracked with weave but you can add other LLMs easily by wrapping them with `@weave.op()`
+:::
+
+# What's next?
 
 You have just learned the **basics of Weave**.
 
 ## What's next?
 
-Checkout out the tutorial to put them in action and build a production-ready LLM app.
+Checkout out the tutorial to build a tracked evaluations pipeline so you can iteratively improve your applications.
