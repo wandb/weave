@@ -2,6 +2,7 @@ import {constNumber, opIndex} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
 import {useMemo} from 'react';
 
+import { useWeaveContext } from '../../../../context';
 import {
   Call,
   CallFilter,
@@ -33,6 +34,9 @@ export const useRuns = (
     () => fnRunsNode(streamId, filters),
     [filters, streamId]
   );
+
+  const {client} = useWeaveContext();
+  client.clearCacheForNode(traceSpansNode);
   const traceSpansQuery = useNodeValue(traceSpansNode);
 
   return useMemo(
