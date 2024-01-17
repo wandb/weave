@@ -1,3 +1,5 @@
+import {CircularProgress, IconButton} from '@material-ui/core';
+import {DashboardCustomize} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
@@ -11,9 +13,10 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {CallFilter} from '../../Browse2/callTree';
-import {useRunsWithFeedback} from '../../Browse2/callTreeHooks';
+import {fnRunsNode, useRunsWithFeedback} from '../../Browse2/callTreeHooks';
 import {RunsTable} from '../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../context';
+import {useMakeNewBoard} from './common/hooks';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {truncateID} from './util';
@@ -144,6 +147,17 @@ export const CallsTable: React.FC<{
     effectiveFilter
   );
 
+  const runsNode = fnRunsNode(
+    {
+      entityName: props.entity,
+      projectName: props.project,
+      streamName: 'stream',
+    },
+    lowLevelFilter
+  );
+
+  const {onMakeBoard, isGenerating} = useMakeNewBoard(runsNode);
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -155,6 +169,18 @@ export const CallsTable: React.FC<{
       )}
       filterListItems={
         <>
+          <IconButton
+            style={{width: '37px', height: '37px'}}
+            size="small"
+            onClick={() => {
+              onMakeBoard();
+            }}>
+            {isGenerating ? (
+              <CircularProgress size={25} />
+            ) : (
+              <DashboardCustomize />
+            )}
+          </IconButton>
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete
@@ -298,7 +324,7 @@ export const CallsTable: React.FC<{
             }
             disablePadding>
             <ListItemButton>
-              <ListItemText primary={`Trace Roots Only`} />
+              <ListItemText primary={`Roots Only`} />
             </ListItemButton>
           </ListItem>
         </>
