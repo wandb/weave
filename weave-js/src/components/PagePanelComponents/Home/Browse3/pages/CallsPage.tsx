@@ -146,18 +146,11 @@ export const CallsTable: React.FC<{
     props.project,
     effectiveFilter
   );
-
-  const runsNode = fnRunsNode(
-    {
-      entityName: props.entity,
-      projectName: props.project,
-      streamName: 'stream',
-    },
+  const {onMakeBoard, isGenerating} = useMakeBoardForCalls(
+    props.entity,
+    props.project,
     lowLevelFilter
   );
-
-  const {onMakeBoard, isGenerating} = useMakeNewBoard(runsNode);
-
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -332,6 +325,29 @@ export const CallsTable: React.FC<{
       <RunsTable loading={runs.loading} spans={runs.result} />
     </FilterLayoutTemplate>
   );
+};
+
+const useMakeBoardForCalls = (
+  entityName: string,
+  projectName: string,
+  lowLevelFilter: CallFilter
+) => {
+  // TODO: Make a generator on the python side that is more robust.
+  // 1. Make feedback a join in weave
+  // 2. Control the column selection like we do in the current table
+  // 3. Map column processing to weave (example timestamps)
+  // 4. Handle references more cleanly
+  // 5. Probably control ordering.
+
+  const runsNode = fnRunsNode(
+    {
+      entityName,
+      projectName,
+      streamName: 'stream',
+    },
+    lowLevelFilter
+  );
+  return useMakeNewBoard(runsNode);
 };
 
 const convertHighLevelFilterToLowLevelFilter = (
