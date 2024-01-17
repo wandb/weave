@@ -152,9 +152,12 @@ export const RunsTable: FC<{
       {
         field: 'status_code',
         headerName: '',
-        width: 50,
-        minWidth: 50,
-        maxWidth: 50,
+        width: 40,
+        minWidth: 40,
+        maxWidth: 40,
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
         renderCell: cellParams => {
           return (
             <Chip
@@ -461,11 +464,19 @@ export const RunsTable: FC<{
   return (
     <DataGridPro
       sx={{
-        border: 0,
+        // borderTop: 1,
+        borderRight: 0,
+        borderLeft: 0,
+        borderBottom: 0,
         '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
           outline: 'none',
         },
+        '& .MuiDataGrid-columnHeaders': {
+          backgroundColor: '#FAFAFA',
+          color: '#979a9e',
+        },
       }}
+      columnHeaderHeight={40}
       apiRef={apiRef}
       loading={loading}
       rows={tableData}

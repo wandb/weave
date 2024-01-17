@@ -1,15 +1,13 @@
-import {FilterList, LastPage, OpenInNew} from '@mui/icons-material';
-import {Badge, Box, List} from '@mui/material';
-import IconButton from '@mui/material/IconButton';
+import {Box} from '@mui/material';
 import {DataGridPro, GridColDef, GridValidRowModel} from '@mui/x-data-grid-pro';
+import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
-import {useHistory} from 'react-router-dom';
 
 type FilterableTablePropsType<
   DataRowType extends GridValidRowModel,
   CompositeFilterType extends {[key: string]: any} = {[key: string]: any}
 > = {
-  getInitialData: (filter: CompositeFilterType) => DataRowType[];
+  getInitialData: () => DataRowType[];
   columns: WFHighLevelDataColumnDictType<DataRowType, CompositeFilterType>;
   getFilterPopoutTargetUrl?: (filter: CompositeFilterType) => string;
   frozenFilter?: Partial<CompositeFilterType>;
@@ -51,6 +49,7 @@ export type WFHighLevelDataColumn<
   };
   // If present, filtering for this column is enabled
   filterControls?: {
+    filterKeys: string[];
     filterPredicate: (
       obj: DataRowType,
       filter: Partial<CompositeFilterType>
@@ -58,6 +57,7 @@ export type WFHighLevelDataColumn<
     filterControlListItem: React.FC<{
       filter: Partial<CompositeFilterType>;
       updateFilter: (update: Partial<CompositeFilterType>) => void;
+      frozenData: DataRowType[];
     }>;
   };
 };
@@ -92,25 +92,48 @@ export const FilterableTable = <
     return {...filter, ...props.frozenFilter} as CompositeFilterType;
   }, [filter, props.frozenFilter]);
 
-  // Get the initial data from the caller (note that we pass the filter in in case
-  // the caller wants to use it)
-  const initialPreFilteredData = useMemo(
-    () => props.getInitialData(effectiveFilter),
-    [effectiveFilter, props]
-  );
+  // Get the initial data from the caller
+  const initialPreFilteredData = useMemo(() => props.getInitialData(), [props]);
+  const {filteredData: frozenData} = useMemo(() => {
+    let data = initialPreFilteredData;
+    const ff = props.frozenFilter;
+    if (ff != null) {
+      Object.values(props.columns).forEach(column => {
+        if (column.filterControls) {
+          data = data.filter(obj =>
+            column.filterControls!.filterPredicate(obj, ff)
+          );
+        }
+      });
+    }
+    return {filteredData: data};
+  }, [initialPreFilteredData, props.columns, props.frozenFilter]);
 
   // Apply the filter controls
-  const filteredData = useMemo(() => {
-    let data = initialPreFilteredData;
-    Object.values(props.columns).forEach(column => {
+  const {filteredData, filteredColData} = useMemo(() => {
+    let data = frozenData;
+    const colData = _.mapValues(props.columns, () => frozenData);
+    Object.entries(props.columns).forEach(([key, column]) => {
       if (column.filterControls) {
         data = data.filter(obj =>
-          column.filterControls!.filterPredicate(obj, effectiveFilter)
+          column.filterControls!.filterPredicate(obj, filter)
         );
+        // UG, nasty n^2 loop
+        Object.entries(props.columns).forEach(([innerKey, innerColumn]) => {
+          if (innerKey === key || !innerColumn.filterControls) {
+            return;
+          }
+          colData[key] = colData[key].filter(obj =>
+            innerColumn.filterControls!.filterPredicate(
+              obj,
+              _.omit(filter, column.filterControls!.filterKeys)
+            )
+          );
+        });
       }
     });
-    return data;
-  }, [effectiveFilter, initialPreFilteredData, props.columns]);
+    return {filteredData: data, filteredColData: colData};
+  }, [filter, frozenData, props.columns]);
 
   // Apply the data transformations
   const dataGridRowData = useMemo(() => {
@@ -153,13 +176,14 @@ export const FilterableTable = <
               updateFilter: update => {
                 setFilter({...filter, ...update} as CompositeFilterType);
               },
+              frozenData: filteredColData[key],
             });
           }
           return <React.Fragment key={key}>{col}</React.Fragment>;
         })}
       </>
     );
-  }, [effectiveFilter, filter, props.columns, setFilter]);
+  }, [effectiveFilter, filter, filteredColData, props.columns, setFilter]);
 
   return (
     <FilterLayoutTemplate
@@ -168,7 +192,16 @@ export const FilterableTable = <
       showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
       filterListItems={filterListItems}>
       <DataGridPro
-        sx={{border: 0}}
+        sx={{
+          borderRight: 0,
+          borderLeft: 0,
+          borderBottom: 0,
+          '& .MuiDataGrid-columnHeaders': {
+            backgroundColor: '#FAFAFA',
+            color: '#979a9e',
+          },
+        }}
+        columnHeaderHeight={40}
         rows={dataGridRowData}
         rowHeight={38}
         columns={dataGridColumns}
@@ -188,8 +221,8 @@ export const FilterLayoutTemplate: React.FC<{
   showPopoutButton?: boolean;
   filterListItems: React.ReactNode;
 }> = props => {
-  const [isOpen, setIsOpen] = useState(false);
-  const history = useHistory();
+  // const [isOpen, setIsOpen] = useState(false);
+  // const history = useHistory();
   return (
     <Box
       sx={{
@@ -197,97 +230,30 @@ export const FilterLayoutTemplate: React.FC<{
         width: '100%',
         height: '100%',
         display: 'flex',
-        flexDirection: 'row',
+        flexDirection: 'column',
       }}>
-      {props.children}
       <Box
         sx={{
           flex: '0 0 auto',
-          height: '100%',
-          width: isOpen ? '240px' : '55px',
+          width: '100%',
           transition: 'width 0.1s ease-in-out',
           display: 'flex',
-          flexDirection: 'column',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          borderLeft: '1px solid #e0e0e0',
+          flexDirection: 'row',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          gap: '8px',
+          p: 1,
+          '& li': {
+            padding: 0,
+            minWidth: '150px',
+          },
+          '& input, & label, & .MuiTypography-root': {
+            fontSize: '0.875rem',
+          },
         }}>
-        {isOpen ? (
-          <>
-            <Box
-              sx={{
-                pl: 1,
-                pr: 1,
-                height: 56,
-                flex: '0 0 auto',
-                borderBottom: '1px solid #e0e0e0',
-                position: 'sticky',
-                top: 0,
-                zIndex: 1,
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}>
-              <Box sx={{flex: '0 0 auto'}}>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setIsOpen(o => !o);
-                  }}>
-                  <LastPage />
-                </IconButton>
-                {props.filterPopoutTargetUrl && props.showPopoutButton && (
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      if (props.filterPopoutTargetUrl) {
-                        history.push(props.filterPopoutTargetUrl);
-                      }
-                    }}>
-                    <OpenInNew />
-                  </IconButton>
-                )}
-              </Box>
-              <Box sx={{flex: '0 0 auto', pr: 1}}>Filters</Box>
-            </Box>
-            <List
-              sx={{width: '100%', maxWidth: 360, bgcolor: 'background.paper'}}>
-              {props.filterListItems}
-            </List>
-          </>
-        ) : (
-          <Box
-            sx={{
-              height: 56,
-              flex: '0 0 auto',
-              borderBottom: '1px solid #e0e0e0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            {props.showFilterIndicator ? (
-              <Badge color="primary" variant="dot">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setIsOpen(o => !o);
-                  }}>
-                  <FilterList />
-                </IconButton>
-              </Badge>
-            ) : (
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setIsOpen(o => !o);
-                }}>
-                <FilterList />
-              </IconButton>
-            )}
-          </Box>
-        )}
+        {props.filterListItems}
       </Box>
+      {props.children}
     </Box>
   );
 };

@@ -90,6 +90,7 @@ const ObjectVersionPageInner: React.FC<{
                     objectName,
                   }}
                   versionCount={objectVersionCount}
+                  neverPeek
                 />
                 ]
               </>

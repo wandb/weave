@@ -68,7 +68,10 @@ const useCallTabs = (call: WFCall) => {
   // const entityName = call.entity();
   // const projectName = call.project();
   // const callId = call.callID();
-  const childCalls = call.childCalls();
+  const childCalls = call.childCalls().filter(c => {
+    return call.opVersion() != null;
+  });
+
   return [
     {
       label: 'Call',
@@ -247,7 +250,7 @@ const CallPageInnerVertical: React.FC<{
 }> = ({call, setVerticalLayout}) => {
   const callId = call.callID();
   const spanName = call.spanName();
-  const title = `${spanName}: ${truncateID(callId)}`;
+  const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   return (
     <SimplePageLayout
