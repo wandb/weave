@@ -25,11 +25,13 @@ def test_evaluate_basic():
         def example_to_model_input(example):
             return example["input"]
 
-        evaluation = weaveflow.evaluate2.Evaluation(
+        evaluation = weaveflow.evaluate.Evaluation(
             dataset, [score], example_to_model_input=example_to_model_input
         )
         model = EvalModel()
         result = asyncio.run(evaluation.evaluate(model))
+
+        assert result == {"score": {"mean": 0.0}}
 
         example_to_model_input0_run = evaluation.example_to_model_input.runs()[0]
         example_to_model_input0_run_example = example_to_model_input0_run.inputs[
