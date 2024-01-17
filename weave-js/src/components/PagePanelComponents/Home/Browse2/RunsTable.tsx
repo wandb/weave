@@ -9,11 +9,11 @@ import {
 import {parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
-import moment from 'moment';
 import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {useParams} from 'react-router-dom';
 
-import {CallLink} from '../Browse3/pages/common/Links';
+import {Timestamp} from '../../../Timestamp';
+import {CallLink, opVersionText} from '../Browse3/pages/common/Links';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
@@ -152,13 +152,17 @@ export const RunsTable: FC<{
       {
         field: 'status_code',
         headerName: '',
-        width: 50,
-        minWidth: 50,
-        maxWidth: 50,
+        width: 40,
+        minWidth: 40,
+        maxWidth: 40,
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
         renderCell: cellParams => {
           return (
             <Chip
               label={' '}
+              sx={{height: '20px', lineHeight: 2}}
               // label={cellParams.row.status_code}
               size="small"
               color={
@@ -173,25 +177,41 @@ export const RunsTable: FC<{
         },
       },
       {
-        flex: !showIO ? 1 : undefined,
-        // width: 100,
         field: 'span_id',
-        headerName: 'Call',
+        headerName: 'ID',
+        width: 75,
+        minWidth: 75,
+        maxWidth: 75,
         renderCell: rowParams => {
+          // return truncateID(rowParams.row.id);
           return (
             <CallLink
               entityName={params.entity}
               projectName={params.project}
               callId={rowParams.row.id}
-              opName={
-                rowParams.row.ormCall?.opVersion()?.op().name() ??
-                rowParams.row.ormCall?.spanName() ??
-                ''
-              }
             />
           );
         },
       },
+      ...(orm
+        ? [
+            {
+              flex: !showIO ? 1 : undefined,
+              field: 'opVersion',
+              headerName: 'Op',
+              renderCell: (rowParams: any) => {
+                const opVersion = rowParams.row.ormCall?.opVersion();
+                if (opVersion == null) {
+                  return rowParams.row.ormCall?.spanName();
+                }
+                return opVersionText(
+                  rowParams.row.ormCall?.spanName(),
+                  opVersion.versionIndex()
+                );
+              },
+            },
+          ]
+        : []),
       ...(orm
         ? [
             {
@@ -213,6 +233,7 @@ export const RunsTable: FC<{
                 }[cellParams.row.opCategory + ''];
                 return (
                   <Chip
+                    sx={{height: '20px', lineHeight: 2}}
                     label={cellParams.row.opCategory}
                     size="small"
                     color={color as any}
@@ -230,37 +251,14 @@ export const RunsTable: FC<{
         minWidth: 100,
         maxWidth: 100,
         renderCell: cellParams => {
-          // return moment(cellParams.row.timestampMs).format(
-          //   'YYYY-MM-DD HH:mm:ss'
-          // );
-          return moment(cellParams.row.timestampMs).fromNow();
+          return (
+            <Timestamp
+              value={cellParams.row.timestampMs / 1000}
+              format="relative"
+            />
+          );
         },
       },
-
-      ...(orm
-        ? [
-            // {
-            //   flex: !showIO ? 1 : undefined,
-            //   field: 'opVersion',
-            //   headerName: 'Name',
-            //   renderCell: (rowParams: any) => {
-            //     const opVersion = rowParams.row.ormCall?.opVersion();
-            //     if (opVersion == null) {
-            //       return rowParams.row.ormCall?.spanName();
-            //     }
-            //     return (
-            //
-            //         entityName={opVersion.entity()}
-            //         projectName={opVersion.project()}
-            //         opName={opVersion.op().name()}
-            //         version={opVersion.version()}
-            //         versionIndex={opVersion.versionIndex()}
-            //       />
-            //     );
-            //   },
-            // },
-          ]
-        : []),
 
       {
         field: 'latency',
@@ -445,6 +443,8 @@ export const RunsTable: FC<{
     return {cols, colGroupingModel};
   }, [orm, params.entity, params.project, showIO, spans]);
   const autosized = useRef(false);
+  // const {peekingRouter} = useWeaveflowRouteContext();
+  // const history = useHistory();
   useEffect(() => {
     if (autosized.current) {
       return;
@@ -463,7 +463,20 @@ export const RunsTable: FC<{
   // }
   return (
     <DataGridPro
-      sx={{border: 0}}
+      sx={{
+        // borderTop: 1,
+        borderRight: 0,
+        borderLeft: 0,
+        borderBottom: 0,
+        '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
+          outline: 'none',
+        },
+        '& .MuiDataGrid-columnHeaders': {
+          backgroundColor: '#FAFAFA',
+          color: '#979a9e',
+        },
+      }}
+      columnHeaderHeight={40}
       apiRef={apiRef}
       loading={loading}
       rows={tableData}
@@ -478,6 +491,16 @@ export const RunsTable: FC<{
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
       columnGroupingModel={columns.colGroupingModel}
+      // onRowClick={({id}) => {
+      //   history.push(
+      //     peekingRouter.callUIUrl(
+      //       params.entity,
+      //       params.project,
+      //       '',
+      //       id as string
+      //     )
+      //   );
+      // }}
     />
     // </Box>
   );

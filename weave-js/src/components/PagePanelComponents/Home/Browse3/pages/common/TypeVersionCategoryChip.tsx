@@ -16,5 +16,12 @@ export const TypeVersionCategoryChip: React.FC<{
     return <></>;
   }
   const color = colorMap[props.typeCategory];
-  return <Chip label={props.typeCategory} size="small" color={color as any} />;
+  return (
+    <Chip
+      label={props.typeCategory}
+      size="small"
+      sx={{height: '20px', lineHeight: 2}}
+      color={color as any}
+    />
+  );
 };
