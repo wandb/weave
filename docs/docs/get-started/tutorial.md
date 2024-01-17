@@ -10,7 +10,7 @@ To iterate on an application, we need a way to evaluate if it's improving. To do
 
 ### Upload a `Dataset`
 
-`Dataset`s enable you to store examples for. Weave automatically captures when it is used and updates the version when there are changes. `Dataset`s are created with lists of examples, where each example row is a dict.
+`Dataset`s enable you to store examples for evaluation. Weave automatically captures when it is used and updates the version when there are changes. `Dataset`s are created with lists of examples, where each example row is a dict.
 
 ```python 
 import weave
