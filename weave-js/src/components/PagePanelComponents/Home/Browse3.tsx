@@ -516,7 +516,9 @@ const Browse3ProjectRoot: FC<{
       sx={{
         flex: '1 1 auto',
         width: '100%',
-        overflow: 'auto',
+        overflowY: 'auto',
+        // Very odd, but this is needed to prevent the horizontal scrollbar for a single pixel
+        overflowX: 'hidden',
       }}>
       <Switch location={customLocation}>
         {/* TYPES */}
