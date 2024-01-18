@@ -9,7 +9,10 @@ import {
 } from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
-import {SimpleKeyValueTable, SimplePageLayout} from './common/SimplePageLayout';
+import {
+  SimpleKeyValueTable,
+  SimplePageLayoutWithHeader,
+} from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFOpVersion} from './wfInterface/types';
@@ -58,7 +61,7 @@ const OpVersionPageInner: React.FC<{
   // );
 
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={opVersionText(opName, opVersionIndex)}
       headerContent={
         <SimpleKeyValueTable

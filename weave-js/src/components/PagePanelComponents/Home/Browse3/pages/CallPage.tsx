@@ -23,8 +23,10 @@ import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   SimpleKeyValueTable,
+  SimpleKeyValueTable2,
   SimplePageLayout,
   SimplePageLayoutContext,
+  SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
 import {GroupedCalls} from './ObjectVersionPage';
@@ -222,7 +224,7 @@ const CallPageInnerVertical: React.FC<{
   const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={title}
       // menuItems={[
       //   {
@@ -233,7 +235,7 @@ const CallPageInnerVertical: React.FC<{
       //   },
       //   // ...callMenuItems,
       // ]}
-      // headerContent={<>hi</>}
+      headerContent={<CallOverview wfCall={call} />}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />
@@ -696,14 +698,10 @@ const useCallFlattenedTraceTree = (call: WFCall) => {
   }, [call]);
 };
 
-export const CallDetails: FC<{
+const CallDetails: FC<{
   wfCall: WFCall;
 }> = ({wfCall}) => {
   const call = wfCall.rawCallSpan();
-  const opCategory = wfCall.opVersion()?.opCategory();
-  const childCalls = wfCall.childCalls().filter(c => {
-    return c.opVersion() != null;
-  });
   const inputKeys =
     call.inputs._keys ??
     Object.entries(call.inputs)
@@ -718,17 +716,6 @@ export const CallDetails: FC<{
       .filter(([k, c]) => c != null && (k === '_result' || !k.startsWith('_')))
       .map(([k, c]) => k);
   const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
-
-  const attributes = _.fromPairs(
-    Object.entries(call.attributes ?? {}).filter(
-      ([k, a]) => !k.startsWith('_') && a != null
-    )
-  );
-  const summary = _.fromPairs(
-    Object.entries(call.summary ?? {}).filter(
-      ([k, a]) => !k.startsWith('_') && k !== 'latency_s' && a != null
-    )
-  );
 
   return (
     <Box
@@ -748,70 +735,6 @@ export const CallDetails: FC<{
           gap: 1,
           paddingTop: '8px',
         }}>
-        <Box
-          sx={{
-            flex: '0 0 auto',
-            // border: '1px solid #ccc',
-            // borderRadius: 4,
-            p: 2,
-          }}>
-          <Typography variant="h6" gutterBottom>
-            Overview
-          </Typography>
-          <SimpleKeyValueTable
-            data={{
-              Operation:
-                parseRefMaybe(call.name) != null ? (
-                  <SmallRef
-                    objRef={parseRefMaybe(call.name)!}
-                    wfTable="OpVersion"
-                  />
-                ) : (
-                  call.name
-                ),
-              ...(opCategory
-                ? {
-                    Category: <OpVersionCategoryChip opCategory={opCategory} />,
-                  }
-                : {}),
-              Status: (
-                <CallStatusCodeChip
-                  statusCode={call.status_code as any}
-                  showLabel
-                />
-              ),
-              Called: (
-                <Timestamp value={call.timestamp / 1000} format="relative" />
-              ),
-              ...(call.summary.latency_s != null
-                ? {
-                    Latency: (
-                      <Typography variant="body2" component="span">
-                        {call.summary.latency_s.toFixed(3)}s
-                      </Typography>
-                    ),
-                  }
-                : {}),
-              ...(call.exception ? {Exception: call.exception} : {}),
-              ...(childCalls.length > 0
-                ? {
-                    'Child Calls': (
-                      <GroupedCalls
-                        calls={childCalls}
-                        partialFilter={{
-                          parentId: wfCall.callID(),
-                        }}
-                      />
-                    ),
-                  }
-                : {}),
-              ...(Object.keys(attributes).length > 0
-                ? {Attributes: attributes}
-                : {}),
-              ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
-            }}
-          />
-        </Box>
         {Object.keys(inputs).length > 0 && (
           <Box
             sx={{
@@ -821,7 +744,7 @@ export const CallDetails: FC<{
             <Typography variant="h6" gutterBottom>
               Inputs
             </Typography>
-            <SimpleKeyValueTable
+            <SimpleKeyValueTable2
               data={
                 // TODO: Consider bringing back openai chat input/output
                 inputs
@@ -838,7 +761,7 @@ export const CallDetails: FC<{
             <Typography variant="h6" gutterBottom>
               Output
             </Typography>
-            <SimpleKeyValueTable
+            <SimpleKeyValueTable2
               data={
                 // TODO: Consider bringing back openai chat input/output
                 output
@@ -848,5 +771,67 @@ export const CallDetails: FC<{
         )}
       </Box>
     </Box>
+  );
+};
+
+const CallOverview: React.FC<{
+  wfCall: WFCall;
+}> = ({wfCall}) => {
+  const call = wfCall.rawCallSpan();
+  const opCategory = wfCall.opVersion()?.opCategory();
+  const childCalls = wfCall.childCalls().filter(c => {
+    return c.opVersion() != null;
+  });
+  const attributes = _.fromPairs(
+    Object.entries(call.attributes ?? {}).filter(
+      ([k, a]) => !k.startsWith('_') && a != null
+    )
+  );
+  const summary = _.fromPairs(
+    Object.entries(call.summary ?? {}).filter(
+      ([k, a]) => !k.startsWith('_') && k !== 'latency_s' && a != null
+    )
+  );
+
+  return (
+    <SimpleKeyValueTable
+      data={{
+        Operation:
+          parseRefMaybe(call.name) != null ? (
+            <SmallRef objRef={parseRefMaybe(call.name)!} wfTable="OpVersion" />
+          ) : (
+            call.name
+          ),
+        ...(opCategory
+          ? {
+              Category: <OpVersionCategoryChip opCategory={opCategory} />,
+            }
+          : {}),
+        Status: (
+          <CallStatusCodeChip statusCode={call.status_code as any} showLabel />
+        ),
+        Called: <Timestamp value={call.timestamp / 1000} format="relative" />,
+        ...(call.summary.latency_s != null
+          ? {
+              Latency: call.summary.latency_s.toFixed(3) + 's',
+            }
+          : {}),
+        ...(call.exception ? {Exception: call.exception} : {}),
+        ...(childCalls.length > 0
+          ? {
+              'Child Calls': (
+                <GroupedCalls
+                  calls={childCalls}
+                  partialFilter={{
+                    parentId: wfCall.callID(),
+                  }}
+                />
+              ),
+            }
+          : {}),
+        ...(Object.keys(attributes).length > 0 ? {Attributes: attributes} : {}),
+        ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
+      }}
+    />
   );
 };

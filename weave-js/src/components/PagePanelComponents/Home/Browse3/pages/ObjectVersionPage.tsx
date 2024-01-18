@@ -15,7 +15,7 @@ import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
-  SimplePageLayout,
+  SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
@@ -69,7 +69,7 @@ const ObjectVersionPageInner: React.FC<{
   // const {onMakeBoard} = useMakeNewBoard(itemNode);
 
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={objectVersionText(objectName, objectVersionIndex)}
       headerContent={
         <SimpleKeyValueTable
