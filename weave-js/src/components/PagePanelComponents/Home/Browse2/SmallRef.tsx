@@ -56,7 +56,12 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
   const refTypeQuery = useNodeValue(refTypeNode);
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);
-  const label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
+  const label =
+    objRef.artifactName +
+    ':' +
+    objRef.artifactVersion.slice(0, 6) +
+    // Is this correct? Should we parse this in any special way?
+    (objRef.artifactPath ? '/' + objRef.artifactPath : '');
   const rootTypeName = getTypeName(rootType);
   let icon = <SpokeIcon sx={{height: '100%'}} />;
   if (rootTypeName === 'Dataset') {

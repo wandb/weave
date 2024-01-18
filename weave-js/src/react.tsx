@@ -507,7 +507,8 @@ export const parseRef = (ref: string): ArtifactRef => {
       projectName,
       artifactName: artifactNamePart,
       artifactVersion,
-      artifactPath: artifactPathPart,
+      // Is this correct?
+      artifactPath: artifactPathPart + url.hash,
     };
   }
 
