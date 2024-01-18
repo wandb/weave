@@ -630,7 +630,9 @@ const useTypeCategoryOptions = (
   }, [allObjectVersions, highLevelFilter]);
 
   return useMemo(() => {
-    return _.uniq(filtered.map(item => item.typeVersion().typeCategory()));
+    return _.uniq(
+      filtered.map(item => item.typeVersion().typeCategory())
+    ).filter(v => v != null) as HackyTypeCategory[];
   }, [filtered]);
 };
 
