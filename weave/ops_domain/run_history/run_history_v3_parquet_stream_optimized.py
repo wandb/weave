@@ -166,11 +166,12 @@ def _fast_path(
                 and "_val" in awl.object_type.property_types
             ):
                 # There are only two kinds of types that look like a _type, _val
-                # struct: Timestamp and Ref. Happily, we distinguish them by
+                # struct: Timestamp and Ref. Happily, we can distinguish them by
                 # looking at the type of the _val field
                 val_field = awl._arrow_data.field("_val")
-                if isinstance(val_field, pa.DoubleArray):
-                    # DoubleArray is a Timestamp
+                if isinstance(val_field, (pa.DoubleArray, pa.Int64Array)):
+                    # DoubleArray is the always included timestamp field
+                    # Int64Array is a user defined timestamp.
                     return ArrowWeaveList(
                         val_field.cast("int64").cast(pa.timestamp("ms", tz="UTC")),
                         types.Timestamp(),
