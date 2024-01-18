@@ -1,5 +1,6 @@
 ---
 sidebar_position: 2
+hide_table_of_contents: true
 ---
 
 # Tutorial: Production LLM workflow
@@ -152,7 +153,7 @@ if __name__ == '__main__':
     print(asyncio.run(evaluation.evaluate(model)))
 ```
 
-# Continue Learning!
+## Continue Learning!
 
 You have just built a **production-ready LLM app**.
 

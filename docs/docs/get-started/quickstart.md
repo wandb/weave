@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+hide_table_of_contents: true
 ---
 
 # Quickstart
@@ -60,10 +61,6 @@ Run this application and your console will output a link to view it within W&B.
 :::note
 OpenAI calls are automatically tracked with weave but you can add other LLMs easily by wrapping them with `@weave.op()`
 :::
-
-# What's next?
-
-You have just learned the **basics of Weave**.
 
 ## What's next?
 
