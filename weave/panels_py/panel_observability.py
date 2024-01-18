@@ -22,6 +22,7 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
             "trace_id": types.optional(types.String()),
             "state": types.optional(types.String()),
             "error": types.optional(types.String()),
+            "priority": types.optional(types.Number()),
             "metrics": types.TypedDict(
                 {
                     "system": types.TypedDict(
@@ -129,13 +130,13 @@ def observability(
     )
 
     group_by_user = weave_internal.define_fn(
-        {"row": input_node.type.object_type}, lambda row: row["entity_name"]
+        {"row": source_data.type.object_type}, lambda row: row["entity_name"]
     )
 
     grouping_fn = varbar.add(
         "grouping_fn",
         weave_internal.define_fn(
-            {"row": input_node.type.object_type}, lambda row: row["entity_name"]
+            {"row": source_data.type.object_type}, lambda row: row["entity_name"]
         ),
         hidden=True,
     )
@@ -211,7 +212,7 @@ def observability(
     )
 
     state_color_func = weave_internal.define_fn(
-        {"row": input_node.type.object_type},
+        {"row": source_data.type.object_type},
         lambda row: colors_node.pick(row["state"]),
     )
 
@@ -227,7 +228,7 @@ def observability(
     )
 
     is_start_stop_state = weave_internal.define_fn(
-        {"row": input_node.type.object_type},
+        {"row": source_data.type.object_type},
         lambda row: weave.ops.Boolean.bool_or(
             row["state"] == "running",
             weave.ops.Boolean.bool_or(
@@ -275,13 +276,17 @@ def observability(
                 "job": row["job"][-1],
                 "enqueued": row[timestamp_col_name][0],
                 "run_start": row[timestamp_col_name][-1],
-                "duration": weave.ops.Number.__mul__(
-                    weave.ops.timedelta_total_seconds(
-                        weave.ops.datetime_sub(
-                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                "duration": weave.ops.Number.__truediv__(
+                    weave.ops.Number.__mul__(
+                        weave.ops.timedelta_total_seconds(
+                            weave.ops.datetime_sub(
+                                row[timestamp_col_name].max(),
+                                row[timestamp_col_name].min(),
+                            ),
                         ),
+                        1000,
                     ),
-                    1000,
+                    60,
                 ),
             }
         ),
@@ -301,21 +306,20 @@ def observability(
             weave.ops.timestamp_bins_nice(bin_range, num_buckets)
         ),
         x_title="Time",
-        y=lambda row: row["duration"],
-        y_title="Time spent queued",
-        label=lambda row: row["entity_name"],
+        y=lambda row: row["duration"].sum(),
+        y_title="Time spent queued (m)",
+        label=lambda row: grouping_fn(row),
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Job": row["job"],
-                "User": row["entity_name"],
-                "Project": row["project_name"],
-                "Run ID": row["run_id"],
-                "Job": row["job"],
+                "Job (s)": weave.ops.join_to_str(row["job"].unique(), ","),
+                "User (s)": weave.ops.join_to_str(row["entity_name"].unique(), ","),
+                "Project (s)": weave.ops.join_to_str(row["project_name"].unique(), ","),
+                "Duration (m)": row["duration"].sum(),
+                "Run count": row.count(),
             }
         ),
-        color=group_by_user.val,
         color_title="Grouping",
-        groupby_dims=[],
+        groupby_dims=["x", "label"],
         mark="bar",
         domain_x=user_zoom_range,
     )
@@ -340,13 +344,17 @@ def observability(
                 "Project": row["project_name"][0],
                 "Run ID": row["run_id"][-1],
                 "Status": row["state"][-1],
-                "Duration (s)": weave.ops.Number.__mul__(
-                    weave.ops.timedelta_total_seconds(
-                        weave.ops.datetime_sub(
-                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
+                "Duration (m)": weave.ops.Number.__truediv__(
+                    weave.ops.Number.__mul__(
+                        weave.ops.timedelta_total_seconds(
+                            weave.ops.datetime_sub(
+                                row[timestamp_col_name].max(),
+                                row[timestamp_col_name].min(),
+                            ),
                         ),
+                        1000,
                     ),
-                    1000,
+                    60,
                 ),
             }
         ),
@@ -391,36 +399,78 @@ def observability(
                 b=row["state"][-1] == "running",
             ),
             weave.ops.dict_(
-                a=weave.ops.timedelta_total_seconds(
-                    weave.ops.datetime_sub(
-                        row[timestamp_col_name].max(),
-                        row[timestamp_col_name].min(),
-                    )
+                a=weave.ops.Number.__truediv__(
+                    weave.ops.timedelta_total_seconds(
+                        weave.ops.datetime_sub(
+                            row[timestamp_col_name].max(),
+                            row[timestamp_col_name].min(),
+                        )
+                    ),
+                    60,
                 ),
-                b=weave.ops.timedelta_total_seconds(
-                    weave.ops.datetime_sub(
-                        weave.ops.from_number(weave.ops.datetime_now()),
-                        row[timestamp_col_name].min(),
-                    )
+                b=weave.ops.Number.__truediv__(
+                    weave.ops.timedelta_total_seconds(
+                        weave.ops.datetime_sub(
+                            weave.ops.from_number(weave.ops.datetime_now()),
+                            row[timestamp_col_name].min(),
+                        )
+                    ),
+                    60,
                 ),
             ),
         ),
-        "Runtime (s)",
+        "Runtime (m)",
     )
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
-        "Avg. cpu %",
+        lambda row: weave.ops.cond(
+            weave.ops.dict_(
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+            ),
+            weave.ops.dict_(
+                a=row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
+                b=weave.ops.make_const_node(types.NoneType(), None),
+            ),
+        ),
+        "Avg. CPU %",
     )
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
-        "Avg. gpu %",
+        lambda row: weave.ops.cond(
+            weave.ops.dict_(
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+            ),
+            weave.ops.dict_(
+                a=row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+                b=weave.ops.make_const_node(types.NoneType(), None),
+            ),
+        ),
+        "Avg. GPU %",
     )
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["gpu_cores_mem"][-1].avg(),
-        "Avg. gpu mem. %",
+        lambda row: weave.ops.cond(
+            weave.ops.dict_(
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+            ),
+            weave.ops.dict_(
+                a=row["metrics"]["system"]["gpu_cores_mem"][-1].avg(),
+                b=weave.ops.make_const_node(types.NoneType(), None),
+            ),
+        ),
+        "Avg. GPU mem. %",
     )
     jobs_table.add_column(
-        lambda row: row["metrics"]["system"]["memory"][-1],
+        lambda row: weave.ops.cond(
+            weave.ops.dict_(
+                a=row["state"][-1] != "running",
+                b=row["state"][-1] == "running",
+            ),
+            weave.ops.dict_(
+                a=row["metrics"]["system"]["memory"][-1],
+                b=weave.ops.make_const_node(types.NoneType(), None),
+            ),
+        ),
         "Avg. mem (MB)",
     )
 
@@ -494,159 +544,142 @@ def observability(
         x=lambda row: row.count(),
         x_title="Count",
         y_title="Grouping",
-        y=lambda row: row["entity_name"],
+        y=lambda row: grouping_fn(row),
         label=lambda row: grouping_fn(row),
-        color=lambda row: grouping_fn(row),
-        groupby_dims=["label", "y"],
+        groupby_dims=["label"],
         mark="bar",
         no_legend=True,
     )
 
-    gpu_waste_by_user_plot = panels.Plot(
-        start_stop_states,
-        x=lambda row: weave.ops.Number.__mul__(
-            weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                ),
+    metric_plot_data = weave.ops.List.groupby(
+        start_stop_states, lambda row: row["trace_id"]
+    )
+    metric_plot_data_mapped = varbar.add(
+        "metric_plot_data",
+        weave.ops.List.map(
+            metric_plot_data,
+            lambda row: weave.ops.dict_(
+                **{
+                    "trace_id": row["trace_id"][0],
+                    "run_id": row["run_id"][-1],
+                    "entity_name": row["entity_name"][0],
+                    "project_name": row["project_name"][0],
+                    "job": row["job"][0],
+                    "duration": weave.ops.Number.__truediv__(
+                        weave.ops.Number.__mul__(
+                            weave.ops.timedelta_total_seconds(
+                                weave.ops.datetime_sub(
+                                    row[timestamp_col_name].max(),
+                                    row[timestamp_col_name].min(),
+                                ),
+                            ),
+                            1000,
+                        ),
+                        60,
+                    ),
+                    "GPU util %": row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+                    "CPU util %": row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
+                    "GPU memory %": row["metrics"]["system"]["gpu_cores_mem"][-1].avg(),
+                    "Memory (MB)": row["metrics"]["system"]["memory"][-1],
+                }
             ),
-            1000,
         ),
-        x_title="Run duration",
-        y_title="Gpu usage (%)",
-        y=lambda row: row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+        hidden=True,
+    )
+
+    gpu_waste_by_user_plot = panels.Plot(
+        metric_plot_data_mapped,
+        x=lambda row: row["duration"],
+        x_title="Run duration (minutes)",
+        y_title="GPU utilization (%)",
+        y=lambda row: row["GPU util %"],
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Run ID": row["run_id"][0],
-                "Project": row["project_name"][0],
-                "Job": row["job"][0],
-                "Duration (s)": weave.ops.Number.__mul__(
-                    weave.ops.timedelta_total_seconds(
-                        weave.ops.datetime_sub(
-                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                        ),
-                    ),
-                    1000,
-                ),
-                "Gpu util %": row["metrics"]["system"]["gpu_cores_util"][-1].avg(),
+                "Run ID": row["run_id"],
+                "Project": row["project_name"],
+                "User": row["entity_name"],
+                "Job": row["job"],
+                "Duration (m)": row["duration"],
+                "GPU util %": row["GPU util %"],
             }
         ),
-        label=lambda row: row["run_id"],
-        color=group_by_user.val,
-        groupby_dims=["label"],
+        color_title="Grouping",
+        label=lambda row: grouping_fn(row),
+        color=lambda row: grouping_fn(row),
+        groupby_dims=[],
         mark="point",
-        no_legend=True,
         domain_y=weave_internal.make_const_node(types.List(types.Number()), [0, 100]),
     )
 
     cpu_waste_by_user_plot = panels.Plot(
-        start_stop_states,
-        x=lambda row: weave.ops.Number.__mul__(
-            weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                ),
-            ),
-            1000,
-        ),
-        x_title="Run duration",
-        y_title="Cpu usage (%)",
-        y=lambda row: row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
+        metric_plot_data_mapped,
+        x=lambda row: row["duration"],
+        x_title="Run duration (minutes)",
+        y_title="CPU utilization (%)",
+        y=lambda row: row["CPU util %"],
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Run ID": row["run_id"][0],
-                "Project": row["project_name"][0],
-                "Job": row["job"][0],
-                "Duration (s)": weave.ops.Number.__mul__(
-                    weave.ops.timedelta_total_seconds(
-                        weave.ops.datetime_sub(
-                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                        ),
-                    ),
-                    1000,
-                ),
-                "Cpu util %": row["metrics"]["system"]["cpu_cores_util"][-1].avg(),
+                "Run ID": row["run_id"],
+                "Project": row["project_name"],
+                "User": row["entity_name"],
+                "Job": row["job"],
+                "Duration (m)": row["duration"],
+                "CPU util %": row["CPU util %"],
             }
         ),
-        label=lambda row: row["run_id"],
-        color=group_by_user.val,
-        groupby_dims=["label"],
+        color_title="Grouping",
+        label=lambda row: grouping_fn(row),
+        color=lambda row: grouping_fn(row),
+        groupby_dims=[],
         mark="point",
-        no_legend=True,
         domain_y=weave_internal.make_const_node(types.List(types.Number()), [0, 100]),
     )
 
     gpu_mem_by_user_plot = panels.Plot(
-        start_stop_states,
-        x=lambda row: weave.ops.Number.__mul__(
-            weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                ),
-            ),
-            1000,
-        ),
-        x_title="Run duration",
-        y_title="Cpu usage (%)",
-        y=lambda row: row["metrics"]["system"]["gpu_cores_mem"][-1].avg(),
+        metric_plot_data_mapped,
+        x=lambda row: row["duration"],
+        x_title="Run duration (minutes)",
+        y_title="GPU memory (%)",
+        y=lambda row: row["GPU memory %"],
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Run ID": row["run_id"][0],
-                "Project": row["project_name"][0],
-                "Job": row["job"][0],
-                "Duration (s)": weave.ops.Number.__mul__(
-                    weave.ops.timedelta_total_seconds(
-                        weave.ops.datetime_sub(
-                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                        ),
-                    ),
-                    1000,
-                ),
-                "Gpu memory %": row["metrics"]["system"]["gpu_cores_mem"][-1].avg(),
+                "Run ID": row["run_id"],
+                "Project": row["project_name"],
+                "User": row["entity_name"],
+                "Job": row["job"],
+                "Duration (m)": row["duration"],
+                "GPU memory (%)": row["GPU memory %"],
             }
         ),
-        label=lambda row: row["run_id"],
-        color=group_by_user.val,
-        groupby_dims=["label"],
+        color_title="Grouping",
+        label=lambda row: grouping_fn(row),
+        color=lambda row: grouping_fn(row),
+        groupby_dims=[],
         mark="point",
-        no_legend=True,
         domain_y=weave_internal.make_const_node(types.List(types.Number()), [0, 100]),
     )
 
     memory_by_user_plot = panels.Plot(
-        start_stop_states,
-        x=lambda row: weave.ops.Number.__mul__(
-            weave.ops.timedelta_total_seconds(
-                weave.ops.datetime_sub(
-                    row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                ),
-            ),
-            1000,
-        ),
-        x_title="Run duration",
+        metric_plot_data_mapped,
+        x=lambda row: row["duration"],
+        x_title="Run duration (minutes)",
         y_title="Memory usage (MB)",
-        y=lambda row: row["metrics"]["system"]["memory"][-1],
+        y=lambda row: row["Memory (MB)"],
         tooltip=lambda row: weave.ops.dict_(
             **{
-                "Run ID": row["run_id"][0],
-                "Project": row["project_name"][0],
-                "Job": row["job"][0],
-                "Duration (s)": weave.ops.Number.__mul__(
-                    weave.ops.timedelta_total_seconds(
-                        weave.ops.datetime_sub(
-                            row[timestamp_col_name].max(), row[timestamp_col_name].min()
-                        ),
-                    ),
-                    1000,
-                ),
-                "Memory (MB)": row["metrics"]["system"]["memory"][-1],
+                "Run ID": row["run_id"],
+                "Project": row["project_name"],
+                "User": row["entity_name"],
+                "Job": row["job"],
+                "Duration (m)": row["duration"],
+                "Memory (MB)": row["Memory (MB)"],
             }
         ),
-        label=lambda row: row["run_id"],
-        color=group_by_user.val,
-        groupby_dims=["label"],
+        color_title="Grouping",
+        label=lambda row: grouping_fn(row),
+        color=lambda row: grouping_fn(row),
+        groupby_dims=[],
         mark="point",
-        no_legend=True,
     )
 
     errors_table = panels.Table(  # type: ignore
@@ -665,12 +698,12 @@ def observability(
 
     # layout
     dashboard.add(
-        "Job_status",
+        "Job_run_status",
         state_transitions_plot,
         layout=panels.GroupPanelLayout(x=0, y=0, w=24, h=6),
     )
     dashboard.add(
-        "Job_table",
+        "Job_run_table",
         jobs_table,
         layout=panels.GroupPanelLayout(x=0, y=6, w=24, h=8),
     )
@@ -701,10 +734,10 @@ def observability(
     selected_jobs.add_column(lambda row: row["c_4.Status"][-1], "Status")
     selected_jobs.add_column(lambda row: row["c_2"].min(), "Start")
     selected_jobs.add_column(lambda row: row["c_2"].max(), "Stop")
-    selected_jobs.add_column(lambda row: row["c_4.Duration (s)"][0], "Duration (s)")
+    selected_jobs.add_column(lambda row: row["c_4.Duration (m)"][0], "Duration (m)")
 
     dashboard.add(
-        "Selected_jobs",
+        "Selected_job_runs",
         selected_jobs,
         layout=panels.GroupPanelLayout(x=0, y=26, w=24, h=10),
     )
@@ -714,22 +747,22 @@ def observability(
         layout=panels.GroupPanelLayout(x=10, y=36, w=14, h=8),
     )
     dashboard.add(
-        "Gpu_use_by_job",
+        "GPU_use_by_job_run",
         gpu_waste_by_user_plot,
         layout=panels.GroupPanelLayout(x=0, y=44, w=12, h=8),
     )
     dashboard.add(
-        "Cpu_use_by_job",
+        "CPU_use_by_job_run",
         cpu_waste_by_user_plot,
         layout=panels.GroupPanelLayout(x=12, y=44, w=12, h=8),
     )
     dashboard.add(
-        "Gpu_memory_by_job",
+        "GPU_memory_by_job_run",
         gpu_mem_by_user_plot,
         layout=panels.GroupPanelLayout(x=0, y=52, w=12, h=8),
     )
     dashboard.add(
-        "System_memory_by_job",
+        "System_memory_by_job_run",
         memory_by_user_plot,
         layout=panels.GroupPanelLayout(x=12, y=52, w=12, h=8),
     )
