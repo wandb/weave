@@ -70,171 +70,123 @@ const ObjectView: FC<{obj: any}> = ({obj}) => {
   return <Typography>{JSON.stringify(obj)}</Typography>;
 };
 
-// export const SpanDetails: FC<{
-//   wfCall: Call;
-// }> = ({wfCall}) => {
-//   const call = wfCall.rawCallSpan();
-//   const inputKeys =
-//     call.inputs._keys ??
-//     Object.entries(call.inputs)
-//       .filter(([k, c]) => c != null && !k.startsWith('_'))
-//       .map(([k, c]) => k);
-//   const inputs = _.fromPairs(inputKeys.map(k => [k, call.inputs[k]]));
+export const SpanDetails: FC<{
+  call: Call;
+  hackyInjectionBelowFunction?: React.ReactNode;
+}> = ({call, hackyInjectionBelowFunction}) => {
+  const inputKeys =
+    call.inputs._keys ??
+    Object.entries(call.inputs)
+      .filter(([k, c]) => c != null && !k.startsWith('_'))
+      .map(([k, c]) => k);
+  const inputs = _.fromPairs(inputKeys.map(k => [k, call.inputs[k]]));
 
-//   const callOutput = call.output ?? {};
-//   const outputKeys =
-//     callOutput._keys ??
-//     Object.entries(call.inputs)
-//       .filter(([k, c]) => c != null && (k === '_result' || !k.startsWith('_')))
-//       .map(([k, c]) => k);
-//   const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
+  const callOutput = call.output ?? {};
+  const outputKeys =
+    callOutput._keys ??
+    Object.entries(call.inputs)
+      .filter(([k, c]) => c != null && (k === '_result' || !k.startsWith('_')))
+      .map(([k, c]) => k);
+  const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
 
-//   const attributes = _.fromPairs(
-//     Object.entries(call.attributes ?? {}).filter(([k, a]) => !k.startsWith('_'))
-//   );
+  const attributes = _.fromPairs(
+    Object.entries(call.attributes ?? {}).filter(([k, a]) => !k.startsWith('_'))
+  );
 
-//   return (
-//     <Box
-//       sx={{
-//         width: '100%',
-//         height: '100%',
-//         overflow: 'auto',
-//         padding: 2,
-//       }}>
-//       <Box
-//         sx={{
-//           width: '100%',
-//         }}>
-//         <SimpleKeyValueTable
-//           data={{
-//             Operation:
-//               parseRefMaybe(call.name) != null ? (
-//                 <SmallRef
-//                   objRef={parseRefMaybe(call.name)!}
-//                   wfTable="OpVersion"
-//                 />
-//               ) : (
-//                 call.name
-//               ),
-//             Status: (
-//               <CallStatusCodeChip
-//                 statusCode={call.status_code as any}
-//                 showLabel
-//               />
-//             ),
-//             Called: (
-//               <Timestamp value={call.timestamp / 1000} format="relative" />
-//             ),
-//             ...(call.summary.latency_s != null
-//               ? {
-//                   Latency: (
-//                     <Typography variant="body2" component="span">
-//                       {call.summary.latency_s.toFixed(3)}s
-//                     </Typography>
-//                   ),
-//                 }
-//               : {}),
-//             ...(call.exception ? {Exception: call.exception} : {}),
-//           }}
-//         />
-//       </Box>
-//     </Box>
-//   );
-
-//   return (
-//     <div style={{width: '100%'}}>
-//       <div style={{marginBottom: 24}}>
-//         <Box mb={2}>
-//           <Box display="flex" justifyContent="space-between">
-//             <Typography variant="h5" gutterBottom>
-//               Function
-//             </Typography>
-//             {isOpenAIChatInput(inputs) && (
-//               <Button
-//                 variant="outlined"
-//                 sx={{backgroundColor: globals.lightYellow}}>
-//                 Open in LLM Playground
-//               </Button>
-//             )}
-//           </Box>
-//           {parseRefMaybe(call.name) != null ? (
-//             <SmallRef objRef={parseRefMaybe(call.name)!} wfTable="OpVersion" />
-//           ) : (
-//             call.name
-//           )}
-//         </Box>
-//         <Typography variant="body2" gutterBottom>
-//           Status: {call.status_code}
-//         </Typography>
-//         {hackyInjectionBelowFunction}
-//         {call.exception != null && (
-//           <Typography variant="body2" gutterBottom>
-//             {call.exception}
-//           </Typography>
-//         )}
-//       </div>
-//       {Object.keys(attributes).length > 0 && (
-//         <div style={{marginBottom: 12}}>
-//           <Typography variant="h6" gutterBottom>
-//             Attributes
-//           </Typography>
-//           <Box pl={2} pr={2}>
-//             <ObjectView
-//               obj={_.fromPairs(
-//                 Object.entries(attributes).filter(([k, v]) => v != null)
-//               )}
-//             />
-//           </Box>
-//         </div>
-//       )}
-//       <div style={{marginBottom: 12}}>
-//         <Typography variant="h6" gutterBottom>
-//           Summary
-//         </Typography>
-//         <Box pl={2} pr={2}>
-//           <ObjectView
-//             obj={_.fromPairs(
-//               Object.entries(call.summary).filter(([k, v]) => v != null)
-//             )}
-//           />
-//         </Box>
-//       </div>
-//       <div style={{marginBottom: 24}}>
-//         <Typography variant="h5" gutterBottom>
-//           Inputs
-//         </Typography>
-//         <Box pl={2} pr={2}>
-//           {isOpenAIChatInput(inputs) ? (
-//             <OpenAIChatInputView chatInput={inputs} />
-//           ) : (
-//             <ObjectView obj={inputs} />
-//           )}
-//         </Box>
-//       </div>
-//       <div style={{marginBottom: 24}}>
-//         <Typography variant="h6" gutterBottom>
-//           Output
-//         </Typography>
-//         <Box pl={2} pr={2}>
-//           {output == null ? (
-//             <div>null</div>
-//           ) : isOpenAIChatOutput(call.output) ? (
-//             <OpenAIChatOutputView chatOutput={call.output} />
-//           ) : (
-//             <ObjectView
-//               obj={_.fromPairs(
-//                 Object.entries(output).filter(
-//                   ([k, v]) =>
-//                     (k === '_result' || !k.startsWith('_')) && v != null
-//                 )
-//               )}
-//             />
-//           )}
-//         </Box>
-//       </div>
-//     </div>
-//   );
-// };
+  return (
+    <div style={{width: '100%'}}>
+      <div style={{marginBottom: 24}}>
+        <Box mb={2}>
+          <Box display="flex" justifyContent="space-between">
+            <Typography variant="h5" gutterBottom>
+              Function
+            </Typography>
+            {isOpenAIChatInput(inputs) && (
+              <Button
+                variant="outlined"
+                sx={{backgroundColor: globals.lightYellow}}>
+                Open in LLM Playground
+              </Button>
+            )}
+          </Box>
+          {parseRefMaybe(call.name) != null ? (
+            <SmallRef objRef={parseRefMaybe(call.name)!} wfTable="OpVersion" />
+          ) : (
+            call.name
+          )}
+        </Box>
+        <Typography variant="body2" gutterBottom>
+          Status: {call.status_code}
+        </Typography>
+        {hackyInjectionBelowFunction}
+        {call.exception != null && (
+          <Typography variant="body2" gutterBottom>
+            {call.exception}
+          </Typography>
+        )}
+      </div>
+      {Object.keys(attributes).length > 0 && (
+        <div style={{marginBottom: 12}}>
+          <Typography variant="h6" gutterBottom>
+            Attributes
+          </Typography>
+          <Box pl={2} pr={2}>
+            <ObjectView
+              obj={_.fromPairs(
+                Object.entries(attributes).filter(([k, v]) => v != null)
+              )}
+            />
+          </Box>
+        </div>
+      )}
+      <div style={{marginBottom: 12}}>
+        <Typography variant="h6" gutterBottom>
+          Summary
+        </Typography>
+        <Box pl={2} pr={2}>
+          <ObjectView
+            obj={_.fromPairs(
+              Object.entries(call.summary).filter(([k, v]) => v != null)
+            )}
+          />
+        </Box>
+      </div>
+      <div style={{marginBottom: 24}}>
+        <Typography variant="h5" gutterBottom>
+          Inputs
+        </Typography>
+        <Box pl={2} pr={2}>
+          {isOpenAIChatInput(inputs) ? (
+            <OpenAIChatInputView chatInput={inputs} />
+          ) : (
+            <ObjectView obj={inputs} />
+          )}
+        </Box>
+      </div>
+      <div style={{marginBottom: 24}}>
+        <Typography variant="h6" gutterBottom>
+          Output
+        </Typography>
+        <Box pl={2} pr={2}>
+          {output == null ? (
+            <div>null</div>
+          ) : isOpenAIChatOutput(call.output) ? (
+            <OpenAIChatOutputView chatOutput={call.output} />
+          ) : (
+            <ObjectView
+              obj={_.fromPairs(
+                Object.entries(output).filter(
+                  ([k, v]) =>
+                    (k === '_result' || !k.startsWith('_')) && v != null
+                )
+              )}
+            />
+          )}
+        </Box>
+      </div>
+    </div>
+  );
+};
 
 export const SpanDetails2: FC<{
   wfCall: WFCall;
