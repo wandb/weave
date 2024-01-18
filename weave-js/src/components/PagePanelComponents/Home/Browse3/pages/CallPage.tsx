@@ -158,7 +158,7 @@ const CallPageInnerHorizontal: React.FC<{
   return (
     <SimplePageLayout
       title={traceTitle}
-      headerContent={<>hi</>}
+      // headerContent={<>hi</>}
       // menuItems={[
       //   {
       //     label: 'View Vertical',
@@ -233,7 +233,7 @@ const CallPageInnerVertical: React.FC<{
       //   },
       //   // ...callMenuItems,
       // ]}
-      headerContent={<>hi</>}
+      // headerContent={<>hi</>}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />
@@ -369,11 +369,14 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
           borderBottom: 'none',
         },
       },
+      '& .MuiDataGrid-columnHeaders': {
+        borderBottom: treeOnly ? 'none' : undefined,
+      },
       [callClass]: {
         backgroundColor: '#a9edf252',
       },
     }),
-    [callClass]
+    [callClass, treeOnly]
   );
 
   // Scroll selected call into view
