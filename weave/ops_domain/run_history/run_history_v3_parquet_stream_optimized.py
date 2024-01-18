@@ -146,7 +146,6 @@ def _fast_path(
 
     all_awls: list[ArrowWeaveList] = []
     for table in raw_history_awl_tables:
-        awl = ArrowWeaveList(table)
         all_awls.append(ArrowWeaveList(table))
 
     # OK I lied, to_arrow does python iteration at the moment, but this is only
@@ -252,7 +251,7 @@ def _get_history3(run: wdt.Run, columns=None):
     else:
         # Legacy slow path. This path drops down to python iteration in many
         # cases.
-        logging.warning(f"Using legacy slow path for history3")
+        logging.warning("Using legacy slow path for history3")
         run_path = wb_util.RunPath(
             run["project"]["entity"]["name"],
             run["project"]["name"],
