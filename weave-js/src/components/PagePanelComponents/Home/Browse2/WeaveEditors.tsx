@@ -53,7 +53,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {useHistory, useLocation} from 'react-router-dom';
+import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowCurrentRouteContext} from '../Browse3/context';
 import {flattenObject, unflattenObject} from './browse2Util';
@@ -629,7 +629,6 @@ export const WeaveEditorTable: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
-  const location = useLocation();
   const addEdit = useWeaveEditorContextAddEdit();
   const makeLinkPath = useObjectVersionLinkPathForPath();
   const objectType = listObjectType(node.type);
