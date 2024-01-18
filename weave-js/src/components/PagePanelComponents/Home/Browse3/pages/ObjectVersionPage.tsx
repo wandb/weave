@@ -2,7 +2,10 @@ import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
 import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
-import {WeaveEditor} from '../../Browse2/WeaveEditors';
+import {
+  WeaveEditor,
+  WeaveEditorSourceContext,
+} from '../../Browse2/WeaveEditors';
 import {WFHighLevelCallFilter} from './CallsPage';
 import {
   CallLink,
@@ -44,6 +47,7 @@ const ObjectVersionPageInner: React.FC<{
   objectVersion: WFObjectVersion;
   refExtra?: string;
 }> = ({objectVersion, refExtra}) => {
+  const objectVersionHash = objectVersion.version();
   const entityName = objectVersion.entity();
   const projectName = objectVersion.project();
   const objectName = objectVersion.object().name();
@@ -57,7 +61,7 @@ const ObjectVersionPageInner: React.FC<{
     return call.opVersion() != null;
   });
   const baseUri = objectVersion.refUri();
-  const fullUri = baseUri + (refExtra ?? '');
+  const fullUri = baseUri + (refExtra ? '/' + refExtra : '');
 
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(baseUri)});
@@ -75,7 +79,7 @@ const ObjectVersionPageInner: React.FC<{
       headerContent={
         <SimpleKeyValueTable
           data={{
-            Name: (
+            [refExtra ? 'Parent Object' : 'Name']: (
               <>
                 <ObjectLink
                   entityName={entityName}
@@ -96,6 +100,11 @@ const ObjectVersionPageInner: React.FC<{
               </>
             ),
             Version: <>{objectVersionIndex}</>,
+            ...(refExtra
+              ? {
+                  Subpath: refExtra,
+                }
+              : {}),
             Category: (
               <TypeVersionCategoryChip typeCategory={objectTypeCategory} />
             ),
@@ -159,9 +168,18 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Values',
           content: (
-            <ScrollableTabContent>
-              <WeaveEditor objType={objectName} node={itemNode} />
-            </ScrollableTabContent>
+            <WeaveEditorSourceContext.Provider
+              value={{
+                entityName,
+                projectName,
+                objectName,
+                objectVersionHash,
+                refExtra: refExtra?.split('/'),
+              }}>
+              <ScrollableTabContent>
+                <WeaveEditor objType={objectName} node={itemNode} />
+              </ScrollableTabContent>
+            </WeaveEditorSourceContext.Provider>
           ),
         },
         // {

@@ -44,8 +44,10 @@ import {
 } from '@wandb/weave/react';
 import * as _ from 'lodash';
 import React, {
+  createContext,
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -53,6 +55,7 @@ import React, {
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
+import {useWeaveflowCurrentRouteContext} from '../Browse3/context';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {Link} from './CommonLib';
 import {
@@ -238,6 +241,40 @@ const WeaveEditorCommit: FC<{
         </>
       )}
     </Dialog>
+  );
+};
+
+export const WeaveEditorSourceContext = createContext<{
+  entityName: string;
+  projectName: string;
+  objectName: string;
+  objectVersionHash: string;
+  refExtra?: string[];
+} | null>(null);
+
+const useObjectVersionLinkPathForPath = () => {
+  const router = useWeaveflowCurrentRouteContext();
+  const weaveEditorSourceContext = useContext(WeaveEditorSourceContext);
+  if (weaveEditorSourceContext == null) {
+    throw new Error('invalid weaveEditorSourceContext');
+  }
+  return useCallback(
+    (path: string[]) =>
+      router.objectVersionUIUrl(
+        weaveEditorSourceContext.entityName,
+        weaveEditorSourceContext.projectName,
+        weaveEditorSourceContext.objectName,
+        weaveEditorSourceContext.objectVersionHash,
+        (weaveEditorSourceContext.refExtra ?? []).concat(path)
+      ),
+    [
+      router,
+      weaveEditorSourceContext.entityName,
+      weaveEditorSourceContext.objectName,
+      weaveEditorSourceContext.objectVersionHash,
+      weaveEditorSourceContext.projectName,
+      weaveEditorSourceContext.refExtra,
+    ]
   );
 };
 
@@ -451,7 +488,7 @@ export const WeaveEditorTypedDict: FC<{
 }> = ({node, path}) => {
   // const val = useNodeValue(node);
   // return <Typography>{JSON.stringify(val)}</Typography>;
-  const loc = useLocation();
+  const makeLinkPath = useObjectVersionLinkPathForPath();
   return (
     <Grid container spacing={2}>
       {Object.entries(typedDictPropertyTypes(node.type))
@@ -470,12 +507,11 @@ export const WeaveEditorTypedDict: FC<{
               }}>
               <Typography>
                 <Link
-                  to={[
-                    loc.pathname,
+                  to={makeLinkPath([
                     ...weaveEditorPathUrlPathPart(path),
                     'pick',
                     key,
-                  ].join('/')}>
+                  ])}>
                   {key}
                 </Link>
               </Typography>
@@ -501,7 +537,7 @@ export const WeaveEditorObject: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
-  const loc = useLocation();
+  const makeLinkPath = useObjectVersionLinkPathForPath();
   return (
     <Grid container spacing={2}>
       {Object.entries(node.type)
@@ -512,11 +548,7 @@ export const WeaveEditorObject: FC<{
             <Grid item key={key + '-key'} xs={singleRow ? 2 : 12}>
               <Typography>
                 <Link
-                  to={[
-                    loc.pathname,
-                    ...weaveEditorPathUrlPathPart(path),
-                    key,
-                  ].join('/')}>
+                  to={makeLinkPath([...weaveEditorPathUrlPathPart(path), key])}>
                   {key}
                 </Link>
               </Typography>
@@ -599,6 +631,7 @@ export const WeaveEditorTable: FC<{
 }> = ({node, path}) => {
   const location = useLocation();
   const addEdit = useWeaveEditorContextAddEdit();
+  const makeLinkPath = useObjectVersionLinkPathForPath();
   const objectType = listObjectType(node.type);
   if (!isTypedDict(objectType)) {
     throw new Error('invalid node for WeaveEditorList');
@@ -674,12 +707,11 @@ export const WeaveEditorTable: FC<{
         width: 50,
         renderCell: params => (
           <Link
-            to={[
-              location.pathname,
+            to={makeLinkPath([
               ...weaveEditorPathUrlPathPart(path),
               'index',
               params.row._origIndex,
-            ].join('/')}>
+            ])}>
             <LinkIcon />
           </Link>
         ),
