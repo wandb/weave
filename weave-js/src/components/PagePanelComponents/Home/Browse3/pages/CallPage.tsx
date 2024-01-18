@@ -71,7 +71,7 @@ const useCallTabs = (call: WFCall) => {
   return [
     {
       label: 'Call',
-      content: <SpanDetails2 wfCall={call} />,
+      content: <CallDetails wfCall={call} />,
     },
     // {
     //   label: 'Child Calls',
@@ -158,14 +158,15 @@ const CallPageInnerHorizontal: React.FC<{
   return (
     <SimplePageLayout
       title={traceTitle}
-      menuItems={[
-        {
-          label: 'View Vertical',
-          onClick: () => {
-            setVerticalLayout(true);
-          },
-        },
-      ]}
+      headerContent={<>hi</>}
+      // menuItems={[
+      //   {
+      //     label: 'View Vertical',
+      //     onClick: () => {
+      //       setVerticalLayout(true);
+      //     },
+      //   },
+      // ]}
       tabs={[
         {
           label: 'Trace',
@@ -232,6 +233,7 @@ const CallPageInnerVertical: React.FC<{
       //   },
       //   // ...callMenuItems,
       // ]}
+      headerContent={<>hi</>}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />
@@ -691,7 +693,7 @@ const useCallFlattenedTraceTree = (call: WFCall) => {
   }, [call]);
 };
 
-export const SpanDetails2: FC<{
+export const CallDetails: FC<{
   wfCall: WFCall;
 }> = ({wfCall}) => {
   const call = wfCall.rawCallSpan();

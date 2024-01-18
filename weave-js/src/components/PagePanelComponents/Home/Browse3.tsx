@@ -351,7 +351,12 @@ const MainPeekingLayout: FC = () => {
 
       <Box
         sx={{
-          borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
+          borderLeft:
+            flexDirection === 'row' ? '1px solid rgba(0, 0, 0, 0.12)' : 'none',
+          borderTop:
+            flexDirection === 'column'
+              ? '1px solid rgba(0, 0, 0, 0.12)'
+              : 'none',
           flex: peekLocation ? '1 1 60%' : '0 0 0px',
           transition: peekLocation ? 'all 0.2s ease-in-out' : '',
           boxShadow:

@@ -370,7 +370,7 @@ export const SimpleKeyValueTable: React.FC<{
                     ndx + rowSpan === Object.keys(flattenedData).length;
                   return (
                     <td
-                      key={i}
+                      key={kpi}
                       style={{
                         ...keyStyle,
                         ...(isFirst ? {borderTop: 'none'} : {}),
