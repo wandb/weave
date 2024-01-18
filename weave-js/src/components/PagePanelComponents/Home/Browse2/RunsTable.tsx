@@ -458,9 +458,17 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
-  // if (loading) {
-  //   return null;
-  // }
+  const initialState: React.ComponentProps<typeof DataGridPro>['initialState'] =
+    useMemo(() => {
+      if (loading) {
+        return undefined;
+      }
+      return {
+        sorting: {
+          sortModel: [{field: 'timestampMs', sort: 'desc'}],
+        },
+      };
+    }, [loading]);
   return (
     <DataGridPro
       sx={{
@@ -481,11 +489,7 @@ export const RunsTable: FC<{
       loading={loading}
       rows={tableData}
       // density="compact"
-      initialState={{
-        sorting: {
-          sortModel: [{field: 'timestampMs', sort: 'desc'}],
-        },
-      }}
+      initialState={initialState}
       rowHeight={38}
       columns={columns.cols}
       experimentalFeatures={{columnGrouping: true}}
