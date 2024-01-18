@@ -128,7 +128,7 @@ def _use_fast_path(flattened_object_type: types.Type) -> bool:
     return False
 
 
-def _fast_path(
+def _fast_history3_concat(
     raw_history_awl_tables: list[pa.Table],
     live_data: list[dict],
 ) -> ArrowWeaveList:
@@ -196,6 +196,114 @@ def _fast_path(
     return history_op_common.concat_awls(all_converted_awls)
 
 
+def _check_fast_history3_concat_type(
+    orig_expected_type: types.Type, fast_path_type: types.Type, depth: int = 0
+) -> str:
+    # Check if the output type of fast_history3_concat matches the expected type we get from
+    # history type refinement.
+
+    # This encodes business logic for places where we expect mismatches
+
+    # Returns True if match
+
+    if isinstance(orig_expected_type, types.UnionType) or isinstance(
+        fast_path_type, types.UnionType
+    ):
+        # The new type may have nullable where the old didn't. Allow this, by just considering
+        # both non_null types.
+        orig_nullable, orig_non_null = types.split_none(orig_expected_type)
+        fast_path_nullable, fast_non_null = types.split_none(fast_path_type)
+        if orig_nullable or fast_path_nullable:
+            return _check_fast_history3_concat_type(
+                orig_non_null, fast_non_null, depth=depth
+            )
+
+    if isinstance(orig_expected_type, types.TypedDict) and isinstance(
+        fast_path_type, types.TypedDict
+    ):
+        result = ""
+        for k in set(orig_expected_type.property_types.keys()).union(
+            fast_path_type.property_types.keys()
+        ):
+            sub_result = _check_fast_history3_concat_type(
+                orig_expected_type.property_types[k],
+                fast_path_type.property_types[k],
+                depth=depth + 1,
+            )
+            if sub_result:
+                result += (
+                    "  " * depth + f"TypedDict property {k} mismatch:\n" + sub_result
+                )
+        return result
+    elif isinstance(orig_expected_type, types.List) and isinstance(
+        fast_path_type, types.List
+    ):
+        result = _check_fast_history3_concat_type(
+            orig_expected_type.object_type, fast_path_type.object_type, depth=depth + 1
+        )
+        if result:
+            return "  " * depth + "List object type mismatch:\n" + result
+        return ""
+
+    elif isinstance(orig_expected_type, types.UnionType) and isinstance(
+        fast_path_type, types.UnionType
+    ):
+        if len(orig_expected_type.members) != len(fast_path_type.members):
+            return (
+                "  " * depth
+                + f"Union type member count mismatch: {len(orig_expected_type.members)} != {len(fast_path_type.members)}\n"
+            )
+        result = ""
+        # Unions can be out of order, so we check each orig member against
+        # each fast_path member until there are no fast_path members left
+        remaining_fast_path_type_members = list(fast_path_type.members)
+        for i in range(len(orig_expected_type.members)):
+            orig_member = orig_expected_type.members[i]
+            for j in range(len(remaining_fast_path_type_members)):
+                fast_member = remaining_fast_path_type_members[j]
+                sub_result = _check_fast_history3_concat_type(
+                    orig_member, fast_member, depth=depth + 1
+                )
+                if not sub_result:
+                    # A match, remove from remaining and go to next
+                    # orig member
+                    remaining_fast_path_type_members.pop(j)
+                    break
+            else:
+                # no remaining fast path member matched the orig member
+                result += (
+                    "  " * depth
+                    + f"Union type member mismatch, original_member: {orig_member} not found in remaining fast_path members\n"
+                )
+        return result
+    elif isinstance(orig_expected_type, types.RefType) and isinstance(
+        fast_path_type, types.RefType
+    ):
+        # The original type may have a full object_type, while in the fast path
+        # we always return UnknownType as the object_type. This is expected.
+        # So we just don't check object_type here.
+        #
+        # The original type will also be a more specific, like WandbArtifactRefType
+        # but we only have RefType in the fast path. This is also expected.
+        return ""
+    else:
+        if orig_expected_type.assign_type(fast_path_type):
+            # For example, if we expect Number but got Float, Float is more specific
+            # so that's OK.
+            return ""
+        if orig_expected_type != fast_path_type:
+            orig_expected_str = str(orig_expected_type)
+            if len(orig_expected_str) > 50:
+                orig_expected_str = orig_expected_str[:50] + "..."
+            fast_path_str = str(fast_path_type)
+            if len(fast_path_str) > 50:
+                fast_path_str = fast_path_str[:50] + "..."
+            return (
+                "  " * depth + f"Expected {orig_expected_str} but got {fast_path_str}\n"
+            )
+        return ""
+
+
 def _get_history3(run: wdt.Run, columns=None):
     # 1. Get the flattened Weave-Type given HistoryKeys
     # 2. Read in the live set
@@ -241,7 +349,7 @@ def _get_history3(run: wdt.Run, columns=None):
     # 5 Now we concat the converted liveset and parquet files
     use_fast_path = _use_fast_path(flattened_object_type)
     if use_fast_path:
-        concatted_awl = _fast_path(raw_history_pa_tables, raw_live_data)
+        concatted_awl = _fast_history3_concat(raw_history_pa_tables, raw_live_data)
         if not isinstance(concatted_awl.object_type, types.TypedDict):
             raise errors.WeaveWBHistoryTranslationError(
                 f"Expected fast_path object_type to be TypedDict, got {concatted_awl.object_type}"
@@ -249,7 +357,19 @@ def _get_history3(run: wdt.Run, columns=None):
 
         # Need to get a new final_type, since we don't rely on the flattend_object_type
         # in the fast path.
-        final_type = _unflatten_history_object_type(concatted_awl.object_type)
+        new_final_type = _unflatten_history_object_type(concatted_awl.object_type)
+        type_mismatch_reason = _check_fast_history3_concat_type(
+            final_type, new_final_type
+        )
+        if type_mismatch_reason:
+            # Leaving this in to fire if we get an unexpected type from the fast
+            # path. It's probably actually ok if this happens, and we could remove
+            # these checks. But I want to understand scenarios in which it happens,
+            # so raising here for now. - Shawn
+            raise errors.WeaveWBHistoryTranslationError(
+                f"Fast path history3 concat produced unexpected type: {type_mismatch_reason}"
+            )
+        final_type = new_final_type
     else:
         # Legacy slow path. This path drops down to python iteration in many
         # cases.
