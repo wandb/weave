@@ -9,6 +9,10 @@ const colorMap: {[key: string]: string} = {
   // 'tune': 'warning',
 };
 
+const ensureCapitalizedFirstLetter = (str: string) => {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
 export const TypeVersionCategoryChip: React.FC<{
   typeCategory: HackyTypeCategory | null;
 }> = props => {
@@ -18,7 +22,7 @@ export const TypeVersionCategoryChip: React.FC<{
   const color = colorMap[props.typeCategory];
   return (
     <Chip
-      label={props.typeCategory}
+      label={ensureCapitalizedFirstLetter(props.typeCategory)}
       size="small"
       sx={{height: '20px', lineHeight: 2}}
       color={color as any}

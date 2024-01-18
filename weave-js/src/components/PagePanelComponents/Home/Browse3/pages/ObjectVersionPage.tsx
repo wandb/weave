@@ -90,9 +90,15 @@ const ObjectVersionPageInner: React.FC<{
               </>
             ),
             Version: <>{objectVersionIndex}</>,
-            Category: (
-              <TypeVersionCategoryChip typeCategory={objectTypeCategory} />
-            ),
+            ...(objectTypeCategory
+              ? {
+                  Category: (
+                    <TypeVersionCategoryChip
+                      typeCategory={objectTypeCategory}
+                    />
+                  ),
+                }
+              : {}),
             // 'Type Version': (
             //   <TypeVersionLink
             //     entityName={entityName}

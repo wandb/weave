@@ -42,6 +42,7 @@ const OpVersionPageInner: React.FC<{
   const opVersionHash = opVersion.version();
   const opVersionCallCount = opVersion.calls().length;
   const opVersionIndex = opVersion.versionIndex();
+  const opVersionCategory = opVersion.opCategory();
   // const opInputTypes = opVersion.inputTypesVersions();
   // const opOutputTypes = opVersion.outputTypeVersions();
   const opInvokes = opVersion.invokes();
@@ -89,9 +90,13 @@ const OpVersionPageInner: React.FC<{
                 neverPeek
               />
             ),
-            Category: (
-              <OpVersionCategoryChip opCategory={opVersion.opCategory()} />
-            ),
+            ...(opVersionCategory
+              ? {
+                  Category: (
+                    <OpVersionCategoryChip opCategory={opVersionCategory} />
+                  ),
+                }
+              : {}),
 
             // Dropping input types and output types for the time being since
             // we have de-prioritized type version navigation.

@@ -1,4 +1,4 @@
-import {Box, Button} from '@material-ui/core';
+import {Box, Button, Typography} from '@material-ui/core';
 import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import {
@@ -10,21 +10,24 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo} from 'react';
+import React, {FC, useCallback, useEffect, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../react';
+import {Timestamp} from '../../../../Timestamp';
 import {Call} from '../../Browse2/callTree';
-import {SmallRef} from '../../Browse2/SmallRef';
-import {SpanDetails2} from '../../Browse2/SpanDetails';
+import {parseRefMaybe, SmallRef} from '../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../context';
+import {CallStatusCodeChip} from './common/CallStatusCodeChip';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
+  SimpleKeyValueTable,
   SimplePageLayout,
   SimplePageLayoutContext,
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
+import {GroupedCalls} from './ObjectVersionPage';
 import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
@@ -686,4 +689,159 @@ const useCallFlattenedTraceTree = (call: WFCall) => {
 
     return {rows, expandKeys};
   }, [call]);
+};
+
+export const SpanDetails2: FC<{
+  wfCall: WFCall;
+}> = ({wfCall}) => {
+  const call = wfCall.rawCallSpan();
+  const opCategory = wfCall.opVersion()?.opCategory();
+  const childCalls = wfCall.childCalls().filter(c => {
+    return c.opVersion() != null;
+  });
+  const inputKeys =
+    call.inputs._keys ??
+    Object.entries(call.inputs)
+      .filter(([k, c]) => c != null && !k.startsWith('_'))
+      .map(([k, c]) => k);
+  const inputs = _.fromPairs(inputKeys.map(k => [k, call.inputs[k]]));
+
+  const callOutput = call.output ?? {};
+  const outputKeys =
+    callOutput._keys ??
+    Object.entries(callOutput)
+      .filter(([k, c]) => c != null && (k === '_result' || !k.startsWith('_')))
+      .map(([k, c]) => k);
+  const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
+
+  const attributes = _.fromPairs(
+    Object.entries(call.attributes ?? {}).filter(
+      ([k, a]) => !k.startsWith('_') && a != null
+    )
+  );
+  const summary = _.fromPairs(
+    Object.entries(call.summary ?? {}).filter(
+      ([k, a]) => !k.startsWith('_') && k !== 'latency_s' && a != null
+    )
+  );
+
+  return (
+    <Box
+      style={{
+        width: '100%',
+        height: '100%',
+        overflowX: 'hidden',
+        overflowY: 'auto',
+        // padding: 2,
+      }}>
+      <Box
+        style={{
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          gap: 1,
+          paddingTop: '8px',
+        }}>
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            // border: '1px solid #ccc',
+            // borderRadius: 4,
+            p: 2,
+          }}>
+          <Typography variant="h6" gutterBottom>
+            Overview
+          </Typography>
+          <SimpleKeyValueTable
+            data={{
+              Operation:
+                parseRefMaybe(call.name) != null ? (
+                  <SmallRef
+                    objRef={parseRefMaybe(call.name)!}
+                    wfTable="OpVersion"
+                  />
+                ) : (
+                  call.name
+                ),
+              ...(opCategory
+                ? {
+                    Category: <OpVersionCategoryChip opCategory={opCategory} />,
+                  }
+                : {}),
+              Status: (
+                <CallStatusCodeChip
+                  statusCode={call.status_code as any}
+                  showLabel
+                />
+              ),
+              Called: (
+                <Timestamp value={call.timestamp / 1000} format="relative" />
+              ),
+              ...(call.summary.latency_s != null
+                ? {
+                    Latency: (
+                      <Typography variant="body2" component="span">
+                        {call.summary.latency_s.toFixed(3)}s
+                      </Typography>
+                    ),
+                  }
+                : {}),
+              ...(call.exception ? {Exception: call.exception} : {}),
+              ...(childCalls.length > 0
+                ? {
+                    'Child Calls': (
+                      <GroupedCalls
+                        calls={childCalls}
+                        partialFilter={{
+                          parentId: wfCall.callID(),
+                        }}
+                      />
+                    ),
+                  }
+                : {}),
+              ...(Object.keys(attributes).length > 0
+                ? {Attributes: attributes}
+                : {}),
+              ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
+            }}
+          />
+        </Box>
+        {Object.keys(inputs).length > 0 && (
+          <Box
+            sx={{
+              flex: '0 0 auto',
+              p: 2,
+            }}>
+            <Typography variant="h6" gutterBottom>
+              Inputs
+            </Typography>
+            <SimpleKeyValueTable
+              data={
+                // TODO: Consider bringing back openai chat input/output
+                inputs
+              }
+            />
+          </Box>
+        )}
+        {Object.keys(output).length > 0 && (
+          <Box
+            sx={{
+              flex: '0 0 auto',
+              p: 2,
+            }}>
+            <Typography variant="h6" gutterBottom>
+              Output
+            </Typography>
+            <SimpleKeyValueTable
+              data={
+                // TODO: Consider bringing back openai chat input/output
+                output
+              }
+            />
+          </Box>
+        )}
+      </Box>
+    </Box>
+  );
 };
