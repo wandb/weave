@@ -111,6 +111,7 @@ def _use_fast_path(flattened_object_type: types.Type) -> bool:
     elif isinstance(
         flattened_object_type,
         (
+            # If the table consists of only these leaf types, then we can use the fast path
             # If you find that you need to expand this list, please talk to
             # Shawn first.
             types.RefType,
@@ -121,7 +122,6 @@ def _use_fast_path(flattened_object_type: types.Type) -> bool:
             types.Timestamp,
         ),
     ):
-        # If the table consists of only these leaf types, then we can use the fast path
         return True
 
     # Encountered a type that requires the legacy path
@@ -237,6 +237,7 @@ def _get_history3(run: wdt.Run, columns=None):
         history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
     ]
 
+    # 5 Now we concat the converted liveset and parquet files
     use_fast_path = _use_fast_path(flattened_object_type)
     if use_fast_path:
         concatted_awl = _fast_path(raw_history_pa_tables, raw_live_data)
@@ -277,7 +278,6 @@ def _get_history3(run: wdt.Run, columns=None):
             artifact,
         )
 
-        # 5.a Now we concat the converted liveset and parquet files
         concatted_awl = history_op_common.concat_awls(
             [
                 live_data_awl,
