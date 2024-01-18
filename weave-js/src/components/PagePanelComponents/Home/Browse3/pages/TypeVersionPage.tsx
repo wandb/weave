@@ -159,7 +159,8 @@ const TypeHierarchy: React.FC<{typeVersion: WFTypeVersion}> = props => {
   const inner = (
     <ul
       style={{
-        paddingLeft: '1rem',
+        paddingInlineStart: '22px',
+        // paddingLeft: '1rem',
         margin: 0,
       }}>
       <li>

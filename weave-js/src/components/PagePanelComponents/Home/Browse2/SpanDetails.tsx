@@ -244,8 +244,9 @@ export const SpanDetails2: FC<{
             flex: '0 0 auto',
             // border: '1px solid #ccc',
             // borderRadius: 4,
+            p: 2,
           }}>
-          <Typography sx={{p: 2}} variant="h6">
+          <Typography variant="h6" gutterBottom>
             Overview
           </Typography>
           <SimpleKeyValueTable
@@ -301,8 +302,9 @@ export const SpanDetails2: FC<{
           <Box
             sx={{
               flex: '0 0 auto',
+              p: 2,
             }}>
-            <Typography sx={{p: 2}} variant="h6">
+            <Typography variant="h6" gutterBottom>
               Inputs
             </Typography>
             <SimpleKeyValueTable
@@ -317,8 +319,9 @@ export const SpanDetails2: FC<{
           <Box
             sx={{
               flex: '0 0 auto',
+              p: 2,
             }}>
-            <Typography sx={{p: 2}} variant="h6">
+            <Typography variant="h6" gutterBottom>
               Output
             </Typography>
             <SimpleKeyValueTable

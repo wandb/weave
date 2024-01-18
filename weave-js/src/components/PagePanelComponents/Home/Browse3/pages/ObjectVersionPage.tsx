@@ -77,12 +77,7 @@ const ObjectVersionPageInner: React.FC<{
           data={{
             Name: (
               <>
-                <ObjectLink
-                  entityName={entityName}
-                  projectName={projectName}
-                  objectName={objectName}
-                />{' '}
-                [
+                {objectName} [
                 <ObjectVersionsLink
                   entity={entityName}
                   project={projectName}
@@ -273,6 +268,7 @@ const ObjectVersionProducingCallsItem: React.FC<{
   return (
     <ul
       style={{
+        paddingInlineStart: '22px',
         margin: 0,
       }}>
       {producingCalls.map(call => {
@@ -354,6 +350,7 @@ export const GroupedCalls: React.FC<{
     <ul
       style={{
         margin: 0,
+        paddingInlineStart: '22px',
       }}>
       {Object.entries(callGroups).map(([key, val], ndx) => {
         return (

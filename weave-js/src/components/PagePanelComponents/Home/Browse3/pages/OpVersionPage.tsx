@@ -65,12 +65,7 @@ const OpVersionPageInner: React.FC<{
           data={{
             Name: (
               <>
-                <OpLink
-                  entityName={entity}
-                  projectName={project}
-                  opName={opName}
-                />{' '}
-                [
+                {opName} [
                 <OpVersionsLink
                   entity={entity}
                   project={project}
@@ -291,7 +286,11 @@ const OpVersionPageInner: React.FC<{
 
 const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
   return (
-    <ul style={{margin: 0}}>
+    <ul
+      style={{
+        paddingInlineStart: '22px',
+        margin: 0,
+      }}>
       {opVersion.invokes().map((v, i) => {
         return (
           <li key={i}>
