@@ -325,10 +325,12 @@ export const SimpleKeyValueTable: React.FC<{
         </tr>
       </thead>
       <tbody>
-        {Object.entries(flattenedData).map(([key, val]) => {
+        {Object.entries(flattenedData).map(([key, val], ndx) => {
           const keyParts = key.split('.');
           const valCols = numCols - keyParts.length;
           const valRef = _.isString(val) ? parseRefMaybe(val) : null;
+          const isFirst = ndx === 0;
+          const isLast = ndx === Object.keys(flattenedData).length - 1;
 
           // Find common prefix of current key and last key
           let i = 0;
@@ -366,7 +368,14 @@ export const SimpleKeyValueTable: React.FC<{
                   );
                   // console.log('rowSpan', key, part, prefix, rowSpan);
                   return (
-                    <td key={i} style={keyStyle} rowSpan={rowSpan}>
+                    <td
+                      key={i}
+                      style={{
+                        ...keyStyle,
+                        ...(isFirst ? {borderTop: 'none'} : {}),
+                        ...(isLast ? {borderBottom: 'none'} : {}),
+                      }}
+                      rowSpan={rowSpan}>
                       {part}
                     </td>
                   );
