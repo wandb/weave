@@ -117,7 +117,9 @@ const ObjectVersionPageInner: React.FC<{
             //   />
             // ),
             Ref: fullUri,
-            ...(producingCalls.length > 0
+            // Hide consuming and producing calls since we don't have a
+            // good way to look this up yet
+            ...(producingCalls.length > 0 && refExtra == null
               ? {
                   'Producing Calls': (
                     <ObjectVersionProducingCallsItem
@@ -126,7 +128,7 @@ const ObjectVersionPageInner: React.FC<{
                   ),
                 }
               : {}),
-            ...(consumingCalls.length > 0
+            ...(consumingCalls.length > 0 && refExtra == null
               ? {
                   'Consuming Calls': (
                     <ObjectVersionConsumingCallsItem
