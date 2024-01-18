@@ -134,7 +134,7 @@ class TypeRegistry:
                 # data to get the data. We already have the obj here, so we can
                 # compute its type directly.
                 RefTypeClass = instance_class_to_potential_type(obj_ref.__class__)[-1]  # type: ignore
-                return RefTypeClass(type_of_without_refs(obj))
+                return RefTypeClass(UnknownType())
 
         obj_type = type_name_to_type("tagged").type_of(obj)
         if obj_type is not None:
@@ -1311,7 +1311,7 @@ class RefType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        return cls(obj.type)
+        return cls(UnknownType())
 
     def _is_assignable_to(self, other_type) -> typing.Optional[bool]:
         # Use issubclass, we have RunLocalType defined as a subclass of RunType
