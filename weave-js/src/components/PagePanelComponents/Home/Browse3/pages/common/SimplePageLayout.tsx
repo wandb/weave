@@ -5,6 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import _ from 'lodash';
+import moment from 'moment';
 import React, {createContext, useContext, useMemo} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
@@ -273,6 +274,7 @@ const keyStyle: React.CSSProperties = {
 
   // Remove this to middle-align the key text
   verticalAlign: 'top',
+  // textAlign: 'right',
 };
 
 export const SimpleKeyValueTable: React.FC<{
@@ -344,7 +346,7 @@ export const SimpleKeyValueTable: React.FC<{
           const newKeyParts = keyParts.slice(i);
 
           return (
-            <>
+            <React.Fragment key={key}>
               <tr key={key}>
                 {/* {_.range(i).map(kpi => {
                   return (
@@ -376,7 +378,9 @@ export const SimpleKeyValueTable: React.FC<{
                         ...(isFirst ? {borderTop: 'none'} : {}),
                         ...(isLast ? {borderBottom: 'none'} : {}),
                       }}
-                      rowSpan={rowSpan}>
+                      rowSpan={rowSpan}
+                      // colSpan={kpi === newKeyParts.length - 1 ? valCols : 1}
+                    >
                       {part}
                     </td>
                   );
@@ -394,6 +398,10 @@ export const SimpleKeyValueTable: React.FC<{
                     <SmallRef objRef={valRef} />
                   ) : _.isString(val) ? (
                     <SimplePopoverText text={val as string} />
+                  ) : _.isBoolean(val) ? (
+                    (val as boolean).toString()
+                  ) : _.isDate(val) ? (
+                    moment(val as Date).format('YYYY-MM-DD HH:mm:ss')
                   ) : (
                     (val as React.ReactNode)
                   )}
@@ -413,7 +421,7 @@ export const SimpleKeyValueTable: React.FC<{
                   </td>
                 </tr>
               )} */}
-            </>
+            </React.Fragment>
           );
         })}
       </tbody>

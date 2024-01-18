@@ -224,7 +224,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                 }}
                 renderInput={params => <TextField {...params} label="Type" />}
                 getOptionLabel={option => {
-                  return typeVersionOptions[option];
+                  return typeVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(typeVersionOptions)}
               />
@@ -251,7 +251,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                   });
                 }}
                 getOptionLabel={option => {
-                  return opVersionOptions[option];
+                  return opVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(opVersionOptions)}
               />
