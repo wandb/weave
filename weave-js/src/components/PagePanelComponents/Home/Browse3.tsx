@@ -19,6 +19,7 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {useWindowSize} from '../../../common/hooks/useWindowSize';
 import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
 import {URL_BROWSE3} from '../../../urls';
@@ -321,6 +322,13 @@ const MainPeekingLayout: FC = () => {
     params.project!
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
+  const windowSize = useWindowSize();
+  const flexDirection = useMemo(() => {
+    if (windowSize.height > windowSize.width * 0.66) {
+      return 'column';
+    }
+    return 'row';
+  }, [windowSize.height, windowSize.width]);
   return (
     <Box
       sx={{
@@ -329,7 +337,7 @@ const MainPeekingLayout: FC = () => {
         height: '100%',
         display: 'flex',
         overflow: 'hidden',
-        flexDirection: 'row',
+        flexDirection,
         alignContent: 'stretch',
       }}>
       <Box
