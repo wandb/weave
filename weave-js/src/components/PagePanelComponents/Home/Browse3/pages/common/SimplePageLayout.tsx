@@ -332,7 +332,6 @@ export const SimpleKeyValueTable: React.FC<{
           const valCols = numCols - keyParts.length;
           const valRef = _.isString(val) ? parseRefMaybe(val) : null;
           const isFirst = ndx === 0;
-          const isLast = ndx === Object.keys(flattenedData).length - 1;
 
           // Find common prefix of current key and last key
           let i = 0;
@@ -369,6 +368,8 @@ export const SimpleKeyValueTable: React.FC<{
                       .length
                   );
                   // console.log('rowSpan', key, part, prefix, rowSpan);
+                  const isLast =
+                    ndx + rowSpan === Object.keys(flattenedData).length;
                   return (
                     <td
                       key={i}
