@@ -19,6 +19,7 @@ import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {SmallRef} from './SmallRef';
+import {CallStatusCodeChip} from '../Browse3/pages/common/CallStatusCodeChip';
 
 type DataGridColumnGroupingModel = Exclude<
   React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
@@ -159,21 +160,7 @@ export const RunsTable: FC<{
         disableColumnMenu: true,
         resizable: false,
         renderCell: cellParams => {
-          return (
-            <Chip
-              label={' '}
-              sx={{height: '20px', lineHeight: 2}}
-              // label={cellParams.row.status_code}
-              size="small"
-              color={
-                cellParams.row.status_code === 'SUCCESS'
-                  ? 'success'
-                  : cellParams.row.status_code === 'ERROR'
-                  ? 'error'
-                  : undefined
-              }
-            />
-          );
+          return <CallStatusCodeChip statusCode={cellParams.row.status_code} />;
         },
       },
       {

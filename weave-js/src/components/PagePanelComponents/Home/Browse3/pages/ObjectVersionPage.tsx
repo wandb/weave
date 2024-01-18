@@ -358,7 +358,7 @@ export const GroupedCalls: React.FC<{
       {Object.entries(callGroups).map(([key, val], ndx) => {
         return (
           <li key={key}>
-            <OpVersionCallsLink val={val} partialFilter={partialFilter} />;
+            <OpVersionCallsLink val={val} partialFilter={partialFilter} />
           </li>
         );
       })}

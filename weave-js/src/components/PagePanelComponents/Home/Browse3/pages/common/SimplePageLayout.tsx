@@ -7,6 +7,8 @@ import MenuItem from '@mui/material/MenuItem';
 import React, {createContext, useContext, useMemo} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
+import _ from 'lodash';
+import {SmallRef, parseRefMaybe} from '../../../Browse2/SmallRef';
 
 type SimplePageLayoutContextType = {
   headerPrefix?: React.ReactNode;
@@ -52,8 +54,8 @@ export const SimplePageLayout: React.FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          pl: 2,
-          pr: 2,
+          // pl: 2,
+          // pr: 2,
           height: props.headerContent ? undefined : 65, // manual to match sidebar
           maxHeight: props.headerContent ? '50%' : undefined,
 
@@ -72,6 +74,8 @@ export const SimplePageLayout: React.FC<{
             flexDirection: 'row',
             alignItems: 'flex-end',
             gap: 1,
+            pl: 2,
+            pr: 2,
           }}>
           {simplePageLayoutContextValue.headerPrefix}
           <Box
@@ -100,8 +104,8 @@ export const SimplePageLayout: React.FC<{
               overflow: 'auto',
               borderTop: '1px solid #e0e0e0',
               borderBottom: '1px solid #e0e0e0',
-              pt: 1,
-              pb: 1,
+              // pt: 1,
+              // pb: 1,
             }}>
             {props.headerContent}
           </Box>
@@ -218,30 +222,157 @@ export const ScrollableTabContent: React.FC<{
   );
 };
 
-export const SimpleKeyValueTable: React.FC<{
-  data: {[key: string]: React.ReactNode};
-}> = props => {
+const isPrimitive = (val: any) => {
   return (
-    <table>
-      <tbody>
-        {Object.keys(props.data).map(key => (
-          <tr key={key}>
-            <td
-              style={{
-                fontWeight: 600,
-                marginRight: 10,
-                paddingRight: 10,
+    React.isValidElement(val) ||
+    _.isString(val) ||
+    _.isNumber(val) ||
+    _.isBoolean(val) ||
+    _.isDate(val) ||
+    _.isNil(val)
+  );
+};
 
-                // align text to the top
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'flex-start',
-              }}>
-              {key}
-            </td>
-            <td>{props.data[key]}</td>
-          </tr>
-        ))}
+const flattenObject = (val: any): any => {
+  if (isPrimitive(val)) {
+    return val;
+  } else if (_.isArray(val)) {
+    return flattenObject(_.fromPairs(val.map((v, i) => [i, v])));
+  } else {
+    return _.fromPairs(
+      Object.entries(val).flatMap(([key, val]) => {
+        if (isPrimitive(val)) {
+          return [[key, val]];
+        }
+        return Object.entries(flattenObject(val)).map(([subKey, subVal]) => {
+          return [key + '.' + subKey, subVal];
+        });
+      })
+    );
+  }
+};
+
+const keyStyle: React.CSSProperties = {
+  // fontWeight: 600,
+  // marginRight: 10,
+  // paddingRight: 10,
+
+  // align text to the top
+  // display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'flex-start',
+
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+
+  backgroundColor: '#FAFAFA',
+  color: '#979a9e',
+
+  padding: '8px',
+
+  borderTop: '1px solid rgba(224, 224, 224, 1)',
+  borderBottom: '1px solid rgba(224, 224, 224, 1)',
+};
+
+export const SimpleKeyValueTable: React.FC<{
+  data: {[key: string]: any};
+}> = props => {
+  const flattenedData = useMemo(() => flattenObject(props.data), [props.data]);
+  const numCols = useMemo(
+    () =>
+      Math.max(
+        ...Object.keys(flattenedData).map(key => key.split('.').length)
+      ) + 1,
+    [flattenedData]
+  );
+  let lastKeyParts: string[] = [];
+  return (
+    <table
+      style={{
+        borderRadius: '4px',
+        maxWidth: '100%',
+        borderCollapse: 'collapse',
+        tableLayout: 'fixed',
+        width: '100%',
+        overflow: 'hidden',
+      }}>
+      <tbody>
+        {Object.entries(flattenedData).map(([key, val]) => {
+          const keyParts = key.split('.');
+          const valCols = numCols - keyParts.length;
+          const valRef = _.isString(val) ? parseRefMaybe(val) : null;
+
+          // Find common prefix of current key and last key
+          let i = 0;
+          while (i < keyParts.length && i < lastKeyParts.length) {
+            if (keyParts[i] !== lastKeyParts[i]) {
+              break;
+            }
+            i++;
+          }
+          lastKeyParts = keyParts;
+
+          const newKeyParts = keyParts.slice(i);
+
+          return (
+            <>
+              <tr key={key}>
+                {/* {_.range(i).map(kpi => {
+                  return (
+                    <td
+                      key={kpi}
+                      style={{
+                        ...keyStyle,
+                        borderTop: 'none',
+                        borderBottom: 'none',
+                      }}
+                    />
+                  );
+                })} */}
+                {newKeyParts.map((part, kpi) => {
+                  const prefix = keyParts.slice(0, i + kpi + 1).join('.') + '.';
+                  const rowSpan = Math.max(
+                    1,
+                    Object.keys(flattenedData).filter(k => k.startsWith(prefix))
+                      .length
+                  );
+                  console.log('rowSpan', key, part, prefix, rowSpan);
+                  return (
+                    <td key={i} style={keyStyle} rowSpan={rowSpan}>
+                      {part}
+                    </td>
+                  );
+                })}
+                <td
+                  colSpan={valCols}
+                  style={{
+                    // width: '0.1%',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    padding: '8px',
+                  }}>
+                  {valRef ? <SmallRef objRef={valRef} /> : val}
+                </td>
+              </tr>
+              {/* {key.endsWith('content') && (
+                <tr>
+                  <td colSpan={numCols}>
+                    <Box
+                      sx={{
+                        width: '100%',
+                        borderTop: '1px solid rgba(224, 224, 224, 1)',
+                        borderBottom: '1px solid rgba(224, 224, 224, 1)',
+                      }}>
+                      {val}
+                    </Box>
+                  </td>
+                </tr>
+              )} */}
+            </>
+          );
+        })}
       </tbody>
     </table>
   );

@@ -15,7 +15,7 @@ import {useHistory} from 'react-router-dom';
 import {parseRef} from '../../../../../react';
 import {Call} from '../../Browse2/callTree';
 import {SmallRef} from '../../Browse2/SmallRef';
-import {SpanDetails} from '../../Browse2/SpanDetails';
+import {SpanDetails, SpanDetails2} from '../../Browse2/SpanDetails';
 import {useWeaveflowCurrentRouteContext} from '../context';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
@@ -65,45 +65,10 @@ export const CallPage: React.FC<{
 };
 
 const useCallTabs = (call: WFCall) => {
-  // const entityName = call.entity();
-  // const projectName = call.project();
-  // const callId = call.callID();
-  const childCalls = call.childCalls().filter(c => {
-    return call.opVersion() != null;
-  });
-
   return [
     {
       label: 'Call',
-      content: (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            flex: '1 1 auto',
-            overflow: 'auto',
-            p: 8,
-          }}>
-          <SpanDetails
-            call={call.rawCallSpan()}
-            hackyInjectionBelowFunction={
-              childCalls.length > 0 && (
-                <>
-                  <Typography variant="h6" gutterBottom>
-                    Child Calls
-                  </Typography>
-                  <GroupedCalls
-                    calls={childCalls}
-                    partialFilter={{
-                      parentId: call.callID(),
-                    }}
-                  />
-                </>
-              )
-            }
-          />
-        </Box>
-      ),
+      content: <SpanDetails2 wfCall={call} />,
     },
     // {
     //   label: 'Child Calls',
@@ -255,15 +220,15 @@ const CallPageInnerVertical: React.FC<{
   return (
     <SimplePageLayout
       title={title}
-      menuItems={[
-        {
-          label: 'View Horizontal',
-          onClick: () => {
-            setVerticalLayout(false);
-          },
-        },
-        // ...callMenuItems,
-      ]}
+      // menuItems={[
+      //   {
+      //     label: 'View Horizontal',
+      //     onClick: () => {
+      //       setVerticalLayout(false);
+      //     },
+      //   },
+      //   // ...callMenuItems,
+      // ]}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />
@@ -408,6 +373,7 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
   return (
     <DataGridPro
       rowHeight={38}
+      columnHeaderHeight={treeOnly ? 0 : 56}
       treeData
       onRowClick={onRowClick}
       rows={rows}
