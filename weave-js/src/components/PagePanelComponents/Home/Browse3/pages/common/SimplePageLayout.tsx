@@ -396,7 +396,7 @@ export const SimpleKeyValueTable: React.FC<{
                   ) : _.isString(val) ? (
                     <SimplePopoverText text={val as string} />
                   ) : (
-                    val
+                    (val as React.ReactNode)
                   )}
                 </td>
               </tr>
