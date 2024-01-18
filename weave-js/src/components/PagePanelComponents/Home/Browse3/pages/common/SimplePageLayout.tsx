@@ -308,6 +308,8 @@ export const SimpleKeyValueTable: React.FC<{
                 style={{
                   width: `${headerWidth}%`,
                   height: '0px',
+                  overflow: 'hidden',
+                  padding: '0px',
                 }}
               />
             );
@@ -316,6 +318,8 @@ export const SimpleKeyValueTable: React.FC<{
             style={{
               width: `50%`,
               height: '0px',
+              overflow: 'hidden',
+              padding: '0px',
             }}
           />
         </tr>
