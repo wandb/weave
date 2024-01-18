@@ -705,6 +705,7 @@ export const WeaveEditorTable: FC<{
             },
           },
         }}
+        loading={fetchQuery.loading}
         disableRowSelectionOnClick
         processRowUpdate={processRowUpdate}
       />
