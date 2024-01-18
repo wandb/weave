@@ -3,7 +3,6 @@ import React from 'react';
 import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
 import {
   CallsLink,
-  OpLink,
   OpVersionLink,
   OpVersionsLink,
   opVersionText,

@@ -1,4 +1,4 @@
-import {Box, Button, Typography} from '@material-ui/core';
+import {Box, Button} from '@material-ui/core';
 import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import {
@@ -16,7 +16,7 @@ import {useHistory} from 'react-router-dom';
 import {parseRef} from '../../../../../react';
 import {Call} from '../../Browse2/callTree';
 import {SmallRef} from '../../Browse2/SmallRef';
-import {SpanDetails, SpanDetails2} from '../../Browse2/SpanDetails';
+import {SpanDetails2} from '../../Browse2/SpanDetails';
 import {useWeaveflowCurrentRouteContext} from '../context';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
@@ -25,7 +25,6 @@ import {
   SimplePageLayoutContext,
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
-import {GroupedCalls} from './ObjectVersionPage';
 import {truncateID} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';

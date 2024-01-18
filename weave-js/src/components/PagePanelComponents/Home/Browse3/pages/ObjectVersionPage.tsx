@@ -7,7 +7,6 @@ import {WFHighLevelCallFilter} from './CallsPage';
 import {
   CallLink,
   CallsLink,
-  ObjectLink,
   ObjectVersionsLink,
   objectVersionText,
   OpVersionLink,
@@ -102,7 +101,7 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            Ref: fullUri,
+            Ref: <span>{fullUri}</span>,
             ...(producingCalls.length > 0
               ? {
                   'Producing Calls': (

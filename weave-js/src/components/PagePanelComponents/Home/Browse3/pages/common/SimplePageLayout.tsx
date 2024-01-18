@@ -4,11 +4,11 @@ import {Box, ListItemText, MenuList, Popover, Tab, Tabs} from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import _ from 'lodash';
 import React, {createContext, useContext, useMemo} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import _ from 'lodash';
-import {SmallRef, parseRefMaybe} from '../../../Browse2/SmallRef';
+import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 
 type SimplePageLayoutContextType = {
   headerPrefix?: React.ReactNode;
@@ -240,13 +240,15 @@ const flattenObject = (val: any): any => {
     return flattenObject(_.fromPairs(val.map((v, i) => [i, v])));
   } else {
     return _.fromPairs(
-      Object.entries(val).flatMap(([key, val]) => {
-        if (isPrimitive(val)) {
-          return [[key, val]];
+      Object.entries(val).flatMap(([key, innerVal]) => {
+        if (isPrimitive(innerVal)) {
+          return [[key, innerVal]];
         }
-        return Object.entries(flattenObject(val)).map(([subKey, subVal]) => {
-          return [key + '.' + subKey, subVal];
-        });
+        return Object.entries(flattenObject(innerVal)).map(
+          ([subKey, subVal]) => {
+            return [key + '.' + subKey, subVal];
+          }
+        );
       })
     );
   }
