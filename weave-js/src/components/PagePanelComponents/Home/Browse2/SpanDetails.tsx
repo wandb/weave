@@ -281,58 +281,102 @@ export const SpanDetails2: FC<{
       <Box
         sx={{
           width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          gap: 1,
+          pt: 1,
         }}>
-        <SimpleKeyValueTable
-          data={{
-            Operation:
-              parseRefMaybe(call.name) != null ? (
-                <SmallRef
-                  objRef={parseRefMaybe(call.name)!}
-                  wfTable="OpVersion"
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            // border: '1px solid #ccc',
+            // borderRadius: 4,
+          }}>
+          <Typography sx={{p: 2}} variant="h6">
+            Overview
+          </Typography>
+          <SimpleKeyValueTable
+            data={{
+              Operation:
+                parseRefMaybe(call.name) != null ? (
+                  <SmallRef
+                    objRef={parseRefMaybe(call.name)!}
+                    wfTable="OpVersion"
+                  />
+                ) : (
+                  call.name
+                ),
+              Status: (
+                <CallStatusCodeChip
+                  statusCode={call.status_code as any}
+                  showLabel
                 />
-              ) : (
-                call.name
               ),
-            Status: (
-              <CallStatusCodeChip
-                statusCode={call.status_code as any}
-                showLabel
-              />
-            ),
-            Called: (
-              <Timestamp value={call.timestamp / 1000} format="relative" />
-            ),
-            ...(call.summary.latency_s != null
-              ? {
-                  Latency: (
-                    <Typography variant="body2" component="span">
-                      {call.summary.latency_s.toFixed(3)}s
-                    </Typography>
-                  ),
-                }
-              : {}),
-            ...(call.exception ? {Exception: call.exception} : {}),
-            ...(childCalls.length > 0
-              ? {
-                  'Child Calls': (
-                    <GroupedCalls
-                      calls={childCalls}
-                      partialFilter={{
-                        parentId: wfCall.callID(),
-                      }}
-                    />
-                  ),
-                }
-              : {}),
-            ...(Object.keys(attributes).length > 0
-              ? {Attributes: attributes}
-              : {}),
-            ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
-            // TODO: Consider bringing back openai chat input/output
-            ...(Object.keys(inputs).length > 0 ? {Inputs: inputs} : {}),
-            ...(Object.keys(output).length > 0 ? {Outputs: output} : {}),
-          }}
-        />
+              Called: (
+                <Timestamp value={call.timestamp / 1000} format="relative" />
+              ),
+              ...(call.summary.latency_s != null
+                ? {
+                    Latency: (
+                      <Typography variant="body2" component="span">
+                        {call.summary.latency_s.toFixed(3)}s
+                      </Typography>
+                    ),
+                  }
+                : {}),
+              ...(call.exception ? {Exception: call.exception} : {}),
+              ...(childCalls.length > 0
+                ? {
+                    'Child Calls': (
+                      <GroupedCalls
+                        calls={childCalls}
+                        partialFilter={{
+                          parentId: wfCall.callID(),
+                        }}
+                      />
+                    ),
+                  }
+                : {}),
+              ...(Object.keys(attributes).length > 0
+                ? {Attributes: attributes}
+                : {}),
+              ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
+            }}
+          />
+        </Box>
+        {Object.keys(inputs).length > 0 && (
+          <Box
+            sx={{
+              flex: '0 0 auto',
+            }}>
+            <Typography sx={{p: 2}} variant="h6">
+              Inputs
+            </Typography>
+            <SimpleKeyValueTable
+              data={
+                // TODO: Consider bringing back openai chat input/output
+                inputs
+              }
+            />
+          </Box>
+        )}
+        {Object.keys(output).length > 0 && (
+          <Box
+            sx={{
+              flex: '0 0 auto',
+            }}>
+            <Typography sx={{p: 2}} variant="h6">
+              Output
+            </Typography>
+            <SimpleKeyValueTable
+              data={
+                // TODO: Consider bringing back openai chat input/output
+                output
+              }
+            />
+          </Box>
+        )}
       </Box>
     </Box>
   );

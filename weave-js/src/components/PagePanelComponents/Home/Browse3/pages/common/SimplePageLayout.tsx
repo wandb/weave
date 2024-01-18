@@ -1,5 +1,5 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {Box, ListItemText, MenuList, Tab, Tabs} from '@mui/material';
+import {Box, ListItemText, MenuList, Popover, Tab, Tabs} from '@mui/material';
 // import {Menu} from '@mui/base/Menu';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
@@ -287,6 +287,7 @@ export const SimpleKeyValueTable: React.FC<{
     [flattenedData]
   );
   let lastKeyParts: string[] = [];
+  const headerWidth = 50 / (numCols - 1);
   return (
     <table
       style={{
@@ -297,6 +298,28 @@ export const SimpleKeyValueTable: React.FC<{
         width: '100%',
         overflow: 'hidden',
       }}>
+      <thead>
+        {/* Width setters */}
+        <tr>
+          {_.range(numCols - 1).map(kpi => {
+            return (
+              <td
+                key={kpi}
+                style={{
+                  width: `${headerWidth}%`,
+                  height: '0px',
+                }}
+              />
+            );
+          })}
+          <td
+            style={{
+              width: `50%`,
+              height: '0px',
+            }}
+          />
+        </tr>
+      </thead>
       <tbody>
         {Object.entries(flattenedData).map(([key, val]) => {
           const keyParts = key.split('.');
@@ -337,7 +360,7 @@ export const SimpleKeyValueTable: React.FC<{
                     Object.keys(flattenedData).filter(k => k.startsWith(prefix))
                       .length
                   );
-                  console.log('rowSpan', key, part, prefix, rowSpan);
+                  // console.log('rowSpan', key, part, prefix, rowSpan);
                   return (
                     <td key={i} style={keyStyle} rowSpan={rowSpan}>
                       {part}
@@ -353,7 +376,13 @@ export const SimpleKeyValueTable: React.FC<{
                     textOverflow: 'ellipsis',
                     padding: '8px',
                   }}>
-                  {valRef ? <SmallRef objRef={valRef} /> : val}
+                  {valRef ? (
+                    <SmallRef objRef={valRef} />
+                  ) : _.isString(val) ? (
+                    <SimplePopoverText text={val as string} />
+                  ) : (
+                    val
+                  )}
                 </td>
               </tr>
               {/* {key.endsWith('content') && (
@@ -375,5 +404,61 @@ export const SimpleKeyValueTable: React.FC<{
         })}
       </tbody>
     </table>
+  );
+};
+
+const SimplePopoverText: React.FC<{
+  text: string;
+}> = props => {
+  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+
+  const handlePopoverOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handlePopoverClose = () => {
+    setAnchorEl(null);
+  };
+
+  const open = Boolean(anchorEl);
+
+  return (
+    <>
+      <Box
+        aria-owns={open ? 'mouse-over-popover' : undefined}
+        aria-haspopup="true"
+        onMouseEnter={handlePopoverOpen}
+        onMouseLeave={handlePopoverClose}
+        sx={{
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: '100%',
+        }}>
+        {props.text}
+      </Box>
+      <Popover
+        id="mouse-over-popover"
+        sx={{
+          pointerEvents: 'none',
+        }}
+        PaperProps={{
+          style: {maxWidth: '50%'},
+        }}
+        open={open}
+        anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        onClose={handlePopoverClose}
+        disableRestoreFocus>
+        {props.text}
+      </Popover>
+    </>
   );
 };

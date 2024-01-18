@@ -13,13 +13,13 @@ import React, {FC, useEffect, useMemo, useRef} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {Timestamp} from '../../../Timestamp';
+import {CallStatusCodeChip} from '../Browse3/pages/common/CallStatusCodeChip';
 import {CallLink, opVersionText} from '../Browse3/pages/common/Links';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {SmallRef} from './SmallRef';
-import {CallStatusCodeChip} from '../Browse3/pages/common/CallStatusCodeChip';
 
 type DataGridColumnGroupingModel = Exclude<
   React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
