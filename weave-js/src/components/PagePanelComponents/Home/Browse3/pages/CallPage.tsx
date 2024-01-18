@@ -412,12 +412,13 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
     // The setTimeout here is a hack; without it scrollToIndexes will throw an error
     // because virtualScrollerRef.current inside the grid is undefined.
     // See https://github.com/mui/mui-x/issues/6411#issuecomment-1271556519
-    setTimeout(() => {
+    const t = setTimeout(() => {
       const rowIndex = apiRef.current.getRowIndexRelativeToVisibleRows(
         call.callID()
       );
       apiRef.current.scrollToIndexes({rowIndex});
     }, 0);
+    return () => clearTimeout(t);
   }, [apiRef, call]);
 
   return (
