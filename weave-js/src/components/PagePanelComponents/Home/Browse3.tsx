@@ -18,6 +18,7 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {useWindowSize} from '../../../common/hooks/useWindowSize';
 import {useNodeValue} from '../../../react';
 import {URL_BROWSE3} from '../../../urls';
 import {ErrorBoundary} from '../../ErrorBoundary';
@@ -64,7 +65,6 @@ import {
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
 import {SideNav} from './Browse3/SideNav';
-import {useWindowSize} from '../../../common/hooks/useWindowSize';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
