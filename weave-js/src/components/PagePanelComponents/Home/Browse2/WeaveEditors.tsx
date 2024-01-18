@@ -718,7 +718,7 @@ export const WeaveEditorTable: FC<{
       },
       ...typeToDataGridColumnSpec(objectType),
     ];
-  }, [location.pathname, objectType, path]);
+  }, [makeLinkPath, objectType, path]);
   return (
     <Box
       sx={{
