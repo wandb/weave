@@ -22,7 +22,12 @@ from . import history_op_common
 from ... import artifact_base, io_service
 from .. import wbmedia
 from ...ops_domain.table import _patch_legacy_image_file_types
-from ...ops_arrow.list_ import weave_arrow_type_check, PathType, PathItemType
+from ...ops_arrow.list_ import (
+    weave_arrow_type_check,
+    PathType,
+    PathItemType,
+    make_vec_none,
+)
 from ... import gql_json_cache
 
 
@@ -93,6 +98,104 @@ class PathTree:
     data: typing.Optional[typing.Any] = None
 
 
+def _use_fast_path(flattened_object_type: types.Type) -> bool:
+    if isinstance(flattened_object_type, types.TypedDict):
+        for k, v in flattened_object_type.property_types.items():
+            if not _use_fast_path(v):
+                return False
+        return True
+    elif isinstance(flattened_object_type, types.List):
+        return _use_fast_path(flattened_object_type.object_type)
+    elif isinstance(flattened_object_type, types.UnionType):
+        return all([_use_fast_path(m) for m in flattened_object_type.members])
+    elif isinstance(
+        flattened_object_type,
+        (
+            # If the table consists of only these leaf types, then we can use the fast path
+            # If you find that you need to expand this list, please talk to
+            # Shawn first.
+            types.RefType,
+            types.NoneType,
+            types.Number,
+            types.String,
+            types.Boolean,
+            types.Timestamp,
+        ),
+    ):
+        return True
+
+    # Encountered a type that requires the legacy path
+    return False
+
+
+def _fast_path(
+    raw_history_awl_tables: list[pa.Table],
+    live_data: list[dict],
+) -> ArrowWeaveList:
+    # This is the fast loading path. We only have the types contained in _use_fast_path
+    # above.
+
+    # This should be the only path used by StreamTable uses! We don't let users
+    # put in the old wandb media types.
+
+    # This path is pure arrow columnar operations, and should never do any
+    # kind of python iteration.
+
+    # Note we don't rely on the computed history type. We figure out the type
+    # from the arrow types.
+
+    all_awls: list[ArrowWeaveList] = []
+    for table in raw_history_awl_tables:
+        all_awls.append(ArrowWeaveList(table))
+
+    # OK I lied, to_arrow does python iteration at the moment, but this is only
+    # on the live set. If the live set remains smallish (which we can tune)
+    # _fast_path should remain fast.
+    all_awls.append(convert.to_arrow(live_data))
+
+    # Nothing below here should do python iteration.
+
+    all_converted_awls = []
+    for awl in all_awls:
+
+        def _convert_cols(
+            awl: ArrowWeaveList, path: PathType
+        ) -> typing.Optional[ArrowWeaveList]:
+            if (
+                isinstance(awl.object_type, types.TypedDict)
+                and "_val" in awl.object_type.property_types
+            ):
+                # There are only two kinds of types that look like a _type, _val
+                # struct: Timestamp and Ref. Happily, we can distinguish them by
+                # looking at the type of the _val field
+                val_field = awl._arrow_data.field("_val")
+                if isinstance(val_field, (pa.DoubleArray, pa.Int64Array)):
+                    # DoubleArray is the always included timestamp field
+                    # Int64Array is a user defined timestamp.
+                    return ArrowWeaveList(
+                        val_field.cast("int64").cast(pa.timestamp("ms", tz="UTC")),
+                        types.Timestamp(),
+                        awl._artifact,
+                    )
+                elif isinstance(awl._arrow_data.field("_val"), pa.StringArray):
+                    # StringArray is a Ref
+                    return ArrowWeaveList(
+                        val_field,
+                        types.RefType(types.UnknownType()),
+                        awl._artifact,
+                    )
+                else:
+                    raise errors.WeaveWBHistoryTranslationError(
+                        f"Encountered unexpected type for _val: {type(awl._arrow_data.field('_val'))}"
+                    )
+            return None
+
+        awl = awl.map_column(fn=lambda x, y: x, pre_fn=_convert_cols)
+        all_converted_awls.append(awl)
+
+    return history_op_common.concat_awls(all_converted_awls)
+
+
 def _get_history3(run: wdt.Run, columns=None):
     # 1. Get the flattened Weave-Type given HistoryKeys
     # 2. Read in the live set
@@ -135,39 +238,58 @@ def _get_history3(run: wdt.Run, columns=None):
         history_op_common.awl_to_pa_table(awl) for awl in union_collapsed_awl_tables
     ]
 
-    run_path = wb_util.RunPath(
-        run["project"]["entity"]["name"],
-        run["project"]["name"],
-        run["name"],
-    )
-    (
-        live_columns,
-        live_columns_already_mapped,
-        processed_history_pa_tables,
-    ) = _process_all_columns(
-        flattened_object_type, raw_live_data, raw_history_pa_tables, run_path, artifact
-    )
+    # 5 Now we concat the converted liveset and parquet files
+    use_fast_path = _use_fast_path(flattened_object_type)
+    if use_fast_path:
+        concatted_awl = _fast_path(raw_history_pa_tables, raw_live_data)
+        if not isinstance(concatted_awl.object_type, types.TypedDict):
+            raise errors.WeaveWBHistoryTranslationError(
+                f"Expected fast_path object_type to be TypedDict, got {concatted_awl.object_type}"
+            )
 
-    live_data_awl = _construct_live_data_awl(
-        live_columns,
-        live_columns_already_mapped,
-        flattened_object_type,
-        len(raw_live_data),
-        artifact,
-    )
+        # Need to get a new final_type, since we don't rely on the flattend_object_type
+        # in the fast path.
+        final_type = _unflatten_history_object_type(concatted_awl.object_type)
+    else:
+        # Legacy slow path. This path drops down to python iteration in many
+        # cases.
+        logging.warning("Using legacy slow path for history3")
+        run_path = wb_util.RunPath(
+            run["project"]["entity"]["name"],
+            run["project"]["name"],
+            run["name"],
+        )
+        (
+            live_columns,
+            live_columns_already_mapped,
+            processed_history_pa_tables,
+        ) = _process_all_columns(
+            flattened_object_type,
+            raw_live_data,
+            raw_history_pa_tables,
+            run_path,
+            artifact,
+        )
 
-    # 5.a Now we concat the converted liveset and parquet files
-    concatted_awl = history_op_common.concat_awls(
-        [
-            live_data_awl,
-            *{
-                ArrowWeaveList(
-                    table, object_type=flattened_object_type, artifact=artifact
-                )
-                for table in processed_history_pa_tables
-            },
-        ]
-    )
+        live_data_awl = _construct_live_data_awl(
+            live_columns,
+            live_columns_already_mapped,
+            flattened_object_type,
+            len(raw_live_data),
+            artifact,
+        )
+
+        concatted_awl = history_op_common.concat_awls(
+            [
+                live_data_awl,
+                *{
+                    ArrowWeaveList(
+                        table, object_type=flattened_object_type, artifact=artifact
+                    )
+                    for table in processed_history_pa_tables
+                },
+            ]
+        )
 
     if len(concatted_awl) == 0:
         return convert.to_arrow([], types.List(final_type), artifact=artifact)
@@ -626,6 +748,8 @@ def _parse_bytes_mapper(
 ) -> typing.Optional[ArrowWeaveList]:
     obj_type = types.non_none(awl.object_type)
     if types.Bytes().assign_type(obj_type):
+        if len(awl._arrow_data) == awl._arrow_data.null_count:
+            return make_vec_none(len(awl._arrow_data))
         _non_vectorized_warning(
             f"Encountered bytes in column {path}, requires in-memory processing"
         )
