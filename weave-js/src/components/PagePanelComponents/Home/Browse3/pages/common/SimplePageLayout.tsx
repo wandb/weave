@@ -259,11 +259,6 @@ const keyStyle: React.CSSProperties = {
   // marginRight: 10,
   // paddingRight: 10,
 
-  // align text to the top
-  // display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'flex-start',
-
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -275,6 +270,9 @@ const keyStyle: React.CSSProperties = {
 
   borderTop: '1px solid rgba(224, 224, 224, 1)',
   borderBottom: '1px solid rgba(224, 224, 224, 1)',
+
+  // Remove this to middle-align the key text
+  verticalAlign: 'top',
 };
 
 export const SimpleKeyValueTable: React.FC<{
