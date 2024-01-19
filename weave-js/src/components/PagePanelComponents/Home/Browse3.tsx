@@ -19,6 +19,7 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {MOON_200} from '../../../common/css/color.styles';
 import {useWindowSize} from '../../../common/hooks/useWindowSize';
 import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
@@ -67,7 +68,6 @@ import {
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
 import {SideNav} from './Browse3/SideNav';
-import {MOON_200} from '../../../common/css/color.styles';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
