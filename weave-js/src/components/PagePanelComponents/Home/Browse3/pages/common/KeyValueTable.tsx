@@ -1,7 +1,7 @@
 import {Box} from '@mui/material';
 import _ from 'lodash';
 import moment from 'moment';
-import React, {useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {isPrimitive} from './util';
@@ -89,7 +89,7 @@ const KeyValueRow: React.FC<{
   rowKey: string;
   rowValue: any;
 }> = props => {
-  const depth = React.useContext(DepthContext);
+  const depth = useContext(DepthContext);
   const [open, setOpen] = React.useState(false);
   const cellRef = React.useRef<HTMLTableCellElement>(null);
   const [canExpand, setCanExpand] = useState(false);
@@ -188,7 +188,7 @@ const DepthContext = React.createContext(0);
 const KeyValueRowForObject: React.FC<{
   objValue: {[key: string]: any};
 }> = props => {
-  const depth = React.useContext(DepthContext);
+  const depth = useContext(DepthContext);
   return (
     <DepthContext.Provider value={depth + 1}>
       {Object.entries(props.objValue).map(([key, value]) => {
