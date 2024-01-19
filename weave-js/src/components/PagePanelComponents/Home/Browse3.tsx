@@ -360,7 +360,9 @@ const MainPeekingLayout: FC = () => {
           flex: peekLocation ? '1 1 60%' : '0 0 0px',
           transition: peekLocation ? 'all 0.2s ease-in-out' : '',
           boxShadow:
-            'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+            flexDirection === 'row'
+              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
+              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
           overflow: 'hidden',
           display: 'flex',
           zIndex: 1,
