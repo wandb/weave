@@ -24,7 +24,6 @@ import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   SimpleKeyValueTable,
-  // ComplexKeyValueTable,
   SimplePageLayout,
   SimplePageLayoutContext,
   SimplePageLayoutWithHeader,
@@ -161,7 +160,6 @@ const CallPageInnerHorizontal: React.FC<{
   return (
     <SimplePageLayout
       title={traceTitle}
-      // headerContent={<>hi</>}
       // menuItems={[
       //   {
       //     label: 'View Vertical',
