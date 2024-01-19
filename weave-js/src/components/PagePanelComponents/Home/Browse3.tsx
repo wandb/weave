@@ -38,7 +38,7 @@ import {
 } from './Browse3/context';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
-import {CallPage} from './Browse3/pages/CallPage';
+import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';

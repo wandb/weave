@@ -1,6 +1,5 @@
 import _ from 'lodash';
-import React, {} from 'react';
-
+import React from 'react';
 
 export const isPrimitive = (val: any) => {
   return (
