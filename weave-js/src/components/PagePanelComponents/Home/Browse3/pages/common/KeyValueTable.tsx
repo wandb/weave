@@ -1,7 +1,7 @@
-import {Box, Popover} from '@mui/material';
+import {Box} from '@mui/material';
 import _ from 'lodash';
 import moment from 'moment';
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 
@@ -88,6 +88,18 @@ const KeyValueRow: React.FC<{
 }> = props => {
   const depth = React.useContext(DepthContext);
   const [open, setOpen] = React.useState(false);
+  const cellRef = React.useRef<HTMLTableCellElement>(null);
+  const [canExpand, setCanExpand] = useState(false);
+  console.log({h: cellRef.current?.clientHeight});
+  useEffect(() => {
+    if (
+      cellRef.current &&
+      cellRef.current.clientHeight >= ROW_HEIGHT * MAX_HEIGHT_MULT - 5
+    ) {
+      setCanExpand(true);
+    }
+  }, []);
+
   if (isPrimitive(props.rowValue)) {
     const valRef = _.isString(props.rowValue)
       ? parseRefMaybe(props.rowValue)
@@ -100,7 +112,7 @@ const KeyValueRow: React.FC<{
       useVal = (
         <Box
           sx={{
-            maxHeight: open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
+            maxHeight: !open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
             overflow: 'auto',
             width: '100%',
           }}>
@@ -110,6 +122,7 @@ const KeyValueRow: React.FC<{
               whiteSpace: 'pre-line',
               fontSize: '16px',
               margin: '0',
+              fontFamily: 'Source Sans Pro',
             }}>
             {useVal}
           </pre>
@@ -126,11 +139,11 @@ const KeyValueRow: React.FC<{
           onClick={() => setOpen(!open)}
           style={{
             ...leafKeyStyle,
-            cursor: 'pointer',
+            cursor: open || canExpand ? 'pointer' : 'auto',
           }}>
           {props.rowKey}
         </td>
-        <td style={valueStyle} colSpan={VALUE_SPACE}>
+        <td style={valueStyle} colSpan={VALUE_SPACE} ref={cellRef}>
           {useVal}
         </td>
       </tr>

@@ -1,15 +1,13 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {Box, ListItemText, MenuList, Popover, Tab, Tabs} from '@mui/material';
+import {Box, ListItemText, MenuList, Tab, Tabs} from '@mui/material';
 // import {Menu} from '@mui/base/Menu';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import _ from 'lodash';
-import moment from 'moment';
 import React, {createContext, useContext, useMemo} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 
 type SimplePageLayoutContextType = {
   headerPrefix?: React.ReactNode;
