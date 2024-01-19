@@ -12,6 +12,7 @@ const MAX_HEIGHT_MULT = 5;
 
 export const KeyValueTable: React.FC<{
   data: {[key: string]: any};
+  headerTitle?: string;
 }> = props => {
   return (
     <Box
@@ -25,16 +26,17 @@ export const KeyValueTable: React.FC<{
           borderCollapse: 'collapse',
           tableLayout: 'fixed',
         }}>
-        <thead>
-          <tr
-            style={{
-              borderBottom: '1px solid rgba(224, 224, 224, 1)',
-              backgroundColor: '#FAFAFA',
-            }}>
-            <th>Key</th>
-            <th colSpan={VALUE_SPACE}>Value</th>
-          </tr>
-        </thead>
+        {props.headerTitle && (
+          <thead>
+            <tr
+              style={{
+                borderBottom: '1px solid rgba(224, 224, 224, 1)',
+                backgroundColor: '#FAFAFA',
+              }}>
+              <th colSpan={VALUE_SPACE + 1}>{props.headerTitle}</th>
+            </tr>
+          </thead>
+        )}
         <tbody>
           <KeyValueRowForObject objValue={props.data} />
         </tbody>
@@ -90,7 +92,7 @@ const KeyValueRow: React.FC<{
   const [open, setOpen] = React.useState(false);
   const cellRef = React.useRef<HTMLTableCellElement>(null);
   const [canExpand, setCanExpand] = useState(false);
-  console.log({h: cellRef.current?.clientHeight});
+
   useEffect(() => {
     if (
       cellRef.current &&
@@ -113,7 +115,8 @@ const KeyValueRow: React.FC<{
         <Box
           sx={{
             maxHeight: !open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
-            overflow: 'auto',
+            overflowY: 'auto',
+            overflowX: 'hidden',
             width: '100%',
           }}>
           <pre
@@ -136,7 +139,11 @@ const KeyValueRow: React.FC<{
     return (
       <tr>
         <td
-          onClick={() => setOpen(!open)}
+          onClick={() => {
+            if (open || canExpand) {
+              setOpen(!open);
+            }
+          }}
           style={{
             ...leafKeyStyle,
             cursor: open || canExpand ? 'pointer' : 'auto',

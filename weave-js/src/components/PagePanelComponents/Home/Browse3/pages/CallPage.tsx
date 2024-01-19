@@ -1,4 +1,4 @@
-import {Box, Button, Typography} from '@material-ui/core';
+import {Box, Button} from '@material-ui/core';
 import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import {
@@ -740,10 +740,8 @@ const CallDetails: FC<{
               flex: '0 0 auto',
               p: 2,
             }}>
-            <Typography variant="h6" gutterBottom>
-              Inputs
-            </Typography>
             <KeyValueTable
+              headerTitle="Inputs"
               data={
                 // TODO: Consider bringing back openai chat input/output
                 inputs
@@ -757,10 +755,8 @@ const CallDetails: FC<{
               flex: '0 0 auto',
               p: 2,
             }}>
-            <Typography variant="h6" gutterBottom>
-              Output
-            </Typography>
             <KeyValueTable
+              headerTitle="Output"
               data={
                 // TODO: Consider bringing back openai chat input/output
                 output

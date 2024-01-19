@@ -123,7 +123,6 @@ export const SimplePageLayout: React.FC<{
           </Box>
         )}
         <Box
-          component="main"
           sx={{
             overflow: 'hidden',
             display: 'flex',
@@ -251,7 +250,8 @@ export const SimplePageLayoutWithHeader: React.FC<{
               borderBottom: '1px solid #e0e0e0',
             }}
             variant="scrollable"
-            scrollButtons="auto"
+            // These scroll buttons are not working
+            scrollButtons={false}
             value={tabId}
             onChange={handleTabChange}>
             {props.tabs.map((tab, i) => (
@@ -260,7 +260,6 @@ export const SimplePageLayoutWithHeader: React.FC<{
           </Tabs>
 
           <Box
-            component="main"
             sx={{
               overflow: 'hidden',
               display: 'flex',
