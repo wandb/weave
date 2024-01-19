@@ -18,6 +18,7 @@ import {Call} from '../../Browse2/callTree';
 import {SmallRef} from '../../Browse2/SmallRef';
 import {SpanDetails} from '../../Browse2/SpanDetails';
 import {useWeaveflowCurrentRouteContext} from '../context';
+import {opNiceName} from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
@@ -582,7 +583,7 @@ const CustomGridTreeDataGroupingCell: React.FC<
           fontWeight: 'bold',
         }}>
         {/* {call.spanName() + ': ' + truncateID(call.callID())} */}
-        {call.spanName().split('-').slice(-1)[0]}
+        {opNiceName(call.spanName())}
       </Box>
       {opCategory && (
         <Box
