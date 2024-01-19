@@ -113,8 +113,8 @@ export const SimplePageLayout: React.FC<{
         {props.leftSidebar && (
           <Box
             sx={{
-              width: '30%',
-              flex: '0 0 30%',
+              width: '35%',
+              flex: '0 0 35%',
               overflow: 'hidden',
               height: '100%',
               maxHeight: '100%',

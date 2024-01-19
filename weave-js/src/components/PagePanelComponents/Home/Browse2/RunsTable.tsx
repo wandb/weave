@@ -14,8 +14,8 @@ import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {Timestamp} from '../../../Timestamp';
-import {CallStatusCodeChip} from '../Browse3/pages/common/CallStatusCodeChip';
 import {CallLink, opVersionText} from '../Browse3/pages/common/Links';
+import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
@@ -182,14 +182,11 @@ export const RunsTable: FC<{
       {
         field: 'status_code',
         headerName: '',
-        width: 40,
-        minWidth: 40,
-        maxWidth: 40,
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
         renderCell: cellParams => {
-          return <CallStatusCodeChip statusCode={cellParams.row.status_code} />;
+          return <StatusChip value={cellParams.row.status_code} />;
         },
       },
       {

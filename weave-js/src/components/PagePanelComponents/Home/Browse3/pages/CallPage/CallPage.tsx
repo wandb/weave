@@ -24,6 +24,7 @@ import {
   SimplePageLayoutContext,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
+import {CallStatusType, StatusChip} from '../common/StatusChip';
 import {UnderConstruction} from '../common/UnderConstruction';
 import {truncateID} from '../util';
 import {useWeaveflowORMContext} from '../wfInterface/context';
@@ -552,6 +553,12 @@ const CustomGridTreeDataGroupingCell: React.FC<
       </Box>
       <Box
         sx={{
+          mr: 1,
+        }}>
+        <StatusChip value={row.status} iconOnly />
+      </Box>
+      <Box
+        sx={{
           // ml: 1,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -647,12 +654,13 @@ const BasicInputOutputRenderer: React.FC<{
  * Returns the flattened trace tree for a given call. Specifically,
  * it will find the trace root for a call, then find all the ancestors
  * of the root. The flattened order is depth-first, so that when listed
- * in a a table, the children of each call will be listed immediately
+ * in a table, the children of each call will be listed immediately
  * after the parent call. The structure of the returned rows conforms to
  * `GridValidRowModel`, but is specifically:
  * {
  *  id: string;
  *  call: WFCall;
+ *  status: CallStatusType;
  *  hierarchy: string[];
  * }
  * where `hierarchy` is the list of call IDs from the root to the current.
@@ -661,13 +669,15 @@ const BasicInputOutputRenderer: React.FC<{
  * from the root to the current call, so that the tree can be expanded to
  * show the current call.
  */
+type Row = {
+  id: string;
+  call: WFCall;
+  status: CallStatusType;
+  hierarchy: string[];
+};
 const useCallFlattenedTraceTree = (call: WFCall) => {
   return useMemo(() => {
-    const rows: Array<{
-      id: string;
-      call: WFCall;
-      hierarchy: string[];
-    }> = [];
+    const rows: Row[] = [];
     const expandKeys = new Set<string>();
     // Ascend to the root
     let currentCall: WFCall | null = call;
@@ -690,10 +700,27 @@ const useCallFlattenedTraceTree = (call: WFCall) => {
       rows.push({
         id: targetCall.callID(),
         call: targetCall,
+        status: targetCall.rawCallSpan().status_code,
         hierarchy: newHierarchy,
       });
       for (const childCall of targetCall.childCalls()) {
         queue.push({targetCall: childCall, parentHierarchy: newHierarchy});
+      }
+    }
+
+    // Update status indicators to reflect status of descendants.
+    const rowMap: Record<string, Row> = {};
+    for (const row of rows) {
+      rowMap[row.id] = row;
+    }
+    for (const row of rows) {
+      if (row.status === 'ERROR') {
+        for (const p of row.hierarchy) {
+          const parent = rowMap[p];
+          if (parent.status === 'SUCCESS') {
+            parent.status = 'DESCENDANT_ERROR';
+          }
+        }
       }
     }
 

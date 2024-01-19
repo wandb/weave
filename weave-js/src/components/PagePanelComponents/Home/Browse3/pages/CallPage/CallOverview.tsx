@@ -3,9 +3,9 @@ import React from 'react';
 
 import {Timestamp} from '../../../../../Timestamp';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {CallStatusCodeChip} from '../common/CallStatusCodeChip';
 import {OpVersionCategoryChip} from '../common/OpVersionCategoryChip';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
+import {StatusChip} from '../common/StatusChip';
 import {GroupedCalls} from '../ObjectVersionPage';
 import {WFCall} from '../wfInterface/types';
 
@@ -42,9 +42,7 @@ export const CallOverview: React.FC<{
               Category: <OpVersionCategoryChip opCategory={opCategory} />,
             }
           : {}),
-        Status: (
-          <CallStatusCodeChip statusCode={call.status_code as any} showLabel />
-        ),
+        Status: <StatusChip value={call.status_code} />,
         Called: <Timestamp value={call.timestamp / 1000} format="relative" />,
         ...(call.summary.latency_s != null
           ? {
