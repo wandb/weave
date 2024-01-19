@@ -248,26 +248,22 @@ def _check_fast_history3_concat_type(
     elif isinstance(orig_expected_type, types.UnionType) and isinstance(
         fast_path_type, types.UnionType
     ):
-        if len(orig_expected_type.members) != len(fast_path_type.members):
-            return (
-                "  " * depth
-                + f"Union type member count mismatch: {len(orig_expected_type.members)} != {len(fast_path_type.members)}\n"
-            )
         result = ""
+
         # Unions can be out of order, so we check each orig member against
-        # each fast_path member until there are no fast_path members left
-        remaining_fast_path_type_members = list(fast_path_type.members)
+        # each fast_path member
+        # We also may have fewer members in the fast_path type, because Refs are always
+        # UnknownType, where in the orig type current they may be more specific and not
+        # merged into a single RefType.
         for i in range(len(orig_expected_type.members)):
             orig_member = orig_expected_type.members[i]
-            for j in range(len(remaining_fast_path_type_members)):
-                fast_member = remaining_fast_path_type_members[j]
+            for j in range(len(fast_path_type.members)):
+                fast_member = fast_path_type.members[j]
                 sub_result = _check_fast_history3_concat_type(
                     orig_member, fast_member, depth=depth + 1
                 )
                 if not sub_result:
-                    # A match, remove from remaining and go to next
-                    # orig member
-                    remaining_fast_path_type_members.pop(j)
+                    # A match, go to next orig member
                     break
             else:
                 # no remaining fast path member matched the orig member
