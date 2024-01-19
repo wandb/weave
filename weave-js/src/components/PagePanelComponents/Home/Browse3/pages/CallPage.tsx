@@ -19,11 +19,12 @@ import {Call} from '../../Browse2/callTree';
 import {parseRefMaybe, SmallRef} from '../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../context';
 import {CallStatusCodeChip} from './common/CallStatusCodeChip';
+import {KeyValueTable} from './common/KeyValueTable';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   SimpleKeyValueTable,
-  SimpleKeyValueTable2,
+  // ComplexKeyValueTable,
   SimplePageLayout,
   SimplePageLayoutContext,
   SimplePageLayoutWithHeader,
@@ -744,7 +745,7 @@ const CallDetails: FC<{
             <Typography variant="h6" gutterBottom>
               Inputs
             </Typography>
-            <SimpleKeyValueTable2
+            <KeyValueTable
               data={
                 // TODO: Consider bringing back openai chat input/output
                 inputs
@@ -761,7 +762,7 @@ const CallDetails: FC<{
             <Typography variant="h6" gutterBottom>
               Output
             </Typography>
-            <SimpleKeyValueTable2
+            <KeyValueTable
               data={
                 // TODO: Consider bringing back openai chat input/output
                 output
