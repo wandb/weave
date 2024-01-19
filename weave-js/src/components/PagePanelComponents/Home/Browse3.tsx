@@ -67,6 +67,7 @@ import {
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
 import {SideNav} from './Browse3/SideNav';
+import {MOON_200} from '../../../common/css/color.styles';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -352,11 +353,9 @@ const MainPeekingLayout: FC = () => {
       <Box
         sx={{
           borderLeft:
-            flexDirection === 'row' ? '1px solid rgba(0, 0, 0, 0.12)' : 'none',
+            flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
           borderTop:
-            flexDirection === 'column'
-              ? '1px solid rgba(0, 0, 0, 0.12)'
-              : 'none',
+            flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
           flex: peekLocation ? '1 1 60%' : '0 0 0px',
           transition: peekLocation ? 'all 0.2s ease-in-out' : '',
           boxShadow:
