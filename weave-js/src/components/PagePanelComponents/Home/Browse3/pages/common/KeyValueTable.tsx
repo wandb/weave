@@ -4,6 +4,7 @@ import moment from 'moment';
 import React, {useEffect, useState} from 'react';
 
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {isPrimitive} from './util';
 
 const VALUE_SPACE = 4;
 const ROW_HEIGHT = 26;
@@ -194,16 +195,5 @@ const KeyValueRowForObject: React.FC<{
         return <KeyValueRow key={key} rowKey={key} rowValue={value} />;
       })}
     </DepthContext.Provider>
-  );
-};
-
-const isPrimitive = (val: any) => {
-  return (
-    React.isValidElement(val) ||
-    _.isString(val) ||
-    _.isNumber(val) ||
-    _.isBoolean(val) ||
-    _.isDate(val) ||
-    _.isNil(val)
   );
 };

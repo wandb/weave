@@ -8,6 +8,7 @@ import _ from 'lodash';
 import React, {createContext, useContext, useMemo} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
+import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
   headerPrefix?: React.ReactNode;
@@ -338,17 +339,6 @@ export const ScrollableTabContent: React.FC<{
       }}>
       {props.children}
     </Box>
-  );
-};
-
-const isPrimitive = (val: any) => {
-  return (
-    React.isValidElement(val) ||
-    _.isString(val) ||
-    _.isNumber(val) ||
-    _.isBoolean(val) ||
-    _.isDate(val) ||
-    _.isNil(val)
   );
 };
 
