@@ -22,7 +22,6 @@ BOARD_INPUT_WEAVE_TYPE = types.List(
             "trace_id": types.optional(types.String()),
             "state": types.optional(types.String()),
             "error": types.optional(types.String()),
-            "priority": types.optional(types.Number()),
             "metrics": types.TypedDict(
                 {
                     "system": types.TypedDict(
