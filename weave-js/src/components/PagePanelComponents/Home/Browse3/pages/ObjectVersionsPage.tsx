@@ -8,9 +8,9 @@ import {
   TextField,
 } from '@mui/material';
 import {
-  DataGridPro,
   GridColDef,
   GridColumnGroupingModel,
+  GridRowSelectionModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
@@ -18,12 +18,13 @@ import React, {useEffect, useMemo, useState} from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
+import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {truncateID} from './util';
+import {truncateID, useURLSearchParamsDict} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {
   HackyTypeCategory,
@@ -472,23 +473,39 @@ const ObjectVersionsTable: React.FC<{
     //   }),]
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
+
+  // Highlight table row if it matches peek drawer.
+  const query = useURLSearchParamsDict();
+  const {peekPath} = query;
+  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const rowIds = useMemo(() => {
+    return rows.map(row => row.id);
+  }, [rows]);
+  const [rowSelectionModel, setRowSelectionModel] =
+    useState<GridRowSelectionModel>([]);
+  useEffect(() => {
+    if (rowIds.length === 0) {
+      // Data may have not loaded
+      return;
+    }
+    if (peekId == null) {
+      // No peek drawer, clear any selection
+      setRowSelectionModel([]);
+    } else {
+      // If peek drawer matches a row, select it.
+      // If not, don't modify selection.
+      if (rowIds.includes(peekId)) {
+        setRowSelectionModel([peekId]);
+      }
+    }
+  }, [rowIds, peekId]);
+
   return (
-    <DataGridPro
+    <StyledDataGrid
       rows={rows}
       initialState={{
         sorting: {
           sortModel: [{field: 'createdAt', sort: 'desc'}],
-        },
-      }}
-      sx={{
-        // borderTop: 1,
-        borderRight: 0,
-        borderLeft: 0,
-        borderBottom: 0,
-
-        '& .MuiDataGrid-columnHeaders': {
-          backgroundColor: '#FAFAFA',
-          color: '#979a9e',
         },
       }}
       columnHeaderHeight={40}
@@ -496,6 +513,7 @@ const ObjectVersionsTable: React.FC<{
       columns={columns}
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
+      rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columnGroupingModel}
     />
   );
