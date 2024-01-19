@@ -961,8 +961,13 @@ const LatestOnlyControlListItem: React.FC<{
         options.length <= 1
       }
       disablePadding>
-      <ListItemButton>
-        <ListItemText primary={`Latest Only`} />
+      <ListItemButton
+        onClick={() => {
+          props.updateFilter({
+            isLatest: !props.filter?.isLatest,
+          });
+        }}>
+        <ListItemText primary="Latest Only" />
       </ListItemButton>
     </ListItem>
   );

@@ -1,5 +1,6 @@
 import LinkIcon from '@mui/icons-material/Link';
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -625,6 +626,8 @@ const typeToDataGridColumnSpec = (type: Type): GridColDef[] => {
   return [];
 };
 
+const MAX_ROWS = 1000;
+
 export const WeaveEditorTable: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
@@ -650,11 +653,12 @@ export const WeaveEditorTable: FC<{
           )
         ),
       }),
-      limit: constNumber(1000),
+      limit: constNumber(MAX_ROWS + 1),
     });
   }, [node, objectType]);
   const fetchQuery = useNodeValue(fetchAllNode);
 
+  const [isTruncated, setIsTruncated] = useState(false);
   const [sourceRows, setSourceRows] = useState<any[] | undefined>();
   useEffect(() => {
     if (sourceRows != null) {
@@ -663,7 +667,8 @@ export const WeaveEditorTable: FC<{
     if (fetchQuery.loading) {
       return;
     }
-    setSourceRows(fetchQuery.result);
+    setIsTruncated(fetchQuery.result.length > MAX_ROWS);
+    setSourceRows(fetchQuery.result.slice(0, MAX_ROWS));
   }, [sourceRows, fetchQuery]);
 
   const gridRows = useMemo(
@@ -719,28 +724,35 @@ export const WeaveEditorTable: FC<{
     ];
   }, [makeLinkPath, objectType, path]);
   return (
-    <Box
-      sx={{
-        height: 460,
-        width: '100%',
-      }}>
-      <DataGrid
-        density="compact"
-        experimentalFeatures={{columnGrouping: true}}
-        rows={gridRows}
-        columns={columnSpec}
-        initialState={{
-          pagination: {
-            paginationModel: {
-              pageSize: 10,
+    <>
+      {isTruncated && (
+        <Alert severity="warning">
+          Showing {MAX_ROWS.toLocaleString()} rows only.
+        </Alert>
+      )}
+      <Box
+        sx={{
+          height: 460,
+          width: '100%',
+        }}>
+        <DataGrid
+          density="compact"
+          experimentalFeatures={{columnGrouping: true}}
+          rows={gridRows}
+          columns={columnSpec}
+          initialState={{
+            pagination: {
+              paginationModel: {
+                pageSize: 10,
+              },
             },
-          },
-        }}
-        loading={fetchQuery.loading}
-        disableRowSelectionOnClick
-        processRowUpdate={processRowUpdate}
-      />
-    </Box>
+          }}
+          loading={fetchQuery.loading}
+          disableRowSelectionOnClick
+          processRowUpdate={processRowUpdate}
+        />
+      </Box>
+    </>
   );
 };
 

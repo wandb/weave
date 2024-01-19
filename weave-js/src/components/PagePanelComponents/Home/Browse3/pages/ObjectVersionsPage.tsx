@@ -278,8 +278,14 @@ export const FilterableObjectVersionsTable: React.FC<{
               latestOnlyOptions.length <= 1
             }
             disablePadding>
-            <ListItemButton>
-              <ListItemText primary={`Latest Only`} />
+            <ListItemButton
+              onClick={() => {
+                setFilter({
+                  ...filter,
+                  latest: !effectiveFilter.latest,
+                });
+              }}>
+              <ListItemText primary="Latest Only" />
             </ListItemButton>
           </ListItem>
         </>

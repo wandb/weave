@@ -378,18 +378,25 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
   );
 
   // Scroll selected call into view
+  const callId = call.callID();
   useEffect(() => {
     // The setTimeout here is a hack; without it scrollToIndexes will throw an error
     // because virtualScrollerRef.current inside the grid is undefined.
     // See https://github.com/mui/mui-x/issues/6411#issuecomment-1271556519
     const t = setTimeout(() => {
-      const rowIndex = apiRef.current.getRowIndexRelativeToVisibleRows(
-        call.callID()
-      );
-      apiRef.current.scrollToIndexes({rowIndex});
+      const rowElement = apiRef.current.getRowElement(callId);
+      if (rowElement) {
+        rowElement.scrollIntoView();
+      } else {
+        // Grid is virtualized, use api to make row visible.
+        // Unfortunately, MUI doesn't offer something like alignToTop
+        const rowIndex =
+          apiRef.current.getRowIndexRelativeToVisibleRows(callId);
+        apiRef.current.scrollToIndexes({rowIndex});
+      }
     }, 0);
     return () => clearTimeout(t);
-  }, [apiRef, call]);
+  }, [apiRef, callId]);
 
   return (
     <DataGridPro

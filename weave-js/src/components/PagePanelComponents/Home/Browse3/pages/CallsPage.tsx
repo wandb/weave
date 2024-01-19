@@ -316,8 +316,14 @@ export const CallsTable: React.FC<{
               Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
             }
             disablePadding>
-            <ListItemButton>
-              <ListItemText primary={`Roots Only`} />
+            <ListItemButton
+              onClick={() => {
+                setFilter({
+                  ...filter,
+                  traceRootsOnly: !effectiveFilter.traceRootsOnly,
+                });
+              }}>
+              <ListItemText primary="Roots Only" />
             </ListItemButton>
           </ListItem>
         </>
