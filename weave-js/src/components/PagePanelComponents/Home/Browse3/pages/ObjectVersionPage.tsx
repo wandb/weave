@@ -10,7 +10,6 @@ import {WFHighLevelCallFilter} from './CallsPage';
 import {
   CallLink,
   CallsLink,
-  ObjectLink,
   ObjectVersionsLink,
   objectVersionText,
   OpVersionLink,
@@ -19,7 +18,7 @@ import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
-  SimplePageLayout,
+  SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
@@ -74,19 +73,14 @@ const ObjectVersionPageInner: React.FC<{
   // const {onMakeBoard} = useMakeNewBoard(itemNode);
 
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={objectVersionText(objectName, objectVersionIndex)}
       headerContent={
         <SimpleKeyValueTable
           data={{
             [refExtra ? 'Parent Object' : 'Name']: (
               <>
-                <ObjectLink
-                  entityName={entityName}
-                  projectName={projectName}
-                  objectName={objectName}
-                />{' '}
-                [
+                {objectName} [
                 <ObjectVersionsLink
                   entity={entityName}
                   project={projectName}
@@ -100,14 +94,21 @@ const ObjectVersionPageInner: React.FC<{
               </>
             ),
             Version: <>{objectVersionIndex}</>,
+            ...(objectTypeCategory
+              ? {
+                  Category: (
+                    <TypeVersionCategoryChip
+                      typeCategory={objectTypeCategory}
+                    />
+                  ),
+                }
+              : {}),
+
             ...(refExtra
               ? {
                   Subpath: refExtra,
                 }
               : {}),
-            Category: (
-              <TypeVersionCategoryChip typeCategory={objectTypeCategory} />
-            ),
             // 'Type Version': (
             //   <TypeVersionLink
             //     entityName={entityName}
@@ -116,7 +117,7 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            Ref: fullUri,
+            Ref: <span>{fullUri}</span>,
             // Hide consuming and producing calls since we don't have a
             // good way to look this up yet
             ...(producingCalls.length > 0 && refExtra == null
@@ -293,6 +294,7 @@ const ObjectVersionProducingCallsItem: React.FC<{
   return (
     <ul
       style={{
+        paddingInlineStart: '22px',
         margin: 0,
       }}>
       {producingCalls.map(call => {
@@ -374,11 +376,12 @@ export const GroupedCalls: React.FC<{
     <ul
       style={{
         margin: 0,
+        paddingInlineStart: '22px',
       }}>
       {Object.entries(callGroups).map(([key, val], ndx) => {
         return (
           <li key={key}>
-            <OpVersionCallsLink val={val} partialFilter={partialFilter} />;
+            <OpVersionCallsLink val={val} partialFilter={partialFilter} />
           </li>
         );
       })}

@@ -1,4 +1,4 @@
-import {Box, Button, Typography} from '@material-ui/core';
+import {Box, Button} from '@material-ui/core';
 import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import {
@@ -13,22 +13,23 @@ import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {parseRef} from '../../../../../react';
-import {Call} from '../../Browse2/callTree';
-import {SmallRef} from '../../Browse2/SmallRef';
-import {SpanDetails} from '../../Browse2/SpanDetails';
-import {useWeaveflowCurrentRouteContext} from '../context';
-import {CenteredAnimatedLoader} from './common/Loader';
-import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
+import {parseRef} from '../../../../../../react';
+import {Call} from '../../../Browse2/callTree';
+import {SmallRef} from '../../../Browse2/SmallRef';
+import {useWeaveflowCurrentRouteContext} from '../../context';
+import {CenteredAnimatedLoader} from '../common/Loader';
+import {OpVersionCategoryChip} from '../common/OpVersionCategoryChip';
 import {
   SimplePageLayout,
   SimplePageLayoutContext,
-} from './common/SimplePageLayout';
-import {UnderConstruction} from './common/UnderConstruction';
-import {GroupedCalls} from './ObjectVersionPage';
-import {truncateID} from './util';
-import {useWeaveflowORMContext} from './wfInterface/context';
-import {WFCall} from './wfInterface/types';
+  SimplePageLayoutWithHeader,
+} from '../common/SimplePageLayout';
+import {UnderConstruction} from '../common/UnderConstruction';
+import {truncateID} from '../util';
+import {useWeaveflowORMContext} from '../wfInterface/context';
+import {WFCall} from '../wfInterface/types';
+import {CallDetails} from './CallDetails';
+import {CallOverview} from './CallOverview';
 
 // % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
@@ -66,45 +67,10 @@ export const CallPage: React.FC<{
 };
 
 const useCallTabs = (call: WFCall) => {
-  // const entityName = call.entity();
-  // const projectName = call.project();
-  // const callId = call.callID();
-  const childCalls = call.childCalls().filter(c => {
-    return call.opVersion() != null;
-  });
-
   return [
     {
       label: 'Call',
-      content: (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            flex: '1 1 auto',
-            overflow: 'auto',
-            p: 8,
-          }}>
-          <SpanDetails
-            call={call.rawCallSpan()}
-            hackyInjectionBelowFunction={
-              childCalls.length > 0 && (
-                <>
-                  <Typography variant="h6" gutterBottom>
-                    Child Calls
-                  </Typography>
-                  <GroupedCalls
-                    calls={childCalls}
-                    partialFilter={{
-                      parentId: call.callID(),
-                    }}
-                  />
-                </>
-              )
-            }
-          />
-        </Box>
-      ),
+      content: <CallDetails wfCall={call} />,
     },
     // {
     //   label: 'Child Calls',
@@ -191,14 +157,14 @@ const CallPageInnerHorizontal: React.FC<{
   return (
     <SimplePageLayout
       title={traceTitle}
-      menuItems={[
-        {
-          label: 'View Vertical',
-          onClick: () => {
-            setVerticalLayout(true);
-          },
-        },
-      ]}
+      // menuItems={[
+      //   {
+      //     label: 'View Vertical',
+      //     onClick: () => {
+      //       setVerticalLayout(true);
+      //     },
+      //   },
+      // ]}
       tabs={[
         {
           label: 'Trace',
@@ -254,17 +220,18 @@ const CallPageInnerVertical: React.FC<{
   const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={title}
-      menuItems={[
-        {
-          label: 'View Horizontal',
-          onClick: () => {
-            setVerticalLayout(false);
-          },
-        },
-        // ...callMenuItems,
-      ]}
+      // menuItems={[
+      //   {
+      //     label: 'View Horizontal',
+      //     onClick: () => {
+      //       setVerticalLayout(false);
+      //     },
+      //   },
+      //   // ...callMenuItems,
+      // ]}
+      headerContent={<CallOverview wfCall={call} />}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />
@@ -400,11 +367,14 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
           borderBottom: 'none',
         },
       },
+      '& .MuiDataGrid-columnHeaders': {
+        borderBottom: treeOnly ? 'none' : undefined,
+      },
       [callClass]: {
         backgroundColor: '#a9edf252',
       },
     }),
-    [callClass]
+    [callClass, treeOnly]
   );
 
   // Scroll selected call into view
@@ -432,6 +402,7 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
     <DataGridPro
       apiRef={apiRef}
       rowHeight={38}
+      columnHeaderHeight={treeOnly ? 0 : 56}
       treeData
       onRowClick={onRowClick}
       rows={rows}

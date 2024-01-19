@@ -224,7 +224,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                 }}
                 renderInput={params => <TextField {...params} label="Type" />}
                 getOptionLabel={option => {
-                  return typeVersionOptions[option];
+                  return typeVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(typeVersionOptions)}
               />
@@ -251,7 +251,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                   });
                 }}
                 getOptionLabel={option => {
-                  return opVersionOptions[option];
+                  return opVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(opVersionOptions)}
               />
@@ -636,7 +636,9 @@ const useTypeCategoryOptions = (
   }, [allObjectVersions, highLevelFilter]);
 
   return useMemo(() => {
-    return _.uniq(filtered.map(item => item.typeVersion().typeCategory()));
+    return _.uniq(
+      filtered.map(item => item.typeVersion().typeCategory())
+    ).filter(v => v != null) as HackyTypeCategory[];
   }, [filtered]);
 };
 

@@ -19,6 +19,7 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {MOON_200} from '../../../common/css/color.styles';
 import {useWindowSize} from '../../../common/hooks/useWindowSize';
 import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
@@ -37,7 +38,7 @@ import {
 } from './Browse3/context';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
-import {CallPage} from './Browse3/pages/CallPage';
+import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
@@ -351,11 +352,16 @@ const MainPeekingLayout: FC = () => {
 
       <Box
         sx={{
-          borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
+          borderLeft:
+            flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
+          borderTop:
+            flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
           flex: peekLocation ? '1 1 60%' : '0 0 0px',
           transition: peekLocation ? 'all 0.2s ease-in-out' : '',
           boxShadow:
-            'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+            flexDirection === 'row'
+              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
+              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
           overflow: 'hidden',
           display: 'flex',
           zIndex: 1,
@@ -511,7 +517,9 @@ const Browse3ProjectRoot: FC<{
       sx={{
         flex: '1 1 auto',
         width: '100%',
-        overflow: 'auto',
+        overflowY: 'auto',
+        // Very odd, but this is needed to prevent the horizontal scrollbar for a single pixel
+        overflowX: 'hidden',
       }}>
       <Switch location={customLocation}>
         {/* TYPES */}

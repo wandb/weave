@@ -859,7 +859,7 @@ const ConsumesTypeVersionFilterControlListItem: React.FC<{
             });
           }}
           getOptionLabel={option => {
-            return optionsDict[option];
+            return optionsDict[option] ?? option;
           }}
           options={Object.keys(optionsDict)}
         />
@@ -917,7 +917,7 @@ const ProducesTypeVersionFilterControlListItem: React.FC<{
             });
           }}
           getOptionLabel={option => {
-            return optionsDict[option];
+            return optionsDict[option] ?? option;
           }}
           options={Object.keys(optionsDict)}
         />
