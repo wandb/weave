@@ -229,7 +229,8 @@ def serve(
         raise ValueError("serve currently only supports wandb client")
 
     print(f"Serving {model_ref}")
-    print(f"Server docs at http://localhost:{port}/docs")
+    print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
+    print()
     os.environ["PROJECT_NAME"] = f"{client.entity_name}/{client.project_name}"
     os.environ["MODEL_REF"] = str(model_ref)
 

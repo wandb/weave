@@ -336,12 +336,17 @@ class DefaultToPy(mappers.Mapper):
             pass
         # If the ref exists elsewhere, just return its uri.
         # TODO: This doesn't deal with MemArtifactRef!
+        gc = graph_client_context.get_graph_client()
+
         existing_ref = storage._get_ref(obj)
         if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
             if (
-                existing_ref.artifact.__class__ == self._artifact.__class__
-                and existing_ref.is_saved
-            ):
+                # If we have a graph_client (weaveflow), only save
+                # a nested ref here if it is a ref to the same storage
+                # engine.
+                not gc
+                or (gc and gc.ref_is_own(existing_ref))
+            ) and existing_ref.is_saved:
                 if self._use_stable_refs:
                     uri = existing_ref.uri
                 else:
@@ -350,7 +355,6 @@ class DefaultToPy(mappers.Mapper):
 
         ref = None
 
-        gc = graph_client_context.get_graph_client()
         if gc and isinstance(obj, op_def.OpDef):
             # This is a hack to ensure op_defs are always published as
             # top-level objects. This should be achieved by a policy
