@@ -1,0 +1,8 @@
+{
+  "label": "Toolbelt",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "Tools for working with Weave objects and ops."
+  }
+}

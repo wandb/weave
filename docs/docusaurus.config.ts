@@ -61,9 +61,15 @@ const config: Config = {
       items: [
         {
           type: "docSidebar",
-          sidebarId: "tutorialSidebar",
+          sidebarId: "documentationSidebar",
           position: "left",
           label: "Documentation",
+        },
+        {
+          type: "docSidebar",
+          sidebarId: "apiReferenceSidebar",
+          position: "left",
+          label: "API Reference",
         },
         {
           href: "https://github.com/wandb/weave",
@@ -110,7 +116,8 @@ const config: Config = {
       copyright: `Weave by W&B`,
     },
     prism: {
-      theme: prismThemes.github,
+      // theme: prismThemes.nightOwl,
+      theme: prismThemes.nightOwlLight,
       darkTheme: prismThemes.dracula,
       magicComments: [
         // Remember to extend the default highlight class name as well!
