@@ -764,7 +764,6 @@ export const WeaveViewOpDef: FC<{
     () => parseRefMaybe(opDefQuery.result ?? ''),
     [opDefQuery.result]
   );
-  console.log('WEAVE VIEW OP DEF', node, opDefQuery, opDefRef);
   if (opDefQuery.loading) {
     return <div>loading</div>;
   } else if (opDefRef != null) {
