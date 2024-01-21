@@ -16,6 +16,7 @@ from . import box
 from . import mappers_python
 from . import val_const
 from . import artifact_fs
+from . import graph_client_context
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
 from .partial_object import PartialObjectType, PartialObject
@@ -96,7 +97,7 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             # and will bind self upon construction as usual.
             if self.type._relocatable:
                 new_class = type(
-                    instance_class.__name__ + "WithLoadedMethods",
+                    instance_class.__name__,
                     (instance_class,),
                     op_methods,
                 )
@@ -327,6 +328,8 @@ class DefaultToPy(mappers.Mapper):
         self._use_stable_refs = use_stable_refs
 
     def apply(self, obj):
+        from . import op_def
+
         try:
             return self.type.instance_to_dict(obj)
         except NotImplementedError:
@@ -335,14 +338,26 @@ class DefaultToPy(mappers.Mapper):
         # TODO: This doesn't deal with MemArtifactRef!
         existing_ref = storage._get_ref(obj)
         if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
-            if existing_ref.is_saved:
+            if (
+                existing_ref.artifact.__class__ == self._artifact.__class__
+                and existing_ref.is_saved
+            ):
                 if self._use_stable_refs:
                     uri = existing_ref.uri
                 else:
                     uri = existing_ref.initial_uri
                 return str(uri)
+
         ref = None
-        if isinstance(obj, ref_base.Ref):
+
+        gc = graph_client_context.get_graph_client()
+        if gc and isinstance(obj, op_def.OpDef):
+            # This is a hack to ensure op_defs are always published as
+            # top-level objects. This should be achieved by a policy
+            # instead. There is a parallel policy in to_weavejs_with_refs
+            # at the moment.
+            ref = gc.save_object(obj, obj.name, "latest")
+        elif isinstance(obj, ref_base.Ref):
             ref = obj
         elif isinstance(obj, str):
             try:
