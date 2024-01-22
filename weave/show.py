@@ -160,4 +160,5 @@ def _ipython_display_method_(self):
 # show when the last expression in a notebook cell produces them.
 graph.Node._ipython_display_ = _ipython_display_method_  # type: ignore
 panel.Panel._ipython_display_ = _ipython_display_method_  # type: ignore
-ref_base.Ref._ipython_display_ = _ipython_display_method_  # type: ignore
+# Don't automatically show weave panel in notebook for ref
+# ref_base.Ref._ipython_display_ = _ipython_display_method_  # type: ignore
