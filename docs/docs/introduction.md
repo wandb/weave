@@ -16,28 +16,29 @@ Weave's core concept is that as your code executes, it keeps track of function c
 
 ## Key concepts
 
+Weave's **core types** layer contains everything you need for organizing AI projects, with built-in lineage, tracking, and reproducibility.
+
+  - **[Datasets](/guides/core-types/datasets)**: Version, store, and share rich tabular data.
+  - **[Models](/guides/core-types/models)**: Version, store and share parameterized functions.
+  - **[Evaluations](/guides/core-types/evaluations)**: Test suites for AI models.
+  - [soon] Agents: ...
+
 Weave's **tracking** layer brings immutable tracing and versioning to your programs and experiments.
 
-  - **[Objects](/docs/using-weave/tracking/objects)**: Weave's extensible serialization lets you easily version, track, and share Python objects.
-  - **[Ops](/docs/using-weave/tracking/ops)**: Versioned, reproducible functions, with automatic tracing.
-  - **[Tracing](/docs/using-weave/tracking/tracing)**: Automatic organization of function calls and data lineage.
-
-Weave's **core types** layer contains everything you need for organizing AI projects, with built-in tracking.
-
-  - **[Datasets](/docs/using-weave/core-types/datasets)**: Version, store, and share rich tabular data.
-  - **[Models](/docs/using-weave/core-types/models)**: Version, store and share parameterized functions.
-  - **[Evaluations](/docs/using-weave/core-types/evaluations)**: Test suites for AI models.
-  - [soon] Agents: ...
+  - **[Objects](/guides/tracking/objects)**: Weave's extensible serialization lets you easily version, track, and share Python objects.
+  - **[Ops](/guides/tracking/ops)**: Versioned, reproducible functions, with automatic tracing.
+  - **[Tracing](/guides/tracking/tracing)**: Automatic organization of function calls and data lineage.
 
 Weave's **ecosystem** is batteries included for other libraries, systems, and best practices.
 
-  - **[Auto-tracking](/docs/using-weave/ecosystem/auto-tracking)**: openai, [coming soon] langchain, llama-index, and more
-  - ...
+  - **[OpenAI](/guides/ecosystem/openai)**: automatic tracking for openai api calls
+  - [soon] Langchain auto-logging
+  - [soon] llama-index auto-logging
 
-Weave's **toolbelt** contains utilities for making use of Weave objects.
+Weave's **tools** layer contains utilities for making use of Weave objects.
   
-  - **[Serve](/docs/using-weave/toolbelt/serve)**: FastAPI server for Weave Ops and Models
-  - **[Deploy](/docs/using-weave/toolbelt/deploy)**: Deploy Weave Ops and Models to various targets
+  - **[Serve](/guides/tools/serve)**: FastAPI server for Weave Ops and Models
+  - **[Deploy](/guides/tools/deploy)**: Deploy Weave Ops and Models to various targets
 
 
 
