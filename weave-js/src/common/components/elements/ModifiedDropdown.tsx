@@ -429,11 +429,12 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
             setSearchQuery(data.searchQuery);
           }
         }}
-        onClose={() => {
-          setSearchQuery('');
-        }}
+        // onClose={() => {
+        //   setSearchQuery('');
+        // }}
         onChange={(e, {value: val}) => {
           setSearchQuery('');
+          console.log('foo');
           const valCount = _.isArray(val) ? val.length : 0;
           if (valCount < itemCount() || !atItemLimit()) {
             if (onChange && val !== ITEM_LIMIT_VALUE) {
