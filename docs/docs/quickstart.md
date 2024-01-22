@@ -55,6 +55,6 @@ Calls made with the openai library are automatically tracked with weave but you 
 
 ## What's next?
 
-- Follow the [Build an Evaluation pipeline tutorial](/docs/get-started/tutorial) to start iteratively improving your applications.
-- Learn how to create parameterized functions with [Models](/docs/using-weave/models).
-- [Serve](/using-weave/serve) and [Deploy](/using-weave/deploy) Weave Ops with the Weave toolbelt.
+- Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
+- Learn how to create parameterized functions with [Models](/guides/core-types/models).
+- [Serve](/guides/toolbelt/serve) and [Deploy](/guides/toolbelt/deploy) Weave Ops with the Weave toolbelt.
