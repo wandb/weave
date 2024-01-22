@@ -429,6 +429,9 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
             setSearchQuery(data.searchQuery);
           }
         }}
+        onClose={() => {
+          setSearchQuery('');
+        }}
         onChange={(e, {value: val}) => {
           setSearchQuery('');
           const valCount = _.isArray(val) ? val.length : 0;
