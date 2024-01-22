@@ -18,7 +18,6 @@ import {Call} from '../../../Browse2/callTree';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {OpVersionCategoryChip} from '../common/OpVersionCategoryChip';
 import {
   SimplePageLayout,
   SimplePageLayoutContext,
@@ -449,7 +448,6 @@ const CustomGridTreeDataGroupingCell: React.FC<
     event.stopPropagation();
   };
 
-  const opCategory = call.opVersion()?.opCategory();
   const isLastChild = useMemo(() => {
     if (rowNode.parent == null) {
       return false;
@@ -569,14 +567,6 @@ const CustomGridTreeDataGroupingCell: React.FC<
         {/* {call.spanName() + ': ' + truncateID(call.callID())} */}
         {call.spanName().split('-').slice(-1)[0]}
       </Box>
-      {opCategory && (
-        <Box
-          sx={{
-            ml: 4,
-          }}>
-          <OpVersionCategoryChip opCategory={opCategory} />
-        </Box>
-      )}
     </Box>
   );
 };
