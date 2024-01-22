@@ -209,6 +209,7 @@ export {
   IconVersionsLayers,
   IconVertexGCP,
   IconVideoPlay,
+  IconViewGlasses,
   IconWandb,
   IconWarning,
   IconWarningAlt,

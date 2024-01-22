@@ -2,7 +2,7 @@ import React, {createContext, useContext} from 'react';
 
 import {WFProject} from './types';
 
-type WeaveflowORMContextType = {
+export type WeaveflowORMContextType = {
   projectConnection: WFProject;
 };
 

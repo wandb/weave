@@ -290,3 +290,9 @@ def consistent_table_col_ids():
 def ref_tracking():
     with context_state.ref_tracking(True):
         yield
+
+
+@pytest.fixture()
+def strict_op_saving():
+    with context_state.strict_op_saving(True):
+        yield

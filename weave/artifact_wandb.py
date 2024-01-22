@@ -9,7 +9,7 @@ import requests
 import logging
 
 from wandb import Artifact
-from wandb.apis import public as wb_public
+from wandb.apis.public import api as wb_public
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
 from . import urls
@@ -436,6 +436,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             # TODO: we could technically support writable artifacts by creating a new version?
             self._unresolved_read_artifact_or_client_uri = uri
         self._local_path: dict[str, str] = {}
+        # self._path_handlers: dict[str, typing.Any] = {}
 
     @property
     def branch(self) -> typing.Optional[str]:
@@ -647,8 +648,12 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         with file_util.safe_open(p, mode) as f:
             yield f
 
-    def get_path_handler(self, path, handler_constructor):
-        raise NotImplementedError()
+    # def get_path_handler(self, path, handler_constructor):
+    #     handler = self._path_handlers.get(path)
+    #     if handler is None:
+    #         handler = handler_constructor(self, path)
+    #         self._path_handlers[path] = handler
+    #     return handler
 
     def read_metadata(self):
         raise NotImplementedError()
@@ -665,6 +670,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     ):
+        # for handler in self._path_handlers.values():
+        #     handler.close()
         additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
             self._writeable_artifact,
@@ -824,6 +831,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
         return cls(
             WandbArtifact(uri.name, uri=uri),
             path=uri.path,
+            extra=uri.extra,
         )
 
     @property
@@ -980,6 +988,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
     # wandb-logged-artifact://afdsjaksdjflkasjdf12341234hv12h3v4k12j3hv41kh4v1423k14v1k2j3hv1k2j3h4v1k23h4v:[version|latest]/path
     #  scheme                                 name                                                              version      path
     path: typing.Optional[str] = None
+    extra: typing.Optional[list[str]] = None
 
     # private attrs
 

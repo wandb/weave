@@ -57,7 +57,7 @@ export interface Call {
   span_id: string;
   trace_id: string;
   parent_id: string;
-  timestamp: string;
+  timestamp: number;
   start_time_ms: number;
   end_time_ms: number;
 }

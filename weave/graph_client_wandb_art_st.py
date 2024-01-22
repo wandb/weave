@@ -14,6 +14,7 @@ from . import urls
 from . import context_state
 from . import weave_internal
 from . import monitoring
+from .monitoring import monitor
 from . import artifact_wandb
 from . import op_def
 from . import ops_primitives
@@ -235,7 +236,7 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
         # self.runs_st.log(span)
         return RunStreamTableSpan(span)
 
-    def fail_run(self, run: RunStreamTableSpan, exception: Exception) -> None:
+    def fail_run(self, run: RunStreamTableSpan, exception: BaseException) -> None:
         span = copy.copy(run._attrs)
         span["end_time_s"] = time.time()
         span["status_code"] = "ERROR"
@@ -261,6 +262,8 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
         span["status_code"] = "SUCCESS"
         span["output"] = output
         span["summary"] = {"latency_s": span["end_time_s"] - span["start_time_s"]}
+        span["attributes"] = monitor._attributes.get()
+
         self.runs_st.log(span)
 
     def add_feedback(self, run_id: str, feedback: dict[str, typing.Any]) -> None:

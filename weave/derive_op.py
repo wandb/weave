@@ -1,3 +1,7 @@
+# This contains logic for making "mapped" ops for all regularly declared ops.
+# These derived ops are not yet fully Weave serializable due to some non-json stuff
+#     in their closure. So we disable strict_op_saving when deriving them.
+
 import copy
 import inspect
 import typing
@@ -19,6 +23,7 @@ from . import weave_internal
 from . import execute_fast
 from . import op_policy
 from . import parallelism
+from . import context_state
 
 from .language_features.tagging import tag_store
 
@@ -373,26 +378,27 @@ class MappedDeriveOpHandler(DeriveOpHandler):
         base_weave_type: type[types.Type],
         orig_op_new_name: str,
     ):
-        named_args = derived_op.input_type.named_args()
-        if len(named_args) == 0 or not isinstance(
-            derived_op.input_type, op_args.OpNamedArgs
-        ):
-            raise errors.WeaveDefinitionError(
-                f"Expected mapped op {derived_op.name} to have named first argument."
+        with context_state.strict_op_saving(False):
+            named_args = derived_op.input_type.named_args()
+            if len(named_args) == 0 or not isinstance(
+                derived_op.input_type, op_args.OpNamedArgs
+            ):
+                raise errors.WeaveDefinitionError(
+                    f"Expected mapped op {derived_op.name} to have named first argument."
+                )
+            first_arg = named_args[0]
+            # Check to see if the first argument is a list of UnknownType. This is how
+            # we know that the type is expected to be the class type
+            first_arg_is_cls = first_arg.type == types.List(
+                types.optional(types.UnknownType())
             )
-        first_arg = named_args[0]
-        # Check to see if the first argument is a list of UnknownType. This is how
-        # we know that the type is expected to be the class type
-        first_arg_is_cls = first_arg.type == types.List(
-            types.optional(types.UnknownType())
-        )
-        if first_arg_is_cls:
-            derived_op.input_type.arg_types[first_arg.name] = types.List(
-                types.optional(base_weave_type())
+            if first_arg_is_cls:
+                derived_op.input_type.arg_types[first_arg.name] = types.List(
+                    types.optional(base_weave_type())
+                )
+            registry_mem.memory_registry.rename_op(
+                derived_op.name, MappedDeriveOpHandler.derived_name(orig_op_new_name)
             )
-        registry_mem.memory_registry.rename_op(
-            derived_op.name, MappedDeriveOpHandler.derived_name(orig_op_new_name)
-        )
 
 
 def _mapped_refine_output_type(orig_op):
@@ -443,8 +449,12 @@ def handler_for_id(handler_id: str) -> type[DeriveOpHandler]:
 
 
 def derive_ops(op: op_def.OpDef):
-    for handler in DeriveOpHandler.__subclasses__():
-        if handler.should_derive_op(op) and handler.handler_id not in op.derived_ops:
-            new_op = handler.make_derived_op(op)
-            op.derived_ops[handler.handler_id] = new_op
-            new_op.derived_from = op
+    with context_state.strict_op_saving(False):
+        for handler in DeriveOpHandler.__subclasses__():
+            if (
+                handler.should_derive_op(op)
+                and handler.handler_id not in op.derived_ops
+            ):
+                new_op = handler.make_derived_op(op)
+                op.derived_ops[handler.handler_id] = new_op
+                new_op.derived_from = op

@@ -50,7 +50,11 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
 
     # Implement the required members from the "GraphClient" protocol class
     def runs(self) -> Sequence[Run]:
-        raise NotImplementedError
+        runs = storage.objects(types.RunType())
+        result: list[WeaveRunObj] = []
+        for run in runs:
+            result.append(typing.cast(WeaveRunObj, run.get()))
+        return result
 
     def run(self, run_id: str) -> typing.Optional[Run]:
         raise NotImplementedError
@@ -144,8 +148,9 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         with_digest_inputs["_digests"] = [ref.digest for ref in input_refs]
         return WeaveRunObj(run_id, op_name, inputs=with_digest_inputs)
 
-    def fail_run(self, run: Run, exception: Exception) -> None:
-        raise NotImplementedError
+    def fail_run(self, run: Run, exception: BaseException) -> None:
+        # TODO: Need to implement for local, for now just do nothing.
+        pass
 
     def finish_run(
         self,

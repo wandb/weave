@@ -4,6 +4,7 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
 import React, {FC} from 'react';
 
+import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {Call} from './callTree';
 import {DisplayControlChars} from './CommonLib';
 import {
@@ -21,7 +22,15 @@ const ObjectView: FC<{obj: any}> = ({obj}) => {
         {Object.entries(obj).flatMap(([key, value]) => {
           const singleRow = !_.isPlainObject(value);
           return [
-            <Grid item key={key + '-key'} xs={singleRow ? 2 : 12}>
+            <Grid
+              item
+              key={key + '-key'}
+              xs={singleRow ? 2 : 12}
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
               <Typography>{key}</Typography>
             </Grid>,
             <Grid item key={key + '-value'} xs={singleRow ? 10 : 12}>
@@ -57,11 +66,29 @@ const ObjectView: FC<{obj: any}> = ({obj}) => {
   return <Typography>{JSON.stringify(obj)}</Typography>;
 };
 
-export const SpanDetails: FC<{call: Call}> = ({call}) => {
-  const actualInputs = Object.entries(call.inputs).filter(
-    ([k, c]) => c != null && !k.startsWith('_')
+export const SpanDetails: FC<{
+  call: Call;
+  hackyInjectionBelowFunction?: React.ReactNode;
+}> = ({call, hackyInjectionBelowFunction}) => {
+  const inputKeys =
+    call.inputs._keys ??
+    Object.entries(call.inputs)
+      .filter(([k, c]) => c != null && !k.startsWith('_'))
+      .map(([k, c]) => k);
+  const inputs = _.fromPairs(inputKeys.map(k => [k, call.inputs[k]]));
+
+  const callOutput = call.output ?? {};
+  const outputKeys =
+    callOutput._keys ??
+    Object.entries(call.inputs)
+      .filter(([k, c]) => c != null && (k === '_result' || !k.startsWith('_')))
+      .map(([k, c]) => k);
+  const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
+
+  const attributes = _.fromPairs(
+    Object.entries(call.attributes ?? {}).filter(([k, a]) => !k.startsWith('_'))
   );
-  const inputs = _.fromPairs(actualInputs);
+
   return (
     <div style={{width: '100%'}}>
       <div style={{marginBottom: 24}}>
@@ -84,16 +111,18 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
             call.name
           )}
         </Box>
-        <Typography variant="body2" gutterBottom>
-          Status: {call.status_code}
-        </Typography>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="body2">Status:</Typography>
+          <StatusChip value={call.status_code} />
+        </Box>
+        {hackyInjectionBelowFunction}
         {call.exception != null && (
           <Typography variant="body2" gutterBottom>
             {call.exception}
           </Typography>
         )}
       </div>
-      {call.attributes != null && (
+      {Object.keys(attributes).length > 0 && (
         <div style={{marginBottom: 12}}>
           <Typography variant="h6" gutterBottom>
             Attributes
@@ -101,7 +130,7 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
           <Box pl={2} pr={2}>
             <ObjectView
               obj={_.fromPairs(
-                Object.entries(call.attributes).filter(([k, v]) => v != null)
+                Object.entries(attributes).filter(([k, v]) => v != null)
               )}
             />
           </Box>
@@ -136,14 +165,14 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
           Output
         </Typography>
         <Box pl={2} pr={2}>
-          {call.output == null ? (
+          {output == null ? (
             <div>null</div>
           ) : isOpenAIChatOutput(call.output) ? (
             <OpenAIChatOutputView chatOutput={call.output} />
           ) : (
             <ObjectView
               obj={_.fromPairs(
-                Object.entries(call.output).filter(
+                Object.entries(output).filter(
                   ([k, v]) =>
                     (k === '_result' || !k.startsWith('_')) && v != null
                 )

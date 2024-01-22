@@ -559,6 +559,27 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         self._validate()
 
+    @property
+    def simple_value_type(self) -> types.Type:
+        """Returns the type of values stored in this list, without any transparent types."""
+        return types.simple_type(self.object_type)
+
+    def is_number(self) -> bool:
+        return isinstance(self.simple_value_type, types.Number)
+
+    def is_boolean(self) -> bool:
+        return isinstance(self.simple_value_type, types.Boolean)
+
+    def is_dict(self) -> bool:
+        return isinstance(self.simple_value_type, types.TypedDict)
+
+    def _lookup_path(self, path: list[str]):
+        remaining_path = path[1:]
+        res = self._index(int(path[0]))
+        if remaining_path:
+            return res._lookup_path(remaining_path)
+        return res
+
     def __add__(self, other) -> "ArrowWeaveList":
         if isinstance(other, list):
             other = ArrowWeaveList(other)
@@ -1072,9 +1093,17 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return np.asarray(pylist)
 
     def __iter__(self):
+        self_ref = ref_base.get_ref(self)
         pylist = self.to_pylist_tagged()
-        for x in pylist:
-            yield x
+        for i, x in enumerate(pylist):
+            if isinstance(x, ref_base.Ref):
+                yield x.get()
+            else:
+                if self_ref:
+                    x = box.box(x)
+                    x_ref = self_ref.with_extra(self.object_type, x, [str(i)])
+                    ref_base._put_ref(x, x_ref)
+                yield x
 
     def __repr__(self):
         return f"<ArrowWeaveList: {self.object_type}>"
@@ -1297,10 +1326,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             # so if the user calls an op on the row, the op refers to a sub-row
             # in this list
             if isinstance(ref, ref_base.Ref):
-                if not isinstance(ref, artifact_base.ArtifactRef):
-                    raise ValueError(
-                        "Cannot index into a non-artifact ref: {}".format(ref)
-                    )
                 result = box.box(result)
                 new_ref = ref.with_extra(self.object_type, result, [str(index)])
                 ref_base._put_ref(result, new_ref)
@@ -1378,6 +1403,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
     def _null_mask(self) -> pa.Array:
         return safe_is_null(self._arrow_data)
+
+    @property
+    def column_names(self):
+        obj_type = types.unwrap_type(self.object_type)
+        return obj_type.property_types.keys()
 
     def column(self, name: str) -> "ArrowWeaveList":
         if isinstance(self.object_type, tagged_value_type.TaggedValueType):

@@ -33,6 +33,7 @@ export const useRuns = (
     () => fnRunsNode(streamId, filters),
     [filters, streamId]
   );
+
   const traceSpansQuery = useNodeValue(traceSpansNode);
 
   return useMemo(

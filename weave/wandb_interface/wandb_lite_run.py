@@ -218,7 +218,7 @@ class InMemoryLazyLiteRun:
             )
 
         with tracer.trace("ArtifactSaver.save"):
-            res = saver.save(
+            res, future = saver.save(
                 type=artifact_type_name,
                 name=artifact_name,
                 client_id=artifact._client_id,
@@ -227,7 +227,10 @@ class InMemoryLazyLiteRun:
                 description=artifact.description,
                 aliases=["latest"] + additional_aliases,
                 use_after_commit=False,
-            )
+            )  # type: ignore
+            # wait for the artifact to be committed before returning the result
+            if future is not None:
+                future.result()
         return res
 
     def upsert_project(self) -> None:
