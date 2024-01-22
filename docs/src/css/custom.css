@@ -59,3 +59,7 @@ h2 { font-size: 1.5rem !important; }
 .pagination-nav {
   display: none;
 }
+
+kbd {
+  font-size: 0.5em;
+}
