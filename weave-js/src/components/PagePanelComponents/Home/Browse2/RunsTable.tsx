@@ -4,17 +4,21 @@ import {
   DataGridPro,
   GridColDef,
   GridColumnGroup,
+  GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
-import React, {FC, useEffect, useMemo, useRef} from 'react';
+import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {Timestamp} from '../../../Timestamp';
 import {CallLink, opVersionText} from '../Browse3/pages/common/Links';
+import {StatusChip} from '../Browse3/pages/common/StatusChip';
+import {useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
+import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
@@ -147,33 +151,42 @@ export const RunsTable: FC<{
     });
   }, [orm?.projectConnection, spans, loading]);
 
+  // Highlight table row if it matches peek drawer.
+  const query = useURLSearchParamsDict();
+  const {peekPath} = query;
+  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const rowIds = useMemo(() => {
+    return tableData.map(row => row.id);
+  }, [tableData]);
+  const [rowSelectionModel, setRowSelectionModel] =
+    useState<GridRowSelectionModel>([]);
+  useEffect(() => {
+    if (rowIds.length === 0) {
+      // Data may have not loaded
+      return;
+    }
+    if (peekId == null) {
+      // No peek drawer, clear any selection
+      setRowSelectionModel([]);
+    } else {
+      // If peek drawer matches a row, select it.
+      // If not, don't modify selection.
+      if (rowIds.includes(peekId)) {
+        setRowSelectionModel([peekId]);
+      }
+    }
+  }, [rowIds, peekId]);
+
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
         field: 'status_code',
         headerName: '',
-        width: 40,
-        minWidth: 40,
-        maxWidth: 40,
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
         renderCell: cellParams => {
-          return (
-            <Chip
-              label={' '}
-              sx={{height: '20px', lineHeight: 2}}
-              // label={cellParams.row.status_code}
-              size="small"
-              color={
-                cellParams.row.status_code === 'SUCCESS'
-                  ? 'success'
-                  : cellParams.row.status_code === 'ERROR'
-                  ? 'error'
-                  : undefined
-              }
-            />
-          );
+          return <StatusChip value={cellParams.row.status_code} />;
         },
       },
       {
@@ -469,21 +482,9 @@ export const RunsTable: FC<{
         },
       };
     }, [loading]);
+
   return (
-    <DataGridPro
-      sx={{
-        // borderTop: 1,
-        borderRight: 0,
-        borderLeft: 0,
-        borderBottom: 0,
-        '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
-          outline: 'none',
-        },
-        '& .MuiDataGrid-columnHeaders': {
-          backgroundColor: '#FAFAFA',
-          color: '#979a9e',
-        },
-      }}
+    <StyledDataGrid
       columnHeaderHeight={40}
       apiRef={apiRef}
       loading={loading}
@@ -494,6 +495,7 @@ export const RunsTable: FC<{
       columns={columns.cols}
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
+      rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columns.colGroupingModel}
       // onRowClick={({id}) => {
       //   history.push(

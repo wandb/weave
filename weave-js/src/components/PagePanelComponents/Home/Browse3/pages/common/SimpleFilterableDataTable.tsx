@@ -1,7 +1,14 @@
 import {Box} from '@mui/material';
-import {DataGridPro, GridColDef, GridValidRowModel} from '@mui/x-data-grid-pro';
+import {
+  GridColDef,
+  GridRowSelectionModel,
+  GridValidRowModel,
+} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
+
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {useURLSearchParamsDict} from '../util';
 
 type FilterableTablePropsType<
   DataRowType extends GridValidRowModel,
@@ -185,28 +192,47 @@ export const FilterableTable = <
     );
   }, [effectiveFilter, filter, filteredColData, props.columns, setFilter]);
 
+  // Highlight table row if it matches peek drawer.
+  const query = useURLSearchParamsDict();
+  const {peekPath} = query;
+  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const rowIds = useMemo(() => {
+    return dataGridRowData.map(row => row.id);
+  }, [dataGridRowData]);
+  const [rowSelectionModel, setRowSelectionModel] =
+    useState<GridRowSelectionModel>([]);
+  useEffect(() => {
+    if (rowIds.length === 0) {
+      // Data may have not loaded
+      return;
+    }
+    if (peekId == null) {
+      // No peek drawer, clear any selection
+      setRowSelectionModel([]);
+    } else {
+      // If peek drawer matches a row, select it.
+      // If not, don't modify selection.
+      if (rowIds.includes(peekId)) {
+        setRowSelectionModel([peekId]);
+      }
+    }
+  }, [rowIds, peekId]);
+
   return (
     <FilterLayoutTemplate
       filterPopoutTargetUrl={props.getFilterPopoutTargetUrl?.(effectiveFilter)}
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
       showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
       filterListItems={filterListItems}>
-      <DataGridPro
-        sx={{
-          borderRight: 0,
-          borderLeft: 0,
-          borderBottom: 0,
-          '& .MuiDataGrid-columnHeaders': {
-            backgroundColor: '#FAFAFA',
-            color: '#979a9e',
-          },
-        }}
+      <StyledDataGrid
         columnHeaderHeight={40}
         rows={dataGridRowData}
         rowHeight={38}
-        columns={dataGridColumns}
+        // Cast to "any" is due to https://github.com/mui/mui-x/issues/6014
+        columns={dataGridColumns as any}
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
+        rowSelectionModel={rowSelectionModel}
         initialState={{
           sorting: {sortModel: [{field: 'createdAt', sort: 'desc'}]},
         }}

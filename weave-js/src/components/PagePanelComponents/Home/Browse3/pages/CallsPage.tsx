@@ -217,7 +217,7 @@ export const CallsTable: React.FC<{
                   // <TextField {...params} label="Op Version" />
                 )}
                 getOptionLabel={option => {
-                  return opVersionOptions[option];
+                  return opVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(opVersionOptions)}
               />
@@ -245,7 +245,7 @@ export const CallsTable: React.FC<{
                   });
                 }}
                 getOptionLabel={option => {
-                  return consumesObjectVersionOptions[option];
+                  return consumesObjectVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(consumesObjectVersionOptions)}
               />
@@ -267,7 +267,7 @@ export const CallsTable: React.FC<{
                   });
                 }}
                 getOptionLabel={option => {
-                  return traceIdOptions[option];
+                  return traceIdOptions[option] ?? option;
                 }}
                 options={Object.keys(traceIdOptions)}
               />
@@ -289,7 +289,7 @@ export const CallsTable: React.FC<{
                   });
                 }}
                 getOptionLabel={option => {
-                  return parentIdOptions[option];
+                  return parentIdOptions[option] ?? option;
                 }}
                 options={Object.keys(parentIdOptions)}
               />
@@ -316,8 +316,14 @@ export const CallsTable: React.FC<{
               Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
             }
             disablePadding>
-            <ListItemButton>
-              <ListItemText primary={`Roots Only`} />
+            <ListItemButton
+              onClick={() => {
+                setFilter({
+                  ...filter,
+                  traceRootsOnly: !effectiveFilter.traceRootsOnly,
+                });
+              }}>
+              <ListItemText primary="Roots Only" />
             </ListItemButton>
           </ListItem>
         </>

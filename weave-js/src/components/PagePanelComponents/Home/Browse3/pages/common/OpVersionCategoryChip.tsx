@@ -1,4 +1,5 @@
 import {Chip} from '@mui/material';
+import _ from 'lodash';
 import React from 'react';
 
 import {HackyOpCategory} from '../wfInterface/types';
@@ -21,7 +22,7 @@ export const OpVersionCategoryChip: React.FC<{
   // The color seems to be borked
   return (
     <Chip
-      label={props.opCategory}
+      label={_.capitalize(props.opCategory)}
       size="small"
       sx={{height: '20px', lineHeight: 2}}
       color={color as any}

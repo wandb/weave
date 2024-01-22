@@ -398,7 +398,7 @@ class OpDefType(types.Type):
             code = result["code"]
             warnings = result["warnings"]
             if warnings:
-                message = f"Partial serialization failure for op {obj}. This op may not be reloadable"
+                message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
                 for warning in warnings:
                     message += "\n  " + warning
                 if context_state.get_strict_op_saving():

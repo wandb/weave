@@ -3,14 +3,16 @@ import React from 'react';
 import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
 import {
   CallsLink,
-  OpLink,
   OpVersionLink,
   OpVersionsLink,
   opVersionText,
 } from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
-import {SimpleKeyValueTable, SimplePageLayout} from './common/SimplePageLayout';
+import {
+  SimpleKeyValueTable,
+  SimplePageLayoutWithHeader,
+} from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFOpVersion} from './wfInterface/types';
@@ -43,6 +45,7 @@ const OpVersionPageInner: React.FC<{
   const opVersionHash = opVersion.version();
   const opVersionCallCount = opVersion.calls().length;
   const opVersionIndex = opVersion.versionIndex();
+  const opVersionCategory = opVersion.opCategory();
   // const opInputTypes = opVersion.inputTypesVersions();
   // const opOutputTypes = opVersion.outputTypeVersions();
   const opInvokes = opVersion.invokes();
@@ -58,19 +61,14 @@ const OpVersionPageInner: React.FC<{
   // );
 
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={opVersionText(opName, opVersionIndex)}
       headerContent={
         <SimpleKeyValueTable
           data={{
             Name: (
               <>
-                <OpLink
-                  entityName={entity}
-                  projectName={project}
-                  opName={opName}
-                />{' '}
-                [
+                {opName} [
                 <OpVersionsLink
                   entity={entity}
                   project={project}
@@ -95,9 +93,13 @@ const OpVersionPageInner: React.FC<{
                 neverPeek
               />
             ),
-            Category: (
-              <OpVersionCategoryChip opCategory={opVersion.opCategory()} />
-            ),
+            ...(opVersionCategory
+              ? {
+                  Category: (
+                    <OpVersionCategoryChip opCategory={opVersionCategory} />
+                  ),
+                }
+              : {}),
 
             // Dropping input types and output types for the time being since
             // we have de-prioritized type version navigation.
@@ -291,7 +293,11 @@ const OpVersionPageInner: React.FC<{
 
 const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
   return (
-    <ul style={{margin: 0}}>
+    <ul
+      style={{
+        paddingInlineStart: '22px',
+        margin: 0,
+      }}>
       {opVersion.invokes().map((v, i) => {
         return (
           <li key={i}>
