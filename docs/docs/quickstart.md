@@ -1,17 +1,9 @@
 ---
 sidebar_position: 1
+hide_table_of_contents: true
 ---
 
 # Quickstart
-
-Weave is a flexible toolkit to evaluate and iterate on complex LLM-applications. 
-Use simple APIs to capture the entire evaluation-driven development workflow. 
-
-- build evaluation datasets
-- evaluate model performance
-- inspect LLM behaviour
-
-In this quickstart, you will learn how to use tracing to debug inputs & outputs of each function.
 
 ## Installation
 
@@ -58,13 +50,11 @@ Now, every time you call this function, weave will automatically capture the inp
 Run this application and your console will output a link to view it within W&B.
 
 :::note
-OpenAI calls are automatically tracked with weave but you can add other LLMs easily by wrapping them with `@weave.op()`
+Calls made with the openai library are automatically tracked with weave but you can add other LLMs easily by wrapping them with `@weave.op()`
 :::
-
-# What's next?
-
-You have just learned the **basics of Weave**.
 
 ## What's next?
 
-Checkout out the tutorial to build a tracked evaluations pipeline so you can iteratively improve your applications.
+- Follow the [Build an Evaluation pipeline tutorial](/docs/get-started/tutorial) to start iteratively improving your applications.
+- Learn how to create parameterized functions with [Models](/docs/using-weave/models).
+- [Serve](/using-weave/serve) and [Deploy](/using-weave/deploy) Weave Ops with the Weave toolbelt.
