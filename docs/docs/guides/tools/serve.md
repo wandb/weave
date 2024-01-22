@@ -5,6 +5,11 @@ hide_table_of_contents: true
 
 # Serve
 
+Given a Weave ref to any Weave Model you can run:
 
+```
+weave serve <ref>
+```
 
-TODO
+to run a FastAPI server for that model.
+
