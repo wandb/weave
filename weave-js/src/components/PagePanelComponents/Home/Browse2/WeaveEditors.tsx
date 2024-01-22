@@ -65,7 +65,7 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
-import {parseRefMaybe} from './SmallRef';
+import {parseRefMaybe, SmallRef} from './SmallRef';
 import {useRefPageUrl} from './url';
 
 const displaysAsSingleRow = (valueType: Type) => {
@@ -767,12 +767,8 @@ export const WeaveViewOpDef: FC<{
   if (opDefQuery.loading) {
     return <div>loading</div>;
   } else if (opDefRef != null) {
-    // return <SmallRef objRef={opDefRef} />;
-    // This is broken in weave when there is a nested op def
-    return (
-      <>{opDefRef.artifactName + ':' + opDefRef.artifactVersion.slice(0, 6)}</>
-    );
+    return <SmallRef objRef={opDefRef} />;
   } else {
-    return <div>invalid op def</div>;
+    return <div>invalid op def: {opDefQuery.result}</div>;
   }
 };
