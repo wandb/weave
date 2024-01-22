@@ -5,5 +5,5 @@ import weave
 @weave.type()
 class Model:
     @weave.op()
-    def predict(self, input: typing.Any) -> typing.Any:
+    async def predict(self, input: typing.Any) -> typing.Any:
         ...

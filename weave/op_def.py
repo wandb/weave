@@ -20,6 +20,7 @@ from . import engine_trace
 from . import memo
 from . import weavify
 from . import eager
+from . import object_context
 from .run import Run
 from . import graph_client_context
 
@@ -389,7 +390,8 @@ class OpDef:
 
         sig = pyfunc_type_util.get_signature(_self.raw_resolve_fn)
         params = sig.bind(*args, **kwargs)
-        return execute.execute_sync_op(_self, params.arguments)
+        with object_context.object_context():
+            return execute.execute_sync_op(_self, params.arguments)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(

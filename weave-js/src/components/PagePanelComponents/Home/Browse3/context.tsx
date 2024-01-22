@@ -118,7 +118,8 @@ export const browse2Context = {
     entityName: string,
     projectName: string,
     objectName: string,
-    objectVersionHash: string
+    objectVersionHash: string,
+    refExtra?: string[]
   ) => {
     throw new Error('Not implemented');
   },
@@ -167,6 +168,13 @@ export const browse2Context = {
     throw new Error('Not implemented');
   },
   tablesUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
+  boardForExpressionUIUrl: (
+    entityName: string,
+    projectName: string,
+    expression: string
+  ) => {
     throw new Error('Not implemented');
   },
 };
@@ -256,12 +264,14 @@ const browse3ContextGen = (
       entityName: string,
       projectName: string,
       objectName: string,
-      objectVersionHash: string
+      objectVersionHash: string,
+      refExtra?: string[]
     ) => {
+      const extra = refExtra ? `/${refExtra.join('/')}` : '';
       return `${projectRoot(
         entityName,
         projectName
-      )}/objects/${objectName}/versions/${objectVersionHash}`;
+      )}/objects/${objectName}/versions/${objectVersionHash}${extra}`;
     },
     opVersionsUIUrl: (
       entityName: string,
@@ -346,6 +356,22 @@ const browse3ContextGen = (
     tablesUIUrl: (entityName: string, projectName: string) => {
       return `${projectRoot(entityName, projectName)}/tables`;
     },
+    boardForExpressionUIUrl: (
+      entityName: string,
+      projectName: string,
+      expression: string
+    ) => {
+      // TODO: This is totally wrong and needs to be updated
+      // when we have a proper boards page. Note, when that
+      // is the case, we should not be asking the user for
+      // an expression most likely.
+      let base = 'https://weave.wandb.ai';
+      console.log(window); // https://app.wandb.test/
+      if (window.location.host === 'app.wandb.test') {
+        base = 'https://weave.wandb.test';
+      }
+      return `${base}/?exp=${encodeURIComponent(expression)}`;
+    },
   };
   return browse3Context;
 };
@@ -384,7 +410,8 @@ type RouteType = {
     entityName: string,
     projectName: string,
     objectName: string,
-    objectVersionHash: string
+    objectVersionHash: string,
+    refExtra?: string[]
   ) => string;
   opVersionsUIUrl: (
     entityName: string,
@@ -416,6 +443,12 @@ type RouteType = {
   boardsUIUrl: (
     entityName: string,
     projectName: string
+    // TODO: Add filter when supported
+  ) => string;
+  boardForExpressionUIUrl: (
+    entityName: string,
+    projectName: string,
+    expression: string
     // TODO: Add filter when supported
   ) => string;
   tablesUIUrl: (
@@ -544,6 +577,15 @@ const useMakePeekingRouter = (): RouteType => {
         PEAK_SEARCH_PARAM,
         baseContext.tablesUIUrl(...args)
       );
+    },
+    boardForExpressionUIUrl: (
+      ...args: Parameters<typeof baseContext.boardForExpressionUIUrl>
+    ) => {
+      throw new Error('Not implemented');
+      // return setSearchParam(
+      //   PEAK_SEARCH_PARAM,
+      //   baseContext.boardForExpressionUIUrl(...args)
+      // );
     },
   };
 };

@@ -204,6 +204,17 @@ export class WFNaiveProject implements WFProject {
     });
   }
 
+  traceRoots(traceID: string): WFCall[] {
+    const rootCalls = Array.from(this.state.callsMap.values()).filter(
+      callDict => {
+        return callDict.callSpan.trace_id === traceID;
+      }
+    );
+    return rootCalls.map(callDict => {
+      return new WFNaiveCall(this.state, callDict.callSpan.span_id);
+    });
+  }
+
   opCategories(): HackyOpCategory[] {
     return ['train', 'predict', 'score', 'evaluate', 'tune'];
   }

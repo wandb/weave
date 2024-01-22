@@ -59,14 +59,11 @@ export const FilterableTypeVersionsTable: React.FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
-  const getInitialData = useCallback(
-    (filter: WFHighLevelTypeVersionFilter) => {
-      return orm.projectConnection.typeVersions().map(o => {
-        return {id: o.version(), obj: o};
-      });
-    },
-    [orm.projectConnection]
-  );
+  const getInitialData = useCallback(() => {
+    return orm.projectConnection.typeVersions().map(o => {
+      return {id: o.version(), obj: o};
+    });
+  }, [orm.projectConnection]);
 
   const getFilterPopoutTargetUrl = useCallback(
     (filter: WFHighLevelTypeVersionFilter) => {
@@ -550,6 +547,7 @@ const InputToFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes('inputTo')}
           renderInput={params => <TextField {...params} label="Input To" />}
@@ -587,6 +585,7 @@ const OutputFromFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'outputFrom'

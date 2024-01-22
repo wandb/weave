@@ -1,3 +1,4 @@
+import {LinearProgress} from '@material-ui/core';
 import {Close, Fullscreen, Home} from '@mui/icons-material';
 import {
   AppBar,
@@ -9,7 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC, useCallback, useEffect, useMemo} from 'react';
+import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Link as RouterLink,
   Route,
@@ -18,12 +19,15 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import {MOON_200} from '../../../common/css/color.styles';
+import {useWindowSize} from '../../../common/hooks/useWindowSize';
+import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
 import {URL_BROWSE3} from '../../../urls';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
-import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
+// import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
 import {
   baseContext,
   browse2Context,
@@ -34,7 +38,7 @@ import {
 } from './Browse3/context';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
-import {CallPage} from './Browse3/pages/CallPage';
+import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
@@ -63,6 +67,7 @@ import {
   fnNaiveBootstrapRuns,
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
+import {SideNav} from './Browse3/SideNav';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -188,7 +193,15 @@ const Browse3Mounted: FC<{
   navigateAwayFromProject?: () => void;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
-
+  const weaveContext = useWeaveContext();
+  const [weaveLoading, setWeaveLoading] = useState(false);
+  useEffect(() => {
+    const obs = weaveContext.client.loadingObservable();
+    const sub = obs.subscribe(loading => {
+      setWeaveLoading(loading);
+    });
+    return () => sub.unsubscribe();
+  }, [weaveContext.client]);
   return (
     <Box
       sx={{
@@ -196,7 +209,20 @@ const Browse3Mounted: FC<{
         height: `calc(100vh - ${props.headerOffset ?? 0}px)`,
         overflow: 'auto',
         flexDirection: 'column',
+        a: {
+          color: '#038194',
+        },
       }}>
+      {weaveLoading && (
+        <Box
+          sx={{
+            width: '100%',
+            position: 'absolute',
+            zIndex: 2,
+          }}>
+          <LinearProgress />
+        </Box>
+      )}
       {!props.hideHeader && (
         <AppBar
           sx={{
@@ -244,9 +270,10 @@ const Browse3Mounted: FC<{
               display: 'flex',
               flexDirection: 'row',
             }}>
-            <RouteAwareBrowse3ProjectSideNav
+            <SideNav />
+            {/* <RouteAwareBrowse3ProjectSideNav
               navigateAwayFromProject={props.navigateAwayFromProject}
-            />
+            /> */}
             <Box
               component="main"
               sx={{
@@ -296,6 +323,13 @@ const MainPeekingLayout: FC = () => {
     params.project!
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
+  const windowSize = useWindowSize();
+  const flexDirection = useMemo(() => {
+    if (windowSize.height > windowSize.width * 0.66) {
+      return 'column';
+    }
+    return 'row';
+  }, [windowSize.height, windowSize.width]);
   return (
     <Box
       sx={{
@@ -304,7 +338,7 @@ const MainPeekingLayout: FC = () => {
         height: '100%',
         display: 'flex',
         overflow: 'hidden',
-        flexDirection: 'row',
+        flexDirection,
         alignContent: 'stretch',
       }}>
       <Box
@@ -318,11 +352,16 @@ const MainPeekingLayout: FC = () => {
 
       <Box
         sx={{
-          borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
+          borderLeft:
+            flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
+          borderTop:
+            flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
           flex: peekLocation ? '1 1 60%' : '0 0 0px',
           transition: peekLocation ? 'all 0.2s ease-in-out' : '',
           boxShadow:
-            'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+            flexDirection === 'row'
+              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
+              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
           overflow: 'hidden',
           display: 'flex',
           zIndex: 1,
@@ -478,7 +517,9 @@ const Browse3ProjectRoot: FC<{
       sx={{
         flex: '1 1 auto',
         width: '100%',
-        overflow: 'auto',
+        overflowY: 'auto',
+        // Very odd, but this is needed to prevent the horizontal scrollbar for a single pixel
+        overflowX: 'hidden',
       }}>
       <Switch location={customLocation}>
         {/* TYPES */}

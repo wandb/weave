@@ -4,17 +4,21 @@ import {
   DataGridPro,
   GridColDef,
   GridColumnGroup,
+  GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
-import React, {FC, useEffect, useMemo, useRef} from 'react';
+import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {Timestamp} from '../../../Timestamp';
 import {CallLink, opVersionText} from '../Browse3/pages/common/Links';
+import {StatusChip} from '../Browse3/pages/common/StatusChip';
+import {useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
+import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
@@ -147,30 +151,42 @@ export const RunsTable: FC<{
     });
   }, [orm?.projectConnection, spans, loading]);
 
+  // Highlight table row if it matches peek drawer.
+  const query = useURLSearchParamsDict();
+  const {peekPath} = query;
+  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const rowIds = useMemo(() => {
+    return tableData.map(row => row.id);
+  }, [tableData]);
+  const [rowSelectionModel, setRowSelectionModel] =
+    useState<GridRowSelectionModel>([]);
+  useEffect(() => {
+    if (rowIds.length === 0) {
+      // Data may have not loaded
+      return;
+    }
+    if (peekId == null) {
+      // No peek drawer, clear any selection
+      setRowSelectionModel([]);
+    } else {
+      // If peek drawer matches a row, select it.
+      // If not, don't modify selection.
+      if (rowIds.includes(peekId)) {
+        setRowSelectionModel([peekId]);
+      }
+    }
+  }, [rowIds, peekId]);
+
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
         field: 'status_code',
         headerName: '',
-        width: 50,
-        minWidth: 50,
-        maxWidth: 50,
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
         renderCell: cellParams => {
-          return (
-            <Chip
-              label={' '}
-              sx={{height: '20px', lineHeight: 2}}
-              // label={cellParams.row.status_code}
-              size="small"
-              color={
-                cellParams.row.status_code === 'SUCCESS'
-                  ? 'success'
-                  : cellParams.row.status_code === 'ERROR'
-                  ? 'error'
-                  : undefined
-              }
-            />
-          );
+          return <StatusChip value={cellParams.row.status_code} />;
         },
       },
       {
@@ -455,30 +471,31 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
-  // if (loading) {
-  //   return null;
-  // }
-  return (
-    <DataGridPro
-      sx={{
-        border: 0,
-        '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
-          outline: 'none',
+  const initialState: React.ComponentProps<typeof DataGridPro>['initialState'] =
+    useMemo(() => {
+      if (loading) {
+        return undefined;
+      }
+      return {
+        sorting: {
+          sortModel: [{field: 'timestampMs', sort: 'desc'}],
         },
-      }}
+      };
+    }, [loading]);
+
+  return (
+    <StyledDataGrid
+      columnHeaderHeight={40}
       apiRef={apiRef}
       loading={loading}
       rows={tableData}
       // density="compact"
-      initialState={{
-        sorting: {
-          sortModel: [{field: 'timestampMs', sort: 'desc'}],
-        },
-      }}
+      initialState={initialState}
       rowHeight={38}
       columns={columns.cols}
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
+      rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columns.colGroupingModel}
       // onRowClick={({id}) => {
       //   history.push(

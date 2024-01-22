@@ -8,7 +8,7 @@ import numpy as np
 import typing
 
 
-def test_op_versioning():
+def test_op_versioning_saveload():
     @weave.op()
     def versioned_op(a: int, b: int) -> int:
         return a + b
@@ -210,7 +210,7 @@ EXPECTED_CLOSURE_CONTANT_DICT_NP_OP_CODE = """import weave
 
 x = {
     "a": 5,
-    "b": weave.storage.artifact_path_ref('x/b#0').get()
+    "b": weave.storage.artifact_path_ref('x/b').get()
 }
 
 @weave.op()
@@ -303,7 +303,7 @@ dog = weave.ref('local-artifact:///op-dog:b8e5d369eea85c8d0852/obj').get()
 
 x = {
     "a": weave.ref('local-artifact:///op-cat:5588512188219faae386/obj').get(),
-    "b": weave.storage.artifact_path_ref('x/b#0').get()
+    "b": weave.storage.artifact_path_ref('x/b').get()
 }
 
 @weave.op()

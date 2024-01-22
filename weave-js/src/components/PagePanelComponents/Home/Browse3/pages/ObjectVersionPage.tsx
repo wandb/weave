@@ -2,12 +2,14 @@ import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
 import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
-import {WeaveEditor} from '../../Browse2/WeaveEditors';
+import {
+  WeaveEditor,
+  WeaveEditorSourceContext,
+} from '../../Browse2/WeaveEditors';
 import {WFHighLevelCallFilter} from './CallsPage';
 import {
   CallLink,
   CallsLink,
-  ObjectLink,
   ObjectVersionsLink,
   objectVersionText,
   OpVersionLink,
@@ -16,7 +18,7 @@ import {CenteredAnimatedLoader} from './common/Loader';
 import {
   ScrollableTabContent,
   SimpleKeyValueTable,
-  SimplePageLayout,
+  SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
@@ -44,6 +46,7 @@ const ObjectVersionPageInner: React.FC<{
   objectVersion: WFObjectVersion;
   refExtra?: string;
 }> = ({objectVersion, refExtra}) => {
+  const objectVersionHash = objectVersion.version();
   const entityName = objectVersion.entity();
   const projectName = objectVersion.project();
   const objectName = objectVersion.object().name();
@@ -57,7 +60,7 @@ const ObjectVersionPageInner: React.FC<{
     return call.opVersion() != null;
   });
   const baseUri = objectVersion.refUri();
-  const fullUri = baseUri + (refExtra ?? '');
+  const fullUri = baseUri + (refExtra ? '/' + refExtra : '');
 
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(baseUri)});
@@ -70,19 +73,14 @@ const ObjectVersionPageInner: React.FC<{
   // const {onMakeBoard} = useMakeNewBoard(itemNode);
 
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={objectVersionText(objectName, objectVersionIndex)}
       headerContent={
         <SimpleKeyValueTable
           data={{
-            Name: (
+            [refExtra ? 'Parent Object' : 'Name']: (
               <>
-                <ObjectLink
-                  entityName={entityName}
-                  projectName={projectName}
-                  objectName={objectName}
-                />{' '}
-                [
+                {objectName} [
                 <ObjectVersionsLink
                   entity={entityName}
                   project={projectName}
@@ -90,14 +88,27 @@ const ObjectVersionPageInner: React.FC<{
                     objectName,
                   }}
                   versionCount={objectVersionCount}
+                  neverPeek
                 />
                 ]
               </>
             ),
             Version: <>{objectVersionIndex}</>,
-            Category: (
-              <TypeVersionCategoryChip typeCategory={objectTypeCategory} />
-            ),
+            ...(objectTypeCategory
+              ? {
+                  Category: (
+                    <TypeVersionCategoryChip
+                      typeCategory={objectTypeCategory}
+                    />
+                  ),
+                }
+              : {}),
+
+            ...(refExtra
+              ? {
+                  Subpath: refExtra,
+                }
+              : {}),
             // 'Type Version': (
             //   <TypeVersionLink
             //     entityName={entityName}
@@ -106,8 +117,10 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            Ref: fullUri,
-            ...(producingCalls.length > 0
+            Ref: <span>{fullUri}</span>,
+            // Hide consuming and producing calls since we don't have a
+            // good way to look this up yet
+            ...(producingCalls.length > 0 && refExtra == null
               ? {
                   'Producing Calls': (
                     <ObjectVersionProducingCallsItem
@@ -116,7 +129,7 @@ const ObjectVersionPageInner: React.FC<{
                   ),
                 }
               : {}),
-            ...(consumingCalls.length > 0
+            ...(consumingCalls.length > 0 && refExtra == null
               ? {
                   'Consuming Calls': (
                     <ObjectVersionConsumingCallsItem
@@ -158,9 +171,18 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Values',
           content: (
-            <ScrollableTabContent>
-              <WeaveEditor objType={objectName} node={itemNode} />
-            </ScrollableTabContent>
+            <WeaveEditorSourceContext.Provider
+              value={{
+                entityName,
+                projectName,
+                objectName,
+                objectVersionHash,
+                refExtra: refExtra?.split('/'),
+              }}>
+              <ScrollableTabContent>
+                <WeaveEditor objType={objectName} node={itemNode} />
+              </ScrollableTabContent>
+            </WeaveEditorSourceContext.Provider>
           ),
         },
         // {
@@ -272,6 +294,7 @@ const ObjectVersionProducingCallsItem: React.FC<{
   return (
     <ul
       style={{
+        paddingInlineStart: '22px',
         margin: 0,
       }}>
       {producingCalls.map(call => {
@@ -353,11 +376,12 @@ export const GroupedCalls: React.FC<{
     <ul
       style={{
         margin: 0,
+        paddingInlineStart: '22px',
       }}>
       {Object.entries(callGroups).map(([key, val], ndx) => {
         return (
           <li key={key}>
-            <OpVersionCallsLink val={val} partialFilter={partialFilter} />;
+            <OpVersionCallsLink val={val} partialFilter={partialFilter} />
           </li>
         );
       })}
