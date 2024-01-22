@@ -20,4 +20,4 @@ track_me(15)
 
 Calling an op will created a new op version if the code has changed from the last call, and log the inputs and outputs of the function.
 
-Ops can be [served](/guides/toolbelt/serve) or [deployed](/guides/toolbelt/serve) using the Weave toolbelt.
+Ops can be [served](/guides/tools/serve) or [deployed](/guides/tools/deploy) using the Weave toolbelt.

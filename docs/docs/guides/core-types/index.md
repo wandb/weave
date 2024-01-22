@@ -4,5 +4,5 @@ Weave Core Types are built with weave tracking, and contain everything you need 
 
 - [Model](/guides/core-types/models)
 - [Dataset](/guides/core-types/datasets)
-- [Evaluation](/guides/core-types/evaluation)
+- [Evaluation](/guides/core-types/evaluations)
 
