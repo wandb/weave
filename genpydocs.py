@@ -1,3 +1,6 @@
+# Run this to re-generate Weave API docs from code.
+
+
 import lazydocs
 
 
@@ -12,6 +15,8 @@ def doc_module(module):
 
     generator = lazydocs.MarkdownGenerator()
     markdown_paragraphs.append(module.__doc__)
+    # We look for the special __docspec__ attribute, which lists what we want
+    # to document, in order.
     for obj in module.__docspec__:
         markdown_paragraphs.append(generator.func2md(obj))
     return MARKDOWN_HEADER + "\n---\n".join(markdown_paragraphs)
