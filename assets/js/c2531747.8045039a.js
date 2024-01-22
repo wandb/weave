@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkdocs=self.webpackChunkdocs||[]).push([[890],{6633:e=>{e.exports=JSON.parse('{"title":"Python API","description":"Technical reference for APIs.","slug":"/category/python-api","permalink":"/category/python-api","navigation":{"next":{"title":"weave","permalink":"/api-reference/python/weave"}}}')}}]);
