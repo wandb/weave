@@ -404,7 +404,8 @@ class OpDefType(types.Type):
                 if context_state.get_strict_op_saving():
                     raise errors.WeaveOpSerializeError(message)
                 else:
-                    print(message)
+                    # print(message)
+                    pass
 
             # This is hacky handling of TypedDict annotations. Fixes
             # 2_images_gen notebook test.
