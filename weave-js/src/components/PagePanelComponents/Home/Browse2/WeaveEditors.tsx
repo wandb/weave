@@ -12,7 +12,11 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import {DataGridPro as DataGrid, GridColDef} from '@mui/x-data-grid-pro';
+import {
+  DataGridPro as DataGrid,
+  GridColDef,
+  useGridApiRef,
+} from '@mui/x-data-grid-pro';
 import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
@@ -632,6 +636,7 @@ export const WeaveEditorTable: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
+  const apiRef = useGridApiRef();
   const addEdit = useWeaveEditorContextAddEdit();
   const makeLinkPath = useObjectVersionLinkPathForPath();
   const objectType = listObjectType(node.type);
@@ -680,6 +685,20 @@ export const WeaveEditorTable: FC<{
       })),
     [sourceRows]
   );
+
+  // Autosize when rows change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      apiRef.current.autosizeColumns({
+        includeHeaders: true,
+        includeOutliers: true,
+      });
+    }, 0);
+    return () => {
+      clearInterval(timeoutId);
+    };
+  }, [gridRows, apiRef]);
+
   const processRowUpdate = useCallback(
     (updatedRow: {[key: string]: any}, originalRow: {[key: string]: any}) => {
       const curSourceRows = sourceRows ?? [];
@@ -736,6 +755,7 @@ export const WeaveEditorTable: FC<{
           width: '100%',
         }}>
         <DataGrid
+          apiRef={apiRef}
           density="compact"
           experimentalFeatures={{columnGrouping: true}}
           rows={gridRows}
