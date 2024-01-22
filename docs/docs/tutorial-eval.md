@@ -86,6 +86,8 @@ The scoring functions take an example row and the resulting prediction and retur
 `example_to_model_input` tells `evaluate` how to use an input from a given example row of the `Dataset`.
 
 ```python
+from weave.weaveflow import evaluate
+
 @weave.op()
 def score(example, prediction):
     return {'correct': example == prediction['correction']}
