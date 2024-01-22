@@ -5,13 +5,13 @@ hide_table_of_contents: true
 
 # Tutorial: Build an Evaluation pipeline
 
-To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same dataset when there is a change. Weave has a first-class way to track evaluations with `Dataset`, `Model` & `Evaluation` classes. We have the built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases. 
+To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same dataset when there is a change. Weave has a first-class way to track evaluations with `Dataset`, `Model` & `Evaluation` classes. We have the built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases.
 
 ### Upload a `Dataset`
 
 `Dataset`s enable you to store examples for evaluation. Weave automatically captures when it is used and updates the version when there are changes. `Dataset`s are created with lists of examples, where each example row is a dict.
 
-```python 
+```python
 import weave
 from weave import weaveflow
 
@@ -24,8 +24,9 @@ dataset = weaveflow.Dataset([
 weave.publish(dataset, 'grammar')
 ```
 
-In a new script, run this code to publish a `Dataset` and follow the link to view it in the UI. 
+In a new script, run this code to publish a `Dataset` and follow the link to view it in the UI.
 If you make edits to the `Dataset` in the UI, you can pull the latest version in code using:
+
 ```python
 dataset = weave.ref('grammar').get()
 ```
@@ -57,7 +58,7 @@ class GrammarModel(Model):
             model=self.model_name,
             messages=[
                 {
-                    "role": "system",s
+                    "role": "system",
                     "content": self.system_message
                 },
                 {
@@ -80,7 +81,7 @@ model.predict('she go to the park')
 
 ### Evaluate a `Model` on a `Dataset`
 
-`Evaluation`s assess a `Model`s performance on a `Dataset` using specified scoring functions. 
+`Evaluation`s assess a `Model`s performance on a `Dataset` using specified scoring functions.
 The scoring functions take an example row and the resulting prediction and return a dictionary of scores for that example.
 `example_to_model_input` tells `evaluate` how to use an input from a given example row of the `Dataset`.
 
@@ -144,7 +145,7 @@ if __name__ == '__main__':
     @weave.op()
     def example_to_model_input(example):
         return example["sentence"]
-    
+
     evaluation = evaluate.Evaluation(
         dataset, scores=[score], example_to_model_input=example_to_model_input
     )
@@ -156,4 +157,3 @@ if __name__ == '__main__':
 You have just built a **production-ready LLM app**.
 
 ## What's next?
-
