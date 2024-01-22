@@ -5,4 +5,19 @@ hide_table_of_contents: true
 
 # Ops
 
-TODO
+A Weave op is a versioned function that automatically logs all calls.
+
+To create an op, decorate a python function with `weave.op()`
+
+```python
+@weave.op()
+def track_me(v):
+    return v + 5
+
+weave.init()
+track_me(15)
+```
+
+Calling an op will created a new op version if the code has changed from the last call, and log the inputs and outputs of the function.
+
+Ops can be [served](/guides/toolbelt/serve) or [deployed](/guides/toolbelt/serve) using the Weave toolbelt.
