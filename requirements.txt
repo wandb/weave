@@ -32,5 +32,6 @@ tabulate
 openai>=1.0.0
 tiktoken>=0.4.0
 faiss-cpu
+rich>=13.7.0
 
 pytest-asyncio<=0.21.1  # newer versions seem to be causing weave op unit test failures?
