@@ -115,7 +115,7 @@ const KeyValueRow: React.FC<{
       useVal = (
         <Box
           sx={{
-            maxHeight: !open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
+            // maxHeight: !open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
             overflowY: 'auto',
             overflowX: 'hidden',
             width: '100%',
@@ -147,7 +147,7 @@ const KeyValueRow: React.FC<{
           }}
           style={{
             ...leafKeyStyle,
-            cursor: open || canExpand ? 'pointer' : 'auto',
+            // cursor: open || canExpand ? 'pointer' : 'auto',
           }}>
           {props.rowKey}
         </td>
