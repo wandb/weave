@@ -60,7 +60,6 @@ const ObjectVersionPageInner: React.FC<{
     return call.opVersion() != null;
   });
   const baseUri = objectVersion.refUri();
-  const fullUri = baseUri;
 
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(baseUri)});
@@ -122,7 +121,7 @@ const ObjectVersionPageInner: React.FC<{
             // https://github.com/wandb/weave/pull/1080 that needs to be
             // finished asap. This is just to fix the demo / first internal
             // release.
-            ...(refExtra ? {Ref: <span>{fullUri}</span>} : {}),
+            ...(refExtra ? {Ref: <span>{baseUri}</span>} : {}),
             // Hide consuming and producing calls since we don't have a
             // good way to look this up yet
             ...(producingCalls.length > 0 && refExtra == null
@@ -177,7 +176,7 @@ const ObjectVersionPageInner: React.FC<{
           label: 'Values',
           content: (
             <WeaveEditorSourceContext.Provider
-              key={fullUri}
+              key={baseUri + refExtra}
               value={{
                 entityName,
                 projectName,
