@@ -164,5 +164,5 @@ evaluation = evaluate.Evaluation(
 )
 print(asyncio.run(evaluation.evaluate(model)))
 # if you're in a Jupyter Notebook, run:
-# await evaluation.evaluate(model))
+# await evaluation.evaluate(model)
 ```
