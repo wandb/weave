@@ -82,7 +82,7 @@ model = GrammarModel('you fix grammar')
 model.predict('she go to the park')
 ```
 
-### Evaluate a `Model` on a `Dataset`
+### Evaluate a Model on a Dataset
 
 Evaluation's assess the performance of a Model on a Dataset using specified scoring functions.
 The scoring functions take an example row and the resulting prediction and return a dictionary of scores for that example.
