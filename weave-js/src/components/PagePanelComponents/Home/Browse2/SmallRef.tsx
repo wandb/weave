@@ -14,6 +14,7 @@ import {
 import {
   ArtifactRef,
   isWandbArtifactRef,
+  ObjectRef,
   parseRef,
   refUri,
   useNodeValue,
@@ -43,7 +44,7 @@ type WFDBTableType =
   | 'Object'
   | 'ObjectVersion';
 
-export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
+export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   objRef,
   wfTable,
 }) => {
@@ -56,7 +57,21 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
   const refTypeQuery = useNodeValue(refTypeNode);
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);
-  const label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
+  let label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
+  let suffix = '';
+
+  // TEMP HACK (Tim): This is a temporary hack to ensure that SmallRef renders
+  // the Evaluation rows with the correct label and link. There is a more full
+  // featured solution here: https://github.com/wandb/weave/pull/1080 that needs
+  // to be finished asap. This is just to fix the demo / first internal release.
+  if (objRef.artifactPath === 'rows%2F0') {
+    label +=
+      '/rows' + (objRef.objectRefExtra ? '/' + objRef.objectRefExtra : '');
+    suffix =
+      '/rows/index' +
+      (objRef.objectRefExtra ? '/' + objRef.objectRefExtra : '');
+  }
+
   const rootTypeName = getTypeName(rootType);
   let icon = <SpokeIcon sx={{height: '100%'}} />;
   if (rootTypeName === 'Dataset') {
@@ -83,7 +98,7 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
     return <div>[Error: non wandb ref]</div>;
   }
   return (
-    <Link to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
+    <Link to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable) + suffix}>
       {Item}
     </Link>
   );
