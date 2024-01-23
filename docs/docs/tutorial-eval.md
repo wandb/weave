@@ -17,11 +17,11 @@ from weave import weaveflow
 
 weave.init('intro-example')
 dataset = weaveflow.Dataset([
-    {'id': '0', 'sentence': "He no like ice cream."},
-    {'id': '1', 'sentence': "She goed to the store."},
-    {'id': '2', 'sentence': "They plays video games all day."}
+    {'id': '0', 'sentence': 'He no like ice cream.', 'correction': 'He does not like ice cream.'},
+    {'id': '1', 'sentence': 'She goed to the store.', 'correction': 'She went to the store.'},
+    {'id': '2', 'sentence': 'They plays video games all day.', 'correction': 'They play video games all day.'}
 ])
-weave.publish(dataset, 'grammar')
+dataset_ref = weave.publish(dataset, 'grammar')
 ```
 
 In a new script, run this code to publish a `Dataset` and follow the link to view it in the UI.
@@ -32,7 +32,7 @@ dataset = weave.ref('grammar').get()
 ```
 
 :::note
-Checkout the Datasets guide to learn more.
+Checkout the [Datasets](/guides/core-types/datasets) guide to learn more.
 :::
 
 ### Build a `Model`
@@ -76,8 +76,12 @@ You can instantiate `@weave.type()` objects like this.
 
 ```python
 model = GrammarModel('you fix grammar')
-model.predict('she go to the park')
+await model.predict('she go to the park')
 ```
+
+:::note
+Checkout the [Models](/guides/core-types/models) guide to learn more.
+:::
 
 ### Evaluate a `Model` on a `Dataset`
 
@@ -89,17 +93,19 @@ The scoring functions take an example row and the resulting prediction and retur
 from weave.weaveflow import evaluate
 
 @weave.op()
-def score(example, prediction):
-    return {'correct': example == prediction['correction']}
+def score(example: dict, prediction: str) -> dict:
+    # example is a row from the Dataset, prediction is the output of predict function
+    return {'correct': example['correction'] == prediction}
 
 @weave.op()
-def example_to_model_input(example):
+def example_to_model_input(example: dict) -> str:
+    # example is a row from the Dataset, the output of this function should be the input to model.predict
     return example["sentence"]
 
 evaluation = evaluate.Evaluation(
     dataset, scores=[score], example_to_model_input=example_to_model_input
 )
-evaluation.evaluate(model)
+await evaluation.evaluate(model)
 ```
 
 ## Pulling it all together
@@ -107,7 +113,7 @@ evaluation.evaluate(model)
 ```python
 import weave
 import asyncio
-from weave.weaveflow import Model, evaluate
+from weave.weaveflow import Model, evaluate, Dataset
 
 @weave.type()
 class GrammarModel(Model):
@@ -126,8 +132,8 @@ class GrammarModel(Model):
                     "content": self.system_message
                 },
                 {
-                "role": "user",
-                "content": sentence
+                    "role": "user",
+                    "content": sentence
                 }
             ],
             temperature=0.7,
@@ -137,25 +143,25 @@ class GrammarModel(Model):
         return response.choices[0].message.content
 
 @weave.op()
-def score(example, prediction):
-    return {'correct': example == prediction['correction']}
+def score(example: dict, prediction: str) -> dict:
+    return {'correct': example['correction'] == prediction}
 
-if __name__ == '__main__':
-    weave.init('intro-example')
-    model = GrammarModel("You will be provided with statements, and your task is to convert them to standard English.")
-    dataset = weave.ref('grammar').get()
-    @weave.op()
-    def example_to_model_input(example):
-        return example["sentence"]
+weave.init('intro-example')
+model = GrammarModel("You will be provided with statements, and your task is to convert them to standard English.")
+dataset = Dataset([
+    {'id': '0', 'sentence': 'He no like ice cream.', 'correction': 'He does not like ice cream.'},
+    {'id': '1', 'sentence': 'She goed to the store.', 'correction': 'She went to the store.'},
+    {'id': '2', 'sentence': 'They plays video games all day.', 'correction': 'They play video games all day.'}
+])
+# dataset = weave.ref('grammar').get()
+@weave.op()
+def example_to_model_input(example):
+    return example["sentence"]
 
-    evaluation = evaluate.Evaluation(
-        dataset, scores=[score], example_to_model_input=example_to_model_input
-    )
-    print(asyncio.run(evaluation.evaluate(model)))
+evaluation = evaluate.Evaluation(
+    dataset, scores=[score], example_to_model_input=example_to_model_input
+)
+print(asyncio.run(evaluation.evaluate(model)))
+# if you're in a Jupyter Notebook, run:
+# await evaluation.evaluate(model))
 ```
-
-## Continue Learning!
-
-You have just built a **production-ready LLM app**.
-
-## What's next?
