@@ -29,16 +29,6 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: "category",
-          label: "Tracking",
-          link: { type: "doc", id: "guides/tracking/index" },
-          items: [
-            "guides/tracking/objects",
-            "guides/tracking/ops",
-            "guides/tracking/tracing",
-          ],
-        },
-        {
-          type: "category",
           label: "Core Types",
           link: { type: "doc", id: "guides/core-types/index" },
           items: [
@@ -49,15 +39,25 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: "category",
-          label: "Ecosystem",
-          link: { type: "doc", id: "guides/ecosystem/index" },
-          items: ["guides/ecosystem/auto-tracking"],
+          label: "Tracking",
+          link: { type: "doc", id: "guides/tracking/index" },
+          items: [
+            "guides/tracking/objects",
+            "guides/tracking/ops",
+            "guides/tracking/tracing",
+          ],
         },
         {
           type: "category",
-          label: "Toolbelt",
-          link: { type: "doc", id: "guides/toolbelt/index" },
-          items: ["guides/toolbelt/serve", "guides/toolbelt/deploy"],
+          label: "Ecosystem",
+          link: { type: "doc", id: "guides/ecosystem/index" },
+          items: ["guides/ecosystem/openai"],
+        },
+        {
+          type: "category",
+          label: "Tools",
+          link: { type: "doc", id: "guides/tools/index" },
+          items: ["guides/tools/serve", "guides/tools/deploy"],
         },
       ],
     },

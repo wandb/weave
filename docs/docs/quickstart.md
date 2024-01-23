@@ -27,15 +27,8 @@ def correct_grammar(sentence: str) -> str:
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {
-                "role": "system",
-                "content": "You will be provided with statements, and your task is to convert them to standard English."
-            },
-            {
-            "role": "user",
-            "content": sentence
-            }
-        ],
+            {"role": "system", "content": "You will be provided with statements, and your task is to convert them to standard English." },
+            {"role": "user", "content": sentence}],
         temperature=0.7,
         max_tokens=64,
     )
@@ -55,6 +48,6 @@ Calls made with the openai library are automatically tracked with weave but you 
 
 ## What's next?
 
-- Follow the [Build an Evaluation pipeline tutorial](/docs/get-started/tutorial) to start iteratively improving your applications.
-- Learn how to create parameterized functions with [Models](/docs/using-weave/models).
-- [Serve](/using-weave/serve) and [Deploy](/using-weave/deploy) Weave Ops with the Weave toolbelt.
+- Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
+- Learn how to create parameterized functions with [Models](/guides/core-types/models).
+- [Serve](/guides/tools/serve) and [Deploy](/guides/tools/deploy) Weave Ops with the Weave toolbelt.
