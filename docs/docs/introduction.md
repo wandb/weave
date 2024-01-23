@@ -17,7 +17,7 @@ Weave's core concept is that as your code executes, it keeps track of function c
 
 ## Why use Weave?
 
-Building applications with large language models is a new style of software development. While these models are incredibly powerful, they are also non-deterministic and therefore tricky to make use of. Weave helps you harness this potential.
+Building applications with large language models is a new style of software development. While these models are incredibly powerful, they are also non-deterministic and therefore tricky to make use of. Weave helps you harness their potential.
 
 You can use Weave to:
 - log and debug language model inputs, outputs, and traces
