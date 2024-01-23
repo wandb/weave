@@ -11,7 +11,7 @@ name: test
 on:
   push:
     paths-ignore:
-      - "docs/*"
+      - "docs/**"
 
 jobs:
   build-container:
