@@ -14,7 +14,7 @@ import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {Timestamp} from '../../../Timestamp';
-import {CallLink, opVersionText} from '../Browse3/pages/common/Links';
+import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
@@ -217,9 +217,14 @@ export const RunsTable: FC<{
                 if (opVersion == null) {
                   return rowParams.row.ormCall?.spanName();
                 }
-                return opVersionText(
-                  rowParams.row.ormCall?.spanName(),
-                  opVersion.versionIndex()
+                return (
+                  <OpVersionLink
+                    entityName={opVersion.entity()}
+                    projectName={opVersion.project()}
+                    opName={opVersion.op().name()}
+                    version={opVersion.version()}
+                    versionIndex={opVersion.versionIndex()}
+                  />
                 );
               },
             },
