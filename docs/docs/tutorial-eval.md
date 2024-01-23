@@ -42,6 +42,12 @@ Like `Dataset`s, Weave automatically captures when they are used and update the 
 
 `Model`s are declared by subclassing `Model` and decorating them with `@weave.type()`. `Model` classes also need a `predict` function definition, which takes one example and returns the response.
 
+:::warning
+
+**Known Issue**: If you are using Google Colab, remove `async` from the following examples.
+
+:::
+
 ```python
 from weave.weaveflow import Model
 
