@@ -164,7 +164,7 @@ export const CallsTable: React.FC<{
       filterListItems={
         <>
           <IconButton
-            style={{width: '37px', height: '37px'}}
+            style={{display: 'none', width: '37px', height: '37px'}}
             size="small"
             onClick={() => {
               onMakeBoard();
