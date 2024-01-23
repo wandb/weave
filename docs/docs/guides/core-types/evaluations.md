@@ -8,9 +8,9 @@ hide_table_of_contents: true
 Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` using specified scoring functions.
 
 ```python
-from weave.weaveflow import evaluate
+from weave.weaveflow import Evaluation
 
-evaluation = evaluate.Evaluation(
+evaluation = Evaluation(
     dataset, scores=[score], example_to_model_input=example_to_model_input
 )
 evaluation.evaluate(model)

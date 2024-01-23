@@ -90,7 +90,7 @@ The scoring functions take an example row and the resulting prediction and retur
 `example_to_model_input` tells `evaluate` how to use an input from a given example row of the `Dataset`.
 
 ```python
-from weave.weaveflow import evaluate
+from weave.weaveflow import Evaluation
 
 @weave.op()
 def score(example: dict, prediction: str) -> dict:
@@ -102,7 +102,7 @@ def example_to_model_input(example: dict) -> str:
     # example is a row from the Dataset, the output of this function should be the input to model.predict
     return example["sentence"]
 
-evaluation = evaluate.Evaluation(
+evaluation = Evaluation(
     dataset, scores=[score], example_to_model_input=example_to_model_input
 )
 await evaluation.evaluate(model)
@@ -113,7 +113,7 @@ await evaluation.evaluate(model)
 ```python
 import weave
 import asyncio
-from weave.weaveflow import Model, evaluate, Dataset
+from weave.weaveflow import Model, Evaluation, Dataset
 
 @weave.type()
 class GrammarModel(Model):
@@ -159,7 +159,7 @@ dataset = Dataset([
 def example_to_model_input(example):
     return example["sentence"]
 
-evaluation = evaluate.Evaluation(
+evaluation = Evaluation(
     dataset, scores=[score], example_to_model_input=example_to_model_input
 )
 print(asyncio.run(evaluation.evaluate(model)))
