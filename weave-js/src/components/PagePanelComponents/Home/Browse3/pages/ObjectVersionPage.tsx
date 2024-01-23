@@ -1,15 +1,12 @@
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
-import {useNodeValue} from '../../../../../react';
-import {Key} from '../../../../Panel2/KeyValTable';
 import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
 import {
   WeaveEditor,
   WeaveEditorSourceContext,
 } from '../../Browse2/WeaveEditors';
 import {WFHighLevelCallFilter} from './CallsPage';
-import {KeyValueTable} from './common/KeyValueTable';
 import {
   CallLink,
   CallsLink,
