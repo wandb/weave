@@ -15,6 +15,15 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 Weave's core concept is that as your code executes, it keeps track of function calls and their inputs and outputs. You don't need to learn a declarative language or a complex object hierarchy. Just decorate functions with `@weave.op()` to [get started](/quickstart)
 
+## Why use Weave?
+
+Building applications with large language models is a new style of software development. While these models are incredibly powerful, they are also non-deterministic and therefore tricky to make use of. Weave helps you harness this potential.
+
+You can use Weave to:
+- log and debug language model inputs, outputs, and traces
+- build rigorous, apples-to-apples evaluations for language model use cases
+- organize all the information generated across the LLM workflow, from experimentation, to evaluations, to production
+
 
 ## Key concepts
 
