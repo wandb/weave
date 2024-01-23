@@ -12,7 +12,7 @@ hide_table_of_contents: true
 ## Track inputs & outputs of functions
 
 - Import weave
-- Call `weave.init('project-name')` to start logging
+- Call `weave.init('project-name')` after logging in to start logging
 - Add the `@weave.op()` decorator to the functions you want to track
 
 ```python
@@ -35,11 +35,13 @@ def correct_grammar(sentence: str) -> str:
     return response.choices[0].message.content
 
 # highlight-next-line
+wandb.login()
+# highlight-next-line
 weave.init('intro-example')
 correct_grammar('she no went to the market')
 ```
 
-Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code. 
+Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code.
 Run this application and your console will output a link to view it within W&B.
 
 :::note
