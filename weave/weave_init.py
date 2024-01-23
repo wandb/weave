@@ -26,10 +26,11 @@ class InitializedClient:
 
 def init_wandb(project_name: str) -> InitializedClient:
     from . import wandb_api
-    
+
     # Call wandb.login() to ensure that the user is logged in. This will prompt
     # the user for their API key if they are not already logged in.
     import wandb
+
     wandb.login()
 
     fields = project_name.split("/")
