@@ -58,18 +58,24 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);
   let label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
-  let suffix = '';
+  let linkSuffix = '';
 
   // TEMP HACK (Tim): This is a temporary hack to ensure that SmallRef renders
   // the Evaluation rows with the correct label and link. There is a more full
   // featured solution here: https://github.com/wandb/weave/pull/1080 that needs
   // to be finished asap. This is just to fix the demo / first internal release.
-  if (objRef.artifactPath === 'rows%2F0') {
+  if (objRef.artifactPath.endsWith('rows%2F0')) {
+    // decodeURIComponent is needed because the path is url encoded
+    const artPath = decodeURIComponent(objRef.artifactPath);
+    const parts = artPath.split('/');
+    const firstParts = parts.slice(0, parts.length - 2);
+    firstParts.push('rows');
+    const labelPath = '/' + firstParts.join('/');
     label +=
-      '/rows' + (objRef.objectRefExtra ? '/' + objRef.objectRefExtra : '');
+      labelPath + (objRef.objectRefExtra ? '/' + objRef.objectRefExtra : '');
 
-    suffix =
-      '/rows' +
+    linkSuffix =
+      labelPath +
       (objRef.objectRefExtra ? '/index/' + objRef.objectRefExtra : '');
   }
 
@@ -99,7 +105,8 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
     return <div>[Error: non wandb ref]</div>;
   }
   return (
-    <Link to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable) + suffix}>
+    <Link
+      to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable) + linkSuffix}>
       {Item}
     </Link>
   );
