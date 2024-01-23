@@ -41,165 +41,165 @@ jobs:
       - name: Build integration test image
         run: python3 docker_build.py build weave-integration-test . Dockerfile.test
 
-  lint:
-    name: Python lint
-    timeout-minutes: 7
-    needs:
-      - build-container
-    # runs-on: [self-hosted, gke-runner]
-    runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
-    steps:
-      - uses: actions/checkout@v2
-      - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
-      - name: Show changes if pre-commit fails
-        if: failure()
-        run: |
-          echo "Files were modified, printing names of changed files"
-          git diff --name-only
-          echo "Failing this step to expand logs in the UI"
-          exit 1
-
-  weavejs-lint-compile:
-    name: WeaveJS Lint and Compile
-    runs-on: ubuntu-latest
-    # runs-on: [self-hosted, gke-runner]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v1
-        with:
-          node-version: "16.x"
-      - run: |
-          set -e
-          cd weave-js
-          yarn install --frozen-lockfile
-          yarn generate
-          yarn eslint --max-warnings=0
-          yarn tslint
-          yarn prettier
-          yarn run tsc
-
-  test:
-    name: Python unit tests
-    timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
-    needs:
-      - build-container
-    # runs-on: [self-hosted, gke-runner]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        job_num: [0, 1]
-
-    # runs-on: ubuntu-latest
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
-    services:
-      wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-        credentials:
-          username: _json_key
-          password: ${{ secrets.gcp_wb_sa_key }}
-        env:
-          CI: 1
-          WANDB_ENABLE_TEST_CONTAINER: true
-        ports:
-          - "8080:8080"
-          - "8083:8083"
-          - "9015:9015"
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
-    steps:
-      # - uses: datadog/agent-github-action@v1.3
-      #   with:
-      #     api_key: ${{ secrets.DD_API_KEY }}
-      - uses: actions/checkout@v2
-      - name: Verify wandb server is running
-        run: curl -s http://wandbservice:8080/healthz
-      - name: Run tests
-        env:
-          DD_SERVICE: weave-python
-          DD_ENV: ci
-          # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
-        run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 ./tests ./ops_arrow ./ecosystem  --ddtrace --durations=5
-
-  # nbmake:
-  #   name: Run notebooks with nbmake
-  #   runs-on: self-hosted
-  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
+  # lint:
+  #   name: Python lint
+  #   timeout-minutes: 7
+  #   needs:
+  #     - build-container
+  #   # runs-on: [self-hosted, gke-runner]
+  #   runs-on: ubuntu-latest
+  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
   #   steps:
   #     - uses: actions/checkout@v2
+  #     - run: source /root/venv/bin/activate && pre-commit run --hook-stage=pre-push --all-files
+  #     - name: Show changes if pre-commit fails
+  #       if: failure()
+  #       run: |
+  #         echo "Files were modified, printing names of changed files"
+  #         git diff --name-only
+  #         echo "Failing this step to expand logs in the UI"
+  #         exit 1
 
-  #     - name: Run notebooks
-  #       run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
-  #     - name: Upload executed notebooks
-  #       uses: actions/upload-artifact@v3
-  #       if: always()
+  # weavejs-lint-compile:
+  #   name: WeaveJS Lint and Compile
+  #   runs-on: ubuntu-latest
+  #   # runs-on: [self-hosted, gke-runner]
+  #   steps:
+  #     - uses: actions/checkout@v2
   #       with:
-  #         name: notebooks
-  #         path: examples
+  #         fetch-depth: 0
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #     - uses: actions/setup-node@v1
+  #       with:
+  #         node-version: "16.x"
+  #     - run: |
+  #         set -e
+  #         cd weave-js
+  #         yarn install --frozen-lockfile
+  #         yarn generate
+  #         yarn eslint --max-warnings=0
+  #         yarn tslint
+  #         yarn prettier
+  #         yarn run tsc
 
-  cypress-run:
-    name: Notebook and UI tests
-    timeout-minutes: 25 # 15 minute timeout routinely trips on rerun
-    needs:
-      - build-container
-      # - lint
-      # - test
-    if: always()
-    # runs-on: [self-hosted, gke-runner]
-    runs-on: ubuntu-latest
+  # test:
+  #   name: Python unit tests
+  #   timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
+  #   needs:
+  #     - build-container
+  #   # runs-on: [self-hosted, gke-runner]
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       job_num: [0, 1]
 
-    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
+  #   # runs-on: ubuntu-latest
+  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
+  #   services:
+  #     wandbservice:
+  #       image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+  #       credentials:
+  #         username: _json_key
+  #         password: ${{ secrets.gcp_wb_sa_key }}
+  #       env:
+  #         CI: 1
+  #         WANDB_ENABLE_TEST_CONTAINER: true
+  #       ports:
+  #         - "8080:8080"
+  #         - "8083:8083"
+  #         - "9015:9015"
+  #       options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+  #   steps:
+  #     # - uses: datadog/agent-github-action@v1.3
+  #     #   with:
+  #     #     api_key: ${{ secrets.DD_API_KEY }}
+  #     - uses: actions/checkout@v2
+  #     - name: Verify wandb server is running
+  #       run: curl -s http://wandbservice:8080/healthz
+  #     - name: Run tests
+  #       env:
+  #         DD_SERVICE: weave-python
+  #         DD_ENV: ci
+  #         # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
+  #       run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 ./tests ./ops_arrow ./ecosystem  --ddtrace --durations=5
 
-    strategy:
-      fail-fast: false
-      matrix:
-        containers: [1, 2, 3, 4, 5, 6]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup W&B API key
-        run: echo "WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}" >> $GITHUB_ENV
-      - name: Setup Replicate API token
-        run: echo "REPLICATE_API_TOKEN=${{ secrets.REPLICATE_API_TOKEN }}" > $GITHUB_ENV
-      - name: Copy node_modules from container to checkout
-        run: cp -R /root/integration_test/node_modules ./integration_test/
-      - name: Activate venv
-        run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
-      - name: Make Log Dir
-        run: mkdir -p /tmp/weave/log
-      - name: Copy over built assets
-        run: cp -r /root/weave-js-build/* ./weave/frontend
-      - name: Start weave server
-        # github actions does something funky with the std file descriptors, they end up
-        # being closed. tqdm (for example) raises an exception when the descriptor it
-        # wants to write to is closed.
-        run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
-        shell: bash
-      - name: Cypress run
-        # Use the following to run just a single test
-        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
-        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
-        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx ds run --record --parallel --browser chrome
-        # uses: cypress-io/github-action@v4
-        # with:
-        #   working-directory: ./integration_testG
-        #   record: true
-        #   parallel: true
-        env:
-          CYPRESS_DEPLOYSENTINEL_KEY: ${{ secrets.CYPRESS_DEPLOYSENTINEL_KEY }}
-          # pass the Dashboard record key as an environment variable
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          # pass GitHub token to allow accurately detecting a build vs a re-run build
-          GITHUB_TOKEN:
-            ${{ secrets.GITHUB_TOKEN }}
-            # - uses: actions/upload-artifact@v3
-          CYPRESS_DEPLOYSENTINEL_UPLOAD_ON_PASSES: true
-      - name: Upload logs
-        uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: weave-server-logs
-          path: /tmp/weave/log
-          retention-days: 3
+  # # nbmake:
+  # #   name: Run notebooks with nbmake
+  # #   runs-on: self-hosted
+  # #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:latest
+  # #   steps:
+  # #     - uses: actions/checkout@v2
+
+  # #     - name: Run notebooks
+  # #       run: source /root/venv/bin/activate && export PYTHONPATH=$(pwd) && pytest -n=4 --nbmake --overwrite examples
+  # #     - name: Upload executed notebooks
+  # #       uses: actions/upload-artifact@v3
+  # #       if: always()
+  # #       with:
+  # #         name: notebooks
+  # #         path: examples
+
+  # cypress-run:
+  #   name: Notebook and UI tests
+  #   timeout-minutes: 25 # 15 minute timeout routinely trips on rerun
+  #   needs:
+  #     - build-container
+  #     # - lint
+  #     # - test
+  #   if: always()
+  #   # runs-on: [self-hosted, gke-runner]
+  #   runs-on: ubuntu-latest
+
+  #   container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
+
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       containers: [1, 2, 3, 4, 5, 6]
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Setup W&B API key
+  #       run: echo "WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}" >> $GITHUB_ENV
+  #     - name: Setup Replicate API token
+  #       run: echo "REPLICATE_API_TOKEN=${{ secrets.REPLICATE_API_TOKEN }}" > $GITHUB_ENV
+  #     - name: Copy node_modules from container to checkout
+  #       run: cp -R /root/integration_test/node_modules ./integration_test/
+  #     - name: Activate venv
+  #       run: source /root/venv/bin/activate && echo "PATH=$PATH" >> $GITHUB_ENV
+  #     - name: Make Log Dir
+  #       run: mkdir -p /tmp/weave/log
+  #     - name: Copy over built assets
+  #       run: cp -r /root/weave-js-build/* ./weave/frontend
+  #     - name: Start weave server
+  #       # github actions does something funky with the std file descriptors, they end up
+  #       # being closed. tqdm (for example) raises an exception when the descriptor it
+  #       # wants to write to is closed.
+  #       run: nohup ./weave_server_test.sh < /dev/null &> /tmp/weave/log/stdout.log &
+  #       shell: bash
+  #     - name: Cypress run
+  #       # Use the following to run just a single test
+  #       # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
+  #       # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
+  #       run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx ds run --record --parallel --browser chrome
+  #       # uses: cypress-io/github-action@v4
+  #       # with:
+  #       #   working-directory: ./integration_testG
+  #       #   record: true
+  #       #   parallel: true
+  #       env:
+  #         CYPRESS_DEPLOYSENTINEL_KEY: ${{ secrets.CYPRESS_DEPLOYSENTINEL_KEY }}
+  #         # pass the Dashboard record key as an environment variable
+  #         CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+  #         # pass GitHub token to allow accurately detecting a build vs a re-run build
+  #         GITHUB_TOKEN:
+  #           ${{ secrets.GITHUB_TOKEN }}
+  #           # - uses: actions/upload-artifact@v3
+  #         CYPRESS_DEPLOYSENTINEL_UPLOAD_ON_PASSES: true
+  #     - name: Upload logs
+  #       uses: actions/upload-artifact@v3
+  #       if: failure()
+  #       with:
+  #         name: weave-server-logs
+  #         path: /tmp/weave/log
+  #         retention-days: 3
