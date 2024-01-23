@@ -1,8 +1,9 @@
 import typing
 import datetime
+import logging
+import shutil
 import time
 import os
-import shutil
 
 from . import engine_trace
 from . import wandb_api
@@ -10,7 +11,7 @@ from . import environment
 from . import errors
 
 statsd = engine_trace.statsd()  # type: ignore
-
+logger = logging.getLogger("root")
 
 """
 Returns a timestamp bucketed by interval days that is calculated from epoch time. For example, if we want
@@ -53,7 +54,7 @@ def set_cache_timestamp() -> None:
     duration = environment.cache_duration_days()
     new_cache_timestamp = bucket_timestamp(duration)
 
-    print(f"Creating new cache that expires at {new_cache_timestamp}")
+    logging.info(f"Creating new cache that expires at {new_cache_timestamp}")
     environment.set_weave_cache_timestamp(str(new_cache_timestamp))
 
 
@@ -67,10 +68,10 @@ def clear_cache():
 
     # Validate the directory path
     if not directory_path:
-        print("WEAVE_PYTHON_CACHE is not set.")
+        logging.info("WEAVE_PYTHON_CACHE is not set.")
         return
     if not os.path.isdir(directory_path):
-        print(f"{directory_path} is not a valid directory.")
+        logging.info(f"{directory_path} is not a valid directory.")
         return
 
     # for each cache in the directory, check if its expired past the buffer
@@ -85,9 +86,9 @@ def clear_cache():
             if item_timestamp + buffer < now:
                 # Delete the data
                 shutil.rmtree(item_path)
-                print(f"Deleted {item}.")
+                logging.info(f"Deleted {item}.")
         except:
-            print(f"Error deleting {item}.", flush=True)
+            logging.info(f"Error deleting {item}.", flush=True)
             continue
 
 
