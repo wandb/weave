@@ -60,7 +60,7 @@ const ObjectVersionPageInner: React.FC<{
     return call.opVersion() != null;
   });
   const baseUri = objectVersion.refUri();
-  let fullUri = baseUri;
+  const fullUri = baseUri;
 
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(baseUri)});
