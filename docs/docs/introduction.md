@@ -7,13 +7,7 @@ hide_table_of_contents: true
 
 # Introduction
 
-:::info
-
-_🍲 This version of Weave is pre-release software intended to be used by internal W&B employees. 🍲_
-
-To use these features, employees must enable `(Weave)Flow` under [W&B Internal Beta Features](https://wandb.ai/settings#w&binternalbetafeatures).
-
-:::
+*🍲 This version of Weave is pre-release software. 🍲*
 
 Weave is a toolkit for developing AI-powered applications, built by [Weights & Biases](https://wandb.ai).
 
