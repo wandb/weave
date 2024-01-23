@@ -5,4 +5,4 @@ hide_table_of_contents: true
 
 # OpenAI
 
-weave will automatic track and log LLM calls made via the [openai python library](https://platform.openai.com/docs/api-reference?lang=python), after `weave.init()` is called.
+Weave will automatic track and log LLM calls made via the [openai python library](https://platform.openai.com/docs/api-reference?lang=python), after `weave.init()` is called.
