@@ -22,7 +22,7 @@ Building applications with large language models is a new style of software deve
 You can use Weave to:
 - log and debug language model inputs, outputs, and traces
 - build rigorous, apples-to-apples evaluations for language model use cases
-- organize all the information generated across the LLM workflow, from experimentation, to evaluations, to production
+- organize all the information generated across the LLM workflow, from experimentation to evaluations to production
 
 
 ## Key concepts
