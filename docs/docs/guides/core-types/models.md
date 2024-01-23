@@ -62,7 +62,7 @@ To serve a model, you can easily spin up a FastAPI server by calling:
 weave serve <your model ref>
 ```
 
-For additional instructions, see [serve](guides/tools/serve).
+For additional instructions, see [serve](/guides/tools/serve).
 
 ## Track production calls
 

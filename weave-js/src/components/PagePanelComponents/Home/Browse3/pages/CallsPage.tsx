@@ -17,6 +17,7 @@ import {fnRunsNode, useRunsWithFeedback} from '../../Browse2/callTreeHooks';
 import {RunsTable} from '../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../context';
 import {useMakeNewBoard} from './common/hooks';
+import {opNiceName} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {truncateID} from './util';
@@ -163,7 +164,7 @@ export const CallsTable: React.FC<{
       filterListItems={
         <>
           <IconButton
-            style={{width: '37px', height: '37px'}}
+            style={{display: 'none', width: '37px', height: '37px'}}
             size="small"
             onClick={() => {
               onMakeBoard();
@@ -444,11 +445,21 @@ const useOpVersionOptions = (
         .filter(v => v != null) as WFOpVersion[];
     }
 
+    // Sort by name ascending, then version descending.
+    versions.sort((a, b) => {
+      const nameA = opNiceName(a.op().name());
+      const nameB = opNiceName(b.op().name());
+      if (nameA !== nameB) {
+        return nameA.localeCompare(nameB);
+      }
+      return b.versionIndex() - a.versionIndex();
+    });
+
     return _.fromPairs(
       versions.map(v => {
         return [
           v.op().name() + ':' + v.version(),
-          v.op().name() + ':v' + v.versionIndex(),
+          opNiceName(v.op().name()) + ':v' + v.versionIndex(),
         ];
       })
     );
@@ -483,6 +494,17 @@ const useConsumesObjectVersionOptions = (
         r => orm.projectConnection.call(r.span_id)?.inputs() ?? []
       );
     }
+
+    // Sort by name ascending, then version descending.
+    versions.sort((a, b) => {
+      const nameA = a.object().name();
+      const nameB = b.object().name();
+      if (nameA !== nameB) {
+        return nameA.localeCompare(nameB);
+      }
+      return b.versionIndex() - a.versionIndex();
+    });
+
     return _.fromPairs(
       versions.map(v => {
         return [
@@ -614,7 +636,9 @@ const useOpCategoryOptions = (
       runs.result.map(r =>
         orm.projectConnection.call(r.span_id)?.opVersion()?.opCategory()
       )
-    ).filter(v => v != null) as HackyOpCategory[];
+    )
+      .filter(v => v != null)
+      .sort() as HackyOpCategory[];
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 
