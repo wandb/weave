@@ -60,7 +60,14 @@ const ObjectVersionPageInner: React.FC<{
     return call.opVersion() != null;
   });
   const baseUri = objectVersion.refUri();
-  const fullUri = baseUri + (refExtra ? '/' + refExtra : '');
+  let fullUri = baseUri;
+
+  if (refExtra) {
+    if (fullUri.endsWith('/obj')) {
+      fullUri = fullUri.slice(0, -4);
+    }
+    fullUri += '/' + refExtra;
+  }
 
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(baseUri)});
