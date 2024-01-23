@@ -153,6 +153,7 @@ dataset = Dataset([
     {'id': '1', 'sentence': 'She goed to the store.', 'correction': 'She went to the store.'},
     {'id': '2', 'sentence': 'They plays video games all day.', 'correction': 'They play video games all day.'}
 ])
+# If you have already published the Dataset, you can 
 # dataset = weave.ref('grammar').get()
 @weave.op()
 def example_to_model_input(example):
