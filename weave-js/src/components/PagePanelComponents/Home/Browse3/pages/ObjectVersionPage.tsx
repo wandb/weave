@@ -60,7 +60,18 @@ const ObjectVersionPageInner: React.FC<{
     return call.opVersion() != null;
   });
   const baseUri = objectVersion.refUri();
-  const fullUri = baseUri + (refExtra ? '/' + refExtra : '');
+  let fullUri = baseUri;
+
+  // TEMP HACK (Tim): This is a temporary hack since objectVersion is always an
+  // `/obj` path right now which is not correct. There is a more full featured
+  // solution here: https://github.com/wandb/weave/pull/1080 that needs to be
+  // finished asap. This is just to fix the demo / first internal release.
+  if (refExtra) {
+    if (fullUri.endsWith('/obj')) {
+      fullUri = fullUri.slice(0, -4);
+    }
+    fullUri += '/' + refExtra;
+  }
 
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(baseUri)});
@@ -70,7 +81,6 @@ const ObjectVersionPageInner: React.FC<{
     const extraFields = refExtra.split('/');
     return nodeFromExtra(objNode, extraFields);
   }, [baseUri, refExtra]);
-  // const {onMakeBoard} = useMakeNewBoard(itemNode);
 
   return (
     <SimplePageLayoutWithHeader

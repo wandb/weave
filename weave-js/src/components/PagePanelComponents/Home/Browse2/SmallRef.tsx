@@ -67,9 +67,10 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   if (objRef.artifactPath === 'rows%2F0') {
     label +=
       '/rows' + (objRef.objectRefExtra ? '/' + objRef.objectRefExtra : '');
+
     suffix =
-      '/rows/index' +
-      (objRef.objectRefExtra ? '/' + objRef.objectRefExtra : '');
+      '/rows' +
+      (objRef.objectRefExtra ? '/index/' + objRef.objectRefExtra : '');
   }
 
   const rootTypeName = getTypeName(rootType);

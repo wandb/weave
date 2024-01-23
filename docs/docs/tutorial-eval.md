@@ -5,11 +5,11 @@ hide_table_of_contents: true
 
 # Tutorial: Build an Evaluation pipeline
 
-To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same dataset when there is a change. Weave has a first-class way to track evaluations with `Dataset`, `Model` & `Evaluation` classes. We have the built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases.
+To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same dataset when there is a change. Weave has a first-class way to track evaluations with `Dataset`, `Model` & `Evaluation` classes. We have built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases.
 
 ### Upload a `Dataset`
 
-`Dataset`s enable you to store examples for evaluation. Weave automatically captures when it is used and updates the version when there are changes. `Dataset`s are created with lists of examples, where each example row is a dict.
+`Dataset`s enable you to store examples for evaluation. Weave automatically captures when they are used and updates the `Dataset` version when there are changes. `Dataset`s are created with lists of examples, where each example row is a dict.
 
 ```python
 import weave
@@ -38,9 +38,9 @@ Checkout the [Datasets](/guides/core-types/datasets) guide to learn more.
 ### Build a `Model`
 
 `Model`s store and version information about your system, such as prompts, temperatures, and more.
-Like `Dataset`s, Weave automatically captures when it is used and update the version when there are changes.
+Like `Dataset`s, Weave automatically captures when they are used and update the version when there are changes.
 
-`Model`s are declared by subclassing `Model` and decorating them with `@weave.type()`. `Model` classes also need a `predict` function definition, which take one example and return the response.
+`Model`s are declared by subclassing `Model` and decorating them with `@weave.type()`. `Model` classes also need a `predict` function definition, which takes one example and returns the response.
 
 ```python
 from weave.weaveflow import Model
