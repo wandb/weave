@@ -346,6 +346,8 @@ def _get_history3(run: wdt.Run, columns=None):
     use_fast_path = _use_fast_path(flattened_object_type)
     if use_fast_path:
         concatted_awl = _fast_history3_concat(raw_history_pa_tables, raw_live_data)
+        if len(concatted_awl) == 0:
+            return convert.to_arrow([], types.List(final_type), artifact=artifact)
         if not isinstance(concatted_awl.object_type, types.TypedDict):
             raise errors.WeaveWBHistoryTranslationError(
                 f"Expected fast_path object_type to be TypedDict, got {concatted_awl.object_type}"
@@ -407,8 +409,8 @@ def _get_history3(run: wdt.Run, columns=None):
             ]
         )
 
-    if len(concatted_awl) == 0:
-        return convert.to_arrow([], types.List(final_type), artifact=artifact)
+        if len(concatted_awl) == 0:
+            return convert.to_arrow([], types.List(final_type), artifact=artifact)
 
     sorted_table = history_op_common.sort_history_pa_table(
         history_op_common.awl_to_pa_table(concatted_awl)
