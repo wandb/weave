@@ -183,6 +183,14 @@
       "created_at": "2024-01-06T00:58:18Z",
       "repoId": 650377372,
       "pullRequestNo": 1034
+    },
+    {
+      "name": "ogozuacik",
+      "id": 27494645,
+      "comment_id": 1907106176,
+      "created_at": "2024-01-23T23:50:36Z",
+      "repoId": 650377372,
+      "pullRequestNo": 1132
     }
   ]
 }
