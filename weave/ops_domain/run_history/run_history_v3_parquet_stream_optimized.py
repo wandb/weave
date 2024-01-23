@@ -364,9 +364,10 @@ def _get_history3(run: wdt.Run, columns=None):
             # path. It's probably actually ok if this happens, and we could remove
             # these checks. But I want to understand scenarios in which it happens,
             # so raising here for now. - Shawn
-            raise errors.WeaveWBHistoryTranslationError(
-                f"Fast path history3 concat produced unexpected type: {type_mismatch_reason}"
-            )
+            # raise errors.WeaveWBHistoryTranslationError(
+            #     f"Fast path history3 concat produced unexpected type: {type_mismatch_reason}"
+            # )
+            pass
         final_type = new_final_type
     else:
         # Legacy slow path. This path drops down to python iteration in many
