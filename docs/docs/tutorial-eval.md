@@ -13,10 +13,10 @@ To iterate on an application, we need a way to evaluate if it's improving. To do
 
 ```python
 import weave
-from weave import weaveflow
+from weave.weaveflow import Dataset
 
 weave.init('intro-example')
-dataset = weaveflow.Dataset([
+dataset = Dataset([
     {'id': '0', 'sentence': 'He no like ice cream.', 'correction': 'He does not like ice cream.'},
     {'id': '1', 'sentence': 'She goed to the store.', 'correction': 'She went to the store.'},
     {'id': '2', 'sentence': 'They plays video games all day.', 'correction': 'They play video games all day.'}
