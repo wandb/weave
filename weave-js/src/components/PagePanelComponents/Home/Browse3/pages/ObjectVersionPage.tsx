@@ -1,12 +1,15 @@
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
+import {useNodeValue} from '../../../../../react';
+import {Key} from '../../../../Panel2/KeyValTable';
 import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
 import {
   WeaveEditor,
   WeaveEditorSourceContext,
 } from '../../Browse2/WeaveEditors';
 import {WFHighLevelCallFilter} from './CallsPage';
+import {KeyValueTable} from './common/KeyValueTable';
 import {
   CallLink,
   CallsLink,
@@ -62,6 +65,10 @@ const ObjectVersionPageInner: React.FC<{
   const baseUri = objectVersion.refUri();
   let fullUri = baseUri;
 
+  // TEMP HACK (Tim): This is a temporary hack since objectVersion is always an
+  // `/obj` path right now which is not correct. There is a more full featured
+  // solution here: https://github.com/wandb/weave/pull/1080 that needs to be
+  // finished asap. This is just to fix the demo / first internal release.
   if (refExtra) {
     if (fullUri.endsWith('/obj')) {
       fullUri = fullUri.slice(0, -4);
@@ -77,6 +84,9 @@ const ObjectVersionPageInner: React.FC<{
     const extraFields = refExtra.split('/');
     return nodeFromExtra(objNode, extraFields);
   }, [baseUri, refExtra]);
+
+  // const value = useNodeValue(itemNode);
+  // console.log('value', value);
   // const {onMakeBoard} = useMakeNewBoard(itemNode);
 
   return (
@@ -175,6 +185,14 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        // {
+        //   label: 'Values',
+        //   content: value.loading ? (
+        //     <></>
+        //   ) : (
+        //     <KeyValueTable data={value.result} />
+        //   ),
+        // },
         {
           label: 'Values',
           content: (
