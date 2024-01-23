@@ -82,10 +82,6 @@ const ObjectVersionPageInner: React.FC<{
     return nodeFromExtra(objNode, extraFields);
   }, [baseUri, refExtra]);
 
-  // const value = useNodeValue(itemNode);
-  // console.log('value', value);
-  // const {onMakeBoard} = useMakeNewBoard(itemNode);
-
   return (
     <SimplePageLayoutWithHeader
       title={objectVersionText(objectName, objectVersionIndex)}
@@ -182,14 +178,6 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
-        // {
-        //   label: 'Values',
-        //   content: value.loading ? (
-        //     <></>
-        //   ) : (
-        //     <KeyValueTable data={value.result} />
-        //   ),
-        // },
         {
           label: 'Values',
           content: (
