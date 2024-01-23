@@ -3,7 +3,7 @@ import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
-  title: "W&B Prompts",
+  title: "W&B Weave",
   tagline: "Confidently ship LLM applications.",
   favicon: "img/favicon.ico",
 
