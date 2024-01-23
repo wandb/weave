@@ -62,17 +62,6 @@ const ObjectVersionPageInner: React.FC<{
   const baseUri = objectVersion.refUri();
   let fullUri = baseUri;
 
-  // TEMP HACK (Tim): This is a temporary hack since objectVersion is always an
-  // `/obj` path right now which is not correct. There is a more full featured
-  // solution here: https://github.com/wandb/weave/pull/1080 that needs to be
-  // finished asap. This is just to fix the demo / first internal release.
-  if (refExtra) {
-    if (fullUri.endsWith('/obj')) {
-      fullUri = fullUri.slice(0, -4);
-    }
-    fullUri += '/' + refExtra;
-  }
-
   const itemNode = useMemo(() => {
     const objNode = opGet({uri: constString(baseUri)});
     if (refExtra == null) {
@@ -127,7 +116,13 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            Ref: <span>{fullUri}</span>,
+            // TEMP HACK (Tim): Disabling with refExtra is a temporary hack
+            // since objectVersion is always an `/obj` path right now which is
+            // not correct. There is a more full featured solution here:
+            // https://github.com/wandb/weave/pull/1080 that needs to be
+            // finished asap. This is just to fix the demo / first internal
+            // release.
+            ...(refExtra ? {Ref: <span>{fullUri}</span>} : {}),
             // Hide consuming and producing calls since we don't have a
             // good way to look this up yet
             ...(producingCalls.length > 0 && refExtra == null

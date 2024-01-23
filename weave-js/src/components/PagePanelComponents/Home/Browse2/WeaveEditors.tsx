@@ -415,7 +415,7 @@ export const WeaveEditorBoolean: FC<{
     },
     [addEdit, path]
   );
-  return <Checkbox checked={curVal} onChange={onChange} />;
+  return <Checkbox checked={curVal ?? false} onChange={onChange} />;
 };
 
 export const WeaveEditorString: FC<{
@@ -444,7 +444,7 @@ export const WeaveEditorString: FC<{
   }, [addEdit, curVal, path]);
   return (
     <TextField
-      value={curVal}
+      value={curVal ?? ''}
       onChange={onChange}
       onBlur={commit}
       multiline
@@ -479,7 +479,7 @@ export const WeaveEditorNumber: FC<{
   }, [addEdit, curVal, path]);
   return (
     <TextField
-      value={curVal}
+      value={curVal ?? ''}
       onChange={onChange}
       onBlur={commit}
       inputProps={{inputMode: 'numeric', pattern: '[.0-9]*'}}
@@ -672,8 +672,8 @@ export const WeaveEditorTable: FC<{
     if (fetchQuery.loading) {
       return;
     }
-    setIsTruncated(fetchQuery.result.length > MAX_ROWS);
-    setSourceRows(fetchQuery.result.slice(0, MAX_ROWS));
+    setIsTruncated((fetchQuery.result ?? []).length > MAX_ROWS);
+    setSourceRows((fetchQuery.result ?? []).slice(0, MAX_ROWS));
   }, [sourceRows, fetchQuery]);
 
   const gridRows = useMemo(
