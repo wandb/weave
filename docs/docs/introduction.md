@@ -7,6 +7,8 @@ hide_table_of_contents: true
 
 # Introduction
 
+*🍲 This version of Weave is pre-release software. 🍲*
+
 Weave is a toolkit for developing AI-powered applications, built by [Weights & Biases](https://wandb.ai).
 
 Our goal is to bring rigor, best-practices, and composability, to the inherently experimental process of developing AI-based software, without introducing cognitive overhead.
