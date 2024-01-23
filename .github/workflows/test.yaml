@@ -10,6 +10,8 @@ name: test
 
 on:
   push:
+    paths-ignore:
+      - "docs/*"
 
 jobs:
   build-container:
