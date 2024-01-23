@@ -18,6 +18,8 @@ hide_table_of_contents: true
 ```python
 # highlight-next-line
 import weave
+# highlight-next-line
+import wandb
 from openai import OpenAI
 
 # highlight-next-line
