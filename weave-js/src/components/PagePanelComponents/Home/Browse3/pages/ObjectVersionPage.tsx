@@ -172,6 +172,7 @@ const ObjectVersionPageInner: React.FC<{
           label: 'Values',
           content: (
             <WeaveEditorSourceContext.Provider
+              key={fullUri}
               value={{
                 entityName,
                 projectName,

@@ -7,11 +7,13 @@ hide_table_of_contents: true
 
 # Introduction
 
+*🍲 This version of Weave is pre-release software. 🍲*
+
 Weave is a toolkit for developing AI-powered applications, built by [Weights & Biases](https://wandb.ai).
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI-based software.
 
-The core concept of Weave is its ability to monitor function calls, including their inputs and outputs, as your code executes. This eliminates the need to master a declarative language or understand an intricate object hierarchy. Just decorate functions with `@weave.op` to [get started](/docs/get-started/quickstart).
+The core concept of Weave is its ability to monitor function calls, including their inputs and outputs, as your code executes. This eliminates the need to master a declarative language or understand an intricate object hierarchy. Just decorate functions with `@weave.op` to [get started](/quickstart).
 
 
 ## Key concepts
@@ -45,4 +47,4 @@ Weave's **tools** layer contains utilities for making use of Weave objects.
 
 ## What's next?
 
-Try the [Quickstart](/docs/get-started/quickstart) to see Weave in action.
+Try the [Quickstart](/quickstart) to see Weave in action.
