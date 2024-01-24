@@ -384,7 +384,10 @@ const WeaveEditorField: FC<{
     return <WeaveEditorObject node={node} path={path} />;
   }
   if (isAssignableTo(node.type, maybe({type: 'OpDef'}))) {
-    return <WeaveViewOpDef node={node} />;
+    return <WeaveViewSmallRef node={node} />;
+  }
+  if (isAssignableTo(node.type, maybe({type: 'WandbArtifactRef'}))) {
+    return <WeaveViewSmallRef node={node} />;
   }
   return <div>[No editor for type {weave.typeToString(node.type)}]</div>;
 };
@@ -776,7 +779,7 @@ export const WeaveEditorTable: FC<{
   );
 };
 
-export const WeaveViewOpDef: FC<{
+export const WeaveViewSmallRef: FC<{
   node: Node;
 }> = ({node}) => {
   const opDefQuery = useNodeValue(node);
@@ -789,6 +792,6 @@ export const WeaveViewOpDef: FC<{
   } else if (opDefRef != null) {
     return <SmallRef objRef={opDefRef} />;
   } else {
-    return <div>invalid op def: {opDefQuery.result}</div>;
+    return <div>invalid ref: {opDefQuery.result}</div>;
   }
 };
