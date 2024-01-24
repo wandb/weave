@@ -45,6 +45,7 @@ export const SimplePageLayout: React.FC<{
         flexDirection: 'column',
         flexGrow: 1,
         height: '100%',
+        overflow: 'hidden',
       }}>
       <Box
         sx={{
@@ -234,6 +235,7 @@ export const SimplePageLayoutWithHeader: React.FC<{
             flexDirection: 'column',
             flexGrow: 1,
             height: '100%',
+            overflow: 'hidden',
           }}>
           <Box
             sx={{
