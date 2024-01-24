@@ -17,11 +17,12 @@ This guide will show you how to:
 
 ```python
 import weave
+from weave.weaveflow import Dataset
 # Initialize Weave
 weave.init('intro-example')
 
 # Create a dataset
-dataset = weaveflow.Dataset([
+dataset = Dataset([
     {'id': '0', 'sentence': "He no likes ice cream.", 'correction': "He doesn't like ice cream."},
     {'id': '1', 'sentence': "She goed to the store.", 'correction': "She went to the store."},
     {'id': '2', 'sentence': "They plays video games all day.", 'correction': "They play video games all day."}
@@ -34,5 +35,5 @@ weave.publish(dataset, 'grammar')
 dataset_ref = weave.ref('grammar').get()
 
 # Access a specific example
-example_label = dataset_ref.rows[2]['label']
+example_label = dataset_ref.rows[2]['sentence']
 ```
