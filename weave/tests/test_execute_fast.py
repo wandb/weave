@@ -32,7 +32,7 @@ def test_resolve_static_branches():
 
 def test_empty_list():
     arr = weave.RuntimeConstNode(types.List(types.TypedDict({})), [])
-    map_fn = weave.define_fn(
+    map_fn = weave_internal.define_fn(
         {"row": arr.type.object_type},
         lambda row: row.merge(weave.ops.dict_(output_classid=row["output_class"].id())),
     )

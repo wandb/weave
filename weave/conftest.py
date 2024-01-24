@@ -10,7 +10,6 @@ import tempfile
 
 import weave
 
-# from weave.panels import table_state
 from . import context_state
 from .tests import fixture_fakewandb
 from . import serialize
@@ -284,6 +283,8 @@ def io_server_factory():
 
 @pytest.fixture()
 def consistent_table_col_ids():
+    from weave.panels import table_state
+
     with table_state.use_consistent_col_ids():
         yield
 

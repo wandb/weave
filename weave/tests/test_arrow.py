@@ -21,7 +21,7 @@ from .. import weave_types as types
 from .. import weave_internal
 from .. import context_state
 from .. import graph
-from ..ops_primitives import list_
+from ..ops_primitives import list_, make_list
 from .. import mappers_arrow
 from ..op_def import map_type
 
@@ -137,7 +137,7 @@ def test_js_groupby_sort():
     arrow_node = weave.save(arrow.to_arrow(list_data))
     node = weavejs_ops.groupby(
         list_node,
-        weave.define_fn(
+        weave_internal.define_fn(
             {"row": list_node.type.object_type},
             lambda row: ops.dict_(
                 a=graph.OutputNode(
@@ -152,7 +152,7 @@ def test_js_groupby_sort():
     node.from_op.inputs["arr"] = arrow_node
     node = weavejs_ops.sort(
         node,
-        weave.define_fn(
+        weave_internal.define_fn(
             {"row": node.type.object_type},
             lambda row: ops.make_list(
                 a=graph.OutputNode(
@@ -263,7 +263,7 @@ def test_custom_saveload():
     ref = storage.save(data)
     data2 = storage.get(str(ref))
     # print("data2", data2._artifact)
-    assert weave.use(weave.weave(data2)[0]["im"].width_()) == 256
+    assert weave.use(weave_internal.const(data2)[0]["im"].width_()) == 256
 
 
 def test_custom_in_list_saveload():
@@ -276,7 +276,7 @@ def test_custom_in_list_saveload():
     ref = storage.save(data)
     data2 = storage.get(str(ref))
     # print("data2", data2._artifact)
-    assert weave.use(weave.weave(data2)[0]["im"].width_()) == [256]
+    assert weave.use(weave_internal.const(data2)[0]["im"].width_()) == [256]
 
 
 def test_custom_tagged_groupby1():
@@ -472,7 +472,7 @@ def test_arrow_nested_with_refs():
 
     # Next, we get a derive node from the data_node, and assert that the path is
     # converted to an artifact reference when appropriate.
-    col_node = arrow.ops.pick(weave.weave(data_node), "outer")
+    col_node = arrow.ops.pick(weave_internal.const(data_node), "outer")
     # Note: we don't need to save the `col_node` because
     # they are already converted to the node representation via dispatch
     raw_col_data = weave.use(col_node)
@@ -575,7 +575,7 @@ def test_tagging_concat():
         tag_store.add_tags(awl, {"list_tag": f"index{index}"})
         awls.append(weave.save(awl))
 
-    list_nodes = weave._ops.make_list(l1=awls[0], l2=awls[1])
+    list_nodes = make_list(l1=awls[0], l2=awls[1])
     concatenated = arrow.ops.concat(list_nodes)
 
     assert weave.use(concatenated.to_py()) == [{"a": 1, "b": 2}, {"a": 3, "b": 4}] * 2
@@ -615,11 +615,11 @@ def test_arrow_unnest():
     assert weave.type_of(data) == arrow.ArrowWeaveListType(
         types.TypedDict({"a": types.List(types.Int()), "b": types.String()})
     )
-    unnest_node = weave.weave(data).unnest()
+    unnest_node = weave_internal.const(data).unnest()
     assert unnest_node.type == arrow.ArrowWeaveListType(
         types.TypedDict({"a": types.Int(), "b": types.String()})
     )
-    assert weave.use(weave.weave(data).unnest()).to_pylist_raw() == [
+    assert weave.use(weave_internal.const(data).unnest()).to_pylist_raw() == [
         {"a": 1, "b": "c"},
         {"a": 2, "b": "c"},
         {"a": 3, "b": "c"},
@@ -645,11 +645,11 @@ def test_arrow_unnest_two_list_cols():
             }
         )
     )
-    unnest_node = weave.weave(data).unnest()
+    unnest_node = weave_internal.const(data).unnest()
     assert unnest_node.type == arrow.ArrowWeaveListType(
         types.TypedDict({"a": types.Int(), "b": types.String(), "c": types.String()})
     )
-    assert weave.use(weave.weave(data).unnest()).to_pylist_raw() == [
+    assert weave.use(weave_internal.const(data).unnest()).to_pylist_raw() == [
         {"a": 1, "b": "c", "c": "a"},
         {"a": 2, "b": "c", "c": "b"},
         {"a": 3, "b": "c", "c": "c"},
@@ -664,7 +664,7 @@ def test_arrow_nullable_concat():
     ca2 = pa.compute.add(ca1, 1)
     awl1 = arrow.ArrowWeaveList(ca1)
     awl2 = arrow.ArrowWeaveList(ca2)
-    list_of_awl = weave._ops.make_list(A=awl1, B=awl2, C=weave.save(None))
+    list_of_awl = make_list(A=awl1, B=awl2, C=weave.save(None))
     result = list_of_awl.concat()
     assert weave.use(result).to_pylist_raw() == [1, 2, 3, 4, 2, 3, 4, 5]
 
@@ -690,7 +690,7 @@ def test_arrow_weave_list_groupby_struct_type_table():
     #    return ops.dict_(**{"d.a": row["d"]["a"]})
 
     group_func = weave_internal.define_fn({"row": awl.object_type}, group_func_body)
-    grouped = weave.weave(awl).groupby(group_func)
+    grouped = weave_internal.const(awl).groupby(group_func)
     assert weave.use(grouped[0]).to_pylist_raw() == [{"d": {"a": 1, "b": 2}, "c": 1}]
 
 
@@ -1385,7 +1385,7 @@ def test_concat_nulls():
         )
     )
 
-    list_nodes = weave._ops.make_list(l1=datal, l2=datar)
+    list_nodes = make_list(l1=datal, l2=datar)
     concatenated = arrow.ops.concat(list_nodes)
 
     assert weave.use(concatenated.to_py()) == [

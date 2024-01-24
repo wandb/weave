@@ -127,7 +127,9 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
             if isinstance(config_val, graph.Node) and isinstance(
                 config_val.type, types.Function
             ):
-                new_config_val = weave.define_fn(config_val.type.input_types, v)
+                new_config_val = weave_internal.define_fn(
+                    config_val.type.input_types, v
+                )
             elif isinstance(config_val, graph.Node):
                 new_config_val = panel_util.make_node(v)
             else:

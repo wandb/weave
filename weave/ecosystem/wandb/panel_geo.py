@@ -53,9 +53,15 @@ def geo_default_config(
     input_type_item_type = weave.type_of(unnested_node).object_type  # type: ignore
     if config == None:
         return GeoConfig(
-            x_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
-            y_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
-            color_fn=weave.define_fn({"item": input_type_item_type}, lambda item: item),
+            x_fn=weave_internal.define_fn(
+                {"item": input_type_item_type}, lambda item: item
+            ),
+            y_fn=weave_internal.define_fn(
+                {"item": input_type_item_type}, lambda item: item
+            ),
+            color_fn=weave_internal.define_fn(
+                {"item": input_type_item_type}, lambda item: item
+            ),
         )
     return config
 
@@ -134,31 +140,31 @@ class Geo(weave.Panel):
             if "x_fn" in options:
                 sig = inspect.signature(options["x_fn"])
                 param_name = list(sig.parameters.values())[0].name
-                self.config.x_fn = weave.define_fn(
+                self.config.x_fn = weave_internal.define_fn(
                     {param_name: unnested.type.object_type}, options["x_fn"]
                 )
             else:
-                self.config.x_fn = weave.define_fn(
+                self.config.x_fn = weave_internal.define_fn(
                     {"item": unnested.type.object_type}, lambda item: item
                 )
             if "y_fn" in options:
                 sig = inspect.signature(options["y_fn"])
                 param_name = list(sig.parameters.values())[0].name
-                self.config.y_fn = weave.define_fn(
+                self.config.y_fn = weave_internal.define_fn(
                     {param_name: unnested.type.object_type}, options["y_fn"]
                 )
             else:
-                self.config.y_fn = weave.define_fn(
+                self.config.y_fn = weave_internal.define_fn(
                     {"item": unnested.type.object_type}, lambda item: item
                 )
             if "color_fn" in options:
                 sig = inspect.signature(options["color_fn"])
                 param_name = list(sig.parameters.values())[0].name
-                self.config.color_fn = weave.define_fn(
+                self.config.color_fn = weave_internal.define_fn(
                     {param_name: unnested.type.object_type}, options["color_fn"]
                 )
             else:
-                self.config.color_fn = weave.define_fn(
+                self.config.color_fn = weave_internal.define_fn(
                     {"item": unnested.type.object_type}, lambda item: item
                 )
 

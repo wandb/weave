@@ -12,6 +12,7 @@ from .. import artifact_mem
 from .. import errors
 from .. import arrow_util
 from .. import api
+from .. import weave_internal
 
 
 from .arrow import (
@@ -390,7 +391,7 @@ def to_arrow(
 
 def to_weave_arrow(v: typing.Any):
     awl = to_arrow(v)
-    return api.weave(awl)
+    return weave_internal.const(awl)
 
 
 def to_parquet_friendly(l: ArrowWeaveList) -> ArrowWeaveList:

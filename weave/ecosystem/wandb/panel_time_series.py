@@ -88,9 +88,9 @@ def first_column_of_type(
         node_type = typing.cast(weave.types.List, node_type)
         object_type = node_type.object_type
         if desired_type.assign_type(object_type):
-            return weave.define_fn(
+            return weave_internal.define_fn(
                 {"input_node": node_type}, lambda item: item
-            ), weave.define_fn({"item": object_type}, lambda item: item)
+            ), weave_internal.define_fn({"item": object_type}, lambda item: item)
         elif weave.types.TypedDict().assign_type(object_type):
             object_type = typing.cast(weave.types.TypedDict, object_type)
             _, non_none_desired = weave.types.split_none(desired_type)
@@ -99,11 +99,11 @@ def first_column_of_type(
                 and "_timestamp" in object_type.property_types
             ):
                 return (
-                    weave.define_fn(
+                    weave_internal.define_fn(
                         {"input_node": node_type},
                         lambda item: (item["_timestamp"] * 1000).toTimestamp(),
                     ),
-                    weave.define_fn(
+                    weave_internal.define_fn(
                         {"item": object_type},
                         lambda item: (item["_timestamp"] * 1000).toTimestamp(),
                     ),
@@ -111,12 +111,14 @@ def first_column_of_type(
             for key in object_type.property_types:
                 value_type = object_type.property_types[key]
                 if desired_type.assign_type(value_type):
-                    return weave.define_fn(
+                    return weave_internal.define_fn(
                         {"input_node": node_type}, lambda item: item[key]
-                    ), weave.define_fn({"item": object_type}, lambda item: item[key])
-        # return weave.define_fn(
+                    ), weave_internal.define_fn(
+                        {"item": object_type}, lambda item: item[key]
+                    )
+        # return weave_internal.define_fn(
         #     {"input_node": node_type}, weave.graph.VoidNode()
-        # ), weave.define_fn({"item": object_type}, lambda _: weave.graph.VoidNode())
+        # ), weave_internal.define_fn({"item": object_type}, lambda _: weave.graph.VoidNode())
     raise ValueError(
         f"Can't extract column with type {desired_type} from node of type {node_type}"
     )
@@ -171,16 +173,16 @@ class TimeSeries(weave.Panel):
                             value = weave_internal.const(value)
                             # value = weave.make_node(value)
                         elif attr in ["x", "label"]:
-                            value = weave.define_fn(
+                            value = weave_internal.define_fn(
                                 {"item": unnested.type.object_type}, value
                             )
                         elif attr in ["agg"]:
-                            value = weave.define_fn(
+                            value = weave_internal.define_fn(
                                 {"group": weave.types.List(unnested.type.object_type)},
                                 value,
                             )
                 else:
-                    value = weave.define_fn(
+                    value = weave_internal.define_fn(
                         {"item": unnested.type.object_type},
                         lambda item: weave.graph.VoidNode(),
                     )
