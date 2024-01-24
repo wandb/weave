@@ -12,7 +12,12 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
-import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
+import {
+  CallsLink,
+  opNiceName,
+  OpVersionLink,
+  OpVersionsLink,
+} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   FilterableTable,
@@ -653,9 +658,9 @@ const OpCategoryFilterControlListItem: React.FC<{
   //   return orm.projectConnection.opCategories();
   // }, [orm.projectConnection]);
   const options = useMemo(() => {
-    return _.uniq(props.frozenData.map(item => item.obj.opCategory())).filter(
-      item => item != null
-    ) as HackyOpCategory[];
+    return _.uniq(props.frozenData.map(item => item.obj.opCategory()))
+      .filter(item => item != null)
+      .sort() as HackyOpCategory[];
   }, [props.frozenData]);
   return (
     <ListItem>
@@ -692,7 +697,13 @@ const OpNameFilterControlListItem: React.FC<{
   //   return orm.projectConnection.ops().map(o => o.name());
   // }, [orm.projectConnection]);
   const options = useMemo(() => {
-    return _.uniq(props.frozenData.map(item => item.obj.op().name()));
+    return _.uniq(props.frozenData.map(item => item.obj.op().name())).sort(
+      (a, b) => {
+        const nameA = opNiceName(a);
+        const nameB = opNiceName(b);
+        return nameA.localeCompare(nameB);
+      }
+    );
   }, [props.frozenData]);
   return (
     <ListItem>
@@ -707,6 +718,7 @@ const OpNameFilterControlListItem: React.FC<{
               opName: newValue,
             });
           }}
+          getOptionLabel={option => opNiceName(option)}
           options={options}
         />
       </FormControl>
