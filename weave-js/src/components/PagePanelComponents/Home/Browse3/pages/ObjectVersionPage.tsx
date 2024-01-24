@@ -185,7 +185,11 @@ const ObjectVersionPageInner: React.FC<{
                 refExtra: refExtra?.split('/'),
               }}>
               <ScrollableTabContent>
-                <WeaveEditor objType={objectName} node={itemNode} />
+                <WeaveEditor
+                  objType={objectName}
+                  node={itemNode}
+                  disableEdits
+                />
               </ScrollableTabContent>
             </WeaveEditorSourceContext.Provider>
           ),
