@@ -9,7 +9,10 @@ from . import projection_utils
 from ._dict_utils import tag_aware_dict_val_for_escaped_key
 from .. import box
 from .. import weave_types as types
-from ..api import Node, op, weave_class, OpVarArgs
+from ..graph import Node
+from ..decorator_op import op
+from ..decorator_class import weave_class
+from ..op_args import OpVarArgs
 from .. import errors
 from .. import execute_fast
 from .. import storage

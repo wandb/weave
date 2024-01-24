@@ -8,7 +8,9 @@ import pytest
 import shutil
 import tempfile
 
-from weave.panels import table_state
+import weave
+
+# from weave.panels import table_state
 from . import context_state
 from .tests import fixture_fakewandb
 from . import serialize

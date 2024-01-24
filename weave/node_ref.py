@@ -3,7 +3,7 @@ import copy
 
 from . import graph
 from . import ref_base
-from . import ops
+from . import weave_types as types
 
 # Notes for the future:
 # - I added list.lookup to lookup rows in a list by ID. I think we probably should
@@ -89,7 +89,9 @@ def ref_to_node(ref: ref_base.Ref) -> typing.Optional[graph.Node]:
     ref = copy.copy(ref)
     ref.extra = []
 
-    node = ops.get(str(ref))
+    node = graph.OutputNode(
+        ref.type, "get", {"uri": graph.ConstNode(types.String(), ref.uri)}
+    )
     for str_key in extra:
         key: typing.Union[str, int] = str_key
         try:

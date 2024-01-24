@@ -5,7 +5,8 @@ import typing
 from . import registry_mem
 from . import op_def
 from . import op_args
-from . import derive_op
+
+# from . import derive_op
 from . import context_state
 from . import weave_types as types
 from . import pyfunc_type_util
@@ -96,8 +97,8 @@ def op(
         # fix that up. So we end up double registering ops in WeaveJS which breaks
         # everything.
         # TODO: fix so we get mappability for custom (ecosystem) ops!
-        if op.location is None:
-            derive_op.derive_ops(op)
+        # if op.location is None:
+        #     derive_op.derive_ops(op)
 
         return op_version
 

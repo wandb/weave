@@ -7,39 +7,41 @@ from . import weave_types as types
 from . import storage
 
 # this patches the `Type` class to enable the make method - needed due to circular references
-from . import make_type as _make_type
-from . import ops
-from . import codify
-from .graph import Node  # used as a type in op definitions
-from .show import show, show_url
+# from . import make_type as _make_type
+# from . import ops
+# from . import codify
+# from .graph import Node  # used as a type in op definitions
+# from .show import show, show_url
 from .api import *
 
-from . import panels
-from .panel import Panel
+# from . import panels
+# from .panel import Panel
 
 from .errors import *
 
+from . import mappers_python_def
+
 # TODO: Don't expose
-from .panel_util import make_node
+# from .panel_util import make_node
 
 from . import wandb_api as _wandb_api
 
-from .core_types import *
-from .monitoring import *
+# from .core_types import *
+# from .monitoring import *
 
-from .panels_py import *
+# from .panels_py import *
 from . import version
 
-from . import ops_arrow as _ops_arrow
+# from . import ops_arrow as _ops_arrow
 
-WeaveList = _ops_arrow.ArrowWeaveList
+# WeaveList = _ops_arrow.ArrowWeaveList
 
 _wandb_api.init()
 
 # Ensure there is a client available for eager mode
 from . import context as _context
 
-_context.get_client()
+# _context.get_client()
 # Eager by default
 # _context_state._eager_mode.set(True)
 

@@ -4,7 +4,8 @@ import numpy as np
 
 from .arrow import arrow_as_array, offsets_starting_at_zero
 
-from ..api import op, OpVarArgs
+from ..decorator_op import op
+from ..op_args import OpVarArgs
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import _dict_utils
