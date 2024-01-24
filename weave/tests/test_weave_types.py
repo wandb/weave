@@ -6,7 +6,7 @@ import weave.weave_types
 from .. import errors
 from .. import weave_types as types
 from .. import runs
-from ..ops_primitives import _dict_utils
+from .. import _dict_utils
 from ..ops_domain import wbmedia
 
 
@@ -525,7 +525,12 @@ def test_assign_dict_to_typeddict():
 
 
 def test_type_of_empty_array_union():
-    assert weave.type_of([{"a": []}, {"a": [1]},]) == weave.types.List(
+    assert weave.type_of(
+        [
+            {"a": []},
+            {"a": [1]},
+        ]
+    ) == weave.types.List(
         weave.types.TypedDict({"a": weave.types.List(weave.types.Int())})
     )
 

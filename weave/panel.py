@@ -9,7 +9,6 @@ from . import weave_types as types
 from . import weave_internal
 from . import panel_util
 from . import errors
-from .ops import get as op_get
 
 
 def run_variable_lambdas(

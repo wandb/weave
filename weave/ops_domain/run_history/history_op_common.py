@@ -32,7 +32,7 @@ from .. import table
 from ... import artifact_fs
 from ...wandb_interface import wandb_stream_table
 from ...compile_table import KeyTree
-from ...ops_primitives import _dict_utils
+from ... import _dict_utils
 from ... import gql_json_cache
 
 tracer = engine_trace.tracer()

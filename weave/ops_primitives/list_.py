@@ -6,7 +6,7 @@ import typing
 
 from . import projection_utils
 
-from ._dict_utils import tag_aware_dict_val_for_escaped_key
+from .._dict_utils import tag_aware_dict_val_for_escaped_key
 from .. import box
 from .. import weave_types as types
 from ..graph import Node

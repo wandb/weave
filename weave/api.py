@@ -9,7 +9,9 @@ from typing import Any
 
 from . import urls
 
-# from . import graph as _graph
+from . import graph as _graph
+from .graph import Node
+
 # from . import graph_mapper as _graph_mapper
 from . import storage as _storage
 from . import ref_base as _ref_base
@@ -17,13 +19,13 @@ from . import artifact_wandb as _artifact_wandb
 from . import wandb_api as _wandb_api
 
 # from . import trace as _trace
-# from . import weave_internal as _weave_internal
+from . import weave_internal as _weave_internal
 from . import errors as _errors
 
 # from . import ops as _ops
 from . import util as _util
 
-# from . import context as _context
+from . import context as _context
 from . import context_state as _context_state
 from . import run as _run
 from . import weave_init as _weave_init
@@ -50,6 +52,10 @@ from .context import (
     use_lazy_execution,
 )
 
+from .panel import Panel
+
+WeaveList = None
+
 # from .server import capture_weave_server_logs
 
 # from .val_const import const
@@ -62,8 +68,10 @@ from .context import (
 
 
 def save(node_or_obj, name=None):
+    from .ops_primitives.weave_api import save, get
+
     if isinstance(node_or_obj, _graph.Node):
-        return _ops.save(node_or_obj, name=name)
+        return save(node_or_obj, name=name)
     else:
         # If the user does not provide a branch, then we explicitly set it to
         # the default branch, "latest".
@@ -80,7 +88,7 @@ def save(node_or_obj, name=None):
             # otherwise the reference will be to whatever branch was provided
             # or the "latest" branch if only a name was provided.
             uri = ref.branch_uri
-        return _ops.get(str(uri))
+        return get(str(uri))
 
 
 def get(ref_str):

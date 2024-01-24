@@ -15,7 +15,7 @@ from .. import box
 from .. import weave_internal
 from .. import op_def_type
 from .. import op_def
-from ..ops_primitives import _dict_utils
+from .. import _dict_utils
 from .. import errors
 from .. import graph
 from ..language_features.tagging import (

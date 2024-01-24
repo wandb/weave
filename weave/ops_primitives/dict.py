@@ -1,5 +1,5 @@
 import typing
-from ._dict_utils import typeddict_pick_output_type
+from .._dict_utils import typeddict_pick_output_type
 from ..decorator_op import op
 from ..decorator_class import weave_class
 from ..op_args import OpVarArgs

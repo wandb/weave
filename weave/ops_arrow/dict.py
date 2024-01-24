@@ -8,7 +8,7 @@ from ..decorator_op import op
 from ..op_args import OpVarArgs
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
-from ..ops_primitives import _dict_utils
+from .. import _dict_utils
 from ..ops_primitives import projection_utils
 from ..language_features.tagging import (
     process_opdef_output_type,
