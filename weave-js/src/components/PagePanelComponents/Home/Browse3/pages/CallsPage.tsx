@@ -1,5 +1,5 @@
-import {CircularProgress, IconButton} from '@material-ui/core';
-import {DashboardCustomize} from '@mui/icons-material';
+import {Box, CircularProgress, IconButton, Typography} from '@material-ui/core';
+import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
@@ -9,13 +9,22 @@ import {
   ListItemText,
   TextField,
 } from '@mui/material';
+import {DataGrid, GridColDef} from '@mui/x-data-grid';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {CallFilter} from '../../Browse2/callTree';
+import {parseRef} from '../../../../../react';
+import {flattenObject} from '../../Browse2/browse2Util';
+import {CallFilter, SpanWithFeedback} from '../../Browse2/callTree';
 import {fnRunsNode, useRunsWithFeedback} from '../../Browse2/callTreeHooks';
-import {RunsTable} from '../../Browse2/RunsTable';
+import {
+  buildTree,
+  DataGridColumnGroupingModel,
+  RunsTable,
+} from '../../Browse2/RunsTable';
+import {SmallRef} from '../../Browse2/SmallRef';
 import {useWeaveflowRouteContext} from '../context';
+import {StyledDataGrid} from '../StyledDataGrid';
 import {useMakeNewBoard} from './common/hooks';
 import {opNiceName} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
@@ -100,14 +109,13 @@ export const CallsTable: React.FC<{
   const lowLevelFilter: CallFilter = useMemo(() => {
     return convertHighLevelFilterToLowLevelFilter(orm, effectiveFilter);
   }, [effectiveFilter, orm]);
-  const runs = useRunsWithFeedback(
-    {
-      entityName: props.entity,
-      projectName: props.project,
-      streamName: 'stream',
-    },
-    lowLevelFilter
-  );
+  const streamId = {
+    entityName: props.entity,
+    projectName: props.project,
+    streamName: 'stream',
+  };
+
+  const runsWithFeedbackQuery = useRunsWithFeedback(streamId, lowLevelFilter);
 
   // # TODO: All of these need to be handled much more logically since
   // we need to calculate the options based on everything except a specific filter.
@@ -152,6 +160,52 @@ export const CallsTable: React.FC<{
     props.project,
     lowLevelFilter
   );
+
+  // TODO: Add these to the incoming filter state and URL.
+  const [userEnabledPivot, setUserEnabledPivot] = useState(false);
+  const [pivotRowDim, setPivotRowDim] = useState<string | null>();
+  const [pivotColDim, setPivotColDim] = useState<string | null>();
+
+  const [pivotRowOptions, setPivotRowOptions] = useState<string[]>([]);
+  const [pivotColOptions, setPivotColOptions] = useState<string[]>([]);
+  const canPivot = useMemo(() => {
+    return (
+      effectiveFilter.opVersions?.length === 1 && pivotRowOptions.length > 1
+    );
+  }, [effectiveFilter.opVersions?.length, pivotRowOptions.length]);
+  const isPivoting = userEnabledPivot && canPivot;
+
+  useEffect(() => {
+    if (runsWithFeedbackQuery.loading) {
+      return;
+    }
+    const runs = runsWithFeedbackQuery.result;
+    if (runs.length === 0) {
+      return;
+    }
+    const firstRun = runs[0];
+    const options: string[] = [];
+    Object.entries(firstRun.inputs).forEach(([key, value]) => {
+      if (
+        typeof value === 'string' &&
+        value.startsWith('wandb-artifact:///') &&
+        !key.startsWith('_')
+      ) {
+        options.push('inputs.' + key);
+      }
+    });
+    setPivotRowOptions(options);
+    setPivotColOptions(options);
+    if (options.length > 1) {
+      if (options[0] === 'inputs.self') {
+        setPivotRowDim(options[0]);
+        setPivotColDim(options[1]);
+      }
+      setPivotRowDim(options[1]);
+      setPivotColDim(options[0]);
+    }
+  }, [runsWithFeedbackQuery.loading, runsWithFeedbackQuery.result]);
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -175,13 +229,25 @@ export const CallsTable: React.FC<{
               <DashboardCustomize />
             )}
           </IconButton>
+          {canPivot && (
+            <IconButton
+              style={{width: '37px', height: '37px'}}
+              size="small"
+              color={userEnabledPivot ? 'primary' : 'default'}
+              onClick={() => {
+                setUserEnabledPivot(!userEnabledPivot);
+              }}>
+              <PivotTableChart />
+            </IconButton>
+          )}
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'opCategory'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes('opCategory')
+                }
                 renderInput={params => (
                   <TextField {...params} label="Category" />
                 )}
@@ -203,9 +269,10 @@ export const CallsTable: React.FC<{
                 // Temp disable multiple for simplicity - may want to re-enable
                 // multiple
                 limitTags={1}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'opVersions'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes('opVersions')
+                }
                 value={effectiveFilter.opVersions?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
@@ -231,9 +298,12 @@ export const CallsTable: React.FC<{
                 limitTags={1}
                 // Temp disable multiple for simplicity - may want to re-enable
                 // multiple
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'inputObjectVersions'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes(
+                    'inputObjectVersions'
+                  )
+                }
                 renderInput={params => (
                   <TextField {...params} label="Inputs" />
                   // <TextField {...params} label="Consumes Objects" />
@@ -256,9 +326,10 @@ export const CallsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'traceId'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes('traceId')
+                }
                 renderInput={params => <TextField {...params} label="Trace" />}
                 value={effectiveFilter.traceId ?? null}
                 onChange={(event, newValue) => {
@@ -278,9 +349,10 @@ export const CallsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'parentId'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes('parentId')
+                }
                 renderInput={params => <TextField {...params} label="Parent" />}
                 value={effectiveFilter.parentId ?? null}
                 onChange={(event, newValue) => {
@@ -313,6 +385,7 @@ export const CallsTable: React.FC<{
               />
             }
             disabled={
+              isPivoting ||
               traceRootOptions.length <= 1 ||
               Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
             }
@@ -328,9 +401,256 @@ export const CallsTable: React.FC<{
             </ListItemButton>
           </ListItem>
         </>
+      }
+      pivotListItems={
+        isPivoting && (
+          <>
+            <Typography
+              style={{width: '38px', textAlign: 'center', flex: '0 0 auto'}}>
+              Pivot
+            </Typography>
+            <ListItem>
+              <FormControl fullWidth>
+                <Autocomplete
+                  size={'small'}
+                  renderInput={params => <TextField {...params} label="Rows" />}
+                  value={pivotRowDim ?? null}
+                  onChange={(event, newValue) => {
+                    setPivotRowDim(newValue);
+                  }}
+                  options={pivotRowOptions}
+                />
+              </FormControl>
+            </ListItem>
+            <ListItem>
+              <FormControl fullWidth>
+                <Autocomplete
+                  size={'small'}
+                  renderInput={params => (
+                    <TextField {...params} label="Columns" />
+                  )}
+                  value={pivotColDim ?? null}
+                  onChange={(event, newValue) => {
+                    setPivotColDim(newValue);
+                  }}
+                  options={pivotColOptions}
+                />
+              </FormControl>
+            </ListItem>
+          </>
+        )
       }>
-      <RunsTable loading={runs.loading} spans={runs.result} />
+      {isPivoting ? (
+        <PivotRunsTable
+          loading={runsWithFeedbackQuery.loading}
+          runs={runsWithFeedbackQuery.result}
+          rowsDim={pivotRowDim}
+          colsDim={pivotColDim}
+        />
+      ) : (
+        <RunsTable
+          loading={runsWithFeedbackQuery.loading}
+          spans={runsWithFeedbackQuery.result}
+        />
+      )}
     </FilterLayoutTemplate>
+  );
+};
+const getValueAtNestedKey = (value: any, dimKey: string) => {
+  dimKey.split('.').forEach(dim => {
+    if (value != null) {
+      value = value[dim];
+    }
+  });
+  return value;
+};
+
+const PivotRunsTable: React.FC<{
+  loading: boolean;
+  runs: SpanWithFeedback[];
+  rowsDim?: string | null;
+  colsDim?: string | null;
+}> = props => {
+  const {pivotData, pivotColumns} = useMemo(() => {
+    if (props.rowsDim == null || props.colsDim == null) {
+      return {pivotData: [], pivotColumns: new Set<string>()};
+    }
+
+    const aggregation = (values: any[]) => {
+      return values[0];
+    };
+
+    // Step 1: Create a map of values
+    const values: {[rowId: string]: {[colId: string]: any[]}} = {};
+    const pivotColumns: Set<string> = new Set();
+    props.runs.forEach(r => {
+      const rowValue = getValueAtNestedKey(r, props.rowsDim!);
+      const colValue = getValueAtNestedKey(r, props.colsDim!);
+      if (rowValue == null || colValue == null) {
+        return;
+      }
+      pivotColumns.add(colValue);
+      if (!values[rowValue]) {
+        values[rowValue] = {};
+      }
+      if (!values[rowValue][colValue]) {
+        values[rowValue][colValue] = [];
+      }
+      values[rowValue][colValue].push(r);
+    });
+
+    // Step 2: Create a list of rows
+    const rows: Array<{[col: string]: any}> = [];
+    Object.keys(values).forEach(rowKey => {
+      const row: {[col: string]: any} = {
+        id: rowKey,
+      };
+      row[props.rowsDim!] = rowKey;
+      Object.keys(values[rowKey]).forEach(colKey => {
+        row[colKey] = aggregation(values[rowKey][colKey]);
+      });
+      rows.push(row);
+    });
+
+    return {pivotData: rows, pivotColumns};
+  }, [props.colsDim, props.rowsDim, props.runs]);
+
+  const columns = useMemo(() => {
+    const cols: GridColDef[] = [
+      {
+        flex: 1,
+        minWidth: 175,
+        field: props.rowsDim!,
+        headerName: props.rowsDim!,
+        renderCell: cellParams => {
+          const value = cellParams.row[props.rowsDim!];
+          if (
+            typeof value === 'string' &&
+            value.startsWith('wandb-artifact:///')
+          ) {
+            return <SmallRef objRef={parseRef(value)} />;
+          }
+          return value;
+        },
+      },
+    ];
+
+    const colGroupingModel: DataGridColumnGroupingModel = [];
+
+    if (pivotData.length === 0) {
+      return {cols: [], colGroupingModel: []};
+    }
+    pivotColumns.forEach(col => {
+      // All output keys as we don't have the order key yet.
+      let outputKeys: {[key: string]: true} = {};
+      pivotData.forEach(pivotRow => {
+        if (pivotRow[col]) {
+          for (const [k, v] of Object.entries(
+            flattenObject(pivotRow[col].output!)
+          )) {
+            if (v != null && (!k.startsWith('_') || k === '_result')) {
+              outputKeys[k] = true;
+            }
+          }
+        }
+      });
+
+      const outputOrder = Object.keys(outputKeys);
+      const outputGrouping = buildTree(outputOrder, col);
+      outputGrouping.renderHeaderGroup = params => {
+        const value = col;
+        if (
+          typeof value === 'string' &&
+          value.startsWith('wandb-artifact:///')
+        ) {
+          return (
+            <Box>
+              <SmallRef objRef={parseRef(value)} />
+            </Box>
+          );
+        }
+        return value;
+      };
+      colGroupingModel.push(outputGrouping);
+      for (const key of outputOrder) {
+        cols.push({
+          flex: 1,
+          minWidth: 150,
+          field: col + '.' + key,
+          headerName: key.split('.').slice(-1)[0],
+          // renderHeader: params => {
+          //   console.log(params);
+          //   if (params.field === col) {
+          //     console.log(params);
+          //   }
+          //   // console.log('NO');
+          // },
+          renderCell: cellParams => {
+            // console.log(cellParams.row[col], key);
+            const value = getValueAtNestedKey(
+              cellParams.row[col]?.['output'],
+              key
+            );
+            if (
+              typeof value === 'string' &&
+              value.startsWith('wandb-artifact:///')
+            ) {
+              return <SmallRef objRef={parseRef(value)} />;
+            }
+            if (typeof value === 'boolean') {
+              return value ? 'true' : 'false';
+            }
+            return value;
+          },
+        });
+      }
+    });
+
+    return {cols, colGroupingModel};
+  }, [pivotColumns, pivotData, props.rowsDim]);
+
+  if (props.loading) {
+    return <CircularProgress />;
+  }
+  if (props.rowsDim == null || props.colsDim == null) {
+    return <>Call to action: Select dimensions</>;
+  }
+
+  // console.log({
+  //   props,
+  //   columns,
+  //   pivotData,
+  // });
+
+  return (
+    <StyledDataGrid
+      columnHeaderHeight={40}
+      // apiRef={apiRef}
+      // loading={loading}
+      rows={pivotData}
+      // density="compact"
+      // initialState={initialState}
+      rowHeight={38}
+      columns={columns.cols}
+      experimentalFeatures={{columnGrouping: true}}
+      disableRowSelectionOnClick
+      // rowSelectionModel={rowSelectionModel}
+      initialState={{
+        pinnedColumns: {left: [props.rowsDim!]},
+      }}
+      // checkboxSelection
+      columnGroupingModel={columns.colGroupingModel}
+      // onRowClick={({id}) => {
+      //   history.push(
+      //     peekingRouter.callUIUrl(
+      //       params.entity,
+      //       params.project,
+      //       '',
+      //       id as string
+      //     )
+      //   );
+      // }}
+    />
   );
 };
 

@@ -24,7 +24,7 @@ import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {SmallRef} from './SmallRef';
 
-type DataGridColumnGroupingModel = Exclude<
+export type DataGridColumnGroupingModel = Exclude<
   React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
   undefined
 >;
@@ -57,7 +57,10 @@ function addToTree(
   addToTree(newNode, fields.slice(1), fullPath);
 }
 
-function buildTree(strings: string[], rootGroupName: string): GridColumnGroup {
+export function buildTree(
+  strings: string[],
+  rootGroupName: string
+): GridColumnGroup {
   const root: GridColumnGroup = {groupId: rootGroupName, children: []};
 
   for (const str of strings) {
@@ -334,7 +337,11 @@ export const RunsTable: FC<{
                   />
                 );
               }
-              return cellParams.row['attributes.' + key];
+              const value = cellParams.row['attributes.' + key];
+              if (typeof value === 'boolean') {
+                return value ? 'True' : 'False';
+              }
+              return value;
             },
           });
         }
@@ -359,15 +366,19 @@ export const RunsTable: FC<{
           field: 'input_' + key,
           headerName: key,
           renderCell: cellParams => {
+            const value = cellParams.row['input_' + key];
+
             if (
-              typeof cellParams.row['input_' + key] === 'string' &&
-              cellParams.row['input_' + key].startsWith('wandb-artifact:///')
+              typeof value === 'string' &&
+              value.startsWith('wandb-artifact:///')
             ) {
-              return (
-                <SmallRef objRef={parseRef(cellParams.row['input_' + key])} />
-              );
+              return <SmallRef objRef={parseRef(value)} />;
             }
-            return cellParams.row['input_' + key];
+
+            if (typeof value === 'boolean') {
+              return value ? 'True' : 'False';
+            }
+            return value;
           },
         });
         inputGroup.children.push({field: 'input_' + key});
@@ -402,15 +413,18 @@ export const RunsTable: FC<{
           field: 'output.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {
+            const value = cellParams.row['output.' + key];
             if (
-              typeof cellParams.row['output.' + key] === 'string' &&
-              cellParams.row['output.' + key].startsWith('wandb-artifact:///')
+              typeof value === 'string' &&
+              value.startsWith('wandb-artifact:///')
             ) {
-              return (
-                <SmallRef objRef={parseRef(cellParams.row['output.' + key])} />
-              );
+              return <SmallRef objRef={parseRef(value)} />;
             }
-            return cellParams.row['output.' + key];
+
+            if (typeof value === 'boolean') {
+              return value ? 'True' : 'False';
+            }
+            return value;
           },
         });
       }
@@ -442,17 +456,17 @@ export const RunsTable: FC<{
           field: 'feedback.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {
+            const value = cellParams.row['feedback.' + key];
             if (
-              typeof cellParams.row['feedback.' + key] === 'string' &&
-              cellParams.row['feedback.' + key].startsWith('wandb-artifact:///')
+              typeof value === 'string' &&
+              value.startsWith('wandb-artifact:///')
             ) {
-              return (
-                <SmallRef
-                  objRef={parseRef(cellParams.row['feedback.' + key])}
-                />
-              );
+              return <SmallRef objRef={parseRef(value)} />;
             }
-            return cellParams.row['feedback.' + key];
+            if (typeof value === 'boolean') {
+              return value ? 'True' : 'False';
+            }
+            return value;
           },
         });
       }
