@@ -3,7 +3,7 @@ __all__ = ["patch", "unpatch"]
 import functools
 from contextlib import contextmanager
 from functools import partialmethod
-from typing import Callable, Union
+from typing import Callable, Type, Union
 
 import openai
 from openai import AsyncStream, Stream
@@ -21,15 +21,17 @@ old_async_create = openai.resources.chat.completions.AsyncCompletions.create
 
 
 class partialmethod_with_self(partialmethod):
-    def __get__(self, obj, cls=None):
-        return self._make_unbound_method().__get__(obj, cls)
+    def __get__(self, obj: Any, cls: Optional[Type[Any]] = None) -> Callable:
+        return self._make_unbound_method().__get__(obj, cls)  # type: ignore
 
 
 class AsyncChatCompletions:
     def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
 
-    async def create(self, *args: Any, **kwargs: Any) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
+    async def create(
+        self, *args: Any, **kwargs: Any
+    ) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
         if kwargs.get("stream", False):
             return self._streaming_create(*args, **kwargs)
         return await self._create(*args, **kwargs)
@@ -42,10 +44,14 @@ class AsyncChatCompletions:
             finish_run(result.model_dump(exclude_unset=True))
         return result
 
-    async def _streaming_create(self, *args: Any, **kwargs: Any) -> AsyncStream[ChatCompletionChunk]:
+    async def _streaming_create(
+        self, *args: Any, **kwargs: Any
+    ) -> AsyncStream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run("openai.chat.completions.create", inputs.model_dump()) as finish_run:
+        with log_run(
+            "openai.chat.completions.create", inputs.model_dump()
+        ) as finish_run:
             # Need to put in a function so the outer function is not a
             # generator. Generators don't execute any of their body's
             # code until next() is called. But we want to create the run
@@ -67,7 +73,9 @@ class ChatCompletions:
     def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
 
-    def create(self, *args: Any, **kwargs: Any) -> Union[ChatCompletion, Stream[ChatCompletionChunk]]:
+    def create(
+        self, *args: Any, **kwargs: Any
+    ) -> Union[ChatCompletion, Stream[ChatCompletionChunk]]:
         if kwargs.get("stream", False):
             result = self._streaming_create(*args, **kwargs)
             return result
@@ -81,10 +89,14 @@ class ChatCompletions:
             finish_run(result.model_dump(exclude_unset=True))
         return result
 
-    def _streaming_create(self, *args: Any, **kwargs: Any) -> Stream[ChatCompletionChunk]:
+    def _streaming_create(
+        self, *args: Any, **kwargs: Any
+    ) -> Stream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run("openai.chat.completions.create", inputs.model_dump()) as finish_run:
+        with log_run(
+            "openai.chat.completions.create", inputs.model_dump()
+        ) as finish_run:
 
             def _stream_create_gen():  # type: ignore
                 chunks = []
@@ -109,11 +121,17 @@ def patch() -> None:
 
             hooks = ChatCompletions(old_create)
             async_hooks = AsyncChatCompletions(old_async_create)
-            openai.resources.chat.completions.Completions.create = partialmethod_with_self(hooks.create)
-            openai.resources.chat.completions.AsyncCompletions.create = partialmethod_with_self(async_hooks.create)
+            openai.resources.chat.completions.Completions.create = (
+                partialmethod_with_self(hooks.create)
+            )
+            openai.resources.chat.completions.AsyncCompletions.create = (
+                partialmethod_with_self(async_hooks.create)
+            )
 
     if version.parse(openai.__version__) < version.parse("1.0.0"):
-        error(f"this integration requires openai>=1.0.0 (got {openai.__version__}).  Please upgrade and try again")
+        error(
+            f"this integration requires openai>=1.0.0 (got {openai.__version__}).  Please upgrade and try again"
+        )
         return
 
     try:
