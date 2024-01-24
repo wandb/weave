@@ -13,16 +13,14 @@ Weave is a toolkit for developing AI-powered applications, built by [Weights & B
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI-based software, without introducing cognitive overhead.
 
-Weave's core concept is that as your code executes, it keeps track of function calls and their inputs and outputs. You don't need to learn a declarative language or a complex object hierarchy. Just decorate functions with `@weave.op()` to [get started](/quickstart)
+[Get started](/quickstart) by decorating Python functions with `@weave.op()`. 
 
-## Why use Weave?
-
-Building applications with large language models is a new style of software development. While these models are incredibly powerful, they are also non-deterministic and therefore tricky to make use of. Weave helps you harness their potential.
+Seriously, try the 🍪 [quickstart](/quickstart) 🍪 first.
 
 You can use Weave to:
-- log and debug language model inputs, outputs, and traces
-- build rigorous, apples-to-apples evaluations for language model use cases
-- organize all the information generated across the LLM workflow, from experimentation to evaluations to production
+- Log and debug language model inputs, outputs, and traces
+- Build rigorous, apples-to-apples evaluations for language model use cases
+- Organize all the information generated across the LLM workflow, from experimentation to evaluations to production
 
 
 ## Key concepts
