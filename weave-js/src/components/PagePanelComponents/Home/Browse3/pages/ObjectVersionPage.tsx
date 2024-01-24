@@ -1,12 +1,16 @@
+import {Box} from '@material-ui/core';
+import _ from 'lodash';
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
+import {useNodeValue} from '../../../../../react';
 import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
 import {
   WeaveEditor,
   WeaveEditorSourceContext,
 } from '../../Browse2/WeaveEditors';
 import {WFHighLevelCallFilter} from './CallsPage';
+import {KeyValueTable} from './common/KeyValueTable';
 import {
   CallLink,
   CallsLink,
@@ -22,6 +26,7 @@ import {
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
+import {isPrimitive} from './common/util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall, WFObjectVersion, WFOpVersion} from './wfInterface/types';
 
@@ -69,6 +74,25 @@ const ObjectVersionPageInner: React.FC<{
     const extraFields = refExtra.split('/');
     return nodeFromExtra(objNode, extraFields);
   }, [baseUri, refExtra]);
+
+  const itemValue = useNodeValue(itemNode);
+  const keyValueData = useMemo(() => {
+    const result = itemValue.result;
+    if (result == null) {
+      return {};
+    }
+    if (isPrimitive(result)) {
+      return {Value: result};
+    }
+    if (_.isArray(result)) {
+      return {Value: result};
+    }
+    if (_.isObject(result)) {
+      return result;
+    }
+    return {};
+  }, [itemValue.result]);
+  console.log({itemValue});
 
   return (
     <SimplePageLayoutWithHeader
@@ -172,6 +196,21 @@ const ObjectVersionPageInner: React.FC<{
       //   },
       // ]}
       tabs={[
+        {
+          label: 'Better Values',
+          content: (
+            <Box
+              sx={{p: 2}}
+              style={{
+                overflowX: 'hidden',
+                overflowY: 'auto',
+                height: '100%',
+                width: '100%',
+              }}>
+              <KeyValueTable data={keyValueData} />
+            </Box>
+          ),
+        },
         {
           label: 'Values',
           content: (

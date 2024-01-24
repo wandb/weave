@@ -64,7 +64,7 @@ const parentKeyStyle: React.CSSProperties = {
   borderBottom: '1px solid rgba(224, 224, 224, 1)',
   backgroundColor: '#FAFAFA',
   color: '#979a9e',
-  position: 'sticky',
+  // position: 'sticky',
   top: 0,
   zIndex: 1,
 };
@@ -85,6 +85,13 @@ const valueStyle: React.CSSProperties = {
   borderBottom: '1px solid rgba(224, 224, 224, 1)',
 };
 
+const limitArray = (arr: any[], limit: number = 1000) => {
+  if (arr.length > limit) {
+    return arr.slice(0, limit);
+  }
+  return arr;
+};
+
 const KeyValueRow: React.FC<{
   rowKey: string;
   rowValue: any;
@@ -102,6 +109,10 @@ const KeyValueRow: React.FC<{
       setCanExpand(true);
     }
   }, []);
+
+  if (props.rowKey === '_type') {
+    return null;
+  }
 
   if (isPrimitive(props.rowValue)) {
     const valRef = _.isString(props.rowValue)
@@ -147,6 +158,14 @@ const KeyValueRow: React.FC<{
           }}
           style={{
             ...leafKeyStyle,
+            ...(depth === 1
+              ? {
+                  paddingLeft: '16px',
+                  textAlign: 'left',
+                  backgroundColor: '#FAFAFA',
+                  color: '#979a9e',
+                }
+              : {}),
             // cursor: open || canExpand ? 'pointer' : 'auto',
           }}>
           {props.rowKey}
@@ -160,7 +179,7 @@ const KeyValueRow: React.FC<{
     return (
       <KeyValueRow
         rowKey={props.rowKey}
-        rowValue={_.fromPairs(props.rowValue.map((v, i) => [i, v]))}
+        rowValue={_.fromPairs(limitArray(props.rowValue).map((v, i) => [i, v]))}
       />
     );
   } else {
