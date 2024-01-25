@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import {Autocomplete, ListItem} from '@mui/material';
 import {GRID_CHECKBOX_SELECTION_COL_DEF, GridColDef} from '@mui/x-data-grid';
+import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {parseRef} from '../../../../../../react';
@@ -20,7 +21,6 @@ import {
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {renderCell} from '../util';
-import _ from 'lodash';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
