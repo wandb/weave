@@ -112,7 +112,7 @@ export const RunsTable: FC<{
         trace_id: call.trace_id,
         status_code: call.status_code,
         timestampMs: call.timestamp,
-        latency: monthRoundedTime(call.summary.latency_s),
+        latency: call.summary.latency_s,
         ..._.mapValues(
           _.mapKeys(
             _.omitBy(args, v => v == null),
@@ -289,6 +289,9 @@ export const RunsTable: FC<{
         minWidth: 100,
         maxWidth: 100,
         // flex: !showIO ? 1 : undefined,
+        renderCell: cellParams => {
+          return monthRoundedTime(cellParams.row.latency);
+        },
       },
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
