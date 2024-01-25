@@ -1221,6 +1221,26 @@ export const toGqlField = (
         extraFields: gqlBasicField('alias'),
       }),
     ];
+  } else if (forwardOp.op.name === 'artifactVersion-rawTags') {
+    return [
+      {
+        name: 'tags',
+        fields: [
+          {
+            name: 'edges',
+            fields: [
+              {
+                name: 'node',
+                fields: gqlBasicField('id')
+                  .concat(gqlBasicField('name'))
+                  .concat(gqlBasicField('tagCategoryName'))
+                  .concat(gqlBasicField('attributes')),
+              },
+            ],
+          },
+        ],
+      },
+    ];
   } else if (forwardOp.op.name === 'artifactVersion-name') {
     // We want to construct <artifactName>:v<versionIndex>
     return gqlBasicField('versionIndex').concat([

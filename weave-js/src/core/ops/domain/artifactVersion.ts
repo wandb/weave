@@ -162,6 +162,26 @@ export const opArtifactVersionCreatedAt = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.createdAt,
 });
 
+export const opArtifactVersionTags = makeArtifactVersionOp({
+  name: 'artifactVersion-rawTags',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns tags belonging to the ${docType('artifactVersion')}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Tags belonging to the ${docType('artifactVersion')}`,
+  returnType: inputTypes =>
+    list(
+      typedDict({
+        id: 'string',
+        name: 'string',
+        tagCategoryName: 'string',
+        attributes: 'string',
+      })
+    ),
+  resolver: ({artifactVersion}) => connectionToNodes(artifactVersion.tags),
+});
+
 export const opArtifactVersionFiles = makeArtifactVersionOp({
   name: 'artifactVersion-files',
   argTypes: artifactVersionArgTypes,
