@@ -548,7 +548,7 @@ const useTraceIdOptions = (
         ) as WFCall[];
     }
 
-    return _.fromPairs(
+    const pairs = _.uniqBy(
       roots.map(c => {
         const version = c.opVersion();
         if (!version) {
@@ -556,10 +556,17 @@ const useTraceIdOptions = (
         }
         return [
           c.traceID(),
-          version.op().name() + ' (' + truncateID(c.callID()) + ')',
+          opNiceName(version.op().name()) + ' (' + truncateID(c.callID()) + ')',
         ];
-      })
+      }),
+      p => p[0]
     );
+
+    pairs.sort((a, b) => {
+      return a[1].localeCompare(b[1]);
+    });
+
+    return _.fromPairs(pairs);
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 
@@ -594,7 +601,8 @@ const useParentIdOptions = (
         .map(r => orm.projectConnection.call(r.span_id)?.parentCall())
         .filter(v => v != null) as WFCall[];
     }
-    return _.fromPairs(
+
+    const pairs = _.uniqBy(
       parents.map(c => {
         const version = c.opVersion();
         if (!version) {
@@ -602,10 +610,17 @@ const useParentIdOptions = (
         }
         return [
           c.callID(),
-          version.op().name() + ' (' + truncateID(c.callID()) + ')',
+          opNiceName(version.op().name()) + ' (' + truncateID(c.callID()) + ')',
         ];
-      })
+      }),
+      p => p[1]
     );
+
+    pairs.sort((a, b) => {
+      return a[1].localeCompare(b[1]);
+    });
+
+    return _.fromPairs(pairs);
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 
