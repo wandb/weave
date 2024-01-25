@@ -56,7 +56,7 @@ export const ObjectVersionsPage: React.FC<{
     if (filter.typeCategory) {
       return _.capitalize(filter.typeCategory) + ' Objects';
     }
-    return 'Calls';
+    return 'Objects';
   }, [filter.typeCategory]);
 
   return (

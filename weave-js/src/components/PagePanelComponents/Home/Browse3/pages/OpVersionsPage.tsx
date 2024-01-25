@@ -55,7 +55,7 @@ export const OpVersionsPage: React.FC<{
     if (filter.opCategory) {
       return _.capitalize(filter.opCategory) + ' Operations';
     }
-    return 'Calls';
+    return 'Operations';
   }, [filter.opCategory]);
 
   return (
