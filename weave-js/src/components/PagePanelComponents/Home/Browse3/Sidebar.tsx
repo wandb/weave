@@ -74,7 +74,7 @@ export type SidebarItem = {
 
 type SidebarProps = {
   selectedItem: string | null;
-  items: SidebarItem[];
+  items: SidebarItem[][];
 };
 
 export const Sidebar = (props: SidebarProps) => {
@@ -82,24 +82,17 @@ export const Sidebar = (props: SidebarProps) => {
     return null;
   }
 
-  const sections = new Set<string>();
-  props.items.forEach(item => {
-    sections.add(item.section ?? '');
-  });
-
   return (
     <StyledSidebar className="fancy-page__sidebar">
       <SidebarSections>
-        {Array.from(sections).map((section, i) => (
+        {props.items.map((sectionItems, i) => (
           <React.Fragment key={'section__' + i}>
-            {section !== '' && (
-              <SidebarSectionHeader>{section}</SidebarSectionHeader>
+            {i !== 0 && (
+              <div className="fancy-page__sidebar__sections__divider" />
             )}
             <SidebarSection
               selectedItem={props.selectedItem}
-              items={props.items.filter(
-                item => section === (item.section ?? '')
-              )}
+              items={sectionItems}
             />
           </React.Fragment>
         ))}

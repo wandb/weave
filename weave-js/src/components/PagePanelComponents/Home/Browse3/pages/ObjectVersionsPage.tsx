@@ -165,29 +165,6 @@ export const FilterableObjectVersionsTable: React.FC<{
               <Autocomplete
                 size={'small'}
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'objectName'
-                )}
-                renderInput={params => (
-                  // <TextField {...params} label="Object Name" />
-                  <TextField {...params} label="Name" />
-                )}
-                value={effectiveFilter.objectName ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    objectName: newValue,
-                  });
-                }}
-                options={objectOptions}
-              />
-            </FormControl>
-          </ListItem>
-
-          <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'typeCategory'
                 )}
                 renderInput={params => (
@@ -202,6 +179,29 @@ export const FilterableObjectVersionsTable: React.FC<{
                   });
                 }}
                 options={typeCategoryOptions}
+              />
+            </FormControl>
+          </ListItem>
+
+          <ListItem>
+            <FormControl fullWidth>
+              <Autocomplete
+                size={'small'}
+                disabled={Object.keys(props.frozenFilter ?? {}).includes(
+                  'objectName'
+                )}
+                renderInput={params => (
+                  // <TextField {...params} label="Object Name" />
+                  <TextField {...params} label="Name" />
+                )}
+                value={effectiveFilter.objectName ?? null}
+                onChange={(event, newValue) => {
+                  setFilter({
+                    ...filter,
+                    objectName: newValue,
+                  });
+                }}
+                options={objectOptions}
               />
             </FormControl>
           </ListItem>
