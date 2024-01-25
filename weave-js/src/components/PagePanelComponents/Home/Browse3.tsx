@@ -366,6 +366,9 @@ const MainPeekingLayout: FC = () => {
         }}
         PaperProps={{
           style: {
+            overflow: 'hidden',
+            display: 'flex',
+            zIndex: 1,
             width: flexDirection === 'row' ? drawerWidth : '100%',
             height: flexDirection === 'column' ? drawerHeight : '100%',
             margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 56px',
@@ -373,9 +376,6 @@ const MainPeekingLayout: FC = () => {
               flexDirection === 'row'
                 ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
                 : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
-            overflow: 'hidden',
-            display: 'flex',
-            zIndex: 1,
             borderLeft:
               flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
             borderTop:
@@ -389,14 +389,14 @@ const MainPeekingLayout: FC = () => {
           id="dragger"
           onMouseDown={handleMousedown}
           style={{
-            cursor: flexDirection === 'row' ? 'ew-resize' : 'ns-resize',
-            padding: flexDirection === 'row' ? '4px 0 0' : '0 4px 0 0',
             borderTop: '1px solid #ddd',
             position: 'absolute',
             top: 0,
             left: 0,
             zIndex: 100,
             backgroundColor: '#f4f7f9',
+            cursor: flexDirection === 'row' ? 'ew-resize' : 'ns-resize',
+            padding: flexDirection === 'row' ? '4px 0 0' : '0 4px 0 0',
             bottom: flexDirection === 'row' ? 0 : 'auto',
             right: flexDirection === 'row' ? 'auto' : 0,
             width: flexDirection === 'row' ? '5px' : 'auto',
