@@ -1,7 +1,14 @@
-import {Box, CircularProgress, Snackbar} from '@material-ui/core';
+import {
+  Box,
+  CircularProgress,
+  FormControl,
+  Snackbar,
+  TextField,
+  Typography,
+} from '@mui/material';
+import {Autocomplete, ListItem} from '@mui/material';
 import {GRID_CHECKBOX_SELECTION_COL_DEF, GridColDef} from '@mui/x-data-grid';
-import _ from 'lodash';
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {parseRef} from '../../../../../../react';
 import {flattenObject} from '../../../Browse2/browse2Util';
@@ -19,28 +26,138 @@ export type WFHighLevelPivotSpec = {
   colDim: string;
 };
 
-export const PivotRunsTable: React.FC<
-  {
-    loading: boolean;
-    runs: SpanWithFeedback[];
-  } & WFHighLevelPivotSpec
-> = props => {
+export const PivotRunsView: React.FC<{
+  loading: boolean;
+  runs: SpanWithFeedback[];
+  pivotSpec: Partial<WFHighLevelPivotSpec>;
+  onPivotSpecChange: (spec: Partial<WFHighLevelPivotSpec>) => void;
+}> = props => {
+  const pivotRowDim = props.pivotSpec.rowDim;
+  const pivotColDim = props.pivotSpec.colDim;
+
+  const [pivotRowOptions, setPivotRowOptions] = useState<string[]>([]);
+  const [pivotColOptions, setPivotColOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const runs = props.runs;
+    if (runs.length === 0) {
+      return;
+    }
+    const firstRun = runs[0];
+    const options: string[] = [];
+    Object.entries(firstRun.inputs).forEach(([key, value]) => {
+      if (
+        typeof value === 'string' &&
+        value.startsWith('wandb-artifact:///') &&
+        !key.startsWith('_')
+      ) {
+        options.push('inputs.' + key);
+      }
+    });
+    setPivotRowOptions(options);
+    setPivotColOptions(options);
+    if (options.length > 1) {
+      if (options[0] === 'inputs.self') {
+        props.onPivotSpecChange({
+          rowDim: options[1],
+          colDim: options[0],
+        });
+      } else {
+        props.onPivotSpecChange({
+          rowDim: options[0],
+          colDim: options[1],
+        });
+      }
+    }
+  }, [props]);
+
+  return (
+    <Box>
+      <Box
+        sx={{
+          flex: '0 0 auto',
+          width: '100%',
+          transition: 'width 0.1s ease-in-out',
+          display: 'flex',
+          flexDirection: 'row',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          alignItems: 'center',
+          gap: '8px',
+          p: 1,
+          '& li': {
+            padding: 0,
+            minWidth: '150px',
+          },
+          '& input, & label, & .MuiTypography-root': {
+            fontSize: '0.875rem',
+          },
+        }}>
+        <Typography
+          style={{width: '38px', textAlign: 'center', flex: '0 0 auto'}}>
+          Pivot
+        </Typography>
+        <ListItem>
+          <FormControl fullWidth>
+            <Autocomplete
+              size={'small'}
+              renderInput={params => <TextField {...params} label="Rows" />}
+              value={pivotRowDim ?? null}
+              onChange={(event, newValue) => {
+                props.onPivotSpecChange({
+                  rowDim: newValue ?? undefined,
+                });
+              }}
+              options={pivotRowOptions}
+            />
+          </FormControl>
+        </ListItem>
+        <ListItem>
+          <FormControl fullWidth>
+            <Autocomplete
+              size={'small'}
+              renderInput={params => <TextField {...params} label="Columns" />}
+              value={pivotColDim ?? null}
+              onChange={(event, newValue) => {
+                props.onPivotSpecChange({
+                  colDim: newValue ?? undefined,
+                });
+              }}
+              options={pivotColOptions}
+            />
+          </FormControl>
+        </ListItem>
+      </Box>
+      {props.pivotSpec.rowDim && props.pivotSpec.colDim ? (
+        <PivotRunsTable {...props} />
+      ) : (
+        <>Please select pivot dimensions</>
+      )}
+    </Box>
+  );
+};
+
+const PivotRunsTable: React.FC<{
+  loading: boolean;
+  runs: SpanWithFeedback[];
+  pivotSpec: WFHighLevelPivotSpec;
+}> = props => {
   const {pivotData, pivotColumns} = useMemo(() => {
     // TODO(tim/pivot_tables): Make this configurable and sort by timestamp!
-    const aggregation = (values: any[]) => {
-      return values[0];
+    const aggregationFn = (internalRows: any[]) => {
+      return internalRows[0];
     };
 
     // Step 1: Create a map of values
     const values: {[rowId: string]: {[colId: string]: any[]}} = {};
-    const pivotColumns: Set<string> = new Set();
+    const pivotColumnsInner: Set<string> = new Set();
     props.runs.forEach(r => {
-      const rowValue = getValueAtNestedKey(r, props.rowDim);
-      const colValue = getValueAtNestedKey(r, props.colDim);
+      const rowValue = getValueAtNestedKey(r, props.pivotSpec.rowDim);
+      const colValue = getValueAtNestedKey(r, props.pivotSpec.colDim);
       if (rowValue == null || colValue == null) {
         return;
       }
-      pivotColumns.add(colValue);
+      pivotColumnsInner.add(colValue);
       if (!values[rowValue]) {
         values[rowValue] = {};
       }
@@ -56,25 +173,25 @@ export const PivotRunsTable: React.FC<
       const row: {[col: string]: any} = {
         id: rowKey,
       };
-      row[props.rowDim] = rowKey;
+      row[props.pivotSpec.rowDim] = rowKey;
       Object.keys(values[rowKey]).forEach(colKey => {
-        row[colKey] = aggregation(values[rowKey][colKey]);
+        row[colKey] = aggregationFn(values[rowKey][colKey]);
       });
       rows.push(row);
     });
 
-    return {pivotData: rows, pivotColumns};
-  }, [props.colDim, props.rowDim, props.runs]);
+    return {pivotData: rows, pivotColumns: pivotColumnsInner};
+  }, [props.pivotSpec.colDim, props.pivotSpec.rowDim, props.runs]);
 
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
         flex: 1,
         minWidth: 175,
-        field: props.rowDim,
-        headerName: props.rowDim,
+        field: props.pivotSpec.rowDim,
+        headerName: props.pivotSpec.rowDim,
         renderCell: cellParams => {
-          const value = cellParams.row[props.rowDim];
+          const value = cellParams.row[props.pivotSpec.rowDim];
           if (
             typeof value === 'string' &&
             value.startsWith('wandb-artifact:///')
@@ -93,7 +210,7 @@ export const PivotRunsTable: React.FC<
     }
     pivotColumns.forEach(col => {
       // All output keys as we don't have the order key yet.
-      let outputKeys: {[key: string]: true} = {};
+      const outputKeys: {[key: string]: true} = {};
       pivotData.forEach(pivotRow => {
         if (pivotRow[col]) {
           for (const [k, v] of Object.entries(
@@ -138,7 +255,7 @@ export const PivotRunsTable: React.FC<
           // },
           renderCell: cellParams => {
             return renderCell(
-              getValueAtNestedKey(cellParams.row[col]?.['output'], key)
+              getValueAtNestedKey(cellParams.row[col]?.output, key)
             );
           },
         });
@@ -146,7 +263,7 @@ export const PivotRunsTable: React.FC<
     });
 
     return {cols, colGroupingModel};
-  }, [pivotColumns, pivotData, props.rowDim]);
+  }, [pivotColumns, pivotData, props.pivotSpec.rowDim]);
 
   const [rowSelectionModel, setRowSelectionModel] = useState<string[]>([]);
   const [snackOpen, setSnackOpen] = useState(false);
@@ -185,7 +302,10 @@ export const PivotRunsTable: React.FC<
         // rowSelectionModel={rowSelectionModel}
         initialState={{
           pinnedColumns: {
-            left: [GRID_CHECKBOX_SELECTION_COL_DEF.field, props.rowDim],
+            left: [
+              GRID_CHECKBOX_SELECTION_COL_DEF.field,
+              props.pivotSpec.rowDim,
+            ],
           },
         }}
         checkboxSelection={false}

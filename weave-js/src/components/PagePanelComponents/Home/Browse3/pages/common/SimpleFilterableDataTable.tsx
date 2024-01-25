@@ -246,7 +246,6 @@ export const FilterLayoutTemplate: React.FC<{
   showFilterIndicator?: boolean;
   showPopoutButton?: boolean;
   filterListItems: React.ReactNode;
-  pivotListItems?: React.ReactNode;
 }> = props => {
   // const [isOpen, setIsOpen] = useState(false);
   // const history = useHistory();
@@ -271,7 +270,6 @@ export const FilterLayoutTemplate: React.FC<{
           alignItems: 'center',
           gap: '8px',
           p: 1,
-          pb: props.pivotListItems ? 0 : 1,
           '& li': {
             padding: 0,
             minWidth: '150px',
@@ -282,30 +280,6 @@ export const FilterLayoutTemplate: React.FC<{
         }}>
         {props.filterListItems}
       </Box>
-      {props.pivotListItems && (
-        <Box
-          sx={{
-            flex: '0 0 auto',
-            width: '100%',
-            transition: 'width 0.1s ease-in-out',
-            display: 'flex',
-            flexDirection: 'row',
-            overflowX: 'auto',
-            overflowY: 'hidden',
-            alignItems: 'center',
-            gap: '8px',
-            p: 1,
-            '& li': {
-              padding: 0,
-              minWidth: '150px',
-            },
-            '& input, & label, & .MuiTypography-root': {
-              fontSize: '0.875rem',
-            },
-          }}>
-          {props.pivotListItems}
-        </Box>
-      )}
       {props.children}
     </Box>
   );

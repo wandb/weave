@@ -1,4 +1,4 @@
-import {CircularProgress, IconButton, Typography} from '@material-ui/core';
+import {CircularProgress, IconButton} from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
@@ -31,7 +31,7 @@ import {
   WFObjectVersion,
   WFOpVersion,
 } from '../wfInterface/types';
-import {PivotRunsTable, WFHighLevelPivotSpec} from './PivotRunsTable';
+import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -156,8 +156,6 @@ export const CallsTable: React.FC<{
   );
 
   const userEnabledPivot = effectiveFilter.isPivot ?? false;
-  const pivotRowDim = effectiveFilter.pivotSpec?.rowDim ?? null;
-  const pivotColDim = effectiveFilter.pivotSpec?.colDim ?? null;
   const setUserEnabledPivot = useCallback(
     (enabled: boolean) => {
       setFilter({
@@ -173,7 +171,6 @@ export const CallsTable: React.FC<{
         filter.pivotSpec?.colDim !== spec.colDim ||
         filter.pivotSpec?.rowDim !== spec.rowDim
       ) {
-        console.log({filter, spec});
         setFilter({
           ...filter,
           pivotSpec: {
@@ -186,54 +183,10 @@ export const CallsTable: React.FC<{
     [filter, setFilter]
   );
 
-  const [pivotRowOptions, setPivotRowOptions] = useState<string[]>([]);
-  const [pivotColOptions, setPivotColOptions] = useState<string[]>([]);
-  const canPivot = useMemo(() => {
-    return (
-      effectiveFilter.opVersions?.length === 1 && pivotRowOptions.length > 1
-    );
-  }, [effectiveFilter.opVersions?.length, pivotRowOptions.length]);
+  const canPivot =
+    effectiveFilter.opVersions?.length === 1 &&
+    effectiveFilter.opVersions[0].includes('Evaluation-evaluate');
   const isPivoting = userEnabledPivot && canPivot;
-
-  useEffect(() => {
-    if (runsWithFeedbackQuery.loading) {
-      return;
-    }
-    const runs = runsWithFeedbackQuery.result;
-    if (runs.length === 0) {
-      return;
-    }
-    const firstRun = runs[0];
-    const options: string[] = [];
-    Object.entries(firstRun.inputs).forEach(([key, value]) => {
-      if (
-        typeof value === 'string' &&
-        value.startsWith('wandb-artifact:///') &&
-        !key.startsWith('_')
-      ) {
-        options.push('inputs.' + key);
-      }
-    });
-    setPivotRowOptions(options);
-    setPivotColOptions(options);
-    if (options.length > 1) {
-      if (options[0] === 'inputs.self') {
-        setPivotDims({
-          rowDim: options[1],
-          colDim: options[0],
-        });
-      } else {
-        setPivotDims({
-          rowDim: options[0],
-          colDim: options[1],
-        });
-      }
-    }
-  }, [
-    runsWithFeedbackQuery.loading,
-    runsWithFeedbackQuery.result,
-    setPivotDims,
-  ]);
 
   return (
     <FilterLayoutTemplate
@@ -430,60 +383,14 @@ export const CallsTable: React.FC<{
             </ListItemButton>
           </ListItem>
         </>
-      }
-      pivotListItems={
-        isPivoting && (
-          <>
-            <Typography
-              style={{width: '38px', textAlign: 'center', flex: '0 0 auto'}}>
-              Pivot
-            </Typography>
-            <ListItem>
-              <FormControl fullWidth>
-                <Autocomplete
-                  size={'small'}
-                  renderInput={params => <TextField {...params} label="Rows" />}
-                  value={pivotRowDim ?? null}
-                  onChange={(event, newValue) => {
-                    setPivotDims({
-                      rowDim: newValue ?? undefined,
-                    });
-                  }}
-                  options={pivotRowOptions}
-                />
-              </FormControl>
-            </ListItem>
-            <ListItem>
-              <FormControl fullWidth>
-                <Autocomplete
-                  size={'small'}
-                  renderInput={params => (
-                    <TextField {...params} label="Columns" />
-                  )}
-                  value={pivotColDim ?? null}
-                  onChange={(event, newValue) => {
-                    setPivotDims({
-                      colDim: newValue ?? undefined,
-                    });
-                  }}
-                  options={pivotColOptions}
-                />
-              </FormControl>
-            </ListItem>
-          </>
-        )
       }>
       {isPivoting ? (
-        pivotRowDim == null || pivotColDim == null ? (
-          <>Please select pivot dimensions</>
-        ) : (
-          <PivotRunsTable
-            loading={runsWithFeedbackQuery.loading}
-            runs={runsWithFeedbackQuery.result}
-            rowDim={pivotRowDim}
-            colDim={pivotColDim}
-          />
-        )
+        <PivotRunsView
+          loading={runsWithFeedbackQuery.loading}
+          runs={runsWithFeedbackQuery.result}
+          pivotSpec={effectiveFilter.pivotSpec ?? {}}
+          onPivotSpecChange={setPivotDims}
+        />
       ) : (
         <RunsTable
           loading={runsWithFeedbackQuery.loading}
