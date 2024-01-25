@@ -42,6 +42,7 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
+import {CompareCallsPage} from './Browse3/pages/CompareCallsPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectsPage} from './Browse3/pages/ObjectsPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
@@ -120,6 +121,7 @@ const tabOptions = [
   'calls',
   'boards',
   'tables',
+  'compare-calls',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -588,6 +590,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
         </Route>
+        <Route path={`${projectRoot}/compare-calls`}>
+          <CompareCallsBinding />
+        </Route>
       </Switch>
     </Box>
   );
@@ -753,6 +758,33 @@ const CallPageBinding = () => {
       entity={params.entity}
       project={params.project}
       callId={params.itemName}
+    />
+  );
+};
+
+const CompareCallsBinding = () => {
+  useCallPeekRedirect();
+  const params = useParams<Browse3TabItemParams>();
+  const query = useURLSearchParamsDict();
+  const compareSpec = useMemo(() => {
+    const callIds = JSON.parse(query.callIds);
+    const primaryDim = query.primaryDim;
+    const secondaryDim = query.secondaryDim;
+
+    return {
+      callIds,
+      primaryDim,
+      secondaryDim,
+    };
+  }, [query.callIds, query.primaryDim, query.secondaryDim]);
+
+  return (
+    <CompareCallsPage
+      entity={params.entity}
+      project={params.project}
+      callIds={compareSpec.callIds}
+      primaryDim={compareSpec.primaryDim}
+      secondaryDim={compareSpec.secondaryDim}
     />
   );
 };

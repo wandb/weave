@@ -391,15 +391,14 @@ const browse3ContextGen = (
       if (callIds.length < 2) {
         throw new Error('Must provide at least 2 call ids');
       }
-      return `${projectRoot(entityName, projectName)}/calls/${
-        callIds[0]
-      }?compare=${encodeURIComponent(
-        JSON.stringify({
-          callIds: callIds.slice(1),
-          primaryDim,
-          secondaryDim,
-        })
-      )}`;
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/compare-calls?callIds=${encodeURIComponent(
+        JSON.stringify(callIds)
+      )}&primaryDim=${encodeURIComponent(
+        primaryDim
+      )}&secondaryDim=${encodeURIComponent(secondaryDim)}`;
     },
   };
   return browse3Context;

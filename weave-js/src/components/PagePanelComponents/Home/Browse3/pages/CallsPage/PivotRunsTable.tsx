@@ -337,11 +337,26 @@ const PivotRunsTable: React.FC<
             return;
           }
           setRowSelectionModel(newSelection as string[]);
+
+          if (newSelection.length !== 2) {
+            return;
+          }
+
+          const callIds: string[] = newSelection.flatMap(id => {
+            return pivotData.flatMap(row => {
+              return Array.from(pivotColumns)
+                .map(col => {
+                  return row[col]?.span_id;
+                })
+                .filter(id => id != null);
+            });
+          });
+
           history.push(
             peekingRouter.compareCallsUIUrl(
               props.entity,
               props.project,
-              newSelection as string[],
+              callIds,
               props.pivotSpec.rowDim,
               props.pivotSpec.colDim
             )
