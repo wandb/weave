@@ -60,3 +60,13 @@ def test_nested_object_deref(ref_tracking):
     b = storage.get(str(b_ref))
     assert b.val == 6
     assert b.a.val == 5
+
+
+def test_ref_tracking_dict(ref_tracking):
+    obj_ref = storage.save({"a": 5})
+    obj = obj_ref.get()
+    sub_obj = obj["a"]
+    sub_obj_ref = weave.obj_ref(sub_obj)
+    assert sub_obj_ref is not None
+    sub_obj2 = storage.get(str(sub_obj_ref))
+    assert sub_obj2 == 5

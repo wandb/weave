@@ -191,3 +191,87 @@ def test_weaveflow_publish_numpy(user_by_api_key_in_env):
     with weave.wandb_client("weaveflow_example"):
         v = {"a": np.array([[1, 2, 3], [4, 5, 6]])}
         ref = weave.publish(v, "dict-with-numpy")
+
+
+def test_weaveflow_unknown_type_op_param_undeclared(eager_mode):
+    class SomeUnknownObject:
+        x: int
+
+        def __init__(self, x: int):
+            self.x = x
+
+    @weave.op()
+    def op_with_unknown_param(v) -> int:
+        return v.x + 2
+
+    assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
+
+
+def test_weaveflow_unknown_type_op_param_declared(eager_mode):
+    class SomeUnknownObject:
+        x: int
+
+        def __init__(self, x: int):
+            self.x = x
+
+    @weave.op()
+    def op_with_unknown_param(v: SomeUnknownObject) -> int:
+        return v.x + 2
+
+    assert op_with_unknown_param(SomeUnknownObject(x=10)) == 12
+
+
+def test_weaveflow_unknown_type_op_param_closure(eager_mode):
+    class SomeUnknownObject:
+        x: int
+
+        def __init__(self, x: int):
+            self.x = x
+
+    v = SomeUnknownObject(x=10)
+
+    @weave.op()
+    def op_with_unknown_param() -> int:
+        return v.x + 2
+
+    assert op_with_unknown_param() == 12
+
+
+@pytest.mark.skip("artifact file download doesn't work here?")
+def test_saveloop_idempotent_with_refs(user_by_api_key_in_env):
+    with weave.wandb_client("weaveflow_example-idempotent_with_refs"):
+
+        @weave.type()
+        class A:
+            b: int
+
+            @weave.op()
+            def call(self, v):
+                return self.b + v
+
+        @weave.type()
+        class C:
+            a: A
+            c: int
+
+            @weave.op()
+            def call(self, v):
+                return self.a.call(v) * self.c
+
+        a = A(5)
+        c = C(a, 10)
+        assert c.call(40) == 450
+
+        c2_0_ref = weave.ref("C:latest")
+        c2_0 = c2_0_ref.get()
+        assert c2_0.call(50) == 550
+
+        c2_1_ref = weave.ref("C:latest")
+        c2_1 = c2_1_ref.get()
+        assert c2_1.call(60) == 650
+        assert c2_0_ref.version == c2_1_ref.version
+
+        c2_2_ref = weave.ref("C:latest")
+        c2_2 = c2_2_ref.get()
+        assert c2_2.call(60) == 650
+        assert c2_1_ref.version == c2_2_ref.version

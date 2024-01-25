@@ -67,18 +67,21 @@ class HandleRequestResponse:
 def handle_request(
     request, deref=False, serialize_fn=storage.to_python
 ) -> HandleRequestResponse:
-    start_time = time.time()
-    tracer = engine_trace.tracer()
-    # Need to add wandb_api.from_environment, which sets up the wandb api
-    # The existing code only did this within the execute() function. But now
-    # I'm hitting the need for this in deserialize, because node_id in deserialize
-    # may try to access ref.type, which may try to access the wandb api.
-    # That may not really be desirable, I didn't go deeper to figure out if
-    # we should maybe stop that. But this fixes the problem for now.
-    with wandb_api.from_environment():
-        # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
-        with tracer.trace("request:deserialize"):
-            nodes = serialize.deserialize(request["graphs"])
+    # Stuff in the server path relies on lazy execution. Eager is now the default
+    # in the weave package itself, so we need to switch to lazy mode here.
+    with context.lazy_execution():
+        start_time = time.time()
+        tracer = engine_trace.tracer()
+        # Need to add wandb_api.from_environment, which sets up the wandb api
+        # The existing code only did this within the execute() function. But now
+        # I'm hitting the need for this in deserialize, because node_id in deserialize
+        # may try to access ref.type, which may try to access the wandb api.
+        # That may not really be desirable, I didn't go deeper to figure out if
+        # we should maybe stop that. But this fixes the problem for now.
+        with wandb_api.from_environment():
+            # nodes = [graph.Node.node_from_json(n) for n in request["graphs"]]
+            with tracer.trace("request:deserialize"):
+                nodes = serialize.deserialize(request["graphs"])
 
         with tracer.trace("request:execute"):
             with execute.top_level_stats() as stats:
@@ -87,29 +90,28 @@ def handle_request(
                         with gql_json_cache.gql_json_cache_context():
                             result = nodes.batch_map(execute.execute_nodes)
 
-        with tracer.trace("request:deref"):
-            if deref:
-                result = result.zip(nodes).safe_map(
-                    lambda t: t[0]
-                    if isinstance(t[1].type, weave_types.RefType)
-                    else storage.deref(t[0])
-                )
+            with tracer.trace("request:deref"):
+                if deref:
+                    result = result.zip(nodes).safe_map(
+                        lambda t: t[0]
+                        if isinstance(t[1].type, weave_types.RefType)
+                        else storage.deref(t[0])
+                    )
 
-    # print("Server request %s (%0.5fs): %s..." % (start_time,
-    #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
+        # print("Server request %s (%0.5fs): %s..." % (start_time,
+        #                                              time.time() - start_time, [n.from_op.name for n in nodes[:3]]))
 
-    logging.info("FINAL STATS\n%s" % pprint.pformat(stats.op_summary()))
+        logging.info("FINAL STATS\n%s" % pprint.pformat(stats.op_summary()))
 
-    # Forces output to be untagged
-    with tracer.trace("serialize_response"):
-        with isolated_tagging_context():
-            with wandb_api.from_environment():
-                result = result.safe_map(serialize_fn)
+        # Forces output to be untagged
+        with tracer.trace("serialize_response"):
+            with isolated_tagging_context():
+                with wandb_api.from_environment():
+                    result = result.safe_map(serialize_fn)
 
-    logger.info("Server request done in: %ss" % (time.time() - start_time))
-    tag_store.clear_tag_store()
-
-    return HandleRequestResponse(result, nodes)
+        logger.info("Server request done in: %ss" % (time.time() - start_time))
+        tag_store.clear_tag_store()
+        return HandleRequestResponse(result, nodes)
 
 
 class SubprocessServer(multiprocessing.Process):

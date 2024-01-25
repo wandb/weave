@@ -472,13 +472,17 @@ export interface WandbArtifactRef {
 
 export type ArtifactRef = LocalArtifactRef | WandbArtifactRef;
 
+export type ObjectRef = ArtifactRef & {
+  objectRefExtra?: string;
+};
+
 export const isWandbArtifactRef = (
   ref: ArtifactRef
 ): ref is WandbArtifactRef => {
   return 'entityName' in ref;
 };
 
-export const parseRef = (ref: string): ArtifactRef => {
+export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
   let splitLimit: number;
 
@@ -508,6 +512,7 @@ export const parseRef = (ref: string): ArtifactRef => {
       artifactName: artifactNamePart,
       artifactVersion,
       artifactPath: artifactPathPart,
+      objectRefExtra: url.hash ? url.hash.slice(1) : undefined,
     };
   }
 

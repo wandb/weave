@@ -20,6 +20,7 @@ from . import engine_trace
 from . import memo
 from . import weavify
 from . import eager
+from . import object_context
 from .run import Run
 from . import graph_client_context
 
@@ -209,7 +210,6 @@ class OpDef:
     location: typing.Optional[uris.WeaveURI]
     is_builtin: bool = False
     weave_fn: typing.Optional[graph.Node]
-    _decl_locals: typing.Dict[str, typing.Any]
     instance: typing.Union[None, graph.Node]
     hidden: bool
     pure: bool
@@ -254,7 +254,6 @@ class OpDef:
         weave_fn: typing.Optional[graph.Node] = None,
         *,
         plugins=None,
-        _decl_locals=None,  # These are python locals() from the enclosing scope.
     ):
         self.name = name
         self.input_type = input_type
@@ -271,7 +270,6 @@ class OpDef:
             if is_builtin is not None
             else context_state.get_loading_built_ins()
         )
-        self._decl_locals = _decl_locals
         self.version = None
         self.location = None
         self.instance = None
@@ -392,7 +390,8 @@ class OpDef:
 
         sig = pyfunc_type_util.get_signature(_self.raw_resolve_fn)
         params = sig.bind(*args, **kwargs)
-        return execute.execute_sync_op(_self, params.arguments)
+        with object_context.object_context():
+            return execute.execute_sync_op(_self, params.arguments)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(

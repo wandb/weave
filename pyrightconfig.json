@@ -3,6 +3,7 @@
     "weave/",
   ],
   "exclude": [
+    "genpydocs.py",
     "docker_build.py",
     "examples",
     "integration_test",

@@ -136,6 +136,7 @@ class SomeUnknownObj:
     pass
 
 
+@pytest.mark.skip("We allow Unknown types now")
 def test_op_unknown_arg_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
 

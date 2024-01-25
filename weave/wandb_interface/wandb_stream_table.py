@@ -26,6 +26,7 @@ from .. import environment
 from .. import file_util
 from .. import graph
 from .. import errors
+from .. import box
 from ..core_types.stream_table_type import StreamTableType
 
 if typing.TYPE_CHECKING:
@@ -350,6 +351,7 @@ def obj_to_weave(obj: typing.Any, artifact: WandbLiveRunFiles) -> typing.Any:
         return obj_to_weave(obj, artifact)
 
     # all primitives
+    obj = box.unbox(obj)
     if isinstance(obj, (int, float, str, bool, type(None))):
         return obj
     else:

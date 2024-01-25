@@ -7,27 +7,29 @@ import {
   GridColDef,
   GridRenderCellParams,
   useGridApiContext,
+  useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {parseRef} from '../../../../../react';
-import {Call} from '../../Browse2/callTree';
-import {SmallRef} from '../../Browse2/SmallRef';
-import {SpanDetails} from '../../Browse2/SpanDetails';
-import {useWeaveflowCurrentRouteContext} from '../context';
-import {CallsTable} from './CallsPage';
-import {CenteredAnimatedLoader} from './common/Loader';
-import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
+import {parseRef} from '../../../../../../react';
+import {Call} from '../../../Browse2/callTree';
+import {SmallRef} from '../../../Browse2/SmallRef';
+import {useWeaveflowCurrentRouteContext} from '../../context';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   SimplePageLayout,
   SimplePageLayoutContext,
-} from './common/SimplePageLayout';
-import {UnderConstruction} from './common/UnderConstruction';
-import {truncateID} from './util';
-import {useWeaveflowORMContext} from './wfInterface/context';
-import {WFCall} from './wfInterface/types';
+  SimplePageLayoutWithHeader,
+} from '../common/SimplePageLayout';
+import {CallStatusType, StatusChip} from '../common/StatusChip';
+import {UnderConstruction} from '../common/UnderConstruction';
+import {truncateID} from '../util';
+import {useWeaveflowORMContext} from '../wfInterface/context';
+import {WFCall} from '../wfInterface/types';
+import {CallDetails} from './CallDetails';
+import {CallOverview} from './CallOverview';
 
 // % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
@@ -65,37 +67,23 @@ export const CallPage: React.FC<{
 };
 
 const useCallTabs = (call: WFCall) => {
-  const entityName = call.entity();
-  const projectName = call.project();
-  const callId = call.callID();
   return [
     {
       label: 'Call',
-      content: (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            flex: '1 1 auto',
-            overflow: 'auto',
-            p: 8,
-          }}>
-          <SpanDetails call={call.rawCallSpan()} />
-        </Box>
-      ),
+      content: <CallDetails wfCall={call} />,
     },
-    {
-      label: 'Child Calls',
-      content: (
-        <CallsTable
-          entity={entityName}
-          project={projectName}
-          frozenFilter={{
-            parentId: callId,
-          }}
-        />
-      ),
-    },
+    // {
+    //   label: 'Child Calls',
+    //   content: (
+    //     <CallsTable
+    //       entity={entityName}
+    //       project={projectName}
+    //       frozenFilter={{
+    //         parentId: callId,
+    //       }}
+    //     />
+    //   ),
+    // },
     {
       label: 'Feedback',
       content: (
@@ -138,20 +126,20 @@ const useCallTabs = (call: WFCall) => {
   ];
 };
 
-const callMenuItems = [
-  {
-    label: '(Under Construction) Open in Board',
-    onClick: () => {
-      console.log('TODO: Open in Board');
-    },
-  },
-  {
-    label: '(Under Construction) Compare',
-    onClick: () => {
-      console.log('TODO: Compare');
-    },
-  },
-];
+// const callMenuItems = [
+//   {
+//     label: '(Under Construction) Open in Board',
+//     onClick: () => {
+//       console.log('TODO: Open in Board');
+//     },
+//   },
+//   {
+//     label: '(Under Construction) Compare',
+//     onClick: () => {
+//       console.log('TODO: Compare');
+//     },
+//   },
+// ];
 
 const CallPageInnerHorizontal: React.FC<{
   call: WFCall;
@@ -169,14 +157,14 @@ const CallPageInnerHorizontal: React.FC<{
   return (
     <SimplePageLayout
       title={traceTitle}
-      menuItems={[
-        {
-          label: 'View Vertical',
-          onClick: () => {
-            setVerticalLayout(true);
-          },
-        },
-      ]}
+      // menuItems={[
+      //   {
+      //     label: 'View Vertical',
+      //     onClick: () => {
+      //       setVerticalLayout(true);
+      //     },
+      //   },
+      // ]}
       tabs={[
         {
           label: 'Trace',
@@ -210,7 +198,7 @@ const CallPageInnerHorizontal: React.FC<{
                 <SimplePageLayoutContext.Provider value={{}}>
                   <SimplePageLayout
                     title={title}
-                    menuItems={callMenuItems}
+                    // menuItems={callMenuItems}
                     tabs={callTabs}
                   />
                 </SimplePageLayoutContext.Provider>
@@ -229,20 +217,21 @@ const CallPageInnerVertical: React.FC<{
 }> = ({call, setVerticalLayout}) => {
   const callId = call.callID();
   const spanName = call.spanName();
-  const title = `${spanName}: ${truncateID(callId)}`;
+  const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={title}
-      menuItems={[
-        {
-          label: 'View Horizontal',
-          onClick: () => {
-            setVerticalLayout(false);
-          },
-        },
-        ...callMenuItems,
-      ]}
+      // menuItems={[
+      //   {
+      //     label: 'View Horizontal',
+      //     onClick: () => {
+      //       setVerticalLayout(false);
+      //     },
+      //   },
+      //   // ...callMenuItems,
+      // ]}
+      headerContent={<CallOverview wfCall={call} />}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />
@@ -253,6 +242,7 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
   call,
   treeOnly,
 }) => {
+  const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
   const {rows, expandKeys: forcedExpandKeys} = useCallFlattenedTraceTree(call);
@@ -330,11 +320,14 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
     []
   );
 
+  const [suppressScroll, setSuppressScroll] = useState(false);
+
   // Informs DataGridPro what to do when a row is clicked - in this case
   // use the current router to navigate to the call page for the clicked
   // call. Effectively this looks like expanding the clicked call.
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
+      setSuppressScroll(true);
       const rowCall = params.row.call as WFCall;
       history.push(
         currentRouter.callUIUrl(
@@ -377,16 +370,48 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
           borderBottom: 'none',
         },
       },
+      '& .MuiDataGrid-columnHeaders': {
+        borderBottom: treeOnly ? 'none' : undefined,
+      },
       [callClass]: {
         backgroundColor: '#a9edf252',
       },
     }),
-    [callClass]
+    [callClass, treeOnly]
   );
+
+  // Scroll selected call into view
+  const callId = call.callID();
+  useEffect(() => {
+    // The setTimeout here is a hack; without it scrollToIndexes will throw an error
+    // because virtualScrollerRef.current inside the grid is undefined.
+    // See https://github.com/mui/mui-x/issues/6411#issuecomment-1271556519
+    const t = setTimeout(() => {
+      if (suppressScroll) {
+        setSuppressScroll(false);
+        return;
+      }
+      const rowElement = apiRef.current.getRowElement(callId);
+      if (rowElement) {
+        rowElement.scrollIntoView();
+      } else {
+        // Grid is virtualized, use api to make row visible.
+        // Unfortunately, MUI doesn't offer something like alignToTop
+        const rowIndex =
+          apiRef.current.getRowIndexRelativeToVisibleRows(callId);
+        apiRef.current.scrollToIndexes({rowIndex});
+      }
+      setSuppressScroll(false);
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiRef, callId]);
 
   return (
     <DataGridPro
+      apiRef={apiRef}
       rowHeight={38}
+      columnHeaderHeight={treeOnly ? 0 : 56}
       treeData
       onRowClick={onRowClick}
       rows={rows}
@@ -432,7 +457,6 @@ const CustomGridTreeDataGroupingCell: React.FC<
     event.stopPropagation();
   };
 
-  const opCategory = call.opVersion()?.opCategory();
   const isLastChild = useMemo(() => {
     if (rowNode.parent == null) {
       return false;
@@ -536,6 +560,12 @@ const CustomGridTreeDataGroupingCell: React.FC<
       </Box>
       <Box
         sx={{
+          mr: 1,
+        }}>
+        <StatusChip value={row.status} iconOnly />
+      </Box>
+      <Box
+        sx={{
           // ml: 1,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -546,14 +576,6 @@ const CustomGridTreeDataGroupingCell: React.FC<
         {/* {call.spanName() + ': ' + truncateID(call.callID())} */}
         {call.spanName().split('-').slice(-1)[0]}
       </Box>
-      {opCategory && (
-        <Box
-          sx={{
-            ml: 4,
-          }}>
-          <OpVersionCategoryChip opCategory={opCategory} />
-        </Box>
-      )}
     </Box>
   );
 };
@@ -631,12 +653,13 @@ const BasicInputOutputRenderer: React.FC<{
  * Returns the flattened trace tree for a given call. Specifically,
  * it will find the trace root for a call, then find all the ancestors
  * of the root. The flattened order is depth-first, so that when listed
- * in a a table, the children of each call will be listed immediately
+ * in a table, the children of each call will be listed immediately
  * after the parent call. The structure of the returned rows conforms to
  * `GridValidRowModel`, but is specifically:
  * {
  *  id: string;
  *  call: WFCall;
+ *  status: CallStatusType;
  *  hierarchy: string[];
  * }
  * where `hierarchy` is the list of call IDs from the root to the current.
@@ -645,13 +668,15 @@ const BasicInputOutputRenderer: React.FC<{
  * from the root to the current call, so that the tree can be expanded to
  * show the current call.
  */
+type Row = {
+  id: string;
+  call: WFCall;
+  status: CallStatusType;
+  hierarchy: string[];
+};
 const useCallFlattenedTraceTree = (call: WFCall) => {
   return useMemo(() => {
-    const rows: Array<{
-      id: string;
-      call: WFCall;
-      hierarchy: string[];
-    }> = [];
+    const rows: Row[] = [];
     const expandKeys = new Set<string>();
     // Ascend to the root
     let currentCall: WFCall | null = call;
@@ -674,10 +699,27 @@ const useCallFlattenedTraceTree = (call: WFCall) => {
       rows.push({
         id: targetCall.callID(),
         call: targetCall,
+        status: targetCall.rawCallSpan().status_code,
         hierarchy: newHierarchy,
       });
       for (const childCall of targetCall.childCalls()) {
         queue.push({targetCall: childCall, parentHierarchy: newHierarchy});
+      }
+    }
+
+    // Update status indicators to reflect status of descendants.
+    const rowMap: Record<string, Row> = {};
+    for (const row of rows) {
+      rowMap[row.id] = row;
+    }
+    for (const row of rows) {
+      if (row.status === 'ERROR') {
+        for (const p of row.hierarchy) {
+          const parent = rowMap[p];
+          if (parent.status === 'SUCCESS') {
+            parent.status = 'DESCENDANT_ERROR';
+          }
+        }
       }
     }
 

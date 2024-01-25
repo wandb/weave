@@ -4,6 +4,7 @@ import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
 import React, {FC} from 'react';
 
+import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {Call} from './callTree';
 import {DisplayControlChars} from './CommonLib';
 import {
@@ -65,7 +66,10 @@ const ObjectView: FC<{obj: any}> = ({obj}) => {
   return <Typography>{JSON.stringify(obj)}</Typography>;
 };
 
-export const SpanDetails: FC<{call: Call}> = ({call}) => {
+export const SpanDetails: FC<{
+  call: Call;
+  hackyInjectionBelowFunction?: React.ReactNode;
+}> = ({call, hackyInjectionBelowFunction}) => {
   const inputKeys =
     call.inputs._keys ??
     Object.entries(call.inputs)
@@ -107,9 +111,11 @@ export const SpanDetails: FC<{call: Call}> = ({call}) => {
             call.name
           )}
         </Box>
-        <Typography variant="body2" gutterBottom>
-          Status: {call.status_code}
-        </Typography>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="body2">Status:</Typography>
+          <StatusChip value={call.status_code} />
+        </Box>
+        {hackyInjectionBelowFunction}
         {call.exception != null && (
           <Typography variant="body2" gutterBottom>
             {call.exception}

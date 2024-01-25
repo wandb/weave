@@ -1,5 +1,6 @@
 import LinkIcon from '@mui/icons-material/Link';
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -11,7 +12,11 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import {DataGridPro as DataGrid, GridColDef} from '@mui/x-data-grid-pro';
+import {
+  DataGridPro as DataGrid,
+  GridColDef,
+  useGridApiRef,
+} from '@mui/x-data-grid-pro';
 import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
@@ -44,15 +49,18 @@ import {
 } from '@wandb/weave/react';
 import * as _ from 'lodash';
 import React, {
+  createContext,
   FC,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import {useHistory, useLocation} from 'react-router-dom';
+import {useHistory} from 'react-router-dom';
 
+import {useWeaveflowCurrentRouteContext} from '../Browse3/context';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {Link} from './CommonLib';
 import {
@@ -61,7 +69,7 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from './easyWeave';
-import {parseRefMaybe} from './SmallRef';
+import {parseRefMaybe, SmallRef} from './SmallRef';
 import {useRefPageUrl} from './url';
 
 const displaysAsSingleRow = (valueType: Type) => {
@@ -238,6 +246,40 @@ const WeaveEditorCommit: FC<{
         </>
       )}
     </Dialog>
+  );
+};
+
+export const WeaveEditorSourceContext = createContext<{
+  entityName: string;
+  projectName: string;
+  objectName: string;
+  objectVersionHash: string;
+  refExtra?: string[];
+} | null>(null);
+
+const useObjectVersionLinkPathForPath = () => {
+  const router = useWeaveflowCurrentRouteContext();
+  const weaveEditorSourceContext = useContext(WeaveEditorSourceContext);
+  if (weaveEditorSourceContext == null) {
+    throw new Error('invalid weaveEditorSourceContext');
+  }
+  return useCallback(
+    (path: string[]) =>
+      router.objectVersionUIUrl(
+        weaveEditorSourceContext.entityName,
+        weaveEditorSourceContext.projectName,
+        weaveEditorSourceContext.objectName,
+        weaveEditorSourceContext.objectVersionHash,
+        (weaveEditorSourceContext.refExtra ?? []).concat(path)
+      ),
+    [
+      router,
+      weaveEditorSourceContext.entityName,
+      weaveEditorSourceContext.objectName,
+      weaveEditorSourceContext.objectVersionHash,
+      weaveEditorSourceContext.projectName,
+      weaveEditorSourceContext.refExtra,
+    ]
   );
 };
 
@@ -451,7 +493,7 @@ export const WeaveEditorTypedDict: FC<{
 }> = ({node, path}) => {
   // const val = useNodeValue(node);
   // return <Typography>{JSON.stringify(val)}</Typography>;
-  const loc = useLocation();
+  const makeLinkPath = useObjectVersionLinkPathForPath();
   return (
     <Grid container spacing={2}>
       {Object.entries(typedDictPropertyTypes(node.type))
@@ -470,12 +512,11 @@ export const WeaveEditorTypedDict: FC<{
               }}>
               <Typography>
                 <Link
-                  to={[
-                    loc.pathname,
+                  to={makeLinkPath([
                     ...weaveEditorPathUrlPathPart(path),
                     'pick',
                     key,
-                  ].join('/')}>
+                  ])}>
                   {key}
                 </Link>
               </Typography>
@@ -501,7 +542,7 @@ export const WeaveEditorObject: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
-  const loc = useLocation();
+  const makeLinkPath = useObjectVersionLinkPathForPath();
   return (
     <Grid container spacing={2}>
       {Object.entries(node.type)
@@ -512,11 +553,7 @@ export const WeaveEditorObject: FC<{
             <Grid item key={key + '-key'} xs={singleRow ? 2 : 12}>
               <Typography>
                 <Link
-                  to={[
-                    loc.pathname,
-                    ...weaveEditorPathUrlPathPart(path),
-                    key,
-                  ].join('/')}>
+                  to={makeLinkPath([...weaveEditorPathUrlPathPart(path), key])}>
                   {key}
                 </Link>
               </Typography>
@@ -593,12 +630,15 @@ const typeToDataGridColumnSpec = (type: Type): GridColDef[] => {
   return [];
 };
 
+const MAX_ROWS = 1000;
+
 export const WeaveEditorTable: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
 }> = ({node, path}) => {
-  const location = useLocation();
+  const apiRef = useGridApiRef();
   const addEdit = useWeaveEditorContextAddEdit();
+  const makeLinkPath = useObjectVersionLinkPathForPath();
   const objectType = listObjectType(node.type);
   if (!isTypedDict(objectType)) {
     throw new Error('invalid node for WeaveEditorList');
@@ -618,11 +658,12 @@ export const WeaveEditorTable: FC<{
           )
         ),
       }),
-      limit: constNumber(1000),
+      limit: constNumber(MAX_ROWS + 1),
     });
   }, [node, objectType]);
   const fetchQuery = useNodeValue(fetchAllNode);
 
+  const [isTruncated, setIsTruncated] = useState(false);
   const [sourceRows, setSourceRows] = useState<any[] | undefined>();
   useEffect(() => {
     if (sourceRows != null) {
@@ -631,7 +672,8 @@ export const WeaveEditorTable: FC<{
     if (fetchQuery.loading) {
       return;
     }
-    setSourceRows(fetchQuery.result);
+    setIsTruncated(fetchQuery.result.length > MAX_ROWS);
+    setSourceRows(fetchQuery.result.slice(0, MAX_ROWS));
   }, [sourceRows, fetchQuery]);
 
   const gridRows = useMemo(
@@ -643,6 +685,20 @@ export const WeaveEditorTable: FC<{
       })),
     [sourceRows]
   );
+
+  // Autosize when rows change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      apiRef.current.autosizeColumns({
+        includeHeaders: true,
+        includeOutliers: true,
+      });
+    }, 0);
+    return () => {
+      clearInterval(timeoutId);
+    };
+  }, [gridRows, apiRef]);
+
   const processRowUpdate = useCallback(
     (updatedRow: {[key: string]: any}, originalRow: {[key: string]: any}) => {
       const curSourceRows = sourceRows ?? [];
@@ -674,41 +730,49 @@ export const WeaveEditorTable: FC<{
         width: 50,
         renderCell: params => (
           <Link
-            to={[
-              location.pathname,
+            to={makeLinkPath([
               ...weaveEditorPathUrlPathPart(path),
               'index',
               params.row._origIndex,
-            ].join('/')}>
+            ])}>
             <LinkIcon />
           </Link>
         ),
       },
       ...typeToDataGridColumnSpec(objectType),
     ];
-  }, [location.pathname, objectType, path]);
+  }, [makeLinkPath, objectType, path]);
   return (
-    <Box
-      sx={{
-        height: 460,
-        width: '100%',
-      }}>
-      <DataGrid
-        density="compact"
-        experimentalFeatures={{columnGrouping: true}}
-        rows={gridRows}
-        columns={columnSpec}
-        initialState={{
-          pagination: {
-            paginationModel: {
-              pageSize: 10,
+    <>
+      {isTruncated && (
+        <Alert severity="warning">
+          Showing {MAX_ROWS.toLocaleString()} rows only.
+        </Alert>
+      )}
+      <Box
+        sx={{
+          height: 460,
+          width: '100%',
+        }}>
+        <DataGrid
+          apiRef={apiRef}
+          density="compact"
+          experimentalFeatures={{columnGrouping: true}}
+          rows={gridRows}
+          columns={columnSpec}
+          initialState={{
+            pagination: {
+              paginationModel: {
+                pageSize: 10,
+              },
             },
-          },
-        }}
-        disableRowSelectionOnClick
-        processRowUpdate={processRowUpdate}
-      />
-    </Box>
+          }}
+          loading={fetchQuery.loading}
+          disableRowSelectionOnClick
+          processRowUpdate={processRowUpdate}
+        />
+      </Box>
+    </>
   );
 };
 
@@ -723,12 +787,8 @@ export const WeaveViewOpDef: FC<{
   if (opDefQuery.loading) {
     return <div>loading</div>;
   } else if (opDefRef != null) {
-    // return <SmallRef objRef={opDefRef} />;
-    // This is broken in weave when there is a nested op def
-    return (
-      <>{opDefRef.artifactName + ':' + opDefRef.artifactVersion.slice(0, 6)}</>
-    );
+    return <SmallRef objRef={opDefRef} />;
   } else {
-    return <div>invalid op def</div>;
+    return <div>invalid op def: {opDefQuery.result}</div>;
   }
 };

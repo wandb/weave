@@ -6,7 +6,7 @@ from wandb import Artifact
 from weave import wandb_client_api
 from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
 from .. import engine_trace
-from wandb.apis import public as wb_public
+from wandb.apis.public import api as wb_public
 
 
 def artifact_commithash_by_digest(
