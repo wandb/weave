@@ -121,6 +121,8 @@ map_to_python_remote = mappers.make_mapper(map_to_python_remote_)
 
 
 def _node_publish_mapper(node: graph.Node) -> typing.Optional[graph.Node]:
+    from .ops_primitives import weave_api
+
     if _node_is_op_get(node):
         node = typing.cast(graph.OutputNode, node)
         uri = _uri_of_get_node(node)

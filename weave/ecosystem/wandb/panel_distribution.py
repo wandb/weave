@@ -5,6 +5,7 @@ import weave
 
 from . import weave_plotly
 from ... import weave_internal
+from ... import panel_util
 
 
 @weave.type()
@@ -44,7 +45,7 @@ class Distribution(weave.Panel):
                 {"item": unnested.type.object_type}, lambda item: item  # type: ignore
             ),
             # Would be nice to call this weave.expr
-            bin_size=weave.make_node(10),  # type: ignore
+            bin_size=panel_util.make_node(10),  # type: ignore
         )
 
     @weave.op()
