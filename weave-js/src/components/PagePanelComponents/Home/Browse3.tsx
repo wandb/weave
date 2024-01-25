@@ -333,7 +333,8 @@ const MainPeekingLayout: FC = () => {
     return 'row';
   }, [windowSize.height, windowSize.width]);
 
-  const {handleMousedown, newWidth, newHeight} = useDrawerResize(flexDirection);
+  const {handleMousedown, drawerWidth, drawerHeight} =
+    useDrawerResize(flexDirection);
 
   return (
     <Box
@@ -365,8 +366,8 @@ const MainPeekingLayout: FC = () => {
         }}
         PaperProps={{
           style: {
-            width: flexDirection === 'row' ? newWidth : '100%',
-            height: flexDirection === 'column' ? newHeight : '100%',
+            width: flexDirection === 'row' ? drawerWidth : '100%',
+            height: flexDirection === 'column' ? drawerHeight : '100%',
             margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 56px',
             boxShadow:
               flexDirection === 'row'
