@@ -14,17 +14,18 @@ import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {renderCell} from '../util';
 
-export const PivotRunsTable: React.FC<{
-  loading: boolean;
-  runs: SpanWithFeedback[];
-  rowsDim?: string | null;
-  colsDim?: string | null;
-}> = props => {
-  const {pivotData, pivotColumns} = useMemo(() => {
-    if (props.rowsDim == null || props.colsDim == null) {
-      return {pivotData: [], pivotColumns: new Set<string>()};
-    }
+export type WFHighLevelPivotSpec = {
+  rowDim: string;
+  colDim: string;
+};
 
+export const PivotRunsTable: React.FC<
+  {
+    loading: boolean;
+    runs: SpanWithFeedback[];
+  } & WFHighLevelPivotSpec
+> = props => {
+  const {pivotData, pivotColumns} = useMemo(() => {
     // TODO(tim/pivot_tables): Make this configurable and sort by timestamp!
     const aggregation = (values: any[]) => {
       return values[0];
@@ -34,8 +35,8 @@ export const PivotRunsTable: React.FC<{
     const values: {[rowId: string]: {[colId: string]: any[]}} = {};
     const pivotColumns: Set<string> = new Set();
     props.runs.forEach(r => {
-      const rowValue = getValueAtNestedKey(r, props.rowsDim!);
-      const colValue = getValueAtNestedKey(r, props.colsDim!);
+      const rowValue = getValueAtNestedKey(r, props.rowDim);
+      const colValue = getValueAtNestedKey(r, props.colDim);
       if (rowValue == null || colValue == null) {
         return;
       }
@@ -55,7 +56,7 @@ export const PivotRunsTable: React.FC<{
       const row: {[col: string]: any} = {
         id: rowKey,
       };
-      row[props.rowsDim!] = rowKey;
+      row[props.rowDim] = rowKey;
       Object.keys(values[rowKey]).forEach(colKey => {
         row[colKey] = aggregation(values[rowKey][colKey]);
       });
@@ -63,17 +64,17 @@ export const PivotRunsTable: React.FC<{
     });
 
     return {pivotData: rows, pivotColumns};
-  }, [props.colsDim, props.rowsDim, props.runs]);
+  }, [props.colDim, props.rowDim, props.runs]);
 
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
         flex: 1,
         minWidth: 175,
-        field: props.rowsDim!,
-        headerName: props.rowsDim!,
+        field: props.rowDim,
+        headerName: props.rowDim,
         renderCell: cellParams => {
-          const value = cellParams.row[props.rowsDim!];
+          const value = cellParams.row[props.rowDim];
           if (
             typeof value === 'string' &&
             value.startsWith('wandb-artifact:///')
@@ -145,15 +146,13 @@ export const PivotRunsTable: React.FC<{
     });
 
     return {cols, colGroupingModel};
-  }, [pivotColumns, pivotData, props.rowsDim]);
+  }, [pivotColumns, pivotData, props.rowDim]);
 
   const [rowSelectionModel, setRowSelectionModel] = useState<string[]>([]);
   const [snackOpen, setSnackOpen] = useState(false);
+
   if (props.loading) {
     return <CircularProgress />;
-  }
-  if (props.rowsDim == null || props.colsDim == null) {
-    return <>Call to action: Select dimensions</>;
   }
 
   // console.log({
@@ -186,7 +185,7 @@ export const PivotRunsTable: React.FC<{
         // rowSelectionModel={rowSelectionModel}
         initialState={{
           pinnedColumns: {
-            left: [GRID_CHECKBOX_SELECTION_COL_DEF.field, props.rowsDim!],
+            left: [GRID_CHECKBOX_SELECTION_COL_DEF.field, props.rowDim],
           },
         }}
         checkboxSelection={false}

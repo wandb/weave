@@ -10,7 +10,7 @@ import {
   TextField,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {CallFilter} from '../../../Browse2/callTree';
 import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
@@ -31,7 +31,7 @@ import {
   WFObjectVersion,
   WFOpVersion,
 } from '../wfInterface/types';
-import {PivotRunsTable} from './PivotRunsTable';
+import {PivotRunsTable, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -40,6 +40,8 @@ export type WFHighLevelCallFilter = {
   inputObjectVersions?: string[];
   parentId?: string | null;
   traceId?: string | null;
+  isPivot?: boolean;
+  pivotSpec?: Partial<WFHighLevelPivotSpec>;
 };
 
 export const CallsPage: React.FC<{
@@ -153,10 +155,36 @@ export const CallsTable: React.FC<{
     lowLevelFilter
   );
 
-  // TODO(tim/pivot_tables): Add these to the incoming filter state and URL.
-  const [userEnabledPivot, setUserEnabledPivot] = useState(false);
-  const [pivotRowDim, setPivotRowDim] = useState<string | null>();
-  const [pivotColDim, setPivotColDim] = useState<string | null>();
+  const userEnabledPivot = effectiveFilter.isPivot ?? false;
+  const pivotRowDim = effectiveFilter.pivotSpec?.rowDim ?? null;
+  const pivotColDim = effectiveFilter.pivotSpec?.colDim ?? null;
+  const setUserEnabledPivot = useCallback(
+    (enabled: boolean) => {
+      setFilter({
+        ...filter,
+        isPivot: enabled,
+      });
+    },
+    [filter, setFilter]
+  );
+  const setPivotDims = useCallback(
+    (spec: Partial<WFHighLevelPivotSpec>) => {
+      if (
+        filter.pivotSpec?.colDim !== spec.colDim ||
+        filter.pivotSpec?.rowDim !== spec.rowDim
+      ) {
+        console.log({filter, spec});
+        setFilter({
+          ...filter,
+          pivotSpec: {
+            ...filter.pivotSpec,
+            ...spec,
+          },
+        });
+      }
+    },
+    [filter, setFilter]
+  );
 
   const [pivotRowOptions, setPivotRowOptions] = useState<string[]>([]);
   const [pivotColOptions, setPivotColOptions] = useState<string[]>([]);
@@ -190,14 +218,22 @@ export const CallsTable: React.FC<{
     setPivotColOptions(options);
     if (options.length > 1) {
       if (options[0] === 'inputs.self') {
-        setPivotRowDim(options[1]);
-        setPivotColDim(options[0]);
+        setPivotDims({
+          rowDim: options[1],
+          colDim: options[0],
+        });
       } else {
-        setPivotRowDim(options[0]);
-        setPivotColDim(options[1]);
+        setPivotDims({
+          rowDim: options[0],
+          colDim: options[1],
+        });
       }
     }
-  }, [runsWithFeedbackQuery.loading, runsWithFeedbackQuery.result]);
+  }, [
+    runsWithFeedbackQuery.loading,
+    runsWithFeedbackQuery.result,
+    setPivotDims,
+  ]);
 
   return (
     <FilterLayoutTemplate
@@ -409,7 +445,9 @@ export const CallsTable: React.FC<{
                   renderInput={params => <TextField {...params} label="Rows" />}
                   value={pivotRowDim ?? null}
                   onChange={(event, newValue) => {
-                    setPivotRowDim(newValue);
+                    setPivotDims({
+                      rowDim: newValue ?? undefined,
+                    });
                   }}
                   options={pivotRowOptions}
                 />
@@ -424,7 +462,9 @@ export const CallsTable: React.FC<{
                   )}
                   value={pivotColDim ?? null}
                   onChange={(event, newValue) => {
-                    setPivotColDim(newValue);
+                    setPivotDims({
+                      colDim: newValue ?? undefined,
+                    });
                   }}
                   options={pivotColOptions}
                 />
@@ -434,12 +474,16 @@ export const CallsTable: React.FC<{
         )
       }>
       {isPivoting ? (
-        <PivotRunsTable
-          loading={runsWithFeedbackQuery.loading}
-          runs={runsWithFeedbackQuery.result}
-          rowsDim={pivotRowDim}
-          colsDim={pivotColDim}
-        />
+        pivotRowDim == null || pivotColDim == null ? (
+          <>Please select pivot dimensions</>
+        ) : (
+          <PivotRunsTable
+            loading={runsWithFeedbackQuery.loading}
+            runs={runsWithFeedbackQuery.result}
+            rowDim={pivotRowDim}
+            colDim={pivotColDim}
+          />
+        )
       ) : (
         <RunsTable
           loading={runsWithFeedbackQuery.loading}
