@@ -119,7 +119,10 @@ export const FilterableTable = <
           colData[key] = colData[key].filter(obj =>
             innerColumn.filterControls!.filterPredicate(
               obj,
-              _.omit(filter, column.filterControls!.filterKeys)
+              _.omit(
+                filter,
+                column.filterControls!.filterKeys
+              ) as Partial<CompositeFilterType>
             )
           );
         });
