@@ -161,6 +161,11 @@ export const CallsTable: React.FC<{
       setFilter({
         ...filter,
         isPivot: enabled,
+        // Reset the pivot dims when disabling pivot
+        pivotSpec:
+          filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
+            ? undefined
+            : filter.pivotSpec,
       });
     },
     [filter, setFilter]

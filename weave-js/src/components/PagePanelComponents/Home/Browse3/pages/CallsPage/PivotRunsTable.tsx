@@ -22,8 +22,8 @@ import {StyledDataGrid} from '../../StyledDataGrid';
 import {renderCell} from '../util';
 
 export type WFHighLevelPivotSpec = {
-  rowDim: string;
-  colDim: string;
+  rowDim: string | null;
+  colDim: string | null;
 };
 
 export const PivotRunsView: React.FC<{
@@ -56,7 +56,11 @@ export const PivotRunsView: React.FC<{
     });
     setPivotRowOptions(options);
     setPivotColOptions(options);
-    if (options.length > 1) {
+    if (
+      props.pivotSpec.colDim === undefined &&
+      props.pivotSpec.rowDim === undefined &&
+      options.length > 1
+    ) {
       if (options[0] === 'inputs.self') {
         props.onPivotSpecChange({
           rowDim: options[1],
@@ -72,7 +76,12 @@ export const PivotRunsView: React.FC<{
   }, [props]);
 
   return (
-    <Box>
+    <Box
+      sx={
+        {
+          // height: '100%',
+        }
+      }>
       <Box
         sx={{
           flex: '0 0 auto',
@@ -105,7 +114,7 @@ export const PivotRunsView: React.FC<{
               value={pivotRowDim ?? null}
               onChange={(event, newValue) => {
                 props.onPivotSpecChange({
-                  rowDim: newValue ?? undefined,
+                  rowDim: newValue ?? null,
                 });
               }}
               options={pivotRowOptions}
@@ -120,7 +129,7 @@ export const PivotRunsView: React.FC<{
               value={pivotColDim ?? null}
               onChange={(event, newValue) => {
                 props.onPivotSpecChange({
-                  colDim: newValue ?? undefined,
+                  colDim: newValue ?? null,
                 });
               }}
               options={pivotColOptions}
