@@ -1,14 +1,16 @@
 import typing
+import contextlib
 import datetime
 import logging
 import shutil
 import time
 import os
 
+from . import context_state
 from . import engine_trace
-from . import wandb_api
 from . import environment
 from . import errors
+from . import wandb_api
 
 statsd = engine_trace.statsd()  # type: ignore
 logger = logging.getLogger("root")
@@ -27,13 +29,25 @@ system time             bucketed time
 16:00 Jan 12 1970      00:00 Jan 19 1970
 12:00 Jan 3 2024       00:00 Jan 10 2024
 """
-
-
 def bucket_timestamp(interval_days: int) -> int:
     if interval_days == 0:
         return 0
     now = time.time()
     interval_seconds = interval_days * 24 * 60 * 60
+    num_intervals = int(now / interval_seconds)
+    # use the bucket end time because this makes it easy to know when a cache interval will no longer be used
+    bucket_end_time = (num_intervals + 1) * interval_seconds
+    return int(
+        datetime.datetime.fromtimestamp(
+            bucket_end_time, datetime.timezone.utc
+        ).timestamp()
+    )
+
+def bucket_timestamp_minutes(interval_minutes: int) -> int:
+    if interval_minutes == 0:
+        return 0
+    now = time.time()
+    interval_seconds = interval_minutes * 60
     num_intervals = int(now / interval_seconds)
     # use the bucket end time because this makes it easy to know when a cache interval will no longer be used
     bucket_end_time = (num_intervals + 1) * interval_seconds
@@ -58,14 +72,31 @@ def set_cache_timestamp() -> None:
     environment.set_weave_cache_timestamp(str(new_cache_timestamp))
 
 
+@contextlib.contextmanager
+def time_interval_cache_prefix() -> typing.Generator[None, None, None]:
+    duration = environment.cache_duration_days()
+    if duration == 0:
+        return
+    cache_prefix = bucket_timestamp(duration)
+    token = context_state._cache_prefix_context.set(cache_prefix)
+    try:
+        yield
+    finally:
+        context_state._cache_prefix_context.reset(token)
+
+
+def get_cache_prefix() -> typing.Optional[str]:
+    return context_state._cache_prefix_context.get()
+
 def clear_cache():
     # Read the directory address and threshold from the environment variable
     directory_path = environment.weave_filesystem_dir()
 
     now = datetime.datetime.now().timestamp()
     # buffer is in seconds
-    buffer = 60 * 60 * 24 * environment.cache_deletion_buffer_days  # days of buffer
-
+    # buffer = 60 * 60 * 24 * environment.cache_deletion_buffer_days  # days of buffer
+    buffer = 60  # minutes of buffer
+    
     # Validate the directory path
     if not directory_path:
         logging.info("WEAVE_PYTHON_CACHE is not set.")
@@ -90,13 +121,6 @@ def clear_cache():
         except:
             logging.info(f"Error deleting {item}.", flush=True)
             continue
-
-
-def get_cache_prefix() -> typing.Optional[str]:
-    if environment.weave_cache_timestamp() == "0":
-        return None  # No clearing cache
-    return environment.weave_cache_timestamp()
-
 
 def get_user_cache_key() -> typing.Optional[str]:
     ctx = wandb_api.get_wandb_api_context()

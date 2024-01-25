@@ -95,14 +95,6 @@ def cache_deletion_buffer_days() -> int:
     return int(os.getenv("WEAVE_CACHE_DELETION_BUFFER_DAYS", 1))
 
 
-def weave_cache_timestamp() -> str:
-    return os.environ.get("WEAVE_CACHE_TIMESTAMP", "0")
-
-
-def set_weave_cache_timestamp(timestamp: str) -> None:
-    os.environ["WEAVE_CACHE_TIMESTAMP"] = timestamp
-
-
 def wandb_production() -> bool:
     return os.getenv("WEAVE_ENV") == "wandb_production"
 
