@@ -36,6 +36,10 @@ logs.configure_logger()
 # tests.
 context_state._eager_mode.set(False)
 
+# A lot of tests rely on weave.ops.* being in scope. Importing this here
+# makes that work...
+from weave import ops
+
 
 def pytest_report_teststatus(
     report: TestReport, config: Config
