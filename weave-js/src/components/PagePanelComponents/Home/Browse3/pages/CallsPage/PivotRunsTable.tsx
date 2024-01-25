@@ -320,6 +320,7 @@ const PivotRunsTable: React.FC<
           if (!cellSpan) {
             return;
           }
+          // TODO(tim/pivot_tables_to_compare_view): Highlighting & Scroll to cell.
           history.push(
             peekingRouter.callUIUrl(
               props.entity,
