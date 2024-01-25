@@ -386,6 +386,7 @@ export const CallsTable: React.FC<{
           onPivotSpecChange={setPivotDims}
           entity={props.entity}
           project={props.project}
+          showCompareButton
         />
       ) : (
         <RunsTable

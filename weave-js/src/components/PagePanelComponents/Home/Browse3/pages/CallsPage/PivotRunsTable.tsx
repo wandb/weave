@@ -14,7 +14,7 @@ import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../../react';
 import {flattenObject} from '../../../Browse2/browse2Util';
-import {SpanWithFeedback} from '../../../Browse2/callTree';
+import {Call, SpanWithFeedback} from '../../../Browse2/callTree';
 import {
   buildTree,
   DataGridColumnGroupingModel,
@@ -31,9 +31,11 @@ export type WFHighLevelPivotSpec = {
 
 type PivotRunsTablePropsType = {
   loading: boolean;
-  runs: SpanWithFeedback[];
+  runs: Call[];
   entity: string;
   project: string;
+  showCompareButton?: boolean;
+  extraDataGridProps?: React.ComponentProps<typeof StyledDataGrid>;
 };
 
 export const PivotRunsView: React.FC<
@@ -165,7 +167,7 @@ export const PivotRunsView: React.FC<
   );
 };
 
-const PivotRunsTable: React.FC<
+export const PivotRunsTable: React.FC<
   PivotRunsTablePropsType & {
     pivotSpec: {
       rowDim: string;
@@ -310,7 +312,7 @@ const PivotRunsTable: React.FC<
             ],
           },
         }}
-        checkboxSelection={!isPeeking}
+        checkboxSelection={!isPeeking && props.showCompareButton}
         columnGroupingModel={columns.colGroupingModel}
         rowSelectionModel={rowSelectionModel}
         onCellClick={params => {
@@ -342,15 +344,20 @@ const PivotRunsTable: React.FC<
             return;
           }
 
-          const callIds: string[] = newSelection.flatMap(id => {
-            return pivotData.flatMap(row => {
-              return Array.from(pivotColumns)
-                .map(col => {
-                  return row[col]?.span_id;
-                })
-                .filter(id => id != null);
-            });
-          });
+          const callIds: string[] = _.uniq(
+            newSelection.flatMap(id => {
+              return pivotData.flatMap(row => {
+                if (row.id !== id) {
+                  return [];
+                }
+                return Array.from(pivotColumns)
+                  .map(col => {
+                    return row[col]?.span_id;
+                  })
+                  .filter(id => id != null);
+              });
+            })
+          );
 
           history.push(
             peekingRouter.compareCallsUIUrl(
@@ -362,6 +369,7 @@ const PivotRunsTable: React.FC<
             )
           );
         }}
+        {...props.extraDataGridProps}
       />
     </>
   );

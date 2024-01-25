@@ -28,6 +28,7 @@ export const SimplePageLayout: React.FC<{
     onClick: () => void;
   }>;
   leftSidebar?: React.ReactNode;
+  hideTabsIfSingle?: boolean;
 }> = props => {
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
   const [tabId, setTabId] = React.useState(0);
@@ -94,15 +95,17 @@ export const SimplePageLayout: React.FC<{
             {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
           </Box>
         </Box>
-        <Tabs
-          variant="scrollable"
-          scrollButtons="auto"
-          value={tabId}
-          onChange={handleTabChange}>
-          {props.tabs.map((tab, i) => (
-            <Tab key={i} label={tab.label} />
-          ))}
-        </Tabs>
+        {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
+          <Tabs
+            variant="scrollable"
+            scrollButtons="auto"
+            value={tabId}
+            onChange={handleTabChange}>
+            {props.tabs.map((tab, i) => (
+              <Tab key={i} label={tab.label} />
+            ))}
+          </Tabs>
+        )}
       </Box>
       <Box
         sx={{
@@ -150,6 +153,7 @@ export const SimplePageLayoutWithHeader: React.FC<{
   }>;
   headerContent: React.ReactNode;
   leftSidebar?: React.ReactNode;
+  hideTabsIfSingle?: boolean;
 }> = props => {
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
   const [tabId, setTabId] = React.useState(0);
@@ -248,19 +252,21 @@ export const SimplePageLayoutWithHeader: React.FC<{
             }}>
             {props.headerContent}
           </Box>
-          <Tabs
-            style={{
-              borderBottom: '1px solid #e0e0e0',
-            }}
-            variant="scrollable"
-            // These scroll buttons are not working
-            scrollButtons={false}
-            value={tabId}
-            onChange={handleTabChange}>
-            {props.tabs.map((tab, i) => (
-              <Tab key={i} label={tab.label} />
-            ))}
-          </Tabs>
+          {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
+            <Tabs
+              style={{
+                borderBottom: '1px solid #e0e0e0',
+              }}
+              variant="scrollable"
+              // These scroll buttons are not working
+              scrollButtons={false}
+              value={tabId}
+              onChange={handleTabChange}>
+              {props.tabs.map((tab, i) => (
+                <Tab key={i} label={tab.label} />
+              ))}
+            </Tabs>
+          )}
 
           <Box
             sx={{
