@@ -20,7 +20,7 @@ import {useMakeNewBoard} from '../common/hooks';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
-import {truncateID} from '../util';
+import {truncateID, useInitializingFilter} from '../util';
 import {
   useWeaveflowORMContext,
   WeaveflowORMContextType,
@@ -52,13 +52,31 @@ export const CallsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
 }> = props => {
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
+  );
+
+  const title = useMemo(() => {
+    if (filter.opCategory) {
+      return _.capitalize(filter.opCategory) + ' Calls';
+    }
+    return 'Calls';
+  }, [filter.opCategory]);
+
   return (
     <SimplePageLayout
-      title="Calls"
+      title={title}
       tabs={[
         {
           label: 'All',
-          content: <CallsTable {...props} />,
+          content: (
+            <CallsTable
+              {...props}
+              initialFilter={filter}
+              onFilterUpdate={setFilter}
+            />
+          ),
         },
       ]}
     />
@@ -77,23 +95,9 @@ export const CallsTable: React.FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
-  const [filterState, setFilterState] = useState<WFHighLevelCallFilter>(
-    props.initialFilter ?? {}
-  );
-  useEffect(() => {
-    if (props.initialFilter) {
-      setFilterState(props.initialFilter);
-    }
-  }, [props.initialFilter]);
-
-  // If the caller is controlling the filter, use the caller's filter state
-  const filter = useMemo(
-    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
-    [filterState, props.initialFilter, props.onFilterUpdate]
-  );
-  const setFilter = useMemo(
-    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
-    [props.onFilterUpdate]
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
   );
 
   const effectiveFilter = useMemo(() => {
@@ -126,12 +130,6 @@ export const CallsTable: React.FC<{
     effectiveFilter
   );
   const parentIdOptions = useParentIdOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
-  const traceIdOptions = useTraceIdOptions(
     orm,
     props.entity,
     props.project,
@@ -318,29 +316,6 @@ export const CallsTable: React.FC<{
                   return consumesObjectVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(consumesObjectVersionOptions)}
-              />
-            </FormControl>
-          </ListItem>
-          <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={
-                  isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes('traceId')
-                }
-                renderInput={params => <TextField {...params} label="Trace" />}
-                value={effectiveFilter.traceId ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    traceId: newValue,
-                  });
-                }}
-                getOptionLabel={option => {
-                  return traceIdOptions[option] ?? option;
-                }}
-                options={Object.keys(traceIdOptions)}
               />
             </FormControl>
           </ListItem>
@@ -600,53 +575,6 @@ const useConsumesObjectVersionOptions = (
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 
-const useTraceIdOptions = (
-  orm: WeaveflowORMContextType,
-  entity: string,
-  project: string,
-  highLevelFilter: WFHighLevelCallFilter
-) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        orm,
-        _.omit(highLevelFilter, ['traceId'])
-      );
-    }, [highLevelFilter, orm])
-  );
-  return useMemo(() => {
-    let roots: WFCall[] = [];
-    if (runs.loading) {
-      roots = orm.projectConnection.calls().filter(v => v.parentCall() == null);
-    } else {
-      roots = runs.result
-        .map(r => orm.projectConnection.call(r.span_id)?.traceID())
-        .filter(traceId => traceId != null)
-        .flatMap(traceId =>
-          orm.projectConnection.traceRoots(traceId!)
-        ) as WFCall[];
-    }
-
-    return _.fromPairs(
-      roots.map(c => {
-        const version = c.opVersion();
-        if (!version) {
-          return [c.traceID(), c.spanName()];
-        }
-        return [
-          c.traceID(),
-          version.op().name() + ' (' + truncateID(c.callID()) + ')',
-        ];
-      })
-    );
-  }, [orm.projectConnection, runs.loading, runs.result]);
-};
-
 const useParentIdOptions = (
   orm: WeaveflowORMContextType,
   entity: string,
@@ -678,7 +606,8 @@ const useParentIdOptions = (
         .map(r => orm.projectConnection.call(r.span_id)?.parentCall())
         .filter(v => v != null) as WFCall[];
     }
-    return _.fromPairs(
+
+    const pairs = _.uniqBy(
       parents.map(c => {
         const version = c.opVersion();
         if (!version) {
@@ -686,10 +615,17 @@ const useParentIdOptions = (
         }
         return [
           c.callID(),
-          version.op().name() + ' (' + truncateID(c.callID()) + ')',
+          opNiceName(version.op().name()) + ' (' + truncateID(c.callID()) + ')',
         ];
-      })
+      }),
+      p => p[1]
     );
+
+    pairs.sort((a, b) => {
+      return a[1].localeCompare(b[1]);
+    });
+
+    return _.fromPairs(pairs);
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 

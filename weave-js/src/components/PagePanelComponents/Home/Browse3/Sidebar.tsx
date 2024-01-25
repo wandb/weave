@@ -1,6 +1,5 @@
 import {
   MEDIUM_BREAKPOINT,
-  MOON_150,
   MOON_250,
   WHITE,
 } from '@wandb/weave/common/css/globals.styles';
@@ -47,21 +46,6 @@ const SidebarSections = styled.div`
 `;
 SidebarSections.displayName = 'S.SidebarSections';
 
-const SidebarSectionHeader = styled.div`
-  font-family: 'Source Sans Pro';
-  font-weight: 800;
-  height: 14px;
-  font-size: 10px;
-  line-height: 14px;
-  text-align: center;
-  background-color: ${MOON_150};
-  padding: 4px 0;
-  @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
-    display: none;
-  }
-`;
-StyledSidebar.displayName = 'S.StyledSidebar';
-
 export type SidebarItem = {
   id: string;
   iconName: IconName;
@@ -74,7 +58,7 @@ export type SidebarItem = {
 
 type SidebarProps = {
   selectedItem: string | null;
-  items: SidebarItem[];
+  items: SidebarItem[][];
 };
 
 export const Sidebar = (props: SidebarProps) => {
@@ -82,24 +66,17 @@ export const Sidebar = (props: SidebarProps) => {
     return null;
   }
 
-  const sections = new Set<string>();
-  props.items.forEach(item => {
-    sections.add(item.section ?? '');
-  });
-
   return (
     <StyledSidebar className="fancy-page__sidebar">
       <SidebarSections>
-        {Array.from(sections).map((section, i) => (
+        {props.items.map((sectionItems, i) => (
           <React.Fragment key={'section__' + i}>
-            {section !== '' && (
-              <SidebarSectionHeader>{section}</SidebarSectionHeader>
+            {i !== 0 && (
+              <div className="fancy-page__sidebar__sections__divider" />
             )}
             <SidebarSection
               selectedItem={props.selectedItem}
-              items={props.items.filter(
-                item => section === (item.section ?? '')
-              )}
+              items={sectionItems}
             />
           </React.Fragment>
         ))}

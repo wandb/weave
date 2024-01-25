@@ -181,16 +181,6 @@ export const RunsTable: FC<{
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
-        field: 'status_code',
-        headerName: '',
-        sortable: false,
-        disableColumnMenu: true,
-        resizable: false,
-        renderCell: cellParams => {
-          return <StatusChip value={cellParams.row.status_code} />;
-        },
-      },
-      {
         field: 'span_id',
         headerName: 'ID',
         width: 75,
@@ -205,6 +195,19 @@ export const RunsTable: FC<{
               callId={rowParams.row.id}
             />
           );
+        },
+      },
+      {
+        field: 'status_code',
+        headerName: 'Status',
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
+        width: 100,
+        minWidth: 100,
+        maxWidth: 100,
+        renderCell: cellParams => {
+          return <StatusChip value={cellParams.row.status_code} />;
         },
       },
       ...(orm
