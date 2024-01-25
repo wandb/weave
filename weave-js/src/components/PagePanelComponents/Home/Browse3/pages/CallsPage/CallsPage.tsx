@@ -211,6 +211,9 @@ export const CallsTable: React.FC<{
         props.project,
         effectiveFilter
       )}
+      filterListSx={{
+        pb: isPivoting ? 0 : 1,
+      }}
       filterListItems={
         <>
           <IconButton
