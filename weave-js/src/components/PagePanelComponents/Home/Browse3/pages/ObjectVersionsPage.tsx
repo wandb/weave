@@ -121,18 +121,6 @@ export const FilterableObjectVersionsTable: React.FC<{
     effectiveFilter
   );
 
-  // const typeVersionOptions = useMemo(() => {
-  //   const versions = orm.projectConnection.typeVersions();
-  //   const options = versions.map(
-  //     v => v.type().name() + ':' + v.version().toString()
-  //   );
-  //   return options;
-  // }, [orm]);
-  const typeVersionOptions = useTypeVersionOptions(
-    allObjectVersions,
-    effectiveFilter
-  );
-
   // const opVersionOptions = useMemo(() => {
   //   const versions = orm.projectConnection.opVersions();
   //   // Note: this excludes the named ones without op versions
@@ -206,31 +194,6 @@ export const FilterableObjectVersionsTable: React.FC<{
             </FormControl>
           </ListItem>
 
-          <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                limitTags={1}
-                // Temp disable multiple for simplicity - may want to re-enable
-                // multiple
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'typeVersions'
-                )}
-                value={effectiveFilter.typeVersions?.[0] ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    typeVersions: newValue ? [newValue] : [],
-                  });
-                }}
-                renderInput={params => <TextField {...params} label="Type" />}
-                getOptionLabel={option => {
-                  return typeVersionOptions[option] ?? option;
-                }}
-                options={Object.keys(typeVersionOptions)}
-              />
-            </FormControl>
-          </ListItem>
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete
@@ -587,31 +550,6 @@ const useObjectOptions = (
 
   return useMemo(() => {
     return filtered.map(item => item.object().name());
-  }, [filtered]);
-};
-
-const useTypeVersionOptions = (
-  allObjectVersions: WFObjectVersion[],
-  highLevelFilter: WFHighLevelObjectVersionFilter
-) => {
-  const filtered = useMemo(() => {
-    return applyFilter(
-      allObjectVersions,
-      _.omit(highLevelFilter, ['typeVersions'])
-    );
-  }, [allObjectVersions, highLevelFilter]);
-
-  return useMemo(() => {
-    const versions = filtered.map(item => item.typeVersion());
-
-    return _.fromPairs(
-      versions.map(v => {
-        return [
-          v.type().name() + ':' + v.version(),
-          v.type().name() + ' (' + truncateID(v.version()) + ')',
-        ];
-      })
-    );
   }, [filtered]);
 };
 
