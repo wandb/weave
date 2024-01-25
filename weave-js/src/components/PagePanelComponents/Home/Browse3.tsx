@@ -438,9 +438,10 @@ const MainPeekingLayout: FC = () => {
             padding: '4px 0 0',
             borderTop: '1px solid #ddd',
             position: 'absolute',
+            top: 0,
             left: 0,
             bottom: 0,
-            zIndex: '1',
+            zIndex: 1,
             backgroundColor: '#f4f7f9',
           }}
         />
