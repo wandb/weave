@@ -20,6 +20,7 @@ import {
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {renderCell} from '../util';
+import _ from 'lodash';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
@@ -164,9 +165,11 @@ const PivotRunsTable: React.FC<{
   };
 }> = props => {
   const {pivotData, pivotColumns} = useMemo(() => {
-    // TODO(tim/pivot_tables): Make this configurable and sort by timestamp!
-    const aggregationFn = (internalRows: any[]) => {
-      return internalRows[0];
+    const aggregationFn = (internalRows: SpanWithFeedback[]) => {
+      if (internalRows.length === 0) {
+        return null;
+      }
+      return _.sortBy(internalRows, r => -r.timestamp)[0];
     };
 
     // Step 1: Create a map of values
@@ -245,6 +248,7 @@ const PivotRunsTable: React.FC<{
       });
 
       const outputOrder = Object.keys(outputKeys);
+      outputOrder.sort();
       const outputGrouping = buildTree(outputOrder, col);
       outputGrouping.renderHeaderGroup = params => {
         return renderCell(col);
