@@ -139,7 +139,15 @@ export const PivotRunsView: React.FC<{
         </ListItem>
       </Box>
       {props.pivotSpec.rowDim && props.pivotSpec.colDim ? (
-        <PivotRunsTable {...props} />
+        <PivotRunsTable
+          {...props}
+          pivotSpec={
+            props.pivotSpec as {
+              rowDim: string;
+              colDim: string;
+            }
+          }
+        />
       ) : (
         <>Please select pivot dimensions</>
       )}
