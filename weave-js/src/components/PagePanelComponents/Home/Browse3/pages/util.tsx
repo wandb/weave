@@ -1,6 +1,6 @@
 import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 
 import {SmallRef} from '../../Browse2/SmallRef';
@@ -33,4 +33,30 @@ export const renderCell = (value: any) => {
     return value ? 'True' : 'False';
   }
   return value;
+};
+
+export const useInitializingFilter = <T,>(
+  initialFilter?: Partial<T>,
+  onFilterUpdate?: (filter: T) => void
+) => {
+  const [filterState, setFilterState] = useState<Partial<T>>(
+    initialFilter ?? {}
+  );
+  useEffect(() => {
+    if (initialFilter) {
+      setFilterState(initialFilter);
+    }
+  }, [initialFilter]);
+
+  // If the caller is controlling the filter, use the caller's filter state
+  const filter = useMemo(
+    () => (onFilterUpdate ? initialFilter ?? ({} as Partial<T>) : filterState),
+    [filterState, initialFilter, onFilterUpdate]
+  );
+  const setFilter = useMemo(
+    () => (onFilterUpdate ? onFilterUpdate : setFilterState),
+    [onFilterUpdate]
+  );
+
+  return {filter, setFilter};
 };
