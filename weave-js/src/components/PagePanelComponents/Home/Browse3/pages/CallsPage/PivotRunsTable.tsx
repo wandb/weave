@@ -267,12 +267,6 @@ const PivotRunsTable: React.FC<{
     return <CircularProgress />;
   }
 
-  // console.log({
-  //   props,
-  //   columns,
-  //   pivotData,
-  // });
-
   return (
     <>
       <Snackbar
@@ -305,20 +299,6 @@ const PivotRunsTable: React.FC<{
         }}
         checkboxSelection={false}
         columnGroupingModel={columns.colGroupingModel}
-        // onRowClick={({id}) => {
-        //   history.push(
-        //     peekingRouter.callUIUrl(
-        //       params.entity,
-        //       params.project,
-        //       '',
-        //       id as string
-        //     )
-        //   );
-        // }}
-        // isRowSelectable={(params: GridRowParams) =>
-        //   rowSelectionModel.includes(params.id as string) ||
-        //   rowSelectionModel.length < 2
-        // }
         rowSelectionModel={rowSelectionModel}
         onRowSelectionModelChange={newSelection => {
           if (newSelection.length > 2) {
