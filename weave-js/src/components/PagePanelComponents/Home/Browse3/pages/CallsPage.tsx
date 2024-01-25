@@ -129,12 +129,6 @@ export const CallsTable: React.FC<{
     props.project,
     effectiveFilter
   );
-  const traceIdOptions = useTraceIdOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
   const opCategoryOptions = useOpCategoryOptions(
     orm,
     props.entity,
@@ -249,28 +243,6 @@ export const CallsTable: React.FC<{
                   return consumesObjectVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(consumesObjectVersionOptions)}
-              />
-            </FormControl>
-          </ListItem>
-          <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'traceId'
-                )}
-                renderInput={params => <TextField {...params} label="Trace" />}
-                value={effectiveFilter.traceId ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    traceId: newValue,
-                  });
-                }}
-                getOptionLabel={option => {
-                  return traceIdOptions[option] ?? option;
-                }}
-                options={Object.keys(traceIdOptions)}
               />
             </FormControl>
           </ListItem>
@@ -510,53 +482,6 @@ const useConsumesObjectVersionOptions = (
         return [
           v.object().name() + ':' + v.version(),
           v.object().name() + ':v' + v.versionIndex(),
-        ];
-      })
-    );
-  }, [orm.projectConnection, runs.loading, runs.result]);
-};
-
-const useTraceIdOptions = (
-  orm: WeaveflowORMContextType,
-  entity: string,
-  project: string,
-  highLevelFilter: WFHighLevelCallFilter
-) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        orm,
-        _.omit(highLevelFilter, ['traceId'])
-      );
-    }, [highLevelFilter, orm])
-  );
-  return useMemo(() => {
-    let roots: WFCall[] = [];
-    if (runs.loading) {
-      roots = orm.projectConnection.calls().filter(v => v.parentCall() == null);
-    } else {
-      roots = runs.result
-        .map(r => orm.projectConnection.call(r.span_id)?.traceID())
-        .filter(traceId => traceId != null)
-        .flatMap(traceId =>
-          orm.projectConnection.traceRoots(traceId!)
-        ) as WFCall[];
-    }
-
-    return _.fromPairs(
-      roots.map(c => {
-        const version = c.opVersion();
-        if (!version) {
-          return [c.traceID(), c.spanName()];
-        }
-        return [
-          c.traceID(),
-          version.op().name() + ' (' + truncateID(c.callID()) + ')',
         ];
       })
     );
