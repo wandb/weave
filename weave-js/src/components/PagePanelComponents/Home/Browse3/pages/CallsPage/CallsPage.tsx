@@ -190,8 +190,9 @@ export const CallsTable: React.FC<{
 
   const canPivot =
     effectiveFilter.opVersions?.length === 1 &&
-    // effectiveFilter.opVersions[0].includes('Evaluation-evaluate');
-    Object.keys(consumesObjectVersionOptions).length > 1;
+    // Super restrictive for now
+    effectiveFilter.opVersions[0].includes('Evaluation-evaluate');
+  // Object.keys(consumesObjectVersionOptions).length > 1;
 
   const isPivoting = userEnabledPivot && canPivot;
 

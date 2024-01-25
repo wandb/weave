@@ -77,11 +77,12 @@ export const PivotRunsView: React.FC<{
 
   return (
     <Box
-      sx={
-        {
-          // height: '100%',
-        }
-      }>
+      sx={{
+        height: '100%',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
       <Box
         sx={{
           flex: '0 0 auto',
@@ -149,7 +150,10 @@ export const PivotRunsView: React.FC<{
 const PivotRunsTable: React.FC<{
   loading: boolean;
   runs: SpanWithFeedback[];
-  pivotSpec: WFHighLevelPivotSpec;
+  pivotSpec: {
+    rowDim: string;
+    colDim: string;
+  };
 }> = props => {
   const {pivotData, pivotColumns} = useMemo(() => {
     // TODO(tim/pivot_tables): Make this configurable and sort by timestamp!
@@ -235,18 +239,7 @@ const PivotRunsTable: React.FC<{
       const outputOrder = Object.keys(outputKeys);
       const outputGrouping = buildTree(outputOrder, col);
       outputGrouping.renderHeaderGroup = params => {
-        const value = col;
-        if (
-          typeof value === 'string' &&
-          value.startsWith('wandb-artifact:///')
-        ) {
-          return (
-            <Box>
-              <SmallRef objRef={parseRef(value)} />
-            </Box>
-          );
-        }
-        return value;
+        return renderCell(col);
       };
       colGroupingModel.push(outputGrouping);
       for (const key of outputOrder) {
@@ -255,13 +248,6 @@ const PivotRunsTable: React.FC<{
           minWidth: 150,
           field: col + '.' + key,
           headerName: key.split('.').slice(-1)[0],
-          // renderHeader: params => {
-          //   console.log(params);
-          //   if (params.field === col) {
-          //     console.log(params);
-          //   }
-          //   // console.log('NO');
-          // },
           renderCell: cellParams => {
             return renderCell(
               getValueAtNestedKey(cellParams.row[col]?.output, key)
