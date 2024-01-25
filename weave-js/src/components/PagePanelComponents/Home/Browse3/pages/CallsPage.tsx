@@ -1,4 +1,10 @@
-import {Box, CircularProgress, IconButton, Typography} from '@material-ui/core';
+import {
+  Box,
+  CircularProgress,
+  IconButton,
+  Snackbar,
+  Typography,
+} from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
@@ -9,7 +15,11 @@ import {
   ListItemText,
   TextField,
 } from '@mui/material';
-import {DataGrid, GridColDef} from '@mui/x-data-grid';
+import {
+  DataGrid,
+  GRID_CHECKBOX_SELECTION_COL_DEF,
+  GridColDef,
+} from '@mui/x-data-grid';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
@@ -161,7 +171,7 @@ export const CallsTable: React.FC<{
     lowLevelFilter
   );
 
-  // TODO: Add these to the incoming filter state and URL.
+  // TODO(tim/pivot_tables): Add these to the incoming filter state and URL.
   const [userEnabledPivot, setUserEnabledPivot] = useState(false);
   const [pivotRowDim, setPivotRowDim] = useState<string | null>();
   const [pivotColDim, setPivotColDim] = useState<string | null>();
@@ -198,11 +208,12 @@ export const CallsTable: React.FC<{
     setPivotColOptions(options);
     if (options.length > 1) {
       if (options[0] === 'inputs.self') {
+        setPivotRowDim(options[1]);
+        setPivotColDim(options[0]);
+      } else {
         setPivotRowDim(options[0]);
         setPivotColDim(options[1]);
       }
-      setPivotRowDim(options[1]);
-      setPivotColDim(options[0]);
     }
   }, [runsWithFeedbackQuery.loading, runsWithFeedbackQuery.result]);
 
@@ -476,6 +487,7 @@ const PivotRunsTable: React.FC<{
       return {pivotData: [], pivotColumns: new Set<string>()};
     }
 
+    // TODO(tim/pivot_tables): Make this configurable and sort by timestamp!
     const aggregation = (values: any[]) => {
       return values[0];
     };
@@ -609,6 +621,8 @@ const PivotRunsTable: React.FC<{
     return {cols, colGroupingModel};
   }, [pivotColumns, pivotData, props.rowsDim]);
 
+  const [rowSelectionModel, setRowSelectionModel] = useState<string[]>([]);
+  const [snackOpen, setSnackOpen] = useState(false);
   if (props.loading) {
     return <CircularProgress />;
   }
@@ -623,34 +637,59 @@ const PivotRunsTable: React.FC<{
   // });
 
   return (
-    <StyledDataGrid
-      columnHeaderHeight={40}
-      // apiRef={apiRef}
-      // loading={loading}
-      rows={pivotData}
-      // density="compact"
-      // initialState={initialState}
-      rowHeight={38}
-      columns={columns.cols}
-      experimentalFeatures={{columnGrouping: true}}
-      disableRowSelectionOnClick
-      // rowSelectionModel={rowSelectionModel}
-      initialState={{
-        pinnedColumns: {left: [props.rowsDim!]},
-      }}
-      // checkboxSelection
-      columnGroupingModel={columns.colGroupingModel}
-      // onRowClick={({id}) => {
-      //   history.push(
-      //     peekingRouter.callUIUrl(
-      //       params.entity,
-      //       params.project,
-      //       '',
-      //       id as string
-      //     )
-      //   );
-      // }}
-    />
+    <>
+      <Snackbar
+        open={snackOpen}
+        autoHideDuration={2000}
+        onClose={() => {
+          setSnackOpen(false);
+        }}
+        message="Only 2 rows can be selected at a time."
+      />
+      <StyledDataGrid
+        columnHeaderHeight={40}
+        // apiRef={apiRef}
+        // loading={loading}
+        rows={pivotData}
+        // density="compact"
+        // initialState={initialState}
+        rowHeight={38}
+        columns={columns.cols}
+        experimentalFeatures={{columnGrouping: true}}
+        disableRowSelectionOnClick
+        // rowSelectionModel={rowSelectionModel}
+        initialState={{
+          pinnedColumns: {
+            left: [GRID_CHECKBOX_SELECTION_COL_DEF.field, props.rowsDim!],
+          },
+        }}
+        checkboxSelection={false}
+        columnGroupingModel={columns.colGroupingModel}
+        // onRowClick={({id}) => {
+        //   history.push(
+        //     peekingRouter.callUIUrl(
+        //       params.entity,
+        //       params.project,
+        //       '',
+        //       id as string
+        //     )
+        //   );
+        // }}
+        // isRowSelectable={(params: GridRowParams) =>
+        //   rowSelectionModel.includes(params.id as string) ||
+        //   rowSelectionModel.length < 2
+        // }
+        rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={newSelection => {
+          if (newSelection.length > 2) {
+            // Limit to 2 selections for the time being.
+            setSnackOpen(true);
+            return;
+          }
+          setRowSelectionModel(newSelection as string[]);
+        }}
+      />
+    </>
   );
 };
 
