@@ -23,33 +23,33 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {parseRef} from '../../../../../react';
-import {flattenObject} from '../../Browse2/browse2Util';
-import {CallFilter, SpanWithFeedback} from '../../Browse2/callTree';
-import {fnRunsNode, useRunsWithFeedback} from '../../Browse2/callTreeHooks';
+import {parseRef} from '../../../../../../react';
+import {flattenObject} from '../../../Browse2/browse2Util';
+import {CallFilter, SpanWithFeedback} from '../../../Browse2/callTree';
+import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
 import {
   buildTree,
   DataGridColumnGroupingModel,
   RunsTable,
-} from '../../Browse2/RunsTable';
-import {SmallRef} from '../../Browse2/SmallRef';
-import {useWeaveflowRouteContext} from '../context';
-import {StyledDataGrid} from '../StyledDataGrid';
-import {useMakeNewBoard} from './common/hooks';
-import {opNiceName} from './common/Links';
-import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
-import {SimplePageLayout} from './common/SimplePageLayout';
-import {renderCell, truncateID} from './util';
+} from '../../../Browse2/RunsTable';
+import {SmallRef} from '../../../Browse2/SmallRef';
+import {useWeaveflowRouteContext} from '../../context';
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {useMakeNewBoard} from '../common/hooks';
+import {opNiceName} from '../common/Links';
+import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
+import {SimplePageLayout} from '../common/SimplePageLayout';
+import {renderCell, truncateID} from '../util';
 import {
   useWeaveflowORMContext,
   WeaveflowORMContextType,
-} from './wfInterface/context';
+} from '../wfInterface/context';
 import {
   HackyOpCategory,
   WFCall,
   WFObjectVersion,
   WFOpVersion,
-} from './wfInterface/types';
+} from '../wfInterface/types';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;

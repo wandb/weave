@@ -6,7 +6,7 @@ import {
   WeaveEditor,
   WeaveEditorSourceContext,
 } from '../../Browse2/WeaveEditors';
-import {WFHighLevelCallFilter} from './CallsPage';
+import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
 import {
   CallLink,
   CallsLink,
