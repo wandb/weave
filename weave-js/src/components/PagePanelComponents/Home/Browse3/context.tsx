@@ -177,6 +177,15 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+  compareCallsUIUrl: (
+    entityName: string,
+    projectName: string,
+    callIds: string[],
+    primaryDim: string,
+    secondaryDim: string
+  ) => {
+    throw new Error('Not implemented');
+  },
 };
 
 const browse3ContextGen = (
@@ -372,6 +381,26 @@ const browse3ContextGen = (
       }
       return `${base}/?exp=${encodeURIComponent(expression)}`;
     },
+    compareCallsUIUrl: (
+      entityName: string,
+      projectName: string,
+      callIds: string[],
+      primaryDim: string,
+      secondaryDim: string
+    ) => {
+      if (callIds.length < 2) {
+        throw new Error('Must provide at least 2 call ids');
+      }
+      return `${projectRoot(entityName, projectName)}/calls/${
+        callIds[0]
+      }?compare=${encodeURIComponent(
+        JSON.stringify({
+          callIds: callIds.slice(1),
+          primaryDim,
+          secondaryDim,
+        })
+      )}`;
+    },
   };
   return browse3Context;
 };
@@ -457,6 +486,13 @@ type RouteType = {
     // TODO: Add filter when supported
   ) => string;
   opPageUrl: (opUri: string) => string;
+  compareCallsUIUrl: (
+    entityName: string,
+    projectName: string,
+    callIds: string[],
+    primaryDim: string,
+    secondaryDim: string
+  ) => string;
 };
 
 const useSetSearchParam = () => {
@@ -586,6 +622,14 @@ const useMakePeekingRouter = (): RouteType => {
       //   PEAK_SEARCH_PARAM,
       //   baseContext.boardForExpressionUIUrl(...args)
       // );
+    },
+    compareCallsUIUrl: (
+      ...args: Parameters<typeof baseContext.compareCallsUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.compareCallsUIUrl(...args)
+      );
     },
   };
 };
