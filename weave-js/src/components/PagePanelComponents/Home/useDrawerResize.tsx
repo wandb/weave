@@ -2,6 +2,8 @@ import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 
+import {useFlexDirection} from './useFlexDirection';
+
 const setDrawerSize = (
   newSize: number,
   setSize: (value: string) => void,
@@ -17,7 +19,8 @@ const setDrawerSize = (
   }
 };
 
-export const useDrawerResize = (flexDirection: 'row' | 'column') => {
+export const useDrawerResize = () => {
+  const flexDirection = useFlexDirection();
   const windowSize = useWindowSize();
   const defaultSize = '60%';
   const maxHeight = 85;
@@ -40,7 +43,7 @@ export const useDrawerResize = (flexDirection: 'row' | 'column') => {
     if (parseInt(height, 10) > maxHeight) {
       setHeight(defaultSize);
     }
-  }, [windowSize.height, windowSize.width, height, width, setHeight, setWidth]);
+  }, [height, setHeight, setWidth, width]);
 
   //  We store this in a ref so that we can access it in the mousemove handler, in a useEffect.
   const [isResizing, setIsResizing] = useState(false);
@@ -84,7 +87,7 @@ export const useDrawerResize = (flexDirection: 'row' | 'column') => {
             100) /
           windowSize.width;
         setDrawerSize(newWidth, setWidth, minWidth, maxWidth);
-      } else {
+      } else if (flexDirection === 'column') {
         const newHeight =
           ((document.body.offsetHeight -
             (e.clientY - document.body.offsetTop)) *
@@ -93,7 +96,7 @@ export const useDrawerResize = (flexDirection: 'row' | 'column') => {
         setDrawerSize(newHeight, setHeight, minHeight, maxHeight);
       }
     },
-    [flexDirection, setHeight, setWidth, windowSize.height, windowSize.width]
+    [flexDirection, windowSize.height, windowSize.width, setHeight, setWidth]
   );
 
   useEffect(() => {
