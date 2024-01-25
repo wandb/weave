@@ -39,7 +39,7 @@ import {useMakeNewBoard} from './common/hooks';
 import {opNiceName} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {truncateID} from './util';
+import {renderCell, truncateID} from './util';
 import {
   useWeaveflowORMContext,
   WeaveflowORMContextType,
@@ -598,21 +598,9 @@ const PivotRunsTable: React.FC<{
           //   // console.log('NO');
           // },
           renderCell: cellParams => {
-            // console.log(cellParams.row[col], key);
-            const value = getValueAtNestedKey(
-              cellParams.row[col]?.['output'],
-              key
+            return renderCell(
+              getValueAtNestedKey(cellParams.row[col]?.['output'], key)
             );
-            if (
-              typeof value === 'string' &&
-              value.startsWith('wandb-artifact:///')
-            ) {
-              return <SmallRef objRef={parseRef(value)} />;
-            }
-            if (typeof value === 'boolean') {
-              return value ? 'true' : 'false';
-            }
-            return value;
           },
         });
       }
