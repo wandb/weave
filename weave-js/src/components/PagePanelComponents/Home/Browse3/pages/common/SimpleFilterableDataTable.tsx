@@ -8,7 +8,7 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {useURLSearchParamsDict} from '../util';
+import {useInitializingFilter, useURLSearchParamsDict} from '../util';
 
 type FilterableTablePropsType<
   DataRowType extends GridValidRowModel,
@@ -75,23 +75,9 @@ export const FilterableTable = <
 >(
   props: FilterableTablePropsType<DataRowType, CompositeFilterType>
 ) => {
-  // Initialize the filter
-  const [filterState, setFilterState] = useState(props.initialFilter ?? {});
-  // Update the filter when the initial filter changes
-  useEffect(() => {
-    if (props.initialFilter) {
-      setFilterState(props.initialFilter);
-    }
-  }, [props.initialFilter]);
-
-  // If the caller is controlling the filter, use the caller's filter state
-  const filter = useMemo(
-    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
-    [filterState, props.initialFilter, props.onFilterUpdate]
-  );
-  const setFilter = useMemo(
-    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
-    [props.onFilterUpdate]
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
   );
 
   // Combine the frozen filter with the filter

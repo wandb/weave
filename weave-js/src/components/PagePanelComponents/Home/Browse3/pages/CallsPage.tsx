@@ -10,7 +10,7 @@ import {
   TextField,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 
 import {CallFilter} from '../../Browse2/callTree';
 import {fnRunsNode, useRunsWithFeedback} from '../../Browse2/callTreeHooks';
@@ -20,7 +20,7 @@ import {useMakeNewBoard} from './common/hooks';
 import {opNiceName} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {truncateID} from './util';
+import {truncateID, useInitializingFilter} from './util';
 import {
   useWeaveflowORMContext,
   WeaveflowORMContextType,
@@ -49,13 +49,31 @@ export const CallsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
 }> = props => {
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
+  );
+
+  const title = useMemo(() => {
+    if (filter.opCategory) {
+      return _.capitalize(filter.opCategory) + ' Calls';
+    }
+    return 'Calls';
+  }, [filter.opCategory]);
+
   return (
     <SimplePageLayout
-      title="Calls"
+      title={title}
       tabs={[
         {
           label: 'All',
-          content: <CallsTable {...props} />,
+          content: (
+            <CallsTable
+              {...props}
+              initialFilter={filter}
+              onFilterUpdate={setFilter}
+            />
+          ),
         },
       ]}
     />
@@ -74,23 +92,9 @@ export const CallsTable: React.FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
-  const [filterState, setFilterState] = useState<WFHighLevelCallFilter>(
-    props.initialFilter ?? {}
-  );
-  useEffect(() => {
-    if (props.initialFilter) {
-      setFilterState(props.initialFilter);
-    }
-  }, [props.initialFilter]);
-
-  // If the caller is controlling the filter, use the caller's filter state
-  const filter = useMemo(
-    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
-    [filterState, props.initialFilter, props.onFilterUpdate]
-  );
-  const setFilter = useMemo(
-    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
-    [props.onFilterUpdate]
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
   );
 
   const effectiveFilter = useMemo(() => {
