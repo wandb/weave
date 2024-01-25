@@ -188,13 +188,19 @@ export const CallsTable: React.FC<{
     [filter, setFilter]
   );
 
-  const canPivot =
-    effectiveFilter.opVersions?.length === 1 &&
-    // Super restrictive for now
-    effectiveFilter.opVersions[0].includes('Evaluation-evaluate');
-  // Object.keys(consumesObjectVersionOptions).length > 1;
+  const qualifiesForPivoting = useMemo(() => {
+    const shownSpanNames = Array.from(
+      new Set(runsWithFeedbackQuery.result.map(span => span.name))
+    );
+    // Super restrictive for now - just showing pivot when
+    // there is only one span name and it is the evaluation.
+    return (
+      shownSpanNames.length === 1 &&
+      shownSpanNames[0].includes('Evaluation-evaluate')
+    );
+  }, [runsWithFeedbackQuery.result]);
 
-  const isPivoting = userEnabledPivot && canPivot;
+  const isPivoting = userEnabledPivot && qualifiesForPivoting;
 
   return (
     <FilterLayoutTemplate
@@ -219,7 +225,7 @@ export const CallsTable: React.FC<{
               <DashboardCustomize />
             )}
           </IconButton>
-          {canPivot && (
+          {qualifiesForPivoting && (
             <IconButton
               style={{width: '37px', height: '37px'}}
               size="small"
