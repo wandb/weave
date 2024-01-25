@@ -1,10 +1,11 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+
 export const useDrawerResize = (flexDirection: 'row' | 'column') => {
   const windowSize = useWindowSize();
-  const [isResizing, setIsResizing] = useState(false);
+  //  We store the drawer width and height in local storage so that it persists
   const [newWidth, setNewWidth] = useLocalStorage(
     'weaveflow-drawer-width',
     '60%'
@@ -21,14 +22,29 @@ export const useDrawerResize = (flexDirection: 'row' | 'column') => {
     if (parseInt(newHeight, 10) > 85) {
       setNewHeight('60%');
     }
-  }, [windowSize.height, windowSize.width]);
+  }, [
+    windowSize.height,
+    windowSize.width,
+    newHeight,
+    newWidth,
+    setNewHeight,
+    setNewWidth,
+  ]);
+
+  //  We store this in a ref so that we can access it in the mousemove handler, in a useEffect.
+  const [isResizing, setIsResizing] = useState(false);
   const resizingRef = useRef<boolean>(false);
   resizingRef.current = isResizing;
 
-  const handleMousedown = (e: React.MouseEvent) => {
-    setIsResizing(true);
-    e.preventDefault();
-  };
+  const handleMousedown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isResizing) {
+        setIsResizing(true);
+      }
+      e.preventDefault();
+    },
+    [isResizing]
+  );
 
   const handleMousemove = useCallback(
     (e: MouseEvent) => {
@@ -43,7 +59,8 @@ export const useDrawerResize = (flexDirection: 'row' | 'column') => {
         const minWidth = 300;
         const maxWidth = document.body.offsetWidth - 100;
         if (offsetRight > minWidth && offsetRight < maxWidth) {
-          setNewWidth(offsetRight * 100 / windowSize.width + '%');
+          //  converts to percentage
+          setNewWidth((offsetRight * 100) / windowSize.width + '%');
         }
       } else {
         const offsetBottom =
@@ -51,11 +68,18 @@ export const useDrawerResize = (flexDirection: 'row' | 'column') => {
         const minHeight = 300;
         const maxHeight = document.body.offsetHeight - 150;
         if (offsetBottom > minHeight && offsetBottom < maxHeight) {
-          setNewHeight( offsetBottom * 100 / windowSize.height + '%');
+          //  converts to percentage
+          setNewHeight((offsetBottom * 100) / windowSize.height + '%');
         }
       }
     },
-    [flexDirection]
+    [
+      flexDirection,
+      setNewHeight,
+      setNewWidth,
+      windowSize.height,
+      windowSize.width,
+    ]
   );
 
   const handleMouseup = useCallback(
