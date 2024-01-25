@@ -9,7 +9,8 @@ import {
 import {Autocomplete, ListItem} from '@mui/material';
 import {GRID_CHECKBOX_SELECTION_COL_DEF, GridColDef} from '@mui/x-data-grid';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../../react';
 import {flattenObject} from '../../../Browse2/browse2Util';
@@ -19,6 +20,7 @@ import {
   DataGridColumnGroupingModel,
 } from '../../../Browse2/RunsTable';
 import {SmallRef} from '../../../Browse2/SmallRef';
+import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {renderCell} from '../util';
 
@@ -27,12 +29,19 @@ export type WFHighLevelPivotSpec = {
   colDim: string | null;
 };
 
-export const PivotRunsView: React.FC<{
+type PivotRunsTablePropsType = {
   loading: boolean;
   runs: SpanWithFeedback[];
-  pivotSpec: Partial<WFHighLevelPivotSpec>;
-  onPivotSpecChange: (spec: Partial<WFHighLevelPivotSpec>) => void;
-}> = props => {
+  entity: string;
+  project: string;
+};
+
+export const PivotRunsView: React.FC<
+  PivotRunsTablePropsType & {
+    pivotSpec: Partial<WFHighLevelPivotSpec>;
+    onPivotSpecChange: (spec: Partial<WFHighLevelPivotSpec>) => void;
+  }
+> = props => {
   const pivotRowDim = props.pivotSpec.rowDim;
   const pivotColDim = props.pivotSpec.colDim;
 
@@ -156,14 +165,18 @@ export const PivotRunsView: React.FC<{
   );
 };
 
-const PivotRunsTable: React.FC<{
-  loading: boolean;
-  runs: SpanWithFeedback[];
-  pivotSpec: {
-    rowDim: string;
-    colDim: string;
-  };
-}> = props => {
+const PivotRunsTable: React.FC<
+  PivotRunsTablePropsType & {
+    pivotSpec: {
+      rowDim: string;
+      colDim: string;
+    };
+  }
+> = props => {
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const history = useHistory();
+
   const {pivotData, pivotColumns} = useMemo(() => {
     const aggregationFn = (internalRows: SpanWithFeedback[]) => {
       if (internalRows.length === 0) {
@@ -215,14 +228,7 @@ const PivotRunsTable: React.FC<{
         field: props.pivotSpec.rowDim,
         headerName: props.pivotSpec.rowDim,
         renderCell: cellParams => {
-          const value = cellParams.row[props.pivotSpec.rowDim];
-          if (
-            typeof value === 'string' &&
-            value.startsWith('wandb-artifact:///')
-          ) {
-            return <SmallRef objRef={parseRef(value)} />;
-          }
-          return value;
+          return renderCell(cellParams.row[props.pivotSpec.rowDim]);
         },
       },
     ];
@@ -300,7 +306,6 @@ const PivotRunsTable: React.FC<{
         columns={columns.cols}
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
-        // rowSelectionModel={rowSelectionModel}
         initialState={{
           pinnedColumns: {
             left: [
@@ -309,9 +314,25 @@ const PivotRunsTable: React.FC<{
             ],
           },
         }}
-        checkboxSelection={false}
+        checkboxSelection={!isPeeking}
         columnGroupingModel={columns.colGroupingModel}
         rowSelectionModel={rowSelectionModel}
+        onCellClick={params => {
+          const cellSpan = params.row[
+            params.field.split('.')[0]
+          ] as SpanWithFeedback;
+          if (!cellSpan) {
+            return;
+          }
+          history.push(
+            peekingRouter.callUIUrl(
+              props.entity,
+              props.project,
+              '',
+              cellSpan.span_id
+            )
+          );
+        }}
         onRowSelectionModelChange={newSelection => {
           if (newSelection.length > 2) {
             // Limit to 2 selections for the time being.
@@ -319,6 +340,15 @@ const PivotRunsTable: React.FC<{
             return;
           }
           setRowSelectionModel(newSelection as string[]);
+          history.push(
+            peekingRouter.compareCallsUIUrl(
+              props.entity,
+              props.project,
+              newSelection as string[],
+              props.pivotSpec.rowDim,
+              props.pivotSpec.colDim
+            )
+          );
         }}
       />
     </>

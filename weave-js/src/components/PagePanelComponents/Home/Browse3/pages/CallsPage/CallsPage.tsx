@@ -407,6 +407,8 @@ export const CallsTable: React.FC<{
           runs={runsWithFeedbackQuery.result}
           pivotSpec={effectiveFilter.pivotSpec ?? {}}
           onPivotSpecChange={setPivotDims}
+          entity={props.entity}
+          project={props.project}
         />
       ) : (
         <RunsTable
