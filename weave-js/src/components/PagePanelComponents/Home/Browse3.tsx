@@ -4,13 +4,21 @@ import {
   AppBar,
   Box,
   Breadcrumbs,
+  Drawer,
   IconButton,
   Link as MaterialLink,
   Toolbar,
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Link as RouterLink,
   Route,
@@ -330,6 +338,49 @@ const MainPeekingLayout: FC = () => {
     }
     return 'row';
   }, [windowSize.height, windowSize.width]);
+
+  const [isResizing, setIsResizing] = useState(false);
+  const [newWidth, setNewWidth] = useState<string | number>('60%');
+
+  const resizingRef = useRef<boolean>(false);
+  resizingRef.current = isResizing;
+
+  const handleMousedown = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    e.preventDefault();
+  };
+
+  const handleMousemove = (e: MouseEvent) => {
+    // we don't want to do anything if we aren't resizing.
+    if (!resizingRef.current) {
+      return;
+    }
+    e.preventDefault();
+    let offsetRight =
+      document.body.offsetWidth - (e.clientX - document.body.offsetLeft);
+    let minWidth = 50;
+    if (offsetRight > minWidth) {
+      setNewWidth(offsetRight);
+    }
+  };
+
+  const handleMouseup = (e: MouseEvent) => {
+    if (isResizing) {
+      setIsResizing(false);
+      e.preventDefault();
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousemove', e => handleMousemove(e));
+    document.addEventListener('mouseup', e => handleMouseup(e));
+
+    return () => {
+      document.removeEventListener('mousemove', e => handleMousemove(e));
+      document.removeEventListener('mouseup', e => handleMouseup(e));
+    };
+  }, [isResizing]);
+
   return (
     <Box
       sx={{
@@ -350,22 +401,49 @@ const MainPeekingLayout: FC = () => {
         <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
       </Box>
 
-      <Box
-        sx={{
-          borderLeft:
-            flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
-          borderTop:
-            flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
-          flex: peekLocation ? '1 1 60%' : '0 0 0px',
-          transition: peekLocation ? 'all 0.2s ease-in-out' : '',
-          boxShadow:
-            flexDirection === 'row'
-              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
-              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
-          overflow: 'hidden',
-          display: 'flex',
-          zIndex: 1,
+      <Drawer
+        variant="persistent"
+        anchor="right"
+        open={peekLocation != null}
+        onClose={() => {
+          const targetPath = query.peekPath!.replace(generalBase, targetBase);
+          history.push(targetPath);
+        }}
+        PaperProps={{
+          style: {
+            width: newWidth,
+            marginTop: '60px',
+            boxShadow:
+              flexDirection === 'row'
+                ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
+                : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
+            overflow: 'hidden',
+            display: 'flex',
+            zIndex: 1,
+            borderLeft:
+              flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
+            borderTop:
+              flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
+          },
+        }}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile.
         }}>
+        <div
+          id="dragger"
+          onMouseDown={handleMousedown}
+          style={{
+            width: '5px',
+            cursor: 'ew-resize',
+            padding: '4px 0 0',
+            borderTop: '1px solid #ddd',
+            position: 'absolute',
+            left: 0,
+            bottom: 0,
+            zIndex: '1',
+            backgroundColor: '#f4f7f9',
+          }}
+        />
         {peekLocation && (
           <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
             <SimplePageLayoutContext.Provider
@@ -418,7 +496,7 @@ const MainPeekingLayout: FC = () => {
             </SimplePageLayoutContext.Provider>
           </WeaveflowPeekContext.Provider>
         )}
-      </Box>
+      </Drawer>
     </Box>
   );
 };
