@@ -454,6 +454,15 @@ export const RunsTable: FC<{
       };
     }, [loading]);
 
+  // This is a workaround.
+  // initialState won't take effect if columns are not set.
+  // see https://github.com/mui/mui-x/issues/6206
+  useEffect(() => {
+    if (columns != null && initialState != null) {
+      apiRef.current.restoreState(initialState);
+    }
+  }, [columns, initialState, apiRef]);
+
   return (
     <StyledDataGrid
       columnHeaderHeight={40}
