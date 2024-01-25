@@ -111,7 +111,7 @@ export const PivotRunsView: React.FC<{
         <ListItem>
           <FormControl fullWidth>
             <Autocomplete
-              size={'small'}
+              size="small"
               renderInput={params => <TextField {...params} label="Rows" />}
               value={pivotRowDim ?? null}
               onChange={(event, newValue) => {
@@ -126,7 +126,7 @@ export const PivotRunsView: React.FC<{
         <ListItem>
           <FormControl fullWidth>
             <Autocomplete
-              size={'small'}
+              size="small"
               renderInput={params => <TextField {...params} label="Columns" />}
               value={pivotColDim ?? null}
               onChange={(event, newValue) => {
@@ -291,16 +291,11 @@ const PivotRunsTable: React.FC<{
       />
       <StyledDataGrid
         columnHeaderHeight={40}
-        // apiRef={apiRef}
-        // loading={loading}
         rows={pivotData}
-        // density="compact"
-        // initialState={initialState}
         rowHeight={38}
         columns={columns.cols}
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
-        // rowSelectionModel={rowSelectionModel}
         initialState={{
           pinnedColumns: {
             left: [

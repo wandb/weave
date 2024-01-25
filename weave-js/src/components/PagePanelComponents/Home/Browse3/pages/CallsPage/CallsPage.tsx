@@ -107,13 +107,15 @@ export const CallsTable: React.FC<{
   const lowLevelFilter: CallFilter = useMemo(() => {
     return convertHighLevelFilterToLowLevelFilter(orm, effectiveFilter);
   }, [effectiveFilter, orm]);
-  const streamId = {
-    entityName: props.entity,
-    projectName: props.project,
-    streamName: 'stream',
-  };
 
-  const runsWithFeedbackQuery = useRunsWithFeedback(streamId, lowLevelFilter);
+  const runsWithFeedbackQuery = useRunsWithFeedback(
+    {
+      entityName: props.entity,
+      projectName: props.project,
+      streamName: 'stream',
+    },
+    lowLevelFilter
+  );
 
   // # TODO: All of these need to be handled much more logically since
   // we need to calculate the options based on everything except a specific filter.
@@ -187,8 +189,8 @@ export const CallsTable: React.FC<{
   );
 
   const qualifiesForPivoting = useMemo(() => {
-    const shownSpanNames = Array.from(
-      new Set(runsWithFeedbackQuery.result.map(span => span.name))
+    const shownSpanNames = _.uniq(
+      runsWithFeedbackQuery.result.map(span => span.name)
     );
     // Super restrictive for now - just showing pivot when
     // there is only one span name and it is the evaluation.
