@@ -11,14 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {
-  FC,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Link as RouterLink,
   Route,
@@ -76,6 +69,7 @@ import {
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
 import {SideNav} from './Browse3/SideNav';
+import {useDrawerResize} from './useDrawerResize';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -339,47 +333,7 @@ const MainPeekingLayout: FC = () => {
     return 'row';
   }, [windowSize.height, windowSize.width]);
 
-  const [isResizing, setIsResizing] = useState(false);
-  const [newWidth, setNewWidth] = useState<string | number>('60%');
-
-  const resizingRef = useRef<boolean>(false);
-  resizingRef.current = isResizing;
-
-  const handleMousedown = (e: React.MouseEvent) => {
-    setIsResizing(true);
-    e.preventDefault();
-  };
-
-  const handleMousemove = (e: MouseEvent) => {
-    // we don't want to do anything if we aren't resizing.
-    if (!resizingRef.current) {
-      return;
-    }
-    e.preventDefault();
-    let offsetRight =
-      document.body.offsetWidth - (e.clientX - document.body.offsetLeft);
-    let minWidth = 50;
-    if (offsetRight > minWidth) {
-      setNewWidth(offsetRight);
-    }
-  };
-
-  const handleMouseup = (e: MouseEvent) => {
-    if (isResizing) {
-      setIsResizing(false);
-      e.preventDefault();
-    }
-  };
-
-  useEffect(() => {
-    document.addEventListener('mousemove', e => handleMousemove(e));
-    document.addEventListener('mouseup', e => handleMouseup(e));
-
-    return () => {
-      document.removeEventListener('mousemove', e => handleMousemove(e));
-      document.removeEventListener('mouseup', e => handleMouseup(e));
-    };
-  }, [isResizing]);
+  const {handleMousedown, newWidth, newHeight} = useDrawerResize(flexDirection);
 
   return (
     <Box
@@ -403,7 +357,7 @@ const MainPeekingLayout: FC = () => {
 
       <Drawer
         variant="persistent"
-        anchor="right"
+        anchor={flexDirection === 'row' ? 'right' : 'bottom'}
         open={peekLocation != null}
         onClose={() => {
           const targetPath = query.peekPath!.replace(generalBase, targetBase);
@@ -411,8 +365,9 @@ const MainPeekingLayout: FC = () => {
         }}
         PaperProps={{
           style: {
-            width: newWidth,
-            marginTop: '60px',
+            width: flexDirection === 'row' ? newWidth : '100%',
+            height: flexDirection === 'column' ? newHeight : '100%',
+            margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 56px',
             boxShadow:
               flexDirection === 'row'
                 ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
@@ -433,16 +388,18 @@ const MainPeekingLayout: FC = () => {
           id="dragger"
           onMouseDown={handleMousedown}
           style={{
-            width: '5px',
-            cursor: 'ew-resize',
-            padding: '4px 0 0',
+            cursor: flexDirection === 'row' ? 'ew-resize' : 'ns-resize',
+            padding: flexDirection === 'row' ? '4px 0 0' : '0 4px 0 0',
             borderTop: '1px solid #ddd',
             position: 'absolute',
             top: 0,
             left: 0,
-            bottom: 0,
-            zIndex: 1,
+            zIndex: 100,
             backgroundColor: '#f4f7f9',
+            bottom: flexDirection === 'row' ? 0 : 'auto',
+            right: flexDirection === 'row' ? 'auto' : 0,
+            width: flexDirection === 'row' ? '5px' : 'auto',
+            height: flexDirection === 'row' ? 'auto' : '5px',
           }}
         />
         {peekLocation && (
