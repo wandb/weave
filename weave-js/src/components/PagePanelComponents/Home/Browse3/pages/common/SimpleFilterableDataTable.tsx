@@ -1,4 +1,4 @@
-import {Box} from '@mui/material';
+import {Box, SxProps} from '@mui/material';
 import {
   GridColDef,
   GridRowSelectionModel,
@@ -235,6 +235,7 @@ export const FilterLayoutTemplate: React.FC<{
   showFilterIndicator?: boolean;
   showPopoutButton?: boolean;
   filterListItems: React.ReactNode;
+  filterListSx?: SxProps;
 }> = props => {
   // const [isOpen, setIsOpen] = useState(false);
   // const history = useHistory();
@@ -266,6 +267,7 @@ export const FilterLayoutTemplate: React.FC<{
           '& input, & label, & .MuiTypography-root': {
             fontSize: '0.875rem',
           },
+          ...(props.filterListSx ?? {}),
         }}>
         {props.filterListItems}
       </Box>

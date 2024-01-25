@@ -3,7 +3,7 @@ import _ from 'lodash';
 import React, {createContext, useCallback, useContext} from 'react';
 import {useLocation} from 'react-router-dom';
 
-import {WFHighLevelCallFilter} from './pages/CallsPage';
+import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';

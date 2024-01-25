@@ -92,7 +92,7 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   }
   const Item = (
     <Box display="flex" alignItems="center">
-      <Box mr={1} sx={{height: '1rem'}}>
+      <Box mr={1} sx={{height: '1rem', lineHeight: '20px'}}>
         {icon}
       </Box>
       {label}

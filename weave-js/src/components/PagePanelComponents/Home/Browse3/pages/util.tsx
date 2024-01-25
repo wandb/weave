@@ -1,6 +1,9 @@
+import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useLocation} from 'react-router-dom';
+
+import {SmallRef} from '../../Browse2/SmallRef';
 
 export const useURLSearchParamsDict = () => {
   const {search} = useLocation();
@@ -22,7 +25,17 @@ export const truncateID = (id: string, maxLen: number = 9) => {
   return `${id.slice(0, startLen)}...${id.slice(-endLen)}`;
 };
 
-export const useInitializingFilter = <T>(
+export const renderCell = (value: any) => {
+  if (typeof value === 'string' && value.startsWith('wandb-artifact:///')) {
+    return <SmallRef objRef={parseRef(value)} />;
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'True' : 'False';
+  }
+  return value;
+};
+
+export const useInitializingFilter = <T,>(
   initialFilter?: Partial<T>,
   onFilterUpdate?: (filter: T) => void
 ) => {
