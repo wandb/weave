@@ -10,7 +10,7 @@ import {
   TextField,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
 import {CallFilter} from '../../../Browse2/callTree';
 import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
