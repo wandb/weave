@@ -1,6 +1,5 @@
 import {
   MEDIUM_BREAKPOINT,
-  MOON_150,
   MOON_250,
   WHITE,
 } from '@wandb/weave/common/css/globals.styles';
@@ -46,21 +45,6 @@ const SidebarSections = styled.div`
   }
 `;
 SidebarSections.displayName = 'S.SidebarSections';
-
-const SidebarSectionHeader = styled.div`
-  font-family: 'Source Sans Pro';
-  font-weight: 800;
-  height: 14px;
-  font-size: 10px;
-  line-height: 14px;
-  text-align: center;
-  background-color: ${MOON_150};
-  padding: 4px 0;
-  @media only screen and (max-width: ${MEDIUM_BREAKPOINT}px) {
-    display: none;
-  }
-`;
-StyledSidebar.displayName = 'S.StyledSidebar';
 
 export type SidebarItem = {
   id: string;
