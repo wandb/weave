@@ -59,6 +59,9 @@ export const SideNav = () => {
     } else if (params.tab === 'ops' || params.tab === 'op-versions') {
       return 'ops';
     } else if (params.tab === 'calls') {
+      if (filterCategory === 'evaluate') {
+        return 'evaluation';
+      }
       return 'calls';
     }
     return null;
@@ -69,54 +72,61 @@ export const SideNav = () => {
     return null;
   }
 
-  const items: SidebarItem[] = [
-    {
-      // section: 'Structure',
-      id: 'ops',
-      name: 'Operations',
-      iconName: IconNames.JobProgramCode,
-      path: baseRouter.opVersionsUIUrl(entity, project, {
-        isLatest: true,
-      }),
-    },
-    {
-      // section: 'Records',
-      id: 'calls',
-      name: 'Calls',
-      iconName: IconNames.RunningRepeat,
-      path: baseRouter.callsUIUrl(entity, project, {
-        traceRootsOnly: true,
-      }),
-    },
-    {
-      // section: 'Records',
-      id: 'objects',
-      name: 'Objects',
-      iconName: IconNames.CubeContainer,
-      path: baseRouter.objectVersionsUIUrl(entity, project, {
-        latest: true,
-      }),
-    },
-    // {
-    //   // section: 'Records',
-    //   id: 'models',
-    //   name: 'Models',
-    //   iconName: IconNames.Model,
-    //   path: baseRouter.objectVersionsUIUrl(entity, project, {
-    //     typeCategory: 'model',
-    //     latest: true,
-    //   }),
-    // },
-    // {
-    //   // section: 'Records',
-    //   id: 'datasets',
-    //   name: 'Datasets',
-    //   iconName: IconNames.Table,
-    //   path: baseRouter.objectVersionsUIUrl(entity, project, {
-    //     typeCategory: 'dataset',
-    //     latest: true,
-    //   }),
-    // },
+  const items: SidebarItem[][] = [
+    [
+      {
+        id: 'evaluation',
+        name: 'Evaluations',
+        iconName: IconNames.TypeNumber,
+        path: baseRouter.callsUIUrl(entity, project, {
+          opCategory: 'evaluate',
+        }),
+      },
+      {
+        id: 'models',
+        name: 'Models',
+        iconName: IconNames.Model,
+        path: baseRouter.objectVersionsUIUrl(entity, project, {
+          typeCategory: 'model',
+          latest: true,
+        }),
+      },
+      {
+        id: 'datasets',
+        name: 'Datasets',
+        iconName: IconNames.Table,
+        path: baseRouter.objectVersionsUIUrl(entity, project, {
+          typeCategory: 'dataset',
+          latest: true,
+        }),
+      },
+    ],
+    [
+      {
+        id: 'ops',
+        name: 'Operations',
+        iconName: IconNames.JobProgramCode,
+        path: baseRouter.opVersionsUIUrl(entity, project, {
+          isLatest: true,
+        }),
+      },
+      {
+        id: 'calls',
+        name: 'Calls',
+        iconName: IconNames.RunningRepeat,
+        path: baseRouter.callsUIUrl(entity, project, {
+          traceRootsOnly: true,
+        }),
+      },
+      {
+        id: 'objects',
+        name: 'Objects',
+        iconName: IconNames.CubeContainer,
+        path: baseRouter.objectVersionsUIUrl(entity, project, {
+          latest: true,
+        }),
+      },
+    ],
   ];
 
   return <Sidebar items={items} selectedItem={selectedItemId} />;
