@@ -22,6 +22,9 @@ import {
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
+import {TabUseDataset} from './TabUseDataset';
+import {TabUseModel} from './TabUseModel';
+import {TabUseObject} from './TabUseObject';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall, WFObjectVersion, WFOpVersion} from './wfInterface/types';
 
@@ -194,6 +197,22 @@ const ObjectVersionPageInner: React.FC<{
             </WeaveEditorSourceContext.Provider>
           ),
         },
+        {
+          label: 'Use',
+          content:
+            objectTypeCategory === 'dataset' ? (
+              <TabUseDataset name={objectName} uri={baseUri} />
+            ) : objectTypeCategory === 'model' ? (
+              <TabUseModel
+                name={objectName}
+                uri={baseUri}
+                projectName={projectName}
+              />
+            ) : (
+              <TabUseObject name={objectName} uri={baseUri} />
+            ),
+        },
+
         // {
         //   label: 'Metadata',
         //   content: (

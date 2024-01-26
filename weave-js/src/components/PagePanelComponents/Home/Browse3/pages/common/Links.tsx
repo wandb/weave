@@ -3,6 +3,7 @@ import {Link as LinkComp} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {TEAL_500, TEAL_600} from '../../../../../../common/css/color.styles';
+import {TargetBlank} from '../../../../../../common/util/links';
 import {useWeaveflowRouteContext} from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
@@ -18,6 +19,14 @@ export const Link = styled(LinkComp)`
   }
 `;
 Link.displayName = 'S.Link';
+
+export const docUrl = (path: string): string => {
+  return 'https://wandb.github.io/weave/' + path;
+};
+
+export const DocLink = (props: {path: string; text: string}) => {
+  return <TargetBlank href={docUrl(props.path)}>{props.text}</TargetBlank>;
+};
 
 export const TypeLink: React.FC<{
   entityName: string;
