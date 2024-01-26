@@ -67,6 +67,7 @@ export const CallsPage: React.FC<{
   return (
     <SimplePageLayout
       title={title}
+      hideTabsIfSingle
       tabs={[
         {
           label: 'All',
@@ -189,6 +190,7 @@ export const CallsTable: React.FC<{
   );
 
   const qualifiesForPivoting = useMemo(() => {
+    // return true;
     const shownSpanNames = _.uniq(
       runsWithFeedbackQuery.result.map(span => span.name)
     );

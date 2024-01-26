@@ -71,6 +71,9 @@ export const CompareCallsPage: React.FC<{
   }, [calls, props.secondaryDim, selectedObjectVersion]);
 
   const subOpVersionOptions = useMemo(() => {
+    if (callsFilteredToSecondaryDim.length === 0) {
+      return {};
+    }
     return Object.fromEntries(
       callsFilteredToSecondaryDim[0]
         .childCalls()
@@ -129,9 +132,6 @@ export const CompareCallsPage: React.FC<{
     colDim: props.primaryDim,
   });
 
-  if (!props.callIds || props.callIds.length < 2) {
-    return <>Need more calls</>;
-  }
   if (!props.primaryDim) {
     return <>Need a primary dimension</>;
   }
@@ -291,23 +291,27 @@ export const CompareCallsPage: React.FC<{
                 />
               </Box> */}
               <Box sx={{minHeight: '300px', flex: '1 1 auto'}}>
-                <PivotRunsView
-                  loading={false}
-                  runs={subruns}
-                  entity={props.entity}
-                  project={props.project}
-                  colDimAtLeafMode
-                  pivotSpec={pivotSpec}
-                  onPivotSpecChange={pivotSpec => {
-                    console.log(pivotSpec);
-                    setPivotSpec(pivotSpec);
-                  }}
-                  // extraDataGridProps={
-                  //   {
-                  //     hideFooter: true,
-                  //   } as any
-                  // }
-                />
+                {!props.callIds || props.callIds.length < 1 ? (
+                  <>Need more calls</>
+                ) : (
+                  <PivotRunsView
+                    loading={false}
+                    runs={subruns}
+                    entity={props.entity}
+                    project={props.project}
+                    colDimAtLeafMode
+                    pivotSpec={pivotSpec}
+                    onPivotSpecChange={pivotSpec => {
+                      console.log(pivotSpec);
+                      setPivotSpec(pivotSpec);
+                    }}
+                    // extraDataGridProps={
+                    //   {
+                    //     hideFooter: true,
+                    //   } as any
+                    // }
+                  />
+                )}
               </Box>
             </Box>
           ),

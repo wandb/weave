@@ -388,9 +388,6 @@ const browse3ContextGen = (
       primaryDim: string,
       secondaryDim: string
     ) => {
-      if (callIds.length < 2) {
-        throw new Error('Must provide at least 2 call ids');
-      }
       return `${projectRoot(
         entityName,
         projectName

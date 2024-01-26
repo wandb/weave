@@ -345,6 +345,23 @@ export const PivotRunsTable: React.FC<
         checkboxSelection={!isPeeking && props.showCompareButton}
         columnGroupingModel={columns.colGroupingModel}
         rowSelectionModel={rowSelectionModel}
+        // onCellClick={params => {
+        //   const cellSpan = params.row[
+        //     params.field.split('.')[0]
+        //   ] as SpanWithFeedback;
+        //   if (!cellSpan) {
+        //     return;
+        //   }
+        //   // TODO(tim/pivot_tables_to_compare_view): Highlighting & Scroll to cell.
+        //   history.push(
+        //     peekingRouter.callUIUrl(
+        //       props.entity,
+        //       props.project,
+        //       '',
+        //       cellSpan.span_id
+        //     )
+        //   );
+        // }}
         onRowSelectionModelChange={newSelection => {
           if (newSelection.length > 2) {
             // Limit to 2 selections for the time being.
@@ -353,9 +370,9 @@ export const PivotRunsTable: React.FC<
           }
           setRowSelectionModel(newSelection as string[]);
 
-          if (newSelection.length !== 2) {
-            return;
-          }
+          // if (newSelection.length !== 2) {
+          //   return;
+          // }
 
           const callIds: string[] = _.uniq(
             newSelection.flatMap(id => {
