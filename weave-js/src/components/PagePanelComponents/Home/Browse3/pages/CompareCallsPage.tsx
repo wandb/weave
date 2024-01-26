@@ -60,7 +60,7 @@ export const CompareCallsPage: React.FC<{
           content: (
             <Box
               sx={{
-                p: 2,
+                // p: 2,
                 pb: 0,
                 display: 'flex',
                 flexDirection: 'column',
