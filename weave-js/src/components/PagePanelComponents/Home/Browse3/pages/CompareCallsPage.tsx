@@ -55,23 +55,14 @@ export const CompareCallsPage: React.FC<{
           }
           return [item, item];
         })
-
-      // .map(item => [item!.version(), item!])
     );
   }, [calls, props.secondaryDim]);
-
-  // const opVersionOptions = useMemo(() => {
-  //   return Object.fromEntries(
-  //     calls[0].opVersion()
-  //   )
-  // }, []);
-  // console.log(objectVersionOptions);
 
   const [selectedObjectVersion, setSelectedObjectVersion] = React.useState<
     string | null
   >(Object.keys(objectVersionOptions)?.[0] ?? null);
 
-  const filteredCalls = useMemo(() => {
+  const callsFilteredToSecondaryDim = useMemo(() => {
     return calls.filter(
       call =>
         getValueAtNestedKey(call.rawCallSpan(), props.secondaryDim!) ===
@@ -81,26 +72,30 @@ export const CompareCallsPage: React.FC<{
 
   const subOpVersionOptions = useMemo(() => {
     return Object.fromEntries(
-      filteredCalls[0]
+      callsFilteredToSecondaryDim[0]
         .childCalls()
         .map(call => call.opVersion())
         .filter(opVersion => opVersion != null)
         .map(opVersion => [opVersion!.version(), opVersion!])
     );
-  }, [filteredCalls]);
+  }, [callsFilteredToSecondaryDim]);
 
   const [selectedOpVersion, setSelectedOpVersion] = React.useState<
     string | null
   >(Object.keys(subOpVersionOptions)?.[0] ?? null);
 
-  const subruns = useMemo(() => {
-    return filteredCalls.flatMap(call =>
+  const subcalls = useMemo(() => {
+    return callsFilteredToSecondaryDim.flatMap(call =>
       call
         .childCalls()
         .filter(item => item.opVersion()?.version() === selectedOpVersion)
-        .map(call => call.rawCallSpan())
     );
-  }, [filteredCalls, selectedOpVersion]);
+  }, [callsFilteredToSecondaryDim, selectedOpVersion]);
+
+  const subruns = useMemo(() => {
+    return subcalls.map(call => call.rawCallSpan());
+  }, [subcalls]);
+
   // console.log(subruns);
 
   const getOptionLabel = useCallback(
@@ -123,8 +118,7 @@ export const CompareCallsPage: React.FC<{
       if (version == null) {
         return option;
       }
-      return version;
-      // return version.op().name() + ':' + version.version().slice(0, 6);
+      return version.op().name() + ':' + version.version().slice(0, 6);
     },
     [subOpVersionOptions]
   );
@@ -198,12 +192,13 @@ export const CompareCallsPage: React.FC<{
                       renderInput={params => (
                         <TextField {...params} label="Object" />
                       )}
-                      value={selectedObjectVersion ?? null}
+                      value={selectedObjectVersion ?? ''}
                       onChange={(event, newValue) => {
                         setSelectedObjectVersion(newValue);
                       }}
                       getOptionLabel={getOptionLabel}
                       options={Object.keys(objectVersionOptions)}
+                      disableClearable
                     />
                   </FormControl>
                 </ListItem>
@@ -214,12 +209,13 @@ export const CompareCallsPage: React.FC<{
                       renderInput={params => (
                         <TextField {...params} label="Sub Op" />
                       )}
-                      value={selectedObjectVersion ?? null}
+                      value={selectedOpVersion ?? ''}
                       onChange={(event, newValue) => {
                         setSelectedOpVersion(newValue);
                       }}
                       getOptionLabel={getOpOptionLabel}
                       options={Object.keys(subOpVersionOptions)}
+                      disableClearable
                     />
                   </FormControl>
                 </ListItem>

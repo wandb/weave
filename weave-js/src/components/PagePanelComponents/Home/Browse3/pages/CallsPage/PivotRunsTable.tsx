@@ -76,10 +76,17 @@ export const PivotRunsView: React.FC<
       if (currRowDim == null && currColDim != null) {
         const rowOptions = options.filter(o => o !== currColDim);
         if (rowOptions.length > 0) {
-          props.onPivotSpecChange({
-            rowDim: rowOptions[0],
-            colDim: currColDim,
-          });
+          if (rowOptions.includes('inputs.example')) {
+            props.onPivotSpecChange({
+              rowDim: 'inputs.example',
+              colDim: currColDim,
+            });
+          } else {
+            props.onPivotSpecChange({
+              rowDim: rowOptions[0],
+              colDim: currColDim,
+            });
+          }
         }
       } else if (currRowDim != null && currColDim == null) {
         const colOptions = options.filter(o => o !== currRowDim);
@@ -142,7 +149,7 @@ export const PivotRunsView: React.FC<
             <Autocomplete
               size="small"
               renderInput={params => <TextField {...params} label="Rows" />}
-              value={pivotRowDim ?? null}
+              value={pivotRowDim ?? ''}
               onChange={(event, newValue) => {
                 props.onPivotSpecChange({
                   colDim: pivotColDim,
@@ -159,7 +166,7 @@ export const PivotRunsView: React.FC<
             <Autocomplete
               size="small"
               renderInput={params => <TextField {...params} label="Columns" />}
-              value={pivotColDim ?? null}
+              value={pivotColDim ?? ''}
               onChange={(event, newValue) => {
                 props.onPivotSpecChange({
                   colDim: newValue ?? null,
