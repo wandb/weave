@@ -1492,7 +1492,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
     ):
         fn = self._make_lambda_node(fn)
-        from .vectorize import _apply_fn_node_with_tag_pushdown
+        from ..ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
 
         return _apply_fn_node_with_tag_pushdown(self, fn)  # type: ignore
 

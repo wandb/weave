@@ -25,7 +25,7 @@ from ..ops_primitives import list_, make_list
 from .. import mappers_arrow
 from ..op_def import map_type
 
-from ..ops_arrow import constructors
+from ..arrow import constructors
 
 
 from ..language_features.tagging import tag_store, tagged_value_type, make_tag_getter_op
@@ -37,7 +37,7 @@ from ..tests import test_wb
 # If you're thinking of import vectorize here, don't! Put your
 # tests in test_arrow_vectorizer.py instead
 from .. import ops_arrow as arrow
-from ..ops_arrow.arrow_tags import (
+from ..arrow.arrow_tags import (
     recursively_encode_pyarrow_strings_as_dictionaries,
 )
 

@@ -119,6 +119,8 @@ class SubprocessServer(multiprocessing.Process):
         self.resp_queue = resp_queue
 
     def run(self):
+        from weave import ops
+
         while True:
             req = self.req_queue.get()
             try:

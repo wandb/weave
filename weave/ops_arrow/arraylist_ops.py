@@ -6,8 +6,8 @@ from .. import weave_types as types
 from ..decorator_arrow_op import arrow_op
 from ..language_features.tagging import tagged_value_type
 
-from .arrow import ArrowWeaveListType, arrow_as_array
-from .list_ import ArrowWeaveList
+from ..arrow.arrow import ArrowWeaveListType, arrow_as_array
+from ..arrow.list_ import ArrowWeaveList
 
 
 def _arrowweavelistlist_listindex_output_type(input_types):

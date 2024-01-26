@@ -13,6 +13,7 @@ from . import ref_base
 from . import errors
 from . import node_ref
 from . import artifact_base
+from .arrow import arrow
 from .language_features.tagging import tagged_value_type
 import contextvars
 
@@ -362,8 +363,6 @@ class GQLHasKeysToArrowStruct(mappers_python.GQLClassWithKeysToPyDict):
 def map_to_arrow_(
     type, mapper, artifact: artifact_base.Artifact, path=[], mapper_options=None
 ):
-    from .ops_arrow import arrow
-
     if isinstance(type, types.Const):
         type = type.val_type
     if isinstance(type, types.TypedDict):
