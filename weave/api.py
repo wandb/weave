@@ -54,7 +54,7 @@ from .context import (
 
 from .panel import Panel
 
-WeaveList = None
+from .arrow.list_ import ArrowWeaveList as WeaveList
 
 # from .server import capture_weave_server_logs
 
