@@ -64,10 +64,14 @@ class ServerRequestContext:
             wandb_api_context = wandb_api.WandbApiContext.from_json(
                 wandb_api_context_json
             )
-        cache_prefix_context = json.get("cache_prefix_context" , None)
+        cache_prefix_context = json.get("cache_prefix_context", None)
         if cache_prefix_context:
             cache_prefix_context = str(cache_prefix_context)
-        return cls(trace_context=trace_context, wandb_api_context=wandb_api_context, cache_prefix_context=cache_prefix_context)
+        return cls(
+            trace_context=trace_context,
+            wandb_api_context=wandb_api_context,
+            cache_prefix_context=cache_prefix_context,
+        )
 
     def to_json(self) -> typing.Any:
         trace_context = None
@@ -157,7 +161,9 @@ class ShutDown:
         return isinstance(other, ShutDown)
 
 
-shutdown_request = ServerRequest("", "shutdown", (), ServerRequestContext(None, None, None))
+shutdown_request = ServerRequest(
+    "", "shutdown", (), ServerRequestContext(None, None, None)
+)
 shutdown_response = ServerResponse("", 0, ShutDown())
 
 HandlerFunction = Callable[..., Any]
@@ -350,7 +356,9 @@ class Server:
                     break
                 tracer.context_provider.activate(req.context.trace_context)
                 with wandb_api.wandb_api_context(req.context.wandb_api_context):
-                    with cache.time_interval_cache_prefix(req.context.cache_prefix_context):
+                    with cache.time_interval_cache_prefix(
+                        req.context.cache_prefix_context
+                    ):
                         # launch a task to handle the request
                         task = loop.create_task(self._handle(req))
                         active_tasks.add(task)

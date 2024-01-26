@@ -71,7 +71,7 @@ def do_in_parallel(
                     with run_context.set_run_stack(run_stack):
                         with context_state.set_eager_mode(eager_mode):
                             with wandb_api.wandb_api_context(wandb_api_ctx):
-                                with cache.time_interval_cache_prefix(cache_prefix):    
+                                with cache.time_interval_cache_prefix(cache_prefix):
                                     with context.execution_client():
                                         with forward_graph.node_result_store(
                                             result_store
