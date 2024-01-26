@@ -24,7 +24,11 @@ import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {truncateID, useURLSearchParamsDict} from './util';
+import {
+  truncateID,
+  useInitializingFilter,
+  useURLSearchParamsDict,
+} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {
   HackyTypeCategory,
@@ -43,14 +47,32 @@ export const ObjectVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
+  );
+
+  const title = useMemo(() => {
+    if (filter.typeCategory) {
+      return _.capitalize(filter.typeCategory) + ' Objects';
+    }
+    return 'Objects';
+  }, [filter.typeCategory]);
+
   return (
     <SimplePageLayout
       // title="Object Versions"
-      title="Objects"
+      title={title}
       tabs={[
         {
           label: 'All',
-          content: <FilterableObjectVersionsTable {...props} />,
+          content: (
+            <FilterableObjectVersionsTable
+              {...props}
+              initialFilter={filter}
+              onFilterUpdate={setFilter}
+            />
+          ),
         },
       ]}
     />
@@ -80,22 +102,9 @@ export const FilterableObjectVersionsTable: React.FC<{
     return orm.projectConnection.objectVersions();
   }, [orm.projectConnection]);
 
-  const [filterState, setFilterState] =
-    useState<WFHighLevelObjectVersionFilter>(props.initialFilter ?? {});
-  useEffect(() => {
-    if (props.initialFilter) {
-      setFilterState(props.initialFilter);
-    }
-  }, [props.initialFilter]);
-
-  // If the caller is controlling the filter, use the caller's filter state
-  const filter = useMemo(
-    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
-    [filterState, props.initialFilter, props.onFilterUpdate]
-  );
-  const setFilter = useMemo(
-    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
-    [props.onFilterUpdate]
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
   );
 
   const effectiveFilter = useMemo(() => {
@@ -117,18 +126,6 @@ export const FilterableObjectVersionsTable: React.FC<{
   //   return orm.projectConnection.typeCategories();
   // }, [orm.projectConnection]);
   const typeCategoryOptions = useTypeCategoryOptions(
-    allObjectVersions,
-    effectiveFilter
-  );
-
-  // const typeVersionOptions = useMemo(() => {
-  //   const versions = orm.projectConnection.typeVersions();
-  //   const options = versions.map(
-  //     v => v.type().name() + ':' + v.version().toString()
-  //   );
-  //   return options;
-  // }, [orm]);
-  const typeVersionOptions = useTypeVersionOptions(
     allObjectVersions,
     effectiveFilter
   );
@@ -165,29 +162,6 @@ export const FilterableObjectVersionsTable: React.FC<{
               <Autocomplete
                 size={'small'}
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'objectName'
-                )}
-                renderInput={params => (
-                  // <TextField {...params} label="Object Name" />
-                  <TextField {...params} label="Name" />
-                )}
-                value={effectiveFilter.objectName ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    objectName: newValue,
-                  });
-                }}
-                options={objectOptions}
-              />
-            </FormControl>
-          </ListItem>
-
-          <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'typeCategory'
                 )}
                 renderInput={params => (
@@ -210,27 +184,25 @@ export const FilterableObjectVersionsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                limitTags={1}
-                // Temp disable multiple for simplicity - may want to re-enable
-                // multiple
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'typeVersions'
+                  'objectName'
                 )}
-                value={effectiveFilter.typeVersions?.[0] ?? null}
+                renderInput={params => (
+                  // <TextField {...params} label="Object Name" />
+                  <TextField {...params} label="Name" />
+                )}
+                value={effectiveFilter.objectName ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    typeVersions: newValue ? [newValue] : [],
+                    objectName: newValue,
                   });
                 }}
-                renderInput={params => <TextField {...params} label="Type" />}
-                getOptionLabel={option => {
-                  return typeVersionOptions[option] ?? option;
-                }}
-                options={Object.keys(typeVersionOptions)}
+                options={objectOptions}
               />
             </FormControl>
           </ListItem>
+
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete
@@ -587,31 +559,6 @@ const useObjectOptions = (
 
   return useMemo(() => {
     return filtered.map(item => item.object().name());
-  }, [filtered]);
-};
-
-const useTypeVersionOptions = (
-  allObjectVersions: WFObjectVersion[],
-  highLevelFilter: WFHighLevelObjectVersionFilter
-) => {
-  const filtered = useMemo(() => {
-    return applyFilter(
-      allObjectVersions,
-      _.omit(highLevelFilter, ['typeVersions'])
-    );
-  }, [allObjectVersions, highLevelFilter]);
-
-  return useMemo(() => {
-    const versions = filtered.map(item => item.typeVersion());
-
-    return _.fromPairs(
-      versions.map(v => {
-        return [
-          v.type().name() + ':' + v.version(),
-          v.type().name() + ' (' + truncateID(v.version()) + ')',
-        ];
-      })
-    );
   }, [filtered]);
 };
 

@@ -3,7 +3,7 @@ import React from 'react';
 
 import {Timestamp} from '../../../../../Timestamp';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {OpVersionCategoryChip} from '../common/OpVersionCategoryChip';
+import {CategoryChip} from '../common/CategoryChip';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {StatusChip} from '../common/StatusChip';
 import {GroupedCalls} from '../ObjectVersionPage';
@@ -39,7 +39,7 @@ export const CallOverview: React.FC<{
           ),
         ...(opCategory
           ? {
-              Category: <OpVersionCategoryChip opCategory={opCategory} />,
+              Category: <CategoryChip value={opCategory} />,
             }
           : {}),
         Status: <StatusChip value={call.status_code} />,

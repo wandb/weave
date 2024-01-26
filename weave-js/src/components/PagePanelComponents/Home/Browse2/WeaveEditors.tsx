@@ -12,7 +12,11 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import {DataGridPro as DataGrid, GridColDef} from '@mui/x-data-grid-pro';
+import {
+  DataGridPro as DataGrid,
+  GridColDef,
+  useGridApiRef,
+} from '@mui/x-data-grid-pro';
 import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
@@ -282,7 +286,8 @@ const useObjectVersionLinkPathForPath = () => {
 export const WeaveEditor: FC<{
   objType: string;
   node: Node;
-}> = ({objType, node}) => {
+  disableEdits?: boolean;
+}> = ({objType, node, disableEdits}) => {
   const weave = useWeaveContext();
   const {stack} = usePanelContext();
   const [refinedNode, setRefinedNode] = useState<NodeOrVoidNode>(voidNode());
@@ -329,21 +334,25 @@ export const WeaveEditor: FC<{
   ) : (
     <WeaveEditorContext.Provider value={contextVal}>
       <Box mb={4}>
-        <WeaveEditorField node={refinedNode} path={[]} />
+        <WeaveEditorField node={refinedNode} path={[]} disableEdits />
       </Box>
-      <Typography>{edits.length} Edits</Typography>
-      <Button variant="outlined" onClick={() => setCommitChangesOpen(true)}>
-        Commit
-      </Button>
-      {commitChangesOpen && (
-        <WeaveEditorCommit
-          objType={objType}
-          rootObjectRef={rootObjectRef}
-          node={refinedNode}
-          edits={edits}
-          handleClose={() => setCommitChangesOpen(false)}
-          handleClearEdits={() => setEdits([])}
-        />
+      {!disableEdits && (
+        <>
+          <Typography>{edits.length} Edits</Typography>
+          <Button variant="outlined" onClick={() => setCommitChangesOpen(true)}>
+            Commit
+          </Button>
+          {commitChangesOpen && (
+            <WeaveEditorCommit
+              objType={objType}
+              rootObjectRef={rootObjectRef}
+              node={refinedNode}
+              edits={edits}
+              handleClose={() => setCommitChangesOpen(false)}
+              handleClearEdits={() => setEdits([])}
+            />
+          )}
+        </>
       )}
     </WeaveEditorContext.Provider>
   );
@@ -352,21 +361,22 @@ export const WeaveEditor: FC<{
 const WeaveEditorField: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node, path}) => {
+  disableEdits?: boolean;
+}> = ({node, path, disableEdits}) => {
   const weave = useWeaveContext();
   if (isAssignableTo(node.type, maybe('boolean'))) {
-    return <WeaveEditorBoolean node={node} path={path} />;
+    return <WeaveEditorBoolean node={node} path={path} disableEdits />;
   }
   if (isAssignableTo(node.type, maybe('string'))) {
-    return <WeaveEditorString node={node} path={path} />;
+    return <WeaveEditorString node={node} path={path} disableEdits />;
   }
   if (isAssignableTo(node.type, maybe('number'))) {
-    return <WeaveEditorNumber node={node} path={path} />;
+    return <WeaveEditorNumber node={node} path={path} disableEdits />;
   }
   if (
     isAssignableTo(node.type, maybe({type: 'typedDict', propertyTypes: {}}))
   ) {
-    return <WeaveEditorTypedDict node={node} path={path} />;
+    return <WeaveEditorTypedDict node={node} path={path} disableEdits />;
   }
   if (
     isAssignableTo(
@@ -374,13 +384,16 @@ const WeaveEditorField: FC<{
       maybe({type: 'list', objectType: {type: 'typedDict', propertyTypes: {}}})
     )
   ) {
-    return <WeaveEditorTable node={node} path={path} />;
+    return <WeaveEditorTable node={node} path={path} disableEdits />;
   }
   if (isAssignableTo(node.type, maybe({type: 'Object'}))) {
-    return <WeaveEditorObject node={node} path={path} />;
+    return <WeaveEditorObject node={node} path={path} disableEdits />;
   }
   if (isAssignableTo(node.type, maybe({type: 'OpDef'}))) {
-    return <WeaveViewOpDef node={node} />;
+    return <WeaveViewSmallRef node={node} />;
+  }
+  if (isAssignableTo(node.type, maybe({type: 'WandbArtifactRef'}))) {
+    return <WeaveViewSmallRef node={node} />;
   }
   return <div>[No editor for type {weave.typeToString(node.type)}]</div>;
 };
@@ -388,7 +401,8 @@ const WeaveEditorField: FC<{
 export const WeaveEditorBoolean: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node, path}) => {
+  disableEdits?: boolean;
+}> = ({node, path, disableEdits}) => {
   const addEdit = useWeaveEditorContextAddEdit();
   const query = useNodeValue(node);
   const [curVal, setCurVal] = useState<boolean>(false);
@@ -411,13 +425,20 @@ export const WeaveEditorBoolean: FC<{
     },
     [addEdit, path]
   );
-  return <Checkbox checked={curVal} onChange={onChange} />;
+  return (
+    <Checkbox
+      checked={curVal ?? false}
+      onChange={onChange}
+      disabled={disableEdits}
+    />
+  );
 };
 
 export const WeaveEditorString: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node, path}) => {
+  disableEdits?: boolean;
+}> = ({node, path, disableEdits}) => {
   const addEdit = useWeaveEditorContextAddEdit();
   const query = useNodeValue(node);
   const [curVal, setCurVal] = useState<string>('');
@@ -438,9 +459,23 @@ export const WeaveEditorString: FC<{
   const commit = useCallback(() => {
     addEdit({path, newValue: curVal});
   }, [addEdit, curVal, path]);
+  if (disableEdits) {
+    return (
+      <pre
+        style={{
+          width: '100%',
+          whiteSpace: 'pre-line',
+          fontSize: '16px',
+          margin: '0',
+          fontFamily: 'Source Sans Pro',
+        }}>
+        {curVal ?? ''}
+      </pre>
+    );
+  }
   return (
     <TextField
-      value={curVal}
+      value={curVal ?? ''}
       onChange={onChange}
       onBlur={commit}
       multiline
@@ -452,7 +487,8 @@ export const WeaveEditorString: FC<{
 export const WeaveEditorNumber: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node, path}) => {
+  disableEdits?: boolean;
+}> = ({node, path, disableEdits}) => {
   const addEdit = useWeaveEditorContextAddEdit();
   const query = useNodeValue(node);
   const [curVal, setCurVal] = useState<string>('');
@@ -473,9 +509,12 @@ export const WeaveEditorNumber: FC<{
   const commit = useCallback(() => {
     addEdit({path, newValue: curVal});
   }, [addEdit, curVal, path]);
+  if (disableEdits) {
+    return <Typography>{curVal ?? ''}</Typography>;
+  }
   return (
     <TextField
-      value={curVal}
+      value={curVal ?? ''}
       onChange={onChange}
       onBlur={commit}
       inputProps={{inputMode: 'numeric', pattern: '[.0-9]*'}}
@@ -486,7 +525,8 @@ export const WeaveEditorNumber: FC<{
 export const WeaveEditorTypedDict: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node, path}) => {
+  disableEdits?: boolean;
+}> = ({node, path, disableEdits}) => {
   // const val = useNodeValue(node);
   // return <Typography>{JSON.stringify(val)}</Typography>;
   const makeLinkPath = useObjectVersionLinkPathForPath();
@@ -525,6 +565,7 @@ export const WeaveEditorTypedDict: FC<{
                     key: constString(key.replace('.', '\\.')),
                   })}
                   path={[...path, {type: 'pick', key}]}
+                  disableEdits={disableEdits}
                 />
               </Box>
             </Grid>,
@@ -537,7 +578,8 @@ export const WeaveEditorTypedDict: FC<{
 export const WeaveEditorObject: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node, path}) => {
+  disableEdits?: boolean;
+}> = ({node, path, disableEdits}) => {
   const makeLinkPath = useObjectVersionLinkPathForPath();
   return (
     <Grid container spacing={2}>
@@ -559,6 +601,7 @@ export const WeaveEditorObject: FC<{
                 <WeaveEditorField
                   node={opObjGetAttr({self: node, name: constString(key)})}
                   path={[...path, {type: 'getattr', key}]}
+                  disableEdits={disableEdits}
                 />
               </Box>
             </Grid>,
@@ -568,7 +611,10 @@ export const WeaveEditorObject: FC<{
   );
 };
 
-const typeToDataGridColumnSpec = (type: Type): GridColDef[] => {
+const typeToDataGridColumnSpec = (
+  type: Type,
+  disableEdits?: boolean
+): GridColDef[] => {
   //   const cols: GridColDef[] = [];
   //   const colGrouping: GridColumnGroup[] = [];
   if (isAssignableTo(type, {type: 'typedDict', propertyTypes: {}})) {
@@ -610,7 +656,7 @@ const typeToDataGridColumnSpec = (type: Type): GridColDef[] => {
         return [
           {
             type: colType,
-            editable,
+            editable: editable && !disableEdits,
             field: key,
             headerName: key,
           },
@@ -631,7 +677,9 @@ const MAX_ROWS = 1000;
 export const WeaveEditorTable: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
-}> = ({node, path}) => {
+  disableEdits?: boolean;
+}> = ({node, path, disableEdits}) => {
+  const apiRef = useGridApiRef();
   const addEdit = useWeaveEditorContextAddEdit();
   const makeLinkPath = useObjectVersionLinkPathForPath();
   const objectType = listObjectType(node.type);
@@ -667,8 +715,8 @@ export const WeaveEditorTable: FC<{
     if (fetchQuery.loading) {
       return;
     }
-    setIsTruncated(fetchQuery.result.length > MAX_ROWS);
-    setSourceRows(fetchQuery.result.slice(0, MAX_ROWS));
+    setIsTruncated((fetchQuery.result ?? []).length > MAX_ROWS);
+    setSourceRows((fetchQuery.result ?? []).slice(0, MAX_ROWS));
   }, [sourceRows, fetchQuery]);
 
   const gridRows = useMemo(
@@ -680,6 +728,20 @@ export const WeaveEditorTable: FC<{
       })),
     [sourceRows]
   );
+
+  // Autosize when rows change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      apiRef.current.autosizeColumns({
+        includeHeaders: true,
+        includeOutliers: true,
+      });
+    }, 0);
+    return () => {
+      clearInterval(timeoutId);
+    };
+  }, [gridRows, apiRef]);
+
   const processRowUpdate = useCallback(
     (updatedRow: {[key: string]: any}, originalRow: {[key: string]: any}) => {
       const curSourceRows = sourceRows ?? [];
@@ -720,9 +782,9 @@ export const WeaveEditorTable: FC<{
           </Link>
         ),
       },
-      ...typeToDataGridColumnSpec(objectType),
+      ...typeToDataGridColumnSpec(objectType, disableEdits),
     ];
-  }, [makeLinkPath, objectType, path]);
+  }, [disableEdits, makeLinkPath, objectType, path]);
   return (
     <>
       {isTruncated && (
@@ -736,6 +798,7 @@ export const WeaveEditorTable: FC<{
           width: '100%',
         }}>
         <DataGrid
+          apiRef={apiRef}
           density="compact"
           experimentalFeatures={{columnGrouping: true}}
           rows={gridRows}
@@ -756,7 +819,7 @@ export const WeaveEditorTable: FC<{
   );
 };
 
-export const WeaveViewOpDef: FC<{
+export const WeaveViewSmallRef: FC<{
   node: Node;
 }> = ({node}) => {
   const opDefQuery = useNodeValue(node);
@@ -769,6 +832,6 @@ export const WeaveViewOpDef: FC<{
   } else if (opDefRef != null) {
     return <SmallRef objRef={opDefRef} />;
   } else {
-    return <div>invalid op def: {opDefQuery.result}</div>;
+    return <div>invalid ref: {opDefQuery.result}</div>;
   }
 };

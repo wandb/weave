@@ -32,7 +32,7 @@ import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
 import {useWeaveflowRouteContext} from './context';
-import {WFHighLevelCallFilter} from './pages/CallsPage';
+import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';

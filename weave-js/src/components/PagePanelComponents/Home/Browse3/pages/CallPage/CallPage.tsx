@@ -10,10 +10,11 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../../react';
+import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {Call} from '../../../Browse2/callTree';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../../context';
@@ -67,11 +68,21 @@ export const CallPage: React.FC<{
 };
 
 const useCallTabs = (call: WFCall) => {
+  const opVersion = call.opVersion();
+  const codeURI = opVersion ? opVersion.refUri() : null;
   return [
     {
       label: 'Call',
       content: <CallDetails wfCall={call} />,
     },
+    ...(codeURI
+      ? [
+          {
+            label: 'Code',
+            content: <Browse2OpDefCode uri={codeURI} />,
+          },
+        ]
+      : []),
     // {
     //   label: 'Child Calls',
     //   content: (
@@ -320,11 +331,14 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
     []
   );
 
+  const [suppressScroll, setSuppressScroll] = useState(false);
+
   // Informs DataGridPro what to do when a row is clicked - in this case
   // use the current router to navigate to the call page for the clicked
   // call. Effectively this looks like expanding the clicked call.
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
+      setSuppressScroll(true);
       const rowCall = params.row.call as WFCall;
       history.push(
         currentRouter.callUIUrl(
@@ -384,6 +398,10 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
     // because virtualScrollerRef.current inside the grid is undefined.
     // See https://github.com/mui/mui-x/issues/6411#issuecomment-1271556519
     const t = setTimeout(() => {
+      if (suppressScroll) {
+        setSuppressScroll(false);
+        return;
+      }
       const rowElement = apiRef.current.getRowElement(callId);
       if (rowElement) {
         rowElement.scrollIntoView();
@@ -394,8 +412,10 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
           apiRef.current.getRowIndexRelativeToVisibleRows(callId);
         apiRef.current.scrollToIndexes({rowIndex});
       }
+      setSuppressScroll(false);
     }, 0);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiRef, callId]);
 
   return (

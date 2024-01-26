@@ -1,12 +1,23 @@
 import React from 'react';
-import {Link} from 'react-router-dom';
+import {Link as LinkComp} from 'react-router-dom';
+import styled from 'styled-components';
 
+import {TEAL_500, TEAL_600} from '../../../../../../common/css/color.styles';
 import {useWeaveflowRouteContext} from '../../context';
-import {WFHighLevelCallFilter} from '../CallsPage';
+import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
 import {truncateID} from '../util';
+
+export const Link = styled(LinkComp)`
+  font-weight: 600;
+  color: ${TEAL_600};
+  &:hover {
+    color: ${TEAL_500};
+  }
+`;
+Link.displayName = 'S.Link';
 
 export const TypeLink: React.FC<{
   entityName: string;

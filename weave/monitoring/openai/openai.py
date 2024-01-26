@@ -2,23 +2,27 @@ __all__ = ["patch", "unpatch"]
 
 import functools
 from contextlib import contextmanager
-from typing import Callable, Union
+from functools import partialmethod
+from typing import Callable, Type, Union
 
 import openai
 from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion
 from packaging import version
 
-from weave import graph_client_context
-from weave import run_context
+from weave import graph_client_context, run_context
 
+from ..monitor import _get_global_monitor
 from .models import *
 from .util import *
 
-from ..monitor import _get_global_monitor
-
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
+
+
+class partialmethod_with_self(partialmethod):
+    def __get__(self, obj: Any, cls: Optional[Type[Any]] = None) -> Callable:
+        return self._make_unbound_method().__get__(obj, cls)  # type: ignore
 
 
 class AsyncChatCompletions:
@@ -118,10 +122,10 @@ def patch() -> None:
             hooks = ChatCompletions(old_create)
             async_hooks = AsyncChatCompletions(old_async_create)
             openai.resources.chat.completions.Completions.create = (
-                functools.partialmethod(hooks.create)
+                partialmethod_with_self(hooks.create)
             )
             openai.resources.chat.completions.AsyncCompletions.create = (
-                functools.partialmethod(async_hooks.create)
+                partialmethod_with_self(async_hooks.create)
             )
 
     if version.parse(openai.__version__) < version.parse("1.0.0"):
