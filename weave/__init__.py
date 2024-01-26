@@ -39,10 +39,9 @@ from . import wandb_api as _wandb_api
 
 # from .panels_py import *
 from . import version
+from .arrow import list_
 
-# from . import ops_arrow as _ops_arrow
-
-# WeaveList = _ops_arrow.ArrowWeaveList
+WeaveList = list_.ArrowWeaveList
 
 _wandb_api.init()
 
