@@ -12,13 +12,13 @@ import React, {useCallback, useMemo} from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
+import {CategoryChip} from './common/CategoryChip';
 import {
   CallsLink,
   opNiceName,
   OpVersionLink,
   OpVersionsLink,
 } from './common/Links';
-import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   FilterableTable,
   WFHighLevelDataColumn,
@@ -187,7 +187,7 @@ export const FilterableOpVersionsTable: React.FC<{
           columnValue: obj => obj.obj.opCategory(),
           gridColDefOptions: {
             renderCell: params => {
-              return <OpVersionCategoryChip opCategory={params.value as any} />;
+              return params.value && <CategoryChip value={params.value} />;
             },
             width: 100,
             minWidth: 100,
