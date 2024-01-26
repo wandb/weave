@@ -1,10 +1,18 @@
-import {Box, FormControl, ListItem, TextField} from '@mui/material';
+import {Box, FormControl, ListItem, TextField, Typography} from '@mui/material';
 import {Autocomplete} from '@mui/material';
-import React, {useMemo} from 'react';
+import _ from 'lodash';
+import React, {useCallback, useMemo} from 'react';
 
+import {parseRef} from '../../../../../react';
 import {Call} from '../../Browse2/callTree';
+import {objectRefDisplayName} from '../../Browse2/SmallRef';
 import {StyledDataGrid} from '../StyledDataGrid';
-import {PivotRunsTable, PivotRunsView} from './CallsPage/PivotRunsTable';
+import {
+  getValueAtNestedKey,
+  PivotRunsTable,
+  PivotRunsView,
+  WFHighLevelPivotSpec,
+} from './CallsPage/PivotRunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
@@ -26,19 +34,106 @@ export const CompareCallsPage: React.FC<{
         ?.filter(item => item != null) as WFCall[]) ?? []
     );
   }, [orm.projectConnection, props.callIds]);
-  const runs = useMemo(() => {
-    return calls.map(call => call.rawCallSpan()).filter(item => item != null);
-  }, [calls]);
+
+  const objectVersionOptions = useMemo(() => {
+    if (props.secondaryDim == null) {
+      return {};
+    }
+    return Object.fromEntries(
+      _.uniq(
+        calls.map(call =>
+          getValueAtNestedKey(call.rawCallSpan(), props.secondaryDim!)
+        )
+      )
+        .filter(item => item != null)
+        .map(item => {
+          if (
+            typeof item === 'string' &&
+            item.startsWith('wandb-artifact://')
+          ) {
+            return [item, objectRefDisplayName(parseRef(item)).label];
+          }
+          return [item, item];
+        })
+
+      // .map(item => [item!.version(), item!])
+    );
+  }, [calls, props.secondaryDim]);
+
+  // const opVersionOptions = useMemo(() => {
+  //   return Object.fromEntries(
+  //     calls[0].opVersion()
+  //   )
+  // }, []);
+  // console.log(objectVersionOptions);
+
+  const [selectedObjectVersion, setSelectedObjectVersion] = React.useState<
+    string | null
+  >(Object.keys(objectVersionOptions)?.[0] ?? null);
+
+  const filteredCalls = useMemo(() => {
+    return calls.filter(
+      call =>
+        getValueAtNestedKey(call.rawCallSpan(), props.secondaryDim!) ===
+        selectedObjectVersion
+    );
+  }, [calls, props.secondaryDim, selectedObjectVersion]);
+
+  const subOpVersionOptions = useMemo(() => {
+    return Object.fromEntries(
+      filteredCalls[0]
+        .childCalls()
+        .map(call => call.opVersion())
+        .filter(opVersion => opVersion != null)
+        .map(opVersion => [opVersion!.version(), opVersion!])
+    );
+  }, [filteredCalls]);
+
+  const [selectedOpVersion, setSelectedOpVersion] = React.useState<
+    string | null
+  >(Object.keys(subOpVersionOptions)?.[0] ?? null);
 
   const subruns = useMemo(() => {
-    return calls.flatMap(call =>
+    return filteredCalls.flatMap(call =>
       call
         .childCalls()
-        .filter(item => item.opVersion()?.version() === '860d744d3df917b00191')
+        .filter(item => item.opVersion()?.version() === selectedOpVersion)
         .map(call => call.rawCallSpan())
     );
-  }, [calls]);
-  console.log(subruns);
+  }, [filteredCalls, selectedOpVersion]);
+  // console.log(subruns);
+
+  const getOptionLabel = useCallback(
+    option => {
+      // console.log(option, objectVersionOptions);
+      const version = objectVersionOptions[option];
+      if (version == null) {
+        return option;
+      }
+      return version;
+      // return version.op().name() + ':' + version.version().slice(0, 6);
+    },
+    [objectVersionOptions]
+  );
+
+  const getOpOptionLabel = useCallback(
+    option => {
+      // console.log(option, objectVersionOptions);
+      const version = subOpVersionOptions[option];
+      if (version == null) {
+        return option;
+      }
+      return version;
+      // return version.op().name() + ':' + version.version().slice(0, 6);
+    },
+    [subOpVersionOptions]
+  );
+
+  const [pivotSpec, setPivotSpec] = React.useState<
+    Partial<WFHighLevelPivotSpec>
+  >({
+    colDim: props.primaryDim,
+  });
 
   if (!props.callIds || props.callIds.length < 2) {
     return <>Need more calls</>;
@@ -67,8 +162,68 @@ export const CompareCallsPage: React.FC<{
                 height: '100%',
                 maxHeight: '100%',
                 overflow: 'auto',
-                gap: '16px',
               }}>
+              <Box
+                sx={{
+                  flex: '0 0 auto',
+                  width: '100%',
+                  transition: 'width 0.1s ease-in-out',
+                  display: 'flex',
+                  flexDirection: 'row',
+                  overflowX: 'auto',
+                  overflowY: 'hidden',
+                  alignItems: 'center',
+                  gap: '8px',
+                  p: 1,
+                  '& li': {
+                    padding: 0,
+                    minWidth: '150px',
+                  },
+                  '& input, & label, & .MuiTypography-root': {
+                    fontSize: '0.875rem',
+                  },
+                }}>
+                <Typography
+                  style={{
+                    width: '38px',
+                    textAlign: 'center',
+                    flex: '0 0 auto',
+                  }}>
+                  Select
+                </Typography>
+                <ListItem>
+                  <FormControl fullWidth>
+                    <Autocomplete
+                      size="small"
+                      renderInput={params => (
+                        <TextField {...params} label="Object" />
+                      )}
+                      value={selectedObjectVersion ?? null}
+                      onChange={(event, newValue) => {
+                        setSelectedObjectVersion(newValue);
+                      }}
+                      getOptionLabel={getOptionLabel}
+                      options={Object.keys(objectVersionOptions)}
+                    />
+                  </FormControl>
+                </ListItem>
+                <ListItem>
+                  <FormControl fullWidth>
+                    <Autocomplete
+                      size="small"
+                      renderInput={params => (
+                        <TextField {...params} label="Sub Op" />
+                      )}
+                      value={selectedObjectVersion ?? null}
+                      onChange={(event, newValue) => {
+                        setSelectedOpVersion(newValue);
+                      }}
+                      getOptionLabel={getOpOptionLabel}
+                      options={Object.keys(subOpVersionOptions)}
+                    />
+                  </FormControl>
+                </ListItem>
+              </Box>
               {/* <Box
                 sx={{
                   display: 'flex',
@@ -145,13 +300,11 @@ export const CompareCallsPage: React.FC<{
                   runs={subruns}
                   entity={props.entity}
                   project={props.project}
-                  pivotSpec={{
-                    // TODO: remove hardcoding
-                    rowDim: 'inputs.example', //props.secondaryDim,
-                    colDim: props.primaryDim,
-                  }}
+                  colDimAtLeafMode
+                  pivotSpec={pivotSpec}
                   onPivotSpecChange={pivotSpec => {
-                    // TODO: Make this work
+                    console.log(pivotSpec);
+                    setPivotSpec(pivotSpec);
                   }}
                   // extraDataGridProps={
                   //   {

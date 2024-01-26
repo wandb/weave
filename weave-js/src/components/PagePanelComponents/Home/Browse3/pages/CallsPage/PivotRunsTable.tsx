@@ -9,7 +9,7 @@ import {
 import {Autocomplete, ListItem} from '@mui/material';
 import {GRID_CHECKBOX_SELECTION_COL_DEF, GridColDef} from '@mui/x-data-grid';
 import _ from 'lodash';
-import React, {useContext, useEffect, useMemo, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../../react';
@@ -34,6 +34,7 @@ type PivotRunsTablePropsType = {
   runs: Call[];
   entity: string;
   project: string;
+  colDimAtLeafMode?: boolean;
   showCompareButton?: boolean;
   extraDataGridProps?: React.ComponentProps<typeof StyledDataGrid>;
 };
@@ -68,21 +69,38 @@ export const PivotRunsView: React.FC<
     });
     setPivotRowOptions(options);
     setPivotColOptions(options);
-    if (
-      props.pivotSpec.colDim === undefined &&
-      props.pivotSpec.rowDim === undefined &&
-      options.length > 1
-    ) {
-      if (options[0] === 'inputs.self') {
-        props.onPivotSpecChange({
-          rowDim: options[1],
-          colDim: options[0],
-        });
-      } else {
-        props.onPivotSpecChange({
-          rowDim: options[0],
-          colDim: options[1],
-        });
+    if (options.length > 0) {
+      const currRowDim = props.pivotSpec.rowDim;
+      const currColDim = props.pivotSpec.colDim;
+
+      if (currRowDim == null && currColDim != null) {
+        const rowOptions = options.filter(o => o !== currColDim);
+        if (rowOptions.length > 0) {
+          props.onPivotSpecChange({
+            rowDim: rowOptions[0],
+            colDim: currColDim,
+          });
+        }
+      } else if (currRowDim != null && currColDim == null) {
+        const colOptions = options.filter(o => o !== currRowDim);
+        if (colOptions.length > 0) {
+          props.onPivotSpecChange({
+            rowDim: currRowDim,
+            colDim: colOptions[0],
+          });
+        }
+      } else if (currRowDim == null && currColDim == null) {
+        if (options[0] === 'inputs.self') {
+          props.onPivotSpecChange({
+            rowDim: options[1],
+            colDim: options[0],
+          });
+        } else {
+          props.onPivotSpecChange({
+            rowDim: options[0],
+            colDim: options[1],
+          });
+        }
       }
     }
   }, [props]);
@@ -127,10 +145,12 @@ export const PivotRunsView: React.FC<
               value={pivotRowDim ?? null}
               onChange={(event, newValue) => {
                 props.onPivotSpecChange({
+                  colDim: pivotColDim,
                   rowDim: newValue ?? null,
                 });
               }}
               options={pivotRowOptions}
+              disableClearable
             />
           </FormControl>
         </ListItem>
@@ -143,9 +163,11 @@ export const PivotRunsView: React.FC<
               onChange={(event, newValue) => {
                 props.onPivotSpecChange({
                   colDim: newValue ?? null,
+                  rowDim: pivotRowDim,
                 });
               }}
               options={pivotColOptions}
+              disableClearable
             />
           </FormControl>
         </ListItem>
@@ -298,6 +320,7 @@ export const PivotRunsTable: React.FC<
         message="Only 2 rows can be selected at a time."
       />
       <StyledDataGrid
+        key={props.pivotSpec.rowDim + props.pivotSpec.colDim}
         columnHeaderHeight={40}
         rows={pivotData}
         rowHeight={38}
@@ -358,7 +381,7 @@ export const PivotRunsTable: React.FC<
   );
 };
 
-const getValueAtNestedKey = (value: any, dimKey: string) => {
+export const getValueAtNestedKey = (value: any, dimKey: string) => {
   dimKey.split('.').forEach(dim => {
     if (value != null) {
       value = value[dim];
