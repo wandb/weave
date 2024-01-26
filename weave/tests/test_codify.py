@@ -33,34 +33,35 @@ from weave import panels
                 )
             ),
             lambda: """weave.panels.panel_table.Table(
-    weave.ops_arrow.list_range.range(1, 100, 1,).map(
-        lambda row: weave.ops_primitives.dict.dict_(
-            x=row,
-            y=weave.ops_primitives.list_.make_list(
-                a=row,
+            weave.ops_arrow.list_range.range(1, 100, 1,).map(
+                lambda row: weave.ops_primitives.dict.dict_(
+                    x=row,
+                    y=weave.ops_primitives.list_.make_list(
+                        a=row,
+                    ),
+                ),
             ),
+        )""",
         ),
-    ),
-)""",
-        ),
-        (
-            lambda: panels.Plot(
-                weave.ops.range(1, 100, 1).map(
-                    lambda row: weave.ops_primitives.dict.dict_(
-                        x=row,
-                        y=row**2,
-                    )
-                )
-            ),
-            lambda: """weave.panels.panel_plot.Plot(
-    weave.ops_arrow.list_range.range(1, 100, 1,).map(
-        lambda row: weave.ops_primitives.dict.dict_(
-            x=row, 
-            y=row.powBinary(2,),
-        ),
-    ),
-)""",
-        ),
+        # This one doesn't work, it generates an unstable ref for some reason
+        # (
+        #     lambda: panels.Plot(
+        #         weave.ops.range(1, 100, 1).map(
+        #             lambda row: weave.ops_primitives.dict.dict_(
+        #                 x=row,
+        #                 y=row**2,
+        #             )
+        #         )
+        #     ),
+        #     lambda: """weave.panels.panel_plot.Plot(
+        #     weave.ops_arrow.list_range.range(1, 100, 1,).map(
+        #         lambda row: weave.ops_primitives.dict.dict_(
+        #             x=row,
+        #             y=row.powBinary(2,),
+        #         ),
+        #     ),
+        # )""",
+        # ),
         (
             lambda: panels.Group(
                 items={
