@@ -6,7 +6,7 @@ import {
   WeaveEditor,
   WeaveEditorSourceContext,
 } from '../../Browse2/WeaveEditors';
-import {WFHighLevelCallFilter} from './CallsPage';
+import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
 import {
   CallLink,
   CallsLink,
@@ -185,7 +185,11 @@ const ObjectVersionPageInner: React.FC<{
                 refExtra: refExtra?.split('/'),
               }}>
               <ScrollableTabContent>
-                <WeaveEditor objType={objectName} node={itemNode} />
+                <WeaveEditor
+                  objType={objectName}
+                  node={itemNode}
+                  disableEdits
+                />
               </ScrollableTabContent>
             </WeaveEditorSourceContext.Provider>
           ),

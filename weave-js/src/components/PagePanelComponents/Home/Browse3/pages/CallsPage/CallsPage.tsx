@@ -1,5 +1,5 @@
 import {CircularProgress, IconButton} from '@material-ui/core';
-import {DashboardCustomize} from '@mui/icons-material';
+import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
@@ -10,27 +10,28 @@ import {
   TextField,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
-import {CallFilter} from '../../Browse2/callTree';
-import {fnRunsNode, useRunsWithFeedback} from '../../Browse2/callTreeHooks';
-import {RunsTable} from '../../Browse2/RunsTable';
-import {useWeaveflowRouteContext} from '../context';
-import {useMakeNewBoard} from './common/hooks';
-import {opNiceName} from './common/Links';
-import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
-import {SimplePageLayout} from './common/SimplePageLayout';
-import {truncateID} from './util';
+import {CallFilter} from '../../../Browse2/callTree';
+import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
+import {RunsTable} from '../../../Browse2/RunsTable';
+import {useWeaveflowRouteContext} from '../../context';
+import {useMakeNewBoard} from '../common/hooks';
+import {opNiceName} from '../common/Links';
+import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
+import {SimplePageLayout} from '../common/SimplePageLayout';
+import {truncateID, useInitializingFilter} from '../util';
 import {
   useWeaveflowORMContext,
   WeaveflowORMContextType,
-} from './wfInterface/context';
+} from '../wfInterface/context';
 import {
   HackyOpCategory,
   WFCall,
   WFObjectVersion,
   WFOpVersion,
-} from './wfInterface/types';
+} from '../wfInterface/types';
+import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -39,6 +40,8 @@ export type WFHighLevelCallFilter = {
   inputObjectVersions?: string[];
   parentId?: string | null;
   traceId?: string | null;
+  isPivot?: boolean;
+  pivotSpec?: Partial<WFHighLevelPivotSpec>;
 };
 
 export const CallsPage: React.FC<{
@@ -49,13 +52,31 @@ export const CallsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
 }> = props => {
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
+  );
+
+  const title = useMemo(() => {
+    if (filter.opCategory) {
+      return _.capitalize(filter.opCategory) + ' Calls';
+    }
+    return 'Calls';
+  }, [filter.opCategory]);
+
   return (
     <SimplePageLayout
-      title="Calls"
+      title={title}
       tabs={[
         {
           label: 'All',
-          content: <CallsTable {...props} />,
+          content: (
+            <CallsTable
+              {...props}
+              initialFilter={filter}
+              onFilterUpdate={setFilter}
+            />
+          ),
         },
       ]}
     />
@@ -74,23 +95,9 @@ export const CallsTable: React.FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
-  const [filterState, setFilterState] = useState<WFHighLevelCallFilter>(
-    props.initialFilter ?? {}
-  );
-  useEffect(() => {
-    if (props.initialFilter) {
-      setFilterState(props.initialFilter);
-    }
-  }, [props.initialFilter]);
-
-  // If the caller is controlling the filter, use the caller's filter state
-  const filter = useMemo(
-    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
-    [filterState, props.initialFilter, props.onFilterUpdate]
-  );
-  const setFilter = useMemo(
-    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
-    [props.onFilterUpdate]
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
   );
 
   const effectiveFilter = useMemo(() => {
@@ -100,7 +107,8 @@ export const CallsTable: React.FC<{
   const lowLevelFilter: CallFilter = useMemo(() => {
     return convertHighLevelFilterToLowLevelFilter(orm, effectiveFilter);
   }, [effectiveFilter, orm]);
-  const runs = useRunsWithFeedback(
+
+  const runsWithFeedbackQuery = useRunsWithFeedback(
     {
       entityName: props.entity,
       projectName: props.project,
@@ -129,12 +137,6 @@ export const CallsTable: React.FC<{
     props.project,
     effectiveFilter
   );
-  const traceIdOptions = useTraceIdOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
   const opCategoryOptions = useOpCategoryOptions(
     orm,
     props.entity,
@@ -152,6 +154,54 @@ export const CallsTable: React.FC<{
     props.project,
     lowLevelFilter
   );
+
+  const userEnabledPivot = effectiveFilter.isPivot ?? false;
+  const setUserEnabledPivot = useCallback(
+    (enabled: boolean) => {
+      setFilter({
+        ...filter,
+        isPivot: enabled,
+        // Reset the pivot dims when disabling pivot
+        pivotSpec:
+          filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
+            ? undefined
+            : filter.pivotSpec,
+      });
+    },
+    [filter, setFilter]
+  );
+  const setPivotDims = useCallback(
+    (spec: Partial<WFHighLevelPivotSpec>) => {
+      if (
+        filter.pivotSpec?.colDim !== spec.colDim ||
+        filter.pivotSpec?.rowDim !== spec.rowDim
+      ) {
+        setFilter({
+          ...filter,
+          pivotSpec: {
+            ...filter.pivotSpec,
+            ...spec,
+          },
+        });
+      }
+    },
+    [filter, setFilter]
+  );
+
+  const qualifiesForPivoting = useMemo(() => {
+    const shownSpanNames = _.uniq(
+      runsWithFeedbackQuery.result.map(span => span.name)
+    );
+    // Super restrictive for now - just showing pivot when
+    // there is only one span name and it is the evaluation.
+    return (
+      shownSpanNames.length === 1 &&
+      shownSpanNames[0].includes('Evaluation-evaluate')
+    );
+  }, [runsWithFeedbackQuery.result]);
+
+  const isPivoting = userEnabledPivot && qualifiesForPivoting;
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -161,6 +211,9 @@ export const CallsTable: React.FC<{
         props.project,
         effectiveFilter
       )}
+      filterListSx={{
+        pb: isPivoting ? 0 : 1,
+      }}
       filterListItems={
         <>
           <IconButton
@@ -175,13 +228,25 @@ export const CallsTable: React.FC<{
               <DashboardCustomize />
             )}
           </IconButton>
+          {qualifiesForPivoting && (
+            <IconButton
+              style={{width: '37px', height: '37px'}}
+              size="small"
+              color={userEnabledPivot ? 'primary' : 'default'}
+              onClick={() => {
+                setUserEnabledPivot(!userEnabledPivot);
+              }}>
+              <PivotTableChart />
+            </IconButton>
+          )}
           <ListItem>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'opCategory'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes('opCategory')
+                }
                 renderInput={params => (
                   <TextField {...params} label="Category" />
                 )}
@@ -203,9 +268,10 @@ export const CallsTable: React.FC<{
                 // Temp disable multiple for simplicity - may want to re-enable
                 // multiple
                 limitTags={1}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'opVersions'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes('opVersions')
+                }
                 value={effectiveFilter.opVersions?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
@@ -231,9 +297,12 @@ export const CallsTable: React.FC<{
                 limitTags={1}
                 // Temp disable multiple for simplicity - may want to re-enable
                 // multiple
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'inputObjectVersions'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes(
+                    'inputObjectVersions'
+                  )
+                }
                 renderInput={params => (
                   <TextField {...params} label="Inputs" />
                   // <TextField {...params} label="Consumes Objects" />
@@ -256,31 +325,10 @@ export const CallsTable: React.FC<{
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'traceId'
-                )}
-                renderInput={params => <TextField {...params} label="Trace" />}
-                value={effectiveFilter.traceId ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    traceId: newValue,
-                  });
-                }}
-                getOptionLabel={option => {
-                  return traceIdOptions[option] ?? option;
-                }}
-                options={Object.keys(traceIdOptions)}
-              />
-            </FormControl>
-          </ListItem>
-          <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={Object.keys(props.frozenFilter ?? {}).includes(
-                  'parentId'
-                )}
+                disabled={
+                  isPivoting ||
+                  Object.keys(props.frozenFilter ?? {}).includes('parentId')
+                }
                 renderInput={params => <TextField {...params} label="Parent" />}
                 value={effectiveFilter.parentId ?? null}
                 onChange={(event, newValue) => {
@@ -313,6 +361,7 @@ export const CallsTable: React.FC<{
               />
             }
             disabled={
+              isPivoting ||
               traceRootOptions.length <= 1 ||
               Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
             }
@@ -329,7 +378,19 @@ export const CallsTable: React.FC<{
           </ListItem>
         </>
       }>
-      <RunsTable loading={runs.loading} spans={runs.result} />
+      {isPivoting ? (
+        <PivotRunsView
+          loading={runsWithFeedbackQuery.loading}
+          runs={runsWithFeedbackQuery.result}
+          pivotSpec={effectiveFilter.pivotSpec ?? {}}
+          onPivotSpecChange={setPivotDims}
+        />
+      ) : (
+        <RunsTable
+          loading={runsWithFeedbackQuery.loading}
+          spans={runsWithFeedbackQuery.result}
+        />
+      )}
     </FilterLayoutTemplate>
   );
 };
@@ -516,53 +577,6 @@ const useConsumesObjectVersionOptions = (
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 
-const useTraceIdOptions = (
-  orm: WeaveflowORMContextType,
-  entity: string,
-  project: string,
-  highLevelFilter: WFHighLevelCallFilter
-) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        orm,
-        _.omit(highLevelFilter, ['traceId'])
-      );
-    }, [highLevelFilter, orm])
-  );
-  return useMemo(() => {
-    let roots: WFCall[] = [];
-    if (runs.loading) {
-      roots = orm.projectConnection.calls().filter(v => v.parentCall() == null);
-    } else {
-      roots = runs.result
-        .map(r => orm.projectConnection.call(r.span_id)?.traceID())
-        .filter(traceId => traceId != null)
-        .flatMap(traceId =>
-          orm.projectConnection.traceRoots(traceId!)
-        ) as WFCall[];
-    }
-
-    return _.fromPairs(
-      roots.map(c => {
-        const version = c.opVersion();
-        if (!version) {
-          return [c.traceID(), c.spanName()];
-        }
-        return [
-          c.traceID(),
-          version.op().name() + ' (' + truncateID(c.callID()) + ')',
-        ];
-      })
-    );
-  }, [orm.projectConnection, runs.loading, runs.result]);
-};
-
 const useParentIdOptions = (
   orm: WeaveflowORMContextType,
   entity: string,
@@ -594,7 +608,8 @@ const useParentIdOptions = (
         .map(r => orm.projectConnection.call(r.span_id)?.parentCall())
         .filter(v => v != null) as WFCall[];
     }
-    return _.fromPairs(
+
+    const pairs = _.uniqBy(
       parents.map(c => {
         const version = c.opVersion();
         if (!version) {
@@ -602,10 +617,17 @@ const useParentIdOptions = (
         }
         return [
           c.callID(),
-          version.op().name() + ' (' + truncateID(c.callID()) + ')',
+          opNiceName(version.op().name()) + ' (' + truncateID(c.callID()) + ')',
         ];
-      })
+      }),
+      p => p[1]
     );
+
+    pairs.sort((a, b) => {
+      return a[1].localeCompare(b[1]);
+    });
+
+    return _.fromPairs(pairs);
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 

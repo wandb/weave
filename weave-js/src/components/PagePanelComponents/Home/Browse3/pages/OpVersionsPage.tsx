@@ -8,18 +8,23 @@ import {
   TextField,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
-import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
+import {
+  CallsLink,
+  opNiceName,
+  OpVersionLink,
+  OpVersionsLink,
+} from './common/Links';
 import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   FilterableTable,
   WFHighLevelDataColumn,
 } from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {truncateID} from './util';
+import {truncateID, useInitializingFilter} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
 
@@ -41,14 +46,32 @@ export const OpVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
+  );
+
+  const title = useMemo(() => {
+    if (filter.opCategory) {
+      return _.capitalize(filter.opCategory) + ' Operations';
+    }
+    return 'Operations';
+  }, [filter.opCategory]);
+
   return (
     <SimplePageLayout
       // title="Op Versions"
-      title="Operations"
+      title={title}
       tabs={[
         {
           label: 'All',
-          content: <FilterableOpVersionsTable {...props} />,
+          content: (
+            <FilterableOpVersionsTable
+              {...props}
+              initialFilter={filter}
+              onFilterUpdate={setFilter}
+            />
+          ),
         },
       ]}
     />
@@ -84,23 +107,9 @@ export const FilterableOpVersionsTable: React.FC<{
     [props.entity, props.project, baseRouter]
   );
 
-  // Initialize the filter
-  const [filterState, setFilterState] = useState(props.initialFilter ?? {});
-  // Update the filter when the initial filter changes
-  useEffect(() => {
-    if (props.initialFilter) {
-      setFilterState(props.initialFilter);
-    }
-  }, [props.initialFilter]);
-
-  // If the caller is controlling the filter, use the caller's filter state
-  const filter = useMemo(
-    () => (props.onFilterUpdate ? props.initialFilter ?? {} : filterState),
-    [filterState, props.initialFilter, props.onFilterUpdate]
-  );
-  const setFilter = useMemo(
-    () => (props.onFilterUpdate ? props.onFilterUpdate : setFilterState),
-    [props.onFilterUpdate]
+  const {filter, setFilter} = useInitializingFilter(
+    props.initialFilter,
+    props.onFilterUpdate
   );
 
   const columns = useMemo(() => {
@@ -653,9 +662,9 @@ const OpCategoryFilterControlListItem: React.FC<{
   //   return orm.projectConnection.opCategories();
   // }, [orm.projectConnection]);
   const options = useMemo(() => {
-    return _.uniq(props.frozenData.map(item => item.obj.opCategory())).filter(
-      item => item != null
-    ) as HackyOpCategory[];
+    return _.uniq(props.frozenData.map(item => item.obj.opCategory()))
+      .filter(item => item != null)
+      .sort() as HackyOpCategory[];
   }, [props.frozenData]);
   return (
     <ListItem>
@@ -692,7 +701,13 @@ const OpNameFilterControlListItem: React.FC<{
   //   return orm.projectConnection.ops().map(o => o.name());
   // }, [orm.projectConnection]);
   const options = useMemo(() => {
-    return _.uniq(props.frozenData.map(item => item.obj.op().name()));
+    return _.uniq(props.frozenData.map(item => item.obj.op().name())).sort(
+      (a, b) => {
+        const nameA = opNiceName(a);
+        const nameB = opNiceName(b);
+        return nameA.localeCompare(nameB);
+      }
+    );
   }, [props.frozenData]);
   return (
     <ListItem>
@@ -707,6 +722,7 @@ const OpNameFilterControlListItem: React.FC<{
               opName: newValue,
             });
           }}
+          getOptionLabel={option => opNiceName(option)}
           options={options}
         />
       </FormControl>

@@ -39,7 +39,7 @@ import {
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
-import {CallsPage} from './Browse3/pages/CallsPage';
+import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {ObjectPage} from './Browse3/pages/ObjectPage';

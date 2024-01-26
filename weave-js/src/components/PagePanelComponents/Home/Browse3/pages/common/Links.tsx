@@ -2,7 +2,7 @@ import React from 'react';
 import {Link} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from '../../context';
-import {WFHighLevelCallFilter} from '../CallsPage';
+import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
