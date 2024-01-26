@@ -89,9 +89,9 @@ def ref_to_node(ref: ref_base.Ref) -> typing.Optional[graph.Node]:
     ref = copy.copy(ref)
     ref.extra = []
 
-    node = graph.OutputNode(
-        ref.type, "get", {"uri": graph.ConstNode(types.String(), ref.uri)}
-    )
+    from weave.ops_primitives import get
+
+    node = get(str(ref))
     for str_key in extra:
         key: typing.Union[str, int] = str_key
         try:
