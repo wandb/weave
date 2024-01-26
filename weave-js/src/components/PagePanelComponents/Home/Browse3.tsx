@@ -746,7 +746,7 @@ const useCallPeekRedirect = () => {
         return;
       }
       const path = baseRouter.callsUIUrl(params.entity, params.project, {
-        opVersions: [opVersion.op().name() + ':' + opVersion.version()],
+        opVersions: [opVersion.op().name() + ':*'],
       });
       const searchParams = new URLSearchParams();
       searchParams.set(
