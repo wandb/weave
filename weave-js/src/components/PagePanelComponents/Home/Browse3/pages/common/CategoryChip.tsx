@@ -23,7 +23,7 @@ const CATEGORY_INFO: Record<OpCategoryType, CategoryInfo> = {
     color: 'teal',
   },
   train: {
-    color: 'cactus',
+    color: 'green',
   },
   evaluate: {
     color: 'sienna',
