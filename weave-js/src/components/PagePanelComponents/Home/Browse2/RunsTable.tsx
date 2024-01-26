@@ -1,4 +1,3 @@
-import {Chip} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -13,6 +12,7 @@ import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {Timestamp} from '../../../Timestamp';
+import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
@@ -182,7 +182,7 @@ export const RunsTable: FC<{
     const cols: GridColDef[] = [
       {
         field: 'span_id',
-        headerName: 'ID',
+        headerName: 'Call',
         width: 75,
         minWidth: 75,
         maxWidth: 75,
@@ -203,11 +203,15 @@ export const RunsTable: FC<{
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
-        width: 100,
-        minWidth: 100,
-        maxWidth: 100,
+        width: 70,
+        minWidth: 70,
+        maxWidth: 70,
         renderCell: cellParams => {
-          return <StatusChip value={cellParams.row.status_code} />;
+          return (
+            <div style={{margin: 'auto'}}>
+              <StatusChip value={cellParams.row.status_code} iconOnly />
+            </div>
+          );
         },
       },
       ...(orm
@@ -243,23 +247,8 @@ export const RunsTable: FC<{
               minWidth: 100,
               maxWidth: 100,
               renderCell: (cellParams: any) => {
-                if (cellParams.value == null) {
-                  return '';
-                }
-                const color = {
-                  train: 'success',
-                  predict: 'info',
-                  score: 'error',
-                  evaluate: 'warning',
-                  // 'tune': 'warning',
-                }[cellParams.row.opCategory + ''];
                 return (
-                  <Chip
-                    sx={{height: '20px', lineHeight: 2}}
-                    label={cellParams.row.opCategory}
-                    size="small"
-                    color={color as any}
-                  />
+                  cellParams.value && <CategoryChip value={cellParams.value} />
                 );
               },
             },
@@ -451,6 +440,7 @@ export const RunsTable: FC<{
         return undefined;
       }
       return {
+        pinnedColumns: {left: ['span_id']},
         sorting: {
           sortModel: [{field: 'timestampMs', sort: 'desc'}],
         },
