@@ -1,22 +1,18 @@
 import inspect
 import typing
 
-
-from . import registry_mem
-from . import op_def
-from . import op_args
-from . import derive_op
-from . import context_state
+from . import context_state, derive_op, op_args, op_def, pyfunc_type_util, registry_mem
 from . import weave_types as types
-from . import pyfunc_type_util
 
 if typing.TYPE_CHECKING:
     from weave.gql_op_plugin import GqlOpPlugin
 
 
 def op(
+    _func=None,
+    /,
+    *,
     input_type: pyfunc_type_util.MaybeInputTypeType = None,
-    # input_type: pyfunc_type_util.MaybeInputTypeType = None,
     output_type: pyfunc_type_util.MaybeOutputTypeType = None,
     refine_output_type: typing.Optional[op_def.OpDef] = None,
     name: typing.Optional[str] = None,
@@ -25,54 +21,27 @@ def op(
     hidden: bool = False,
     pure: bool = True,
     _op_def_class: type[op_def.OpDef] = op_def.OpDef,
-    *,  # Marks the rest of the arguments as keyword-only.
     plugins: typing.Optional[dict[str, "GqlOpPlugin"]] = None,
     mutation: bool = False,
-    # If True, the op will be weavified, ie it's resolver will be stored as a Weave
-    # op graph. The compile node_ops pass will expand the node to the weavified
-    # version, instead of executing the original python resolver body.
     weavify: bool = False,
-) -> typing.Callable[[typing.Callable], op_def.OpDef]:
-    """Decorator for declaring an op.
+):
+    """Decorator for declaring an op."""
 
-    Decorated functions must be typed, either with Python types or by declaring
-    input_type, output_type as arguments to op (Python types preferred).
-    """
-
-    # For builtins, enforce that parameter and return types must be declared.
-    # For user ops, allow missing types.
-    allow_unknowns = not context_state._loading_built_ins.get()
-
-    def wrap(f):
-        weave_input_type = pyfunc_type_util.determine_input_type(
-            f, input_type, allow_unknowns=allow_unknowns
-        )
-        weave_output_type = pyfunc_type_util.determine_output_type(
-            f, output_type, allow_unknowns=allow_unknowns
-        )
+    def wrap(func):
+        allow_unknowns = not context_state._loading_built_ins.get()
+        weave_input_type = pyfunc_type_util.determine_input_type(func, input_type, allow_unknowns=allow_unknowns)
+        weave_output_type = pyfunc_type_util.determine_output_type(func, output_type, allow_unknowns=allow_unknowns)
 
         fq_op_name = name
         if fq_op_name is None:
             op_prefix = "op"
-
-            # This would be a much nicer: automatically use first type name.
-            # But what about Unions? I'm not going to solve in this PR.
-            # TODO: implement this.
-            # if (
-            #     isinstance(weave_input_type, op_args.OpNamedArgs)
-            #     and weave_input_type.arg_types
-            # ):
-            #     arg_type0 = next(iter(weave_input_type.arg_types.values()))
-            #     if arg_type0 != types.UnknownType():
-            #         op_prefix = arg_type0.name
-
-            fq_op_name = f"{op_prefix}-{f.__name__}"
+            fq_op_name = f"{op_prefix}-{func.__name__}"
 
         op = _op_def_class(
             fq_op_name,
             weave_input_type,
             weave_output_type,
-            f,
+            func,
             refine_output_type=refine_output_type,
             setter=setter,
             render_info=render_info,
@@ -88,17 +57,15 @@ def op(
 
         op_version = registry_mem.memory_registry.register_op(op)
 
-        # After we register the op, create any derived ops
-
-        # If op.location is set, then its a custom (non-builtin op). We don't
-        # derive custom ops for now, as the derive code doesn't do the right thing.
-        # The op name is the location/uri for custom ops, and the derive code doesn't
-        # fix that up. So we end up double registering ops in WeaveJS which breaks
-        # everything.
-        # TODO: fix so we get mappability for custom (ecosystem) ops!
         if op.location is None:
             derive_op.derive_ops(op)
 
         return op_version
 
-    return wrap
+    if callable(_func):
+        # The decorator was used as @op without parentheses.
+        return wrap(_func)
+    else:
+        # The decorator was used as @op(...) with parentheses.
+        # Return a new decorator that will call 'decorator' with the function later.
+        return wrap

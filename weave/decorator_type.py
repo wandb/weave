@@ -1,23 +1,24 @@
+import dataclasses
 import inspect
 import typing
-import dataclasses
 
+from . import context_state, decorator_class, decorator_op, errors, infer_types
 from . import weave_types as types
-from . import infer_types
-from . import decorator_class
-from . import errors
-from . import decorator_op
-from . import context_state
 
 _py_type = type
 
 
 def type(
+    _func=None,
+    /,
+    *,
     __override_name: typing.Optional[str] = None,
     __is_simple: bool = False,
     __init: typing.Optional[bool] = None,
     __mixins: typing.Optional[list[typing.Type]] = None,
 ):
+    """Decorator for declaring a type."""
+
     def wrap(target):
         init = False
         if __init is not None:
@@ -67,9 +68,7 @@ def type(
                 except TypeError:
                     # hmmm... Exception rewriting. Am I OK with this? Could be overly aggressive.
                     # TODO: decide if we should do this
-                    raise errors.WeaveDefinitionError(
-                        f"{target}.{field.name} is not a valid python type (a class or type)"
-                    )
+                    raise errors.WeaveDefinitionError(f"{target}.{field.name} is not a valid python type (a class or type)")
                 # if weave_type == types.UnknownType():
                 #     raise errors.WeaveDefinitionError(
                 #         f"Weave doesn't yet handle the type '{field.type}' at {target}.{field.name}"
@@ -88,8 +87,7 @@ def type(
         # and deserialize them along with the data attached to the object
         if relocatable:
             for name, member in inspect.getmembers(target):
-                from . import op_def
-                from . import op_def_type
+                from . import op_def, op_def_type
 
                 if isinstance(member, op_def.BoundOpDef):
                     static_property_types[name] = op_def_type.OpDefType()
@@ -150,4 +148,10 @@ def type(
 
         return dc
 
-    return wrap
+    if callable(_func):
+        # The decorator was used as @type without parentheses.
+        return wrap(_func)
+    else:
+        # The decorator was used as @type(...) with parentheses.
+        # Return a new decorator that will call 'decorator' with the class later.
+        return wrap

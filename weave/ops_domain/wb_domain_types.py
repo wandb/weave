@@ -1,11 +1,11 @@
 import typing
+
 from .. import weave_types as types
 from ..decorator_type import type as weave_type
 from ..partial_object import (
     PartialObject,
     PartialObjectTypeGeneratorType,
 )
-
 
 """
 This file contains all the "W&B Domain Types". Each domain type should
@@ -55,10 +55,10 @@ def gql_type(
         _instance_class: typing.Type["GQLBase"],
     ) -> typing.Type[PartialObject]:
         decorator = weave_type(
-            name,
-            True,
-            None,
-            [PartialObjectTypeGeneratorType],
+            __override_name=name,
+            __is_simple=True,
+            __init=None,
+            __mixins=[PartialObjectTypeGeneratorType],
         )
         return decorator(_instance_class)
 
@@ -150,9 +150,7 @@ class ArtifactCollection(GQLBase):
 
 
 ArtifactCollectionType = ArtifactCollection.WeaveType()  # type: ignore
-ArtifactCollectionType = typing.cast(
-    PartialObjectTypeGeneratorType, ArtifactCollectionType
-)
+ArtifactCollectionType = typing.cast(PartialObjectTypeGeneratorType, ArtifactCollectionType)
 
 
 @gql_type("artifactVersion")
@@ -174,9 +172,7 @@ class ArtifactCollectionMembership(GQLBase):
 
 
 ArtifactCollectionMembershipType = ArtifactCollectionMembership.WeaveType()  # type: ignore
-ArtifactCollectionMembershipType = typing.cast(
-    PartialObjectTypeGeneratorType, ArtifactCollectionMembershipType
-)
+ArtifactCollectionMembershipType = typing.cast(PartialObjectTypeGeneratorType, ArtifactCollectionMembershipType)
 
 
 @gql_type("artifactAlias")
