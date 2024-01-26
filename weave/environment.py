@@ -91,6 +91,7 @@ def cache_duration_days() -> int:
     return int(os.getenv("WEAVE_CACHE_DURATION_DAYS", 0))
 
 
+# represents the number of days after a cache has expired to leave it until deletion
 def cache_deletion_buffer_days() -> int:
     return int(os.getenv("WEAVE_CACHE_DELETION_BUFFER_DAYS", 1))
 

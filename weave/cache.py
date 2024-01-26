@@ -29,7 +29,7 @@ system time             bucketed time
 16:00 Jan 12 1970      00:00 Jan 19 1970
 12:00 Jan 3 2024       00:00 Jan 10 2024
 """
-def bucket_timestamp(interval_days: int) -> int:
+def bucket_timestamp(interval_days: int) -> str:
     if interval_days == 0:
         return 0
     now = time.time()
@@ -37,50 +37,23 @@ def bucket_timestamp(interval_days: int) -> int:
     num_intervals = int(now / interval_seconds)
     # use the bucket end time because this makes it easy to know when a cache interval will no longer be used
     bucket_end_time = (num_intervals + 1) * interval_seconds
-    return int(
+    return str(
         datetime.datetime.fromtimestamp(
             bucket_end_time, datetime.timezone.utc
-        ).timestamp()
+        ).timestamp().__floor__()
     )
-
-def bucket_timestamp_minutes(interval_minutes: int) -> int:
-    if interval_minutes == 0:
-        return 0
-    now = time.time()
-    interval_seconds = interval_minutes * 60
-    num_intervals = int(now / interval_seconds)
-    # use the bucket end time because this makes it easy to know when a cache interval will no longer be used
-    bucket_end_time = (num_intervals + 1) * interval_seconds
-    return int(
-        datetime.datetime.fromtimestamp(
-            bucket_end_time, datetime.timezone.utc
-        ).timestamp()
-    )
-
-
-def is_current_cache_valid() -> bool:
-    return int(environment.weave_cache_timestamp()) > int(
-        datetime.datetime.now().timestamp()
-    )
-
-
-def set_cache_timestamp() -> None:
-    duration = environment.cache_duration_days()
-    new_cache_timestamp = bucket_timestamp(duration)
-
-    logging.info(f"Creating new cache that expires at {new_cache_timestamp}")
-    environment.set_weave_cache_timestamp(str(new_cache_timestamp))
-
 
 @contextlib.contextmanager
-def time_interval_cache_prefix() -> typing.Generator[None, None, None]:
-    duration = environment.cache_duration_days()
-    if duration == 0:
-        return
-    cache_prefix = bucket_timestamp(duration)
+def time_interval_cache_prefix(cache_prefix_input: typing.Optional[str] = None) -> typing.Generator[None, None, None]:
+    cache_prefix = cache_prefix_input
+    if cache_prefix is None:
+        duration = environment.cache_duration_days()
+        if duration != 0:
+            cache_prefix = bucket_timestamp(duration)
+            logger.info(f"New cache prefix {cache_prefix}")
     token = context_state._cache_prefix_context.set(cache_prefix)
     try:
-        yield
+        yield 
     finally:
         context_state._cache_prefix_context.reset(token)
 
@@ -94,8 +67,7 @@ def clear_cache():
 
     now = datetime.datetime.now().timestamp()
     # buffer is in seconds
-    # buffer = 60 * 60 * 24 * environment.cache_deletion_buffer_days  # days of buffer
-    buffer = 60  # minutes of buffer
+    buffer = 60 * 60 * 24 * environment.cache_deletion_buffer_days  # days of buffer
     
     # Validate the directory path
     if not directory_path:
