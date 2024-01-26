@@ -1511,9 +1511,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         leftOuter: bool = False,
         rightOuter: bool = False,
     ):
+        from ..ops_arrow import list_join
+
         join1Fn = self._make_lambda_node(join1Fn)
         join2Fn = other._make_lambda_node(join2Fn)
-        from . import list_join
 
         return list_join.join2_impl(
             self, other, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter
