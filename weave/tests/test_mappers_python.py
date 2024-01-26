@@ -5,6 +5,7 @@ from .. import weave_types as types
 from .. import context
 from .. import api
 from .. import weave_internal
+from .. import val_const
 
 
 def test_map_typed_dict():
@@ -53,7 +54,7 @@ def test_map_typed_dict_with_nan():
 
 
 def test_map_const():
-    d = {"a": weave_internal.const(5)}
+    d = {"a": val_const.const(5)}
     d_type = types.TypeRegistry.type_of(d)
     m = mappers_python.map_to_python(d_type, None)
     d2 = m.apply(d)
