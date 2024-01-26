@@ -33,7 +33,7 @@ system time             bucketed time
 
 def bucket_timestamp(interval_days: int) -> str:
     if interval_days == 0:
-        return 0
+        return "0"
     now = time.time()
     interval_seconds = interval_days * 24 * 60 * 60
     num_intervals = int(now / interval_seconds)
@@ -67,13 +67,13 @@ def get_cache_prefix() -> typing.Optional[str]:
     return context_state._cache_prefix_context.get()
 
 
-def clear_cache():
+def clear_cache() -> None:
     # Read the directory address and threshold from the environment variable
     directory_path = environment.weave_filesystem_dir()
 
     now = datetime.datetime.now().timestamp()
     # buffer is in seconds
-    buffer = 60 * 60 * 24 * environment.cache_deletion_buffer_days  # days of buffer
+    buffer = 60 * 60 * 24 * environment.cache_deletion_buffer_days()  # days of buffer
 
     # Validate the directory path
     if not directory_path:
@@ -85,8 +85,6 @@ def clear_cache():
 
     # for each cache in the directory, check if its expired past the buffer
     for item in os.listdir(directory_path):
-        if environment.weave_cache_timestamp() == item:
-            continue
         try:
             item_timestamp = int(item)
             item_path = os.path.join(directory_path, item)
@@ -97,7 +95,7 @@ def clear_cache():
                 shutil.rmtree(item_path)
                 logging.info(f"Deleted {item}.")
         except:
-            logging.info(f"Error deleting {item}.", flush=True)
+            logging.info(f"Error deleting {item}.")
             continue
 
 
