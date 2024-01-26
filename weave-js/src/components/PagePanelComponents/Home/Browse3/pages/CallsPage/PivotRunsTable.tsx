@@ -265,7 +265,7 @@ export const PivotRunsTable: React.FC<
       for (const key of outputOrder) {
         cols.push({
           flex: 1,
-          minWidth: 150,
+          minWidth: 100,
           field: col + '.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {

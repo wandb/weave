@@ -69,7 +69,7 @@ export const CompareCallsPage: React.FC<{
                 overflow: 'auto',
                 gap: '16px',
               }}>
-              <Box
+              {/* <Box
                 sx={{
                   display: 'flex',
                   flexDirection: 'row',
@@ -95,8 +95,8 @@ export const CompareCallsPage: React.FC<{
                   // }}
                   options={['a', 'b', 'c']}
                 />
-              </Box>
-              <Box sx={{minHeight: '300px', flex: '0 0 auto'}}>
+              </Box> */}
+              {/* <Box sx={{minHeight: '300px', flex: '0 0 auto'}}>
                 <PivotRunsTable
                   loading={false}
                   runs={runs}
@@ -112,8 +112,8 @@ export const CompareCallsPage: React.FC<{
                     } as any
                   }
                 />
-              </Box>
-              <Box
+              </Box> */}
+              {/* <Box
                 sx={{
                   display: 'flex',
                   flexDirection: 'row',
@@ -138,7 +138,7 @@ export const CompareCallsPage: React.FC<{
                   // }}
                   options={['a', 'b', 'c']}
                 />
-              </Box>
+              </Box> */}
               <Box sx={{minHeight: '300px', flex: '1 1 auto'}}>
                 <PivotRunsView
                   loading={false}

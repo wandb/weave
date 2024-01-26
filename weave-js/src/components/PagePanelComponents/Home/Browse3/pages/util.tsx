@@ -32,6 +32,9 @@ export const renderCell = (value: any) => {
   if (typeof value === 'boolean') {
     return value ? 'True' : 'False';
   }
+  if (typeof value === 'number') {
+    return value.toFixed(4);
+  }
   return value;
 };
 
