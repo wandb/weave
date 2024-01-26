@@ -297,10 +297,10 @@ def execute():
         req_bytes = request.data
     req_compressed = zlib.compress(req_bytes)
     req_b64 = base64.b64encode(req_compressed).decode("ascii")
-    # logging.info(
-    #     "Execute request (zlib): %s",
-    #     req_b64,
-    # )
+    logging.info(
+        "Execute request (zlib): %s",
+        req_b64,
+    )
 
     if not request.json:
         abort(400, "Request body must be JSON.")
