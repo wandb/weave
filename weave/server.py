@@ -120,6 +120,8 @@ class SubprocessServer(multiprocessing.Process):
 
     def run(self):
         from weave import ops
+        from weave import panels
+        from weave import panels_py
 
         while True:
             req = self.req_queue.get()

@@ -96,6 +96,10 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
+    from weave import ops
+    from weave import panels
+    from weave import panels_py
+
     # Attempt to import MVP ecosystem modules
     try:
         from weave.ecosystem import langchain, replicate
