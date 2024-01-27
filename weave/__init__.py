@@ -7,7 +7,6 @@ import sys
 pre_init_modules = set(sys.modules.keys())
 
 from . import context_state as _context_state
-from . import logs as _logging
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
