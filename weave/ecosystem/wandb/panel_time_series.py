@@ -3,6 +3,7 @@ import typing
 
 import weave
 from weave import weave_internal
+from weave.panel_util import make_node
 
 from . import weave_plotly
 from ...language_features.tagging import tagged_value_type
@@ -168,7 +169,7 @@ class TimeSeries(weave.Panel):
                     value = options[attr]
                     if not isinstance(value, weave.graph.Node):
                         if attr in ["min_x", "max_x", "mark", "axis_labels"]:
-                            value = weave.make_node(value)
+                            value = make_node(value)
                         if attr in ["min_x", "max_x"]:
                             value = weave_internal.const(value)
                             # value = weave.make_node(value)
