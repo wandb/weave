@@ -1,3 +1,4 @@
+-r requirements.txt
 -r requirements.engine.txt
 -r requirements.datadog.txt
 pytest>=7.2.1
