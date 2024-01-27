@@ -20,11 +20,9 @@ from . import ref_base as _ref_base
 from . import artifact_wandb as _artifact_wandb
 from . import wandb_api as _wandb_api
 
-# from . import trace as _trace
 from . import weave_internal as _weave_internal
 from . import errors as _errors
 
-# from . import ops as _ops
 from . import util as _util
 
 from . import context as _context
@@ -40,11 +38,9 @@ from weave.monitoring import monitor as _monitor
 # exposed as part of api
 from . import weave_types as types
 
-# from . import types_numpy as _types_numpy
 from . import errors
 from .decorators import weave_class, op, mutation, type
 
-# from .op_args import OpVarArgs
 from .op_def import OpDef
 from . import usage_analytics
 from .context import (
@@ -57,16 +53,6 @@ from .context import (
 from .panel import Panel
 
 from .arrow.list_ import ArrowWeaveList as WeaveList
-
-# from .server import capture_weave_server_logs
-
-# from .val_const import const
-# from .file_base import File, Dir
-# from .dispatch import RuntimeConstNode
-
-# from .weave_internal import define_fn
-
-# Node = _graph.Node
 
 
 def save(node_or_obj, name=None):
