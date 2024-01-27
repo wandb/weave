@@ -12,7 +12,9 @@ from . import urls
 from . import graph as _graph
 from .graph import Node
 
-# from . import graph_mapper as _graph_mapper
+# If this is not imported, serialization of Weave Nodes is incorrect!
+from . import graph_mapper as _graph_mapper
+
 from . import storage as _storage
 from . import ref_base as _ref_base
 from . import artifact_wandb as _artifact_wandb

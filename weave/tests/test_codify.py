@@ -43,26 +43,24 @@ from weave import panels
             ),
         )""",
         ),
-        # This one doesn't work after refactoring weave to not import
-        # ops and panels by default, it generates an unstable ref for some reason
-        # (
-        #     lambda: panels.Plot(
-        #         weave.ops.range(1, 100, 1).map(
-        #             lambda row: weave.ops_primitives.dict.dict_(
-        #                 x=row,
-        #                 y=row**2,
-        #             )
-        #         )
-        #     ),
-        #     lambda: """weave.panels.panel_plot.Plot(
-        #     weave.ops_arrow.list_range.range(1, 100, 1,).map(
-        #         lambda row: weave.ops_primitives.dict.dict_(
-        #             x=row,
-        #             y=row.powBinary(2,),
-        #         ),
-        #     ),
-        # )""",
-        # ),
+        (
+            lambda: panels.Plot(
+                weave.ops.range(1, 100, 1).map(
+                    lambda row: weave.ops_primitives.dict.dict_(
+                        x=row,
+                        y=row**2,
+                    )
+                )
+            ),
+            lambda: """weave.panels.panel_plot.Plot(
+            weave.ops_arrow.list_range.range(1, 100, 1,).map(
+                lambda row: weave.ops_primitives.dict.dict_(
+                    x=row,
+                    y=row.powBinary(2,),
+                ),
+            ),
+        )""",
+        ),
         (
             lambda: panels.Group(
                 items={
