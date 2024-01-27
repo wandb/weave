@@ -7,7 +7,11 @@ import {
   Typography,
 } from '@mui/material';
 import {Autocomplete, ListItem} from '@mui/material';
-import {GRID_CHECKBOX_SELECTION_COL_DEF, GridColDef} from '@mui/x-data-grid';
+import {
+  GRID_CHECKBOX_SELECTION_COL_DEF,
+  GridColDef,
+  GridColumnGroup,
+} from '@mui/x-data-grid';
 import _ from 'lodash';
 import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -196,6 +200,8 @@ export const PivotRunsView: React.FC<
   );
 };
 
+type PivotDataRowType = {[col: string]: any};
+
 export const PivotRunsTable: React.FC<
   PivotRunsTablePropsType & {
     pivotSpec: {
@@ -236,9 +242,9 @@ export const PivotRunsTable: React.FC<
     });
 
     // Step 2: Create a list of rows
-    const rows: Array<{[col: string]: any}> = [];
+    const rows: Array<PivotDataRowType> = [];
     Object.keys(values).forEach(rowKey => {
-      const row: {[col: string]: any} = {
+      const row: PivotDataRowType = {
         id: rowKey,
       };
       row[props.pivotSpec.rowDim] = rowKey;
@@ -250,6 +256,18 @@ export const PivotRunsTable: React.FC<
 
     return {pivotData: rows, pivotColumns: pivotColumnsInner};
   }, [props.pivotSpec.colDim, props.pivotSpec.rowDim, props.runs]);
+
+  const opsInPlay = useMemo(() => {
+    return _.uniq(
+      pivotData
+        .flatMap(pivotRow =>
+          Array.from(pivotColumns).map(
+            col => (pivotRow[col] as SpanWithFeedback | null)?.name
+          )
+        )
+        .filter(name => name != null)
+    );
+  }, [pivotColumns, pivotData]);
 
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
@@ -269,45 +287,106 @@ export const PivotRunsTable: React.FC<
     if (pivotData.length === 0) {
       return {cols: [], colGroupingModel: []};
     }
-    pivotColumns.forEach(col => {
-      // All output keys as we don't have the order key yet.
-      const outputKeys: {[key: string]: true} = {};
-      pivotData.forEach(pivotRow => {
-        if (pivotRow[col]) {
-          for (const [k, v] of Object.entries(
-            flattenObject(pivotRow[col].output!)
-          )) {
-            if (v != null && (!k.startsWith('_') || k === '_result')) {
-              outputKeys[k] = true;
+
+    if (!props.colDimAtLeafMode || pivotColumns.size === 1) {
+      pivotColumns.forEach(col => {
+        // All output keys as we don't have the order key yet.
+        const outputKeys: {[key: string]: true} = {};
+        pivotData.forEach(pivotRow => {
+          if (pivotRow[col]) {
+            for (const [k, v] of Object.entries(
+              flattenObject(pivotRow[col].output!)
+            )) {
+              if (v != null && (!k.startsWith('_') || k === '_result')) {
+                outputKeys[k] = true;
+              }
             }
           }
+        });
+
+        const outputOrder = Object.keys(outputKeys);
+        outputOrder.sort();
+        const outputGrouping = buildTree(outputOrder, col);
+        outputGrouping.renderHeaderGroup = params => {
+          return renderCell(col);
+        };
+        colGroupingModel.push(outputGrouping);
+        for (const key of outputOrder) {
+          cols.push({
+            flex: 1,
+            minWidth: 100,
+            field: col + '.' + key,
+            headerName: key.split('.').slice(-1)[0],
+            renderCell: cellParams => {
+              return renderCell(
+                getValueAtNestedKey(cellParams.row[col]?.output, key)
+              );
+            },
+          });
         }
       });
-
-      const outputOrder = Object.keys(outputKeys);
-      outputOrder.sort();
-      const outputGrouping = buildTree(outputOrder, col);
-      outputGrouping.renderHeaderGroup = params => {
-        return renderCell(col);
-      };
-      colGroupingModel.push(outputGrouping);
-      for (const key of outputOrder) {
-        cols.push({
-          flex: 1,
-          minWidth: 100,
-          field: col + '.' + key,
-          headerName: key.split('.').slice(-1)[0],
-          renderCell: cellParams => {
-            return renderCell(
-              getValueAtNestedKey(cellParams.row[col]?.output, key)
-            );
-          },
-        });
+    } else {
+      // Verify that each of the rows are from the same op
+      if (opsInPlay.length !== 1) {
+        throw new Error('All rows must be from the same op');
       }
-    });
+      const op = opsInPlay[0] as string;
+      // All output keys as we don't have the order key yet.
+      const outputKeys: {[key: string]: true} = {};
+      pivotColumns.forEach(col => {
+        pivotData.forEach(pivotRow => {
+          if (pivotRow[col]) {
+            for (const [k, v] of Object.entries(
+              flattenObject(pivotRow[col].output!)
+            )) {
+              if (v != null && (!k.startsWith('_') || k === '_result')) {
+                outputKeys[k] = true;
+              }
+            }
+          }
+        });
+      });
+
+      const outputOrder = Object.keys(outputKeys).flatMap(key => {
+        return Array.from(pivotColumns).map(col => key + '.' + col);
+      });
+      outputOrder.sort();
+      const outputGrouping = buildTree(outputOrder, op);
+      const outputGroups = outputGrouping.children as GridColumnGroup[];
+      outputGroups.forEach(group => {
+        colGroupingModel.push(group);
+      });
+
+      Object.keys(outputKeys).forEach(key => {
+        pivotColumns.forEach(col => {
+          cols.push({
+            flex: 1,
+            minWidth: 150,
+            field: op + '.' + key + '.' + col,
+            headerName: key.split('.').slice(-1)[0],
+            renderHeader: params => {
+              return renderCell(col);
+            },
+            renderCell: cellParams => {
+              return renderCell(
+                getValueAtNestedKey(cellParams.row[col]?.output, key)
+              );
+            },
+          });
+        });
+      });
+    }
+
+    console.log(colGroupingModel);
 
     return {cols, colGroupingModel};
-  }, [pivotColumns, pivotData, props.pivotSpec.rowDim]);
+  }, [
+    opsInPlay,
+    pivotColumns,
+    pivotData,
+    props.colDimAtLeafMode,
+    props.pivotSpec.rowDim,
+  ]);
 
   const [rowSelectionModel, setRowSelectionModel] = useState<string[]>([]);
   const [snackOpen, setSnackOpen] = useState(false);

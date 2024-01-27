@@ -3,9 +3,14 @@ export const flattenObject = (
   parentKey: string = '',
   result: {[key: string]: any} = {}
 ) => {
-  for (const key in obj) {
+  if (typeof obj !== 'object' || obj === null) {
+    return obj;
+  }
+  const keys = Object.keys(obj);
+  keys.sort();
+  keys.forEach(key => {
     if (!obj.hasOwnProperty(key)) {
-      continue;
+      return;
     }
     const newKey = parentKey ? `${parentKey}.${key}` : key;
     if (Array.isArray(obj[key])) {
@@ -15,7 +20,7 @@ export const flattenObject = (
     } else {
       result[newKey] = obj[key];
     }
-  }
+  })
   return result;
 };
 export const unflattenObject = (obj: {[key: string]: any}) => {
