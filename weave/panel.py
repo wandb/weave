@@ -157,3 +157,8 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
             "id": self.id,
             "config": self.config,
         }
+
+    def _ipython_display_(self):
+        from . import show
+
+        show.show(self)

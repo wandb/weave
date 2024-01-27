@@ -19,7 +19,6 @@ from . import storage
 # from . import ops
 # from . import codify
 # from .graph import Node  # used as a type in op definitions
-# from .show import show, show_url
 from .api import *
 
 # from . import panels
