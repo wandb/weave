@@ -15,7 +15,8 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [types-all, wandb>=0.15.5]
-        exclude: .*pyi$
+        # You have to exclude in 3 places. 1) here. 2) mypi.ini exclude, 3) skip_imports for each module in mypy.ini
+        exclude: (.*pyi$)|(weave/ecosystem)|(weave/tests)|(weave/panel)|(weave/ops)
   # Turn pyright back off, duplicative of mypy
   # - repo: https://github.com/RobertCraigie/pyright-python
   #   rev: v1.1.341

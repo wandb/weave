@@ -1,5 +1,6 @@
-import inspect
+import functools
 import typing
+from typing import ParamSpec, TypeVar, Callable, Optional
 
 
 from . import registry_mem
@@ -15,25 +16,29 @@ if typing.TYPE_CHECKING:
     from weave.gql_op_plugin import GqlOpPlugin
 
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
 def op(
     input_type: pyfunc_type_util.MaybeInputTypeType = None,
     # input_type: pyfunc_type_util.MaybeInputTypeType = None,
     output_type: pyfunc_type_util.MaybeOutputTypeType = None,
-    refine_output_type: typing.Optional[op_def.OpDef] = None,
-    name: typing.Optional[str] = None,
-    setter: typing.Optional[typing.Callable] = None,
-    render_info: typing.Optional[dict] = None,
+    refine_output_type: Optional[op_def.OpDef] = None,
+    name: Optional[str] = None,
+    setter: Optional[Callable] = None,
+    render_info: Optional[dict] = None,
     hidden: bool = False,
     pure: bool = True,
     _op_def_class: type[op_def.OpDef] = op_def.OpDef,
     *,  # Marks the rest of the arguments as keyword-only.
-    plugins: typing.Optional[dict[str, "GqlOpPlugin"]] = None,
+    plugins: Optional[dict[str, "GqlOpPlugin"]] = None,
     mutation: bool = False,
     # If True, the op will be weavified, ie it's resolver will be stored as a Weave
     # op graph. The compile node_ops pass will expand the node to the weavified
     # version, instead of executing the original python resolver body.
     weavify: bool = False,
-) -> typing.Callable[[typing.Callable], op_def.OpDef]:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator for declaring an op.
 
     Decorated functions must be typed, either with Python types or by declaring
@@ -44,7 +49,7 @@ def op(
     # For user ops, allow missing types.
     allow_unknowns = not context_state._loading_built_ins.get()
 
-    def wrap(f):
+    def wrap(f: Callable[P, R]) -> Callable[P, R]:
         weave_input_type = pyfunc_type_util.determine_input_type(
             f, input_type, allow_unknowns=allow_unknowns
         )
@@ -99,6 +104,8 @@ def op(
         # TODO: fix so we get mappability for custom (ecosystem) ops!
         if op.location is None:
             derive_op.derive_ops(op)
+
+        functools.update_wrapper(op_version, f)
 
         return op_version
 
