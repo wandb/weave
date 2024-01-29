@@ -1,4 +1,4 @@
-import {Box, Button, Typography} from '@material-ui/core';
+import {Box, Typography} from '@material-ui/core';
 import {
   DataGridPro as DataGrid,
   DataGridPro,

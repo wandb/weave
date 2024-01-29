@@ -18,6 +18,7 @@ import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {Call} from '../../../Browse2/callTree';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   SimplePageLayout,
@@ -31,7 +32,6 @@ import {useWeaveflowORMContext} from '../wfInterface/context';
 import {WFCall} from '../wfInterface/types';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
-import {opNiceName} from '../common/Links';
 
 // % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
