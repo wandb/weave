@@ -204,13 +204,6 @@ export const CallsTable: React.FC<{
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
   const hideControls = true;
 
-  console.log(
-    isPivoting,
-    effectiveFilter,
-    runsWithFeedbackQuery.result.length,
-    lowLevelFilter
-  );
-
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
