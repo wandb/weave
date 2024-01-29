@@ -10,6 +10,7 @@ from .. import wb_domain_types as wdt
 from ...ops_primitives import make_list
 from ...ops_arrow.list_ops import concat
 from ...ops_arrow import ArrowWeaveList
+from ...arrow.concat import concatenate_all
 from ... import util
 from ... import errors
 from ... import io_service
@@ -32,7 +33,7 @@ from .. import table
 from ... import artifact_fs
 from ...wandb_interface import wandb_stream_table
 from ...compile_table import KeyTree
-from ...ops_primitives import _dict_utils
+from ... import _dict_utils
 from ... import gql_json_cache
 
 tracer = engine_trace.tracer()
@@ -395,8 +396,6 @@ def process_history_awl_tables(tables: list[ArrowWeaveList]):
 
 
 def concat_awls(awls: list[ArrowWeaveList]):
-    from ...ops_arrow.concat import concatenate_all
-
     return concatenate_all(awls)
 
 

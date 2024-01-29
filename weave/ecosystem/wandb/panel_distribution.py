@@ -4,6 +4,8 @@ import typing
 import weave
 
 from . import weave_plotly
+from ... import weave_internal
+from ... import panel_util
 
 
 @weave.type()
@@ -36,14 +38,14 @@ class Distribution(weave.Panel):
         input_node = self.input_node
         unnested = weave.ops.unnest(input_node)
         return DistributionConfig(
-            value_fn=weave.define_fn(
+            value_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type}, lambda item: item  # type: ignore
             ),
-            label_fn=weave.define_fn(
+            label_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type}, lambda item: item  # type: ignore
             ),
             # Would be nice to call this weave.expr
-            bin_size=weave.make_node(10),  # type: ignore
+            bin_size=panel_util.make_node(10),  # type: ignore
         )
 
     @weave.op()

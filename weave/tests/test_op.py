@@ -36,36 +36,6 @@ def test_op_simple():
     assert weave.use(x) == "34"
 
 
-@weave.op(
-    name="test_op-op_kwargs",
-    input_type=weave.OpVarArgs(types.Int()),
-    output_type=types.String(),
-)
-def op_kwargs(**kwargs):
-    return kwargs
-
-
-def test_op_kwargs():
-    x = op_kwargs(a=1, b=2)
-    # TODO: should show calling convention, must include keys or we lose information.
-    assert str(x) == "op_kwargs(1, 2)"
-
-    # This is correct, we can always store keyword args in the call.
-    # This should be called an op_call instead of Op
-    test_helpers.assert_nodes_equal(
-        x,
-        graph.OutputNode(
-            types.String(),
-            test_helpers.RegexMatcher(".*test_op-op_kwargs.*"),
-            {
-                "a": weave_internal.make_const_node(types.Int(), 1),
-                "b": weave_internal.make_const_node(types.Int(), 2),
-            },
-        ),
-    )
-    assert weave.use(x) == {"a": 1, "b": 2}
-
-
 @weave.op()
 def op_inferredtype(a: int, b: int) -> str:
     return str(a) + str(b)

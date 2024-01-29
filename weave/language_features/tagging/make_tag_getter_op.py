@@ -4,7 +4,6 @@ from ... import weave_types as types
 from ... import decorator_op
 from . import tagged_value_type
 from . import tag_store
-from ...ops_arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 
 if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
@@ -27,6 +26,8 @@ def make_tag_getter_op(
     Returns:
         The op.
     """
+    from ...arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+
     # Uncomment below once we allow searching by type alone.
     # if tag_key is None and tag_type is None:
     #     raise ValueError("Must provide either tag_key or tag_type")

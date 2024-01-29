@@ -1,5 +1,7 @@
 import random
 import weave
+from weave.show import show_url
+from weave import panels
 
 # Weave package now defaults to eager mode, but lazy mode required for this example notebook for now.
 weave.use_lazy_execution()
@@ -28,13 +30,13 @@ panel: wandb.Distribution = wandb.Distribution(
     items, value_fn=lambda x: x["loss1"], label_fn=lambda x: x["str_val"], bin_size=1.5  # type: ignore
 )
 
-panel = weave.panels.Board(
+panel = panels.Board(
     {},
     [
-        weave.panels.BoardPanel(
+        panels.BoardPanel(
             panel, layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=12)
         )
     ],
 )
 
-print(weave.show_url(panel))
+print(show_url(panel))
