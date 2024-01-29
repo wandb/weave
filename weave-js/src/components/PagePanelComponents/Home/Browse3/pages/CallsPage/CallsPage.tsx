@@ -371,7 +371,6 @@ export const CallsTable: React.FC<{
               traceRootOptions.length <= 1 ||
               Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
             }
-            sx={{pt: 0, pb: 0}}
             disablePadding>
             <ListItemButton
               onClick={() => {

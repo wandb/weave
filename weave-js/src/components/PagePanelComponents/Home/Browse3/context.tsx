@@ -1,7 +1,7 @@
 import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {createContext, useCallback, useContext} from 'react';
-import {useLocation} from 'react-router-dom';
+import {useHistory, useLocation} from 'react-router-dom';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
@@ -643,3 +643,16 @@ export const WeaveflowPeekContext = createContext<{
 }>({
   isPeeking: false,
 });
+
+export const useClosePeek = () => {
+  const history = useHistory();
+  return () => {
+    const queryParams = new URLSearchParams(history.location.search);
+    if (queryParams.has('peekPath')) {
+      queryParams.delete('peekPath');
+      history.replace({
+        search: queryParams.toString(),
+      });
+    }
+  };
+};

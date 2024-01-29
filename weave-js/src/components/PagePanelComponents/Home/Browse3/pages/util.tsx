@@ -1,10 +1,10 @@
+import {Box} from '@material-ui/core';
 import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 
 import {SmallRef} from '../../Browse2/SmallRef';
-import {Box} from '@material-ui/core';
 
 export const useURLSearchParamsDict = () => {
   const {search} = useLocation();

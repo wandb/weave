@@ -1,7 +1,7 @@
 import {Box, FormControl, ListItem, TextField, Typography} from '@mui/material';
 import {Autocomplete} from '@mui/material';
 import _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 
 import {parseRef} from '../../../../../react';
 import {Call} from '../../Browse2/callTree';
@@ -16,6 +16,8 @@ import {
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
+import {WeaveAnimatedLoader} from '../../../../Panel2/WeaveAnimatedLoader';
+import {CenteredAnimatedLoader} from './common/Loader';
 
 export const CompareCallsPage: React.FC<{
   entity: string;
@@ -34,6 +36,7 @@ export const CompareCallsPage: React.FC<{
         ?.filter(item => item != null) as WFCall[]) ?? []
     );
   }, [orm.projectConnection, props.callIds]);
+  console.log(calls);
 
   const objectVersionOptions = useMemo(() => {
     if (props.secondaryDim == null) {
@@ -60,7 +63,14 @@ export const CompareCallsPage: React.FC<{
 
   const [selectedObjectVersion, setSelectedObjectVersion] = React.useState<
     string | null
-  >(Object.keys(objectVersionOptions)?.[0] ?? null);
+  >(null);
+
+  const initialSelectedObjectVersion = Object.keys(objectVersionOptions)?.[0];
+  useEffect(() => {
+    if (selectedObjectVersion == null && initialSelectedObjectVersion != null) {
+      setSelectedObjectVersion(initialSelectedObjectVersion);
+    }
+  }, [initialSelectedObjectVersion, selectedObjectVersion]);
 
   const callsFilteredToSecondaryDim = useMemo(() => {
     return calls.filter(
@@ -85,7 +95,14 @@ export const CompareCallsPage: React.FC<{
 
   const [selectedOpVersion, setSelectedOpVersion] = React.useState<
     string | null
-  >(Object.keys(subOpVersionOptions)?.[0] ?? null);
+  >(null);
+
+  const initialSelectedOpVersion = Object.keys(subOpVersionOptions)?.[0];
+  useEffect(() => {
+    if (selectedOpVersion == null && initialSelectedOpVersion != null) {
+      setSelectedOpVersion(initialSelectedOpVersion);
+    }
+  }, [initialSelectedOpVersion, selectedOpVersion]);
 
   const subcalls = useMemo(() => {
     return callsFilteredToSecondaryDim.flatMap(call =>
@@ -99,7 +116,14 @@ export const CompareCallsPage: React.FC<{
     return subcalls.map(call => call.rawCallSpan());
   }, [subcalls]);
 
-  // console.log(subruns);
+  console.log(
+    'subruns',
+    selectedObjectVersion,
+    selectedOpVersion,
+    callsFilteredToSecondaryDim,
+    subcalls,
+    subruns
+  );
 
   const getOptionLabel = useCallback(
     option => {
@@ -136,12 +160,52 @@ export const CompareCallsPage: React.FC<{
   // the controls for now as there is no need to change them.
   const showSubOpSelection = false;
 
-  if (!props.primaryDim) {
-    return <>Need a primary dimension</>;
-  }
-  if (!props.secondaryDim) {
-    return <>Need a secondary dimension</>;
-  }
+  const pageDetails = useMemo(() => {
+    if (calls.length === 0) {
+      return <CenteredAnimatedLoader />;
+    }
+    if (!props.primaryDim) {
+      return <>Need a primary dimension</>;
+    }
+    if (!props.secondaryDim) {
+      return <>Need a secondary dimension</>;
+    }
+    if (!props.callIds || props.callIds.length < 1) {
+      return <>Need more calls</>;
+    }
+
+    return (
+      <PivotRunsView
+        loading={false}
+        runs={subruns}
+        entity={props.entity}
+        project={props.project}
+        colDimAtLeafMode
+        pivotSpec={pivotSpec}
+        onPivotSpecChange={pivotSpec => {
+          setPivotSpec(pivotSpec);
+        }}
+        // Since we have a very constrained pivot, we can hide
+        // the controls for now as there is no need to change them.
+        // Punting on design
+        hideControls
+        // extraDataGridProps={
+        //   {
+        //     hideFooter: true,
+        //   } as any
+        // }
+      />
+    );
+  }, [
+    calls.length,
+    pivotSpec,
+    props.callIds,
+    props.entity,
+    props.primaryDim,
+    props.project,
+    props.secondaryDim,
+    subruns,
+  ]);
 
   return (
     <SimplePageLayout
@@ -172,7 +236,7 @@ export const CompareCallsPage: React.FC<{
                   overflowY: 'hidden',
                   alignItems: 'center',
                   gap: '8px',
-                  p: 1,
+                  p: 1.5,
                   '& li': {
                     padding: 0,
                     minWidth: '150px',
@@ -297,31 +361,7 @@ export const CompareCallsPage: React.FC<{
                 />
               </Box> */}
               <Box sx={{minHeight: '300px', flex: '1 1 auto'}}>
-                {!props.callIds || props.callIds.length < 1 ? (
-                  <>Need more calls</>
-                ) : (
-                  <PivotRunsView
-                    loading={false}
-                    runs={subruns}
-                    entity={props.entity}
-                    project={props.project}
-                    colDimAtLeafMode
-                    pivotSpec={pivotSpec}
-                    onPivotSpecChange={pivotSpec => {
-                      console.log(pivotSpec);
-                      setPivotSpec(pivotSpec);
-                    }}
-                    // Since we have a very constrained pivot, we can hide
-                    // the controls for now as there is no need to change them.
-                    // Punting on design
-                    hideControls
-                    // extraDataGridProps={
-                    //   {
-                    //     hideFooter: true,
-                    //   } as any
-                    // }
-                  />
-                )}
+                {pageDetails}
               </Box>
             </Box>
           ),

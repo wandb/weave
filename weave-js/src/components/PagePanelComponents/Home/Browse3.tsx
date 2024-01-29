@@ -32,6 +32,7 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
+  useClosePeek,
   useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
@@ -330,6 +331,7 @@ const MainPeekingLayout: FC = () => {
   const flexDirection = useFlexDirection();
 
   const {handleMousedown, drawerWidth, drawerHeight} = useDrawerResize();
+  const closePeek = useClosePeek();
 
   return (
     <Box
@@ -411,15 +413,7 @@ const MainPeekingLayout: FC = () => {
                       }}>
                       <IconButton
                         onClick={() => {
-                          const queryParams = new URLSearchParams(
-                            history.location.search
-                          );
-                          if (queryParams.has('peekPath')) {
-                            queryParams.delete('peekPath');
-                            history.replace({
-                              search: queryParams.toString(),
-                            });
-                          }
+                          closePeek();
                         }}>
                         <Close />
                       </IconButton>

@@ -24,7 +24,11 @@ import {
   DataGridColumnGroupingModel,
 } from '../../../Browse2/RunsTable';
 import {SmallRef} from '../../../Browse2/SmallRef';
-import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
+import {
+  useClosePeek,
+  useWeaveflowRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {renderCell} from '../util';
 
@@ -56,8 +60,13 @@ export const PivotRunsView: React.FC<
   const [pivotRowOptions, setPivotRowOptions] = useState<string[]>([]);
   const [pivotColOptions, setPivotColOptions] = useState<string[]>([]);
 
+  const runs = props.runs;
+
+  const currRowDim = props.pivotSpec.rowDim;
+  const currColDim = props.pivotSpec.colDim;
+  const onPivotSpecChange = props.onPivotSpecChange;
   useEffect(() => {
-    const runs = props.runs;
+    console.log('Rerunning');
     if (runs.length === 0) {
       return;
     }
@@ -74,20 +83,18 @@ export const PivotRunsView: React.FC<
     });
     setPivotRowOptions(options);
     setPivotColOptions(options);
+    console.log(options);
     if (options.length > 0) {
-      const currRowDim = props.pivotSpec.rowDim;
-      const currColDim = props.pivotSpec.colDim;
-
       if (currRowDim == null && currColDim != null) {
         const rowOptions = options.filter(o => o !== currColDim);
         if (rowOptions.length > 0) {
           if (rowOptions.includes('inputs.example')) {
-            props.onPivotSpecChange({
+            onPivotSpecChange({
               rowDim: 'inputs.example',
               colDim: currColDim,
             });
           } else {
-            props.onPivotSpecChange({
+            onPivotSpecChange({
               rowDim: rowOptions[0],
               colDim: currColDim,
             });
@@ -96,26 +103,26 @@ export const PivotRunsView: React.FC<
       } else if (currRowDim != null && currColDim == null) {
         const colOptions = options.filter(o => o !== currRowDim);
         if (colOptions.length > 0) {
-          props.onPivotSpecChange({
+          onPivotSpecChange({
             rowDim: currRowDim,
             colDim: colOptions[0],
           });
         }
       } else if (currRowDim == null && currColDim == null) {
         if (options[0] === 'inputs.self') {
-          props.onPivotSpecChange({
+          onPivotSpecChange({
             rowDim: options[1],
             colDim: options[0],
           });
         } else {
-          props.onPivotSpecChange({
+          onPivotSpecChange({
             rowDim: options[0],
             colDim: options[1],
           });
         }
       }
     }
-  }, [props]);
+  }, [currColDim, currRowDim, onPivotSpecChange, runs]);
 
   return (
     <Box
@@ -184,7 +191,7 @@ export const PivotRunsView: React.FC<
           </FormControl>
         </ListItem>
       </Box>
-      {props.pivotSpec.rowDim && props.pivotSpec.colDim ? (
+      {props.pivotSpec.rowDim != null && props.pivotSpec.colDim != null ? (
         <PivotRunsTable
           {...props}
           pivotSpec={
@@ -378,8 +385,6 @@ export const PivotRunsTable: React.FC<
       });
     }
 
-    console.log(colGroupingModel);
-
     return {cols, colGroupingModel};
   }, [
     opsInPlay,
@@ -389,6 +394,7 @@ export const PivotRunsTable: React.FC<
     props.pivotSpec.rowDim,
   ]);
 
+  const closePeek = useClosePeek();
   const [rowSelectionModel, setRowSelectionModel] = useState<string[]>([]);
   const [snackOpen, setSnackOpen] = useState(false);
 
@@ -448,11 +454,12 @@ export const PivotRunsTable: React.FC<
             setSnackOpen(true);
             return;
           }
-          setRowSelectionModel(newSelection as string[]);
 
-          // if (newSelection.length !== 2) {
-          //   return;
-          // }
+          setRowSelectionModel(newSelection as string[]);
+          if (newSelection.length === 0) {
+            closePeek();
+            return;
+          }
 
           const callIds: string[] = _.uniq(
             newSelection.flatMap(id => {
