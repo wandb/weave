@@ -1,4 +1,4 @@
-import {CircularProgress, IconButton} from '@material-ui/core';
+import {Button, CircularProgress, IconButton} from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
@@ -92,6 +92,7 @@ export const CallsTable: React.FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
+  hideFilters?: boolean;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
@@ -213,9 +214,12 @@ export const CallsTable: React.FC<{
         props.project,
         effectiveFilter
       )}
-      filterListSx={{
-        pb: isPivoting ? 0 : 1,
-      }}
+      filterListSx={
+        {
+          // Hide until we show filters
+          // pb: isPivoting ? 0 : 1,
+        }
+      }
       filterListItems={
         <>
           <IconButton
@@ -367,6 +371,7 @@ export const CallsTable: React.FC<{
               traceRootOptions.length <= 1 ||
               Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
             }
+            sx={{pt: 0, pb: 0}}
             disablePadding>
             <ListItemButton
               onClick={() => {
@@ -389,6 +394,10 @@ export const CallsTable: React.FC<{
           entity={props.entity}
           project={props.project}
           showCompareButton
+          // Since we have a very constrained pivot, we can hide
+          // the controls for now as there is no need to change them.
+          // Punting on design
+          hideControls
         />
       ) : (
         <RunsTable

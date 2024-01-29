@@ -4,6 +4,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 
 import {SmallRef} from '../../Browse2/SmallRef';
+import {Box} from '@material-ui/core';
 
 export const useURLSearchParamsDict = () => {
   const {search} = useLocation();
@@ -33,7 +34,15 @@ export const renderCell = (value: any) => {
     return value ? 'True' : 'False';
   }
   if (typeof value === 'number') {
-    return value.toFixed(4);
+    return (
+      <Box
+        sx={{
+          textAlign: 'right',
+          width: '100%',
+        }}>
+        {value.toFixed(4)}
+      </Box>
+    );
   }
   return value;
 };

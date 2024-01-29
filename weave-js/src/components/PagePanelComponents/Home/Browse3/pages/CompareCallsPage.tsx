@@ -132,6 +132,10 @@ export const CompareCallsPage: React.FC<{
     colDim: props.primaryDim,
   });
 
+  // Since we have a very constrained pivot, we can hide
+  // the controls for now as there is no need to change them.
+  const showSubOpSelection = false;
+
   if (!props.primaryDim) {
     return <>Need a primary dimension</>;
   }
@@ -177,20 +181,20 @@ export const CompareCallsPage: React.FC<{
                     fontSize: '0.875rem',
                   },
                 }}>
-                <Typography
+                {/* <Typography
                   style={{
                     width: '38px',
                     textAlign: 'center',
                     flex: '0 0 auto',
                   }}>
                   Select
-                </Typography>
+                </Typography> */}
                 <ListItem>
                   <FormControl fullWidth>
                     <Autocomplete
                       size="small"
                       renderInput={params => (
-                        <TextField {...params} label="Object" />
+                        <TextField {...params} label="Input" />
                       )}
                       value={selectedObjectVersion ?? ''}
                       onChange={(event, newValue) => {
@@ -202,23 +206,25 @@ export const CompareCallsPage: React.FC<{
                     />
                   </FormControl>
                 </ListItem>
-                <ListItem>
-                  <FormControl fullWidth>
-                    <Autocomplete
-                      size="small"
-                      renderInput={params => (
-                        <TextField {...params} label="Sub Op" />
-                      )}
-                      value={selectedOpVersion ?? ''}
-                      onChange={(event, newValue) => {
-                        setSelectedOpVersion(newValue);
-                      }}
-                      getOptionLabel={getOpOptionLabel}
-                      options={Object.keys(subOpVersionOptions)}
-                      disableClearable
-                    />
-                  </FormControl>
-                </ListItem>
+                {showSubOpSelection && (
+                  <ListItem>
+                    <FormControl fullWidth>
+                      <Autocomplete
+                        size="small"
+                        renderInput={params => (
+                          <TextField {...params} label="Sub Op" />
+                        )}
+                        value={selectedOpVersion ?? ''}
+                        onChange={(event, newValue) => {
+                          setSelectedOpVersion(newValue);
+                        }}
+                        getOptionLabel={getOpOptionLabel}
+                        options={Object.keys(subOpVersionOptions)}
+                        disableClearable
+                      />
+                    </FormControl>
+                  </ListItem>
+                )}
               </Box>
               {/* <Box
                 sx={{
@@ -305,6 +311,10 @@ export const CompareCallsPage: React.FC<{
                       console.log(pivotSpec);
                       setPivotSpec(pivotSpec);
                     }}
+                    // Since we have a very constrained pivot, we can hide
+                    // the controls for now as there is no need to change them.
+                    // Punting on design
+                    hideControls
                     // extraDataGridProps={
                     //   {
                     //     hideFooter: true,

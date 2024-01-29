@@ -291,7 +291,9 @@ export const RunsTable: FC<{
 
     let attributesKeys: {[key: string]: true} = {};
     spans.forEach(span => {
-      for (const [k, v] of Object.entries(flattenObject(span.attributes!))) {
+      for (const [k, v] of Object.entries(
+        flattenObject(span.attributes ?? {})
+      )) {
         if (v != null && k !== '_keys') {
           attributesKeys[k] = true;
         }
@@ -353,7 +355,7 @@ export const RunsTable: FC<{
       // All output keys as we don't have the order key yet.
       let outputKeys: {[key: string]: true} = {};
       spans.forEach(span => {
-        for (const [k, v] of Object.entries(flattenObject(span.output!))) {
+        for (const [k, v] of Object.entries(flattenObject(span.output ?? {}))) {
           if (v != null && (!k.startsWith('_') || k === '_result')) {
             outputKeys[k] = true;
           }
@@ -385,7 +387,9 @@ export const RunsTable: FC<{
 
       let feedbackKeys: {[key: string]: true} = {};
       spans.forEach(span => {
-        for (const [k, v] of Object.entries(flattenObject(span.feedback!))) {
+        for (const [k, v] of Object.entries(
+          flattenObject(span.feedback ?? {})
+        )) {
           if (v != null && k !== '_keys') {
             feedbackKeys[k] = true;
           }

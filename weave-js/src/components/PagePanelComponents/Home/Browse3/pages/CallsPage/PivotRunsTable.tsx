@@ -40,6 +40,7 @@ type PivotRunsTablePropsType = {
   project: string;
   colDimAtLeafMode?: boolean;
   showCompareButton?: boolean;
+  hideControls?: boolean;
   extraDataGridProps?: React.ComponentProps<typeof StyledDataGrid>;
 };
 
@@ -129,7 +130,7 @@ export const PivotRunsView: React.FC<
           flex: '0 0 auto',
           width: '100%',
           transition: 'width 0.1s ease-in-out',
-          display: 'flex',
+          display: props.hideControls ? 'none' : 'flex',
           flexDirection: 'row',
           overflowX: 'auto',
           overflowY: 'hidden',
