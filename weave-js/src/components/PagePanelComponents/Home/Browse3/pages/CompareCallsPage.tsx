@@ -13,11 +13,10 @@ import {
   PivotRunsView,
   WFHighLevelPivotSpec,
 } from './CallsPage/PivotRunsTable';
+import {CenteredAnimatedLoader} from './common/Loader';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
-import {WeaveAnimatedLoader} from '../../../../Panel2/WeaveAnimatedLoader';
-import {CenteredAnimatedLoader} from './common/Loader';
 
 export const CompareCallsPage: React.FC<{
   entity: string;
@@ -230,7 +229,7 @@ export const CompareCallsPage: React.FC<{
                   flex: '0 0 auto',
                   width: '100%',
                   transition: 'width 0.1s ease-in-out',
-                  display: 'flex',
+                  display: calls.length === 0 ? 'none' : 'flex',
                   flexDirection: 'row',
                   overflowX: 'auto',
                   overflowY: 'hidden',
