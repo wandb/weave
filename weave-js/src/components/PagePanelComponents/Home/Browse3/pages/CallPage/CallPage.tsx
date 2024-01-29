@@ -14,6 +14,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../../react';
+import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {Call} from '../../../Browse2/callTree';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../../context';
@@ -67,11 +68,21 @@ export const CallPage: React.FC<{
 };
 
 const useCallTabs = (call: WFCall) => {
+  const opVersion = call.opVersion();
+  const codeURI = opVersion ? opVersion.refUri() : null;
   return [
     {
       label: 'Call',
       content: <CallDetails wfCall={call} />,
     },
+    ...(codeURI
+      ? [
+          {
+            label: 'Code',
+            content: <Browse2OpDefCode uri={codeURI} />,
+          },
+        ]
+      : []),
     // {
     //   label: 'Child Calls',
     //   content: (
