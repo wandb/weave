@@ -1,8 +1,7 @@
-from __future__ import annotations
-
 import functools
 import typing
-from typing import ParamSpec, TypeVar, Callable, Optional
+from typing import TypeVar, Callable, Optional
+from typing_extensions import ParamSpec
 
 
 from . import registry_mem
