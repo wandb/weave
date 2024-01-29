@@ -13,17 +13,15 @@ import {
   GridColumnGroup,
 } from '@mui/x-data-grid';
 import _ from 'lodash';
-import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {parseRef} from '../../../../../../react';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {Call, SpanWithFeedback} from '../../../Browse2/callTree';
 import {
   buildTree,
   DataGridColumnGroupingModel,
 } from '../../../Browse2/RunsTable';
-import {SmallRef} from '../../../Browse2/SmallRef';
 import {
   useClosePeek,
   usePeekLocation,
@@ -31,7 +29,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {renderCell, useURLSearchParamsDict} from '../util';
+import {renderCell} from '../util';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
@@ -249,7 +247,7 @@ export const PivotRunsTable: React.FC<
     });
 
     // Step 2: Create a list of rows
-    const rows: Array<PivotDataRowType> = [];
+    const rows: PivotDataRowType[] = [];
     Object.keys(values).forEach(rowKey => {
       const row: PivotDataRowType = {
         id: rowKey,
@@ -495,7 +493,7 @@ export const PivotRunsTable: React.FC<
                   .map(col => {
                     return row[col]?.span_id;
                   })
-                  .filter(id => id != null);
+                  .filter(maybeId => maybeId != null);
               });
             })
           );

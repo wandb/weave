@@ -1,4 +1,4 @@
-import {Button, CircularProgress, IconButton} from '@material-ui/core';
+import {CircularProgress, IconButton} from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,

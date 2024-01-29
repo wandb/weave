@@ -20,7 +20,7 @@ export const flattenObject = (
     } else {
       result[newKey] = obj[key];
     }
-  })
+  });
   return result;
 };
 export const unflattenObject = (obj: {[key: string]: any}) => {

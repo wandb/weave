@@ -1,15 +1,12 @@
-import {Box, FormControl, ListItem, TextField, Typography} from '@mui/material';
+import {Box, FormControl, ListItem, TextField} from '@mui/material';
 import {Autocomplete} from '@mui/material';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
 
 import {parseRef} from '../../../../../react';
-import {Call} from '../../Browse2/callTree';
 import {objectRefDisplayName} from '../../Browse2/SmallRef';
-import {StyledDataGrid} from '../StyledDataGrid';
 import {
   getValueAtNestedKey,
-  PivotRunsTable,
   PivotRunsView,
   WFHighLevelPivotSpec,
 } from './CallsPage/PivotRunsTable';
@@ -171,8 +168,8 @@ export const CompareCallsPage: React.FC<{
         project={props.project}
         colDimAtLeafMode
         pivotSpec={pivotSpec}
-        onPivotSpecChange={pivotSpec => {
-          setPivotSpec(pivotSpec);
+        onPivotSpecChange={newPivotSpec => {
+          setPivotSpec(newPivotSpec);
         }}
         // Since we have a very constrained pivot, we can hide
         // the controls for now as there is no need to change them.
