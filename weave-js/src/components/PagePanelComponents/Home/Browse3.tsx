@@ -33,6 +33,7 @@ import {
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
   useClosePeek,
+  usePeekLocation,
   useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
@@ -168,30 +169,6 @@ export const Browse3: FC<{
   );
 };
 
-const usePeekLocation = (peekPath?: string) => {
-  return useMemo(() => {
-    if (peekPath == null) {
-      return undefined;
-    }
-    const peekPathParts = peekPath.split('?');
-    const peekPathname = peekPathParts[0];
-    const peekSearch = peekPathParts[1] ?? '';
-    const peekSearchParts = peekSearch.split('#');
-    const peekSearchString = peekSearchParts[0];
-    const peekHash = peekSearchParts[1] ?? '';
-
-    return {
-      key: 'peekLoc',
-      pathname: peekPathname,
-      search: peekSearchString,
-      hash: peekHash,
-      state: {
-        '[userDefined]': true,
-      },
-    };
-  }, [peekPath]);
-};
-
 const Browse3Mounted: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
@@ -322,7 +299,7 @@ const MainPeekingLayout: FC = () => {
   const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
   const generalProjectRoot = browse2Context.projectUrl(':entity', ':project');
   const query = useURLSearchParamsDict();
-  const peekLocation = usePeekLocation(query.peekPath ?? undefined);
+  const peekLocation = usePeekLocation();
   const generalBase = browse2Context.projectUrl(
     params.entity!,
     params.project!

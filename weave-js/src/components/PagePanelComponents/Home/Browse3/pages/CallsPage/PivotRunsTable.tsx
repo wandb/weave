@@ -26,11 +26,12 @@ import {
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {
   useClosePeek,
+  usePeekLocation,
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {renderCell} from '../util';
+import {renderCell, useURLSearchParamsDict} from '../util';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
@@ -66,7 +67,6 @@ export const PivotRunsView: React.FC<
   const currColDim = props.pivotSpec.colDim;
   const onPivotSpecChange = props.onPivotSpecChange;
   useEffect(() => {
-    console.log('Rerunning');
     if (runs.length === 0) {
       return;
     }
@@ -83,7 +83,6 @@ export const PivotRunsView: React.FC<
     });
     setPivotRowOptions(options);
     setPivotColOptions(options);
-    console.log(options);
     if (options.length > 0) {
       if (currRowDim == null && currColDim != null) {
         const rowOptions = options.filter(o => o !== currColDim);
@@ -397,6 +396,31 @@ export const PivotRunsTable: React.FC<
   const closePeek = useClosePeek();
   const [rowSelectionModel, setRowSelectionModel] = useState<string[]>([]);
   const [snackOpen, setSnackOpen] = useState(false);
+
+  // Update row selection model from the URL.
+  const peekLocation = usePeekLocation();
+  useEffect(() => {
+    if (!props.showCompareButton) {
+      return;
+    }
+    const params = new URLSearchParams(peekLocation?.search ?? '');
+    const entries = Array.from(params.entries());
+    const searchDict = _.fromPairs(entries);
+    const callIds: string[] = JSON.parse(searchDict.callIds ?? '[]');
+    const rowIds: string[] = _.uniq(
+      callIds
+        .map(callId => {
+          return pivotData.find(row => {
+            return Array.from(pivotColumns).find(col => {
+              return row[col]?.span_id === callId;
+            });
+          })?.id;
+        })
+        .filter(id => id != null)
+    );
+
+    setRowSelectionModel(rowIds);
+  }, [peekLocation, pivotColumns, pivotData, props.showCompareButton]);
 
   if (props.loading) {
     return <CircularProgress />;

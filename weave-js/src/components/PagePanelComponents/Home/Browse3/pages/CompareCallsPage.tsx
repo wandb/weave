@@ -35,7 +35,6 @@ export const CompareCallsPage: React.FC<{
         ?.filter(item => item != null) as WFCall[]) ?? []
     );
   }, [orm.projectConnection, props.callIds]);
-  console.log(calls);
 
   const objectVersionOptions = useMemo(() => {
     if (props.secondaryDim == null) {
@@ -114,15 +113,6 @@ export const CompareCallsPage: React.FC<{
   const subruns = useMemo(() => {
     return subcalls.map(call => call.rawCallSpan());
   }, [subcalls]);
-
-  console.log(
-    'subruns',
-    selectedObjectVersion,
-    selectedOpVersion,
-    callsFilteredToSecondaryDim,
-    subcalls,
-    subruns
-  );
 
   const getOptionLabel = useCallback(
     option => {
@@ -259,13 +249,13 @@ export const CompareCallsPage: React.FC<{
                       renderInput={params => (
                         <TextField {...params} label="Input" />
                       )}
-                      value={selectedObjectVersion ?? ''}
+                      value={selectedObjectVersion ?? null}
                       onChange={(event, newValue) => {
                         setSelectedObjectVersion(newValue);
                       }}
                       getOptionLabel={getOptionLabel}
                       options={Object.keys(objectVersionOptions)}
-                      disableClearable
+                      disableClearable={selectedObjectVersion != null}
                     />
                   </FormControl>
                 </ListItem>
@@ -277,13 +267,13 @@ export const CompareCallsPage: React.FC<{
                         renderInput={params => (
                           <TextField {...params} label="Sub Op" />
                         )}
-                        value={selectedOpVersion ?? ''}
+                        value={selectedOpVersion ?? null}
                         onChange={(event, newValue) => {
                           setSelectedOpVersion(newValue);
                         }}
                         getOptionLabel={getOpOptionLabel}
                         options={Object.keys(subOpVersionOptions)}
-                        disableClearable
+                        disableClearable={selectedOpVersion != null}
                       />
                     </FormControl>
                   </ListItem>

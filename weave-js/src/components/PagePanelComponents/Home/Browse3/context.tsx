@@ -1,12 +1,13 @@
 import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {createContext, useCallback, useContext} from 'react';
+import React, {createContext, useCallback, useContext, useMemo} from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
+import {useURLSearchParamsDict} from './pages/util';
 
 const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
   if (!filter) {
@@ -655,4 +656,30 @@ export const useClosePeek = () => {
       });
     }
   };
+};
+
+export const usePeekLocation = () => {
+  const {peekPath} = useURLSearchParamsDict();
+
+  return useMemo(() => {
+    if (peekPath == null) {
+      return undefined;
+    }
+    const peekPathParts = peekPath.split('?');
+    const peekPathname = peekPathParts[0];
+    const peekSearch = peekPathParts[1] ?? '';
+    const peekSearchParts = peekSearch.split('#');
+    const peekSearchString = peekSearchParts[0];
+    const peekHash = peekSearchParts[1] ?? '';
+
+    return {
+      key: 'peekLoc',
+      pathname: peekPathname,
+      search: peekSearchString,
+      hash: peekHash,
+      state: {
+        '[userDefined]': true,
+      },
+    };
+  }, [peekPath]);
 };
