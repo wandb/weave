@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import typing
 from typing import ParamSpec, TypeVar, Callable, Optional
