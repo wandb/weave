@@ -6,7 +6,7 @@ import json
 import os
 
 
-def test_graph_playback():
+def test_graph_playback(dev_only_admin_env_override):
     for payload in execute_payloads:
         res = handle_request(payload, True, storage.make_js_serializer())
         res.results.unwrap()

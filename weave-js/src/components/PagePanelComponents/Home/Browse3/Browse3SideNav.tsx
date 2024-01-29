@@ -1,19 +1,9 @@
 import {
-  AutoFixHigh,
   Category,
-  DashboardCustomize,
-  Dataset,
-  Layers,
   ManageHistory,
-  ModelTraining,
   NavigateBefore,
   NavigateNext,
-  Rule,
-  Scoreboard,
   Segment,
-  TableChart,
-  Tune,
-  TypeSpecimen,
   Undo,
 } from '@mui/icons-material';
 import {
@@ -42,7 +32,7 @@ import {useHistory, useParams} from 'react-router-dom';
 
 import {useProjectsForEntity} from '../query';
 import {useWeaveflowRouteContext} from './context';
-import {WFHighLevelCallFilter} from './pages/CallsPage';
+import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
@@ -64,6 +54,12 @@ type NavigationCallbacks = {
 type Browse3ProjectSideNavProps = {
   entity: string;
   project: string;
+  /**
+   * If true, the sidebar will be collapsed by default.
+   * If false, the sidebar will be expanded by default.
+   * If undefined, the sidebar will be expanded by default unless there is a peekPath.
+   */
+  preferCollapsed?: boolean;
   selectedCategory?:
     | 'objects'
     | 'calls'
@@ -106,6 +102,9 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
       return {};
     }
   }, [query.filter]);
+  const containsPeekPath = useMemo(() => {
+    return query.peekPath != null && query.peekPath !== '';
+  }, [query.peekPath]);
   const selectedNavSection = useMemo(() => {
     if (params.tab === 'types' || params.tab === 'type-versions') {
       return 'types';
@@ -132,7 +131,7 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
     return filters[category];
   }, [filters]);
 
-  const router = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   if (!currentProject || !currentEntity) {
     return null;
   }
@@ -142,32 +141,35 @@ export const RouteAwareBrowse3ProjectSideNav: FC<{
       project={currentProject}
       selectedCategory={selectedNavSection}
       filterCategory={filterCategory}
+      preferCollapsed={containsPeekPath}
       navigateToProject={project => {
-        history.push(router.projectUrl(params.entity, project));
+        history.push(baseRouter.projectUrl(params.entity, project));
       }}
       navigateToObjectVersions={(filter?: WFHighLevelObjectVersionFilter) => {
         history.push(
-          router.objectVersionsUIUrl(params.entity, params.project, filter)
+          baseRouter.objectVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToCalls={(filter?: WFHighLevelCallFilter) => {
-        history.push(router.callsUIUrl(params.entity, params.project, filter));
+        history.push(
+          baseRouter.callsUIUrl(params.entity, params.project, filter)
+        );
       }}
       navigateToTypeVersions={(filter?: WFHighLevelTypeVersionFilter) => {
         history.push(
-          router.typeVersionsUIUrl(params.entity, params.project, filter)
+          baseRouter.typeVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToOpVersions={(filter?: WFHighLevelOpVersionFilter) => {
         history.push(
-          router.opVersionsUIUrl(params.entity, params.project, filter)
+          baseRouter.opVersionsUIUrl(params.entity, params.project, filter)
         );
       }}
       navigateToBoards={() => {
-        history.push(router.boardsUIUrl(params.entity, params.project));
+        history.push(baseRouter.boardsUIUrl(params.entity, params.project));
       }}
       navigateToTables={() => {
-        history.push(router.tablesUIUrl(params.entity, params.project));
+        history.push(baseRouter.tablesUIUrl(params.entity, params.project));
       }}
       navigateAwayFromProject={props.navigateAwayFromProject}
     />
@@ -180,10 +182,18 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
   const projects = useMemo(() => {
     return [props.project, ...(entityProjectsValue.result ?? [])];
   }, [entityProjectsValue.result, props.project]);
-  const wbSidebarWidth = 56;
+  const wbSidebarWidth = 57;
   const wbSideBarSpeed = 0.2;
   const initialWidth = drawerWidth - wbSidebarWidth;
-  const [open, setOpen] = useState(true);
+  const [userControlledOpen, setUserControlledOpen] = useState<
+    boolean | undefined
+  >(undefined);
+  const open = useMemo(() => {
+    if (userControlledOpen !== undefined) {
+      return userControlledOpen;
+    }
+    return !props.preferCollapsed;
+  }, [props.preferCollapsed, userControlledOpen]);
   const adjustedDrawerWidth = useMemo(() => {
     return open ? drawerWidth : wbSidebarWidth;
   }, [open]);
@@ -236,7 +246,7 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
           flexDirection: 'row',
           gap: 1,
         }}>
-        <IconButton size="small" onClick={() => setOpen(o => !o)}>
+        <IconButton size="small" onClick={() => setUserControlledOpen(o => !o)}>
           {open ? <NavigateBefore /> : <NavigateNext />}
         </IconButton>
         {open && (
@@ -331,7 +341,6 @@ const SideBarNavItem: FC<{
         <ListItemIcon>{props.item.icon}</ListItemIcon>
         <ListItemText primary={props.item.title} />
       </ListItemButton>
-      {/* <BottomNavigationAction label="Recents" icon={<Restore />} /> */}
       {props.item.children && (
         <List disablePadding>
           {props.item.children.map((item, itemIndex) => {
@@ -399,6 +408,21 @@ const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
   const sections: SectionType[] = useMemo(() => {
     return [
       {
+        title: 'Structure',
+        items: [
+          {
+            title: 'Operations', // 'Methods (OpDefVersions)',
+            selected: props.selectedCategory === 'ops',
+            icon: <ManageHistory />,
+            onClick: () => {
+              props.navigateToOpVersions({
+                isLatest: true,
+              });
+            },
+          },
+        ],
+      },
+      {
         title: 'Records',
         items: [
           {
@@ -416,30 +440,30 @@ const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
               });
             },
             // TODO: Get Feedback from team on this
-            children: [
-              {
-                title: 'Models',
-                icon: <Layers />,
-                selected: props.filterCategory === 'model',
-                onClick: () => {
-                  props.navigateToObjectVersions({
-                    typeCategory: 'model',
-                    latest: true,
-                  });
-                },
-              },
-              {
-                title: 'Datasets',
-                icon: <Dataset />,
-                selected: props.filterCategory === 'dataset',
-                onClick: () => {
-                  props.navigateToObjectVersions({
-                    typeCategory: 'dataset',
-                    latest: true,
-                  });
-                },
-              },
-            ],
+            // children: [
+            //   {
+            //     title: 'Models',
+            //     icon: <Layers />,
+            //     selected: props.filterCategory === 'model',
+            //     onClick: () => {
+            //       props.navigateToObjectVersions({
+            //         typeCategory: 'model',
+            //         latest: true,
+            //       });
+            //     },
+            //   },
+            //   {
+            //     title: 'Datasets',
+            //     icon: <Dataset />,
+            //     selected: props.filterCategory === 'dataset',
+            //     onClick: () => {
+            //       props.navigateToObjectVersions({
+            //         typeCategory: 'dataset',
+            //         latest: true,
+            //       });
+            //     },
+            //   },
+            // ],
           },
           {
             title: 'Calls', // 'Traces (Calls)',
@@ -459,95 +483,95 @@ const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
               });
             },
             // TODO: Get Feedback from team on this
-            children: [
-              {
-                title: 'Train',
-                selected: props.filterCategory === 'train',
-                icon: <ModelTraining />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'train'});
-                },
-              },
-              {
-                title: 'Predict',
-                selected: props.filterCategory === 'predict',
-                icon: <AutoFixHigh />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'predict'});
-                },
-              },
-              {
-                title: 'Score',
-                selected: props.filterCategory === 'score',
-                icon: <Scoreboard />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'score'});
-                },
-              },
-              {
-                title: 'Evaluate',
-                selected: props.filterCategory === 'evaluate',
-                icon: <Rule />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'evaluate'});
-                },
-              },
-              {
-                title: 'Tune',
-                selected: props.filterCategory === 'tune',
-                icon: <Tune />,
-                onClick: () => {
-                  props.navigateToCalls({opCategory: 'tune'});
-                },
-              },
-            ],
+            // children: [
+            //   {
+            //     title: 'Train',
+            //     selected: props.filterCategory === 'train',
+            //     icon: <ModelTraining />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'train'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Predict',
+            //     selected: props.filterCategory === 'predict',
+            //     icon: <AutoFixHigh />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'predict'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Score',
+            //     selected: props.filterCategory === 'score',
+            //     icon: <Scoreboard />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'score'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Evaluate',
+            //     selected: props.filterCategory === 'evaluate',
+            //     icon: <Rule />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'evaluate'});
+            //     },
+            //   },
+            //   {
+            //     title: 'Tune',
+            //     selected: props.filterCategory === 'tune',
+            //     icon: <Tune />,
+            //     onClick: () => {
+            //       props.navigateToCalls({opCategory: 'tune'});
+            //     },
+            //   },
+            // ],
           },
         ],
       },
-      {
-        title: 'Structure',
-        items: [
-          {
-            title: 'Types', // 'Classes (TypeVersions)',
-            selected: props.selectedCategory === 'types',
-            icon: <TypeSpecimen />,
-            onClick: () => {
-              props.navigateToTypeVersions();
-            },
-          },
-          {
-            title: 'Operations', // 'Methods (OpDefVersions)',
-            selected: props.selectedCategory === 'ops',
-            icon: <ManageHistory />,
-            onClick: () => {
-              props.navigateToOpVersions({
-                isLatest: true,
-              });
-            },
-          },
-        ],
-      },
-      {
-        title: 'Analytics',
-        items: [
-          {
-            title: 'Boards',
-            selected: props.selectedCategory === 'boards',
-            icon: <DashboardCustomize />,
-            onClick: () => {
-              props.navigateToBoards();
-            },
-          },
-          {
-            title: 'Tables',
-            selected: props.selectedCategory === 'tables',
-            icon: <TableChart />,
-            onClick: () => {
-              props.navigateToTables();
-            },
-          },
-        ],
-      },
+      // {
+      //   title: 'Structure',
+      //   items: [
+      //     {
+      //       title: 'Types', // 'Classes (TypeVersions)',
+      //       selected: props.selectedCategory === 'types',
+      //       icon: <TypeSpecimen />,
+      //       onClick: () => {
+      //         props.navigateToTypeVersions();
+      //       },
+      //     },
+      //     {
+      //       title: 'Operations', // 'Methods (OpDefVersions)',
+      //       selected: props.selectedCategory === 'ops',
+      //       icon: <ManageHistory />,
+      //       onClick: () => {
+      //         props.navigateToOpVersions({
+      //           isLatest: true,
+      //         });
+      //       },
+      //     },
+      //   ],
+      // },
+      // {
+      //   title: 'Analytics',
+      //   items: [
+      //     {
+      //       title: 'Boards',
+      //       selected: props.selectedCategory === 'boards',
+      //       icon: <DashboardCustomize />,
+      //       onClick: () => {
+      //         props.navigateToBoards();
+      //       },
+      //     },
+      //     {
+      //       title: 'Tables',
+      //       selected: props.selectedCategory === 'tables',
+      //       icon: <TableChart />,
+      //       onClick: () => {
+      //         props.navigateToTables();
+      //       },
+      //     },
+      //   ],
+      // },
     ];
   }, [props]);
   return sections;

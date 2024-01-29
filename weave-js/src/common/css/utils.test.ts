@@ -1,4 +1,4 @@
-import {hexToRGB} from './globals.styles';
+import {Color, hexToRGB} from './utils';
 
 describe('hexToRGB', () => {
   it('converts six value syntax', () => {
@@ -18,5 +18,22 @@ describe('hexToRGB', () => {
   it('throws when given invalid formats', () => {
     expect(() => hexToRGB('#FFFF')).toThrow();
     expect(() => hexToRGB('#ggg')).toThrow();
+  });
+});
+
+describe('Color.fromHex', () => {
+  it('parses six value syntax', () => {
+    const c = Color.fromHex('#123456');
+    expect(c.r).toEqual(18);
+    expect(c.g).toEqual(52);
+    expect(c.b).toEqual(86);
+    expect(c.a).toEqual(undefined);
+  });
+  it('parses three value syntax', () => {
+    const c = Color.fromHex('#fab');
+    expect(c.r).toEqual(255);
+    expect(c.g).toEqual(170);
+    expect(c.b).toEqual(187);
+    expect(c.a).toEqual(undefined);
   });
 });

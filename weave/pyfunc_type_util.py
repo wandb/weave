@@ -66,7 +66,7 @@ def determine_input_type(
             existing_weave_type = weave_input_type.arg_types.get(input_name)
             if python_type is not None:
                 inferred_type = infer_types.python_type_to_type(python_type)
-                if inferred_type == types.UnknownType():
+                if not allow_unknowns and inferred_type == types.UnknownType():
                     raise errors.WeaveDefinitionError(
                         "Weave Type could not be determined from Python type (%s) for arg: %s."
                         % (python_type, input_name)

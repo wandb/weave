@@ -9,16 +9,18 @@ export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
     return opDefCodeNode(uri);
   }, [uri]);
   const opPyContentsQuery = useNodeValue(opPyContents);
-  const text = opPyContentsQuery.result ?? '';
+  const text = opPyContentsQuery.loading ? '' : opPyContentsQuery.result;
   return (
     <Editor
-      height={500}
+      height={'100%'}
       defaultLanguage="python"
       loading={opPyContentsQuery.loading}
       value={text}
       options={{
         readOnly: true,
         minimap: {enabled: false},
+        scrollBeyondLastLine: false,
+        padding: {top: 10, bottom: 10},
       }}
     />
   );

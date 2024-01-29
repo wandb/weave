@@ -366,6 +366,15 @@ def default_monitor() -> Monitor:
 
 
 def _get_global_monitor() -> typing.Optional[Monitor]:
+    client = graph_client_context.get_graph_client()
+    if client is not None:
+        if not isinstance(
+            client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+        ):
+            raise ValueError(
+                "monitor logging (via openai patch for example) is only supported with wandb client currently"
+            )
+        return Monitor(client.runs_st)
     return _global_monitor
 
 

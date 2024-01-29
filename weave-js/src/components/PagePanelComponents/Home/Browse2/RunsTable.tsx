@@ -1,27 +1,28 @@
-import {Chip} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
   GridColDef,
   GridColumnGroup,
+  GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {parseRef} from '@wandb/weave/react';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
-import moment from 'moment';
-import React, {FC, useEffect, useMemo, useRef} from 'react';
-import {Link, useParams} from 'react-router-dom';
+import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
+import {useParams} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../Browse3/context';
-import {OpVersionLink} from '../Browse3/pages/common/Links';
+import {Timestamp} from '../../../Timestamp';
+import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
+import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
+import {StatusChip} from '../Browse3/pages/common/StatusChip';
+import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
+import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {SmallRef} from './SmallRef';
 
-type DataGridColumnGroupingModel = Exclude<
+export type DataGridColumnGroupingModel = Exclude<
   React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
   undefined
 >;
@@ -54,7 +55,10 @@ function addToTree(
   addToTree(newNode, fields.slice(1), fullPath);
 }
 
-function buildTree(strings: string[], rootGroupName: string): GridColumnGroup {
+export function buildTree(
+  strings: string[],
+  rootGroupName: string
+): GridColumnGroup {
   const root: GridColumnGroup = {groupId: rootGroupName, children: []};
 
   for (const str of strings) {
@@ -69,7 +73,6 @@ export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
 }> = ({loading, spans}) => {
-  const routeContext = useWeaveflowRouteContext();
   const showIO = useMemo(() => {
     return Array.from(new Set(spans.map(span => span.name))).length === 1;
   }, [spans]);
@@ -102,13 +105,14 @@ export const RunsTable: FC<{
       return {
         id: call.span_id,
         ormCall,
+        loading,
         opVersion: ormCall?.opVersion()?.op()?.name(),
         isRoot: ormCall?.parentCall() == null,
         opCategory: ormCall?.opVersion()?.opCategory(),
         trace_id: call.trace_id,
         status_code: call.status_code,
         timestampMs: call.timestamp,
-        latency: monthRoundedTime(call.summary.latency_s, true),
+        latency: call.summary.latency_s,
         ..._.mapValues(
           _.mapKeys(
             _.omitBy(args, v => v == null),
@@ -117,9 +121,7 @@ export const RunsTable: FC<{
             }
           ),
           v =>
-            typeof v === 'string' ||
-            typeof v === 'boolean' ||
-            typeof v === 'number'
+            typeof v === 'string' || typeof v === 'number'
               ? v
               : JSON.stringify(v)
         ),
@@ -134,9 +136,7 @@ export const RunsTable: FC<{
             }
           ),
           v =>
-            typeof v === 'string' ||
-            typeof v === 'boolean' ||
-            typeof v === 'number'
+            typeof v === 'string' || typeof v === 'number'
               ? v
               : JSON.stringify(v)
         ),
@@ -150,81 +150,76 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [orm?.projectConnection, spans]);
+  }, [orm?.projectConnection, spans, loading]);
+
+  // Highlight table row if it matches peek drawer.
+  const query = useURLSearchParamsDict();
+  const {peekPath} = query;
+  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const rowIds = useMemo(() => {
+    return tableData.map(row => row.id);
+  }, [tableData]);
+  const [rowSelectionModel, setRowSelectionModel] =
+    useState<GridRowSelectionModel>([]);
+  useEffect(() => {
+    if (rowIds.length === 0) {
+      // Data may have not loaded
+      return;
+    }
+    if (peekId == null) {
+      // No peek drawer, clear any selection
+      setRowSelectionModel([]);
+    } else {
+      // If peek drawer matches a row, select it.
+      // If not, don't modify selection.
+      if (rowIds.includes(peekId)) {
+        setRowSelectionModel([peekId]);
+      }
+    }
+  }, [rowIds, peekId]);
 
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
-        field: 'timestampMs',
-        headerName: 'Timestamp',
-        width: 150,
-        minWidth: 150,
-        maxWidth: 150,
-        renderCell: cellParams => {
-          return moment(cellParams.row.timestampMs).format(
-            'YYYY-MM-DD HH:mm:ss'
-          );
-        },
-      },
-
-      {
-        flex: !showIO ? 1 : undefined,
-        // width: 100,
         field: 'span_id',
         headerName: 'Call',
+        width: 75,
+        minWidth: 75,
+        maxWidth: 75,
         renderCell: rowParams => {
+          // return truncateID(rowParams.row.id);
           return (
-            <Link
-              to={routeContext.callUIUrl(
-                params.entity,
-                params.project,
-                rowParams.row.trace_id,
-                rowParams.row.id
-              )}>
-              {rowParams.row.id}
-            </Link>
+            <CallLink
+              entityName={params.entity}
+              projectName={params.project}
+              callId={rowParams.row.id}
+            />
           );
         },
       },
-
-      ...(orm
-        ? [
-            {
-              field: 'opCategory',
-              headerName: 'Category',
-              width: 100,
-              minWidth: 100,
-              maxWidth: 100,
-              renderCell: (cellParams: any) => {
-                if (cellParams.value == null) {
-                  return '';
-                }
-
-                const color = {
-                  train: 'success',
-                  predict: 'info',
-                  score: 'error',
-                  evaluate: 'warning',
-                  // 'tune': 'warning',
-                }[cellParams.row.opCategory + ''];
-                return (
-                  <Chip
-                    label={cellParams.row.opCategory}
-                    size="small"
-                    color={color as any}
-                  />
-                );
-              },
-            },
-          ]
-        : []),
-
+      {
+        field: 'status_code',
+        headerName: 'Status',
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
+        width: 70,
+        minWidth: 70,
+        maxWidth: 70,
+        renderCell: cellParams => {
+          return (
+            <div style={{margin: 'auto'}}>
+              <StatusChip value={cellParams.row.status_code} iconOnly />
+            </div>
+          );
+        },
+      },
       ...(orm
         ? [
             {
               flex: !showIO ? 1 : undefined,
               field: 'opVersion',
-              headerName: 'Name',
+              headerName: 'Op',
               renderCell: (rowParams: any) => {
                 const opVersion = rowParams.row.ormCall?.opVersion();
                 if (opVersion == null) {
@@ -236,41 +231,56 @@ export const RunsTable: FC<{
                     projectName={opVersion.project()}
                     opName={opVersion.op().name()}
                     version={opVersion.version()}
+                    versionIndex={opVersion.versionIndex()}
                   />
                 );
               },
             },
           ]
         : []),
+      ...(orm
+        ? [
+            {
+              field: 'opCategory',
+              headerName: 'Category',
+              width: 100,
+              minWidth: 100,
+              maxWidth: 100,
+              renderCell: (cellParams: any) => {
+                return (
+                  cellParams.value && <CategoryChip value={cellParams.value} />
+                );
+              },
+            },
+          ]
+        : []),
+
       {
-        field: 'status_code',
-        headerName: 'Status',
+        field: 'timestampMs',
+        headerName: 'Called',
         width: 100,
         minWidth: 100,
         maxWidth: 100,
         renderCell: cellParams => {
           return (
-            <Chip
-              label={cellParams.row.status_code}
-              size="small"
-              color={
-                cellParams.row.status_code === 'SUCCESS'
-                  ? 'success'
-                  : cellParams.row.status_code === 'ERROR'
-                  ? 'error'
-                  : undefined
-              }
+            <Timestamp
+              value={cellParams.row.timestampMs / 1000}
+              format="relative"
             />
           );
         },
       },
+
       {
         field: 'latency',
         headerName: 'Latency',
-        width: 125,
-        minWidth: 125,
-        maxWidth: 125,
+        width: 100,
+        minWidth: 100,
+        maxWidth: 100,
         // flex: !showIO ? 1 : undefined,
+        renderCell: cellParams => {
+          return monthRoundedTime(cellParams.row.latency);
+        },
       },
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
@@ -301,27 +311,17 @@ export const RunsTable: FC<{
       const attributesGrouping = buildTree(attributesOrder, 'attributes');
       colGroupingModel.push(attributesGrouping);
       for (const key of attributesOrder) {
-        cols.push({
-          flex: 1,
-          minWidth: 150,
-          field: 'attributes.' + key,
-          headerName: key.split('.').slice(-1)[0],
-          renderCell: cellParams => {
-            if (
-              typeof cellParams.row['attributes.' + key] === 'string' &&
-              cellParams.row['attributes.' + key].startsWith(
-                'wandb-artifact:///'
-              )
-            ) {
-              return (
-                <SmallRef
-                  objRef={parseRef(cellParams.row['attributes.' + key])}
-                />
-              );
-            }
-            return cellParams.row['attributes.' + key];
-          },
-        });
+        if (!key.startsWith('_')) {
+          cols.push({
+            flex: 1,
+            minWidth: 150,
+            field: 'attributes.' + key,
+            headerName: key.split('.').slice(-1)[0],
+            renderCell: cellParams => {
+              return renderCell(cellParams.row['attributes.' + key]);
+            },
+          });
+        }
       }
 
       const inputOrder =
@@ -343,15 +343,7 @@ export const RunsTable: FC<{
           field: 'input_' + key,
           headerName: key,
           renderCell: cellParams => {
-            if (
-              typeof cellParams.row['input_' + key] === 'string' &&
-              cellParams.row['input_' + key].startsWith('wandb-artifact:///')
-            ) {
-              return (
-                <SmallRef objRef={parseRef(cellParams.row['input_' + key])} />
-              );
-            }
-            return cellParams.row['input_' + key];
+            return renderCell(cellParams.row['input_' + key]);
           },
         });
         inputGroup.children.push({field: 'input_' + key});
@@ -386,15 +378,7 @@ export const RunsTable: FC<{
           field: 'output.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {
-            if (
-              typeof cellParams.row['output.' + key] === 'string' &&
-              cellParams.row['output.' + key].startsWith('wandb-artifact:///')
-            ) {
-              return (
-                <SmallRef objRef={parseRef(cellParams.row['output.' + key])} />
-              );
-            }
-            return cellParams.row['output.' + key];
+            return renderCell(cellParams.row['output.' + key]);
           },
         });
       }
@@ -426,25 +410,17 @@ export const RunsTable: FC<{
           field: 'feedback.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {
-            if (
-              typeof cellParams.row['feedback.' + key] === 'string' &&
-              cellParams.row['feedback.' + key].startsWith('wandb-artifact:///')
-            ) {
-              return (
-                <SmallRef
-                  objRef={parseRef(cellParams.row['feedback.' + key])}
-                />
-              );
-            }
-            return cellParams.row['feedback.' + key];
+            return renderCell(cellParams.row['feedback.' + key]);
           },
         });
       }
     }
 
     return {cols, colGroupingModel};
-  }, [orm, params.entity, params.project, routeContext, showIO, spans]);
+  }, [orm, params.entity, params.project, showIO, spans]);
   const autosized = useRef(false);
+  // const {peekingRouter} = useWeaveflowRouteContext();
+  // const history = useHistory();
   useEffect(() => {
     if (autosized.current) {
       return;
@@ -458,23 +434,52 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
+  const initialState: React.ComponentProps<typeof DataGridPro>['initialState'] =
+    useMemo(() => {
+      if (loading) {
+        return undefined;
+      }
+      return {
+        pinnedColumns: {left: ['span_id']},
+        sorting: {
+          sortModel: [{field: 'timestampMs', sort: 'desc'}],
+        },
+      };
+    }, [loading]);
+
+  // This is a workaround.
+  // initialState won't take effect if columns are not set.
+  // see https://github.com/mui/mui-x/issues/6206
+  useEffect(() => {
+    if (columns != null && initialState != null) {
+      apiRef.current.restoreState(initialState);
+    }
+  }, [columns, initialState, apiRef]);
+
   return (
-    <DataGridPro
-      sx={{border: 0}}
+    <StyledDataGrid
+      columnHeaderHeight={40}
       apiRef={apiRef}
       loading={loading}
       rows={tableData}
       // density="compact"
-      initialState={{
-        sorting: {
-          sortModel: [{field: 'timestampMs', sort: 'desc'}],
-        },
-      }}
+      initialState={initialState}
       rowHeight={38}
       columns={columns.cols}
       experimentalFeatures={{columnGrouping: true}}
       disableRowSelectionOnClick
+      rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columns.colGroupingModel}
+      // onRowClick={({id}) => {
+      //   history.push(
+      //     peekingRouter.callUIUrl(
+      //       params.entity,
+      //       params.project,
+      //       '',
+      //       id as string
+      //     )
+      //   );
+      // }}
     />
     // </Box>
   );

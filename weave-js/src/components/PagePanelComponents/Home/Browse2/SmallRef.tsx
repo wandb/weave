@@ -3,7 +3,7 @@ import {SmartToy as SmartToyIcon} from '@mui/icons-material';
 import {TableRows as TableRowsIcon} from '@mui/icons-material';
 import {DataObject as DataObjectIcon} from '@mui/icons-material';
 import {Spoke as SpokeIcon} from '@mui/icons-material';
-import {Box, Typography} from '@mui/material';
+import {Box} from '@mui/material';
 import {
   callOpVeryUnsafe,
   constString,
@@ -14,6 +14,7 @@ import {
 import {
   ArtifactRef,
   isWandbArtifactRef,
+  ObjectRef,
   parseRef,
   refUri,
   useNodeValue,
@@ -43,11 +44,11 @@ type WFDBTableType =
   | 'Object'
   | 'ObjectVersion';
 
-export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
+export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   objRef,
   wfTable,
 }) => {
-  const {refUIUrl} = useWeaveflowRouteContext();
+  const {peekingRouter} = useWeaveflowRouteContext();
   const refTypeNode = useMemo(() => {
     const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
     return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
@@ -56,22 +57,45 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
   const refTypeQuery = useNodeValue(refTypeNode);
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);
-  const label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
+  let label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
+  let linkSuffix = '';
+
+  // TEMP HACK (Tim): This is a temporary hack to ensure that SmallRef renders
+  // the Evaluation rows with the correct label and link. There is a more full
+  // featured solution here: https://github.com/wandb/weave/pull/1080 that needs
+  // to be finished asap. This is just to fix the demo / first internal release.
+  if (objRef.artifactPath.endsWith('rows%2F0')) {
+    // decodeURIComponent is needed because the path is url encoded
+    const artPath = decodeURIComponent(objRef.artifactPath);
+    const parts = artPath.split('/');
+    const firstParts = parts.slice(0, parts.length - 2);
+    firstParts.push('rows');
+    const labelPath = '/' + firstParts.join('/');
+    label +=
+      labelPath + (objRef.objectRefExtra ? '/' + objRef.objectRefExtra : '');
+
+    linkSuffix =
+      labelPath +
+      (objRef.objectRefExtra ? '/index/' + objRef.objectRefExtra : '');
+  }
+
   const rootTypeName = getTypeName(rootType);
-  let icon = <SpokeIcon />;
+  let icon = <SpokeIcon sx={{height: '100%'}} />;
   if (rootTypeName === 'Dataset') {
-    icon = <DatasetIcon />;
+    icon = <DatasetIcon sx={{height: '100%'}} />;
   } else if (rootTypeName === 'Model') {
-    icon = <SmartToyIcon />;
+    icon = <SmartToyIcon sx={{height: '100%'}} />;
   } else if (rootTypeName === 'list') {
-    icon = <TableRowsIcon />;
+    icon = <TableRowsIcon sx={{height: '100%'}} />;
   } else if (rootTypeName === 'OpDef') {
-    icon = <DataObjectIcon />;
+    icon = <DataObjectIcon sx={{height: '100%'}} />;
   }
   const Item = (
     <Box display="flex" alignItems="center">
-      <Box mr={1}>{icon}</Box>
-      <Typography variant="body1">{label}</Typography>
+      <Box mr={1} sx={{height: '1rem', lineHeight: '20px'}}>
+        {icon}
+      </Box>
+      {label}
     </Box>
   );
   if (refTypeQuery.loading) {
@@ -80,7 +104,12 @@ export const SmallRef: FC<{objRef: ArtifactRef; wfTable?: WFDBTableType}> = ({
   if (!isWandbArtifactRef(objRef)) {
     return <div>[Error: non wandb ref]</div>;
   }
-  return <Link to={refUIUrl(rootTypeName, objRef, wfTable)}>{Item}</Link>;
+  return (
+    <Link
+      to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable) + linkSuffix}>
+      {Item}
+    </Link>
+  );
 };
 
 export const parseRefMaybe = (s: string): ArtifactRef | null => {

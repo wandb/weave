@@ -1,3 +1,5 @@
+"""These are the top-level functions in the `import weave` namespace.
+"""
 import time
 import typing
 import os
@@ -40,7 +42,7 @@ from .context import (
     use_fixed_server_port,
     use_frontend_devmode,
     # eager_execution,
-    # lazy_execution,
+    use_lazy_execution,
 )
 from .server import capture_weave_server_logs
 from .val_const import const
@@ -126,6 +128,20 @@ def from_pandas(df):
 
 
 def init(project_name: str) -> _graph_client.GraphClient:
+    """Initialize weave tracking, logging to a wandb project.
+
+    Logging is initialized globally, so you do not need to keep a reference
+    to the return value of init.
+
+    Following init, calls of weave.op() decorated functions will be logged
+    to the specified project.
+
+    Args:
+        project_name: The name of the Weights & Biases project to log to.
+
+    Returns:
+        A Weave client.
+    """
     return _weave_init.init_wandb(project_name).client
 
 
@@ -153,6 +169,18 @@ def local_client() -> typing.Iterator[_graph_client.GraphClient]:
 
 
 def publish(obj: typing.Any, name: str) -> _ref_base.Ref:
+    """Save and version a python object.
+
+    If an object with name already exists, and the content hash of obj does
+    not match the latest version of that object, a new version will be created.
+
+    Args:
+        obj: The object to save and version.
+        name: The name to save the object under.
+
+    Returns:
+        A weave Ref to the saved object.
+    """
     client = _graph_client_context.require_graph_client()
 
     ref = client.save_object(obj, name, "latest")
@@ -166,21 +194,32 @@ def publish(obj: typing.Any, name: str) -> _ref_base.Ref:
     return ref
 
 
-def ref(uri: str) -> _ref_base.Ref:
-    if not "://" in uri:
+def ref(location: str) -> _ref_base.Ref:
+    """Construct a Ref to a Weave object.
+
+    TODO: what happens if obj does not exist
+
+    Args:
+        location: A fully-qualified weave ref URI, or if weave.init() has been called, "name:version" or just "name" ("latest" will be used for version in this case).
+
+
+    Returns:
+        A weave Ref to the object.
+    """
+    if not "://" in location:
         client = _graph_client_context.get_graph_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
-        if "/" in uri:
+        if "/" in location:
             raise ValueError("'/' not currently supported in short-form URI")
-        if ":" not in uri:
-            name = uri
+        if ":" not in location:
+            name = location
             version = "latest"
         else:
-            name, version = uri.split(":")
-        uri = str(client.ref_uri(name, version))
+            name, version = location.split(":")
+        location = str(client.ref_uri(name, version, "obj"))
 
-    return _ref_base.Ref.from_str(uri)
+    return _ref_base.Ref.from_str(location)
 
 
 def obj_ref(obj: typing.Any) -> typing.Optional[_ref_base.Ref]:
@@ -229,7 +268,8 @@ def serve(
         raise ValueError("serve currently only supports wandb client")
 
     print(f"Serving {model_ref}")
-    print(f"Server docs at http://localhost:{port}/docs")
+    print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
+    print()
     os.environ["PROJECT_NAME"] = f"{client.entity_name}/{client.project_name}"
     os.environ["MODEL_REF"] = str(model_ref)
 
@@ -256,3 +296,6 @@ def serve(
     else:
         run()
     return None
+
+
+__docspec__ = [init, publish, ref]

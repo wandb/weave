@@ -14,6 +14,7 @@ from . import urls
 from . import context_state
 from . import weave_internal
 from . import monitoring
+from .monitoring import monitor
 from . import artifact_wandb
 from . import op_def
 from . import ops_primitives
@@ -165,13 +166,19 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     def ref_is_own(self, ref: typing.Optional[Ref]) -> bool:
         return isinstance(ref, artifact_wandb.WandbArtifactRef)
 
-    def ref_uri(self, name: str, version: str) -> artifact_wandb.WeaveWBArtifactURI:
+    def ref_uri(
+        self, name: str, version: str, path: str
+    ) -> artifact_wandb.WeaveWBArtifactURI:
         return artifact_wandb.WeaveWBArtifactURI(
-            name, version, self.entity_name, self.project_name
+            name, version, self.entity_name, self.project_name, path=path
         )
 
     def run_ui_url(self, run: Run) -> str:
-        return urls.call_path(self.entity_name, self.project_name, run.id)
+        return urls.call_path_as_peek(
+            self.entity_name,
+            self.project_name,
+            run.id,
+        )
 
     ##### Write API
 
@@ -180,13 +187,14 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     ) -> artifact_wandb.WandbArtifactRef:
         from . import storage
 
-        return storage._direct_publish(
+        res = storage._direct_publish(
             obj,
             name=name,
             wb_entity_name=self.entity_name,
             wb_project_name=self.project_name,
             branch_name=branch_name,
         )
+        return res
 
     def create_run(
         self,
@@ -228,7 +236,7 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
         # self.runs_st.log(span)
         return RunStreamTableSpan(span)
 
-    def fail_run(self, run: RunStreamTableSpan, exception: Exception) -> None:
+    def fail_run(self, run: RunStreamTableSpan, exception: BaseException) -> None:
         span = copy.copy(run._attrs)
         span["end_time_s"] = time.time()
         span["status_code"] = "ERROR"
@@ -254,6 +262,8 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
         span["status_code"] = "SUCCESS"
         span["output"] = output
         span["summary"] = {"latency_s": span["end_time_s"] - span["start_time_s"]}
+        span["attributes"] = monitor._attributes.get()
+
         self.runs_st.log(span)
 
     def add_feedback(self, run_id: str, feedback: dict[str, typing.Any]) -> None:

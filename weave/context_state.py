@@ -55,9 +55,9 @@ if patch_context:
 
 # Set to the op uri if we're in the process of loading
 # an op from an artifact.
-_loading_op_location: contextvars.ContextVar[
-    typing.Optional["uris.WeaveURI"]
-] = contextvars.ContextVar("loading_op_location", default=None)
+_no_op_register: contextvars.ContextVar[typing.Optional[bool]] = contextvars.ContextVar(
+    "loading_op_location", default=None
+)
 
 
 # Set to true if we're in the process of loading builtin functions
@@ -70,23 +70,27 @@ _loading_built_ins: contextvars.ContextVar[
 @contextlib.contextmanager
 def loading_builtins(builtins):
     token = _loading_built_ins.set(builtins)
-    yield _loading_built_ins.get()
-    _loading_built_ins.reset(token)
+    try:
+        yield _loading_built_ins.get()
+    finally:
+        _loading_built_ins.reset(token)
 
 
 @contextlib.contextmanager
-def loading_op_location(location):
-    token = _loading_op_location.set(location)
-    yield _loading_op_location.get()
-    _loading_op_location.reset(token)
+def no_op_register():
+    token = _no_op_register.set(True)
+    try:
+        yield _no_op_register.get()
+    finally:
+        _no_op_register.reset(token)
 
 
-def get_loading_op_location():
-    return _loading_op_location.get()
+def get_no_op_register():
+    return _no_op_register.get()
 
 
-def set_loading_built_ins() -> contextvars.Token:
-    return _loading_built_ins.set(True)
+def set_loading_built_ins(val=True) -> contextvars.Token:
+    return _loading_built_ins.set(val)
 
 
 def clear_loading_built_ins(token) -> None:
@@ -170,7 +174,7 @@ def set_frontend_url(url: str):
 
 
 _eager_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "eager_mode", default=False
+    "eager_mode", default=True
 )
 
 
@@ -289,3 +293,30 @@ def ref_tracking(enabled: bool):
     token = _ref_tracking_enabled.set(enabled)
     yield _ref_tracking_enabled.get()
     _ref_tracking_enabled.reset(token)
+
+
+_serverless_io_service: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_serverless_io_service", default=False
+)
+
+
+def serverless_io_service() -> bool:
+    return _serverless_io_service.get()
+
+
+# Throw an error if op saving encounters an unknonwn condition.
+# The default behavior is to warn.
+_strict_op_saving: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_strict_op_saving", default=False
+)
+
+
+def get_strict_op_saving() -> bool:
+    return _strict_op_saving.get()
+
+
+@contextlib.contextmanager
+def strict_op_saving(enabled: bool):
+    token = _strict_op_saving.set(enabled)
+    yield _strict_op_saving.get()
+    _strict_op_saving.reset(token)

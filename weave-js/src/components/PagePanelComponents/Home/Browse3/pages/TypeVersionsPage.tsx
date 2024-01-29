@@ -56,27 +56,20 @@ export const FilterableTypeVersionsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelTypeVersionFilter) => void;
 }> = props => {
-  const routerContext = useWeaveflowRouteContext();
+  const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
 
-  const getInitialData = useCallback(
-    (filter: WFHighLevelTypeVersionFilter) => {
-      return orm.projectConnection.typeVersions().map(o => {
-        return {id: o.version(), obj: o};
-      });
-    },
-    [orm.projectConnection]
-  );
+  const getInitialData = useCallback(() => {
+    return orm.projectConnection.typeVersions().map(o => {
+      return {id: o.version(), obj: o};
+    });
+  }, [orm.projectConnection]);
 
   const getFilterPopoutTargetUrl = useCallback(
     (filter: WFHighLevelTypeVersionFilter) => {
-      return routerContext.typeVersionsUIUrl(
-        props.entity,
-        props.project,
-        filter
-      );
+      return baseRouter.typeVersionsUIUrl(props.entity, props.project, filter);
     },
-    [props.entity, props.project, routerContext]
+    [props.entity, props.project, baseRouter]
   );
 
   const columns = useMemo(() => {
@@ -162,8 +155,8 @@ export const FilterableTypeVersionsTable: React.FC<{
             renderCell: params => {
               return (
                 <TypeLink
-                  entityName={params.row.obj.project()}
-                  projectName={params.row.obj.entity()}
+                  entityName={params.row.obj.entity()}
+                  projectName={params.row.obj.project()}
                   typeName={params.row.obj.type().name()}
                 />
               );
@@ -212,7 +205,7 @@ export const FilterableTypeVersionsTable: React.FC<{
                 <ObjectVersionsLink
                   entity={params.row.obj.entity()}
                   project={params.row.obj.project()}
-                  versionsCount={params.value}
+                  versionCount={params.value}
                   filter={{
                     typeVersions: [
                       params.row.obj.type().name() +
@@ -554,6 +547,7 @@ const InputToFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes('inputTo')}
           renderInput={params => <TextField {...params} label="Input To" />}
@@ -591,6 +585,7 @@ const OutputFromFilterControlListItem: React.FC<{
       <FormControl fullWidth>
         <Autocomplete
           size={'small'}
+          limitTags={1}
           multiple
           disabled={Object.keys(props.frozenFilter ?? {}).includes(
             'outputFrom'

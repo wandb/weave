@@ -50,7 +50,11 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
 
     # Implement the required members from the "GraphClient" protocol class
     def runs(self) -> Sequence[Run]:
-        raise NotImplementedError
+        runs = storage.objects(types.RunType())
+        result: list[WeaveRunObj] = []
+        for run in runs:
+            result.append(typing.cast(WeaveRunObj, run.get()))
+        return result
 
     def run(self, run_id: str) -> typing.Optional[Run]:
         raise NotImplementedError
@@ -65,7 +69,13 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         raise NotImplementedError
 
     def op_runs(self, op_def: OpDef) -> Sequence[Run]:
-        raise NotImplementedError
+        runs = storage.objects(types.RunType())
+        result: list[WeaveRunObj] = []
+        for run_ref in runs:
+            run = typing.cast(WeaveRunObj, run_ref.get())
+            if run.op_name == str(op_def.location):
+                result.append(run)
+        return result
 
     def ref_input_to(self, ref: Ref) -> Sequence[Run]:
         runs = storage.objects(types.RunType())
@@ -105,8 +115,10 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         return isinstance(ref, artifact_local.LocalArtifactRef)
 
-    def ref_uri(self, name: str, version: str) -> artifact_local.WeaveLocalArtifactURI:
-        return artifact_local.WeaveLocalArtifactURI(name, version)
+    def ref_uri(
+        self, name: str, version: str, path: str
+    ) -> artifact_local.WeaveLocalArtifactURI:
+        return artifact_local.WeaveLocalArtifactURI(name, version, path=path)
 
     def run_ui_url(self, run: Run) -> str:
         raise NotImplementedError
@@ -136,8 +148,9 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         with_digest_inputs["_digests"] = [ref.digest for ref in input_refs]
         return WeaveRunObj(run_id, op_name, inputs=with_digest_inputs)
 
-    def fail_run(self, run: Run, exception: Exception) -> None:
-        raise NotImplementedError
+    def fail_run(self, run: Run, exception: BaseException) -> None:
+        # TODO: Need to implement for local, for now just do nothing.
+        pass
 
     def finish_run(
         self,

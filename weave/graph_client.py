@@ -59,7 +59,7 @@ class GraphClient(Protocol, Generic[R]):
         ...
 
     @abstractmethod
-    def ref_uri(self, name: str, version: str) -> WeaveURI:
+    def ref_uri(self, name: str, version: str, path: str) -> WeaveURI:
         ...
 
     @abstractmethod
@@ -83,7 +83,7 @@ class GraphClient(Protocol, Generic[R]):
         ...
 
     @abstractmethod
-    def fail_run(self, run: R, exception: Exception) -> None:
+    def fail_run(self, run: R, exception: BaseException) -> None:
         ...
 
     @abstractmethod

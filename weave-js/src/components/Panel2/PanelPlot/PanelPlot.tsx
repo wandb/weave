@@ -1,4 +1,3 @@
-import {Option} from '@wandb/weave/common/util/uihelpers';
 import {isAssignableTo, maybe} from '@wandb/weave/core';
 import {produce} from 'immer';
 import _ from 'lodash';
@@ -27,6 +26,7 @@ import {PanelPlot2Inner} from './PanelPlot2Inner';
 import * as PlotState from './plotState';
 import {isValidConfig} from './plotState';
 import {ScaleConfigOption} from './ScaleConfigOption';
+import {GroupByOption, SelectGroupBy} from './SelectGroupBy';
 import * as S from './styles';
 import {AxisName, inputType, PanelPlotProps} from './types';
 import {defaultPlot, useVegaReadyTables} from './util';
@@ -237,13 +237,12 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
     return (
       <>
         {config.series.map((s, i) => {
-          const groupByDropdownOptions: Option[] = PLOT_DIMS_UI.filter(
+          const groupByDropdownOptions: GroupByOption[] = PLOT_DIMS_UI.filter(
             dimName => dimName !== 'mark'
           ).map(dimName => {
             return {
-              key: dimName,
-              text: dimName,
               value: s.dims[dimName as keyof SeriesConfig['dims']],
+              label: dimName,
             };
           });
           return (
@@ -270,35 +269,14 @@ const PanelPlotConfigInner: React.FC<PanelPlotProps> = props => {
                 </ConfigPanel.ConfigOption>
               }
               <ConfigPanel.ConfigOption multiline={true} label="Group by">
-                <ConfigPanel.ModifiedDropdownConfigField
-                  multiple
+                <SelectGroupBy
                   options={groupByDropdownOptions}
-                  value={s.table.groupBy.filter(value =>
-                    // In updateGroupBy above, if the dim is label, color also gets added
-                    // as another dimension to group by. It's confusing to the user
-                    // so we hide the automatic color grouping in the UI
-                    // TODO: need to discuss with shawn on grouping logic
-                    groupByDropdownOptions.some(o => o.value === value)
-                  )}
-                  onChange={(event, {value}) => {
-                    const values = value as string[];
-                    const valueToAdd = values.filter(
-                      x => !s.table.groupBy.includes(x)
-                    );
-                    const valueToRemove = s.table.groupBy.filter(
-                      x => !values.includes(x)
-                    );
-                    if (valueToAdd.length > 0) {
-                      const dimName = groupByDropdownOptions.find(
-                        o => o.value === valueToAdd[0]
-                      )?.text as keyof SeriesConfig['dims'];
-                      updateGroupBy(true, i, dimName, valueToAdd[0]);
-                    } else if (valueToRemove.length > 0) {
-                      const dimName = groupByDropdownOptions.find(
-                        o => o.value === valueToRemove[0]
-                      )?.text as keyof SeriesConfig['dims'];
-                      updateGroupBy(false, i, dimName, valueToRemove[0]);
-                    }
+                  series={s}
+                  onAdd={(dimName, value) => {
+                    updateGroupBy(true, i, dimName, value);
+                  }}
+                  onRemove={(dimName, value) => {
+                    updateGroupBy(false, i, dimName, value);
                   }}
                 />
               </ConfigPanel.ConfigOption>

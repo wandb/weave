@@ -3,7 +3,7 @@ import copy
 import contextvars
 import contextlib
 import typing
-from typing import Iterable
+from typing import Sequence
 import inspect
 
 from weave.weavejs_fixes import fixup_node
@@ -20,6 +20,7 @@ from . import engine_trace
 from . import memo
 from . import weavify
 from . import eager
+from . import object_context
 from .run import Run
 from . import graph_client_context
 
@@ -209,7 +210,6 @@ class OpDef:
     location: typing.Optional[uris.WeaveURI]
     is_builtin: bool = False
     weave_fn: typing.Optional[graph.Node]
-    _decl_locals: typing.Dict[str, typing.Any]
     instance: typing.Union[None, graph.Node]
     hidden: bool
     pure: bool
@@ -254,7 +254,6 @@ class OpDef:
         weave_fn: typing.Optional[graph.Node] = None,
         *,
         plugins=None,
-        _decl_locals=None,  # These are python locals() from the enclosing scope.
     ):
         self.name = name
         self.input_type = input_type
@@ -271,7 +270,6 @@ class OpDef:
             if is_builtin is not None
             else context_state.get_loading_built_ins()
         )
-        self._decl_locals = _decl_locals
         self.version = None
         self.location = None
         self.instance = None
@@ -381,14 +379,19 @@ class OpDef:
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 
     def eager_call(_self, *args, **kwargs):
-        output_node = _self.lazy_call(*args, **kwargs)
         if (
             _self.name == "get"
             or _self.name == "root-project"
             or any(isinstance(n, graph.Node) for n in args)
         ) or (any(isinstance(n, graph.Node) for n in kwargs.values())):
+            output_node = _self.lazy_call(*args, **kwargs)
             return output_node
-        return weave_internal.use(output_node)
+        from . import execute
+
+        sig = pyfunc_type_util.get_signature(_self.raw_resolve_fn)
+        params = sig.bind(*args, **kwargs)
+        with object_context.object_context():
+            return execute.execute_sync_op(_self, params.arguments)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
@@ -607,7 +610,7 @@ class OpDef:
     def op_def_is_auto_tag_handling_arrow_op(self) -> bool:
         return isinstance(self, AutoTagHandlingArrowOpDef)
 
-    def runs(self) -> Iterable[Run]:
+    def runs(self) -> Sequence[Run]:
         client = graph_client_context.require_graph_client()
         return client.op_runs(self)
 

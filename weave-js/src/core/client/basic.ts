@@ -277,6 +277,7 @@ export class BasicClient implements Client {
     );
     notDoneObservables.map(o => (o.inFlight = true));
     if (notDoneObservables.length > 0) {
+      this.setIsLoading(true);
       // console.log(
       //   'CLIENT BATCH START',
       //   notDoneObservables,

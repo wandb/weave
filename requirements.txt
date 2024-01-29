@@ -1,4 +1,4 @@
-wandb>=0.15.5
+wandb>=0.16.2
 sentry-sdk<1.29.0 # 1.29.0 adds monkey-patched GQL error handling which breaks our unit tests communicating with the server
 python-json-logger>=2.0.4
 numpy>=1.21
@@ -8,7 +8,7 @@ flask>=2.1
 black>=22.3.0  # used for code generation
 flask_cors>=3.0.10
 notebook>=6.4.8  # current Colab version
-pyarrow>=13.0.0  # TODO: Colab has 9.0.0, can we support?
+pyarrow>=14.0.1  # TODO: Colab has 9.0.0, can we support?
 ipynbname>=2021.3.2
 pillow>=10.0.1  # addresses CVE-2023-4863
 scikit-learn>=1.2.1  # used for embedding projection
@@ -32,5 +32,6 @@ tabulate
 openai>=1.0.0
 tiktoken>=0.4.0
 faiss-cpu
+rich>=13.7.0
 
 pytest-asyncio<=0.21.1  # newer versions seem to be causing weave op unit test failures?

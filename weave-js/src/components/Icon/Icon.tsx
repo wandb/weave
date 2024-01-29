@@ -39,6 +39,7 @@ import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-cont
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
 import {ReactComponent as ImportCross} from '../../assets/icons/icon-cross.svg';
+import {ReactComponent as ImportCrownPro} from '../../assets/icons/icon-crown-pro.svg';
 import {ReactComponent as ImportCubeContainer} from '../../assets/icons/icon-cube-container.svg';
 import {ReactComponent as ImportDashboardBlackboard} from '../../assets/icons/icon-dashboard-blackboard.svg';
 import {ReactComponent as ImportDate} from '../../assets/icons/icon-date.svg';
@@ -147,6 +148,7 @@ import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-redd
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
 import {ReactComponent as ImportRegex} from '../../assets/icons/icon-regex.svg';
 import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
+import {ReactComponent as ImportRemoveAlt} from '../../assets/icons/icon-remove-alt.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
 import {ReactComponent as ImportRetry} from '../../assets/icons/icon-retry.svg';
 import {ReactComponent as ImportRobotServiceMember} from '../../assets/icons/icon-robot-service-member.svg';
@@ -207,6 +209,7 @@ import {ReactComponent as ImportUsersTeam} from '../../assets/icons/icon-users-t
 import {ReactComponent as ImportVersionsLayers} from '../../assets/icons/icon-versions-layers.svg';
 import {ReactComponent as ImportVertexGCP} from '../../assets/icons/icon-vertex-gcp.svg';
 import {ReactComponent as ImportVideoPlay} from '../../assets/icons/icon-video-play.svg';
+import {ReactComponent as ImportViewGlasses} from '../../assets/icons/icon-view-glasses.svg';
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
@@ -345,6 +348,9 @@ export const IconCreditCardPayment = (props: SVGIconProps) => (
 );
 export const IconCross = (props: SVGIconProps) => (
   <ImportCross {...updateIconProps(props)} />
+);
+export const IconCrownPro = (props: SVGIconProps) => (
+  <ImportCrownPro {...updateIconProps(props)} />
 );
 export const IconCubeContainer = (props: SVGIconProps) => (
   <ImportCubeContainer {...updateIconProps(props)} />
@@ -670,6 +676,9 @@ export const IconRegex = (props: SVGIconProps) => (
 export const IconRemove = (props: SVGIconProps) => (
   <ImportRemove {...updateIconProps(props)} />
 );
+export const IconRemoveAlt = (props: SVGIconProps) => (
+  <ImportRemoveAlt {...updateIconProps(props)} />
+);
 export const IconReport = (props: SVGIconProps) => (
   <ImportReport {...updateIconProps(props)} />
 );
@@ -850,6 +859,9 @@ export const IconVertexGCP = (props: SVGIconProps) => (
 export const IconVideoPlay = (props: SVGIconProps) => (
   <ImportVideoPlay {...updateIconProps(props)} />
 );
+export const IconViewGlasses = (props: SVGIconProps) => (
+  <ImportViewGlasses {...updateIconProps(props)} />
+);
 export const IconWandb = (props: SVGIconProps) => (
   <ImportWandb {...updateIconProps(props)} />
 );
@@ -915,6 +927,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   copy: IconCopy,
   'credit-card-payment': IconCreditCardPayment,
   cross: IconCross,
+  'crown-pro': IconCrownPro,
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
   date: IconDate,
@@ -1023,6 +1036,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   redo: IconRedo,
   regex: IconRegex,
   remove: IconRemove,
+  'remove-alt': IconRemoveAlt,
   report: IconReport,
   retry: IconRetry,
   'robot-service-member': IconRobotServiceMember,
@@ -1083,6 +1097,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'versions-layers': IconVersionsLayers,
   'vertex-gcp': IconVertexGCP,
   'video-play': IconVideoPlay,
+  'view-glasses': IconViewGlasses,
   wandb: IconWandb,
   warning: IconWarning,
   'warning-alt': IconWarningAlt,
