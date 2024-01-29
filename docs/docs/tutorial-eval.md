@@ -208,7 +208,7 @@ def example_to_model_input(example: dict) -> str:
 
 # Finally, we run an evaluation of this model. 
 # This will generate a prediction for each input example, and then score it with each scoring function.
-evaluation = evaluate.Evaluation(
+evaluation = Evaluation(
     dataset, scores=[color_score, fruit_name_score], example_to_model_input=example_to_model_input
 )
 print(asyncio.run(evaluation.evaluate(model)))
