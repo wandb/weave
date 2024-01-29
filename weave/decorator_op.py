@@ -18,6 +18,26 @@ if typing.TYPE_CHECKING:
     from weave.gql_op_plugin import GqlOpPlugin
 
 
+# Important usability note
+#
+# Even though the op decorator actually returns an OpDef object, the
+# type annotation of the return is just Callable. If the signature
+# is changed back to OpDef, pyright (VSCode's language server) will
+# not pass through the underlying function type signature. So for
+# example, hovering an op decorated function will never show the original
+# function's docstring. At runtime, we call functools.update_wrapper
+# to copy the original function's signature to the OpDef object, but
+# the language server's static analysis does not see this.
+#
+# I tried to use a Protocol that extends Callable to mix OpDef attributes
+# in with Callable, but that also makes the decorator opaque to the
+# language server.
+#
+# So we make a specifity tradeoff here: decorated functions will look
+# just like their original functions to type checkers, and users will
+# need to cast them to OpDef if they want to access the OpDef attributes
+# in a typesafe way. You can use the weave.as_op_def() helper to do this.
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
