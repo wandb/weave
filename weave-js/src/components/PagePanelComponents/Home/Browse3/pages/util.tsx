@@ -3,6 +3,7 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 
+import {Pill} from '../../../../Tag';
 import {SmallRef} from '../../Browse2/SmallRef';
 
 export const useURLSearchParamsDict = () => {
@@ -26,6 +27,9 @@ export const truncateID = (id: string, maxLen: number = 9) => {
 };
 
 export const renderCell = (value: any) => {
+  if (value == null) {
+    return <Pill color="moon" label="None" />;
+  }
   if (typeof value === 'string' && value.startsWith('wandb-artifact:///')) {
     return <SmallRef objRef={parseRef(value)} />;
   }
