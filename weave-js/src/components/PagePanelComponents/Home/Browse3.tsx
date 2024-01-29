@@ -70,6 +70,8 @@ import {
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 import {useFlexDirection} from './useFlexDirection';
+import {useWindowSize} from '../../../common/hooks/useWindowSize';
+import _ from 'lodash';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -327,7 +329,32 @@ const MainPeekingLayout: FC = () => {
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   const flexDirection = useFlexDirection();
 
-  const {handleMousedown, drawerWidth, drawerHeight} = useDrawerResize();
+  const {
+    handleMousedown,
+    drawerWidthAsPct: drawerWidth,
+    drawerHeightAsPct: drawerHeight,
+  } = useDrawerResize();
+
+  const windowSize = useWindowSize();
+  const exactRemainingWidth = useMemo(() => {
+    const drawerWidthAsPctValue = parseFloat(drawerWidth);
+    const drawerWidthAsPx = windowSize.width * (drawerWidthAsPctValue / 100);
+    return windowSize.width - drawerWidthAsPx - 56; // 56 is the sidebar :(
+  }, [drawerWidth, windowSize.width]);
+  const [remainingWidth, setRemainingWidth] = useState(exactRemainingWidth);
+  const updateRemainingWidth = useCallback(
+    _.debounce((newDrawerWidth, windowWidth) => {
+      const drawerWidthAsPctValue = parseFloat(newDrawerWidth);
+      const drawerWidthAsPx = windowWidth * (drawerWidthAsPctValue / 100);
+      // 56 is the sidebar :( This is sort of hacky since the sidebar is not technically part of the drawer.
+      const exactRemainingWidth = windowWidth - drawerWidthAsPx - 56;
+      setRemainingWidth(exactRemainingWidth);
+    }),
+    []
+  );
+  useEffect(() => {
+    updateRemainingWidth(drawerWidth, windowSize.width);
+  }, [drawerWidth, updateRemainingWidth, windowSize.width]);
 
   return (
     <Box
@@ -342,7 +369,8 @@ const MainPeekingLayout: FC = () => {
       }}>
       <Box
         sx={{
-          flex: '1 1 40%',
+          flex: peekLocation == null ? '1 1 auto' : '0 0 auto',
+          width: peekLocation == null ? 'auto' : `${remainingWidth}px`,
           overflow: 'hidden',
           display: 'flex',
         }}>

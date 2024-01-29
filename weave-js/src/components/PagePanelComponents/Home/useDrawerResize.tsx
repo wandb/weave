@@ -111,7 +111,7 @@ export const useDrawerResize = () => {
 
   return {
     handleMousedown,
-    drawerWidth: width,
-    drawerHeight: height,
+    drawerWidthAsPct: width,
+    drawerHeightAsPct: height,
   };
 };
