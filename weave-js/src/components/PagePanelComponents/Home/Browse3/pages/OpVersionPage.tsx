@@ -1,6 +1,7 @@
 import React from 'react';
 
 import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
+import {CategoryChip} from './common/CategoryChip';
 import {
   CallsLink,
   OpVersionLink,
@@ -8,7 +9,6 @@ import {
   opVersionText,
 } from './common/Links';
 import {CenteredAnimatedLoader} from './common/Loader';
-import {OpVersionCategoryChip} from './common/OpVersionCategoryChip';
 import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
@@ -95,9 +95,7 @@ const OpVersionPageInner: React.FC<{
             ),
             ...(opVersionCategory
               ? {
-                  Category: (
-                    <OpVersionCategoryChip opCategory={opVersionCategory} />
-                  ),
+                  Category: <CategoryChip value={opVersionCategory} />,
                 }
               : {}),
 
