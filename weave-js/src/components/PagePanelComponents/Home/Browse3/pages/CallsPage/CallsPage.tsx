@@ -204,6 +204,13 @@ export const CallsTable: React.FC<{
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
   const hideControls = true;
 
+  console.log(
+    isPivoting,
+    effectiveFilter,
+    runsWithFeedbackQuery.result.length,
+    lowLevelFilter
+  );
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -448,7 +455,7 @@ const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   const allOpVersions = orm.projectConnection.opVersions();
-  const opUrisFromVersions: string[] = [];
+  let opUrisFromVersions: string[] = [];
   if (effectiveFilter.opVersions) {
     const opVersionFilters = effectiveFilter.opVersions.map(f => f.split(':'));
     for (const opVersion of allOpVersions) {
@@ -456,6 +463,9 @@ const convertHighLevelFilterToLowLevelFilter = (
         opUrisFromVersions.push(opVersion.refUri());
       }
     }
+  }
+  if (opUrisFromVersions.length === 0 && effectiveFilter.opVersions) {
+    opUrisFromVersions = ['DOES_NOT_EXIST:VALUE'];
   }
   let opUrisFromCategory = allOpVersions
     .filter(ov => ov.opCategory() === effectiveFilter.opCategory)
