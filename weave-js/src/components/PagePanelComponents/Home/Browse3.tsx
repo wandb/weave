@@ -345,6 +345,19 @@ const MainPeekingLayout: FC = () => {
           flex: '1 1 40%',
           overflow: 'hidden',
           display: 'flex',
+          transition: "margin-right 0.5s ease-in", 
+          marginRight: `calc(${drawerWidth} + 28px)`,
+          ...(peekLocation == null && {
+            transition: "margin-right 0.5s ease-out",
+            marginRight: 0,
+          }),
+          /**
+           * This is necessary to enable the selection of content. In the DOM, the stacking order is determined
+           * by the order of appearance. Following this rule, elements appearing later in the markup will overlay
+           * those that appear earlier. Since the Drawer comes after the Main content, this adjustment ensures
+           * proper interaction with the underlying content.
+           */
+          position: 'relative',
         }}>
         <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
       </Box>
