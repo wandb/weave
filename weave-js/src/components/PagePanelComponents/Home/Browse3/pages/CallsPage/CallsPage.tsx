@@ -281,11 +281,11 @@ export const CallsTable: React.FC<{
                     opVersions: newValue ? [newValue] : [],
                   });
                 }}
-                renderInput={params => (
-                  <TextField {...params} label="Op" />
-                  // <TextField {...params} label="Op Version" />
-                )}
+                renderInput={params => <TextField {...params} label="Op" />}
                 getOptionLabel={option => {
+                  if (option.endsWith(':*')) {
+                    return opNiceName(option.slice(0, -2));
+                  }
                   return opVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(opVersionOptions)}
@@ -423,20 +423,36 @@ const useMakeBoardForCalls = (
   return useMakeNewBoard(runsNode);
 };
 
+const opVersionMatchesFilters = (
+  opVersion: WFOpVersion,
+  filters: string[][]
+): boolean => {
+  const name = opVersion.op().name();
+  for (const filter of filters) {
+    if (filter[0] === name) {
+      if (filter[1] === '*' || filter[1] === opVersion.version()) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
 const convertHighLevelFilterToLowLevelFilter = (
   orm: WeaveflowORMContextType,
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
-  const opUrisFromVersions =
-    (effectiveFilter.opVersions
-      ?.map(uri => {
-        const [opName, version] = uri.split(':');
-        const opVersion = orm.projectConnection.opVersion(opName, version);
-        return opVersion?.refUri();
-      })
-      .filter(item => item != null) as string[]) ?? [];
-  let opUrisFromCategory = orm.projectConnection
-    .opVersions()
+  const allOpVersions = orm.projectConnection.opVersions();
+  const opUrisFromVersions: string[] = [];
+  if (effectiveFilter.opVersions) {
+    const opVersionFilters = effectiveFilter.opVersions.map(f => f.split(':'));
+    for (const opVersion of allOpVersions) {
+      if (opVersionMatchesFilters(opVersion, opVersionFilters)) {
+        opUrisFromVersions.push(opVersion.refUri());
+      }
+    }
+  }
+  let opUrisFromCategory = allOpVersions
     .filter(ov => ov.opCategory() === effectiveFilter.opCategory)
     .map(ov => ov.refUri());
   if (opUrisFromCategory.length === 0 && effectiveFilter.opCategory) {
@@ -487,7 +503,7 @@ const useOpVersionOptions = (
   entity: string,
   project: string,
   highLevelFilter: WFHighLevelCallFilter
-) => {
+): Record<string, string> => {
   const runs = useRunsWithFeedback(
     {
       entityName: entity,
@@ -521,14 +537,19 @@ const useOpVersionOptions = (
       return b.versionIndex() - a.versionIndex();
     });
 
-    return _.fromPairs(
-      versions.map(v => {
-        return [
-          v.op().name() + ':' + v.version(),
-          opNiceName(v.op().name()) + ':v' + v.versionIndex(),
-        ];
-      })
-    );
+    // Build up options object, injecting options for all versions of an op.
+    let lastName = null;
+    const options: Record<string, string> = {};
+    for (const v of versions) {
+      const opName = v.op().name();
+      if (opName !== lastName) {
+        options[opName + ':*'] = opNiceName(opName);
+        lastName = opName;
+      }
+      options[opName + ':' + v.version()] =
+        opNiceName(opName) + ':v' + v.versionIndex();
+    }
+    return options;
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 

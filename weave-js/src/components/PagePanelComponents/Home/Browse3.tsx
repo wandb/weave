@@ -4,6 +4,7 @@ import {
   AppBar,
   Box,
   Breadcrumbs,
+  Drawer,
   IconButton,
   Link as MaterialLink,
   Toolbar,
@@ -20,7 +21,6 @@ import {
 } from 'react-router-dom';
 
 import {MOON_200} from '../../../common/css/color.styles';
-import {useWindowSize} from '../../../common/hooks/useWindowSize';
 import {useWeaveContext} from '../../../context';
 import {useNodeValue} from '../../../react';
 import {URL_BROWSE3} from '../../../urls';
@@ -69,6 +69,8 @@ import {
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
 import {SideNav} from './Browse3/SideNav';
+import {useDrawerResize} from './useDrawerResize';
+import {useFlexDirection} from './useFlexDirection';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -325,13 +327,10 @@ const MainPeekingLayout: FC = () => {
     params.project!
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
-  const windowSize = useWindowSize();
-  const flexDirection = useMemo(() => {
-    if (windowSize.height > windowSize.width * 0.66) {
-      return 'column';
-    }
-    return 'row';
-  }, [windowSize.height, windowSize.width]);
+  const flexDirection = useFlexDirection();
+
+  const {handleMousedown, drawerWidth, drawerHeight} = useDrawerResize();
+
   return (
     <Box
       sx={{
@@ -352,22 +351,53 @@ const MainPeekingLayout: FC = () => {
         <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
       </Box>
 
-      <Box
-        sx={{
-          borderLeft:
-            flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
-          borderTop:
-            flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
-          flex: peekLocation ? '1 1 60%' : '0 0 0px',
-          transition: peekLocation ? 'all 0.2s ease-in-out' : '',
-          boxShadow:
-            flexDirection === 'row'
-              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
-              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
-          overflow: 'hidden',
-          display: 'flex',
-          zIndex: 1,
+      <Drawer
+        variant="persistent"
+        anchor={flexDirection === 'row' ? 'right' : 'bottom'}
+        open={peekLocation != null}
+        onClose={() => {
+          const targetPath = query.peekPath!.replace(generalBase, targetBase);
+          history.push(targetPath);
+        }}
+        PaperProps={{
+          style: {
+            overflow: 'hidden',
+            display: 'flex',
+            zIndex: 1,
+            width: flexDirection === 'row' ? drawerWidth : '100%',
+            height: flexDirection === 'column' ? drawerHeight : '100%',
+            margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 56px',
+            boxShadow:
+              flexDirection === 'row'
+                ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
+                : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
+            borderLeft:
+              flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
+            borderTop:
+              flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
+          },
+        }}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile.
         }}>
+        <div
+          id="dragger"
+          onMouseDown={handleMousedown}
+          style={{
+            borderTop: '1px solid #ddd',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: 100,
+            backgroundColor: '#f4f7f9',
+            cursor: flexDirection === 'row' ? 'ew-resize' : 'ns-resize',
+            padding: flexDirection === 'row' ? '4px 0 0' : '0 4px 0 0',
+            bottom: flexDirection === 'row' ? 0 : 'auto',
+            right: flexDirection === 'row' ? 'auto' : 0,
+            width: flexDirection === 'row' ? '5px' : 'auto',
+            height: flexDirection === 'row' ? 'auto' : '5px',
+          }}
+        />
         {peekLocation && (
           <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
             <SimplePageLayoutContext.Provider
@@ -420,7 +450,7 @@ const MainPeekingLayout: FC = () => {
             </SimplePageLayoutContext.Provider>
           </WeaveflowPeekContext.Provider>
         )}
-      </Box>
+      </Drawer>
     </Box>
   );
 };
@@ -721,7 +751,7 @@ const useCallPeekRedirect = () => {
         return;
       }
       const path = baseRouter.callsUIUrl(params.entity, params.project, {
-        opVersions: [opVersion.op().name() + ':' + opVersion.version()],
+        opVersions: [opVersion.op().name() + ':*'],
       });
       const searchParams = new URLSearchParams();
       searchParams.set(
