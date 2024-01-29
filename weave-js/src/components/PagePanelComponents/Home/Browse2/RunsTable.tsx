@@ -1,3 +1,4 @@
+import {Box, Typography} from '@material-ui/core';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -11,6 +12,7 @@ import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
+import {TargetBlank} from '../../../../common/util/links';
 import {Timestamp} from '../../../Timestamp';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
@@ -484,6 +486,29 @@ export const RunsTable: FC<{
       //     )
       //   );
       // }}
+      slots={{
+        noRowsOverlay: () => {
+          return (
+            <Box
+              sx={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Typography color="textSecondary">
+                No calls found. Try clearing the filters above or learn more
+                about how to log calls by visiting{' '}
+                <TargetBlank href="https://wandb.me/weave">
+                  the docs
+                </TargetBlank>
+                .
+              </Typography>
+            </Box>
+          );
+        },
+      }}
     />
     // </Box>
   );
