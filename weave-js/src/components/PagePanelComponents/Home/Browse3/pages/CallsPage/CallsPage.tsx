@@ -92,7 +92,6 @@ export const CallsTable: React.FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
-  hideFilters?: boolean;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
@@ -191,7 +190,6 @@ export const CallsTable: React.FC<{
   );
 
   const qualifiesForPivoting = useMemo(() => {
-    // return true;
     const shownSpanNames = _.uniq(
       runsWithFeedbackQuery.result.map(span => span.name)
     );
@@ -204,6 +202,7 @@ export const CallsTable: React.FC<{
   }, [runsWithFeedbackQuery.result]);
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
+  const hideControls = true;
 
   return (
     <FilterLayoutTemplate
@@ -214,12 +213,10 @@ export const CallsTable: React.FC<{
         props.project,
         effectiveFilter
       )}
-      filterListSx={
-        {
-          // Hide until we show filters
-          // pb: isPivoting ? 0 : 1,
-        }
-      }
+      filterListSx={{
+        // Hide until we show filters
+        pb: isPivoting && !hideControls ? 0 : 1,
+      }}
       filterListItems={
         <>
           <IconButton
@@ -396,7 +393,7 @@ export const CallsTable: React.FC<{
           // Since we have a very constrained pivot, we can hide
           // the controls for now as there is no need to change them.
           // Punting on design
-          hideControls
+          hideControls={hideControls}
         />
       ) : (
         <RunsTable

@@ -13,7 +13,14 @@ import {
   GridColumnGroup,
 } from '@mui/x-data-grid';
 import _ from 'lodash';
-import React, {useContext, useEffect, useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
@@ -158,7 +165,7 @@ export const PivotRunsView: React.FC<
             <Autocomplete
               size="small"
               renderInput={params => <TextField {...params} label="Rows" />}
-              value={pivotRowDim ?? ''}
+              value={pivotRowDim ?? null}
               onChange={(event, newValue) => {
                 props.onPivotSpecChange({
                   colDim: pivotColDim,
@@ -166,7 +173,7 @@ export const PivotRunsView: React.FC<
                 });
               }}
               options={pivotRowOptions}
-              disableClearable
+              disableClearable={pivotRowDim != null}
             />
           </FormControl>
         </ListItem>
@@ -175,7 +182,7 @@ export const PivotRunsView: React.FC<
             <Autocomplete
               size="small"
               renderInput={params => <TextField {...params} label="Columns" />}
-              value={pivotColDim ?? ''}
+              value={pivotColDim ?? null}
               onChange={(event, newValue) => {
                 props.onPivotSpecChange({
                   colDim: newValue ?? null,
@@ -183,7 +190,7 @@ export const PivotRunsView: React.FC<
                 });
               }}
               options={pivotColOptions}
-              disableClearable
+              disableClearable={pivotColDim != null}
             />
           </FormControl>
         </ListItem>
@@ -274,6 +281,8 @@ export const PivotRunsTable: React.FC<
     );
   }, [pivotColumns, pivotData]);
 
+  const usingLeafMode = props.colDimAtLeafMode && pivotColumns.size !== 1;
+
   const columns = useMemo(() => {
     const cols: GridColDef[] = [
       {
@@ -293,7 +302,7 @@ export const PivotRunsTable: React.FC<
       return {cols: [], colGroupingModel: []};
     }
 
-    if (!props.colDimAtLeafMode || pivotColumns.size === 1) {
+    if (!usingLeafMode) {
       pivotColumns.forEach(col => {
         // All output keys as we don't have the order key yet.
         const outputKeys: {[key: string]: true} = {};
@@ -387,13 +396,21 @@ export const PivotRunsTable: React.FC<
     opsInPlay,
     pivotColumns,
     pivotData,
-    props.colDimAtLeafMode,
     props.pivotSpec.rowDim,
+    usingLeafMode,
   ]);
 
   const closePeek = useClosePeek();
+  const [limitSnackOpen, setLimitSnackOpen] = useState(false);
+  const [clickSnackOpen, setClickSnackOpen] = useState(false);
+  const clickSnackEnabled = useRef(true);
+  const openClickSnack = useCallback(() => {
+    if (clickSnackEnabled.current) {
+      setClickSnackOpen(true);
+    }
+  }, [clickSnackEnabled]);
+
   const [rowSelectionModel, setRowSelectionModel] = useState<string[]>([]);
-  const [snackOpen, setSnackOpen] = useState(false);
 
   // Update row selection model from the URL.
   const peekLocation = usePeekLocation();
@@ -427,12 +444,20 @@ export const PivotRunsTable: React.FC<
   return (
     <>
       <Snackbar
-        open={snackOpen}
+        open={limitSnackOpen}
         autoHideDuration={2000}
         onClose={() => {
-          setSnackOpen(false);
+          setLimitSnackOpen(false);
         }}
         message="Only 2 rows can be selected at a time."
+      />
+      <Snackbar
+        open={clickSnackOpen}
+        autoHideDuration={20000}
+        onClose={() => {
+          setClickSnackOpen(false);
+        }}
+        message="Double click to view source call."
       />
       <StyledDataGrid
         key={props.pivotSpec.rowDim + props.pivotSpec.colDim}
@@ -453,27 +478,47 @@ export const PivotRunsTable: React.FC<
         checkboxSelection={!isPeeking && props.showCompareButton}
         columnGroupingModel={columns.colGroupingModel}
         rowSelectionModel={rowSelectionModel}
-        // onCellClick={params => {
-        //   const cellSpan = params.row[
-        //     params.field.split('.')[0]
-        //   ] as SpanWithFeedback;
-        //   if (!cellSpan) {
-        //     return;
-        //   }
-        //   // TODO(tim/pivot_tables_to_compare_view): Highlighting & Scroll to cell.
-        //   history.push(
-        //     peekingRouter.callUIUrl(
-        //       props.entity,
-        //       props.project,
-        //       '',
-        //       cellSpan.span_id
-        //     )
-        //   );
-        // }}
+        onCellClick={params => {
+          if (
+            params.field === '__check__' ||
+            params.field === props.pivotSpec.rowDim
+          ) {
+            return;
+          }
+          clickSnackEnabled.current = true;
+          setTimeout(() => {
+            openClickSnack();
+          }, 250);
+        }}
+        onCellDoubleClick={params => {
+          if (
+            params.field === '__check__' ||
+            params.field === props.pivotSpec.rowDim
+          ) {
+            return;
+          }
+          clickSnackEnabled.current = false;
+          const fieldParts = params.field.split('.');
+          const col = usingLeafMode
+            ? fieldParts[fieldParts.length - 1]
+            : fieldParts[0];
+          const cellSpan = params.row[col] as SpanWithFeedback;
+          if (!cellSpan) {
+            return;
+          }
+          history.push(
+            peekingRouter.callUIUrl(
+              props.entity,
+              props.project,
+              '',
+              cellSpan.span_id
+            )
+          );
+        }}
         onRowSelectionModelChange={newSelection => {
           if (newSelection.length > 2) {
             // Limit to 2 selections for the time being.
-            setSnackOpen(true);
+            setLimitSnackOpen(true);
             return;
           }
 
@@ -507,6 +552,13 @@ export const PivotRunsTable: React.FC<
               props.pivotSpec.colDim
             )
           );
+        }}
+        sx={{
+          '& .MuiDataGrid-virtualScrollerRenderZone > div > .MuiDataGrid-cell':
+            {
+              cursor: 'pointer',
+            },
+          ...(props.extraDataGridProps?.sx ?? {}),
         }}
         {...props.extraDataGridProps}
       />

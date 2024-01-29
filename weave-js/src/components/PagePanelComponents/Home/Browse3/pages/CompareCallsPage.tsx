@@ -22,8 +22,6 @@ export const CompareCallsPage: React.FC<{
   primaryDim?: string;
   secondaryDim?: string;
 }> = props => {
-  // TODO: filter initial calls to only the correct dim
-  // TODO: filter the subcalls to only the correct dim
   const orm = useWeaveflowORMContext(props.entity, props.project);
   const calls = useMemo(() => {
     return (
@@ -113,20 +111,17 @@ export const CompareCallsPage: React.FC<{
 
   const getOptionLabel = useCallback(
     option => {
-      // console.log(option, objectVersionOptions);
       const version = objectVersionOptions[option];
       if (version == null) {
         return option;
       }
       return version;
-      // return version.op().name() + ':' + version.version().slice(0, 6);
     },
     [objectVersionOptions]
   );
 
   const getOpOptionLabel = useCallback(
     option => {
-      // console.log(option, objectVersionOptions);
       const version = subOpVersionOptions[option];
       if (version == null) {
         return option;
@@ -144,7 +139,8 @@ export const CompareCallsPage: React.FC<{
 
   // Since we have a very constrained pivot, we can hide
   // the controls for now as there is no need to change them.
-  const showSubOpSelection = false;
+  // Punting on design
+  const hideControls = true;
 
   const pageDetails = useMemo(() => {
     if (calls.length === 0) {
@@ -171,19 +167,12 @@ export const CompareCallsPage: React.FC<{
         onPivotSpecChange={newPivotSpec => {
           setPivotSpec(newPivotSpec);
         }}
-        // Since we have a very constrained pivot, we can hide
-        // the controls for now as there is no need to change them.
-        // Punting on design
-        hideControls
-        // extraDataGridProps={
-        //   {
-        //     hideFooter: true,
-        //   } as any
-        // }
+        hideControls={hideControls}
       />
     );
   }, [
     calls.length,
+    hideControls,
     pivotSpec,
     props.callIds,
     props.entity,
@@ -231,14 +220,6 @@ export const CompareCallsPage: React.FC<{
                     fontSize: '0.875rem',
                   },
                 }}>
-                {/* <Typography
-                  style={{
-                    width: '38px',
-                    textAlign: 'center',
-                    flex: '0 0 auto',
-                  }}>
-                  Select
-                </Typography> */}
                 <ListItem>
                   <FormControl fullWidth>
                     <Autocomplete
@@ -256,7 +237,7 @@ export const CompareCallsPage: React.FC<{
                     />
                   </FormControl>
                 </ListItem>
-                {showSubOpSelection && (
+                {!hideControls && (
                   <ListItem>
                     <FormControl fullWidth>
                       <Autocomplete
@@ -276,76 +257,6 @@ export const CompareCallsPage: React.FC<{
                   </ListItem>
                 )}
               </Box>
-              {/* <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  overflow: 'hidden',
-                  flex: '0 0 auto',
-                  height: '75px',
-                }}>
-                Comparing calls in
-                <Autocomplete
-                  size={'small'}
-                  renderInput={params => (
-                    <TextField {...params} label="TODO MAKE THIS WORK" />
-                  )}
-                  // value={effectiveFilter.parentId ?? null}
-                  // onChange={(event, newValue) => {
-                  //   setFilter({
-                  //     ...filter,
-                  //     parentId: newValue,
-                  //   });
-                  // }}
-                  // getOptionLabel={option => {
-                  //   return parentIdOptions[option] ?? option;
-                  // }}
-                  options={['a', 'b', 'c']}
-                />
-              </Box> */}
-              {/* <Box sx={{minHeight: '300px', flex: '0 0 auto'}}>
-                <PivotRunsTable
-                  loading={false}
-                  runs={runs}
-                  entity={props.entity}
-                  project={props.project}
-                  pivotSpec={{
-                    rowDim: props.primaryDim,
-                    colDim: props.secondaryDim,
-                  }}
-                  extraDataGridProps={
-                    {
-                      hideFooter: true,
-                    } as any
-                  }
-                />
-              </Box> */}
-              {/* <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  overflow: 'hidden',
-                  flex: '0 0 auto',
-                }}>
-                Comparing child calls for op
-                <Autocomplete
-                  size={'small'}
-                  renderInput={params => (
-                    <TextField {...params} label="TODO MAKE THIS WORK" />
-                  )}
-                  // value={effectiveFilter.parentId ?? null}
-                  // onChange={(event, newValue) => {
-                  //   setFilter({
-                  //     ...filter,
-                  //     parentId: newValue,
-                  //   });
-                  // }}
-                  // getOptionLabel={option => {
-                  //   return parentIdOptions[option] ?? option;
-                  // }}
-                  options={['a', 'b', 'c']}
-                />
-              </Box> */}
               <Box sx={{minHeight: '300px', flex: '1 1 auto'}}>
                 {pageDetails}
               </Box>
