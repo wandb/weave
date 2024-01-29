@@ -509,7 +509,7 @@ const convertHighLevelFilterToLowLevelFilter = (
       })
       .filter(item => item != null) as string[],
     traceId: effectiveFilter.traceId ?? undefined,
-    parentId: effectiveFilter.parentId ?? undefined,
+    parentIds: effectiveFilter.parentId ? [effectiveFilter.parentId] : [],
   };
 };
 
