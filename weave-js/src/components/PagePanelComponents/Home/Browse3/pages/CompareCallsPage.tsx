@@ -4,6 +4,7 @@ import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
 
 import {parseRef} from '../../../../../react';
+import {useRuns} from '../../Browse2/callTreeHooks';
 import {objectRefDisplayName} from '../../Browse2/SmallRef';
 import {
   getValueAtNestedKey,
@@ -12,8 +13,6 @@ import {
 } from './CallsPage/PivotRunsTable';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useWeaveflowORMContext} from './wfInterface/context';
-import {WFCall} from './wfInterface/types';
 
 export const CompareCallsPage: React.FC<{
   entity: string;
@@ -22,14 +21,43 @@ export const CompareCallsPage: React.FC<{
   primaryDim?: string;
   secondaryDim?: string;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const calls = useMemo(() => {
-    return (
-      (props.callIds
-        ?.map(cid => orm.projectConnection.call(cid))
-        ?.filter(item => item != null) as WFCall[]) ?? []
-    );
-  }, [orm.projectConnection, props.callIds]);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
+  const parentCallsQuery = useRuns(
+    {
+      entityName: props.entity,
+      projectName: props.project,
+      streamName: 'stream',
+    },
+    {
+      callIds: props.callIds,
+    }
+  );
+  const parentCalls = useMemo(() => {
+    return parentCallsQuery.result;
+    // return (
+    //   (props.callIds
+    //     ?.map(cid => orm.projectConnection.call(cid))
+    //     ?.filter(item => item != null) as WFCall[]) ?? []
+    // );
+  }, [parentCallsQuery.result]);
+  const childCallsQuery = useRuns(
+    {
+      entityName: props.entity,
+      projectName: props.project,
+      streamName: 'stream',
+    },
+    {
+      callIds: props.callIds,
+    }
+  );
+  const childCalls = useMemo(() => {
+    return childCallsQuery.result;
+    // return (
+    //   (props.callIds
+    //     ?.map(cid => orm.projectConnection.call(cid))
+    //     ?.filter(item => item != null) as WFCall[]) ?? []
+    // );
+  }, [childCallsQuery.result]);
 
   const objectVersionOptions = useMemo(() => {
     if (props.secondaryDim == null) {
@@ -37,9 +65,7 @@ export const CompareCallsPage: React.FC<{
     }
     return Object.fromEntries(
       _.uniq(
-        calls.map(call =>
-          getValueAtNestedKey(call.rawCallSpan(), props.secondaryDim!)
-        )
+        parentCalls.map(call => getValueAtNestedKey(call, props.secondaryDim!))
       )
         .filter(item => item != null)
         .map(item => {
@@ -52,7 +78,7 @@ export const CompareCallsPage: React.FC<{
           return [item, item];
         })
     );
-  }, [calls, props.secondaryDim]);
+  }, [parentCalls, props.secondaryDim]);
 
   const [selectedObjectVersion, setSelectedObjectVersion] = React.useState<
     string | null
@@ -66,25 +92,18 @@ export const CompareCallsPage: React.FC<{
   }, [initialSelectedObjectVersion, selectedObjectVersion]);
 
   const callsFilteredToSecondaryDim = useMemo(() => {
-    return calls.filter(
+    return parentCalls.filter(
       call =>
-        getValueAtNestedKey(call.rawCallSpan(), props.secondaryDim!) ===
-        selectedObjectVersion
+        getValueAtNestedKey(call, props.secondaryDim!) === selectedObjectVersion
     );
-  }, [calls, props.secondaryDim, selectedObjectVersion]);
+  }, [parentCalls, props.secondaryDim, selectedObjectVersion]);
 
   const subOpVersionOptions = useMemo(() => {
     if (callsFilteredToSecondaryDim.length === 0) {
       return {};
     }
-    return Object.fromEntries(
-      callsFilteredToSecondaryDim[0]
-        .childCalls()
-        .map(call => call.opVersion())
-        .filter(opVersion => opVersion != null)
-        .map(opVersion => [opVersion!.version(), opVersion!])
-    );
-  }, [callsFilteredToSecondaryDim]);
+    return Object.fromEntries(childCalls.map(call => [call.name, call]));
+  }, [callsFilteredToSecondaryDim.length, childCalls]);
 
   const [selectedOpVersion, setSelectedOpVersion] = React.useState<
     string | null
@@ -99,15 +118,16 @@ export const CompareCallsPage: React.FC<{
 
   const subcalls = useMemo(() => {
     return callsFilteredToSecondaryDim.flatMap(call =>
-      call
-        .childCalls()
-        .filter(item => item.opVersion()?.version() === selectedOpVersion)
+      childCalls.filter(call => call.name === selectedOpVersion)
     );
-  }, [callsFilteredToSecondaryDim, selectedOpVersion]);
+  }, [callsFilteredToSecondaryDim, childCalls, selectedOpVersion]);
 
   const subruns = useMemo(() => {
-    return subcalls.map(call => call.rawCallSpan());
+    return subcalls;
+    // return subcalls.map(call => call.rawCallSpan());
   }, [subcalls]);
+
+  const loading = parentCallsQuery.loading || childCallsQuery.loading;
 
   const getOptionLabel = useCallback(
     option => {
@@ -126,7 +146,8 @@ export const CompareCallsPage: React.FC<{
       if (version == null) {
         return option;
       }
-      return version.op().name() + ':' + version.version().slice(0, 6);
+      return option;
+      // return version.op().name() + ':' + version.version().slice(0, 6);
     },
     [subOpVersionOptions]
   );
@@ -143,7 +164,7 @@ export const CompareCallsPage: React.FC<{
   const hideControls = true;
 
   const pageDetails = useMemo(() => {
-    if (calls.length === 0) {
+    if (loading) {
       return <CenteredAnimatedLoader />;
     }
     if (!props.primaryDim) {
@@ -171,8 +192,8 @@ export const CompareCallsPage: React.FC<{
       />
     );
   }, [
-    calls.length,
     hideControls,
+    loading,
     pivotSpec,
     props.callIds,
     props.entity,
@@ -205,7 +226,7 @@ export const CompareCallsPage: React.FC<{
                   flex: '0 0 auto',
                   width: '100%',
                   transition: 'width 0.1s ease-in-out',
-                  display: calls.length === 0 ? 'none' : 'flex',
+                  display: subruns.length === 0 ? 'none' : 'flex',
                   flexDirection: 'row',
                   overflowX: 'auto',
                   overflowY: 'hidden',
