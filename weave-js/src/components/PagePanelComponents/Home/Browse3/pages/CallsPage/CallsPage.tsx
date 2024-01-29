@@ -203,6 +203,12 @@ export const CallsTable: React.FC<{
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
   const hideControls = true;
+  const clearFilters = useMemo(() => {
+    if (Object.keys(filter ?? {}).length > 0) {
+      return () => setFilter({});
+    }
+    return null;
+  }, [filter, setFilter]);
 
   return (
     <FilterLayoutTemplate
@@ -399,6 +405,7 @@ export const CallsTable: React.FC<{
         <RunsTable
           loading={runsWithFeedbackQuery.loading}
           spans={runsWithFeedbackQuery.result}
+          clearFilters={clearFilters}
         />
       )}
     </FilterLayoutTemplate>

@@ -1,4 +1,4 @@
-import {Box, Typography} from '@material-ui/core';
+import {Box, Button, Typography} from '@material-ui/core';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -12,6 +12,7 @@ import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
+import {TEAL_600} from '../../../../common/css/color.styles';
 import {TargetBlank} from '../../../../common/util/links';
 import {Timestamp} from '../../../Timestamp';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
@@ -74,7 +75,8 @@ export function buildTree(
 export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
-}> = ({loading, spans}) => {
+  clearFilters?: null | (() => void);
+}> = ({loading, spans, clearFilters}) => {
   const showIO = useMemo(() => {
     return Array.from(new Set(spans.map(span => span.name))).length === 1;
   }, [spans]);
@@ -498,8 +500,26 @@ export const RunsTable: FC<{
                 alignItems: 'center',
               }}>
               <Typography color="textSecondary">
-                No calls found. Try clearing the filters above or learn more
-                about how to log calls by visiting{' '}
+                No calls found.{' '}
+                {clearFilters != null ? (
+                  <>
+                    Try{' '}
+                    <span
+                      style={{
+                        cursor: 'pointer',
+                        color: TEAL_600,
+                      }}
+                      onClick={() => {
+                        clearFilters();
+                      }}>
+                      clearing the filters
+                    </span>{' '}
+                    or l
+                  </>
+                ) : (
+                  'L'
+                )}
+                earn more about how to log calls by visiting{' '}
                 <TargetBlank href="https://wandb.me/weave">
                   the docs
                 </TargetBlank>
