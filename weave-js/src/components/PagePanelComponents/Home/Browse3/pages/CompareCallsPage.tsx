@@ -1,8 +1,9 @@
 import {Box, FormControl, ListItem, TextField} from '@mui/material';
 import {Autocomplete} from '@mui/material';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
+import {useWeaveContext} from '../../../../../context';
 import {parseRef} from '../../../../../react';
 import {Call} from '../../Browse2/callTree';
 import {useRuns} from '../../Browse2/callTreeHooks';
@@ -14,6 +15,8 @@ import {
 } from './CallsPage/PivotRunsTable';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {SimplePageLayout} from './common/SimplePageLayout';
+import {useWeaveflowORMContext} from './wfInterface/context';
+import {WFCall} from './wfInterface/types';
 
 export const CompareCallsPage: React.FC<{
   entity: string;
@@ -31,12 +34,12 @@ export const CompareCallsPage: React.FC<{
   >(null);
 
   const {
-    subruns,
+    parentRuns,
+    parentRunsFilteredToInputSelection,
+    childRunsOfFilteredParents,
+    childRunsFilteredToOpVersion,
     loading,
-    callsFilteredToSecondaryDim,
-    parentCalls,
-    childCalls,
-  } = useSubRunsFromWeaveQuery(
+  } = useSubRunsFromFastestEngine(
     props.entity,
     props.project,
     props.callIds,
@@ -51,7 +54,7 @@ export const CompareCallsPage: React.FC<{
     }
     return Object.fromEntries(
       _.uniq(
-        parentCalls.map(call => getValueAtNestedKey(call, props.secondaryDim!))
+        parentRuns.map(call => getValueAtNestedKey(call, props.secondaryDim!))
       )
         .filter(item => item != null)
         .map(item => {
@@ -64,7 +67,7 @@ export const CompareCallsPage: React.FC<{
           return [item, item];
         })
     );
-  }, [parentCalls, props.secondaryDim]);
+  }, [parentRuns, props.secondaryDim]);
 
   const initialSelectedObjectVersion = Object.keys(objectVersionOptions)?.[0];
   useEffect(() => {
@@ -74,11 +77,20 @@ export const CompareCallsPage: React.FC<{
   }, [initialSelectedObjectVersion, selectedObjectVersion]);
 
   const subOpVersionOptions = useMemo(() => {
-    if (callsFilteredToSecondaryDim.length === 0) {
+    if (parentRunsFilteredToInputSelection.length === 0) {
       return {};
     }
-    return Object.fromEntries(childCalls.map(call => [call.name, call]));
-  }, [callsFilteredToSecondaryDim.length, childCalls]);
+    return Object.fromEntries(
+      childRunsOfFilteredParents.map(call => {
+        const opRef = call.name;
+        const parsed = parseRef(opRef);
+        return [
+          parsed.artifactVersion,
+          parsed.artifactName + ':' + parsed.artifactVersion.slice(0, 6),
+        ];
+      })
+    );
+  }, [parentRunsFilteredToInputSelection.length, childRunsOfFilteredParents]);
 
   const initialSelectedOpVersion = Object.keys(subOpVersionOptions)?.[0];
 
@@ -105,8 +117,7 @@ export const CompareCallsPage: React.FC<{
       if (version == null) {
         return option;
       }
-      return option;
-      // return version.op().name() + ':' + version.version().slice(0, 6);
+      return version;
     },
     [subOpVersionOptions]
   );
@@ -139,7 +150,7 @@ export const CompareCallsPage: React.FC<{
     return (
       <PivotRunsView
         loading={false}
-        runs={subruns}
+        runs={childRunsFilteredToOpVersion}
         entity={props.entity}
         project={props.project}
         colDimAtLeafMode
@@ -159,7 +170,7 @@ export const CompareCallsPage: React.FC<{
     props.primaryDim,
     props.project,
     props.secondaryDim,
-    subruns,
+    childRunsFilteredToOpVersion,
   ]);
 
   return (
@@ -185,7 +196,8 @@ export const CompareCallsPage: React.FC<{
                   flex: '0 0 auto',
                   width: '100%',
                   transition: 'width 0.1s ease-in-out',
-                  display: subruns.length === 0 ? 'none' : 'flex',
+                  display:
+                    childRunsFilteredToOpVersion.length === 0 ? 'none' : 'flex',
                   flexDirection: 'row',
                   overflowX: 'auto',
                   overflowY: 'hidden',
@@ -249,11 +261,11 @@ export const CompareCallsPage: React.FC<{
 };
 
 type SubRunsReturnType = {
-  subruns: Call[];
+  parentRuns: Call[];
+  parentRunsFilteredToInputSelection: Call[];
+  childRunsOfFilteredParents: Call[];
+  childRunsFilteredToOpVersion: Call[];
   loading: boolean;
-  callsFilteredToSecondaryDim: Call[];
-  parentCalls: Call[];
-  childCalls: Call[];
 };
 
 const useSubRunsFromWeaveQuery = (
@@ -264,7 +276,7 @@ const useSubRunsFromWeaveQuery = (
   selectedOpVersion: string | null,
   selectedObjectVersion: string | null
 ): SubRunsReturnType => {
-  const parentCallsQuery = useRuns(
+  const parentRunsQuery = useRuns(
     {
       entityName: entity,
       projectName: project,
@@ -274,13 +286,15 @@ const useSubRunsFromWeaveQuery = (
       callIds: parentCallIds,
     }
   );
-  const parentCalls = parentCallsQuery.result;
+  const parentRuns = parentRunsQuery.result;
 
-  const callsFilteredToSecondaryDim = useMemo(() => {
-    return parentCalls.filter(
-      call => getValueAtNestedKey(call, secondaryDim!) === selectedObjectVersion
+  const parentRunsFilteredToInputSelection = useMemo(() => {
+    return parentRuns.filter(
+      call =>
+        secondaryDim &&
+        getValueAtNestedKey(call, secondaryDim) === selectedObjectVersion
     );
-  }, [parentCalls, secondaryDim, selectedObjectVersion]);
+  }, [parentRuns, secondaryDim, selectedObjectVersion]);
 
   const childCallsQuery = useRuns(
     {
@@ -289,27 +303,170 @@ const useSubRunsFromWeaveQuery = (
       streamName: 'stream',
     },
     {
-      callIds: parentCallIds,
+      parentIds: parentRunsFilteredToInputSelection.map(call => call.span_id),
     }
   );
 
-  const childCalls = childCallsQuery.result;
+  const childRunsOfFilteredParents = childCallsQuery.result;
 
-  const subcalls = useMemo(() => {
-    return callsFilteredToSecondaryDim.flatMap(call =>
-      childCalls.filter(call => call.name === selectedOpVersion)
+  const childRunsFilteredToOpVersion = useMemo(() => {
+    return childRunsOfFilteredParents.filter(
+      call => selectedOpVersion && call.name.includes(selectedOpVersion)
     );
-  }, [callsFilteredToSecondaryDim, childCalls, selectedOpVersion]);
-
-  const subruns = subcalls;
-
-  const loading = parentCallsQuery.loading || childCallsQuery.loading;
+  }, [childRunsOfFilteredParents, selectedOpVersion]);
 
   return {
-    subruns,
-    loading,
-    callsFilteredToSecondaryDim,
-    parentCalls,
-    childCalls,
+    parentRuns,
+    parentRunsFilteredToInputSelection,
+    childRunsOfFilteredParents,
+    childRunsFilteredToOpVersion,
+    loading: parentRunsQuery.loading || childCallsQuery.loading,
   };
+};
+
+const useSubRunsFromORM = (
+  entity: string,
+  project: string,
+  parentCallIds: string[] | undefined,
+  secondaryDim: string | undefined,
+  selectedOpVersion: string | null,
+  selectedObjectVersion: string | null
+): SubRunsReturnType => {
+  const orm = useWeaveflowORMContext(entity, project);
+  const weaveContext = useWeaveContext();
+  const [weaveLoading, setWeaveLoading] = useState(false);
+  useEffect(() => {
+    const obs = weaveContext.client.loadingObservable();
+    const sub = obs.subscribe(loading => {
+      setWeaveLoading(loading);
+    });
+    return () => sub.unsubscribe();
+  }, [weaveContext.client]);
+
+  const parentCalls = useMemo(() => {
+    return (
+      (parentCallIds
+        ?.map(cid => orm.projectConnection.call(cid))
+        ?.filter(item => item != null) as WFCall[]) ?? []
+    );
+  }, [orm.projectConnection, parentCallIds]);
+
+  const parentCallsFilteredToInputSelection = useMemo(() => {
+    return parentCalls.filter(
+      call =>
+        secondaryDim &&
+        getValueAtNestedKey(call.rawCallSpan(), secondaryDim) ===
+          selectedObjectVersion
+    );
+  }, [parentCalls, secondaryDim, selectedObjectVersion]);
+
+  const childCallsOfFilteredParents = useMemo(() => {
+    return parentCallsFilteredToInputSelection.flatMap(call =>
+      call.childCalls()
+    );
+  }, [parentCallsFilteredToInputSelection]);
+
+  const childCallsFilteredToOpVersion = useMemo(() => {
+    return childCallsOfFilteredParents.filter(
+      item => item.opVersion()?.version() === selectedOpVersion
+    );
+  }, [childCallsOfFilteredParents, selectedOpVersion]);
+
+  const parentRuns = useMemo(() => {
+    return parentCalls.map(c => c.rawCallSpan());
+  }, [parentCalls]);
+
+  const parentRunsFilteredToInputSelection = useMemo(() => {
+    return parentCallsFilteredToInputSelection.map(c => c.rawCallSpan());
+  }, [parentCallsFilteredToInputSelection]);
+
+  const childRunsOfFilteredParents = useMemo(() => {
+    return childCallsOfFilteredParents.map(call => call.rawCallSpan());
+  }, [childCallsOfFilteredParents]);
+
+  const childRunsFilteredToOpVersion = useMemo(() => {
+    return childCallsFilteredToOpVersion.map(call => call.rawCallSpan());
+  }, [childCallsFilteredToOpVersion]);
+
+  return {
+    parentRuns,
+    parentRunsFilteredToInputSelection,
+    childRunsOfFilteredParents,
+    childRunsFilteredToOpVersion,
+    loading: weaveLoading,
+  };
+};
+
+const useSubRunsFromFastestEngine = (
+  entity: string,
+  project: string,
+  parentCallIds: string[] | undefined,
+  secondaryDim: string | undefined,
+  selectedOpVersion: string | null,
+  selectedObjectVersion: string | null
+): SubRunsReturnType => {
+  const weaveQueryResults = useSubRunsFromWeaveQuery(
+    entity,
+    project,
+    parentCallIds,
+    secondaryDim,
+    selectedOpVersion,
+    selectedObjectVersion
+  );
+
+  const ormResults = useSubRunsFromORM(
+    entity,
+    project,
+    parentCallIds,
+    secondaryDim,
+    selectedOpVersion,
+    selectedObjectVersion
+  );
+
+  if (!weaveQueryResults.loading && !ormResults.loading) {
+    if (weaveQueryResults.parentRuns.length !== ormResults.parentRuns.length) {
+      console.error(
+        'parentRuns mismatch',
+        weaveQueryResults.parentRuns,
+        ormResults.parentRuns
+      );
+    }
+    if (
+      weaveQueryResults.parentRunsFilteredToInputSelection.length !==
+      ormResults.parentRunsFilteredToInputSelection.length
+    ) {
+      console.error(
+        'parentRunsFilteredToInputSelection mismatch',
+        weaveQueryResults.parentRunsFilteredToInputSelection,
+        ormResults.parentRunsFilteredToInputSelection
+      );
+    }
+    if (
+      weaveQueryResults.childRunsOfFilteredParents.length !==
+      ormResults.childRunsOfFilteredParents.length
+    ) {
+      console.error(
+        'childRunsOfFilteredParents mismatch',
+        weaveQueryResults.childRunsOfFilteredParents,
+        ormResults.childRunsOfFilteredParents
+      );
+    }
+    if (
+      weaveQueryResults.childRunsFilteredToOpVersion.length !==
+      ormResults.childRunsFilteredToOpVersion.length
+    ) {
+      console.error(
+        'childRunsFilteredToOpVersion mismatch',
+        weaveQueryResults.childRunsFilteredToOpVersion,
+        ormResults.childRunsFilteredToOpVersion
+      );
+    }
+  }
+
+  return useMemo(() => {
+    if (!ormResults.loading) {
+      return ormResults;
+    }
+    return weaveQueryResults;
+  }, [ormResults, weaveQueryResults]);
 };
