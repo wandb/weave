@@ -455,7 +455,7 @@ export const PivotRunsTable: React.FC<
       />
       <Snackbar
         open={clickSnackOpen}
-        autoHideDuration={20000}
+        autoHideDuration={2000}
         onClose={() => {
           setClickSnackOpen(false);
         }}
