@@ -186,6 +186,7 @@ export const RunsTable: FC<{
         width: 75,
         minWidth: 75,
         maxWidth: 75,
+        hideable: false,
         renderCell: rowParams => {
           // return truncateID(rowParams.row.id);
           return (
