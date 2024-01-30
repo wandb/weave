@@ -15,6 +15,16 @@ if typing.TYPE_CHECKING:
     from .op_def import OpDef
 
 
+def _deref_all(obj: typing.Any):
+    if isinstance(obj, dict):
+        return {k: _deref_all(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_deref_all(v) for v in obj]
+    elif isinstance(obj, ref_base.Ref):
+        return obj.get()
+    return obj
+
+
 def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
     import numpy as np
 
@@ -97,9 +107,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
                     client.finish_run(run, output, output_refs)
                     if not parent_run:
                         print("🍩 View run:", run.ui_url)
-                    if isinstance(output, ref_base.Ref):
-                        return output.get()
-                    return output
+                    return _deref_all(output)
                 except Exception as e:
                     client.fail_run(run, e)
                     raise
@@ -114,10 +122,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
             client.finish_run(run, output, output_refs)
             if not parent_run:
                 print("🍩 View run:", run.ui_url)
-            if isinstance(output, ref_base.Ref):
-                res = output.get()
-            else:
-                res = output
+            res = _deref_all(output)
 
     else:
         res = op_def.resolve_fn(**inputs)
