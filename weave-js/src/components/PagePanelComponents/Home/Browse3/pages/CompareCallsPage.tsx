@@ -4,6 +4,7 @@ import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo} from 'react';
 
 import {parseRef} from '../../../../../react';
+import {Call} from '../../Browse2/callTree';
 import {useRuns} from '../../Browse2/callTreeHooks';
 import {objectRefDisplayName} from '../../Browse2/SmallRef';
 import {
@@ -21,43 +22,28 @@ export const CompareCallsPage: React.FC<{
   primaryDim?: string;
   secondaryDim?: string;
 }> = props => {
-  // const orm = useWeaveflowORMContext(props.entity, props.project);
-  const parentCallsQuery = useRuns(
-    {
-      entityName: props.entity,
-      projectName: props.project,
-      streamName: 'stream',
-    },
-    {
-      callIds: props.callIds,
-    }
+  const [selectedOpVersion, setSelectedOpVersion] = React.useState<
+    string | null
+  >(null);
+
+  const [selectedObjectVersion, setSelectedObjectVersion] = React.useState<
+    string | null
+  >(null);
+
+  const {
+    subruns,
+    loading,
+    callsFilteredToSecondaryDim,
+    parentCalls,
+    childCalls,
+  } = useSubRunsFromWeaveQuery(
+    props.entity,
+    props.project,
+    props.callIds,
+    props.secondaryDim,
+    selectedOpVersion,
+    selectedObjectVersion
   );
-  const parentCalls = useMemo(() => {
-    return parentCallsQuery.result;
-    // return (
-    //   (props.callIds
-    //     ?.map(cid => orm.projectConnection.call(cid))
-    //     ?.filter(item => item != null) as WFCall[]) ?? []
-    // );
-  }, [parentCallsQuery.result]);
-  const childCallsQuery = useRuns(
-    {
-      entityName: props.entity,
-      projectName: props.project,
-      streamName: 'stream',
-    },
-    {
-      callIds: props.callIds,
-    }
-  );
-  const childCalls = useMemo(() => {
-    return childCallsQuery.result;
-    // return (
-    //   (props.callIds
-    //     ?.map(cid => orm.projectConnection.call(cid))
-    //     ?.filter(item => item != null) as WFCall[]) ?? []
-    // );
-  }, [childCallsQuery.result]);
 
   const objectVersionOptions = useMemo(() => {
     if (props.secondaryDim == null) {
@@ -80,23 +66,12 @@ export const CompareCallsPage: React.FC<{
     );
   }, [parentCalls, props.secondaryDim]);
 
-  const [selectedObjectVersion, setSelectedObjectVersion] = React.useState<
-    string | null
-  >(null);
-
   const initialSelectedObjectVersion = Object.keys(objectVersionOptions)?.[0];
   useEffect(() => {
     if (selectedObjectVersion == null && initialSelectedObjectVersion != null) {
       setSelectedObjectVersion(initialSelectedObjectVersion);
     }
   }, [initialSelectedObjectVersion, selectedObjectVersion]);
-
-  const callsFilteredToSecondaryDim = useMemo(() => {
-    return parentCalls.filter(
-      call =>
-        getValueAtNestedKey(call, props.secondaryDim!) === selectedObjectVersion
-    );
-  }, [parentCalls, props.secondaryDim, selectedObjectVersion]);
 
   const subOpVersionOptions = useMemo(() => {
     if (callsFilteredToSecondaryDim.length === 0) {
@@ -105,29 +80,13 @@ export const CompareCallsPage: React.FC<{
     return Object.fromEntries(childCalls.map(call => [call.name, call]));
   }, [callsFilteredToSecondaryDim.length, childCalls]);
 
-  const [selectedOpVersion, setSelectedOpVersion] = React.useState<
-    string | null
-  >(null);
-
   const initialSelectedOpVersion = Object.keys(subOpVersionOptions)?.[0];
+
   useEffect(() => {
     if (selectedOpVersion == null && initialSelectedOpVersion != null) {
       setSelectedOpVersion(initialSelectedOpVersion);
     }
   }, [initialSelectedOpVersion, selectedOpVersion]);
-
-  const subcalls = useMemo(() => {
-    return callsFilteredToSecondaryDim.flatMap(call =>
-      childCalls.filter(call => call.name === selectedOpVersion)
-    );
-  }, [callsFilteredToSecondaryDim, childCalls, selectedOpVersion]);
-
-  const subruns = useMemo(() => {
-    return subcalls;
-    // return subcalls.map(call => call.rawCallSpan());
-  }, [subcalls]);
-
-  const loading = parentCallsQuery.loading || childCallsQuery.loading;
 
   const getOptionLabel = useCallback(
     option => {
@@ -287,4 +246,70 @@ export const CompareCallsPage: React.FC<{
       ]}
     />
   );
+};
+
+type SubRunsReturnType = {
+  subruns: Call[];
+  loading: boolean;
+  callsFilteredToSecondaryDim: Call[];
+  parentCalls: Call[];
+  childCalls: Call[];
+};
+
+const useSubRunsFromWeaveQuery = (
+  entity: string,
+  project: string,
+  parentCallIds: string[] | undefined,
+  secondaryDim: string | undefined,
+  selectedOpVersion: string | null,
+  selectedObjectVersion: string | null
+): SubRunsReturnType => {
+  const parentCallsQuery = useRuns(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    {
+      callIds: parentCallIds,
+    }
+  );
+  const parentCalls = parentCallsQuery.result;
+
+  const callsFilteredToSecondaryDim = useMemo(() => {
+    return parentCalls.filter(
+      call => getValueAtNestedKey(call, secondaryDim!) === selectedObjectVersion
+    );
+  }, [parentCalls, secondaryDim, selectedObjectVersion]);
+
+  const childCallsQuery = useRuns(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: 'stream',
+    },
+    {
+      callIds: parentCallIds,
+    }
+  );
+
+  const childCalls = childCallsQuery.result;
+
+  const subcalls = useMemo(() => {
+    return callsFilteredToSecondaryDim.flatMap(call =>
+      childCalls.filter(call => call.name === selectedOpVersion)
+    );
+  }, [callsFilteredToSecondaryDim, childCalls, selectedOpVersion]);
+
+  const subruns = subcalls;
+
+  const loading = parentCallsQuery.loading || childCallsQuery.loading;
+
+  return {
+    subruns,
+    loading,
+    callsFilteredToSecondaryDim,
+    parentCalls,
+    childCalls,
+  };
 };
