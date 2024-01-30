@@ -5,6 +5,7 @@ import time
 from .. import cache
 from .. import environment
 
+
 def test_lru_time_window_cache():
     curtime = {"t": datetime.datetime(2020, 1, 1)}
 
@@ -39,14 +40,15 @@ def test_lru_time_window_cache():
         ((None, "bar2"), (datetime.datetime(2020, 1, 1, 0, 0, 8), "h")),
     ]
 
+
 def test_bucket_timestamp():
     day_in_seconds = 60 * 60 * 24
     cacheTimestamps = []
     for i in range(10):
         cacheTimestamps.append(int(cache.bucket_timestamp(i), 10))
-    
+
     # Assert that the 0 is always 0
-    assert cacheTimestamps[0] == 0  
+    assert cacheTimestamps[0] == 0
 
     # Assert that the timestamps are bucketed into the correct intervals
     for i in range(1, 10):
@@ -56,7 +58,7 @@ def test_bucket_timestamp():
     # Assert that running the same function should bucket into the same interval
     for i in range(10):
         assert cacheTimestamps[i] == int(cache.bucket_timestamp(i), 10)
-    
+
 
 def test_clear_cache():
     # Test that the clear_cache function works
@@ -73,7 +75,7 @@ def test_clear_cache():
 
     # create 10 cache directories
     # 5 in the past, 5 in the future
-    for i in [-10,-9,-8,-7,-6,1,2,3,4,5]:
+    for i in [-10, -9, -8, -7, -6, 1, 2, 3, 4, 5]:
         path = os.path.join(cache_dir, str(int(time.time() + (i * day_in_seconds))))
         paths.append(path)
         os.makedirs(path)
@@ -86,7 +88,7 @@ def test_clear_cache():
     cache.clear_cache()
 
     # check cache directory file count is correct
-    assert len(os.listdir(cache_dir)) == orig_file_count + len(paths)/2
+    assert len(os.listdir(cache_dir)) == orig_file_count + len(paths) / 2
 
     # delete all created driectories
     for path in paths:
