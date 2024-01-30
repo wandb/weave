@@ -354,10 +354,7 @@ const MainPeekingLayout: FC = () => {
         variant="persistent"
         anchor={isFlexRow ? 'right' : 'bottom'}
         open={isDrawerOpen}
-        onClose={() => {
-          const targetPath = query.peekPath!.replace(generalBase, targetBase);
-          history.push(targetPath);
-        }}
+        onClose={closePeek}
         PaperProps={{
           style: {
             overflow: 'hidden',
