@@ -63,7 +63,7 @@ def time_interval_cache_prefix(
         context_state._cache_prefix_context.reset(token)
 
 
-def get_cache_prefix() -> typing.Optional[str]:
+def get_cache_prefix_context() -> typing.Optional[str]:
     return context_state._cache_prefix_context.get()
 
 

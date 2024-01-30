@@ -476,7 +476,7 @@ class AsyncConnection:
 
         wb_ctx = wandb_api.get_wandb_api_context()
         cur_trace_context = tracer.current_trace_context()
-        cache_prefix = cache.get_cache_prefix()
+        cache_prefix = cache.get_cache_prefix_context()
 
         req = ServerRequest(
             self.client_id,
@@ -570,7 +570,7 @@ class SyncClient:
     def request(self, name: str, *args: typing.Any) -> typing.Any:
         wb_ctx = wandb_api.get_wandb_api_context()
         cur_trace_context = tracer.current_trace_context()
-        cache_prefix = cache.get_cache_prefix()
+        cache_prefix = cache.get_cache_prefix_context()
         self._current_request_id += 1
 
         with self.server.registered_client(self):

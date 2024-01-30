@@ -188,7 +188,7 @@ def get_filesystem_async() -> FilesystemAsync:
 
 def get_filesystem_dir() -> str:
     path = environment.weave_filesystem_dir()
-    prefix = cache.get_cache_prefix()
+    prefix = cache.get_cache_prefix_context()
     if prefix is not None:
         path = os.path.join(path, prefix)
     cache_key = cache.get_user_cache_key()

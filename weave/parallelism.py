@@ -59,7 +59,7 @@ def do_in_parallel(
     eager_mode = context_state.eager_mode()
     graph_client = graph_client_context.get_graph_client()
     run_stack = run_context.get_run_stack()
-    cache_prefix = cache.get_cache_prefix()
+    cache_prefix = cache.get_cache_prefix_context()
 
     def do_one_with_memo_and_parallel_budget(x: ItemType) -> ResultType:
         memo_token = memo._memo_storage.set(memo_ctx)
