@@ -34,13 +34,14 @@ export const renderCell = (value: any) => {
     return value ? 'True' : 'False';
   }
   if (typeof value === 'number') {
+    const printedVal = Number.isInteger(value) ? value : value.toFixed(4);
     return (
       <Box
         sx={{
           textAlign: 'right',
           width: '100%',
         }}>
-        {value.toFixed(4)}
+        {printedVal}
       </Box>
     );
   }
