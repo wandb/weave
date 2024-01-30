@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
+import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Link as RouterLink,
@@ -326,8 +327,11 @@ const MainPeekingLayout: FC = () => {
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   const flexDirection = useFlexDirection();
+  const isFlexRow = flexDirection === 'row';
+  const isDrawerOpen = peekLocation != null;
+  const windowSize = useWindowSize();
 
-  const {handleMousedown, drawerWidth, drawerHeight} = useDrawerResize();
+  const {handleMousedown, drawerWidthPct, drawerHeightPct} = useDrawerResize();
 
   return (
     <Box
@@ -345,12 +349,17 @@ const MainPeekingLayout: FC = () => {
           flex: '1 1 40%',
           overflow: 'hidden',
           display: 'flex',
-          transition: "margin-right 0.5s ease-in", 
-          marginRight: `calc(${drawerWidth} + 28px)`,
-          ...(peekLocation == null && {
-            transition: "margin-right 0.5s ease-out",
-            marginRight: 0,
+          // This transition is from the mui drawer component, to keep the main content animation in similar
+          ...(!isDrawerOpen && {
+            transition: 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms',
           }),
+          marginRight:
+            !isDrawerOpen || !isFlexRow
+              ? 0
+              : `${drawerWidthPct / (1 - 56 / windowSize.width)}%`,
+          // this is vh because margin-bottom percentages are relative to the viewport width
+          marginBottom: !isDrawerOpen || isFlexRow ? 0 : `${drawerHeightPct}vh`,
+
           /**
            * This is necessary to enable the selection of content. In the DOM, the stacking order is determined
            * by the order of appearance. Following this rule, elements appearing later in the markup will overlay
@@ -364,8 +373,8 @@ const MainPeekingLayout: FC = () => {
 
       <Drawer
         variant="persistent"
-        anchor={flexDirection === 'row' ? 'right' : 'bottom'}
-        open={peekLocation != null}
+        anchor={isFlexRow ? 'right' : 'bottom'}
+        open={isDrawerOpen}
         onClose={() => {
           const targetPath = query.peekPath!.replace(generalBase, targetBase);
           history.push(targetPath);
@@ -375,17 +384,14 @@ const MainPeekingLayout: FC = () => {
             overflow: 'hidden',
             display: 'flex',
             zIndex: 1,
-            width: flexDirection === 'row' ? drawerWidth : '100%',
-            height: flexDirection === 'column' ? drawerHeight : '100%',
-            margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 56px',
-            boxShadow:
-              flexDirection === 'row'
-                ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
-                : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
-            borderLeft:
-              flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
-            borderTop:
-              flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
+            width: isFlexRow ? `${drawerWidthPct}%` : '100%',
+            height: !isFlexRow ? `${drawerHeightPct}%` : '100%',
+            margin: isFlexRow ? '60px 0 0 0' : '0 0 0 56px',
+            boxShadow: isFlexRow
+              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
+              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
+            borderLeft: isFlexRow ? `1px solid ${MOON_200}` : 'none',
+            borderTop: !isFlexRow ? `1px solid ${MOON_200}` : 'none',
           },
         }}
         ModalProps={{
@@ -401,12 +407,12 @@ const MainPeekingLayout: FC = () => {
             left: 0,
             zIndex: 100,
             backgroundColor: '#f4f7f9',
-            cursor: flexDirection === 'row' ? 'ew-resize' : 'ns-resize',
-            padding: flexDirection === 'row' ? '4px 0 0' : '0 4px 0 0',
-            bottom: flexDirection === 'row' ? 0 : 'auto',
-            right: flexDirection === 'row' ? 'auto' : 0,
-            width: flexDirection === 'row' ? '5px' : 'auto',
-            height: flexDirection === 'row' ? 'auto' : '5px',
+            cursor: isFlexRow ? 'ew-resize' : 'ns-resize',
+            padding: isFlexRow ? '4px 0 0' : '0 4px 0 0',
+            bottom: isFlexRow ? 0 : 'auto',
+            right: isFlexRow ? 'auto' : 0,
+            width: isFlexRow ? '5px' : 'auto',
+            height: isFlexRow ? 'auto' : '5px',
           }}
         />
         {peekLocation && (
