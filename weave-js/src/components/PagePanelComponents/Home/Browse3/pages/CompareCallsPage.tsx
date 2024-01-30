@@ -3,7 +3,6 @@ import {Autocomplete} from '@mui/material';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
-import {useWeaveContext} from '../../../../../context';
 import {parseRef} from '../../../../../react';
 import {Call} from '../../Browse2/callTree';
 import {useRuns} from '../../Browse2/callTreeHooks';
@@ -333,15 +332,6 @@ const useSubRunsFromORM = (
   selectedObjectVersion: string | null
 ): SubRunsReturnType => {
   const orm = useWeaveflowORMContext(entity, project);
-  const weaveContext = useWeaveContext();
-  const [weaveLoading, setWeaveLoading] = useState(false);
-  useEffect(() => {
-    const obs = weaveContext.client.loadingObservable();
-    const sub = obs.subscribe(loading => {
-      setWeaveLoading(loading);
-    });
-    return () => sub.unsubscribe();
-  }, [weaveContext.client]);
 
   const parentCalls = useMemo(() => {
     return (
@@ -393,7 +383,7 @@ const useSubRunsFromORM = (
     parentRunsFilteredToInputSelection,
     childRunsOfFilteredParents,
     childRunsFilteredToOpVersion,
-    loading: weaveLoading,
+    loading: parentRuns.length === 0,
   };
 };
 
@@ -430,8 +420,7 @@ const useSubRunsFromFastestEngine = (
         weaveQueryResults.parentRuns,
         ormResults.parentRuns
       );
-    }
-    if (
+    } else if (
       weaveQueryResults.parentRunsFilteredToInputSelection.length !==
       ormResults.parentRunsFilteredToInputSelection.length
     ) {
@@ -440,8 +429,7 @@ const useSubRunsFromFastestEngine = (
         weaveQueryResults.parentRunsFilteredToInputSelection,
         ormResults.parentRunsFilteredToInputSelection
       );
-    }
-    if (
+    } else if (
       weaveQueryResults.childRunsOfFilteredParents.length !==
       ormResults.childRunsOfFilteredParents.length
     ) {
@@ -450,8 +438,7 @@ const useSubRunsFromFastestEngine = (
         weaveQueryResults.childRunsOfFilteredParents,
         ormResults.childRunsOfFilteredParents
       );
-    }
-    if (
+    } else if (
       weaveQueryResults.childRunsFilteredToOpVersion.length !==
       ormResults.childRunsFilteredToOpVersion.length
     ) {
@@ -463,10 +450,22 @@ const useSubRunsFromFastestEngine = (
     }
   }
 
+  // We don't want to switch between ORM and weave query results
+  // as they result in the table reloading. Just choose one for a
+  // given render and stick with it.
+  const [usingORM, setUsingORM] = useState<boolean | undefined>(undefined);
+
   return useMemo(() => {
-    if (!ormResults.loading) {
+    if (!ormResults.loading && usingORM !== false) {
+      if (usingORM !== true) {
+        setUsingORM(true);
+      }
       return ormResults;
+    } else {
+      if (usingORM !== false) {
+        setUsingORM(false);
+      }
+      return weaveQueryResults;
     }
-    return weaveQueryResults;
-  }, [ormResults, weaveQueryResults]);
+  }, [ormResults, usingORM, weaveQueryResults]);
 };
