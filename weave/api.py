@@ -1,5 +1,6 @@
 """These are the top-level functions in the `import weave` namespace.
 """
+
 import time
 import typing
 import os
@@ -37,6 +38,9 @@ from weave.monitoring import monitor as _monitor
 
 # exposed as part of api
 from . import weave_types as types
+
+# needed to enable automatic numpy serialization
+from . import types_numpy as _types_numpy
 
 from . import errors
 from .decorators import weave_class, op, mutation, type
