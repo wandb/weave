@@ -1,3 +1,4 @@
+import {Box} from '@material-ui/core';
 import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
@@ -8,7 +9,7 @@ import {SmallRef} from '../../Browse2/SmallRef';
 export const useURLSearchParamsDict = () => {
   const {search} = useLocation();
 
-  return React.useMemo(() => {
+  return useMemo(() => {
     const params = new URLSearchParams(search);
     const entries = Array.from(params.entries());
     const searchDict = _.fromPairs(entries);
@@ -31,6 +32,18 @@ export const renderCell = (value: any) => {
   }
   if (typeof value === 'boolean') {
     return value ? 'True' : 'False';
+  }
+  if (typeof value === 'number') {
+    const printedVal = Number.isInteger(value) ? value : value.toFixed(4);
+    return (
+      <Box
+        sx={{
+          textAlign: 'right',
+          width: '100%',
+        }}>
+        {printedVal}
+      </Box>
+    );
   }
   return value;
 };

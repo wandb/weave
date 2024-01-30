@@ -21,7 +21,7 @@ def tree_merge(a: KeyTree, b: KeyTree) -> None:
 
 def get_projection(obj: stitch.ObjectRecorder) -> KeyTree:
     """Given an object returned by stitch, return a tree of all accessed columns."""
-    from .ops_primitives import _dict_utils
+    from . import _dict_utils
 
     cols: KeyTree = {}
     all_keys = False

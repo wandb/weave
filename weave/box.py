@@ -2,7 +2,6 @@ import typing
 import random
 import datetime
 import numpy as np
-import pytz
 
 from . import context_state
 
@@ -158,7 +157,7 @@ def box(
     elif type(obj) == np.ndarray:
         return BoxedNDArray(obj)
     elif type(obj) == datetime.datetime:
-        return BoxedDatetime.fromtimestamp(obj.timestamp(), tz=pytz.UTC)
+        return BoxedDatetime.fromtimestamp(obj.timestamp(), tz=datetime.timezone.utc)
     elif type(obj) == datetime.timedelta:
         return BoxedTimedelta(seconds=obj.total_seconds())
     elif obj is None:

@@ -8,7 +8,8 @@ import pytest
 import shutil
 import tempfile
 
-from weave.panels import table_state
+import weave
+
 from . import context_state
 from .tests import fixture_fakewandb
 from . import serialize
@@ -34,6 +35,10 @@ logs.configure_logger()
 # A lot of tests are written to expect lazy mode, so just make lazy mode the default for
 # tests.
 context_state._eager_mode.set(False)
+
+# A lot of tests rely on weave.ops.* being in scope. Importing this here
+# makes that work...
+from weave import ops
 
 
 def pytest_report_teststatus(
@@ -282,6 +287,8 @@ def io_server_factory():
 
 @pytest.fixture()
 def consistent_table_col_ids():
+    from weave.panels import table_state
+
     with table_state.use_consistent_col_ids():
         yield
 

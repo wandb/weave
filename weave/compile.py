@@ -271,7 +271,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                     node.type, "ArrowWeaveListTypedDict-columnNames", {"self": awl_node}
                 )
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "flatten":
-        from .ops_arrow.arrow import ArrowWeaveListType
+        from .arrow.arrow import ArrowWeaveListType
         from .ops_arrow.list_ops import _concat_output_type
 
         # The operation of flattening a lists of arrow weave lists is exactly equal to the far
@@ -286,7 +286,7 @@ def _simple_optimizations(node: graph.Node) -> typing.Optional[graph.Node]:
                 {"arr": arr_node},
             )
     elif isinstance(node, graph.OutputNode) and node.from_op.name == "concat":
-        from .ops_arrow.arrow import ArrowWeaveListType
+        from .arrow.arrow import ArrowWeaveListType
         from .ops_arrow.list_ops import flatten_return_type
 
         # The operation of concat on a awl of lists is exactly equal to the far
@@ -909,7 +909,7 @@ def _propagate_updated_types_through_lambdas(
         updated_input_types = {**target_node.type.input_types}
         expected_input_types = expected_type.input_types
         dirty_input_keys = set()
-        for (input_key, expected_input_type) in expected_input_types.items():
+        for input_key, expected_input_type in expected_input_types.items():
             if input_key not in updated_input_types or expected_input_type.assign_type(
                 updated_input_types[input_key]
             ):

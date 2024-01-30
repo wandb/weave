@@ -29,6 +29,11 @@ export const StyledDataGrid = styled(DataGridPro)(({theme}) => ({
     color: '#979a9e',
   },
 
+  '& .MuiDataGrid-pinnedColumnHeaders': {
+    backgroundColor: MOON_50,
+    color: '#979a9e',
+  },
+
   '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
     outline: 'none',
   },

@@ -1,3 +1,4 @@
+import {Box, Typography} from '@material-ui/core';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -8,9 +9,18 @@ import {
 } from '@mui/x-data-grid-pro';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
-import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  ComponentProps,
+  FC,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useParams} from 'react-router-dom';
 
+import {TEAL_600} from '../../../../common/css/color.styles';
+import {TargetBlank} from '../../../../common/util/links';
 import {Timestamp} from '../../../Timestamp';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
@@ -23,7 +33,7 @@ import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 
 export type DataGridColumnGroupingModel = Exclude<
-  React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+  ComponentProps<typeof DataGrid>['columnGroupingModel'],
   undefined
 >;
 
@@ -72,7 +82,8 @@ export function buildTree(
 export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
-}> = ({loading, spans}) => {
+  clearFilters?: null | (() => void);
+}> = ({loading, spans, clearFilters}) => {
   const showIO = useMemo(() => {
     return Array.from(new Set(spans.map(span => span.name))).length === 1;
   }, [spans]);
@@ -186,6 +197,7 @@ export const RunsTable: FC<{
         width: 75,
         minWidth: 75,
         maxWidth: 75,
+        hideable: false,
         renderCell: rowParams => {
           // return truncateID(rowParams.row.id);
           return (
@@ -291,7 +303,9 @@ export const RunsTable: FC<{
 
     let attributesKeys: {[key: string]: true} = {};
     spans.forEach(span => {
-      for (const [k, v] of Object.entries(flattenObject(span.attributes!))) {
+      for (const [k, v] of Object.entries(
+        flattenObject(span.attributes ?? {})
+      )) {
         if (v != null && k !== '_keys') {
           attributesKeys[k] = true;
         }
@@ -330,7 +344,7 @@ export const RunsTable: FC<{
           k => !k.startsWith('_')
         );
       const inputGroup: Exclude<
-        React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+        ComponentProps<typeof DataGrid>['columnGroupingModel'],
         undefined
       >[number] = {
         groupId: 'inputs',
@@ -353,7 +367,7 @@ export const RunsTable: FC<{
       // All output keys as we don't have the order key yet.
       let outputKeys: {[key: string]: true} = {};
       spans.forEach(span => {
-        for (const [k, v] of Object.entries(flattenObject(span.output!))) {
+        for (const [k, v] of Object.entries(flattenObject(span.output ?? {}))) {
           if (v != null && (!k.startsWith('_') || k === '_result')) {
             outputKeys[k] = true;
           }
@@ -385,7 +399,9 @@ export const RunsTable: FC<{
 
       let feedbackKeys: {[key: string]: true} = {};
       spans.forEach(span => {
-        for (const [k, v] of Object.entries(flattenObject(span.feedback!))) {
+        for (const [k, v] of Object.entries(
+          flattenObject(span.feedback ?? {})
+        )) {
           if (v != null && k !== '_keys') {
             feedbackKeys[k] = true;
           }
@@ -434,7 +450,7 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
-  const initialState: React.ComponentProps<typeof DataGridPro>['initialState'] =
+  const initialState: ComponentProps<typeof DataGridPro>['initialState'] =
     useMemo(() => {
       if (loading) {
         return undefined;
@@ -480,6 +496,47 @@ export const RunsTable: FC<{
       //     )
       //   );
       // }}
+      slots={{
+        noRowsOverlay: () => {
+          return (
+            <Box
+              sx={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Typography color="textSecondary">
+                No calls found.{' '}
+                {clearFilters != null ? (
+                  <>
+                    Try{' '}
+                    <span
+                      style={{
+                        cursor: 'pointer',
+                        color: TEAL_600,
+                      }}
+                      onClick={() => {
+                        clearFilters();
+                      }}>
+                      clearing the filters
+                    </span>{' '}
+                    or l
+                  </>
+                ) : (
+                  'L'
+                )}
+                earn more about how to log calls by visiting{' '}
+                <TargetBlank href="https://wandb.me/weave">
+                  the docs
+                </TargetBlank>
+                .
+              </Typography>
+            </Box>
+          );
+        },
+      }}
     />
     // </Box>
   );

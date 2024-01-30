@@ -2,6 +2,7 @@ import json
 import pathlib
 
 import weave
+from weave.file_base import Dir
 
 
 def dirsize(path) -> int:
@@ -10,7 +11,7 @@ def dirsize(path) -> int:
 
 @weave.type()
 class SlackReadExportApi:
-    data_dir: weave.Dir
+    data_dir: Dir
 
     def channel_names(self):
         return (n.name for n in pathlib.Path(self.data_dir.path).glob("*"))

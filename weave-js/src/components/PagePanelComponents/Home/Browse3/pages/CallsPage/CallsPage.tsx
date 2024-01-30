@@ -10,7 +10,7 @@ import {
   TextField,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {FC, useCallback, useMemo} from 'react';
 
 import {CallFilter} from '../../../Browse2/callTree';
 import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
@@ -44,7 +44,7 @@ export type WFHighLevelCallFilter = {
   pivotSpec?: Partial<WFHighLevelPivotSpec>;
 };
 
-export const CallsPage: React.FC<{
+export const CallsPage: FC<{
   entity: string;
   project: string;
   initialFilter?: WFHighLevelCallFilter;
@@ -67,6 +67,7 @@ export const CallsPage: React.FC<{
   return (
     <SimplePageLayout
       title={title}
+      hideTabsIfSingle
       tabs={[
         {
           label: 'All',
@@ -83,7 +84,7 @@ export const CallsPage: React.FC<{
   );
 };
 
-export const CallsTable: React.FC<{
+export const CallsTable: FC<{
   entity: string;
   project: string;
   frozenFilter?: WFHighLevelCallFilter;
@@ -201,6 +202,13 @@ export const CallsTable: React.FC<{
   }, [runsWithFeedbackQuery.result]);
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
+  const hideControls = true;
+  const clearFilters = useMemo(() => {
+    if (Object.keys(filter ?? {}).length > 0) {
+      return () => setFilter({});
+    }
+    return null;
+  }, [filter, setFilter]);
 
   return (
     <FilterLayoutTemplate
@@ -212,7 +220,8 @@ export const CallsTable: React.FC<{
         effectiveFilter
       )}
       filterListSx={{
-        pb: isPivoting ? 0 : 1,
+        // Hide until we show filters
+        pb: isPivoting && !hideControls ? 0 : 1,
       }}
       filterListItems={
         <>
@@ -279,11 +288,11 @@ export const CallsTable: React.FC<{
                     opVersions: newValue ? [newValue] : [],
                   });
                 }}
-                renderInput={params => (
-                  <TextField {...params} label="Op" />
-                  // <TextField {...params} label="Op Version" />
-                )}
+                renderInput={params => <TextField {...params} label="Op" />}
                 getOptionLabel={option => {
+                  if (option.endsWith(':*')) {
+                    return opNiceName(option.slice(0, -2));
+                  }
                   return opVersionOptions[option] ?? option;
                 }}
                 options={Object.keys(opVersionOptions)}
@@ -384,11 +393,19 @@ export const CallsTable: React.FC<{
           runs={runsWithFeedbackQuery.result}
           pivotSpec={effectiveFilter.pivotSpec ?? {}}
           onPivotSpecChange={setPivotDims}
+          entity={props.entity}
+          project={props.project}
+          showCompareButton
+          // Since we have a very constrained pivot, we can hide
+          // the controls for now as there is no need to change them.
+          // Punting on design
+          hideControls={hideControls}
         />
       ) : (
         <RunsTable
           loading={runsWithFeedbackQuery.loading}
           spans={runsWithFeedbackQuery.result}
+          clearFilters={clearFilters}
         />
       )}
     </FilterLayoutTemplate>
@@ -418,20 +435,39 @@ const useMakeBoardForCalls = (
   return useMakeNewBoard(runsNode);
 };
 
+const opVersionMatchesFilters = (
+  opVersion: WFOpVersion,
+  filters: string[][]
+): boolean => {
+  const name = opVersion.op().name();
+  for (const filter of filters) {
+    if (filter[0] === name) {
+      if (filter[1] === '*' || filter[1] === opVersion.version()) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
 const convertHighLevelFilterToLowLevelFilter = (
   orm: WeaveflowORMContextType,
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
-  const opUrisFromVersions =
-    (effectiveFilter.opVersions
-      ?.map(uri => {
-        const [opName, version] = uri.split(':');
-        const opVersion = orm.projectConnection.opVersion(opName, version);
-        return opVersion?.refUri();
-      })
-      .filter(item => item != null) as string[]) ?? [];
-  let opUrisFromCategory = orm.projectConnection
-    .opVersions()
+  const allOpVersions = orm.projectConnection.opVersions();
+  let opUrisFromVersions: string[] = [];
+  if (effectiveFilter.opVersions) {
+    const opVersionFilters = effectiveFilter.opVersions.map(f => f.split(':'));
+    for (const opVersion of allOpVersions) {
+      if (opVersionMatchesFilters(opVersion, opVersionFilters)) {
+        opUrisFromVersions.push(opVersion.refUri());
+      }
+    }
+  }
+  if (opUrisFromVersions.length === 0 && effectiveFilter.opVersions) {
+    opUrisFromVersions = ['DOES_NOT_EXIST:VALUE'];
+  }
+  let opUrisFromCategory = allOpVersions
     .filter(ov => ov.opCategory() === effectiveFilter.opCategory)
     .map(ov => ov.refUri());
   if (opUrisFromCategory.length === 0 && effectiveFilter.opCategory) {
@@ -473,7 +509,7 @@ const convertHighLevelFilterToLowLevelFilter = (
       })
       .filter(item => item != null) as string[],
     traceId: effectiveFilter.traceId ?? undefined,
-    parentId: effectiveFilter.parentId ?? undefined,
+    parentIds: effectiveFilter.parentId ? [effectiveFilter.parentId] : [],
   };
 };
 
@@ -482,7 +518,7 @@ const useOpVersionOptions = (
   entity: string,
   project: string,
   highLevelFilter: WFHighLevelCallFilter
-) => {
+): Record<string, string> => {
   const runs = useRunsWithFeedback(
     {
       entityName: entity,
@@ -516,14 +552,19 @@ const useOpVersionOptions = (
       return b.versionIndex() - a.versionIndex();
     });
 
-    return _.fromPairs(
-      versions.map(v => {
-        return [
-          v.op().name() + ':' + v.version(),
-          opNiceName(v.op().name()) + ':v' + v.versionIndex(),
-        ];
-      })
-    );
+    // Build up options object, injecting options for all versions of an op.
+    let lastName = null;
+    const options: Record<string, string> = {};
+    for (const v of versions) {
+      const opName = v.op().name();
+      if (opName !== lastName) {
+        options[opName + ':*'] = opNiceName(opName);
+        lastName = opName;
+      }
+      options[opName + ':' + v.version()] =
+        opNiceName(opName) + ':v' + v.versionIndex();
+    }
+    return options;
   }, [orm.projectConnection, runs.loading, runs.result]);
 };
 

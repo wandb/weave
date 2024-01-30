@@ -1,5 +1,6 @@
 import {constNumber, opIndex} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
+import _ from 'lodash';
 import {useMemo} from 'react';
 
 import {
@@ -166,7 +167,10 @@ export const useRunsWithFeedback = (
     if (runsQuery.loading || feedbackQuery.loading) {
       return {loading: true, result: []};
     }
-    const runs = runsQuery.result;
+    // TODO: (HACK) Not sure why we are getting duplicates yet, but duplicates
+    //        will mess up the UI downstream, so uniquify here.
+    // const runs = runsQuery.result;
+    const runs = _.uniqBy(runsQuery.result, r => r.span_id);
     const feedback = feedbackQuery.result ?? [];
     const result = joinRunsWithFeedback(runs ?? [], feedback);
     return {

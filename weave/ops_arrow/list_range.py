@@ -5,7 +5,7 @@ import pyarrow as pa
 from ..api import op
 from .. import weave_types as types
 
-from .list_ import ArrowWeaveList
+from ..arrow.list_ import ArrowWeaveList
 
 py_range = range
 
