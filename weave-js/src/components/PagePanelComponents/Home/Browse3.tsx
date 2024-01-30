@@ -341,7 +341,13 @@ const MainPeekingLayout: FC = () => {
     const drawerWidthAsPx = windowSize.width * (drawerWidthAsPctValue / 100);
     return windowSize.width - drawerWidthAsPx - 56; // 56 is the sidebar :(
   }, [drawerWidth, windowSize.width]);
+  const exactRemainingHeight = useMemo(() => {
+    const drawerHeightAsPctValue = parseFloat(drawerHeight);
+    const drawerHeightAsPx = windowSize.height * (drawerHeightAsPctValue / 100);
+    return windowSize.height - drawerHeightAsPx - 60; // 60 is the navbar :(
+  }, [drawerWidth, windowSize.width]);
   const [remainingWidth, setRemainingWidth] = useState(exactRemainingWidth);
+  const [remainingHeight, setRemainingHeight] = useState(exactRemainingHeight);
   const updateRemainingWidth = useCallback(
     _.debounce((newDrawerWidth, windowWidth) => {
       const drawerWidthAsPctValue = parseFloat(newDrawerWidth);
@@ -352,9 +358,22 @@ const MainPeekingLayout: FC = () => {
     }),
     []
   );
+  const updateRemainingHeight = useCallback(
+    _.debounce((newDrawerHeight, windowHeight) => {
+      const drawerHeightAsPctValue = parseFloat(newDrawerHeight);
+      const drawerHeightAsPx = windowHeight * (drawerHeightAsPctValue / 100);
+      // 56 is the sidebar :( This is sort of hacky since the sidebar is not technically part of the drawer.
+      const exactRemainingHeight = windowHeight - drawerHeightAsPx - 56;
+      setRemainingHeight(exactRemainingHeight);
+    }),
+    []
+  );
   useEffect(() => {
     updateRemainingWidth(drawerWidth, windowSize.width);
   }, [drawerWidth, updateRemainingWidth, windowSize.width]);
+  useEffect(() => {
+    updateRemainingHeight(drawerHeight, windowSize.height);
+  }, [drawerHeight, updateRemainingHeight, windowSize.height]);
 
   return (
     <Box
@@ -370,7 +389,8 @@ const MainPeekingLayout: FC = () => {
       <Box
         sx={{
           flex: peekLocation == null ? '1 1 auto' : '0 0 auto',
-          width: peekLocation == null ? 'auto' : `${remainingWidth}px`,
+          width: peekLocation == null || flexDirection != 'row' ? 'auto' : `${remainingWidth}px`,
+          height: peekLocation == null || flexDirection != 'column' ? 'auto' : `${remainingHeight}px`,
           overflow: 'hidden',
           display: 'flex',
         }}>
