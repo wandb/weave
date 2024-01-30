@@ -54,6 +54,7 @@ dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.dynamic.optional-dependencies]
 examples = {file = ["requirements.ecosystem.txt"]}
+engine = {file = ["requirements.engine.txt"]}
 ecosystem = {file = ["requirements.ecosystem.txt"]}
 datadog = {file = ["requirements.datadog.txt"]}
 modal = {file = ["requirements.modal.txt"]}

@@ -6,7 +6,6 @@ from . import weave_types as types
 from . import infer_types
 from . import decorator_class
 from . import errors
-from . import decorator_op
 from . import context_state
 
 _py_type = type

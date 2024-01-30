@@ -12,7 +12,7 @@ from . import test_helpers
 from ..weavejs_fixes import recursively_unwrap_unions
 
 from .. import api as weave
-from ..ops_arrow import list_ as arrow
+from ..arrow import list_ as arrow
 from .. import weave_types as types
 from .. import storage
 from .. import artifact_wandb

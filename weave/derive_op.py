@@ -8,7 +8,6 @@ import typing
 
 
 from . import weave_types as types
-from . import context
 from . import op_args
 from . import registry_mem
 from . import op_def
@@ -16,7 +15,6 @@ from . import errors
 from . import graph
 from . import box
 from . import weave_internal
-from . import wandb_api
 from . import box
 from . import storage
 from . import weave_internal

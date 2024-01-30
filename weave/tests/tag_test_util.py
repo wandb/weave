@@ -3,7 +3,6 @@ from .. import graph
 from .. import box
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..language_features.tagging import tag_store
-from ..language_features.tagging import make_tag_getter_op
 import weave
 
 
@@ -32,4 +31,6 @@ def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):
 
 
 def make_get_tag(tag_name: str):
+    from ..language_features.tagging import make_tag_getter_op
+
     return make_tag_getter_op.make_tag_getter_op(f"_ct_{tag_name}", types.String())

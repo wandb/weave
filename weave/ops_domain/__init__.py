@@ -1,3 +1,7 @@
+from .. import context_state as _context_state
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
+
 # Exporting these
 from . import wbgqlquery_op
 from . import entity_ops
@@ -30,3 +34,5 @@ viewer = user_ops.root_viewer  # type: ignore
 project = project_ops.project  # type: ignore
 entity = entity_ops.entity  # type: ignore
 org = org_ops.org  # type: ignore
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)

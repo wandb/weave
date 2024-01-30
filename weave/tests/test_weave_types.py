@@ -6,7 +6,7 @@ import weave.weave_types
 from .. import errors
 from .. import weave_types as types
 from .. import runs
-from ..ops_primitives import _dict_utils
+from .. import _dict_utils
 from ..ops_domain import wbmedia
 
 

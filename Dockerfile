@@ -42,7 +42,7 @@ ENV PORT 9239
 WORKDIR /weave
 ADD . .
 
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.engine.txt
 RUN mkdir /local-artifacts
 
 EXPOSE 9239
