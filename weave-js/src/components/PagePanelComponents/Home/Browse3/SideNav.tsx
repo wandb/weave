@@ -80,6 +80,8 @@ export const SideNav = () => {
         iconName: IconNames.TypeNumber,
         path: baseRouter.callsUIUrl(entity, project, {
           opCategory: 'evaluate',
+          opVersions: ['Evaluation-evaluate:*'],
+          isPivot: true,
         }),
       },
       {
