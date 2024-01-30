@@ -2,7 +2,12 @@ import React from 'react';
 import {Link as LinkComp} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {TEAL_500, TEAL_600} from '../../../../../../common/css/color.styles';
+import {
+  MOON_550,
+  MOON_700,
+  TEAL_500,
+  TEAL_600,
+} from '../../../../../../common/css/color.styles';
 import {TargetBlank} from '../../../../../../common/util/links';
 import {useWeaveflowRouteContext} from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
@@ -11,11 +16,17 @@ import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
 import {truncateID} from '../util';
 
-export const Link = styled(LinkComp)`
+type LinkVariant = 'primary' | 'secondary';
+
+type LinkProps = {
+  $variant?: LinkVariant;
+};
+
+export const Link = styled(LinkComp)<LinkProps>`
   font-weight: 600;
-  color: ${TEAL_600};
+  color: ${p => (p.$variant === 'secondary' ? MOON_700 : TEAL_600)};
   &:hover {
-    color: ${TEAL_500};
+    color: ${p => (p.$variant === 'secondary' ? MOON_550 : TEAL_500)};
   }
 `;
 Link.displayName = 'S.Link';
@@ -157,6 +168,7 @@ export const OpVersionLink: React.FC<{
   opName: string;
   version: string;
   versionIndex: number;
+  variant?: LinkVariant;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
   // const text = props.hideName
@@ -165,6 +177,7 @@ export const OpVersionLink: React.FC<{
   const text = opVersionText(props.opName, props.versionIndex);
   return (
     <Link
+      $variant={props.variant}
       to={peekingRouter.opVersionUIUrl(
         props.entityName,
         props.projectName,
@@ -212,11 +225,14 @@ export const CallsLink: React.FC<{
   callCount: number;
   filter?: WFHighLevelCallFilter;
   neverPeek?: boolean;
+  variant?: LinkVariant;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
-    <Link to={router.callsUIUrl(props.entity, props.project, props.filter)}>
+    <Link
+      $variant={props.variant}
+      to={router.callsUIUrl(props.entity, props.project, props.filter)}>
       {props.callCount} calls
     </Link>
   );
@@ -228,11 +244,13 @@ export const ObjectVersionsLink: React.FC<{
   versionCount: number;
   filter?: WFHighLevelObjectVersionFilter;
   neverPeek?: boolean;
+  variant?: LinkVariant;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
     <Link
+      $variant={props.variant}
       to={router.objectVersionsUIUrl(
         props.entity,
         props.project,
@@ -249,11 +267,13 @@ export const OpVersionsLink: React.FC<{
   versionCount: number;
   filter?: WFHighLevelOpVersionFilter;
   neverPeek?: boolean;
+  variant?: LinkVariant;
 }> = props => {
   const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
   const router = props.neverPeek ? baseRouter : peekingRouter;
   return (
     <Link
+      $variant={props.variant}
       to={router.opVersionsUIUrl(props.entity, props.project, props.filter)}>
       {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>

@@ -79,6 +79,7 @@ const OpVersionPageInner: React.FC<{
                   }}
                   versionCount={opVersionCount}
                   neverPeek
+                  variant="secondary"
                 />
                 ]
               </>
@@ -93,6 +94,7 @@ const OpVersionPageInner: React.FC<{
                   opVersions: [opVersionFilterId],
                 }}
                 neverPeek
+                variant="secondary"
               />
             ),
             ...(opVersionCategory
