@@ -3,14 +3,14 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from .arrow import offsets_starting_at_zero
+from ..arrow.arrow import offsets_starting_at_zero
 
 from ..api import op
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 
-from .list_ import ArrowWeaveList, ArrowWeaveListType
-from .arrow import ArrowWeaveListType
+from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from ..arrow.arrow import ArrowWeaveListType
 from . import util
 
 

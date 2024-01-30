@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 import random
 from faker import Faker
-from weave.ops_arrow.list_ import dataframe_to_arrow
+from weave.arrow.list_ import dataframe_to_arrow
 from datetime import timedelta, time
-from weave import ops_arrow
+from weave.arrow.list_ import ArrowWeaveList
+
 
 # Generate the version schedule
 def generate_version_schedule(
@@ -85,7 +86,7 @@ def generate_user_usage_schedule(
     return user_usage_schedule
 
 
-def random_predictions(n_users: int = 10) -> ops_arrow.ArrowWeaveList:
+def random_predictions(n_users: int = 10) -> ArrowWeaveList:
     # Define our fake users
     fake = Faker()
     users = [fake.user_name() for _ in range(n_users)]

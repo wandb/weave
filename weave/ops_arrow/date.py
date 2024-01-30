@@ -5,7 +5,7 @@ import pyarrow as pa
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..api import op
-from .list_ import ArrowWeaveList, ArrowWeaveListType
+from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 from .. import timestamp as weave_timestamp
 from . import util
 

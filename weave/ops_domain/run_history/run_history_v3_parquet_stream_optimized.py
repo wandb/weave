@@ -13,7 +13,9 @@ from ... import weave_types as types
 from .. import trace_tree, wb_domain_types as wdt
 from ... import artifact_mem
 from .. import wb_util
-from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
+from ...arrow.list_ import ArrowWeaveList
+from ...arrow.list_ import ArrowWeaveListType
+from ...arrow import convert
 from ...op_def import map_type
 from ... import engine_trace
 from ... import errors
@@ -22,7 +24,7 @@ from . import history_op_common
 from ... import artifact_base, io_service
 from .. import wbmedia
 from ...ops_domain.table import _patch_legacy_image_file_types
-from ...ops_arrow.list_ import (
+from ...arrow.list_ import (
     weave_arrow_type_check,
     PathType,
     PathItemType,

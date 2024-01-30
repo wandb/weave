@@ -14,7 +14,7 @@ from pyarrow import compute as pc
 from .. import weave_types as types
 from ..language_features.tagging import tagged_value_type
 
-from . import errors
+from .. import errors
 from .list_ import (
     ArrowWeaveList,
     ArrowWeaveListGeneric,

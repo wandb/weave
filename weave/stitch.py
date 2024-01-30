@@ -22,7 +22,7 @@
 import dataclasses
 import typing
 
-from .ops_primitives import _dict_utils
+from . import _dict_utils
 
 from . import graph
 from . import errors

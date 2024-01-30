@@ -2,24 +2,25 @@ import typing
 import pyarrow as pa
 import numpy as np
 
-from .arrow import arrow_as_array, offsets_starting_at_zero
+from ..arrow.arrow import arrow_as_array, offsets_starting_at_zero
 
-from ..api import op, OpVarArgs
+from ..decorator_op import op
+from ..op_args import OpVarArgs
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
-from ..ops_primitives import _dict_utils
+from .. import _dict_utils
 from ..ops_primitives import projection_utils
 from ..language_features.tagging import (
     process_opdef_output_type,
 )
-from .arrow_tags import direct_add_arrow_tags
-from . import convert
+from ..arrow.arrow_tags import direct_add_arrow_tags
+from ..arrow import convert
 
-from .constructors import (
+from ..arrow.constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
 )
-from .list_ import ArrowWeaveList, ArrowWeaveListType
+from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 
 
 def typeddict_pick_output_type(input_types):

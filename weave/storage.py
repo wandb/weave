@@ -506,7 +506,7 @@ def convert_timestamps_to_epoch_ms(obj: typing.Any) -> typing.Any:
 
 
 def to_weavejs(obj, artifact: typing.Optional[artifact_base.Artifact] = None):
-    from .ops_arrow import list_ as arrow_list
+    from .arrow import list_ as arrow_list
 
     obj = box.unbox(obj)
     if isinstance(obj, (str, int, float, bool, type(None))):
