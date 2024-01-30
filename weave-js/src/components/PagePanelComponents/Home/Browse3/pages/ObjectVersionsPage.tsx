@@ -304,6 +304,7 @@ const ObjectVersionsTable: React.FC<{
   }, [props.objectVersions]);
   const columns: GridColDef[] = [
     basicField('version', 'Object', {
+      hideable: false,
       renderCell: params => {
         // Icon to indicate navigation to the object version
         return (

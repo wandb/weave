@@ -1,8 +1,6 @@
 import logging
-import typing
 
 from . import graph
-from . import execute
 from . import registry_mem
 from . import weave_internal
 from . import weave_types as types

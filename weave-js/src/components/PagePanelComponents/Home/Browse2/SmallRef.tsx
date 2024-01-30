@@ -44,19 +44,7 @@ type WFDBTableType =
   | 'Object'
   | 'ObjectVersion';
 
-export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
-  objRef,
-  wfTable,
-}) => {
-  const {peekingRouter} = useWeaveflowRouteContext();
-  const refTypeNode = useMemo(() => {
-    const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
-    return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
-  }, [objRef]);
-
-  const refTypeQuery = useNodeValue(refTypeNode);
-  const refType: Type = refTypeQuery.result ?? 'unknown';
-  const rootType = getRootType(refType);
+export const objectRefDisplayName = (objRef: ObjectRef) => {
   let label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
   let linkSuffix = '';
 
@@ -78,6 +66,22 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
       labelPath +
       (objRef.objectRefExtra ? '/index/' + objRef.objectRefExtra : '');
   }
+  return {label, linkSuffix};
+};
+export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
+  objRef,
+  wfTable,
+}) => {
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const refTypeNode = useMemo(() => {
+    const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
+    return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
+  }, [objRef]);
+
+  const refTypeQuery = useNodeValue(refTypeNode);
+  const refType: Type = refTypeQuery.result ?? 'unknown';
+  const rootType = getRootType(refType);
+  const {label, linkSuffix} = objectRefDisplayName(objRef);
 
   const rootTypeName = getTypeName(rootType);
   let icon = <SpokeIcon sx={{height: '100%'}} />;

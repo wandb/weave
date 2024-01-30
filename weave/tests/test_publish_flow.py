@@ -13,6 +13,7 @@ from weave.artifact_wandb import (
     likely_commit_hash,
 )
 from weave.uris import WeaveURI
+from weave import panels
 
 
 def test_publish_values(user_by_api_key_in_env):
@@ -22,8 +23,10 @@ def test_publish_values(user_by_api_key_in_env):
 
 
 def test_publish_panel(user_by_api_key_in_env):
-    table_obj = weave.panels.Table(
-        weave.make_node(
+    from .. import panel_util
+
+    table_obj = panels.Table(
+        panel_util.make_node(
             [
                 {"a": 1, "b": 2, "c": 3},
                 {"a": 4, "b": 5, "c": 6},
@@ -41,7 +44,7 @@ def test_publish_panel(user_by_api_key_in_env):
 
 
 def test_publish_table(user_by_api_key_in_env):
-    table_obj = weave.panels.Table(
+    table_obj = panels.Table(
         weave.save(
             [
                 {"a": 1, "b": 2, "c": 3},
@@ -70,16 +73,16 @@ def test_publish_group(user_by_api_key_in_env):
         ]
     )
 
-    group = weave.panels.Group(
+    group = panels.Group(
         items={
-            "table": weave.panels.Table(
+            "table": panels.Table(
                 local_data,
                 columns=[
                     lambda row: row["a"],
                     lambda row: row["b"] * 2,
                 ],
             ),
-            "plot": lambda table: weave.panels.Plot(
+            "plot": lambda table: panels.Plot(
                 table.all_rows(),
                 x=lambda row: row["c_0"],
                 y=lambda row: row["c_1"],

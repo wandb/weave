@@ -315,12 +315,12 @@ def test_group_by_bins_arrow_vectorized():
     func_node = weave_internal.define_fn(
         {"row": api.type_of(segment.metrics).object_type}, groupby_func
     )
-    groupby_node = weave.weave(segment.metrics).groupby(func_node)
+    groupby_node = weave_internal.const(segment.metrics).groupby(func_node)
 
     result = api.use(groupby_node)
-    assert api.use(weave.weave(result).count()) == 9
+    assert api.use(weave_internal.const(result).count()) == 9
 
-    group_key_node = weave.weave(result)[4].groupkey()
+    group_key_node = weave_internal.const(result)[4].groupkey()
     key = api.use(group_key_node)
     assert key == {"number_bin_col_name": {"start": 145.0, "stop": 150.0}}
 

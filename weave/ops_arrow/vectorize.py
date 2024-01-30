@@ -19,11 +19,12 @@ from .. import op_args
 
 from .. import graph_debug
 
-from .arrow import ArrowWeaveListType
-from .list_ import ArrowWeaveList
+from ..arrow.arrow import ArrowWeaveListType
+from ..arrow.list_ import ArrowWeaveList
+from ..arrow.arrow_tags import pushdown_list_tags
+from ..arrow import convert
 from . import arraylist_ops
-from . import convert_ops, convert
-from .arrow_tags import pushdown_list_tags
+from . import convert_ops
 from ..ops_primitives.dict import dict_
 from ..ops_arrow.dict import preprocess_merge
 

@@ -2,7 +2,7 @@ import typing
 
 from . import weave_types as types
 from .language_features.tagging import tagged_value_type
-from .ops_arrow.arrow import ArrowWeaveListType
+from .arrow.arrow import ArrowWeaveListType
 from . import op_def
 from .decorator_op import op
 
@@ -163,4 +163,4 @@ def arrow_op(
         pure=pure,
         _op_def_class=op_def.AutoTagHandlingArrowOpDef,
         plugins=plugins,
-    )
+    )  # type: ignore

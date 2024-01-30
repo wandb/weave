@@ -12,7 +12,6 @@ import builtins
 from typing import Any
 
 from . import artifact_local
-from . import op_def
 from . import errors
 from . import context_state
 from . import weave_types as types
@@ -23,6 +22,9 @@ from . import storage
 from . import artifact_fs
 
 from . import infer_types
+
+if typing.TYPE_CHECKING:
+    from .op_def import OpDef
 
 
 def type_code(type_):
@@ -375,10 +377,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 
 class OpDefType(types.Type):
-    instance_class = op_def.OpDef
-    instance_classes = op_def.OpDef
-
-    def save_instance(self, obj: op_def.OpDef, artifact, name):
+    def save_instance(self, obj: "OpDef", artifact, name):
         if obj.name.startswith("mapped_"):
             # Skip mapped (derived ops)
             return None
@@ -497,7 +496,7 @@ class OpDefType(types.Type):
             )
             return None
 
-        od: op_def.OpDef = getattr(mod, last_op_function.name)
+        od: "OpDef" = getattr(mod, last_op_function.name)
 
         location = artifact.uri_obj.with_path(name)
         registry_mem.memory_registry.register_op(od, location=location)
