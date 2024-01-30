@@ -272,22 +272,22 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
         key: constString('parent_id'),
       }),
       rhs: constString(filters.parentIds[0]),
-    })
+    });
     for (const callId of filters.parentIds.slice(1)) {
       clause = opOr({
         lhs: clause,
         rhs: opStringEqual({
           lhs: opPick({
             obj: rowVar,
-            key: constString('span_id'),
+            key: constString('parent_id'),
           }),
           rhs: constString(callId),
         }),
-      })
+      });
     }
     filterClauses.push(clause);
   }
-  
+
   if (filters.traceRootsOnly) {
     filterClauses.push(
       opIsNone({
@@ -305,7 +305,7 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
         key: constString('span_id'),
       }),
       rhs: constString(filters.callIds[0]),
-    })
+    });
     for (const callId of filters.callIds.slice(1)) {
       clause = opOr({
         lhs: clause,
@@ -316,7 +316,7 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
           }),
           rhs: constString(callId),
         }),
-      })
+      });
     }
     filterClauses.push(clause);
   }
