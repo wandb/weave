@@ -4,6 +4,7 @@ import typing
 import numpy as np
 
 from .. import ref_base
+from weave import weaveflow
 
 
 @pytest.mark.skip("failing in ci")
@@ -275,3 +276,16 @@ def test_saveloop_idempotent_with_refs(user_by_api_key_in_env):
         c2_2 = c2_2_ref.get()
         assert c2_2.call(60) == 650
         assert c2_1_ref.version == c2_2_ref.version
+
+
+def test_subobj_ref_passing():
+    with weave.local_client():
+        dataset = weaveflow.Dataset([{"x": 1, "y": 3}, {"x": 2, "y": 16}])
+        dataset_ref = weave.publish(dataset, "dataset")
+
+        @weave.op()
+        def get_item(row):
+            return {"in": row["x"], "out": row["x"]}
+
+        res = get_item(dataset.rows[0])
+        assert res == {"in": 1, "out": 1}
