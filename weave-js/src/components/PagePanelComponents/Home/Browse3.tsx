@@ -350,23 +350,14 @@ const MainPeekingLayout: FC = () => {
           overflow: 'hidden',
           display: 'flex',
           // This transition is from the mui drawer component, to keep the main content animation in similar
-          ...(!isDrawerOpen && {
-            transition: 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms',
-          }),
+          transition: !isDrawerOpen ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms' : 'none',
           marginRight:
             !isDrawerOpen || !isFlexRow
               ? 0
+              // this is a hack to make the drawer width percentage work with the siderbar of 56px
               : `${drawerWidthPct / (1 - 56 / windowSize.width)}%`,
           // this is vh because margin-bottom percentages are relative to the viewport width
           marginBottom: !isDrawerOpen || isFlexRow ? 0 : `${drawerHeightPct}vh`,
-
-          /**
-           * This is necessary to enable the selection of content. In the DOM, the stacking order is determined
-           * by the order of appearance. Following this rule, elements appearing later in the markup will overlay
-           * those that appear earlier. Since the Drawer comes after the Main content, this adjustment ensures
-           * proper interaction with the underlying content.
-           */
-          position: 'relative',
         }}>
         <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
       </Box>
