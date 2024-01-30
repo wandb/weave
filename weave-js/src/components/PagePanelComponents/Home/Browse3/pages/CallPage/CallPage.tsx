@@ -12,6 +12,7 @@ import {
 import _ from 'lodash';
 import React, {
   FC,
+  MouseEvent,
   ReactNode,
   useCallback,
   useEffect,
