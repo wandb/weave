@@ -1,6 +1,12 @@
 import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {createContext, useCallback, useContext, useMemo} from 'react';
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+} from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
@@ -41,7 +47,7 @@ export const Browse3WeaveflowRouteContextProvider = ({
   projectRoot,
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   projectRoot(entityName: string, projectName: string): string;
 }) => {
   const baseRouter = browse3ContextGen(projectRoot);

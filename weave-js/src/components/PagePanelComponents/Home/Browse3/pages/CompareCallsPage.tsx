@@ -1,7 +1,7 @@
 import {Box, FormControl, ListItem, TextField} from '@mui/material';
 import {Autocomplete} from '@mui/material';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 
 import {parseRef} from '../../../../../react';
 import {Call} from '../../Browse2/callTree';
@@ -17,18 +17,18 @@ import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
 
-export const CompareCallsPage: React.FC<{
+export const CompareCallsPage: FC<{
   entity: string;
   project: string;
   callIds?: string[];
   primaryDim?: string;
   secondaryDim?: string;
 }> = props => {
-  const [selectedOpVersion, setSelectedOpVersion] = React.useState<
-    string | null
-  >(null);
+  const [selectedOpVersion, setSelectedOpVersion] = useState<string | null>(
+    null
+  );
 
-  const [selectedObjectVersion, setSelectedObjectVersion] = React.useState<
+  const [selectedObjectVersion, setSelectedObjectVersion] = useState<
     string | null
   >(null);
 
@@ -121,9 +121,7 @@ export const CompareCallsPage: React.FC<{
     [subOpVersionOptions]
   );
 
-  const [pivotSpec, setPivotSpec] = React.useState<
-    Partial<WFHighLevelPivotSpec>
-  >({
+  const [pivotSpec, setPivotSpec] = useState<Partial<WFHighLevelPivotSpec>>({
     colDim: props.primaryDim,
   });
 

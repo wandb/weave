@@ -5,34 +5,44 @@ import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import _ from 'lodash';
-import React, {createContext, useContext, useMemo} from 'react';
+import React, {
+  createContext,
+  CSSProperties,
+  FC,
+  MouseEvent,
+  ReactNode,
+  SyntheticEvent,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
-  headerPrefix?: React.ReactNode;
+  headerPrefix?: ReactNode;
 };
 
 export const SimplePageLayoutContext =
   createContext<SimplePageLayoutContextType>({});
 
-export const SimplePageLayout: React.FC<{
+export const SimplePageLayout: FC<{
   title: string;
   tabs: Array<{
     label: string;
-    content: React.ReactNode;
+    content: ReactNode;
   }>;
   menuItems?: Array<{
     label: string;
     onClick: () => void;
   }>;
-  leftSidebar?: React.ReactNode;
+  leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
 }> = props => {
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
-  const [tabId, setTabId] = React.useState(0);
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const [tabId, setTabId] = useState(0);
+  const handleTabChange = (event: SyntheticEvent, newValue: number) => {
     setTabId(newValue);
   };
   const tabContent = useMemo(
@@ -141,23 +151,23 @@ export const SimplePageLayout: React.FC<{
   );
 };
 
-export const SimplePageLayoutWithHeader: React.FC<{
+export const SimplePageLayoutWithHeader: FC<{
   title: string;
   tabs: Array<{
     label: string;
-    content: React.ReactNode;
+    content: ReactNode;
   }>;
   menuItems?: Array<{
     label: string;
     onClick: () => void;
   }>;
-  headerContent: React.ReactNode;
-  leftSidebar?: React.ReactNode;
+  headerContent: ReactNode;
+  leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
 }> = props => {
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
-  const [tabId, setTabId] = React.useState(0);
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const [tabId, setTabId] = useState(0);
+  const handleTabChange = (event: SyntheticEvent, newValue: number) => {
     setTabId(newValue);
   };
   const tabContent = useMemo(
@@ -283,15 +293,15 @@ export const SimplePageLayoutWithHeader: React.FC<{
   );
 };
 
-const ActionMenu: React.FC<{
+const ActionMenu: FC<{
   menuItems: Array<{
     label: string;
     onClick: () => void;
   }>;
 }> = props => {
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
-  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleClick = (event: MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
   const handleClose = () => {
@@ -332,8 +342,8 @@ const ActionMenu: React.FC<{
   );
 };
 
-export const ScrollableTabContent: React.FC<{
-  sx?: React.CSSProperties;
+export const ScrollableTabContent: FC<{
+  sx?: CSSProperties;
 }> = props => {
   return (
     <Box
@@ -350,8 +360,8 @@ export const ScrollableTabContent: React.FC<{
   );
 };
 
-export const SimpleKeyValueTable: React.FC<{
-  data: {[key: string]: React.ReactNode};
+export const SimpleKeyValueTable: FC<{
+  data: {[key: string]: ReactNode};
 }> = props => {
   return (
     <table

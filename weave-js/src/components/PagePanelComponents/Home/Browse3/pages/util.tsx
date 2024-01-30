@@ -9,7 +9,7 @@ import {SmallRef} from '../../Browse2/SmallRef';
 export const useURLSearchParamsDict = () => {
   const {search} = useLocation();
 
-  return React.useMemo(() => {
+  return useMemo(() => {
     const params = new URLSearchParams(search);
     const entries = Array.from(params.entries());
     const searchDict = _.fromPairs(entries);

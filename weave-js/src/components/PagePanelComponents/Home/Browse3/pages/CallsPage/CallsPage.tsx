@@ -10,7 +10,7 @@ import {
   TextField,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {FC, useCallback, useMemo} from 'react';
 
 import {CallFilter} from '../../../Browse2/callTree';
 import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
@@ -44,7 +44,7 @@ export type WFHighLevelCallFilter = {
   pivotSpec?: Partial<WFHighLevelPivotSpec>;
 };
 
-export const CallsPage: React.FC<{
+export const CallsPage: FC<{
   entity: string;
   project: string;
   initialFilter?: WFHighLevelCallFilter;
@@ -84,7 +84,7 @@ export const CallsPage: React.FC<{
   );
 };
 
-export const CallsTable: React.FC<{
+export const CallsTable: FC<{
   entity: string;
   project: string;
   frozenFilter?: WFHighLevelCallFilter;

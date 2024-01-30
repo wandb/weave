@@ -9,7 +9,14 @@ import {
 } from '@mui/x-data-grid-pro';
 import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
-import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  ComponentProps,
+  FC,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {TEAL_600} from '../../../../common/css/color.styles';
@@ -26,7 +33,7 @@ import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 
 export type DataGridColumnGroupingModel = Exclude<
-  React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+  ComponentProps<typeof DataGrid>['columnGroupingModel'],
   undefined
 >;
 
@@ -336,7 +343,7 @@ export const RunsTable: FC<{
           k => !k.startsWith('_')
         );
       const inputGroup: Exclude<
-        React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+        ComponentProps<typeof DataGrid>['columnGroupingModel'],
         undefined
       >[number] = {
         groupId: 'inputs',
@@ -442,7 +449,7 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
-  const initialState: React.ComponentProps<typeof DataGridPro>['initialState'] =
+  const initialState: ComponentProps<typeof DataGridPro>['initialState'] =
     useMemo(() => {
       if (loading) {
         return undefined;

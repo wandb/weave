@@ -11,7 +11,14 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
+import React, {
+  ComponentProps,
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   Link as RouterLink,
   Route,
@@ -343,9 +350,10 @@ const MainPeekingLayout: FC = () => {
             overflow: 'hidden',
             display: 'flex',
             zIndex: 1,
-            width: flexDirection === 'row' ? drawerWidth : '100%',
-            height: flexDirection === 'column' ? drawerHeight : '100%',
-            margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 56px',
+            width: flexDirection === 'row' ? drawerWidth : 'calc(100% - 57px)',
+            height:
+              flexDirection === 'column' ? drawerHeight : 'calc(100% - 60px)',
+            margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 57px',
             boxShadow:
               flexDirection === 'row'
                 ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
@@ -1012,7 +1020,7 @@ const TablesPageBinding = () => {
   return <TablesPage entity={params.entity} project={params.project} />;
 };
 
-const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
+const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
   <MaterialLink
     sx={{
       color: theme => theme.palette.getContrastText(theme.palette.primary.main),

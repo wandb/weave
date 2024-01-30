@@ -14,6 +14,8 @@ import {
 } from '@mui/x-data-grid';
 import _ from 'lodash';
 import React, {
+  ComponentProps,
+  FC,
   useCallback,
   useContext,
   useEffect,
@@ -51,10 +53,10 @@ type PivotRunsTablePropsType = {
   colDimAtLeafMode?: boolean;
   showCompareButton?: boolean;
   hideControls?: boolean;
-  extraDataGridProps?: React.ComponentProps<typeof StyledDataGrid>;
+  extraDataGridProps?: ComponentProps<typeof StyledDataGrid>;
 };
 
-export const PivotRunsView: React.FC<
+export const PivotRunsView: FC<
   PivotRunsTablePropsType & {
     pivotSpec: Partial<WFHighLevelPivotSpec>;
     onPivotSpecChange: (spec: Partial<WFHighLevelPivotSpec>) => void;
@@ -216,7 +218,7 @@ export const PivotRunsView: React.FC<
 
 type PivotDataRowType = {[col: string]: any};
 
-export const PivotRunsTable: React.FC<
+export const PivotRunsTable: FC<
   PivotRunsTablePropsType & {
     pivotSpec: {
       rowDim: string;
