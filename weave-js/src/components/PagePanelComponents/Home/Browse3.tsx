@@ -338,12 +338,14 @@ const MainPeekingLayout: FC = () => {
           overflow: 'hidden',
           display: 'flex',
           // This transition is from the mui drawer component, to keep the main content animation in similar
-          transition: !isDrawerOpen ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms' : 'none',
+          transition: !isDrawerOpen
+            ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
+            : 'none',
           marginRight:
             !isDrawerOpen || !isFlexRow
               ? 0
-              // this is a hack to make the drawer width percentage work with the siderbar of 56px
-              : `${drawerWidthPct / (1 - 56 / windowSize.width)}%`,
+              : // this is a hack to make the drawer width percentage work with the siderbar of 56px
+                `${drawerWidthPct / (1 - 56 / windowSize.width)}%`,
           // this is vh because margin-bottom percentages are relative to the viewport width
           marginBottom: !isDrawerOpen || isFlexRow ? 0 : `${drawerHeightPct}vh`,
         }}>
