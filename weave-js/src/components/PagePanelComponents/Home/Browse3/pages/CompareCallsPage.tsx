@@ -462,7 +462,10 @@ const useSubRunsFromFastestEngine = (
       }
       return ormResults;
     } else {
-      if (usingORM !== false) {
+      if (
+        usingORM !== false &&
+        weaveQueryResults.childRunsFilteredToOpVersion.length > 0
+      ) {
         setUsingORM(false);
       }
       return weaveQueryResults;
