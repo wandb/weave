@@ -68,8 +68,9 @@ export const PivotRunsView: React.FC<
 
   const runs = props.runs;
 
-  const currRowDim = props.pivotSpec.rowDim;
-  const currColDim = props.pivotSpec.colDim;
+  const [effectivePivotSpec, setEffectivePivotSpec] = useState(props.pivotSpec);
+  const currRowDim = effectivePivotSpec.rowDim;
+  const currColDim = effectivePivotSpec.colDim;
   const onPivotSpecChange = props.onPivotSpecChange;
   useEffect(() => {
     if (runs.length === 0) {
@@ -93,12 +94,12 @@ export const PivotRunsView: React.FC<
         const rowOptions = options.filter(o => o !== currColDim);
         if (rowOptions.length > 0) {
           if (rowOptions.includes('inputs.example')) {
-            onPivotSpecChange({
+            setEffectivePivotSpec({
               rowDim: 'inputs.example',
               colDim: currColDim,
             });
           } else {
-            onPivotSpecChange({
+            setEffectivePivotSpec({
               rowDim: rowOptions[0],
               colDim: currColDim,
             });
@@ -107,19 +108,19 @@ export const PivotRunsView: React.FC<
       } else if (currRowDim != null && currColDim == null) {
         const colOptions = options.filter(o => o !== currRowDim);
         if (colOptions.length > 0) {
-          onPivotSpecChange({
+          setEffectivePivotSpec({
             rowDim: currRowDim,
             colDim: colOptions[0],
           });
         }
       } else if (currRowDim == null && currColDim == null) {
         if (options[0] === 'inputs.self') {
-          onPivotSpecChange({
+          setEffectivePivotSpec({
             rowDim: options[1],
             colDim: options[0],
           });
         } else {
-          onPivotSpecChange({
+          setEffectivePivotSpec({
             rowDim: options[0],
             colDim: options[1],
           });
@@ -195,11 +196,12 @@ export const PivotRunsView: React.FC<
           </FormControl>
         </ListItem>
       </Box>
-      {props.pivotSpec.rowDim != null && props.pivotSpec.colDim != null ? (
+      {effectivePivotSpec.rowDim != null &&
+      effectivePivotSpec.colDim != null ? (
         <PivotRunsTable
           {...props}
           pivotSpec={
-            props.pivotSpec as {
+            effectivePivotSpec as {
               rowDim: string;
               colDim: string;
             }
