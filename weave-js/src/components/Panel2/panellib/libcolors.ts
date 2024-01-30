@@ -1,6 +1,5 @@
 import {
   constFunction,
-  isAssignableTo,
   isVoidNode,
   Node,
   NodeOrVoidNode,
@@ -8,8 +7,6 @@ import {
   opMapEach,
   opPick,
   opRunId,
-  taggedValue,
-  typedDict,
   voidNode,
   withNamedTag,
 } from '@wandb/weave/core';
@@ -22,11 +19,14 @@ export const useColorNode = (inputNode: Node): NodeOrVoidNode => {
   return useMemo(() => {
     if (
       frame.runColors == null ||
-      isVoidNode(frame.runColors) ||
-      !isAssignableTo(
-        inputNode.type,
-        taggedValue(typedDict({run: 'run'}), 'any')
-      )
+      isVoidNode(frame.runColors)
+      // This was added by this pr https://github.com/wandb/weave/pull/865/files
+      // to fix a slow query, it also as a result broke run colors in charts
+      // I am going to comment out to fix run colors but we should take another look at this later
+      // || !isAssignableTo(
+      //   inputNode.type,
+      //   taggedValue(typedDict({run: 'run'}), 'any')
+      // )
     ) {
       return voidNode();
     }
