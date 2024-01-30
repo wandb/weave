@@ -18,7 +18,7 @@ def make_node(v: typing.Any) -> graph.Node:
 
     # Otherwise
     ref = storage.save(v)
-    return ops.get(str(ref))
+    return ops.get(str(ref))  # type: ignore
 
 
 def child_item(v):

@@ -1,6 +1,9 @@
 # These are the base Weave requirements, enough for weave tracking and evaluation
 # to work.
 
+# Type annotations, we need ParamSpec in python3.9
+typing_extensions>=4.0.0
+
 # Definitely need arrow
 pyarrow>=14.0.1  # TODO: Colab has 9.0.0, can we support?
 

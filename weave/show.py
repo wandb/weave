@@ -66,13 +66,13 @@ def make_show_obj(obj: typing.Any) -> tuple[typing.Union[panel.Panel, graph.Node
         else:
             name = make_varname_for_type(obj.type)
             uri = obj.uri
-        return ops.get(uri), name
+        return ops.get(uri), name  # type: ignore
 
     if types.TypeRegistry.has_type(obj):
         names = util.find_names(obj)
 
         ref = storage.save(obj, name=names[-1])
-        node = ops.get(ref.uri)
+        node = ops.get(ref.uri)  # type: ignore
         return node, make_varname_for_type(ref.type)
 
     raise errors.WeaveTypeError(

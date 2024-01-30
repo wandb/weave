@@ -1,5 +1,6 @@
 """These are the top-level functions in the `import weave` namespace.
 """
+
 import time
 import typing
 import os
@@ -237,6 +238,24 @@ def output_of(obj: typing.Any) -> typing.Optional[_run.Run]:
         return ref
 
     return client.ref_output_of(ref)
+
+
+def as_op_def(fn: typing.Callable) -> OpDef:
+    """Given a @weave.op() decorated function, return its OpDef.
+
+    @weave.op() decorated functions are instances of OpDef already, so this
+    function should be a no-op at runtime. But you can use it to satisfy type checkers
+    if you need to access OpDef attributes in a typesafe way.
+
+    Args:
+        fn: A weave.op() decorated function.
+
+    Returns:
+        The OpDef of the function.
+    """
+    if not isinstance(fn, OpDef):
+        raise ValueError("fn must be a weave.op() decorated function")
+    return fn
 
 
 import contextlib

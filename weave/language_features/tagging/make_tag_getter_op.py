@@ -72,7 +72,7 @@ def make_tag_getter_op(
             obj._artifact,
         )
 
-    tag_getter_op._gets_tag_by_name = tag_key
-    awl_tag_getter_op._gets_tag_by_name = tag_key
+    tag_getter_op._gets_tag_by_name = tag_key  # type: ignore
+    awl_tag_getter_op._gets_tag_by_name = tag_key  # type: ignore
 
-    return tag_getter_op
+    return tag_getter_op  # type: ignore
