@@ -369,7 +369,9 @@ const MainPeekingLayout: FC = () => {
             overflow: 'hidden',
             display: 'flex',
             zIndex: 1,
-            width: isFlexRow ? `${drawerWidthPct}%` : `calc(100% - ${SIDEBAR_WIDTH}px)`,
+            width: isFlexRow
+              ? `${drawerWidthPct}%`
+              : `calc(100% - ${SIDEBAR_WIDTH}px)`,
             height: !isFlexRow ? `${drawerHeightPct}%` : '100%',
             margin: isFlexRow ? 0 : `0 0 0 ${SIDEBAR_WIDTH + 1}px`,
             boxShadow: isFlexRow
