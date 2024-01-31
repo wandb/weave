@@ -372,7 +372,7 @@ const MainPeekingLayout: FC = () => {
               ? `${drawerHeightPct}%`
               : `calc(100% - ${NAVBAR_HEIGHT}px)`,
             margin: isFlexRow
-              ? `'${NAVBAR_HEIGHT}px 0 0 0`
+              ? `${NAVBAR_HEIGHT}px 0 0 0`
               : `0 0 0 ${SIDEBAR_WIDTH + 1}px`,
             boxShadow: isFlexRow
               ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
