@@ -43,9 +43,10 @@ When interpreting a reference, we follow the following rules:
    - If the current object is a List, then:
      - `index/{INDEX}` - get the item at position `INDEX`
 
-So putting this all together, the following ref should be interpreted as follows: `wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj#attr/rows/index/10/key/input`
-_ Fetch the artifact corresponding to `example_entity/example_project/example_artifact:abc123` from W&B.
-_ Determine that `obj` is not a specific entry but rather a "weave object" \* Return the data located in the `rows` property, `10`th item in the list, `input` key.
+So putting this all together, the following ref (`wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj#attr/rows/index/10/key/input`) should be interpreted as follows:
+
+- Fetch the artifact corresponding to `example_entity/example_project/example_artifact:abc123` from W&B.
+- Determine that `obj` is not a specific entry but rather a "weave object" \* Return the data located in the `rows` property, `10`th item in the list, `input` key.
 
 Note: a careful reader will notice that the same piece of data might have multiple valid refs pointing to it. Consider the following case:
 
