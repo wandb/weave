@@ -54,9 +54,15 @@ def generate_requirements_txt(model_ref: str, dir: str, dev: bool = False) -> st
     else:
         weave = "weave @ git+https://github.com/wandb/weave@master"
     # TODO: add any additional reqs the op needs
+
+    # We're requiring faiss-cpu for now here, to get Hooman Slackbot deploy
+    # working. But this is not right, objects and ops should have their own
+    # requirements that we compile together here.
+    # TODO: Fix
     return f"""
 uvicorn[standard]
 fastapi
+faiss-cpu
 {weave}
 """
 
@@ -310,6 +316,7 @@ def develop(
         [docker, "buildx", "build", "-t", name, "--load", "."], cwd=dir, capture=False
     )
     env_api_key = environment.weave_wandb_api_key()
+    print("USING API KEY", env_api_key)
     if env_api_key is None:
         raise ValueError("WANDB_API_KEY environment variable required")
     env = {"WANDB_API_KEY": env_api_key}
