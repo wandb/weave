@@ -46,7 +46,10 @@ When interpreting a reference, we follow the following rules:
 So putting this all together, the following ref (`wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj#attr/rows/index/10/key/input`) should be interpreted as follows:
 
 - Fetch the artifact corresponding to `example_entity/example_project/example_artifact:abc123` from W&B.
-- Determine that `obj` is not a specific entry but rather a "weave object" \* Return the data located in the `rows` property, `10`th item in the list, `input` key.
+- Determine that `obj` is not a specific entry but rather a "weave object"
+- Get the `rows` property from the object (this could be a list or a table in this case)
+- Get the row at index `10`. (this is a dictionary)
+- Get the value located at the `input` key.
 
 Note: a careful reader will notice that the same piece of data might have multiple valid refs pointing to it. Consider the following case:
 
