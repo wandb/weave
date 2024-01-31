@@ -1,0 +1,51 @@
+# Weave Reference Format Specification
+
+A weave reference ("ref") has 2 formats:
+
+1. The W&B Artifact: `wandb-artifact:///{ENTITY}/{PROJECT}/{ARTIFACT_NAME}:{ALIAS}[/{FILE_PATH}[#REF_EXTRA]]`
+   - Yes, the 3 forward slashes are correct.
+2. The Local Artifact `local-artifact:///{ARTIFACT_NAME}:{ALIAS}[/{FILE_PATH}[#REF_EXTRA]]`
+   - A known problem with local artifacts is that it is possible to have name collisions with artifacts of the same name, sourced from 2 different projects.
+
+Path Component Details:
+
+We will define the "CommonCharset" as alphanumeric and underscore `_` and dash `-`
+
+- `ENTITY`: limited to CommonCharset
+- `PROJECT`: limited to CommonCharset
+- `ARTIFACT_NAME`: limited to CommonCharset
+- `ALIAS`: can take 1 of 3 forms:
+  - "alias": limited to CommonCharset, for example `latest`
+  - "version": `v#` where `#` is an integer value
+  - "digest": a deterministic hex digest of the contents
+  - "versionHash": a hex digest combining the "digest" with the prior version's digest in the sequence.
+- `FILE_PATH`: (optional) a list of forward slash `/` separated `FILE_PATH_PART`s. Each `FILE_PATH_PART` is limited to CommonCharset and dot `.`
+- `REF_EXTRA`: (optional, only allowed if `FILE_PATH` is present) a list of forward slash `/` separated `REF_EXTRA_TUPLE`s. A `REF_EXTRA_TUPLE` has the format of `{REF_EXTRA_EDGE_TYPE}/{REF_EXTRA_PART}`. Where `REF_EXTRA_EDGE_TYPE` is one of: **TODO - need link from Shawn**. A `REF_EXTRA_PART` is limited to CommonCharset.
+  - important: the `REF_EXTRA_EDGE_TYPE` part of the spec is not implemented yet.
+
+When interpreting a reference, we follow the following rules:
+
+1. Lookup the artifact itself using everything up to, but excluding the `FILE_PATH`. If no `FILE_PATH` exists, then the reference is pointing to an artifact and we halt.
+2. If `FILE_PATH` exists, then we fetch the file located at such path. There are two cases:
+   a. `FILE_PATH` exactly matches a member file of the artifact. In this case, the ref is pointing to the specific file and we halt.
+   b. `FILE_PATH` is not contained in the artifact, but rather `FILE_PATH.type.json` is contained in the artifact. In this case, the ref is pointing to a "weave object". The Weave engine reads the `FILE_PATH.type.json` file to determine the type of the object. Reconstruction/deserialization of the object will often require reading 1 or more peer files - the rules of which are up to the type's implementation. By far the most common case here is when `FILE_PATH = "obj"`. Where we have `obj.type.json` at the root of the artifact, then a peer file, for example `obj.object.json` containing the data payload itself. Note: the peer file needn't be called `obj.object.json` - this is up to the object type to determine. **Importantly:** this is the case where the ref is pointing to a "weave object" and the file system is not important to the user. If no `REF_EXTRA` exists, we halt.
+3. If a `REF_EXTRA` exists (and by definition our `FILE_PATH` points to a weave object), then the `REF_EXTRA` tells us how to traverse the object itself to extract a nested data property. For example, you might have a class called `Model` with an attribute `prompt`. If the ref wants to point to the prompt field itself, the `REF_EXTRA` would be `attr/prompt`. As mentioned above, there are a number of `REF_EXTRA_EDGE_TYPE`s that allow the ref to point deep into the object. This is useful for things like datasets where you might have an class called `Dataset` that has a property `rows` which is a list of dictionaries. At this point, we return the final data.
+
+So putting this all together, the following ref should be interpreted as follows: `wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj#attr/rows/index/10/key/input`
+_ Fetch the artifact corresponding to `example_entity/example_project/example_artifact:abc123` from W&B.
+_ Determine that `obj` is not a specific entry but rather a "weave object" \* Return the data located in the `rows` property, `10`th item in the list, `input` key.
+
+Note: a careful reader will notice that the same piece of data might have multiple valid refs pointing to it. Consider the following case:
+
+1. `wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj#attr/rows/index/10/key/input`
+2. `wandb-artifact:///example_entity/example_project/example_artifact:abc123/rows/0#index/10/key/input`
+
+Both of these refs will return the same exact data (assuming that the `obj` object's `rows` property is a pointer to the `rows/0` entry.). While this is perfectly fine and valid, **I think that we have an issue in our current implementation:** Today, when we store refs when iterating through a dataset, we store version 2 above in the call data. This breaks the relationship as we no longer know that the data was derived from traversing into the dataset itself. Why is this a problem? Well, if you are given reference 2, then you have no way of knowing that it is actually a descendant member of `wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj` (other than maybe by convention). Reference 2 is a biproduct of the serialization format, not the logical "thing" the user is using.
+
+**Further idea:** We should probably add a `?hash=CONTENT_HASH` at the end of refs - this would allow us to know if two entries in the same dataset are actually the same content. We can't purely rely on the artifact hash for uniqueness since the ref could be pointing to a deep member of the artifact.
+
+Actions:
+
+1. Implement the `REF_EXTRA_EDGE_TYPE` in refs (this will effect python and UI)
+2. Get resolution the dual ref issue noted above
+3. Possibly add a content hash to refs for cross-dataset comparison.
