@@ -35,3 +35,6 @@ gql[requests]>=3.4.1
 
 # Segment logging
 analytics-python>=1.2.9
+
+# Used for version parsing in integrations.
+packaging>=21.0
