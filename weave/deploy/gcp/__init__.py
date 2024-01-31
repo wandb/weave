@@ -316,7 +316,6 @@ def develop(
         [docker, "buildx", "build", "-t", name, "--load", "."], cwd=dir, capture=False
     )
     env_api_key = environment.weave_wandb_api_key()
-    print("USING API KEY", env_api_key)
     if env_api_key is None:
         raise ValueError("WANDB_API_KEY environment variable required")
     env = {"WANDB_API_KEY": env_api_key}
