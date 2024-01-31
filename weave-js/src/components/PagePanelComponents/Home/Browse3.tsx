@@ -143,6 +143,9 @@ const browse3Paths = (projectRoot: string) => [
   `${projectRoot}`,
 ];
 
+const SIDEBAR_WIDTH = 56;
+const NAVBAR_HEIGHT = 60;
+
 export const Browse3: FC<{
   hideHeader?: boolean;
   headerOffset?: number;
@@ -345,7 +348,7 @@ const MainPeekingLayout: FC = () => {
             !isDrawerOpen || !isFlexRow
               ? 0
               : // this is a hack to make the drawer width percentage work with the siderbar of 56px
-                `${drawerWidthPct / (1 - 56 / windowSize.width)}%`,
+                `${drawerWidthPct / (1 - SIDEBAR_WIDTH / windowSize.width)}%`,
           // this is vh because margin-bottom percentages are relative to the viewport width
           marginBottom: !isDrawerOpen || isFlexRow ? 0 : `${drawerHeightPct}vh`,
         }}>
@@ -362,9 +365,15 @@ const MainPeekingLayout: FC = () => {
             overflow: 'hidden',
             display: 'flex',
             zIndex: 1,
-            width: isFlexRow ? `${drawerWidthPct}%` : 'calc(100% - 57px)',
-            height: !isFlexRow ? `${drawerHeightPct}%` : 'calc(100% - 60px)',
-            margin: isFlexRow ? '60px 0 0 0' : '0 0 0 57px',
+            width: isFlexRow
+              ? `${drawerWidthPct}%`
+              : `calc(100% - ${SIDEBAR_WIDTH + 1}px)`,
+            height: !isFlexRow
+              ? `${drawerHeightPct}%`
+              : `calc(100% - ${NAVBAR_HEIGHT}px)`,
+            margin: isFlexRow
+              ? `'${NAVBAR_HEIGHT}px 0 0 0`
+              : `0 0 0 ${SIDEBAR_WIDTH + 1}px`,
             boxShadow: isFlexRow
               ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
               : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
