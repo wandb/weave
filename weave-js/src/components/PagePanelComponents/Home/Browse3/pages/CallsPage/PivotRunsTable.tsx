@@ -83,7 +83,8 @@ export const PivotRunsView: FC<
     Object.entries(firstRun.inputs).forEach(([key, value]) => {
       if (
         typeof value === 'string' &&
-        value.startsWith('wandb-artifact:///') &&
+        (value.startsWith('wandb-artifact:///') ||
+          value.startsWith('local-artifact:///')) &&
         !key.startsWith('_')
       ) {
         options.push('inputs.' + key);

@@ -82,6 +82,10 @@ export const SideNav = () => {
           opCategory: 'evaluate',
           opVersions: ['Evaluation-evaluate:*'],
           isPivot: true,
+          pivotSpec: {
+            rowDim: 'inputs.model',
+            colDim: 'inputs.self',
+          },
         }),
       },
       {
