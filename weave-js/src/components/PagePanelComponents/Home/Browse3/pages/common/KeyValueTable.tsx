@@ -123,7 +123,9 @@ const KeyValueRow: React.FC<{
           <pre
             style={{
               width: '100%',
-              whiteSpace: 'pre-line',
+              // See https://developer.mozilla.org/en-US/docs/Web/CSS/white-space
+              // We want to break on spaces, but also on newlines and preserve them
+              whiteSpace: 'break-spaces',
               fontSize: '16px',
               margin: '0',
               fontFamily: 'Source Sans Pro',
