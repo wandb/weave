@@ -301,10 +301,8 @@ def serve(
 
     def run():
         with _wandb_api.wandb_api_context(wandb_api_ctx):
-            with _context_state.eager_execution():
-                with _context.execution_client():
-                    with attributes(trace_attrs):
-                        uvicorn.run(app, host="0.0.0.0", port=port)
+            with attributes(trace_attrs):
+                uvicorn.run(app, host="0.0.0.0", port=port)
 
     if _util.is_notebook():
         thread = True
