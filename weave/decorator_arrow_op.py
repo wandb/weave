@@ -163,4 +163,4 @@ def arrow_op(
         pure=pure,
         _op_def_class=op_def.AutoTagHandlingArrowOpDef,
         plugins=plugins,
-    )
+    )  # type: ignore
