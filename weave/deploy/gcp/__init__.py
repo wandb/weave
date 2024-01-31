@@ -57,6 +57,7 @@ def generate_requirements_txt(model_ref: str, dir: str, dev: bool = False) -> st
     return f"""
 uvicorn[standard]
 fastapi
+faiss-cpu
 {weave}
 """
 
