@@ -2,7 +2,7 @@
 FROM cypress/included:10.11.0 as builder
 
 RUN apt update
-RUN apt -y install python3-venv python3-dev gcc g++
+RUN apt -y install python3-venv python3-dev gcc g++ xz-utils
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 COPY requirements.* /root/
 WORKDIR /root
@@ -35,9 +35,10 @@ COPY requirements.ecosystem.txt /root
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
     pip install -r requirements.ecosystem.txt"
 
-COPY integration_test/package.json /root/integration_test/package.json
-COPY integration_test/package-lock.json /root/integration_test/package-lock.json
-RUN --mount=type=cache,target=/usr/local/share/.cache cd integration_test && npm install
+ENV RECORD_REPLAY_DIRECTORY=/root/.replay/
+RUN mkdir -p $RECORD_REPLAY_DIRECTORY
+COPY integration_test/package.json integration_test/yarn.lock /root/integration_test/
+RUN --mount=type=cache,target=/usr/local/share/.cache cd integration_test && yarn install --frozen-lockfile && npx @replayio/cypress install
 
 # TODO, currently builder doesn't support --link
 COPY --from=js_builder /root/weave-js/build /root/weave-js-build
