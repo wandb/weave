@@ -169,14 +169,12 @@ def test_ref_extra_object(ref_tracking):
 
 def test_ref_extra_table(ref_tracking):
     arrow_raw = arrow.to_arrow(
-            [
-                {"a": 1},
-                {"a": 2},
-            ]
-        )
-    saved_obj = weave.use(
-        weave.save(arrow_raw)
+        [
+            {"a": 1},
+            {"a": 2},
+        ]
     )
+    saved_obj = weave.use(weave.save(arrow_raw))
 
     assert saved_obj.to_pylist_notags() == arrow_raw.to_pylist_notags()
     assert_local_ref(saved_obj, ["obj"], [])
@@ -196,23 +194,21 @@ def test_ref_extra_table_very_nested(ref_tracking):
         inner_a: int
 
     arrow_raw = arrow.to_arrow(
-            [
-                {
-                    "a": arrow.to_arrow(
-                        [
-                            CustomObject(inner_a=1),
-                        ]
-                    )
-                },
-            ]
-        )
-
-    saved_obj = weave.use(
-        weave.save(arrow_raw)
+        [
+            {
+                "a": arrow.to_arrow(
+                    [
+                        CustomObject(inner_a=1),
+                    ]
+                )
+            },
+        ]
     )
 
+    saved_obj = weave.use(weave.save(arrow_raw))
+
     assert saved_obj.to_pylist_notags() == arrow_raw.to_pylist_notags()
-    
+
     assert_local_ref(
         saved_obj[0]["a"][0].inner_a,
         ["obj"],

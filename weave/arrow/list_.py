@@ -1453,7 +1453,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 ref_base._put_ref(val, sub_ref)
         return val
 
-
     def unique(self) -> "ArrowWeaveList":
         return ArrowWeaveList(
             pa.compute.unique(self._arrow_data),
