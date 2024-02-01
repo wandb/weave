@@ -4,6 +4,7 @@ import datetime
 import numpy as np
 
 from . import context_state
+from . import ref_util
 
 
 def make_id() -> int:
@@ -71,7 +72,7 @@ class BoxedDict(dict):
         assert len(path) > 1
         edge_type = path[0]
         edge_path = path[1]
-        assert edge_type == "key"
+        assert edge_type == ref_util.DICT_KEY_EDGE_TYPE
 
         res = self[edge_path]
         remaining_path = path[2:]
@@ -89,7 +90,9 @@ class BoxedDict(dict):
             self_ref = ref_base.get_ref(self)
             if self_ref is not None:
                 val = box(val)
-                sub_ref = self_ref.with_extra(None, val, ["key", __key])
+                sub_ref = self_ref.with_extra(
+                    None, val, [ref_util.DICT_KEY_EDGE_TYPE, __key]
+                )
                 ref_base._put_ref(val, sub_ref)
         return val
 
@@ -99,7 +102,7 @@ class BoxedList(list):
         assert len(path) > 1
         edge_type = path[0]
         edge_path = path[1]
-        assert edge_type == "idx"
+        assert edge_type == ref_util.LIST_INDEX_EDGE_TYPE
 
         res = self[int(edge_path)]
         remaining_path = path[2:]
@@ -117,7 +120,9 @@ class BoxedList(list):
             self_ref = ref_base.get_ref(self)
             if self_ref is not None:
                 val = box(val)
-                sub_ref = self_ref.with_extra(None, val, ["idx", str(__index)])
+                sub_ref = self_ref.with_extra(
+                    None, val, [ref_util.LIST_INDEX_EDGE_TYPE, str(__index)]
+                )
                 ref_base._put_ref(val, sub_ref)
         return val
 

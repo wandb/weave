@@ -9,6 +9,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import textwrap
 
+
 from .. import context_state
 from .. import ref_base
 from .. import weave_types as types
@@ -25,6 +26,7 @@ from ..language_features.tagging import (
 from .. import artifact_base
 from .. import node_ref
 from ..language_features.tagging import tag_store
+from .. import ref_util
 
 from .arrow import (
     safe_is_null,
@@ -578,8 +580,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         assert len(path) > 1
         edge_type = path[0]
         edge_path = path[1]
-        assert edge_type in ["idx", "col"]
-        if edge_type == "idx":
+        assert edge_type in [
+            ref_util.TABLE_INDEX_EDGE_TYPE,
+            ref_util.TABLE_COLUMN_EDGE_TYPE,
+        ]
+        if edge_type == ref_util.TABLE_INDEX_EDGE_TYPE:
             res = self[int(edge_path)]
         else:
             res = self.column(edge_path)
@@ -1336,7 +1341,11 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             # in this list
             if isinstance(ref, ref_base.Ref):
                 result = box.box(result)
-                new_ref = ref.with_extra(self.object_type, result, ["idx", str(index)])
+                new_ref = ref.with_extra(
+                    self.object_type,
+                    result,
+                    [ref_util.TABLE_INDEX_EDGE_TYPE, str(index)],
+                )
                 ref_base._put_ref(result, new_ref)
 
             # No item ref or self ref, just return the result
@@ -1456,7 +1465,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
             self_ref = ref_base.get_ref(self)
             if self_ref is not None:
-                sub_ref = self_ref.with_extra(None, val, ["col", str(name)])
+                sub_ref = self_ref.with_extra(
+                    None, val, [ref_util.TABLE_COLUMN_EDGE_TYPE, str(name)]
+                )
                 ref_base._put_ref(val, sub_ref)
         return val
 

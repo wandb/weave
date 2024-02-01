@@ -15,6 +15,7 @@ from . import context_state
 from . import errors
 from . import mappers_python
 from . import timestamp as weave_timestamp
+from . import ref_util
 
 
 if typing.TYPE_CHECKING:
@@ -1179,7 +1180,9 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
             self_ref = ref_base.get_ref(self)
             if self_ref is not None:
                 attribute = box.box(attribute)
-                sub_ref = self_ref.with_extra(None, attribute, ["attr", str(name)])
+                sub_ref = self_ref.with_extra(
+                    None, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
+                )
                 ref_base._put_ref(attribute, sub_ref)
             return attribute
 
@@ -1189,7 +1192,7 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
         assert len(path) > 1
         edge_type = path[0]
         edge_path = path[1]
-        assert edge_type == "attr"
+        assert edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE
 
         res = getattr(self, edge_path)
         remaining_path = path[2:]

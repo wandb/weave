@@ -2,6 +2,12 @@ import typing
 import dataclasses
 from urllib import parse
 
+DICT_KEY_EDGE_TYPE = "key"
+LIST_INDEX_EDGE_TYPE = "idx"
+OBJECT_ATTRIBUTE_EDGE_TYPE = "attr"
+TABLE_INDEX_EDGE_TYPE = "idx"
+TABLE_COLUMN_EDGE_TYPE = "col"
+
 
 def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]:
     if "#" not in s:
