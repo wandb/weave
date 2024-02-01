@@ -9,6 +9,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import textwrap
 
+from .. import context_state
 from .. import ref_base
 from .. import weave_types as types
 from .. import box
@@ -1435,12 +1436,23 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if name not in property_types:
             return make_vec_none(len(self))
 
-        return ArrowWeaveList(
+        val = ArrowWeaveList(
             self._arrow_data.field(name),
             property_types[name],
             self._artifact,
             invalid_reason=self._invalid_reason,
         )
+
+        if context_state.ref_tracking_enabled():
+            from .. import ref_base
+
+            self_ref = ref_base.get_ref(self)
+            if self_ref is not None:
+                val = box.box(val)
+                sub_ref = self_ref.with_extra(None, val, ["col", str(name)])
+                ref_base._put_ref(val, sub_ref)
+        return val
+
 
     def unique(self) -> "ArrowWeaveList":
         return ArrowWeaveList(
