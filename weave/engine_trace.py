@@ -42,7 +42,7 @@ class DummySpan:
 
     def set_meta(self, *args, **kwargs):
         pass
-    
+
     def set_metric(self, *args, **kwargs):
         pass
 
