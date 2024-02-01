@@ -114,7 +114,7 @@ export const SideNav = () => {
       },
       {
         id: 'calls',
-        name: 'Calls',
+        name: 'Traces',
         iconName: IconNames.RunningRepeat,
         path: baseRouter.callsUIUrl(entity, project, {
           traceRootsOnly: true,
