@@ -214,7 +214,7 @@ export const RunsTable: FC<{
     const cols: GridColDef[] = [
       {
         field: 'span_id',
-        headerName: 'Call',
+        headerName: 'Trace',
         width: 75,
         minWidth: 75,
         maxWidth: 75,
