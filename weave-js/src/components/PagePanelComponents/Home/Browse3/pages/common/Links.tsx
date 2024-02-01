@@ -193,6 +193,28 @@ export const OpVersionLink: React.FC<{
   );
 };
 
+export const OpCallLink: React.FC<{
+  entityName: string;
+  projectName: string;
+  opName: string;
+  callId: string;
+}> = props => {
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const opName = opNiceName(props.opName);
+  const truncatedId = truncateID(props.callId);
+  return (
+    <Link
+      to={peekingRouter.callUIUrl(
+        props.entityName,
+        props.projectName,
+        '',
+        props.callId
+      )}>
+      {opName} ({truncatedId})
+    </Link>
+  );
+};
+
 export const CallLink: React.FC<{
   entityName: string;
   projectName: string;
