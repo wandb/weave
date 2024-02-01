@@ -41,9 +41,9 @@ def parse_ref_str(s: str) -> ParsedRef:
     path = path[1:]
     path_parts = path.split("/")
     if scheme == "wandb-artifact":
-        entity = path_parts[1]
-        project = path_parts[2]
-        path_parts = path_parts[3:]
+        entity = path_parts[0]
+        project = path_parts[1]
+        path_parts = path_parts[2:]
 
     artifact, alias = path_parts[0].split(":")
     file_path_parts = path_parts[1:]

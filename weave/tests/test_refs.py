@@ -128,6 +128,81 @@ def assert_local_ref(object, path_parts, extra_parts):
     assert parsed_obj_ref == target_obj_ref
 
 
+def test_ref_parser():
+    assert ref_util.parse_ref_str(
+        "local-artifact:///art_name:version"
+    ) == ref_util.ParsedRef(
+        scheme="local-artifact",
+        entity=None,
+        project=None,
+        artifact="art_name",
+        alias="version",
+        file_path_parts=[],
+        ref_extra_tuples=[],
+    )
+    assert ref_util.parse_ref_str(
+        "local-artifact:///art_name:version/possibly/deep/path"
+    ) == ref_util.ParsedRef(
+        scheme="local-artifact",
+        entity=None,
+        project=None,
+        artifact="art_name",
+        alias="version",
+        file_path_parts=["possibly", "deep", "path"],
+        ref_extra_tuples=[],
+    )
+    assert ref_util.parse_ref_str(
+        "local-artifact:///art_name:version/possibly/deep/path#very/deep/ref/extra"
+    ) == ref_util.ParsedRef(
+        scheme="local-artifact",
+        entity=None,
+        project=None,
+        artifact="art_name",
+        alias="version",
+        file_path_parts=["possibly", "deep", "path"],
+        ref_extra_tuples=[
+            ref_util.RefExtraTuple("very", "deep"),
+            ref_util.RefExtraTuple("ref", "extra"),
+        ],
+    )
+    assert ref_util.parse_ref_str(
+        "wandb-artifact:///entity/project/art_name:version"
+    ) == ref_util.ParsedRef(
+        scheme="wandb-artifact",
+        entity="entity",
+        project="project",
+        artifact="art_name",
+        alias="version",
+        file_path_parts=[],
+        ref_extra_tuples=[],
+    )
+    assert ref_util.parse_ref_str(
+        "wandb-artifact:///entity/project/art_name:version/possibly/deep/path"
+    ) == ref_util.ParsedRef(
+        scheme="wandb-artifact",
+        entity="entity",
+        project="project",
+        artifact="art_name",
+        alias="version",
+        file_path_parts=["possibly", "deep", "path"],
+        ref_extra_tuples=[],
+    )
+    assert ref_util.parse_ref_str(
+        "wandb-artifact:///entity/project/art_name:version/possibly/deep/path#very/deep/ref/extra"
+    ) == ref_util.ParsedRef(
+        scheme="wandb-artifact",
+        entity="entity",
+        project="project",
+        artifact="art_name",
+        alias="version",
+        file_path_parts=["possibly", "deep", "path"],
+        ref_extra_tuples=[
+            ref_util.RefExtraTuple("very", "deep"),
+            ref_util.RefExtraTuple("ref", "extra"),
+        ],
+    )
+
+
 def test_ref_extra_dict(ref_tracking):
     obj = {"a": 1}
     saved_obj = weave.use(weave.save(obj))
