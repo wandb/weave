@@ -1115,7 +1115,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             else:
                 if self_ref:
                     x = box.box(x)
-                    x_ref = self_ref.with_extra(self.object_type, x, [str(i)])
+                    x_ref = self_ref.with_extra(
+                        self.object_type, x, [ref_util.TABLE_INDEX_EDGE_TYPE, str(i)]
+                    )
                     ref_base._put_ref(x, x_ref)
                 yield x
 

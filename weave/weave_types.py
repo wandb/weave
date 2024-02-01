@@ -15,7 +15,7 @@ from . import context_state
 from . import errors
 from . import mappers_python
 from . import timestamp as weave_timestamp
-from . import ref_util
+from . import object_type_ref_util
 
 
 if typing.TYPE_CHECKING:
@@ -1160,45 +1160,10 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     )
     exec(object_init_code)
 
-    # Weave objects must auto-dereference refs when they are accessed.
-    def object_getattribute(self, name):
-        attribute = object.__getattribute__(self, name)
-        attr_type = type_attr_types.get(name)
-        if attr_type is None:
-            return attribute
-        from . import ref_base
-
-        if isinstance(attribute, ref_base.Ref):
-            # TODO: This should put a new ref as well, for ref-tracking
-            attribute = attribute.get()
-
-        # Only do this if ref_tracking_enabled right now. I just want to
-        # avoid introducing new behavior into W&B prod for the moment.
-        if context_state.ref_tracking_enabled():
-            from . import box
-
-            self_ref = ref_base.get_ref(self)
-            if self_ref is not None:
-                attribute = box.box(attribute)
-                sub_ref = self_ref.with_extra(
-                    None, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
-                )
-                ref_base._put_ref(attribute, sub_ref)
-            return attribute
-
-        return attribute
-
-    def object_lookup_path(self, path: typing.List[str]):
-        assert len(path) > 1
-        edge_type = path[0]
-        edge_path = path[1]
-        assert edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE
-
-        res = getattr(self, edge_path)
-        remaining_path = path[2:]
-        if remaining_path:
-            return res._lookup_path(remaining_path)
-        return res
+    object_getattribute = object_type_ref_util.make_object_getattribute(
+        list(type_attr_types.keys())
+    )
+    object_lookup_path = object_type_ref_util.make_object_lookup_path()
 
     new_object_class = type(
         object_class_name,
