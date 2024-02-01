@@ -304,6 +304,7 @@ const ObjectVersionsTable: React.FC<{
   }, [props.objectVersions]);
   const columns: GridColDef[] = [
     basicField('version', 'Object', {
+      hideable: false,
       renderCell: params => {
         // Icon to indicate navigation to the object version
         return (
@@ -558,7 +559,9 @@ const useObjectOptions = (
   }, [allObjectVersions, highLevelFilter]);
 
   return useMemo(() => {
-    return filtered.map(item => item.object().name());
+    return _.uniq(filtered.map(item => item.object().name())).sort((a, b) =>
+      a.localeCompare(b)
+    );
   }, [filtered]);
 };
 

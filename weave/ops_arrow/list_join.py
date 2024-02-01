@@ -10,13 +10,13 @@ from ..api import op
 from .. import graph
 from .. import engine_trace
 
-from . import convert
-from .arrow import (
+from ..arrow import convert
+from ..arrow.arrow import (
     ArrowWeaveListType,
     safe_coalesce,
 )
-from .arrow_tags import pushdown_list_tags
-from .list_ import ArrowWeaveList, make_vec_dict, make_vec_taggedvalue, awl_zip
+from ..arrow.arrow_tags import pushdown_list_tags
+from ..arrow.list_ import ArrowWeaveList, make_vec_dict, make_vec_taggedvalue, awl_zip
 
 tracer = engine_trace.tracer()  # type: ignore
 

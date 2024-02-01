@@ -265,7 +265,7 @@ def test_join_all(li):
         ]
     )
     join_list = list_.make_list(a=list_node_1, c=None, b=list_node_2)
-    join_fn = weave.define_fn(
+    join_fn = weave_internal.define_fn(
         {"row": list_node_1.type.object_type},
         lambda row: row["val"],
     )
@@ -413,7 +413,7 @@ def test_join_2(li):
         ]
     )
     # join_list = list_.make_list(a=list_node_1, c=None, b=list_node_2)
-    join_fn = weave.define_fn(
+    join_fn = weave_internal.define_fn(
         {"row": list_node_1.type.object_type},
         lambda row: row["val"],
     )

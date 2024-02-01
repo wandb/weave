@@ -120,6 +120,7 @@ export const FilterableOpVersionsTable: React.FC<{
           columnLabel: 'Op',
           columnValue: obj => obj.obj.version(),
           gridColDefOptions: {
+            hideable: false,
             renderCell: params => {
               return (
                 <OpVersionLink

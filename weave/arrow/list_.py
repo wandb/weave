@@ -15,7 +15,7 @@ from .. import box
 from .. import weave_internal
 from .. import op_def_type
 from .. import op_def
-from ..ops_primitives import _dict_utils
+from .. import _dict_utils
 from .. import errors
 from .. import graph
 from ..language_features.tagging import (
@@ -1492,7 +1492,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self, fn: typing.Union[typing.Callable[[typing.Any], typing.Any], graph.Node]
     ):
         fn = self._make_lambda_node(fn)
-        from .vectorize import _apply_fn_node_with_tag_pushdown
+        from ..ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
 
         return _apply_fn_node_with_tag_pushdown(self, fn)  # type: ignore
 
@@ -1511,9 +1511,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         leftOuter: bool = False,
         rightOuter: bool = False,
     ):
+        from ..ops_arrow import list_join
+
         join1Fn = self._make_lambda_node(join1Fn)
         join2Fn = other._make_lambda_node(join2Fn)
-        from . import list_join
 
         return list_join.join2_impl(
             self, other, join1Fn, join2Fn, alias1, alias2, leftOuter, rightOuter

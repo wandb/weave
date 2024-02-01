@@ -123,7 +123,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
     ):
         if "params" not in old_type or "class_map" not in old_type["params"]:
             # This is legacy and fixed in `_patch_legacy_image_file_types``
-            return ops.LegacyImageArtifactFileRefType()
+            return ops.LegacyImageArtifactFileRefType()  # type: ignore
 
         boxLayersType = (
             weave0_type_json_to_weave1_type(old_type["params"]["box_layers"]).val  # type: ignore
@@ -145,7 +145,7 @@ def _convert_type(old_type: Weave0TypeJson) -> types.Type:
             if "class_map" in old_type["params"]
             else None
         )
-        return ops.ImageArtifactFileRefType(
+        return ops.ImageArtifactFileRefType(  # type: ignore
             boxLayersType,
             boxScoreKeysType,
             maskLayersType,

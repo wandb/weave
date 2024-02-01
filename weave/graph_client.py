@@ -1,12 +1,15 @@
+import typing
 from typing import Protocol, Generic, Sequence, TypeVar, Optional, Any
 from abc import abstractmethod
 
-from .op_def import OpDef
 from .ref_base import Ref
 from .uris import WeaveURI
 from .run import RunKey, Run
 
 R = TypeVar("R", bound=Run)
+
+if typing.TYPE_CHECKING:
+    from .op_def import OpDef
 
 
 class GraphClient(Protocol, Generic[R]):
@@ -29,7 +32,7 @@ class GraphClient(Protocol, Generic[R]):
         ...
 
     @abstractmethod
-    def op_runs(self, op_def: OpDef) -> Sequence[Run]:
+    def op_runs(self, op_def: "OpDef") -> Sequence[Run]:
         ...
 
     @abstractmethod

@@ -1,6 +1,6 @@
 # WeaveJS ops used for testing. These are not used in production.
 
-from ..ops_primitives._dict_utils import typeddict_pick_output_type
+from .._dict_utils import typeddict_pick_output_type
 from .. import weave_types as types
 from .. import graph
 from .. import weave_internal

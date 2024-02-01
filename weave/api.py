@@ -1,5 +1,6 @@
 """These are the top-level functions in the `import weave` namespace.
 """
+
 import time
 import typing
 import os
@@ -8,17 +9,23 @@ import dataclasses
 from typing import Any
 
 from . import urls
+
 from . import graph as _graph
+from .graph import Node
+
+# If this is not imported, serialization of Weave Nodes is incorrect!
 from . import graph_mapper as _graph_mapper
+
 from . import storage as _storage
 from . import ref_base as _ref_base
 from . import artifact_wandb as _artifact_wandb
 from . import wandb_api as _wandb_api
-from . import trace as _trace
+
 from . import weave_internal as _weave_internal
 from . import errors as _errors
-from . import ops as _ops
+
 from . import util as _util
+
 from . import context as _context
 from . import context_state as _context_state
 from . import run as _run
@@ -27,15 +34,17 @@ from . import graph_client as _graph_client
 from . import graph_client_local as _graph_client_local
 from . import graph_client_wandb_art_st as _graph_client_wandb_art_st
 from . import graph_client_context as _graph_client_context
-from weave import monitoring as _monitoring
 from weave.monitoring import monitor as _monitor
 
 # exposed as part of api
 from . import weave_types as types
+
+# needed to enable automatic numpy serialization
 from . import types_numpy as _types_numpy
+
 from . import errors
 from .decorators import weave_class, op, mutation, type
-from .op_args import OpVarArgs
+
 from .op_def import OpDef
 from . import usage_analytics
 from .context import (
@@ -44,19 +53,17 @@ from .context import (
     # eager_execution,
     use_lazy_execution,
 )
-from .server import capture_weave_server_logs
-from .val_const import const
-from .file_base import File, Dir
-from .dispatch import RuntimeConstNode
 
-from .weave_internal import define_fn
+from .panel import Panel
 
-Node = _graph.Node
+from .arrow.list_ import ArrowWeaveList as WeaveList
 
 
 def save(node_or_obj, name=None):
+    from .ops_primitives.weave_api import save, get
+
     if isinstance(node_or_obj, _graph.Node):
-        return _ops.save(node_or_obj, name=name)
+        return save(node_or_obj, name=name)
     else:
         # If the user does not provide a branch, then we explicitly set it to
         # the default branch, "latest".
@@ -73,7 +80,7 @@ def save(node_or_obj, name=None):
             # otherwise the reference will be to whatever branch was provided
             # or the "latest" branch if only a name was provided.
             uri = ref.branch_uri
-        return _ops.get(str(uri))
+        return get(str(uri))
 
 
 def get(ref_str):
@@ -116,8 +123,8 @@ def type_of(obj: typing.Any) -> types.Type:
     return types.TypeRegistry.type_of(obj)
 
 
-def weave(obj: typing.Any) -> RuntimeConstNode:
-    return _weave_internal.make_const_node(type_of(obj), obj)  # type: ignore
+# def weave(obj: typing.Any) -> RuntimeConstNode:
+#     return _weave_internal.make_const_node(type_of(obj), obj)  # type: ignore
 
 
 def from_pandas(df):
@@ -236,6 +243,24 @@ def output_of(obj: typing.Any) -> typing.Optional[_run.Run]:
     return client.ref_output_of(ref)
 
 
+def as_op_def(fn: typing.Callable) -> OpDef:
+    """Given a @weave.op() decorated function, return its OpDef.
+
+    @weave.op() decorated functions are instances of OpDef already, so this
+    function should be a no-op at runtime. But you can use it to satisfy type checkers
+    if you need to access OpDef attributes in a typesafe way.
+
+    Args:
+        fn: A weave.op() decorated function.
+
+    Returns:
+        The OpDef of the function.
+    """
+    if not isinstance(fn, OpDef):
+        raise ValueError("fn must be a weave.op() decorated function")
+    return fn
+
+
 import contextlib
 
 
@@ -279,10 +304,8 @@ def serve(
 
     def run():
         with _wandb_api.wandb_api_context(wandb_api_ctx):
-            with _context_state.eager_execution():
-                with _context.execution_client():
-                    with attributes(trace_attrs):
-                        uvicorn.run(app, host="0.0.0.0", port=port)
+            with attributes(trace_attrs):
+                uvicorn.run(app, host="0.0.0.0", port=port)
 
     if _util.is_notebook():
         thread = True

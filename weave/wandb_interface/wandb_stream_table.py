@@ -212,7 +212,7 @@ class _StreamTableSync:
     def _ipython_display_(self) -> graph.Node:
         from .. import show
 
-        return show(self.rows())
+        return show.show(self.rows())
 
     def _log_row(self, row: typing.Mapping) -> None:
         row_copy = {**row}

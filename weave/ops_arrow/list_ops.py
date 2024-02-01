@@ -17,19 +17,19 @@ from .. import op_args
 from ..ops_primitives import list_ as primitive_list
 from .. import op_def
 
-from .arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
-from .list_ import (
+from ..arrow.arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
+from ..arrow.list_ import (
     ArrowWeaveList,
     PathType,
     is_list_arrowweavelist,
     is_taggedvalue_arrowweavelist,
 )
-from . import arrow_tags
+from ..arrow import arrow_tags
 from .vectorize import _apply_fn_node_with_tag_pushdown
-from . import convert
-from .convert import to_compare_safe
-from .concat import concatenate_all
-from .constructors import (
+from ..arrow import convert
+from ..arrow.convert import to_compare_safe
+from ..arrow.concat import concatenate_all
+from ..arrow.constructors import (
     vectorized_container_constructor_preprocessor,
     vectorized_input_types,
 )

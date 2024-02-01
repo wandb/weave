@@ -2,7 +2,8 @@ import click
 import os
 import time
 import typing
-from weave import server, __version__
+import sys
+from weave import __version__
 
 # from .model_server import app
 from .urls import BROWSE3_PATH
@@ -24,6 +25,11 @@ def cli() -> None:
 @cli.command("ui", help="Start the weave UI.")
 def start_ui() -> None:
     print("Starting server...")
+    try:
+        from weave import server
+    except ModuleNotFoundError:
+        print("Run 'pip install weave[engine]' to use the local server.")
+        sys.exit(1)
     serv = server.HttpServer(port=3000)  # type: ignore
     serv.start()
     print("Server started")

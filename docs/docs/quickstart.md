@@ -15,28 +15,42 @@ hide_table_of_contents: true
 - Call `weave.init('project-name')` to start logging
 - Add the `@weave.op()` decorator to the functions you want to track
 
+In this example, we're using openai so you will need to [add an openai API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
+
 ```python
 # highlight-next-line
 import weave
+import json
 from openai import OpenAI
 
 # highlight-next-line
 @weave.op()
-def correct_grammar(sentence: str) -> str:
+def extract_fruit(sentence: str) -> dict:
+    from openai import OpenAI
     client = OpenAI()
+
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You will be provided with statements, and your task is to convert them to standard English." },
-            {"role": "user", "content": sentence}],
+    model="gpt-3.5-turbo-1106",
+    messages=[
+        {
+            "role": "system",
+            "content": "You will be provided with unstructured data, and your task is to parse it one JSON dictionary with fruit, color and flavor as keys."
+        },
+        {
+            "role": "user",
+            "content": sentence
+        }
+        ],
         temperature=0.7,
-        max_tokens=64,
+        response_format={ "type": "json_object" }
     )
-    return response.choices[0].message.content
+    extracted = response.choices[0].message.content
+    return json.loads(extracted)
 
 # highlight-next-line
 weave.init('intro-example')
-correct_grammar('she no went to the market')
+sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
+extract_fruit(sentence)
 ```
 
 Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code. 
@@ -49,5 +63,3 @@ Calls made with the openai library are automatically tracked with weave but you 
 ## What's next?
 
 - Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
-- Learn how to create parameterized functions with [Models](/guides/core-types/models).
-- [Serve](/guides/tools/serve) and [Deploy](/guides/tools/deploy) Weave Ops with the Weave toolbelt.

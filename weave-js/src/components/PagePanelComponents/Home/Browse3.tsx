@@ -11,7 +11,15 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
-import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
+import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
+import React, {
+  ComponentProps,
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   Link as RouterLink,
   Route,
@@ -32,6 +40,8 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
+  useClosePeek,
+  usePeekLocation,
   useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
@@ -42,6 +52,7 @@ import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
+import {CompareCallsPage} from './Browse3/pages/CompareCallsPage';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
 import {ObjectsPage} from './Browse3/pages/ObjectsPage';
 import {ObjectVersionPage} from './Browse3/pages/ObjectVersionPage';
@@ -122,6 +133,7 @@ const tabOptions = [
   'calls',
   'boards',
   'tables',
+  'compare-calls',
 ];
 const tabs = tabOptions.join('|');
 const browse3Paths = (projectRoot: string) => [
@@ -130,6 +142,9 @@ const browse3Paths = (projectRoot: string) => [
   `${projectRoot}/:tab(${tabs})`,
   `${projectRoot}`,
 ];
+
+const SIDEBAR_WIDTH = 56;
+const NAVBAR_HEIGHT = 60;
 
 export const Browse3: FC<{
   hideHeader?: boolean;
@@ -163,30 +178,6 @@ export const Browse3: FC<{
       </Switch>
     </Browse3WeaveflowRouteContextProvider>
   );
-};
-
-const usePeekLocation = (peekPath?: string) => {
-  return useMemo(() => {
-    if (peekPath == null) {
-      return undefined;
-    }
-    const peekPathParts = peekPath.split('?');
-    const peekPathname = peekPathParts[0];
-    const peekSearch = peekPathParts[1] ?? '';
-    const peekSearchParts = peekSearch.split('#');
-    const peekSearchString = peekSearchParts[0];
-    const peekHash = peekSearchParts[1] ?? '';
-
-    return {
-      key: 'peekLoc',
-      pathname: peekPathname,
-      search: peekSearchString,
-      hash: peekHash,
-      state: {
-        '[userDefined]': true,
-      },
-    };
-  }, [peekPath]);
 };
 
 const Browse3Mounted: FC<{
@@ -319,15 +310,19 @@ const MainPeekingLayout: FC = () => {
   const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
   const generalProjectRoot = browse2Context.projectUrl(':entity', ':project');
   const query = useURLSearchParamsDict();
-  const peekLocation = usePeekLocation(query.peekPath ?? undefined);
+  const peekLocation = usePeekLocation();
   const generalBase = browse2Context.projectUrl(
     params.entity!,
     params.project!
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   const flexDirection = useFlexDirection();
+  const isFlexRow = flexDirection === 'row';
+  const isDrawerOpen = peekLocation != null;
+  const windowSize = useWindowSize();
 
-  const {handleMousedown, drawerWidth, drawerHeight} = useDrawerResize();
+  const {handleMousedown, drawerWidthPct, drawerHeightPct} = useDrawerResize();
+  const closePeek = useClosePeek();
 
   return (
     <Box
@@ -345,34 +340,46 @@ const MainPeekingLayout: FC = () => {
           flex: '1 1 40%',
           overflow: 'hidden',
           display: 'flex',
+          // This transition is from the mui drawer component, to keep the main content animation in similar
+          transition: !isDrawerOpen
+            ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
+            : 'none',
+          marginRight:
+            !isDrawerOpen || !isFlexRow
+              ? 0
+              : `${(drawerWidthPct * windowSize.width) / 100}px`,
+          // this is px hack to account for the navbar hiehgt
+          marginBottom:
+            !isDrawerOpen || isFlexRow
+              ? 0
+              : `${
+                  (drawerHeightPct * (windowSize.height - NAVBAR_HEIGHT)) / 100
+                }px`,
         }}>
         <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
       </Box>
 
       <Drawer
         variant="persistent"
-        anchor={flexDirection === 'row' ? 'right' : 'bottom'}
-        open={peekLocation != null}
-        onClose={() => {
-          const targetPath = query.peekPath!.replace(generalBase, targetBase);
-          history.push(targetPath);
-        }}
+        anchor={isFlexRow ? 'right' : 'bottom'}
+        open={isDrawerOpen}
+        onClose={closePeek}
         PaperProps={{
           style: {
             overflow: 'hidden',
             display: 'flex',
             zIndex: 1,
-            width: flexDirection === 'row' ? drawerWidth : '100%',
-            height: flexDirection === 'column' ? drawerHeight : '100%',
-            margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 56px',
-            boxShadow:
-              flexDirection === 'row'
-                ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
-                : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
-            borderLeft:
-              flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
-            borderTop:
-              flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
+            width: isFlexRow
+              ? `${drawerWidthPct}%`
+              : `calc(100% - ${SIDEBAR_WIDTH}px)`,
+            height: !isFlexRow ? `${drawerHeightPct}%` : '100%',
+            margin: isFlexRow ? 0 : `0 0 0 ${SIDEBAR_WIDTH + 1}px`,
+            boxShadow: isFlexRow
+              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
+              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
+            borderLeft: isFlexRow ? `1px solid ${MOON_200}` : 'none',
+            borderTop: !isFlexRow ? `1px solid ${MOON_200}` : 'none',
+            position: 'absolute',
           },
         }}
         ModalProps={{
@@ -388,12 +395,12 @@ const MainPeekingLayout: FC = () => {
             left: 0,
             zIndex: 100,
             backgroundColor: '#f4f7f9',
-            cursor: flexDirection === 'row' ? 'ew-resize' : 'ns-resize',
-            padding: flexDirection === 'row' ? '4px 0 0' : '0 4px 0 0',
-            bottom: flexDirection === 'row' ? 0 : 'auto',
-            right: flexDirection === 'row' ? 'auto' : 0,
-            width: flexDirection === 'row' ? '5px' : 'auto',
-            height: flexDirection === 'row' ? 'auto' : '5px',
+            cursor: isFlexRow ? 'ew-resize' : 'ns-resize',
+            padding: isFlexRow ? '4px 0 0' : '0 4px 0 0',
+            bottom: isFlexRow ? 0 : 'auto',
+            right: isFlexRow ? 'auto' : 0,
+            width: isFlexRow ? '5px' : 'auto',
+            height: isFlexRow ? 'auto' : '5px',
           }}
         />
         {peekLocation && (
@@ -409,15 +416,7 @@ const MainPeekingLayout: FC = () => {
                       }}>
                       <IconButton
                         onClick={() => {
-                          const queryParams = new URLSearchParams(
-                            history.location.search
-                          );
-                          if (queryParams.has('peekPath')) {
-                            queryParams.delete('peekPath');
-                            history.replace({
-                              search: queryParams.toString(),
-                            });
-                          }
+                          closePeek();
                         }}>
                         <Close />
                       </IconButton>
@@ -618,6 +617,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/tables`}>
           <TablesPageBinding />
         </Route>
+        <Route path={`${projectRoot}/compare-calls`}>
+          <CompareCallsBinding />
+        </Route>
       </Switch>
     </Box>
   );
@@ -783,6 +785,33 @@ const CallPageBinding = () => {
       entity={params.entity}
       project={params.project}
       callId={params.itemName}
+    />
+  );
+};
+
+const CompareCallsBinding = () => {
+  useCallPeekRedirect();
+  const params = useParams<Browse3TabItemParams>();
+  const query = useURLSearchParamsDict();
+  const compareSpec = useMemo(() => {
+    const callIds = JSON.parse(query.callIds);
+    const primaryDim = query.primaryDim;
+    const secondaryDim = query.secondaryDim;
+
+    return {
+      callIds,
+      primaryDim,
+      secondaryDim,
+    };
+  }, [query.callIds, query.primaryDim, query.secondaryDim]);
+
+  return (
+    <CompareCallsPage
+      entity={params.entity}
+      project={params.project}
+      callIds={compareSpec.callIds}
+      primaryDim={compareSpec.primaryDim}
+      secondaryDim={compareSpec.secondaryDim}
     />
   );
 };
@@ -1009,7 +1038,7 @@ const TablesPageBinding = () => {
   return <TablesPage entity={params.entity} project={params.project} />;
 };
 
-const AppBarLink = (props: React.ComponentProps<typeof RouterLink>) => (
+const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
   <MaterialLink
     sx={{
       color: theme => theme.palette.getContrastText(theme.palette.primary.main),

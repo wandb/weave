@@ -1,12 +1,19 @@
 import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {createContext, useCallback, useContext} from 'react';
-import {useLocation} from 'react-router-dom';
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+} from 'react';
+import {useHistory, useLocation} from 'react-router-dom';
 
 import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
+import {useURLSearchParamsDict} from './pages/util';
 
 const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
   if (!filter) {
@@ -40,7 +47,7 @@ export const Browse3WeaveflowRouteContextProvider = ({
   projectRoot,
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   projectRoot(entityName: string, projectName: string): string;
 }) => {
   const baseRouter = browse3ContextGen(projectRoot);
@@ -174,6 +181,15 @@ export const browse2Context = {
     entityName: string,
     projectName: string,
     expression: string
+  ) => {
+    throw new Error('Not implemented');
+  },
+  compareCallsUIUrl: (
+    entityName: string,
+    projectName: string,
+    callIds: string[],
+    primaryDim: string,
+    secondaryDim: string
   ) => {
     throw new Error('Not implemented');
   },
@@ -372,6 +388,22 @@ const browse3ContextGen = (
       }
       return `${base}/?exp=${encodeURIComponent(expression)}`;
     },
+    compareCallsUIUrl: (
+      entityName: string,
+      projectName: string,
+      callIds: string[],
+      primaryDim: string,
+      secondaryDim: string
+    ) => {
+      return `${projectRoot(
+        entityName,
+        projectName
+      )}/compare-calls?callIds=${encodeURIComponent(
+        JSON.stringify(callIds)
+      )}&primaryDim=${encodeURIComponent(
+        primaryDim
+      )}&secondaryDim=${encodeURIComponent(secondaryDim)}`;
+    },
   };
   return browse3Context;
 };
@@ -457,6 +489,13 @@ type RouteType = {
     // TODO: Add filter when supported
   ) => string;
   opPageUrl: (opUri: string) => string;
+  compareCallsUIUrl: (
+    entityName: string,
+    projectName: string,
+    callIds: string[],
+    primaryDim: string,
+    secondaryDim: string
+  ) => string;
 };
 
 const useSetSearchParam = () => {
@@ -587,6 +626,14 @@ const useMakePeekingRouter = (): RouteType => {
       //   baseContext.boardForExpressionUIUrl(...args)
       // );
     },
+    compareCallsUIUrl: (
+      ...args: Parameters<typeof baseContext.compareCallsUIUrl>
+    ) => {
+      return setSearchParam(
+        PEAK_SEARCH_PARAM,
+        baseContext.compareCallsUIUrl(...args)
+      );
+    },
   };
 };
 
@@ -603,3 +650,42 @@ export const WeaveflowPeekContext = createContext<{
 }>({
   isPeeking: false,
 });
+
+export const useClosePeek = () => {
+  const history = useHistory();
+  return () => {
+    const queryParams = new URLSearchParams(history.location.search);
+    if (queryParams.has('peekPath')) {
+      queryParams.delete('peekPath');
+      history.replace({
+        search: queryParams.toString(),
+      });
+    }
+  };
+};
+
+export const usePeekLocation = () => {
+  const {peekPath} = useURLSearchParamsDict();
+
+  return useMemo(() => {
+    if (peekPath == null) {
+      return undefined;
+    }
+    const peekPathParts = peekPath.split('?');
+    const peekPathname = peekPathParts[0];
+    const peekSearch = peekPathParts[1] ?? '';
+    const peekSearchParts = peekSearch.split('#');
+    const peekSearchString = peekSearchParts[0];
+    const peekHash = peekSearchParts[1] ?? '';
+
+    return {
+      key: 'peekLoc',
+      pathname: peekPathname,
+      search: peekSearchString,
+      hash: peekHash,
+      state: {
+        '[userDefined]': true,
+      },
+    };
+  }, [peekPath]);
+};
