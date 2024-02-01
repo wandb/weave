@@ -148,9 +148,7 @@ def type(
 
         # dc.constructor = constructor
         dc = object_type_ref_util.build_ref_aware_object_subclass(
-            target_name,
-            dc,
-            [field.name for field in fields]
+            target_name, dc, [field.name for field in fields]
         )
 
         return dc

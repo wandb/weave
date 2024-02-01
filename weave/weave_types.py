@@ -1780,7 +1780,11 @@ def simple_type(t: Type) -> Type:
 
 
 def is_list_like(t: Type) -> bool:
-    return List().assign_type(non_none(t))
+    return is_type_like(t, List())
+
+
+def is_type_like(t: Type, of_type: Type) -> bool:
+    return of_type.assign_type(non_none(t))
 
 
 def is_custom_type(t: Type) -> bool:

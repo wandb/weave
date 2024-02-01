@@ -38,7 +38,14 @@ def test_evaluate_basic():
             "example"
         ]
         assert isinstance(example_to_model_input0_run_example, ref_base.Ref)
-        assert example_to_model_input0_run_example.extra == ['atr', 'dataset', "atr", "rows", "row", "0"]
+        assert example_to_model_input0_run_example.extra == [
+            "atr",
+            "dataset",
+            "atr",
+            "rows",
+            "row",
+            "0",
+        ]
         assert example_to_model_input0_run_example.get() == {
             "input": "1 + 2",
             "output": "3",
@@ -47,13 +54,31 @@ def test_evaluate_basic():
         predict0_run = EvalModel.predict.runs()[0]
         predict0_run_input = predict0_run.inputs["input"]
         assert isinstance(predict0_run_input, ref_base.Ref)
-        assert predict0_run_input.extra == ['atr', 'dataset', "atr", "rows", "row", "0", "key", "input"]
+        assert predict0_run_input.extra == [
+            "atr",
+            "dataset",
+            "atr",
+            "rows",
+            "row",
+            "0",
+            "key",
+            "input",
+        ]
         assert predict0_run_input.get() == "1 + 2"
 
         predict1_run = EvalModel.predict.runs()[1]
         predict1_run_input = predict1_run.inputs["input"]
         assert isinstance(predict1_run_input, ref_base.Ref)
-        assert predict1_run_input.extra == ['atr', 'dataset', "atr", "rows", "row", "1", "key", "input"]
+        assert predict1_run_input.extra == [
+            "atr",
+            "dataset",
+            "atr",
+            "rows",
+            "row",
+            "1",
+            "key",
+            "input",
+        ]
         assert predict1_run_input.get() == "2**4"
 
         # TODO: exhaustively check all graph relationships

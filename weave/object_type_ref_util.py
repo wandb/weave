@@ -3,7 +3,10 @@ import typing
 from . import context_state
 from . import ref_util
 
-def make_object_getattribute(allowed_attributes: list[str]) -> typing.Callable[[typing.Any, str], typing.Any]:
+
+def make_object_getattribute(
+    allowed_attributes: list[str],
+) -> typing.Callable[[typing.Any, str], typing.Any]:
     # Weave objects must auto-dereference refs when they are accessed.
     def object_getattribute(self: typing.Any, name: str) -> typing.Any:
         attribute = object.__getattribute__(self, name)
@@ -26,9 +29,10 @@ def make_object_getattribute(allowed_attributes: list[str]) -> typing.Callable[[
             self_ref = ref_base.get_ref(self)
             if attr_ref is not None:
                 if self_ref is not None:
-                    if attr_ref.version != self_ref.version:
-                        # TODO: Comment why i am early returning here
-                        return attribute
+                    if hasattr(attr_ref, "version") and hasattr(self_ref, "version"):
+                        if attr_ref.version != self_ref.version:
+                            # TODO: Comment why i am early returning here
+                            return attribute
 
             if self_ref is not None:
                 attribute = box.box(attribute)
@@ -39,9 +43,13 @@ def make_object_getattribute(allowed_attributes: list[str]) -> typing.Callable[[
             return attribute
 
         return attribute
+
     return object_getattribute
 
-def make_object_lookup_path() -> typing.Callable[[typing.Any, typing.List[str]], typing.Any]:
+
+def make_object_lookup_path() -> typing.Callable[
+    [typing.Any, typing.List[str]], typing.Any
+]:
     def object_lookup_path(self: typing.Any, path: typing.List[str]) -> typing.Any:
         assert len(path) > 1
         edge_type = path[0]
@@ -53,12 +61,16 @@ def make_object_lookup_path() -> typing.Callable[[typing.Any, typing.List[str]],
         if remaining_path:
             return res._lookup_path(remaining_path)
         return res
+
     return object_lookup_path
 
-def build_ref_aware_object_subclass(target_name: str, starting_class: type, allowed_attributes: list[str]) -> type:
+
+def build_ref_aware_object_subclass(
+    target_name: str, starting_class: type, allowed_attributes: list[str]
+) -> type:
     return type(
         target_name,
-        (starting_class, ),
+        (starting_class,),
         {
             "__getattribute__": make_object_getattribute(allowed_attributes),
             "_lookup_path": make_object_lookup_path(),

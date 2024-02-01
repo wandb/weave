@@ -304,6 +304,7 @@ def test_ref_extra_table_very_nested(ref_tracking):
     )
     assert storage.get(val._ref.uri) == 1
 
+
 def test_refs_across_artifacts(ref_tracking):
     inner_obj = {"a": 1}
     saved_inner_obj = weave.use(weave.save(inner_obj))
@@ -322,7 +323,7 @@ def test_refs_across_artifacts(ref_tracking):
     assert_local_ref(val, ["obj"], ["key", "outer"])
     assert storage.get(val._ref.uri) == inner_obj
 
-    val = saved_outer_obj["outer"]['a']
+    val = saved_outer_obj["outer"]["a"]
     assert val == 1
     assert_local_ref(val, ["obj"], ["key", "outer", "key", "a"])
     assert storage.get(val._ref.uri) == 1
@@ -333,10 +334,11 @@ def test_refs_across_artifacts(ref_tracking):
     assert_local_ref(val, ["obj"], [])
     assert storage.get(val._ref.uri) == inner_obj
 
-    val = saved_outer_obj["inner"]['a']
+    val = saved_outer_obj["inner"]["a"]
     # assert val == inner_obj
     assert_local_ref(val, ["obj"], ["key", "a"])
     assert storage.get(val._ref.uri) == inner_obj
+
 
 def test_ref_objects_across_artifacts(ref_tracking):
     @weave.type()
@@ -353,7 +355,7 @@ def test_ref_objects_across_artifacts(ref_tracking):
     saved_obj_b = weave.use(weave.save(obj_b))
 
     val = saved_obj_b.inner_b
-    assert_local_ref(val, ["obj"], ['atr', 'inner_b'])
+    assert_local_ref(val, ["obj"], ["atr", "inner_b"])
 
     # Case 2: Cross Ref
     obj_a = CustomObjectA(inner_a=1)

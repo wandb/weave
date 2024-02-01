@@ -273,7 +273,10 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         ot = self._outer_type
         if self.extra is not None:
             from . import types_numpy
-            if not types.is_list_like(ot) and isinstance(ot, types_numpy.NumpyArrayType):
+
+            if not types.is_list_like(ot) and isinstance(
+                ot, types_numpy.NumpyArrayType
+            ):
                 # The Numpy type implementation is not consistent with how list extra refs
                 # work!
                 # TODO: fix
@@ -287,15 +290,27 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
                     extra_edge_type = self.extra[i]
                     extra_edge_value = self.extra[i + 1]
                     if extra_edge_type == ref_util.DICT_KEY_EDGE_TYPE:
-                        ot = ot.property_types[extra_edge_value]
+                        if not types.is_type_like(ot, types.TypedDict({})):
+                            raise errors.WeaveInternalError(
+                                f"Cannot get type of {self} with extra {self.extra}"
+                            )
+                        ot = ot.property_types[extra_edge_value]  # type: ignore
                     elif extra_edge_type == ref_util.LIST_INDEX_EDGE_TYPE:
-                        ot = ot.object_type
+                        if not types.is_list_like(ot):
+                            raise errors.WeaveInternalError(
+                                f"Cannot get type of {self} with extra {self.extra}"
+                            )
+                        ot = ot.object_type  # type: ignore
                     elif extra_edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE:
-                        ot = ot.property_types()[extra_edge_value]
+                        if not types.is_type_like(ot, types.ObjectType()):
+                            raise errors.WeaveInternalError(
+                                f"Cannot get type of {self} with extra {self.extra}"
+                            )
+                        ot = ot.property_types()[extra_edge_value]  # type: ignore
                     elif extra_edge_type == ref_util.TABLE_ROW_EDGE_TYPE:
-                        ot = ot.object_type
+                        ot = ot.object_type  # type: ignore
                     elif extra_edge_type == ref_util.TABLE_COLUMN_EDGE_TYPE:
-                        ot = types.List(ot.object_type.property_types[extra_edge_value])
+                        ot = types.List(ot.object_type.property_types[extra_edge_value])  # type: ignore
                     else:
                         raise errors.WeaveInternalError(
                             f"Cannot get type of {self} with extra {self.extra}"
