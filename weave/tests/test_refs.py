@@ -337,7 +337,7 @@ def test_refs_across_artifacts(ref_tracking):
     val = saved_outer_obj["inner"]["a"]
     # assert val == inner_obj
     assert_local_ref(val, ["obj"], ["key", "a"])
-    assert storage.get(val._ref.uri) == inner_obj
+    assert storage.get(val._ref.uri) == 1
 
 
 def test_ref_objects_across_artifacts(ref_tracking):

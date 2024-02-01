@@ -82,19 +82,9 @@ class BoxedDict(dict):
 
     def __getitem__(self, __key: typing.Any) -> typing.Any:
         val = super().__getitem__(__key)
-        # Only do this if ref_tracking_enabled right now. I just want to
-        # avoid introducing new behavior into W&B prod for the moment.
-        if context_state.ref_tracking_enabled():
-            from . import ref_base
-
-            self_ref = ref_base.get_ref(self)
-            if self_ref is not None:
-                val = box(val)
-                sub_ref = self_ref.with_extra(
-                    None, val, [ref_util.DICT_KEY_EDGE_TYPE, __key]
-                )
-                ref_base._put_ref(val, sub_ref)
-        return val
+        return ref_util.val_with_relative_ref(
+            self, val, [ref_util.DICT_KEY_EDGE_TYPE, str(__key)]
+        )
 
 
 class BoxedList(list):
@@ -112,19 +102,9 @@ class BoxedList(list):
 
     def __getitem__(self, __index: typing.Any) -> typing.Any:
         val = super().__getitem__(__index)
-        # Only do this if ref_tracking_enabled right now. I just want to
-        # avoid introducing new behavior into W&B prod for the moment.
-        if context_state.ref_tracking_enabled():
-            from . import ref_base
-
-            self_ref = ref_base.get_ref(self)
-            if self_ref is not None:
-                val = box(val)
-                sub_ref = self_ref.with_extra(
-                    None, val, [ref_util.LIST_INDEX_EDGE_TYPE, str(__index)]
-                )
-                ref_base._put_ref(val, sub_ref)
-        return val
+        return ref_util.val_with_relative_ref(
+            self, val, [ref_util.LIST_INDEX_EDGE_TYPE, str(__index)]
+        )
 
 
 class BoxedDatetime(datetime.datetime):

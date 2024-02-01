@@ -12,37 +12,9 @@ def make_object_getattribute(
         attribute = object.__getattribute__(self, name)
         if name not in allowed_attributes:
             return attribute
-        from . import ref_base
-
-        if isinstance(attribute, ref_base.Ref):
-            # TODO: This should put a new ref as well, for ref-tracking
-            attribute = attribute.get()
-
-        # TODO: Generalize this block everywhere it's used
-        # Only do this if ref_tracking_enabled right now. I just want to
-        # avoid introducing new behavior into W&B prod for the moment.
-        if context_state.ref_tracking_enabled():
-            from . import box
-            from . import storage
-
-            attr_ref = storage.get_ref(attribute)
-            self_ref = ref_base.get_ref(self)
-            if attr_ref is not None:
-                if self_ref is not None:
-                    if hasattr(attr_ref, "version") and hasattr(self_ref, "version"):
-                        if attr_ref.version != self_ref.version:
-                            # TODO: Comment why i am early returning here
-                            return attribute
-
-            if self_ref is not None:
-                attribute = box.box(attribute)
-                sub_ref = self_ref.with_extra(
-                    None, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
-                )
-                ref_base._put_ref(attribute, sub_ref)
-            return attribute
-
-        return attribute
+        return ref_util.val_with_relative_ref(
+            self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
+        )
 
     return object_getattribute
 

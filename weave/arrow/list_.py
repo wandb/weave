@@ -1110,16 +1110,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         self_ref = ref_base.get_ref(self)
         pylist = self.to_pylist_tagged()
         for i, x in enumerate(pylist):
-            if isinstance(x, ref_base.Ref):
-                yield x.get()
-            else:
-                if self_ref:
-                    x = box.box(x)
-                    x_ref = self_ref.with_extra(
-                        self.object_type, x, [ref_util.TABLE_ROW_EDGE_TYPE, str(i)]
-                    )
-                    ref_base._put_ref(x, x_ref)
-                yield x
+            yield ref_util.val_with_relative_ref(
+                self, x, [ref_util.TABLE_ROW_EDGE_TYPE, str(i)]
+            )
 
     def __repr__(self):
         return f"<ArrowWeaveList: {self.object_type}>"
@@ -1331,27 +1324,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             from .. import artifact_base
 
             result = awl.to_pylist_tagged()[0]
-            # If we already have a ref, get it and return it immediately.
-            if isinstance(result, ref_base.Ref):
-                return result.get()
 
-            # Otherwise if self has a ref, return a ref to self/index
-            ref = ref_base.get_ref(self)
-
-            # Ensure we associate a ref for the row we're returning,
-            # so if the user calls an op on the row, the op refers to a sub-row
-            # in this list
-            if isinstance(ref, ref_base.Ref):
-                result = box.box(result)
-                new_ref = ref.with_extra(
-                    self.object_type,
-                    result,
-                    [ref_util.TABLE_ROW_EDGE_TYPE, str(index)],
-                )
-                ref_base._put_ref(result, new_ref)
-
-            # No item ref or self ref, just return the result
-            return result
+            return ref_util.val_with_relative_ref(
+                self, result, [ref_util.TABLE_ROW_EDGE_TYPE, str(index)]
+            )
         return awl
 
     def __getitem__(
@@ -1462,16 +1438,9 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             invalid_reason=self._invalid_reason,
         )
 
-        if context_state.ref_tracking_enabled():
-            from .. import ref_base
-
-            self_ref = ref_base.get_ref(self)
-            if self_ref is not None:
-                sub_ref = self_ref.with_extra(
-                    None, val, [ref_util.TABLE_COLUMN_EDGE_TYPE, str(name)]
-                )
-                ref_base._put_ref(val, sub_ref)
-        return val
+        return ref_util.val_with_relative_ref(
+            self, val, [ref_util.TABLE_COLUMN_EDGE_TYPE, str(name)]
+        )
 
     def unique(self) -> "ArrowWeaveList":
         return ArrowWeaveList(
