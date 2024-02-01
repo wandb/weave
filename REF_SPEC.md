@@ -56,12 +56,6 @@ Note: a careful reader will notice that the same piece of data might have multip
 1. `wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj#attr/rows/index/10/key/input`
 2. `wandb-artifact:///example_entity/example_project/example_artifact:abc123/rows/0#index/10/key/input`
 
-Both of these refs will return the same exact data (assuming that the `obj` object's `rows` property is a pointer to the `rows/0` entry.). While this is perfectly fine and valid, **I think that we have an issue in our current implementation:** Today, when we store refs when iterating through a dataset, we store version 2 above in the call data. This breaks the relationship as we no longer know that the data was derived from traversing into the dataset itself. Why is this a problem? Well, if you are given reference 2, then you have no way of knowing that it is actually a descendant member of `wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj` (other than maybe by convention). Reference 2 is a biproduct of the serialization format, not the logical "thing" the user is using.
+Both of these refs will return the same exact data (assuming that the `obj` object's `rows` property is a pointer to the `rows/0` entry.). While this is perfectly fine and valid, it has a problem. Case 2 breaks the relationship as we no longer know that the data was derived from traversing into the dataset itself. If you are given reference 2, then you have no way of knowing that it is actually a descendant member of `wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj` (other than maybe by convention). Reference 2 is a biproduct of the serialization format, not the logical "thing" the user is using. Therefore, when constructing refs, we always prefer case 1. However, an important exception to this rule is if during the object extra traversal, we "jump" to completely new artifact, then we restart the ref there. This allows us to preserve the name of the object.
 
 **Further idea:** We should probably add a `?hash=CONTENT_HASH` at the end of refs - this would allow us to know if two entries in the same dataset are actually the same content. We can't purely rely on the artifact hash for uniqueness since the ref could be pointing to a deep member of the artifact.
-
-Actions:
-
-1. Implement the `REF_EXTRA_EDGE_TYPE` in refs (this will effect python and UI)
-2. Get resolution the dual ref issue noted above
-3. Possibly add a content hash to refs for cross-dataset comparison.
