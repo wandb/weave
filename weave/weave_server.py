@@ -353,13 +353,12 @@ def execute():
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
-    if root_span is not None:
-        root_span.set_tag("request_size", len(req_bytes), len(req_bytes))
-    fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
+    fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
     response_payload = _value_or_errors_to_response(fixed_response)
 
     if root_span is not None:
+        root_span.set_metric("request_size", len(req_bytes), True)
         root_span.set_metric("node_count", len(response_payload["data"]), True)
         root_span.set_metric(
             "error_count",
