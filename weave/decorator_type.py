@@ -20,6 +20,12 @@ def type(
     __mixins: typing.Optional[list[typing.Type]] = None,
 ):
     def wrap(target):
+        target = object_type_ref_util.build_ref_aware_object_subclass(
+            target.__name__,
+            target,
+            [field.name for field in dataclasses.fields(dataclasses.dataclass(target))],
+        )
+
         init = False
         if __init is not None:
             init = __init
@@ -147,9 +153,6 @@ def type(
         #     )
 
         # dc.constructor = constructor
-        dc = object_type_ref_util.build_ref_aware_object_subclass(
-            target_name, dc, [field.name for field in fields]
-        )
 
         return dc
 
