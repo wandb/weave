@@ -1,9 +1,8 @@
 import typing
 import weave
+from .obj import Object
 
 
-@weave.type()
-class Model:
+class Model(Object):
     @weave.op()
-    async def predict(self, input: typing.Any) -> typing.Any:
-        ...
+    async def predict(self, input: typing.Any) -> typing.Any: ...

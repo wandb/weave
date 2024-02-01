@@ -227,9 +227,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
-    instance_classes: typing.ClassVar[
-        typing.Union[type, typing.List[type], None]
-    ] = None
+    instance_classes: typing.ClassVar[typing.Union[type, typing.List[type], None]] = (
+        None
+    )
 
     _type_attrs = None
     _hash = None
@@ -1009,13 +1009,19 @@ class ObjectType(Type):
     instance_classes = pydantic.BaseModel
 
     def __init__(self, **attr_types: Type):
-        self.__dict__["attr_types"] = attr_types
+        fixed_attr_types = {}
         for k, v in attr_types.items():
+            if k == "name":
+                fixed_attr_types["_name"] = v
+            else:
+                fixed_attr_types[k] = v
+        self.__dict__["attr_types"] = fixed_attr_types
+        for k, v in fixed_attr_types.items():
             self.__dict__[k] = v
 
     @property
     def type_vars(self):
-        if self.__class__ == ObjectType:
+        if hasattr(self, "attr_types"):
             return self.attr_types
         else:
             return super().type_vars
@@ -1023,30 +1029,52 @@ class ObjectType(Type):
     def property_types(self) -> dict[str, Type]:
         return self.type_vars
 
-    # TIM: Commenting this out from Weaveflow - it does not seem to align with
-    # all the uses of `attr_types` being dictionaries, not methods.
-    # def attr_types(self) -> dict[str, Type]:
-    #     from . import op_def_type
+    @classmethod
+    def typeclass_of_class(cls, check_class):
+        if not issubclass(check_class, pydantic.BaseModel):
+            raise errors.WeaveTypeError(
+                "ObjectType.type_of_class only support pydantic models"
+            )
 
-    #     return {
-    #         k: t
-    #         for k, t in self.property_types().items()
-    #         if not isinstance(t, op_def_type.OpDefType)
-    #     }
+        bases = check_class.__bases__
+        base_type = ObjectType
+        if len(bases) > 0:
+            base0 = bases[0]
+            if (
+                issubclass(base0, pydantic.BaseModel)
+                and base0.__name__ != "BaseModel"
+                and base0.__name__ != "Object"
+            ):
+                base_type = cls.typeclass_of_class(base0)
+
+        attr_types = {"_relocatable": True}
+
+        # TODO: need to use type class cache
+        new_cls = type(check_class.__name__, (base_type,), attr_types)
+        return new_cls
 
     @classmethod
     def type_of_instance(cls, obj):
         if isinstance(obj, pydantic.BaseModel):
+            type_class = cls.typeclass_of_class(obj.__class__)
             from . import weave_pydantic
 
             schema = obj.schema()
+            # TODO: I think we want the type of the actual object here, not
+            # the schema type.
             schema_type = weave_pydantic.json_schema_to_weave_type(schema)
             assert isinstance(schema_type, TypedDict), "Bad schema type"
 
-            res = cls(**schema_type.property_types)
+            attr_types = schema_type.property_types
+            from . import op_def
+            from . import op_def_type
 
-            # Hack to get around frozen dataclass
-            res.__dict__["_relocatable"] = True
+            for attr_name, attr_val in inspect.getmembers(
+                obj, lambda m: isinstance(m, op_def.OpDef)
+            ):
+                attr_types[attr_name] = op_def_type.OpDefType()
+
+            res = type_class(**schema_type.property_types)
 
             return res
 
@@ -1059,6 +1087,9 @@ class ObjectType(Type):
 
     def _to_dict(self) -> dict:
         d = self.class_to_dict()
+        if hasattr(self, "_type_name"):
+            d["type"] = getattr(self, "_type_name")
+
         if self._relocatable:
             d["_relocatable"] = True
         # TODO: we don't need _is_object, now that we have base_type everywhere.
@@ -1073,6 +1104,7 @@ class ObjectType(Type):
         serializer = mappers_python.map_to_python(self, artifact)
 
         result = serializer.apply(obj)
+        del result["_type"]
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(result, f, allow_nan=False)
 
@@ -1137,7 +1169,7 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     type_attr_types = {
         k: TypeRegistry.type_from_dict(v)
         for k, v in t.items()
-        if not k.startswith("_") and k != "type"
+        if k == "_name" or (not k.startswith("_") and k != "type")
     }
     import textwrap
 
@@ -1161,6 +1193,8 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
 
     # Weave objects must auto-dereference refs when they are accessed.
     def object_getattribute(self, name):
+        if name == "name":
+            name = "_name"
         attribute = object.__getattribute__(self, name)
         attr_type = type_attr_types.get(name)
         if attr_type is None:

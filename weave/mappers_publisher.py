@@ -52,12 +52,17 @@ class FunctionToPyFunction(mappers.Mapper):
 
 class ObjectToPyDict(mappers_python_def.ObjectToPyDict):
     def apply(self, obj):
-        res = super().apply(obj)
-        copy_obj = dataclasses.copy.copy(obj)
-        for prop_name, prop_serializer in self._property_serializers.items():
-            if prop_serializer is not None:
-                setattr(copy_obj, prop_name, res[prop_name])
-        obj = copy_obj
+        # res = super().apply(obj)
+        # copy_obj = dataclasses.copy.copy(obj)
+        # for prop_name, prop_serializer in self._property_serializers.items():
+        #     if prop_name == "_name":
+        #         prop_name = "name"
+        #     if prop_serializer is not None:
+        #         try:
+        #             setattr(copy_obj, prop_name, res[prop_name])
+        #         except:
+        #             breakpoint()
+        # obj = copy_obj
         return obj
 
 

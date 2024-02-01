@@ -233,7 +233,7 @@ def deploy(
     service_account: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
     base_image: typing.Optional[str] = "python:3.11",
-    memory: typing.Optional[str] = "500Mi",
+    memory: typing.Optional[str] = "1000Mi",
 ) -> None:
     """Deploy the weave application."""
     enforce_login()

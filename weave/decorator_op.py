@@ -68,7 +68,8 @@ def op(
 
     # For builtins, enforce that parameter and return types must be declared.
     # For user ops, allow missing types.
-    allow_unknowns = not context_state._loading_built_ins.get()
+    loading_builtins = context_state._loading_built_ins.get()
+    allow_unknowns = not loading_builtins
 
     def wrap(f: Callable[P, R]) -> Callable[P, R]:
         weave_input_type = pyfunc_type_util.determine_input_type(
@@ -112,6 +113,9 @@ def op(
             from .weavify import op_to_weave_fn
 
             op.weave_fn = op_to_weave_fn(op)
+
+        if not loading_builtins:
+            return op
 
         op_version = registry_mem.memory_registry.register_op(op)
 

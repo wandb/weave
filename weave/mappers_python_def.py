@@ -45,6 +45,8 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
         # fields.
         result = {"_type": self.type.name}
         for prop_name, prop_serializer in self._property_serializers.items():
+            if prop_name == "_name":
+                prop_name = "name"
             if prop_serializer is not None:
                 v = prop_serializer.apply(getattr(obj, prop_name))
                 result[prop_name] = v
@@ -66,9 +68,10 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
             if serializer.type != OpDefType() and k in constructor_sig.parameters:
-                # None haxxx
-                # TODO: remove
-                obj_val = obj.get(k)
+                get_k = k
+                if get_k == "_name":
+                    get_k = "name"
+                obj_val = obj.get(get_k)
                 if obj_val is not None or serializer.type == types.UnknownType():
                     v = serializer.apply(obj_val)
                     result[k] = v

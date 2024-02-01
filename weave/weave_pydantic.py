@@ -1,5 +1,6 @@
 from pydantic import BaseModel, create_model
 from . import weave_types as types
+from . import infer_types
 import typing
 import enum
 
@@ -39,6 +40,10 @@ def weave_type_to_pydantic(
 
 
 def json_schema_to_weave_type(json_schema: JSONSchema) -> types.Type:
+    if "anyOf" in json_schema:
+        return types.UnionType(
+            *[json_schema_to_weave_type(s) for s in json_schema["anyOf"]]
+        )
     type = JSONType(json_schema["type"])
     if type == JSONType.INTEGER:
         return types.Int()
