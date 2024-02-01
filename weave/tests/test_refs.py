@@ -1,5 +1,8 @@
+import weave
 from .. import artifact_local
 from .. import ref_util
+from .. import storage
+from .. import ops_arrow as arrow
 
 
 def test_laref_artifact_version_1():
@@ -87,4 +90,143 @@ def test_laref_artifact_version_path_extra2():
     assert ref_util.parse_local_ref_str("x.txt#5/a") == (
         "x.txt",
         ["5", "a"],
+    )
+
+
+"""
+
+* Dict
+    * Key
+* List
+    * Index
+* Object
+    * Attribute
+* Table (ArrowWeaveList)
+    * Index
+    * Column
+    * Id (not implemented)
+
+"""
+
+
+def assert_local_ref(object, path_parts, extra_parts):
+    obj_ref = storage.get_ref(object)
+    parsed_obj_ref = ref_util.parse_ref_str(obj_ref.uri)
+
+    target_obj_ref = ref_util.ParsedRef(
+        scheme="local-artifact",
+        entity=None,
+        project=None,
+        artifact=obj_ref.name,
+        alias=obj_ref.version,
+        file_path_parts=path_parts,
+        ref_extra_tuples=[
+            ref_util.RefExtraTuple(*extra_parts[i : i + 2])
+            for i in range(0, len(extra_parts), 2)
+        ],
+    )
+    assert parsed_obj_ref == target_obj_ref
+
+
+def test_ref_extra_dict(ref_tracking):
+    obj = {"a": 1}
+    saved_obj = weave.use(weave.save(obj))
+
+    assert saved_obj == obj
+    assert_local_ref(saved_obj, ["obj"], [])
+
+    val = saved_obj["a"]
+    assert val == 1
+    assert_local_ref(val, ["obj"], ["key", "a"])
+
+
+def test_ref_extra_list(ref_tracking):
+    obj = [1]
+    saved_obj = weave.use(weave.save(obj))
+
+    assert saved_obj == obj
+    assert_local_ref(saved_obj, ["obj"], [])
+
+    val = saved_obj[0]
+    assert val == 1
+    assert_local_ref(val, ["obj"], ["idx", "0"])
+
+
+def test_ref_extra_object(ref_tracking):
+    @weave.type()
+    class CustomObject:
+        inner_a: int
+
+    obj = CustomObject(inner_a=1)
+    saved_obj = weave.use(weave.save(obj))
+
+    assert saved_obj == obj
+    assert_local_ref(saved_obj, ["obj"], [])
+
+    val = saved_obj.inner_a
+    assert val == 1
+    assert_local_ref(val, ["obj"], ["attr", "inner_a"])
+
+
+def test_ref_extra_table(ref_tracking):
+    saved_obj = weave.use(
+        arrow.to_arrow(
+            [
+                {"a": 1},
+                {"a": 2},
+            ]
+        )
+    )
+
+    assert saved_obj == arrow.to_arrow(
+        [
+            {"a": 1},
+            {"a": 2},
+        ]
+    )
+    assert_local_ref(saved_obj, ["obj"], [])
+
+    val = saved_obj[0]
+    assert val == {"a": 1}
+    assert_local_ref(val, ["obj"], ["idx", "0"])
+
+    val = saved_obj.column("a")
+    assert val == [1, 2]
+    assert_local_ref(val, ["obj"], ["col", "0"])
+
+
+def test_ref_extra_table_very_nested(ref_tracking):
+    @weave.type()
+    class CustomObject:
+        inner_a: int
+
+    saved_obj = weave.use(
+        arrow.to_arrow(
+            [
+                {
+                    "a": arrow.to_arrow(
+                        [
+                            CustomObject(inner_a=1),
+                        ]
+                    )
+                },
+            ]
+        )
+    )
+
+    assert saved_obj == arrow.to_arrow(
+        [
+            {
+                "a": arrow.to_arrow(
+                    [
+                        CustomObject(inner_a=1),
+                    ]
+                )
+            },
+        ]
+    )
+    assert_local_ref(
+        saved_obj[0]["a"][0].inner_a,
+        ["obj"],
+        ["idx", "0", "attr", "a", "idx", "0", "attr", "inner_a"],
     )

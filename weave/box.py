@@ -84,7 +84,7 @@ class BoxedDict(dict):
             self_ref = ref_base.get_ref(self)
             if self_ref is not None:
                 val = box(val)
-                sub_ref = self_ref.with_extra(None, val, [__key])
+                sub_ref = self_ref.with_extra(None, val, ["key", __key])
                 ref_base._put_ref(val, sub_ref)
         return val
 

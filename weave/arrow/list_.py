@@ -1327,7 +1327,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             # in this list
             if isinstance(ref, ref_base.Ref):
                 result = box.box(result)
-                new_ref = ref.with_extra(self.object_type, result, [str(index)])
+                new_ref = ref.with_extra(self.object_type, result, ["idx", str(index)])
                 ref_base._put_ref(result, new_ref)
 
             # No item ref or self ref, just return the result
