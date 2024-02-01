@@ -1436,7 +1436,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         if name not in property_types:
             return make_vec_none(len(self))
 
-        val = ArrowWeaveList(
+        val: ArrowWeaveList = ArrowWeaveList(
             self._arrow_data.field(name),
             property_types[name],
             self._artifact,
@@ -1448,7 +1448,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
             self_ref = ref_base.get_ref(self)
             if self_ref is not None:
-                val = box.box(val)
                 sub_ref = self_ref.with_extra(None, val, ["col", str(name)])
                 ref_base._put_ref(val, sub_ref)
         return val
