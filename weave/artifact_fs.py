@@ -272,23 +272,35 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
         ot = self._outer_type
         if self.extra is not None:
-            # This is some hacking to make extra refs work (a ref that's a pointer to
-            # an item in a list)...
-            # Not a general solution!
-            # TODO: fix
             from . import types_numpy
-
-            if types.is_list_like(ot):
-                self._type = ot.object_type  # type: ignore
-            elif isinstance(ot, types_numpy.NumpyArrayType):
+            if not types.is_list_like(ot) and isinstance(ot, types_numpy.NumpyArrayType):
                 # The Numpy type implementation is not consistent with how list extra refs
                 # work!
                 # TODO: fix
                 self._type = ot
             else:
-                raise errors.WeaveInternalError(
-                    f"Cannot get type of {self} with extra {self.extra}"
-                )
+                if len(self.extra) % 2 != 0:
+                    raise errors.WeaveInternalError(
+                        f"Cannot get type of {self} with extra {self.extra}"
+                    )
+                for i in range(0, len(self.extra), 2):
+                    extra_edge_type = self.extra[i]
+                    extra_edge_value = self.extra[i + 1]
+                    if extra_edge_type == ref_util.DICT_KEY_EDGE_TYPE:
+                        ot = ot.property_types[extra_edge_value]
+                    elif extra_edge_type == ref_util.LIST_INDEX_EDGE_TYPE:
+                        ot = ot.object_type
+                    elif extra_edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE:
+                        ot = ot.property_types()[extra_edge_value]
+                    elif extra_edge_type == ref_util.TABLE_ROW_EDGE_TYPE:
+                        ot = ot.object_type
+                    elif extra_edge_type == ref_util.TABLE_COLUMN_EDGE_TYPE:
+                        ot = types.List(ot.object_type.property_types[extra_edge_value])
+                    else:
+                        raise errors.WeaveInternalError(
+                            f"Cannot get type of {self} with extra {self.extra}"
+                        )
+                self._type = ot
         else:
             self._type = ot
         return self._type

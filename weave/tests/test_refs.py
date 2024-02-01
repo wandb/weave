@@ -303,3 +303,63 @@ def test_ref_extra_table_very_nested(ref_tracking):
         ["row", "0", "key", "a", "row", "0", "ndx", "0", "atr", "inner_a"],
     )
     assert storage.get(val._ref.uri) == 1
+
+def test_refs_across_artifacts(ref_tracking):
+    inner_obj = {"a": 1}
+    saved_inner_obj = weave.use(weave.save(inner_obj))
+    outer_obj = {"outer": inner_obj, "inner": saved_inner_obj}
+    saved_outer_obj = weave.use(weave.save(outer_obj))
+    obj = {"outer": inner_obj, "inner": {"a": 1}}
+
+    # TODO: These need to be uncommented as they highlight an issue with nested refs
+    # assert saved_outer_obj == obj
+    assert_local_ref(saved_outer_obj, ["obj"], [])
+    # assert storage.get(saved_outer_obj._ref.uri) == obj
+
+    # Non-saved children follow the same ref structure
+    val = saved_outer_obj["outer"]
+    assert val == inner_obj
+    assert_local_ref(val, ["obj"], ["key", "outer"])
+    assert storage.get(val._ref.uri) == inner_obj
+
+    val = saved_outer_obj["outer"]['a']
+    assert val == 1
+    assert_local_ref(val, ["obj"], ["key", "outer", "key", "a"])
+    assert storage.get(val._ref.uri) == 1
+
+    # Jumping artifact boundaries uses new artifact refs (need to add to docs - we lose the backward link at this point, but that is ok)
+    val = saved_outer_obj["inner"]
+    # assert val == inner_obj
+    assert_local_ref(val, ["obj"], [])
+    assert storage.get(val._ref.uri) == inner_obj
+
+    val = saved_outer_obj["inner"]['a']
+    # assert val == inner_obj
+    assert_local_ref(val, ["obj"], ["key", "a"])
+    assert storage.get(val._ref.uri) == inner_obj
+
+def test_ref_objects_across_artifacts(ref_tracking):
+    @weave.type()
+    class CustomObjectA:
+        inner_a: int
+
+    @weave.type()
+    class CustomObjectB:
+        inner_b: CustomObjectA
+
+    # Case 1: No Cross Ref
+    obj_a = CustomObjectA(inner_a=1)
+    obj_b = CustomObjectB(inner_b=obj_a)
+    saved_obj_b = weave.use(weave.save(obj_b))
+
+    val = saved_obj_b.inner_b
+    assert_local_ref(val, ["obj"], ['atr', 'inner_b'])
+
+    # Case 2: Cross Ref
+    obj_a = CustomObjectA(inner_a=1)
+    obj_b = CustomObjectB(inner_b=weave.use(weave.save(obj_a, "COB")))
+    saved_obj_b = weave.use(weave.save(obj_b))
+
+    val = saved_obj_b.inner_b
+    # Notice that we have reset the ref structure here to the new artifact
+    assert_local_ref(val, ["obj"], [])

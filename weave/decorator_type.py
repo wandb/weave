@@ -2,11 +2,13 @@ import inspect
 import typing
 import dataclasses
 
+
 from . import weave_types as types
 from . import infer_types
 from . import decorator_class
 from . import errors
 from . import context_state
+from . import object_type_ref_util
 
 _py_type = type
 
@@ -29,7 +31,6 @@ def type(
         target_name = target.__name__
         if __override_name is not None:
             target_name = __override_name
-
         base_type = types.ObjectType
         if target.__bases__:
             # Add the first base classes as the type base.
@@ -146,6 +147,11 @@ def type(
         #     )
 
         # dc.constructor = constructor
+        dc = object_type_ref_util.build_ref_aware_object_subclass(
+            target_name,
+            dc,
+            [field.name for field in fields]
+        )
 
         return dc
 

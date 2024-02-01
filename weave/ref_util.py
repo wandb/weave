@@ -5,7 +5,7 @@ from urllib import parse
 DICT_KEY_EDGE_TYPE = "key"
 LIST_INDEX_EDGE_TYPE = "ndx"
 OBJECT_ATTRIBUTE_EDGE_TYPE = "atr"
-TABLE_INDEX_EDGE_TYPE = "row"
+TABLE_ROW_EDGE_TYPE = "row"
 TABLE_COLUMN_EDGE_TYPE = "col"
 
 

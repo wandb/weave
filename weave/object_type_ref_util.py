@@ -15,12 +15,21 @@ def make_object_getattribute(allowed_attributes: list[str]) -> typing.Callable[[
             # TODO: This should put a new ref as well, for ref-tracking
             attribute = attribute.get()
 
+        # TODO: Generalize this block everywhere it's used
         # Only do this if ref_tracking_enabled right now. I just want to
         # avoid introducing new behavior into W&B prod for the moment.
         if context_state.ref_tracking_enabled():
             from . import box
+            from . import storage
 
+            attr_ref = storage.get_ref(attribute)
             self_ref = ref_base.get_ref(self)
+            if attr_ref is not None:
+                if self_ref is not None:
+                    if attr_ref.version != self_ref.version:
+                        # TODO: Comment why i am early returning here
+                        return attribute
+
             if self_ref is not None:
                 attribute = box.box(attribute)
                 sub_ref = self_ref.with_extra(
@@ -45,3 +54,13 @@ def make_object_lookup_path() -> typing.Callable[[typing.Any, typing.List[str]],
             return res._lookup_path(remaining_path)
         return res
     return object_lookup_path
+
+def build_ref_aware_object_subclass(target_name: str, starting_class: type, allowed_attributes: list[str]) -> type:
+    return type(
+        target_name,
+        (starting_class, ),
+        {
+            "__getattribute__": make_object_getattribute(allowed_attributes),
+            "_lookup_path": make_object_lookup_path(),
+        },
+    )

@@ -581,10 +581,10 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         edge_type = path[0]
         edge_path = path[1]
         assert edge_type in [
-            ref_util.TABLE_INDEX_EDGE_TYPE,
+            ref_util.TABLE_ROW_EDGE_TYPE,
             ref_util.TABLE_COLUMN_EDGE_TYPE,
         ]
-        if edge_type == ref_util.TABLE_INDEX_EDGE_TYPE:
+        if edge_type == ref_util.TABLE_ROW_EDGE_TYPE:
             res = self[int(edge_path)]
         else:
             res = self.column(edge_path)
@@ -1116,7 +1116,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 if self_ref:
                     x = box.box(x)
                     x_ref = self_ref.with_extra(
-                        self.object_type, x, [ref_util.TABLE_INDEX_EDGE_TYPE, str(i)]
+                        self.object_type, x, [ref_util.TABLE_ROW_EDGE_TYPE, str(i)]
                     )
                     ref_base._put_ref(x, x_ref)
                 yield x
@@ -1346,7 +1346,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
                 new_ref = ref.with_extra(
                     self.object_type,
                     result,
-                    [ref_util.TABLE_INDEX_EDGE_TYPE, str(index)],
+                    [ref_util.TABLE_ROW_EDGE_TYPE, str(index)],
                 )
                 ref_base._put_ref(result, new_ref)
 
