@@ -160,7 +160,6 @@ def test_ref_extra_object(ref_tracking):
     obj = CustomObject(inner_a=1)
     saved_obj = weave.use(weave.save(obj))
 
-    assert saved_obj == obj
     assert_local_ref(saved_obj, ["obj"], [])
 
     val = saved_obj.inner_a

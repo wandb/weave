@@ -90,7 +90,19 @@ class BoxedDict(dict):
 
 
 class BoxedList(list):
-    pass
+    def __getitem__(self, __index: typing.Any) -> typing.Any:
+        val = super().__getitem__(__index)
+        # Only do this if ref_tracking_enabled right now. I just want to
+        # avoid introducing new behavior into W&B prod for the moment.
+        if context_state.ref_tracking_enabled():
+            from . import ref_base
+
+            self_ref = ref_base.get_ref(self)
+            if self_ref is not None:
+                val = box(val)
+                sub_ref = self_ref.with_extra(None, val, ["idx", str(__index)])
+                ref_base._put_ref(val, sub_ref)
+        return val
 
 
 class BoxedDatetime(datetime.datetime):

@@ -1169,7 +1169,20 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
 
         if isinstance(attribute, ref_base.Ref):
             # TODO: This should put a new ref as well, for ref-tracking
-            return attribute.get()
+            attribute = attribute.get()
+
+        # Only do this if ref_tracking_enabled right now. I just want to
+        # avoid introducing new behavior into W&B prod for the moment.
+        if context_state.ref_tracking_enabled():
+            from . import box
+
+            self_ref = ref_base.get_ref(self)
+            if self_ref is not None:
+                attribute = box.box(attribute)
+                sub_ref = self_ref.with_extra(None, attribute, ["attr", str(name)])
+                ref_base._put_ref(attribute, sub_ref)
+            return attribute
+
         return attribute
 
     new_object_class = type(
