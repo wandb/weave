@@ -3,14 +3,15 @@ import {
   isAssignableTo,
   isListLike,
   isVoidNode,
-  list,
-  listObjectType,
+  listObjectTypePassTags,
   Node,
   NodeOrVoidNode,
   opGetRunTag,
   opMapEach,
   opPick,
   opRunId,
+  taggedValue,
+  typedDict,
   voidNode,
   withNamedTag,
 } from '@wandb/weave/core';
@@ -22,15 +23,16 @@ export const useColorNode = (inputNode: Node): NodeOrVoidNode => {
   const {frame} = usePanelContext();
   return useMemo(() => {
     let rowType = inputNode.type;
+    // Arbitrarily limit the number of times we unnest
     let limit = 10;
     while (isListLike(rowType) && limit > 0) {
-      rowType = listObjectType(rowType);
+      rowType = listObjectTypePassTags(rowType);
       limit--;
     }
     if (
       frame.runColors == null ||
-      isVoidNode(frame.runColors) //  ||
-      // !isAssignableTo(rowType, taggedValue(typedDict({run: 'run'}), 'any'))
+      isVoidNode(frame.runColors) ||
+      !isAssignableTo(rowType, taggedValue(typedDict({run: 'run'}), 'any'))
     ) {
       return voidNode();
     }
