@@ -10,9 +10,9 @@ export interface WFProject extends ProjectOwned {
   objects: () => WFObject[];
   typeVersion: (name: string, version: string) => WFTypeVersion | null;
   typeVersions: () => WFTypeVersion[];
-  opVersion: (name: string, version: string) => WFOpVersion | null;
+  opVersion: (refUriStr: string) => WFOpVersion | null;
   opVersions: () => WFOpVersion[];
-  objectVersion: (name: string, version: string) => WFObjectVersion | null;
+  objectVersion: (refUriStr: string) => WFObjectVersion | null;
   objectVersions: () => WFObjectVersion[];
   call: (callID: string) => WFCall | null;
   calls: () => WFCall[];
@@ -27,12 +27,24 @@ interface ProjectOwned {
   project: () => string;
 }
 
-interface ArtifactVersionBacked {
+export interface ArtifactVersion extends ProjectOwned {
+  artifactName: () => string;
+  versionCommitHash: () => string;
   versionIndex: () => number;
   aliases: () => string[];
-  description: () => string;
-  createdAtMs: () => number;
+  objectAtPath: (path: string) => ReferencedObject;
+}
+
+export interface ReferencedObject {
+  artifactVersion: () => ArtifactVersion;
+  filePath: () => string;
+  refExtraPath: () => string;
   refUri: () => string;
+  parentObject: () => ReferencedObject;
+  childObject: (
+    refExtraEdgeType: string,
+    refExtraEdgeName: string
+  ) => ReferencedObject;
 }
 
 export interface WFType extends ProjectOwned {
@@ -74,28 +86,23 @@ export type HackyOpCategory =
   | 'evaluate'
   | 'tune';
 
-export interface WFOpVersion extends ProjectOwned, ArtifactVersionBacked {
+export interface WFOpVersion extends ProjectOwned, ReferencedObject {
   op: () => WFOp;
-  version: () => string;
   inputTypesVersions: () => WFTypeVersion[]; // {[argName: string]: WFTypeVersion};
   outputTypeVersions: () => WFTypeVersion[]; // WFTypeVersion
   invokes: () => WFOpVersion[];
   invokedBy: () => WFOpVersion[];
   calls: () => WFCall[];
   opCategory: () => HackyOpCategory | null; // not technically part of data model since it is derived from the op details
+  createdAtMs: () => number;
 }
 
-export interface WFObjectVersion extends ProjectOwned, ArtifactVersionBacked {
+export interface WFObjectVersion extends ProjectOwned, ReferencedObject {
   object: () => WFObject;
-  version: () => string;
-  properties: () => {[propName: string]: WFObjectVersion};
-  parentObjectVersion: () => {
-    path: string;
-    objectVersion: WFObjectVersion;
-  } | null;
   typeVersion: () => WFTypeVersion;
   inputTo: () => WFCall[]; // Array<{argName: string; opVersion: WFCall}>;
   outputFrom: () => WFCall[];
+  createdAtMs: () => number;
 }
 
 export interface WFCall extends ProjectOwned {
