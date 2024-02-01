@@ -575,8 +575,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         return isinstance(self.simple_value_type, types.TypedDict)
 
     def _lookup_path(self, path: list[str]):
-        remaining_path = path[1:]
-        res = self._index(int(path[0]))
+        assert len(path) > 1
+        edge_type = path[0]
+        edge_path = path[1]
+        assert edge_type in ["idx", "col"]
+        if edge_type == "idx":
+            res = self[int(edge_path)]
+        else:
+            res = self.column(edge_path)
+
+        remaining_path = path[2:]
         if remaining_path:
             return res._lookup_path(remaining_path)
         return res

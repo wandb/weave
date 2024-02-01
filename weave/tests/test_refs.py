@@ -134,10 +134,12 @@ def test_ref_extra_dict(ref_tracking):
 
     assert saved_obj == obj
     assert_local_ref(saved_obj, ["obj"], [])
+    assert storage.get(saved_obj._ref.uri) == obj
 
     val = saved_obj["a"]
     assert val == 1
     assert_local_ref(val, ["obj"], ["key", "a"])
+    assert storage.get(val._ref.uri) == 1
 
 
 def test_ref_extra_list(ref_tracking):
@@ -146,10 +148,12 @@ def test_ref_extra_list(ref_tracking):
 
     assert saved_obj == obj
     assert_local_ref(saved_obj, ["obj"], [])
+    assert storage.get(saved_obj._ref.uri) == obj
 
     val = saved_obj[0]
     assert val == 1
     assert_local_ref(val, ["obj"], ["idx", "0"])
+    assert storage.get(val._ref.uri) == 1
 
 
 def test_ref_extra_object(ref_tracking):
@@ -165,6 +169,7 @@ def test_ref_extra_object(ref_tracking):
     val = saved_obj.inner_a
     assert val == 1
     assert_local_ref(val, ["obj"], ["attr", "inner_a"])
+    assert storage.get(val._ref.uri) == 1
 
 
 def test_ref_extra_table(ref_tracking):
@@ -178,14 +183,20 @@ def test_ref_extra_table(ref_tracking):
 
     assert saved_obj.to_pylist_notags() == arrow_raw.to_pylist_notags()
     assert_local_ref(saved_obj, ["obj"], [])
+    assert (
+        storage.get(saved_obj._ref.uri).to_pylist_notags()
+        == arrow_raw.to_pylist_notags()
+    )
 
     val = saved_obj[0]
     assert val == {"a": 1}
     assert_local_ref(val, ["obj"], ["idx", "0"])
+    assert storage.get(val._ref.uri) == {"a": 1}
 
     val = saved_obj.column("a")
     assert val.to_pylist_notags() == [1, 2]
     assert_local_ref(val, ["obj"], ["col", "a"])
+    assert storage.get(val._ref.uri).to_pylist_notags() == [1, 2]
 
 
 def test_ref_extra_table_very_nested(ref_tracking):
@@ -209,8 +220,11 @@ def test_ref_extra_table_very_nested(ref_tracking):
 
     assert saved_obj.to_pylist_notags() == arrow_raw.to_pylist_notags()
 
+    val = saved_obj[0]["a"][0].inner_a
+    assert val == 1
     assert_local_ref(
         saved_obj[0]["a"][0].inner_a,
         ["obj"],
         ["idx", "0", "key", "a", "idx", "0", "attr", "inner_a"],
     )
+    assert storage.get(val._ref.uri) == 1

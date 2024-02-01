@@ -1185,12 +1185,25 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
 
         return attribute
 
+    def object_lookup_path(self, path: typing.List[str]):
+        assert len(path) > 1
+        edge_type = path[0]
+        edge_path = path[1]
+        assert edge_type == "attr"
+
+        res = getattr(self, edge_path)
+        remaining_path = path[2:]
+        if remaining_path:
+            return res._lookup_path(remaining_path)
+        return res
+
     new_object_class = type(
         object_class_name,
         (),
         {
             "__init__": locals()["loaded_object_init"],
             "__getattribute__": object_getattribute,
+            "_lookup_path": object_lookup_path,
         },
     )
 

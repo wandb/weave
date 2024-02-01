@@ -68,8 +68,13 @@ class BoxedDict(dict):
     _id: typing.Optional[int] = None
 
     def _lookup_path(self, path: typing.List[str]):
-        res = self[path[0]]
-        remaining_path = path[1:]
+        assert len(path) > 1
+        edge_type = path[0]
+        edge_path = path[1]
+        assert edge_type == "key"
+
+        res = self[edge_path]
+        remaining_path = path[2:]
         if remaining_path:
             return res._lookup_path(remaining_path)
         return res
@@ -90,6 +95,18 @@ class BoxedDict(dict):
 
 
 class BoxedList(list):
+    def _lookup_path(self, path: typing.List[str]):
+        assert len(path) > 1
+        edge_type = path[0]
+        edge_path = path[1]
+        assert edge_type == "idx"
+
+        res = self[int(edge_path)]
+        remaining_path = path[2:]
+        if remaining_path:
+            return res._lookup_path(remaining_path)
+        return res
+
     def __getitem__(self, __index: typing.Any) -> typing.Any:
         val = super().__getitem__(__index)
         # Only do this if ref_tracking_enabled right now. I just want to
