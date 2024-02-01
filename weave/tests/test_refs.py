@@ -227,7 +227,7 @@ def test_ref_extra_list(ref_tracking):
 
     val = saved_obj[0]
     assert val == 1
-    assert_local_ref(val, ["obj"], ["idx", "0"])
+    assert_local_ref(val, ["obj"], ["ndx", "0"])
     assert storage.get(val._ref.uri) == 1
 
 
@@ -243,7 +243,7 @@ def test_ref_extra_object(ref_tracking):
 
     val = saved_obj.inner_a
     assert val == 1
-    assert_local_ref(val, ["obj"], ["attr", "inner_a"])
+    assert_local_ref(val, ["obj"], ["atr", "inner_a"])
     assert storage.get(val._ref.uri) == 1
 
 
@@ -265,7 +265,7 @@ def test_ref_extra_table(ref_tracking):
 
     val = saved_obj[0]
     assert val == {"a": 1}
-    assert_local_ref(val, ["obj"], ["idx", "0"])
+    assert_local_ref(val, ["obj"], ["row", "0"])
     assert storage.get(val._ref.uri) == {"a": 1}
 
     val = saved_obj.column("a")
@@ -284,7 +284,7 @@ def test_ref_extra_table_very_nested(ref_tracking):
             {
                 "a": arrow.to_arrow(
                     [
-                        CustomObject(inner_a=1),
+                        [CustomObject(inner_a=1)],
                     ]
                 )
             },
@@ -295,11 +295,11 @@ def test_ref_extra_table_very_nested(ref_tracking):
 
     assert saved_obj.to_pylist_notags() == arrow_raw.to_pylist_notags()
 
-    val = saved_obj[0]["a"][0].inner_a
+    val = saved_obj[0]["a"][0][0].inner_a
     assert val == 1
     assert_local_ref(
-        saved_obj[0]["a"][0].inner_a,
+        val,
         ["obj"],
-        ["idx", "0", "key", "a", "idx", "0", "attr", "inner_a"],
+        ["row", "0", "key", "a", "row", "0", "ndx", "0", "atr", "inner_a"],
     )
     assert storage.get(val._ref.uri) == 1

@@ -3,9 +3,9 @@ import dataclasses
 from urllib import parse
 
 DICT_KEY_EDGE_TYPE = "key"
-LIST_INDEX_EDGE_TYPE = "idx"
-OBJECT_ATTRIBUTE_EDGE_TYPE = "attr"
-TABLE_INDEX_EDGE_TYPE = "idx"
+LIST_INDEX_EDGE_TYPE = "ndx"
+OBJECT_ATTRIBUTE_EDGE_TYPE = "atr"
+TABLE_INDEX_EDGE_TYPE = "row"
 TABLE_COLUMN_EDGE_TYPE = "col"
 
 

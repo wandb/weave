@@ -20,8 +20,8 @@ We will define the "CommonCharset" as alphanumeric and underscore `_` and dash `
   - "digest": a deterministic hex digest of the contents
   - "versionHash": a hex digest combining the "digest" with the prior version's digest in the sequence.
 - `FILE_PATH`: (optional) a list of forward slash `/` separated `FILE_PATH_PART`s. Each `FILE_PATH_PART` is limited to CommonCharset and dot `.`
-- `REF_EXTRA`: (optional, only allowed if `FILE_PATH` is present) a list of forward slash `/` separated `REF_EXTRA_TUPLE`s. A `REF_EXTRA_TUPLE` has the format of `{REF_EXTRA_EDGE_TYPE}/{REF_EXTRA_PART}`. Where `REF_EXTRA_EDGE_TYPE` is one of: `index`, `col`, `id`, `key`, `attr`. A `REF_EXTRA_PART` is limited to CommonCharset.
-  - **Important:** the `REF_EXTRA_EDGE_TYPE` part of the spec is not implemented yet.
+- `REF_EXTRA`: (optional, only allowed if `FILE_PATH` is present) a list of forward slash `/` separated `REF_EXTRA_TUPLE`s. A `REF_EXTRA_TUPLE` has the format of `{REF_EXTRA_EDGE_TYPE}/{REF_EXTRA_PART}`. Where `REF_EXTRA_EDGE_TYPE` is one of: `ndx`, `key`, `atr`, `col`, `row`, `id`. A `REF_EXTRA_PART` is limited to CommonCharset.
+  - **Important:** the `REF_EXTRA_EDGE_TYPE` of `id` is not yet implemented
 
 When interpreting a reference, we follow the following rules:
 
@@ -33,15 +33,15 @@ When interpreting a reference, we follow the following rules:
 
 3. If a `REF_EXTRA` exists (and by definition our `FILE_PATH` points to a weave object), then the `REF_EXTRA` tells us how to traverse the object itself to extract a nested data property. For example, you might have a class called `Model` with an attribute `prompt`. If the ref wants to point to the prompt field itself, the `REF_EXTRA` would be `attr/prompt`. As mentioned above, there are a number of `REF_EXTRA_EDGE_TYPE`s that allow the ref to point deep into the object. This is useful for things like datasets where you might have an class called `Dataset` that has a property `rows` which is a list of dictionaries. At this point, we return the final data. The specific rules for `REF_EXTRA_EDGE_TYPE` are as follows:
    - If the current object is a Table (ArrowWeaveList), then:
-     - `index/{INDEX}` - get the row at index `INDEX`
+     - `ndx/{INDEX}` - get the row at index `INDEX`
      - `col/{COLUMN_NAME}` - get the column called `COLUMN_NAME`
      - `id/{ID}` - get the row at id `ID`
    - If the current object is a Dict, then:
      - `key/{KEY}` - get the value at key `KEY`
    - If the current object is a Object, then:
-     - `attr/{ATTRIBUTE}` - get the value at attribute `ATTRIBUTE`
+     - `atr/{ATTRIBUTE}` - get the value at attribute `ATTRIBUTE`
    - If the current object is a List, then:
-     - `index/{INDEX}` - get the item at position `INDEX`
+     - `ndx/{INDEX}` - get the item at position `INDEX`
 
 So putting this all together, the following ref (`wandb-artifact:///example_entity/example_project/example_artifact:abc123/obj#attr/rows/index/10/key/input`) should be interpreted as follows:
 
