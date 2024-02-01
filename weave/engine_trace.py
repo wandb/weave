@@ -40,6 +40,9 @@ class DummySpan:
     def set_tag(self, key, unredacted_val, redacted_val=None):
         pass
 
+    def set_meta(self, *args, **kwargs):
+        pass
+    
     def set_metric(self, *args, **kwargs):
         pass
 
@@ -156,6 +159,14 @@ class WeaveTraceSpan:
             self.attributes["tags"][key] = unredacted_val
         elif redacted_val is not None:
             self.attributes["tags"][key] = redacted_val
+
+    def set_meta(self, key, unredacted_val, redacted_val=None):
+        if "metadata" not in self.attributes:
+            self.attributes["metadata"] = {}
+        if not os.getenv("DISABLE_WEAVE_PII"):
+            self.attributes["metadata"][key] = unredacted_val
+        elif redacted_val is not None:
+            self.attributes["metadata"][key] = redacted_val
 
     def set_metric(self, key, unredacted_val, redacted_val=None):
         if "metrics" not in self.attributes:
