@@ -328,7 +328,7 @@ def test_refs_across_artifacts(ref_tracking):
     assert_local_ref(val, ["obj"], ["key", "outer", "key", "a"])
     assert storage.get(val._ref.uri) == 1
 
-    # Jumping artifact boundaries uses new artifact refs (need to add to docs - we lose the backward link at this point, but that is ok)
+    # Jumping artifact boundaries uses new artifact refs
     val = saved_outer_obj["inner"]
     # assert val == inner_obj
     assert_local_ref(val, ["obj"], [])

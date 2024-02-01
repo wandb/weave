@@ -20,12 +20,6 @@ def type(
     __mixins: typing.Optional[list[typing.Type]] = None,
 ):
     def wrap(target):
-        target = object_type_ref_util.build_ref_aware_object_subclass(
-            target.__name__,
-            target,
-            [field.name for field in dataclasses.fields(dataclasses.dataclass(target))],
-        )
-
         init = False
         if __init is not None:
             init = __init
@@ -37,6 +31,11 @@ def type(
         target_name = target.__name__
         if __override_name is not None:
             target_name = __override_name
+        dc = object_type_ref_util.build_ref_aware_object_subclass(
+            target.__name__,
+            dc,
+            [field.name for field in fields],
+        )
         base_type = types.ObjectType
         if target.__bases__:
             # Add the first base classes as the type base.
@@ -58,8 +57,8 @@ def type(
 
         TargetType = _py_type(f"{target_name}Type", bases, {})
         TargetType.name = target_name
-        TargetType.instance_classes = target
-        TargetType.instance_class = target
+        TargetType.instance_classes = dc
+        TargetType.instance_class = dc
 
         type_vars: dict[str, types.Type] = {}
         static_property_types: dict[str, types.Type] = {}
