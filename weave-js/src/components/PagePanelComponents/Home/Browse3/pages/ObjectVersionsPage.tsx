@@ -559,7 +559,9 @@ const useObjectOptions = (
   }, [allObjectVersions, highLevelFilter]);
 
   return useMemo(() => {
-    return filtered.map(item => item.object().name());
+    return _.uniq(filtered.map(item => item.object().name())).sort((a, b) =>
+      a.localeCompare(b)
+    );
   }, [filtered]);
 };
 

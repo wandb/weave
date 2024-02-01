@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
+import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import React, {
   ComponentProps,
   FC,
@@ -141,6 +142,9 @@ const browse3Paths = (projectRoot: string) => [
   `${projectRoot}/:tab(${tabs})`,
   `${projectRoot}`,
 ];
+
+const SIDEBAR_WIDTH = 56;
+const NAVBAR_HEIGHT = 60;
 
 export const Browse3: FC<{
   hideHeader?: boolean;
@@ -313,8 +317,11 @@ const MainPeekingLayout: FC = () => {
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
   const flexDirection = useFlexDirection();
+  const isFlexRow = flexDirection === 'row';
+  const isDrawerOpen = peekLocation != null;
+  const windowSize = useWindowSize();
 
-  const {handleMousedown, drawerWidth, drawerHeight} = useDrawerResize();
+  const {handleMousedown, drawerWidthPct, drawerHeightPct} = useDrawerResize();
   const closePeek = useClosePeek();
 
   return (
@@ -333,35 +340,46 @@ const MainPeekingLayout: FC = () => {
           flex: '1 1 40%',
           overflow: 'hidden',
           display: 'flex',
+          // This transition is from the mui drawer component, to keep the main content animation in similar
+          transition: !isDrawerOpen
+            ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
+            : 'none',
+          marginRight:
+            !isDrawerOpen || !isFlexRow
+              ? 0
+              : `${(drawerWidthPct * windowSize.width) / 100}px`,
+          // this is px hack to account for the navbar hiehgt
+          marginBottom:
+            !isDrawerOpen || isFlexRow
+              ? 0
+              : `${
+                  (drawerHeightPct * (windowSize.height - NAVBAR_HEIGHT)) / 100
+                }px`,
         }}>
         <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
       </Box>
 
       <Drawer
         variant="persistent"
-        anchor={flexDirection === 'row' ? 'right' : 'bottom'}
-        open={peekLocation != null}
-        onClose={() => {
-          const targetPath = query.peekPath!.replace(generalBase, targetBase);
-          history.push(targetPath);
-        }}
+        anchor={isFlexRow ? 'right' : 'bottom'}
+        open={isDrawerOpen}
+        onClose={closePeek}
         PaperProps={{
           style: {
             overflow: 'hidden',
             display: 'flex',
             zIndex: 1,
-            width: flexDirection === 'row' ? drawerWidth : 'calc(100% - 57px)',
-            height:
-              flexDirection === 'column' ? drawerHeight : 'calc(100% - 60px)',
-            margin: flexDirection === 'row' ? '60px 0 0 0' : '0 0 0 57px',
-            boxShadow:
-              flexDirection === 'row'
-                ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
-                : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
-            borderLeft:
-              flexDirection === 'row' ? `1px solid ${MOON_200}` : 'none',
-            borderTop:
-              flexDirection === 'column' ? `1px solid ${MOON_200}` : 'none',
+            width: isFlexRow
+              ? `${drawerWidthPct}%`
+              : `calc(100% - ${SIDEBAR_WIDTH}px)`,
+            height: !isFlexRow ? `${drawerHeightPct}%` : '100%',
+            margin: isFlexRow ? 0 : `0 0 0 ${SIDEBAR_WIDTH + 1}px`,
+            boxShadow: isFlexRow
+              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
+              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
+            borderLeft: isFlexRow ? `1px solid ${MOON_200}` : 'none',
+            borderTop: !isFlexRow ? `1px solid ${MOON_200}` : 'none',
+            position: 'absolute',
           },
         }}
         ModalProps={{
@@ -377,12 +395,12 @@ const MainPeekingLayout: FC = () => {
             left: 0,
             zIndex: 100,
             backgroundColor: '#f4f7f9',
-            cursor: flexDirection === 'row' ? 'ew-resize' : 'ns-resize',
-            padding: flexDirection === 'row' ? '4px 0 0' : '0 4px 0 0',
-            bottom: flexDirection === 'row' ? 0 : 'auto',
-            right: flexDirection === 'row' ? 'auto' : 0,
-            width: flexDirection === 'row' ? '5px' : 'auto',
-            height: flexDirection === 'row' ? 'auto' : '5px',
+            cursor: isFlexRow ? 'ew-resize' : 'ns-resize',
+            padding: isFlexRow ? '4px 0 0' : '0 4px 0 0',
+            bottom: isFlexRow ? 0 : 'auto',
+            right: isFlexRow ? 'auto' : 0,
+            width: isFlexRow ? '5px' : 'auto',
+            height: isFlexRow ? 'auto' : '5px',
           }}
         />
         {peekLocation && (

@@ -83,6 +83,19 @@ def cache_mode() -> CacheMode:
     )
 
 
+# represents the number of days to re-use the weave cache before switching to a new directory
+# a low number will cause frequent cache rotations and may lead to performance degradation due to
+# cache misses. A high number will result in a large cache size which may cause infrastructure issues.
+# if unset, the cache will write to a path that will not be cleaned up by the default cleanup task
+def cache_duration_days() -> int:
+    return int(os.getenv("WEAVE_CACHE_DURATION_DAYS", 0))
+
+
+# represents the number of days after a cache has expired to leave it until deletion
+def cache_deletion_buffer_days() -> int:
+    return int(os.getenv("WEAVE_CACHE_DELETION_BUFFER_DAYS", 1))
+
+
 def wandb_production() -> bool:
     return os.getenv("WEAVE_ENV") == "wandb_production"
 

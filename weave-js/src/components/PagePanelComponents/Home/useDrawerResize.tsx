@@ -6,41 +6,41 @@ import {useFlexDirection} from './useFlexDirection';
 
 const setDrawerSize = (
   newSize: number,
-  setSize: (value: string) => void,
+  setSize: (value: number) => void,
   min: number,
   max: number
 ) => {
   if (newSize > max) {
-    setSize(max + '%');
+    setSize(max);
   } else if (newSize < min) {
-    setSize(min + '%');
+    setSize(min);
   } else {
-    setSize(newSize + '%');
+    setSize(newSize);
   }
 };
 
 export const useDrawerResize = () => {
   const flexDirection = useFlexDirection();
   const windowSize = useWindowSize();
-  const defaultSize = '60%';
+  const defaultSize = 60;
   const maxHeight = 85;
   const maxWidth = 90;
 
   //  We store the drawer width and height in local storage so that it persists
   const [width, setWidth] = useLocalStorage(
-    'weaveflow-drawer-width',
+    'weaveflow-drawer-width-number',
     defaultSize
   );
   const [height, setHeight] = useLocalStorage(
-    'weaveflow-drawer-height',
+    'weaveflow-drawer-height-number',
     defaultSize
   );
 
   useEffect(() => {
-    if (parseInt(width, 10) > maxWidth) {
+    if (width > maxWidth) {
       setWidth(defaultSize);
     }
-    if (parseInt(height, 10) > maxHeight) {
+    if (height > maxHeight) {
       setHeight(defaultSize);
     }
   }, [height, setHeight, setWidth, width]);
@@ -82,17 +82,11 @@ export const useDrawerResize = () => {
       e.preventDefault();
       if (flexDirection === 'row') {
         const newWidth =
-          ((document.body.offsetWidth -
-            (e.clientX - document.body.offsetLeft)) *
-            100) /
-          windowSize.width;
+          ((windowSize.width - e.clientX) * 100) / windowSize.width;
         setDrawerSize(newWidth, setWidth, minWidth, maxWidth);
       } else if (flexDirection === 'column') {
         const newHeight =
-          ((document.body.offsetHeight -
-            (e.clientY - document.body.offsetTop)) *
-            100) /
-          windowSize.height;
+          ((windowSize.height - e.clientY) * 100) / windowSize.height;
         setDrawerSize(newHeight, setHeight, minHeight, maxHeight);
       }
     },
@@ -111,7 +105,7 @@ export const useDrawerResize = () => {
 
   return {
     handleMousedown,
-    drawerWidth: width,
-    drawerHeight: height,
+    drawerWidthPct: width,
+    drawerHeightPct: height,
   };
 };
