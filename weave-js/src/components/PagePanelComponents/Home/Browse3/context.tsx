@@ -223,6 +223,16 @@ const browse3ContextGen = (
           objRef.artifactVersion
         );
       }
+
+      // TEMP HACK (Tim): This is a temp hack to handle old URIs logged with
+      // weave client before having landed and deployed
+      // https://github.com/wandb/weave/pull/1169. Should be removed before the
+      // public release.
+      if (objRef.artifactPath.endsWith('rows%2F0')) {
+        objRef.artifactPath = 'obj';
+        objRef.artifactRefExtra = 'atr/rows/ndx/' + objRef.artifactRefExtra;
+      }
+
       return browse3Context.objectVersionUIUrl(
         objRef.entityName,
         objRef.projectName,
