@@ -19,8 +19,8 @@ import React, {
 } from 'react';
 import {useParams} from 'react-router-dom';
 
-import {MOON_250, TEAL_600} from '../../../../common/css/color.styles';
-import {TargetBlank} from '../../../../common/util/links';
+import {MOON_250} from '../../../../common/css/color.styles';
+import {A, TargetBlank} from '../../../../common/util/links';
 import {Timestamp} from '../../../Timestamp';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
@@ -568,16 +568,12 @@ export const RunsTable: FC<{
                   {clearFilters != null ? (
                     <>
                       Try{' '}
-                      <span
-                        style={{
-                          cursor: 'pointer',
-                          color: TEAL_600,
-                        }}
+                      <A
                         onClick={() => {
                           clearFilters();
                         }}>
                         clearing the filters
-                      </span>{' '}
+                      </A>{' '}
                       or l
                     </>
                   ) : (

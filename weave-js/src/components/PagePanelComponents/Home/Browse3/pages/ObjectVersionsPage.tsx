@@ -418,6 +418,7 @@ const ObjectVersionsTable: React.FC<{
                   }}
                   versionCount={params.row.obj.object().objectVersions().length}
                   neverPeek
+                  variant="secondary"
                 />
               );
             },

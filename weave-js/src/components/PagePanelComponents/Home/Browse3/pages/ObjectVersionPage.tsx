@@ -90,6 +90,7 @@ const ObjectVersionPageInner: React.FC<{
                   }}
                   versionCount={objectVersionCount}
                   neverPeek
+                  variant="secondary"
                 />
                 ]
               </>
@@ -432,6 +433,7 @@ const OpVersionCallsLink: React.FC<{
         opName={val.opVersion.op().name()}
         version={val.opVersion.version()}
         versionIndex={val.opVersion.versionIndex()}
+        variant="secondary"
       />{' '}
       [
       <CallsLink
@@ -445,6 +447,7 @@ const OpVersionCallsLink: React.FC<{
           ...(partialFilter ?? {}),
         }}
         neverPeek
+        variant="secondary"
       />
       ]
     </>

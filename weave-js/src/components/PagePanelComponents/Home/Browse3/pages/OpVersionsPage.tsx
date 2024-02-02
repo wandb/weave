@@ -165,6 +165,7 @@ export const FilterableOpVersionsTable: React.FC<{
                         params.row.obj.version(),
                     ],
                   }}
+                  variant="secondary"
                 />
               );
             },
@@ -269,6 +270,7 @@ export const FilterableOpVersionsTable: React.FC<{
                         opName: params.row.obj.op().name(),
                       }}
                       neverPeek
+                      variant="secondary"
                     />
                   );
                 },
