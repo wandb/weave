@@ -88,7 +88,7 @@ export const CompareCallsPage: FC<{
         const opRef = call.name;
         const parsed = parseRef(opRef);
         return [
-          parsed.artifactVersion,
+          opRef,
           parsed.artifactName + ':' + parsed.artifactVersion.slice(0, 6),
         ];
       })
@@ -405,6 +405,15 @@ const useSubRunsFromFastestEngine = (
     selectedOpVersionRef,
     selectedObjectVersionRef
   );
+
+  console.log({
+    entity,
+    project,
+    parentCallIds,
+    secondaryDim,
+    selectedOpVersionRef,
+    selectedObjectVersionRef,
+  });
 
   const ormResults = useSubRunsFromORM(
     entity,
