@@ -24,11 +24,11 @@ export const CompareCallsPage: FC<{
   primaryDim?: string;
   secondaryDim?: string;
 }> = props => {
-  const [selectedOpVersion, setSelectedOpVersion] = useState<string | null>(
-    null
-  );
+  const [selectedOpVersionRef, setSelectedOpVersionRef] = useState<
+    string | null
+  >(null);
 
-  const [selectedObjectVersion, setSelectedObjectVersion] = useState<
+  const [selectedObjectVersionRef, setSelectedObjectVersionRef] = useState<
     string | null
   >(null);
 
@@ -43,8 +43,8 @@ export const CompareCallsPage: FC<{
     props.project,
     props.callIds,
     props.secondaryDim,
-    selectedOpVersion,
-    selectedObjectVersion
+    selectedOpVersionRef,
+    selectedObjectVersionRef
   );
 
   const objectVersionOptions = useMemo(() => {
@@ -68,12 +68,16 @@ export const CompareCallsPage: FC<{
     );
   }, [parentRuns, props.secondaryDim]);
 
-  const initialSelectedObjectVersion = Object.keys(objectVersionOptions)?.[0];
+  const initialSelectedObjectVersionRef =
+    Object.keys(objectVersionOptions)?.[0];
   useEffect(() => {
-    if (selectedObjectVersion == null && initialSelectedObjectVersion != null) {
-      setSelectedObjectVersion(initialSelectedObjectVersion);
+    if (
+      selectedObjectVersionRef == null &&
+      initialSelectedObjectVersionRef != null
+    ) {
+      setSelectedObjectVersionRef(initialSelectedObjectVersionRef);
     }
-  }, [initialSelectedObjectVersion, selectedObjectVersion]);
+  }, [initialSelectedObjectVersionRef, selectedObjectVersionRef]);
 
   const subOpVersionOptions = useMemo(() => {
     if (parentRunsFilteredToInputSelection.length === 0) {
@@ -91,13 +95,13 @@ export const CompareCallsPage: FC<{
     );
   }, [parentRunsFilteredToInputSelection.length, childRunsOfFilteredParents]);
 
-  const initialSelectedOpVersion = Object.keys(subOpVersionOptions)?.[0];
+  const initialSelectedOpVersionRef = Object.keys(subOpVersionOptions)?.[0];
 
   useEffect(() => {
-    if (selectedOpVersion == null && initialSelectedOpVersion != null) {
-      setSelectedOpVersion(initialSelectedOpVersion);
+    if (selectedOpVersionRef == null && initialSelectedOpVersionRef != null) {
+      setSelectedOpVersionRef(initialSelectedOpVersionRef);
     }
-  }, [initialSelectedOpVersion, selectedOpVersion]);
+  }, [initialSelectedOpVersionRef, selectedOpVersionRef]);
 
   const getOptionLabel = useCallback(
     option => {
@@ -216,13 +220,13 @@ export const CompareCallsPage: FC<{
                       renderInput={params => (
                         <TextField {...params} label="Input" />
                       )}
-                      value={selectedObjectVersion ?? null}
+                      value={selectedObjectVersionRef ?? null}
                       onChange={(event, newValue) => {
-                        setSelectedObjectVersion(newValue);
+                        setSelectedObjectVersionRef(newValue);
                       }}
                       getOptionLabel={getOptionLabel}
                       options={Object.keys(objectVersionOptions)}
-                      disableClearable={selectedObjectVersion != null}
+                      disableClearable={selectedObjectVersionRef != null}
                     />
                   </FormControl>
                 </ListItem>
@@ -234,13 +238,13 @@ export const CompareCallsPage: FC<{
                         renderInput={params => (
                           <TextField {...params} label="Sub Op" />
                         )}
-                        value={selectedOpVersion ?? null}
+                        value={selectedOpVersionRef ?? null}
                         onChange={(event, newValue) => {
-                          setSelectedOpVersion(newValue);
+                          setSelectedOpVersionRef(newValue);
                         }}
                         getOptionLabel={getOpOptionLabel}
                         options={Object.keys(subOpVersionOptions)}
-                        disableClearable={selectedOpVersion != null}
+                        disableClearable={selectedOpVersionRef != null}
                       />
                     </FormControl>
                   </ListItem>
@@ -270,8 +274,8 @@ const useSubRunsFromWeaveQuery = (
   project: string,
   parentCallIds: string[] | undefined,
   secondaryDim: string | undefined,
-  selectedOpVersion: string | null,
-  selectedObjectVersion: string | null
+  selectedOpVersionRef: string | null,
+  selectedObjectVersionRef: string | null
 ): SubRunsReturnType => {
   const parentRunsQuery = useRuns(
     {
@@ -289,9 +293,9 @@ const useSubRunsFromWeaveQuery = (
     return parentRuns.filter(
       call =>
         secondaryDim &&
-        getValueAtNestedKey(call, secondaryDim) === selectedObjectVersion
+        getValueAtNestedKey(call, secondaryDim) === selectedObjectVersionRef
     );
-  }, [parentRuns, secondaryDim, selectedObjectVersion]);
+  }, [parentRuns, secondaryDim, selectedObjectVersionRef]);
 
   const childCallsQuery = useRuns(
     {
@@ -308,9 +312,9 @@ const useSubRunsFromWeaveQuery = (
 
   const childRunsFilteredToOpVersion = useMemo(() => {
     return childRunsOfFilteredParents.filter(
-      call => selectedOpVersion && call.name.includes(selectedOpVersion)
+      call => selectedOpVersionRef && call.name.includes(selectedOpVersionRef)
     );
-  }, [childRunsOfFilteredParents, selectedOpVersion]);
+  }, [childRunsOfFilteredParents, selectedOpVersionRef]);
 
   return {
     parentRuns,
@@ -326,8 +330,8 @@ const useSubRunsFromORM = (
   project: string,
   parentCallIds: string[] | undefined,
   secondaryDim: string | undefined,
-  selectedOpVersion: string | null,
-  selectedObjectVersion: string | null
+  selectedOpVersionRef: string | null,
+  selectedObjectVersionRef: string | null
 ): SubRunsReturnType => {
   const orm = useWeaveflowORMContext(entity, project);
 
@@ -344,9 +348,9 @@ const useSubRunsFromORM = (
       call =>
         secondaryDim &&
         getValueAtNestedKey(call.rawCallSpan(), secondaryDim) ===
-          selectedObjectVersion
+          selectedObjectVersionRef
     );
-  }, [parentCalls, secondaryDim, selectedObjectVersion]);
+  }, [parentCalls, secondaryDim, selectedObjectVersionRef]);
 
   const childCallsOfFilteredParents = useMemo(() => {
     return parentCallsFilteredToInputSelection.flatMap(call =>
@@ -356,9 +360,9 @@ const useSubRunsFromORM = (
 
   const childCallsFilteredToOpVersion = useMemo(() => {
     return childCallsOfFilteredParents.filter(
-      item => item.opVersion()?.version() === selectedOpVersion
+      item => item.opVersion()?.refUri() === selectedOpVersionRef
     );
-  }, [childCallsOfFilteredParents, selectedOpVersion]);
+  }, [childCallsOfFilteredParents, selectedOpVersionRef]);
 
   const parentRuns = useMemo(() => {
     return parentCalls.map(c => c.rawCallSpan());
@@ -390,16 +394,16 @@ const useSubRunsFromFastestEngine = (
   project: string,
   parentCallIds: string[] | undefined,
   secondaryDim: string | undefined,
-  selectedOpVersion: string | null,
-  selectedObjectVersion: string | null
+  selectedOpVersionRef: string | null,
+  selectedObjectVersionRef: string | null
 ): SubRunsReturnType => {
   const weaveQueryResults = useSubRunsFromWeaveQuery(
     entity,
     project,
     parentCallIds,
     secondaryDim,
-    selectedOpVersion,
-    selectedObjectVersion
+    selectedOpVersionRef,
+    selectedObjectVersionRef
   );
 
   const ormResults = useSubRunsFromORM(
@@ -407,8 +411,8 @@ const useSubRunsFromFastestEngine = (
     project,
     parentCallIds,
     secondaryDim,
-    selectedOpVersion,
-    selectedObjectVersion
+    selectedOpVersionRef,
+    selectedObjectVersionRef
   );
 
   if (!weaveQueryResults.loading && !ormResults.loading) {
