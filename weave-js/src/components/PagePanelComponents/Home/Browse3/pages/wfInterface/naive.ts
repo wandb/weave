@@ -877,25 +877,30 @@ type WFNaiveObjectVersionDictType = {
 };
 
 class WFNaiveReferencedObject implements ReferencedObject {
+  constructor(
+    private readonly reference: WFNaiveRefDict,
+    private readonly artifactVersion: WFNaiveArtifactVersionDictType
+  ) {}
   // TODO: I don't think this should be exposed
   entity(): string {
-    throw new Error('Method not implemented.');
+    return this.reference.entity;
   }
   project(): string {
-    throw new Error('Method not implemented.');
+    return this.reference.project;
   }
   name(): string {
-    throw new Error('Method not implemented.');
+    return this.reference.artifactName;
   }
   commitHash(): string {
-    throw new Error('Method not implemented.');
+    return this.reference.versionCommitHash;
   }
-
   filePath(): string {
-    throw new Error('Method not implemented.');
+    return this.reference.filePathParts.join('/');
   }
   refExtraPath(): string {
-    throw new Error('Method not implemented.');
+    return this.reference.refExtraTuples
+      .map(({edgeType, edgeName}) => `${edgeType}/${edgeName}`)
+      .join('/');
   }
   parentObject(): ReferencedObject {
     throw new Error('Method not implemented.');
@@ -907,14 +912,13 @@ class WFNaiveReferencedObject implements ReferencedObject {
     throw new Error('Method not implemented.');
   }
   refUri(): string {
-    throw new Error('Method not implemented.');
+    return refDictToRefString(this.reference);
   }
-
   versionIndex(): number {
-    throw new Error('Method not implemented.');
+    return this.artifactVersion.versionIndex;
   }
   aliases(): string[] {
-    throw new Error('Method not implemented.');
+    return this.artifactVersion.aliases;
   }
 }
 
@@ -926,7 +930,10 @@ class WFNaiveObjectVersion
     private readonly state: WFNaiveProjectState,
     private readonly objectVersionDict: WFNaiveObjectVersionDictType
   ) {
-    super();
+    super(
+      objectVersionDict.reference,
+      objectVersionDict.artifactVersion
+    );
   }
 
   static fromURI = (
@@ -1000,9 +1007,6 @@ class WFNaiveObjectVersion
   description(): string {
     return this.objectVersionDict.artifactVersion.description;
   }
-  refUri(): string {
-    return refDictToRefString(this.objectVersionDict.reference);
-  }
 }
 
 type WFNaiveOpVersionDictType = {
@@ -1022,7 +1026,10 @@ class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
     private readonly state: WFNaiveProjectState,
     private readonly opVersionDict: WFNaiveOpVersionDictType
   ) {
-    super();
+    super(
+      opVersionDict.reference,
+      opVersionDict.artifactVersion
+    );
   }
   static fromURI = (
     state: WFNaiveProjectState,
@@ -1105,9 +1112,6 @@ class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
   }
   project(): string {
     return this.state.project;
-  }
-  refUri(): string {
-    return refDictToRefString(this.opVersionDict.reference);
   }
 }
 
