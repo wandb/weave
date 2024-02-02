@@ -31,7 +31,7 @@ export const OpVersionPage: React.FC<{
       project: props.project,
       artifactName: props.opName,
       versionCommitHash: props.version,
-      filePathParts: [],
+      filePathParts: ['obj'],
       refExtraTuples: [],
     })
   );

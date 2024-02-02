@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
@@ -23,6 +24,7 @@ import {
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './wfInterface/context';
+import {refDictToRefString} from './wfInterface/naive';
 import {WFCall, WFObjectVersion, WFOpVersion} from './wfInterface/types';
 
 export const ObjectVersionPage: React.FC<{
@@ -33,9 +35,20 @@ export const ObjectVersionPage: React.FC<{
   refExtra?: string;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
+  const refExtraParts = props.refExtra ? props.refExtra.split('/') : [];
   const objectVersion = orm.projectConnection.objectVersion(
-    props.objectName,
-    props.version
+    refDictToRefString({
+      entity: props.entity,
+      project: props.project,
+      artifactName: props.objectName,
+      versionCommitHash: props.version,
+      // TODO: We need to get more of these from the URL!
+      filePathParts: ['obj'],
+      refExtraTuples: _.range(0, refExtraParts.length, 2).map(i => ({
+        edgeType: refExtraParts[i],
+        edgeName: refExtraParts[i + 1],
+      })),
+    })
   );
   if (!objectVersion) {
     return <CenteredAnimatedLoader />;
@@ -46,11 +59,11 @@ const ObjectVersionPageInner: React.FC<{
   objectVersion: WFObjectVersion;
   refExtra?: string;
 }> = ({objectVersion, refExtra}) => {
-  const objectVersionHash = objectVersion.version();
+  const objectVersionHash = objectVersion.artifactVersion().versionCommitHash();
   const entityName = objectVersion.entity();
   const projectName = objectVersion.project();
   const objectName = objectVersion.object().name();
-  const objectVersionIndex = objectVersion.versionIndex();
+  const objectVersionIndex = objectVersion.artifactVersion().versionIndex();
   const objectVersionCount = objectVersion.object().objectVersions().length;
   const objectTypeCategory = objectVersion.typeVersion().typeCategory();
   const producingCalls = objectVersion.outputFrom().filter(call => {
@@ -295,7 +308,7 @@ const ObjectVersionProducingCallsItem: React.FC<{
         callId={call.callID()}
         simpleText={{
           opName: call.spanName(),
-          versionIndex: call.opVersion()?.versionIndex() ?? 0,
+          versionIndex: call.opVersion()?.artifactVersion().versionIndex() ?? 0,
         }}
       />
     );
@@ -315,7 +328,8 @@ const ObjectVersionProducingCallsItem: React.FC<{
               callId={call.callID()}
               simpleText={{
                 opName: call.spanName(),
-                versionIndex: call.opVersion()?.versionIndex() ?? 0,
+                versionIndex:
+                  call.opVersion()?.artifactVersion().versionIndex() ?? 0,
               }}
             />
           </li>
@@ -335,11 +349,7 @@ const ObjectVersionConsumingCallsItem: React.FC<{
     <GroupedCalls
       calls={consumingCalls}
       partialFilter={{
-        inputObjectVersions: [
-          props.objectVersion.object().name() +
-            ':' +
-            props.objectVersion.version(),
-        ],
+        inputObjectVersionRefs: [props.objectVersion.refUri()],
       }}
     />
   );
@@ -362,7 +372,7 @@ export const GroupedCalls: React.FC<{
         return;
       }
 
-      const key = opVersion.version();
+      const key = opVersion.refUri();
       if (groups[key] == null) {
         groups[key] = {
           opVersion,
@@ -411,8 +421,8 @@ const OpVersionCallsLink: React.FC<{
         entityName={val.opVersion.entity()}
         projectName={val.opVersion.project()}
         opName={val.opVersion.op().name()}
-        version={val.opVersion.version()}
-        versionIndex={val.opVersion.versionIndex()}
+        version={val.opVersion.artifactVersion().versionCommitHash()}
+        versionIndex={val.opVersion.artifactVersion().versionIndex()}
       />{' '}
       [
       <CallsLink
@@ -420,9 +430,7 @@ const OpVersionCallsLink: React.FC<{
         project={val.opVersion.project()}
         callCount={val.calls.length}
         filter={{
-          opVersions: [
-            val.opVersion.op().name() + ':' + val.opVersion.version(),
-          ],
+          opVersionRefs: [val.opVersion.refUri()],
           ...(partialFilter ?? {}),
         }}
         neverPeek
