@@ -10,6 +10,7 @@ from weave.op_def import OpDef, BoundOpDef
 
 class ObjectMeta(ModelMetaclass):
     def __new__(cls, name, bases, dct):
+        # Modify an OpDef names to include the class name.
         original_class = super(ObjectMeta, cls).__new__(cls, name, bases, dct)
         for attr, bound_op_def in inspect.getmembers(
             original_class, lambda x: isinstance(x, BoundOpDef)
