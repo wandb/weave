@@ -973,6 +973,9 @@ class Dict(Type):
 
             def get(_self, _):
                 return self.object_type
+    
+            def __getitem__(_self, _):
+                return self.object_type
 
         return DictPropertyTypes()
 
