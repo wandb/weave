@@ -556,7 +556,16 @@ const useOpVersionOptions = (
     for (const v of versions) {
       const opName = v.op().name();
       if (opName !== lastName) {
-        options[opName + ':*'] = opNiceName(opName);
+        options[
+          refDictToRefString({
+            entity: v.entity(),
+            project: v.project(),
+            artifactName: v.name(),
+            versionCommitHash: '*',
+            filePathParts: [],
+            refExtraTuples: [],
+          })
+        ] = opNiceName(opName);
         lastName = opName;
       }
       options[v.refUri()] = opNiceName(opName) + ':v' + v.versionIndex();
