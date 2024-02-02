@@ -15,6 +15,7 @@ import {
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
 import {useWeaveflowORMContext} from './wfInterface/context';
+import {refDictToRefString} from './wfInterface/naive';
 import {WFOpVersion} from './wfInterface/types';
 
 export const OpVersionPage: React.FC<{
@@ -25,8 +26,14 @@ export const OpVersionPage: React.FC<{
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
   const opVersion = orm.projectConnection.opVersion(
-    props.opName,
-    props.version
+    refDictToRefString({
+      entity: props.entity,
+      project: props.project,
+      artifactName: props.opName,
+      versionCommitHash: props.version,
+      filePathParts: [],
+      refExtraTuples: [],
+    })
   );
   if (opVersion == null) {
     return <CenteredAnimatedLoader />;
@@ -42,23 +49,10 @@ const OpVersionPageInner: React.FC<{
   const project = opVersion.project();
   const opName = opVersion.op().name();
   const opVersionCount = opVersion.op().opVersions().length;
-  const opVersionHash = opVersion.version();
   const opVersionCallCount = opVersion.calls().length;
-  const opVersionIndex = opVersion.versionIndex();
+  const opVersionIndex = opVersion.artifactVersion().versionIndex();
   const opVersionCategory = opVersion.opCategory();
-  // const opInputTypes = opVersion.inputTypesVersions();
-  // const opOutputTypes = opVersion.outputTypeVersions();
   const opInvokes = opVersion.invokes();
-  const opVersionFilterId = opName + ':' + opVersionHash;
-
-  // const streamId = useMemo(
-  //   () => ({
-  //     entityName: entity,
-  //     projectName: project,
-  //     streamName: 'stream',
-  //   }),
-  //   [entity, project]
-  // );
 
   return (
     <SimplePageLayoutWithHeader
@@ -88,7 +82,7 @@ const OpVersionPageInner: React.FC<{
                 project={project}
                 callCount={opVersionCallCount}
                 filter={{
-                  opVersions: [opVersionFilterId],
+                  opVersionRefs: [opVersion.refUri()],
                 }}
                 neverPeek
               />
@@ -303,8 +297,8 @@ const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
               entityName={v.entity()}
               projectName={v.project()}
               opName={v.op().name()}
-              version={v.version()}
-              versionIndex={v.versionIndex()}
+              version={v.artifactVersion().versionCommitHash()}
+              versionIndex={v.artifactVersion().versionIndex()}
             />
             <OpVersionOpTree opVersion={v} />
           </li>
