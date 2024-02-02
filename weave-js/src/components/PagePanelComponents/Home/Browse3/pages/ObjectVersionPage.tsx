@@ -65,7 +65,7 @@ const ObjectVersionPageInner: React.FC<{
   const objectName = objectVersion.object().name();
   const objectVersionIndex = objectVersion.versionIndex();
   const objectVersionCount = objectVersion.object().objectVersions().length;
-  const objectTypeCategory = objectVersion.typeVersion().typeCategory();
+  const objectTypeCategory = objectVersion.typeVersion()?.typeCategory();
   const producingCalls = objectVersion.outputFrom().filter(call => {
     return call.opVersion() != null;
   });

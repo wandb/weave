@@ -283,14 +283,16 @@ const ObjectVersionsTable: React.FC<{
       const firstOutputFrom = firstOutputFromOpVersion
         ? firstOutputFromOpVersion.refUri()
         : null;
+      const typeVersion = ov.typeVersion();
       return {
         id: ov.refUri(),
         obj: ov,
         object: ov.object().name(),
-        typeCategory: ov.typeVersion().typeCategory(),
+        typeCategory: ov.typeVersion()?.typeCategory(),
         version: ov.commitHash(),
-        typeVersion:
-          ov.typeVersion().type().name() + ':' + ov.typeVersion().version(),
+        typeVersion: typeVersion
+          ? typeVersion.type().name() + ':' + typeVersion.version()
+          : null,
         inputTo: ov.inputTo().length,
         outputFrom: firstOutputFrom,
         // description: ov.description(),
@@ -499,11 +501,13 @@ const applyFilter = (
       effectiveFilter.typeVersions &&
       effectiveFilter.typeVersions.length > 0
     ) {
+      const typeVersion = ov.typeVersion();
+      if (!typeVersion) {
+        return false;
+      }
       if (
         !effectiveFilter.typeVersions.includes(
-          ov.typeVersion().type().name() +
-            ':' +
-            ov.typeVersion().version().toString()
+          typeVersion.type().name() + ':' + typeVersion.version().toString()
         )
       ) {
         return false;
@@ -515,7 +519,7 @@ const applyFilter = (
       }
     }
     if (effectiveFilter.typeCategory) {
-      if (effectiveFilter.typeCategory !== ov.typeVersion().typeCategory()) {
+      if (effectiveFilter.typeCategory !== ov.typeVersion()?.typeCategory()) {
         return false;
       }
     }
@@ -599,7 +603,7 @@ const useTypeCategoryOptions = (
 
   return useMemo(() => {
     return _.uniq(
-      filtered.map(item => item.typeVersion().typeCategory())
+      filtered.map(item => item.typeVersion()?.typeCategory())
     ).filter(v => v != null) as HackyTypeCategory[];
   }, [filtered]);
 };
