@@ -1,9 +1,10 @@
 import typing
 import weave
 
+from .obj import Object
 
-@weave.type()
-class Dataset:
+
+class Dataset(Object):
     rows: list[typing.Any]
 
     def __post_init__(self) -> None:

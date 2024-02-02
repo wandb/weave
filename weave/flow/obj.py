@@ -23,7 +23,7 @@ class ObjectMeta(ModelMetaclass):
 
 
 class Object(pydantic.BaseModel, metaclass=ObjectMeta):
-    name: Optional[str] = "hello"
+    name: Optional[str] = None
     description: Optional[str] = None
 
     # Allow OpDef attributes

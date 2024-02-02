@@ -1,6 +1,6 @@
 import typing
 import weave
-from .obj import Object
+from weave.flow.obj import Object
 
 
 class Model(Object):

@@ -59,8 +59,6 @@ from .panel import Panel
 
 from .arrow.list_ import ArrowWeaveList as WeaveList
 
-from .flow import Object, Dataset, Model
-
 
 def save(node_or_obj, name=None):
     from .ops_primitives.weave_api import save, get
