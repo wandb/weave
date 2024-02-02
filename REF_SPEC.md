@@ -1,6 +1,6 @@
 # Weave Reference Format Specification
 
-A weave reference ("ref") has 2 formats:
+A weave reference ("ref") has the following 2 formats:
 
 1. The W&B Artifact: `wandb-artifact:///{ENTITY}/{PROJECT}/{ARTIFACT_NAME}:{ALIAS}[/{FILE_PATH}[#REF_EXTRA]]`
    - Yes, the 3 forward slashes are correct.
