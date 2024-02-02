@@ -32,6 +32,7 @@ export const ObjectVersionPage: React.FC<{
   project: string;
   objectName: string;
   version: string;
+  filePath: string;
   refExtra?: string;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
@@ -43,7 +44,7 @@ export const ObjectVersionPage: React.FC<{
       artifactName: props.objectName,
       versionCommitHash: props.version,
       // TODO: We need to get more of these from the URL!
-      filePathParts: ['obj'],
+      filePathParts: props.filePath.split('/'),
       refExtraTuples: _.range(0, refExtraParts.length, 2).map(i => ({
         edgeType: refExtraParts[i],
         edgeName: refExtraParts[i + 1],
@@ -64,6 +65,7 @@ const ObjectVersionPageInner: React.FC<{
   const projectName = objectVersion.project();
   const objectName = objectVersion.object().name();
   const objectVersionIndex = objectVersion.versionIndex();
+  const objectFilePath = objectVersion.filePath();
   const objectVersionCount = objectVersion.object().objectVersions().length;
   const objectTypeCategory = objectVersion.typeVersion()?.typeCategory();
   const producingCalls = objectVersion.outputFrom().filter(call => {
@@ -195,6 +197,7 @@ const ObjectVersionPageInner: React.FC<{
                 projectName,
                 objectName,
                 objectVersionHash,
+                filePath: objectFilePath,
                 refExtra: refExtra?.split('/'),
               }}>
               <ScrollableTabContent>

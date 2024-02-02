@@ -91,6 +91,8 @@ export const ObjectVersionLink: React.FC<{
   objectName: string;
   version: string;
   versionIndex: number;
+  filePath: string;
+  refExtra?: string;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
   // const text = props.hideName
@@ -103,7 +105,9 @@ export const ObjectVersionLink: React.FC<{
         props.entityName,
         props.projectName,
         props.objectName,
-        props.version
+        props.version,
+        props.filePath,
+        props.refExtra
       )}>
       {text}
     </Link>

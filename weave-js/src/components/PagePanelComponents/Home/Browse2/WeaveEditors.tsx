@@ -254,6 +254,7 @@ export const WeaveEditorSourceContext = createContext<{
   projectName: string;
   objectName: string;
   objectVersionHash: string;
+  filePath: string;
   refExtra?: string[];
 } | null>(null);
 
@@ -270,11 +271,13 @@ const useObjectVersionLinkPathForPath = () => {
         weaveEditorSourceContext.projectName,
         weaveEditorSourceContext.objectName,
         weaveEditorSourceContext.objectVersionHash,
-        (weaveEditorSourceContext.refExtra ?? []).concat(path)
+        weaveEditorSourceContext.filePath,
+        (weaveEditorSourceContext.refExtra ?? []).concat(path).join('/')
       ),
     [
       router,
       weaveEditorSourceContext.entityName,
+      weaveEditorSourceContext.filePath,
       weaveEditorSourceContext.objectName,
       weaveEditorSourceContext.objectVersionHash,
       weaveEditorSourceContext.projectName,

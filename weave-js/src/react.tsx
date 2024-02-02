@@ -468,6 +468,7 @@ export interface WandbArtifactRef {
   artifactName: string;
   artifactVersion: string;
   artifactPath: string;
+  artifactRefExtra?: string;
 }
 
 export type ArtifactRef = LocalArtifactRef | WandbArtifactRef;

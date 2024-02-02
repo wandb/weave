@@ -314,6 +314,8 @@ const ObjectVersionsTable: React.FC<{
             objectName={params.row.obj.object().name()}
             version={params.row.obj.version()}
             versionIndex={params.row.obj.versionIndex()}
+            filePath={params.row.obj.filePath()}
+            refExtra={params.row.obj.refExtraPath()}
           />
         );
       },

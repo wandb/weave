@@ -106,7 +106,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
                     # output = box.box(output)
                     client.finish_run(run, output, output_refs)
                     if not parent_run:
-                        print("🍩 View run:", run.ui_url)
+                        print("🍩 View call:", run.ui_url)
                     return _deref_all(output)
                 except Exception as e:
                     client.fail_run(run, e)
@@ -121,7 +121,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
             client.finish_run(run, output, output_refs)
             if not parent_run:
-                print("🍩 View run:", run.ui_url)
+                print("🍩 View call:", run.ui_url)
             res = _deref_all(output)
 
     else:

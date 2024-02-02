@@ -126,7 +126,8 @@ export const browse2Context = {
     projectName: string,
     objectName: string,
     objectVersionHash: string,
-    refExtra?: string[]
+    filePath: string,
+    refExtra?: string
   ) => {
     throw new Error('Not implemented');
   },
@@ -226,7 +227,9 @@ const browse3ContextGen = (
         objRef.entityName,
         objRef.projectName,
         objRef.artifactName,
-        objRef.artifactVersion
+        objRef.artifactVersion,
+        objRef.artifactPath,
+        objRef.artifactRefExtra
       );
     },
     entityUrl: (entityName: string) => {
@@ -281,13 +284,16 @@ const browse3ContextGen = (
       projectName: string,
       objectName: string,
       objectVersionHash: string,
-      refExtra?: string[]
+      filePath: string,
+      refExtra?: string
     ) => {
-      const extra = refExtra ? `/${refExtra.join('/')}` : '';
+      const extra = refExtra ? `&extra=${encodeURIComponent(refExtra)}` : '';
       return `${projectRoot(
         entityName,
         projectName
-      )}/objects/${objectName}/versions/${objectVersionHash}${extra}`;
+      )}/objects/${objectName}/versions/${objectVersionHash}?path=${encodeURIComponent(
+        filePath
+      )}${extra}`;
     },
     opVersionsUIUrl: (
       entityName: string,
@@ -443,7 +449,8 @@ type RouteType = {
     projectName: string,
     objectName: string,
     objectVersionHash: string,
-    refExtra?: string[]
+    filePath: string,
+    refExtra?: string
   ) => string;
   opVersionsUIUrl: (
     entityName: string,
