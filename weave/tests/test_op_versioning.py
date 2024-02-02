@@ -54,7 +54,8 @@ def solo_versioned_op(a: int) -> float:
 def test_solo_op_versioning(strict_op_saving):
     from . import op_versioning_solo
 
-    ref = weave.obj_ref(op_versioning_solo.solo_versioned_op)
+    with weave.local_client():
+        ref = weave.publish(op_versioning_solo.solo_versioned_op)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -102,7 +103,8 @@ def versioned_op_importfrom(a: int) -> float:
 def test_op_versioning_importfrom(strict_op_saving):
     from . import op_versioning_importfrom
 
-    ref = weave.obj_ref(op_versioning_importfrom.versioned_op_importfrom)
+    with weave.local_client():
+        ref = weave.publish(op_versioning_importfrom.versioned_op_importfrom)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -164,6 +166,8 @@ def test_op_versioning_closure_contant(strict_op_saving):
         return a + x
 
     ref = weave.obj_ref(versioned_op_closure_constant)
+    with weave.local_client():
+        ref = weave.publish(versioned_op_closure_constant)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -194,7 +198,8 @@ def test_op_versioning_closure_dict_simple(strict_op_saving):
     def versioned_op_closure_constant(a: int) -> float:
         return a + x["a"]
 
-    ref = weave.obj_ref(versioned_op_closure_constant)
+    with weave.local_client():
+        ref = weave.publish(versioned_op_closure_constant)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:

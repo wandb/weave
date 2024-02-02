@@ -3,6 +3,7 @@
 
 import time
 import typing
+from typing import Optional
 import os
 import contextlib
 import dataclasses
@@ -175,11 +176,13 @@ def local_client() -> typing.Iterator[_graph_client.GraphClient]:
         inited_client.reset()
 
 
-def publish(obj: typing.Any, name: str) -> _ref_base.Ref:
+def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
     not match the latest version of that object, a new version will be created.
+
+    TODO: Need to document how name works with this change.
 
     Args:
         obj: The object to save and version.
@@ -190,7 +193,15 @@ def publish(obj: typing.Any, name: str) -> _ref_base.Ref:
     """
     client = _graph_client_context.require_graph_client()
 
-    ref = client.save_object(obj, name, "latest")
+    save_name: str
+    if name:
+        save_name = name
+    elif hasattr(obj, "name"):
+        save_name = obj.name
+    else:
+        save_name = obj.__class__.__name__
+
+    ref = client.save_object(obj, save_name, "latest")
 
     print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
 
