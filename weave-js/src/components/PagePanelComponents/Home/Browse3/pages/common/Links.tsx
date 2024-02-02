@@ -193,17 +193,19 @@ export const OpVersionLink: React.FC<{
   );
 };
 
-export const OpCallLink: React.FC<{
+export const CallLink: React.FC<{
   entityName: string;
   projectName: string;
   opName: string;
   callId: string;
+  variant?: LinkVariant;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const opName = opNiceName(props.opName);
   const truncatedId = truncateID(props.callId);
   return (
     <Link
+      $variant={props.variant}
       to={peekingRouter.callUIUrl(
         props.entityName,
         props.projectName,
@@ -211,36 +213,6 @@ export const OpCallLink: React.FC<{
         props.callId
       )}>
       {opName} ({truncatedId})
-    </Link>
-  );
-};
-
-export const CallLink: React.FC<{
-  entityName: string;
-  projectName: string;
-  callId: string;
-  simpleText?: {
-    opName: string;
-    versionIndex: number;
-  };
-}> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
-  let text = truncateID(props.callId);
-  if (props.simpleText) {
-    text = opVersionText(
-      props.simpleText.opName,
-      props.simpleText.versionIndex
-    );
-  }
-  return (
-    <Link
-      to={peekingRouter.callUIUrl(
-        props.entityName,
-        props.projectName,
-        '',
-        props.callId
-      )}>
-      {text}
     </Link>
   );
 };
