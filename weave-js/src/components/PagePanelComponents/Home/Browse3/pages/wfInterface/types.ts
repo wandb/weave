@@ -29,7 +29,7 @@ interface ProjectOwned {
 
 export interface ReferencedObject extends ProjectOwned {
   filePath: () => string;
-  refExtraPath: () => string;
+  refExtraPath: () => null | string;
   refUri: () => string;
   parentObject: () => ReferencedObject;
   childObject: (

@@ -292,17 +292,7 @@ export class WFNaiveProject implements WFProject {
     });
   }
   objectVersion(refUriStr: string): WFObjectVersion | null {
-    // TODO: I think we need to do some more intelligent parsing here
-    if (!this.state.objectVersionsMap.has(refUriStr)) {
-      return null;
-      // throw new Error(
-      //   `Cannot find version: ${version} in project: ${this.state.project}`
-      // );
-    }
-    return new WFNaiveObjectVersion(
-      this.state,
-      this.state.objectVersionsMap.get(refUriStr)!
-    );
+    return WFNaiveObjectVersion.fromURI(this.state, refUriStr);
   }
   objectVersions(): WFObjectVersion[] {
     return Array.from(this.state.objectVersionsMap.values()).map(
@@ -903,7 +893,10 @@ class WFNaiveReferencedObject implements ReferencedObject {
   filePath(): string {
     return this.reference.filePathParts.join('/');
   }
-  refExtraPath(): string {
+  refExtraPath(): null | string {
+    if (this.reference.refExtraTuples.length === 0) {
+      return null;
+    }
     return this.reference.refExtraTuples
       .map(({edgeType, edgeName}) => `${edgeType}/${edgeName}`)
       .join('/');

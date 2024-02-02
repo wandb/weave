@@ -58,14 +58,14 @@ export const ObjectVersionPage: React.FC<{
 };
 const ObjectVersionPageInner: React.FC<{
   objectVersion: WFObjectVersion;
-  refExtra?: string;
-}> = ({objectVersion, refExtra}) => {
+}> = ({objectVersion}) => {
   const objectVersionHash = objectVersion.commitHash();
   const entityName = objectVersion.entity();
   const projectName = objectVersion.project();
   const objectName = objectVersion.object().name();
   const objectVersionIndex = objectVersion.versionIndex();
   const objectFilePath = objectVersion.filePath();
+  const refExtra = objectVersion.refExtraPath();
   const objectVersionCount = objectVersion.object().objectVersions().length;
   const objectTypeCategory = objectVersion.typeVersion()?.typeCategory();
   const producingCalls = objectVersion.outputFrom().filter(call => {
@@ -74,16 +74,18 @@ const ObjectVersionPageInner: React.FC<{
   const consumingCalls = objectVersion.inputTo().filter(call => {
     return call.opVersion() != null;
   });
-  const baseUri = objectVersion.refUri();
+  const refUri = objectVersion.refUri();
 
   const itemNode = useMemo(() => {
+    const uriParts = refUri.split('#');
+    const baseUri = uriParts[0];
     const objNode = opGet({uri: constString(baseUri)});
-    if (refExtra == null) {
+    if (uriParts.length === 1) {
       return objNode;
     }
-    const extraFields = refExtra.split('/');
+    const extraFields = uriParts[1].split('/');
     return nodeFromExtra(objNode, extraFields);
-  }, [baseUri, refExtra]);
+  }, [refUri]);
 
   return (
     <SimplePageLayoutWithHeader
@@ -91,21 +93,25 @@ const ObjectVersionPageInner: React.FC<{
       headerContent={
         <SimpleKeyValueTable
           data={{
-            [refExtra ? 'Parent Object' : 'Name']: (
-              <>
-                {objectName} [
-                <ObjectVersionsLink
-                  entity={entityName}
-                  project={projectName}
-                  filter={{
-                    objectName,
-                  }}
-                  versionCount={objectVersionCount}
-                  neverPeek
-                />
-                ]
-              </>
-            ),
+            ...(refExtra
+              ? {
+                  Name: (
+                    <>
+                      {objectName} [
+                      <ObjectVersionsLink
+                        entity={entityName}
+                        project={projectName}
+                        filter={{
+                          objectName,
+                        }}
+                        versionCount={objectVersionCount}
+                        neverPeek
+                      />
+                      ]
+                    </>
+                  ),
+                }
+              : {}),
             Version: <>{objectVersionIndex}</>,
             ...(objectTypeCategory
               ? {
@@ -130,16 +136,10 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            // TEMP HACK (Tim): Disabling with refExtra is a temporary hack
-            // since objectVersion is always an `/obj` path right now which is
-            // not correct. There is a more full featured solution here:
-            // https://github.com/wandb/weave/pull/1080 that needs to be
-            // finished asap. This is just to fix the demo / first internal
-            // release.
-            ...(refExtra ? {Ref: <span>{baseUri}</span>} : {}),
+            Ref: <span>{refUri}</span>,
             // Hide consuming and producing calls since we don't have a
             // good way to look this up yet
-            ...(producingCalls.length > 0 && refExtra == null
+            ...(producingCalls.length > 0
               ? {
                   'Producing Calls': (
                     <ObjectVersionProducingCallsItem
@@ -148,7 +148,7 @@ const ObjectVersionPageInner: React.FC<{
                   ),
                 }
               : {}),
-            ...(consumingCalls.length > 0 && refExtra == null
+            ...(consumingCalls.length > 0
               ? {
                   'Consuming Calls': (
                     <ObjectVersionConsumingCallsItem
@@ -191,7 +191,7 @@ const ObjectVersionPageInner: React.FC<{
           label: 'Values',
           content: (
             <WeaveEditorSourceContext.Provider
-              key={baseUri + refExtra}
+              key={refUri}
               value={{
                 entityName,
                 projectName,

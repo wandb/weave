@@ -112,9 +112,9 @@ const weaveEditorPathUrlPathPart = (path: WeaveEditorPathEl[]) => {
   // Return the url path for a given editor path
   return path.flatMap(pathEl => {
     if (pathEl.type === 'getattr') {
-      return [pathEl.key];
+      return ['atr', pathEl.key];
     } else if (pathEl.type === 'pick') {
-      return ['pick', pathEl.key];
+      return ['key', pathEl.key];
     } else {
       throw new Error('invalid pathEl type');
     }
@@ -265,15 +265,16 @@ const useObjectVersionLinkPathForPath = () => {
     throw new Error('invalid weaveEditorSourceContext');
   }
   return useCallback(
-    (path: string[]) =>
-      router.objectVersionUIUrl(
+    (path: string[]) => {
+      return router.objectVersionUIUrl(
         weaveEditorSourceContext.entityName,
         weaveEditorSourceContext.projectName,
         weaveEditorSourceContext.objectName,
         weaveEditorSourceContext.objectVersionHash,
         weaveEditorSourceContext.filePath,
         (weaveEditorSourceContext.refExtra ?? []).concat(path).join('/')
-      ),
+      );
+    },
     [
       router,
       weaveEditorSourceContext.entityName,
@@ -553,7 +554,7 @@ export const WeaveEditorTypedDict: FC<{
                 <Link
                   to={makeLinkPath([
                     ...weaveEditorPathUrlPathPart(path),
-                    'pick',
+                    'key',
                     key,
                   ])}>
                   {key}
@@ -594,7 +595,11 @@ export const WeaveEditorObject: FC<{
             <Grid item key={key + '-key'} xs={singleRow ? 2 : 12}>
               <Typography>
                 <Link
-                  to={makeLinkPath([...weaveEditorPathUrlPathPart(path), key])}>
+                  to={makeLinkPath([
+                    ...weaveEditorPathUrlPathPart(path),
+                    'atr',
+                    key,
+                  ])}>
                   {key}
                 </Link>
               </Typography>
@@ -778,7 +783,7 @@ export const WeaveEditorTable: FC<{
           <Link
             to={makeLinkPath([
               ...weaveEditorPathUrlPathPart(path),
-              'index',
+              'ndx',
               params.row._origIndex,
             ])}>
             <LinkIcon />
