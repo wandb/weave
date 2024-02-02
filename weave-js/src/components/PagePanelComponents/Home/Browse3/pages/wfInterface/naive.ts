@@ -407,10 +407,16 @@ export class WFNaiveProject implements WFProject {
         return;
       }
       exampleCall.inputs().forEach(input => {
-        inputTypeVersionMap.add(input.typeVersion().version());
+        const inputType = input.typeVersion();
+        if (inputType) {
+          inputTypeVersionMap.add(inputType.version());
+        }
       });
       exampleCall.output().forEach(output => {
-        outputTypeVersionMap.add(output.typeVersion().version());
+        const outputType = output.typeVersion();
+        if (outputType) {
+          outputTypeVersionMap.add(outputType.version());
+        }
       });
       selfOpVersion.inputTypeVersionRefs = Array.from(inputTypeVersionMap);
       selfOpVersion.outputTypeVersionRefs = Array.from(outputTypeVersionMap);
@@ -873,7 +879,7 @@ type WFNaiveObjectVersionDictType = {
   reference: WFNaiveRefDict;
   artifactVersion: WFNaiveArtifactVersionDictType;
 
-  typeVersionHash: string;
+  typeVersionHash?: string;
 };
 
 class WFNaiveReferencedObject implements ReferencedObject {
@@ -930,21 +936,38 @@ class WFNaiveObjectVersion
     private readonly state: WFNaiveProjectState,
     private readonly objectVersionDict: WFNaiveObjectVersionDictType
   ) {
-    super(
-      objectVersionDict.reference,
-      objectVersionDict.artifactVersion
-    );
+    super(objectVersionDict.reference, objectVersionDict.artifactVersion);
   }
 
   static fromURI = (
     state: WFNaiveProjectState,
     objectRefUri: string
   ): WFNaiveObjectVersion => {
-    const objectVersionDict = state.objectVersionsMap.get(objectRefUri);
+    let refExtraTuples: Array<{edgeType: string; edgeName: string}> = [];
+    let useUri = objectRefUri;
+
+    // In the case that we are dealing with a refExtra, the objectVersionMap will
+    // not contain that (it would be way too expensive)
+    const refDict = refStringToRefDict(objectRefUri);
+    if (refDict.refExtraTuples.length > 0) {
+      refExtraTuples = refDict.refExtraTuples;
+      useUri = refDictToRefString({...refDict, refExtraTuples: []});
+    }
+    let objectVersionDict = state.objectVersionsMap.get(useUri);
     if (!objectVersionDict) {
       throw new Error(
         `Cannot find ObjectVersion with id: ${objectRefUri} in project: ${state.project}`
       );
+    }
+    if (refExtraTuples.length > 0) {
+      objectVersionDict = {
+        ...objectVersionDict,
+        reference: {
+          ...objectVersionDict.reference,
+          refExtraTuples,
+        },
+        typeVersionHash: undefined,
+      };
     }
     return new WFNaiveObjectVersion(state, objectVersionDict);
   };
@@ -978,7 +1001,10 @@ class WFNaiveObjectVersion
   parentObjectVersion(): {path: string; objectVersion: WFObjectVersion} | null {
     throw new Error('Method not implemented.');
   }
-  typeVersion(): WFTypeVersion {
+  typeVersion(): null | WFTypeVersion {
+    if (!this.objectVersionDict.typeVersionHash) {
+      return null;
+    }
     return new WFNaiveTypeVersion(
       this.state,
       this.objectVersionDict.typeVersionHash
@@ -1026,10 +1052,7 @@ class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
     private readonly state: WFNaiveProjectState,
     private readonly opVersionDict: WFNaiveOpVersionDictType
   ) {
-    super(
-      opVersionDict.reference,
-      opVersionDict.artifactVersion
-    );
+    super(opVersionDict.reference, opVersionDict.artifactVersion);
   }
   static fromURI = (
     state: WFNaiveProjectState,

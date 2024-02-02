@@ -94,7 +94,7 @@ export interface WFOpVersion extends ProjectOwned, ReferencedObject {
 
 export interface WFObjectVersion extends ProjectOwned, ReferencedObject {
   object: () => WFObject;
-  typeVersion: () => WFTypeVersion;
+  typeVersion: () => null | WFTypeVersion;
   inputTo: () => WFCall[]; // Array<{argName: string; opVersion: WFCall}>;
   outputFrom: () => WFCall[];
   createdAtMs: () => number;
