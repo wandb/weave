@@ -1104,7 +1104,8 @@ class ObjectType(Type):
         serializer = mappers_python.map_to_python(self, artifact)
 
         result = serializer.apply(obj)
-        del result["_type"]
+        if "_type" in result:
+            del result["_type"]
         with artifact.new_file(f"{name}.object.json") as f:
             json.dump(result, f, allow_nan=False)
 

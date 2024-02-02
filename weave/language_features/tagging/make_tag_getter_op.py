@@ -4,6 +4,7 @@ from ... import weave_types as types
 from ... import decorator_op
 from . import tagged_value_type
 from . import tag_store
+from ... import context_state as _context_state
 
 if typing.TYPE_CHECKING:
     from ... import op_def as OpDef
@@ -27,6 +28,8 @@ def make_tag_getter_op(
         The op.
     """
     from ...arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+
+    _loading_builtins_token = _context_state.set_loading_built_ins()
 
     # Uncomment below once we allow searching by type alone.
     # if tag_key is None and tag_type is None:
@@ -74,5 +77,7 @@ def make_tag_getter_op(
 
     tag_getter_op._gets_tag_by_name = tag_key  # type: ignore
     awl_tag_getter_op._gets_tag_by_name = tag_key  # type: ignore
+
+    _context_state.clear_loading_built_ins(_loading_builtins_token)
 
     return tag_getter_op  # type: ignore
