@@ -50,7 +50,7 @@ const OpVersionPageInner: React.FC<{
   const opName = opVersion.op().name();
   const opVersionCount = opVersion.op().opVersions().length;
   const opVersionCallCount = opVersion.calls().length;
-  const opVersionIndex = opVersion.artifactVersion().versionIndex();
+  const opVersionIndex = opVersion.versionIndex();
   const opVersionCategory = opVersion.opCategory();
   const opInvokes = opVersion.invokes();
 
@@ -297,8 +297,8 @@ const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
               entityName={v.entity()}
               projectName={v.project()}
               opName={v.op().name()}
-              version={v.artifactVersion().versionCommitHash()}
-              versionIndex={v.artifactVersion().versionIndex()}
+              version={v.commitHash()}
+              versionIndex={v.versionIndex()}
             />
             <OpVersionOpTree opVersion={v} />
           </li>

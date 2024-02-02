@@ -27,16 +27,7 @@ interface ProjectOwned {
   project: () => string;
 }
 
-export interface ArtifactVersion extends ProjectOwned {
-  artifactName: () => string;
-  versionCommitHash: () => string;
-  versionIndex: () => number;
-  aliases: () => string[];
-  objectAtPath: (path: string) => ReferencedObject;
-}
-
-export interface ReferencedObject {
-  artifactVersion: () => ArtifactVersion;
+export interface ReferencedObject extends ProjectOwned {
   filePath: () => string;
   refExtraPath: () => string;
   refUri: () => string;
@@ -45,6 +36,10 @@ export interface ReferencedObject {
     refExtraEdgeType: string,
     refExtraEdgeName: string
   ) => ReferencedObject;
+  name: () => string;
+  commitHash: () => string;
+  versionIndex: () => number;
+  aliases: () => string[];
 }
 
 export interface WFType extends ProjectOwned {

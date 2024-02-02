@@ -127,8 +127,8 @@ export const FilterableOpVersionsTable: React.FC<{
                   entityName={params.row.obj.entity()}
                   projectName={params.row.obj.project()}
                   opName={params.row.obj.op().name()}
-                  version={params.row.obj.artifactVersion().versionCommitHash()}
-                  versionIndex={params.row.obj.artifactVersion().versionIndex()}
+                  version={params.row.obj.commitHash()}
+                  versionIndex={params.row.obj.versionIndex()}
                 />
               );
             },
@@ -611,10 +611,7 @@ export const FilterableOpVersionsTable: React.FC<{
         filterControls: {
           filterKeys: ['isLatest'],
           filterPredicate: ({obj}, {isLatest}) => {
-            return (
-              !isLatest ||
-              obj.artifactVersion().aliases().includes('latest') === isLatest
-            );
+            return !isLatest || obj.aliases().includes('latest') === isLatest;
           },
           filterControlListItem: cellProps => {
             return (
@@ -952,9 +949,7 @@ const LatestOnlyControlListItem: React.FC<{
 }> = props => {
   const options = useMemo(() => {
     return _.uniq(
-      props.frozenData.map(o =>
-        o.obj.artifactVersion().aliases().includes('latest')
-      )
+      props.frozenData.map(o => o.obj.aliases().includes('latest'))
     );
   }, [props.frozenData]);
 

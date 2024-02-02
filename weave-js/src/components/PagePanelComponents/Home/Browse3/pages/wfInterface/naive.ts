@@ -18,7 +18,6 @@ import {
   typeVersionFromTypeDict,
 } from './query';
 import {
-  ArtifactVersion,
   HackyOpCategory,
   HackyTypeCategory,
   HackyTypeTree,
@@ -879,9 +878,19 @@ type WFNaiveObjectVersionDictType = {
 
 class WFNaiveReferencedObject implements ReferencedObject {
   // TODO: I don't think this should be exposed
-  artifactVersion(): WFNaiveArtifactVersion {
+  entity(): string {
     throw new Error('Method not implemented.');
   }
+  project(): string {
+    throw new Error('Method not implemented.');
+  }
+  name(): string {
+    throw new Error('Method not implemented.');
+  }
+  commitHash(): string {
+    throw new Error('Method not implemented.');
+  }
+
   filePath(): string {
     throw new Error('Method not implemented.');
   }
@@ -900,28 +909,11 @@ class WFNaiveReferencedObject implements ReferencedObject {
   refUri(): string {
     throw new Error('Method not implemented.');
   }
-}
 
-class WFNaiveArtifactVersion implements ArtifactVersion {
-  artifactName(): string {
-    throw new Error('Method not implemented.');
-  }
-  versionCommitHash(): string {
-    throw new Error('Method not implemented.');
-  }
   versionIndex(): number {
     throw new Error('Method not implemented.');
   }
   aliases(): string[] {
-    throw new Error('Method not implemented.');
-  }
-  objectAtPath(path: string): ReferencedObject {
-    throw new Error('Method not implemented.');
-  }
-  entity(): string {
-    throw new Error('Method not implemented.');
-  }
-  project(): string {
     throw new Error('Method not implemented.');
   }
 }

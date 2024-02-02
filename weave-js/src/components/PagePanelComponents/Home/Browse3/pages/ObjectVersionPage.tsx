@@ -59,11 +59,11 @@ const ObjectVersionPageInner: React.FC<{
   objectVersion: WFObjectVersion;
   refExtra?: string;
 }> = ({objectVersion, refExtra}) => {
-  const objectVersionHash = objectVersion.artifactVersion().versionCommitHash();
+  const objectVersionHash = objectVersion.commitHash();
   const entityName = objectVersion.entity();
   const projectName = objectVersion.project();
   const objectName = objectVersion.object().name();
-  const objectVersionIndex = objectVersion.artifactVersion().versionIndex();
+  const objectVersionIndex = objectVersion.versionIndex();
   const objectVersionCount = objectVersion.object().objectVersions().length;
   const objectTypeCategory = objectVersion.typeVersion().typeCategory();
   const producingCalls = objectVersion.outputFrom().filter(call => {
@@ -308,7 +308,7 @@ const ObjectVersionProducingCallsItem: React.FC<{
         callId={call.callID()}
         simpleText={{
           opName: call.spanName(),
-          versionIndex: call.opVersion()?.artifactVersion().versionIndex() ?? 0,
+          versionIndex: call.opVersion()?.versionIndex() ?? 0,
         }}
       />
     );
@@ -328,8 +328,7 @@ const ObjectVersionProducingCallsItem: React.FC<{
               callId={call.callID()}
               simpleText={{
                 opName: call.spanName(),
-                versionIndex:
-                  call.opVersion()?.artifactVersion().versionIndex() ?? 0,
+                versionIndex: call.opVersion()?.versionIndex() ?? 0,
               }}
             />
           </li>
@@ -421,8 +420,8 @@ const OpVersionCallsLink: React.FC<{
         entityName={val.opVersion.entity()}
         projectName={val.opVersion.project()}
         opName={val.opVersion.op().name()}
-        version={val.opVersion.artifactVersion().versionCommitHash()}
-        versionIndex={val.opVersion.artifactVersion().versionIndex()}
+        version={val.opVersion.commitHash()}
+        versionIndex={val.opVersion.versionIndex()}
       />{' '}
       [
       <CallsLink

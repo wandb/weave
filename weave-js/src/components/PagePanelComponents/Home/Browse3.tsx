@@ -753,7 +753,7 @@ const useCallPeekRedirect = () => {
           refDictToRefString({
             entity: opVersion.entity(),
             project: opVersion.project(),
-            artifactName: opVersion.artifactVersion().artifactName(),
+            artifactName: opVersion.name(),
             versionCommitHash: '*',
             filePathParts: [],
             refExtraTuples: [],

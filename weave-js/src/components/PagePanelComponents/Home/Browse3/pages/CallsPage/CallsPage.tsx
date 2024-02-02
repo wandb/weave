@@ -25,7 +25,11 @@ import {
   useWeaveflowORMContext,
   WeaveflowORMContextType,
 } from '../wfInterface/context';
-import {refStringToRefDict, stringIsRef} from '../wfInterface/naive';
+import {
+  refDictToRefString,
+  refStringToRefDict,
+  stringIsRef,
+} from '../wfInterface/naive';
 import {
   HackyOpCategory,
   WFCall,
@@ -447,10 +451,16 @@ const convertHighLevelFilterToLowLevelFilter = (
       if (stringIsRef(ref)) {
         const refDict = refStringToRefDict(ref);
         if (refDict.versionCommitHash === '*') {
-          const artUri = ref.split(':')[0];
           allOpVersions.forEach(opVersion => {
             if (
-              opVersion.artifactVersion().objectAtPath('').refUri() === artUri
+              refDictToRefString({
+                entity: opVersion.op().entity(),
+                project: opVersion.op().project(),
+                artifactName: opVersion.name(),
+                versionCommitHash: '*',
+                filePathParts: [],
+                refExtraTuples: [],
+              }) === ref
             ) {
               opUrisFromVersions.push(opVersion.refUri());
             }
@@ -537,9 +547,7 @@ const useOpVersionOptions = (
       if (nameA !== nameB) {
         return nameA.localeCompare(nameB);
       }
-      return (
-        b.artifactVersion().versionIndex() - a.artifactVersion().versionIndex()
-      );
+      return b.versionIndex() - a.versionIndex();
     });
 
     // Build up options object, injecting options for all versions of an op.
@@ -551,8 +559,7 @@ const useOpVersionOptions = (
         options[opName + ':*'] = opNiceName(opName);
         lastName = opName;
       }
-      options[v.refUri()] =
-        opNiceName(opName) + ':v' + v.artifactVersion().versionIndex();
+      options[v.refUri()] = opNiceName(opName) + ':v' + v.versionIndex();
     }
     return options;
   }, [orm.projectConnection, runs.loading, runs.result]);
@@ -594,17 +601,12 @@ const useConsumesObjectVersionOptions = (
       if (nameA !== nameB) {
         return nameA.localeCompare(nameB);
       }
-      return (
-        b.artifactVersion().versionIndex() - a.artifactVersion().versionIndex()
-      );
+      return b.versionIndex() - a.versionIndex();
     });
 
     return _.fromPairs(
       versions.map(v => {
-        return [
-          v.refUri(),
-          v.object().name() + ':v' + v.artifactVersion().versionIndex(),
-        ];
+        return [v.refUri(), v.object().name() + ':v' + v.versionIndex()];
       })
     );
   }, [orm.projectConnection, runs.loading, runs.result]);

@@ -288,15 +288,15 @@ const ObjectVersionsTable: React.FC<{
         obj: ov,
         object: ov.object().name(),
         typeCategory: ov.typeVersion().typeCategory(),
-        version: ov.artifactVersion().versionCommitHash(),
+        version: ov.commitHash(),
         typeVersion:
           ov.typeVersion().type().name() + ':' + ov.typeVersion().version(),
         inputTo: ov.inputTo().length,
         outputFrom: firstOutputFrom,
         // description: ov.description(),
-        versionIndex: ov.artifactVersion().versionIndex(),
+        versionIndex: ov.versionIndex(),
         createdAt: ov.createdAtMs(),
-        isLatest: ov.artifactVersion().aliases().includes('latest'),
+        isLatest: ov.aliases().includes('latest'),
       };
     });
   }, [props.objectVersions]);
@@ -510,7 +510,7 @@ const applyFilter = (
       }
     }
     if (effectiveFilter.latest) {
-      if (!ov.artifactVersion().aliases().includes('latest')) {
+      if (!ov.aliases().includes('latest')) {
         return false;
       }
     }
@@ -579,10 +579,7 @@ const useOpVersionOptions = (
       versions.map(v => {
         return [
           v.refUri(),
-          v.op().name() +
-            ' (' +
-            truncateID(v.artifactVersion().versionCommitHash()) +
-            ')',
+          v.op().name() + ' (' + truncateID(v.commitHash()) + ')',
         ];
       })
     );
@@ -616,8 +613,6 @@ const useLatestOnlyOptions = (
   }, [allObjectVersions, highLevelFilter]);
 
   return useMemo(() => {
-    return _.uniq(
-      filtered.map(item => item.artifactVersion().aliases().includes('latest'))
-    );
+    return _.uniq(filtered.map(item => item.aliases().includes('latest')));
   }, [filtered]);
 };
