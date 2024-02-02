@@ -76,6 +76,7 @@ import {
   fnNaiveBootstrapFeedback,
   fnNaiveBootstrapObjects,
   fnNaiveBootstrapRuns,
+  refDictToRefString,
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
 import {SideNav} from './Browse3/SideNav';
@@ -748,7 +749,16 @@ const useCallPeekRedirect = () => {
         return;
       }
       const path = baseRouter.callsUIUrl(params.entity, params.project, {
-        opVersions: [opVersion.op().name() + ':*'],
+        opVersionRefs: [
+          refDictToRefString({
+            entity: opVersion.entity(),
+            project: opVersion.project(),
+            artifactName: opVersion.artifactVersion().artifactName(),
+            versionCommitHash: '*',
+            filePathParts: [],
+            refExtraTuples: [],
+          }),
+        ],
       });
       const searchParams = new URLSearchParams();
       searchParams.set(

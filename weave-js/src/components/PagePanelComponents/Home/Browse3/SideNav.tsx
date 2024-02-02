@@ -4,6 +4,7 @@ import {useParams} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from './context';
 import {useURLSearchParamsDict} from './pages/util';
+import {refDictToRefString} from './pages/wfInterface/naive';
 import {Sidebar, SidebarItem} from './Sidebar';
 
 export const SideNav = () => {
@@ -80,7 +81,16 @@ export const SideNav = () => {
         iconName: IconNames.TypeNumber,
         path: baseRouter.callsUIUrl(entity, project, {
           opCategory: 'evaluate',
-          opVersions: ['Evaluation-evaluate:*'],
+          opVersionRefs: [
+            refDictToRefString({
+              entity: currentEntity,
+              project: currentProject,
+              artifactName: 'Evaluation-evaluate',
+              versionCommitHash: '*',
+              filePathParts: [],
+              refExtraTuples: [],
+            }),
+          ],
           isPivot: true,
         }),
       },
