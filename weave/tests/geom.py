@@ -3,6 +3,10 @@ import math
 import typing
 import weave
 
+from .. import context_state as _context_state
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
+
 
 @weave.type()
 class Point2d:
@@ -44,3 +48,6 @@ class LineSegment:
         x = self.x0 + (self.x1 - self.x0) / 2
         y = self.y0 + (self.y1 - self.y0) / 2
         return Point2d(x, y)
+
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)
