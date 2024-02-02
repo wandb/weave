@@ -4,6 +4,7 @@ import {hexToId} from '../util/digest';
 import {has} from '../util/has';
 import {extension as fileExtension} from '../util/path';
 import {splitOnce} from '../util/string';
+import {taggable} from './modifiers';
 import {
   ConcreteTaggedValue,
   ConstType,
@@ -1077,6 +1078,23 @@ export const listObjectType = (type: Type): Type => {
     throw new Error('listObjectType: incoming type is not a list');
   }
   return type.objectType;
+};
+
+// Unwraps the inner type of a list, and passes tagged value along.
+export const listObjectTypePassTags = (type: Type): Type => {
+  return taggable(type, untaggedType => {
+    untaggedType = nullableTaggableValue(untaggedType);
+    if (isUnion(untaggedType)) {
+      return union(untaggedType.members.map(m => listObjectTypePassTags(m)));
+    }
+    if (isFunction(untaggedType)) {
+      return listObjectTypePassTags(untaggedType.outputType);
+    }
+    if (!isList(untaggedType)) {
+      throw new Error('listObjectType: incoming type is not a list');
+    }
+    return untaggedType.objectType;
+  });
 };
 
 export const listLength = (type: Type): number | undefined => {
