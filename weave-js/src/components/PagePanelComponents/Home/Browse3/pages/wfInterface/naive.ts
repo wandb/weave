@@ -925,13 +925,6 @@ class WFNaiveObjectVersion
   extends WFNaiveReferencedObject
   implements WFObjectVersion
 {
-  constructor(
-    private readonly state: WFNaiveProjectState,
-    private readonly objectVersionDict: WFNaiveObjectVersionDictType
-  ) {
-    super(objectVersionDict.reference, objectVersionDict.artifactVersion);
-  }
-
   static fromURI = (
     state: WFNaiveProjectState,
     objectRefUri: string
@@ -964,6 +957,12 @@ class WFNaiveObjectVersion
     }
     return new WFNaiveObjectVersion(state, objectVersionDict);
   };
+  constructor(
+    private readonly state: WFNaiveProjectState,
+    private readonly objectVersionDict: WFNaiveObjectVersionDictType
+  ) {
+    super(objectVersionDict.reference, objectVersionDict.artifactVersion);
+  }
   createdAtMs(): number {
     return this.objectVersionDict.artifactVersion.createdAt;
   }
@@ -1041,16 +1040,13 @@ type WFNaiveOpVersionDictType = {
   invokesOpVersionRefs: string[];
 };
 class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
-  constructor(
-    private readonly state: WFNaiveProjectState,
-    private readonly opVersionDict: WFNaiveOpVersionDictType
-  ) {
-    super(opVersionDict.reference, opVersionDict.artifactVersion);
-  }
   static fromURI = (
     state: WFNaiveProjectState,
     opRefUri: string
   ): WFNaiveOpVersion => {
+    // For now this works for now since there is only a single op stored in an
+    // artifact. If we ever store most stuff in op artifacts, then we might need
+    // to extend this to be more like the ObjectVersion.fromURI
     const opVersionDict = state.opVersionsMap.get(opRefUri);
     if (!opVersionDict) {
       throw new Error(
@@ -1059,6 +1055,12 @@ class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
     }
     return new WFNaiveOpVersion(state, opVersionDict);
   };
+  constructor(
+    private readonly state: WFNaiveProjectState,
+    private readonly opVersionDict: WFNaiveOpVersionDictType
+  ) {
+    super(opVersionDict.reference, opVersionDict.artifactVersion);
+  }
   opCategory(): HackyOpCategory | null {
     const opNames = this.opVersionDict.reference.artifactName.split('-');
     const opName = opNames[opNames.length - 1];
