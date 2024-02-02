@@ -199,6 +199,10 @@ def _tag_aware_dict_or_list_type_for_path(
             )
     elif isinstance(inner_type, types.TypedDict):
         return _dict_type_for_path(type, path)
+    elif isinstance(inner_type, types.Dict):
+        if len(next_path) == 0:
+            return inner_type.object_type
+        return _tag_aware_dict_or_list_type_for_path(inner_type.object_type, next_path)
     else:
         return types.NoneType()
 

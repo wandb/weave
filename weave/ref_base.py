@@ -11,6 +11,7 @@ from . import errors
 from . import graph_client_context
 from . import weave_types as types
 from . import object_context
+from . import context_state
 from .language_features.tagging import tag_store
 
 # We store Refs here if we can't attach them directly to the object
@@ -77,7 +78,8 @@ class Ref:
             ref_without_extra = self.without_extra(None)
             outer_obj = ref_without_extra.get()
             try:
-                obj = outer_obj._lookup_path(self.extra)  # type: ignore
+                with context_state.ref_tracking(True):
+                    obj = outer_obj._lookup_path(self.extra)  # type: ignore
             except AttributeError:
                 raise errors.WeaveInternalError(
                     f"Ref has extra {self.extra} but object of type {type(outer_obj)} does not support _lookup_path"

@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
@@ -26,6 +27,7 @@ import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
 import {useWeaveflowORMContext} from './wfInterface/context';
+import {refDictToRefString} from './wfInterface/naive';
 import {WFCall, WFObjectVersion, WFOpVersion} from './wfInterface/types';
 
 export const ObjectVersionPage: React.FC<{
@@ -33,12 +35,24 @@ export const ObjectVersionPage: React.FC<{
   project: string;
   objectName: string;
   version: string;
+  filePath: string;
   refExtra?: string;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
+  const refExtraParts = props.refExtra ? props.refExtra.split('/') : [];
   const objectVersion = orm.projectConnection.objectVersion(
-    props.objectName,
-    props.version
+    refDictToRefString({
+      entity: props.entity,
+      project: props.project,
+      artifactName: props.objectName,
+      versionCommitHash: props.version,
+      // TODO: We need to get more of these from the URL!
+      filePathParts: props.filePath.split('/'),
+      refExtraTuples: _.range(0, refExtraParts.length, 2).map(i => ({
+        edgeType: refExtraParts[i],
+        edgeName: refExtraParts[i + 1],
+      })),
+    })
   );
   if (!objectVersion) {
     return <CenteredAnimatedLoader />;
@@ -47,31 +61,34 @@ export const ObjectVersionPage: React.FC<{
 };
 const ObjectVersionPageInner: React.FC<{
   objectVersion: WFObjectVersion;
-  refExtra?: string;
-}> = ({objectVersion, refExtra}) => {
-  const objectVersionHash = objectVersion.version();
+}> = ({objectVersion}) => {
+  const objectVersionHash = objectVersion.commitHash();
   const entityName = objectVersion.entity();
   const projectName = objectVersion.project();
   const objectName = objectVersion.object().name();
   const objectVersionIndex = objectVersion.versionIndex();
+  const objectFilePath = objectVersion.filePath();
+  const refExtra = objectVersion.refExtraPath();
   const objectVersionCount = objectVersion.object().objectVersions().length;
-  const objectTypeCategory = objectVersion.typeVersion().typeCategory();
+  const objectTypeCategory = objectVersion.typeVersion()?.typeCategory();
   const producingCalls = objectVersion.outputFrom().filter(call => {
     return call.opVersion() != null;
   });
   const consumingCalls = objectVersion.inputTo().filter(call => {
     return call.opVersion() != null;
   });
-  const baseUri = objectVersion.refUri();
+  const refUri = objectVersion.refUri();
 
   const itemNode = useMemo(() => {
+    const uriParts = refUri.split('#');
+    const baseUri = uriParts[0];
     const objNode = opGet({uri: constString(baseUri)});
-    if (refExtra == null) {
+    if (uriParts.length === 1) {
       return objNode;
     }
-    const extraFields = refExtra.split('/');
+    const extraFields = uriParts[1].split('/');
     return nodeFromExtra(objNode, extraFields);
-  }, [baseUri, refExtra]);
+  }, [refUri]);
 
   return (
     <SimplePageLayoutWithHeader
@@ -119,16 +136,10 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            // TEMP HACK (Tim): Disabling with refExtra is a temporary hack
-            // since objectVersion is always an `/obj` path right now which is
-            // not correct. There is a more full featured solution here:
-            // https://github.com/wandb/weave/pull/1080 that needs to be
-            // finished asap. This is just to fix the demo / first internal
-            // release.
-            ...(refExtra ? {Ref: <span>{baseUri}</span>} : {}),
+            Ref: <span>{refUri}</span>,
             // Hide consuming and producing calls since we don't have a
             // good way to look this up yet
-            ...(producingCalls.length > 0 && refExtra == null
+            ...(producingCalls.length > 0
               ? {
                   'Producing Calls': (
                     <ObjectVersionProducingCallsItem
@@ -137,7 +148,7 @@ const ObjectVersionPageInner: React.FC<{
                   ),
                 }
               : {}),
-            ...(consumingCalls.length > 0 && refExtra == null
+            ...(consumingCalls.length > 0
               ? {
                   'Consuming Calls': (
                     <ObjectVersionConsumingCallsItem
@@ -180,12 +191,13 @@ const ObjectVersionPageInner: React.FC<{
           label: 'Values',
           content: (
             <WeaveEditorSourceContext.Provider
-              key={baseUri + refExtra}
+              key={refUri}
               value={{
                 entityName,
                 projectName,
                 objectName,
                 objectVersionHash,
+                filePath: objectFilePath,
                 refExtra: refExtra?.split('/'),
               }}>
               <ScrollableTabContent>
@@ -202,15 +214,15 @@ const ObjectVersionPageInner: React.FC<{
           label: 'Use',
           content:
             objectTypeCategory === 'dataset' ? (
-              <TabUseDataset name={objectName} uri={baseUri} />
+              <TabUseDataset name={objectName} uri={refUri} />
             ) : objectTypeCategory === 'model' ? (
               <TabUseModel
                 name={objectName}
-                uri={baseUri}
+                uri={refUri}
                 projectName={projectName}
               />
             ) : (
-              <TabUseObject name={objectName} uri={baseUri} />
+              <TabUseObject name={objectName} uri={refUri} />
             ),
         },
 
@@ -355,11 +367,7 @@ const ObjectVersionConsumingCallsItem: React.FC<{
     <GroupedCalls
       calls={consumingCalls}
       partialFilter={{
-        inputObjectVersions: [
-          props.objectVersion.object().name() +
-            ':' +
-            props.objectVersion.version(),
-        ],
+        inputObjectVersionRefs: [props.objectVersion.refUri()],
       }}
     />
   );
@@ -382,7 +390,7 @@ export const GroupedCalls: React.FC<{
         return;
       }
 
-      const key = opVersion.version();
+      const key = opVersion.refUri();
       if (groups[key] == null) {
         groups[key] = {
           opVersion,
@@ -431,7 +439,7 @@ const OpVersionCallsLink: React.FC<{
         entityName={val.opVersion.entity()}
         projectName={val.opVersion.project()}
         opName={val.opVersion.op().name()}
-        version={val.opVersion.version()}
+        version={val.opVersion.commitHash()}
         versionIndex={val.opVersion.versionIndex()}
         variant="secondary"
       />{' '}
@@ -441,9 +449,7 @@ const OpVersionCallsLink: React.FC<{
         project={val.opVersion.project()}
         callCount={val.calls.length}
         filter={{
-          opVersions: [
-            val.opVersion.op().name() + ':' + val.opVersion.version(),
-          ],
+          opVersionRefs: [val.opVersion.refUri()],
           ...(partialFilter ?? {}),
         }}
         neverPeek

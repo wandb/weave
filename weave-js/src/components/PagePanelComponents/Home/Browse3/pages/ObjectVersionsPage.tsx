@@ -84,7 +84,7 @@ export type WFHighLevelObjectVersionFilter = {
   typeVersions?: string[];
   latest?: boolean;
   typeCategory?: HackyTypeCategory | null;
-  inputToOpVersions?: string[];
+  inputToOpVersionRefs?: string[];
 };
 
 export const FilterableObjectVersionsTable: React.FC<{
@@ -216,11 +216,11 @@ export const FilterableObjectVersionsTable: React.FC<{
                 renderInput={params => (
                   <TextField {...params} label="Input To" />
                 )}
-                value={effectiveFilter.inputToOpVersions?.[0] ?? null}
+                value={effectiveFilter.inputToOpVersionRefs?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    inputToOpVersions: newValue ? [newValue] : [],
+                    inputToOpVersionRefs: newValue ? [newValue] : [],
                   });
                 }}
                 getOptionLabel={option => {
@@ -281,18 +281,18 @@ const ObjectVersionsTable: React.FC<{
       const firstOutputFromOpVersion =
         outputFrom.length > 0 ? outputFrom[0].opVersion() : null;
       const firstOutputFrom = firstOutputFromOpVersion
-        ? firstOutputFromOpVersion.op().name() +
-          ':' +
-          firstOutputFromOpVersion.version()
+        ? firstOutputFromOpVersion.refUri()
         : null;
+      const typeVersion = ov.typeVersion();
       return {
-        id: ov.version(),
+        id: ov.refUri(),
         obj: ov,
         object: ov.object().name(),
-        typeCategory: ov.typeVersion().typeCategory(),
-        version: ov.version(),
-        typeVersion:
-          ov.typeVersion().type().name() + ':' + ov.typeVersion().version(),
+        typeCategory: ov.typeVersion()?.typeCategory(),
+        version: ov.commitHash(),
+        typeVersion: typeVersion
+          ? typeVersion.type().name() + ':' + typeVersion.version()
+          : null,
         inputTo: ov.inputTo().length,
         outputFrom: firstOutputFrom,
         // description: ov.description(),
@@ -314,6 +314,8 @@ const ObjectVersionsTable: React.FC<{
             objectName={params.row.obj.object().name()}
             version={params.row.obj.version()}
             versionIndex={params.row.obj.versionIndex()}
+            filePath={params.row.obj.filePath()}
+            refExtra={params.row.obj.refExtraPath()}
           />
         );
       },
@@ -502,11 +504,13 @@ const applyFilter = (
       effectiveFilter.typeVersions &&
       effectiveFilter.typeVersions.length > 0
     ) {
+      const typeVersion = ov.typeVersion();
+      if (!typeVersion) {
+        return false;
+      }
       if (
         !effectiveFilter.typeVersions.includes(
-          ov.typeVersion().type().name() +
-            ':' +
-            ov.typeVersion().version().toString()
+          typeVersion.type().name() + ':' + typeVersion.version().toString()
         )
       ) {
         return false;
@@ -518,22 +522,20 @@ const applyFilter = (
       }
     }
     if (effectiveFilter.typeCategory) {
-      if (effectiveFilter.typeCategory !== ov.typeVersion().typeCategory()) {
+      if (effectiveFilter.typeCategory !== ov.typeVersion()?.typeCategory()) {
         return false;
       }
     }
     if (
-      effectiveFilter.inputToOpVersions &&
-      effectiveFilter.inputToOpVersions.length > 0
+      effectiveFilter.inputToOpVersionRefs &&
+      effectiveFilter.inputToOpVersionRefs.length > 0
     ) {
       const inputToOpVersions = ov.inputTo().map(i => i.opVersion());
       if (
         !inputToOpVersions.some(
           ovInner =>
             ovInner &&
-            effectiveFilter.inputToOpVersions?.includes(
-              ovInner.op().name() + ':' + ovInner.version()
-            )
+            effectiveFilter.inputToOpVersionRefs?.includes(ovInner.refUri())
         )
       ) {
         return false;
@@ -585,8 +587,8 @@ const useOpVersionOptions = (
     return _.fromPairs(
       versions.map(v => {
         return [
-          v.op().name() + ':' + v.version(),
-          v.op().name() + ' (' + truncateID(v.version()) + ')',
+          v.refUri(),
+          v.op().name() + ' (' + truncateID(v.commitHash()) + ')',
         ];
       })
     );
@@ -606,7 +608,7 @@ const useTypeCategoryOptions = (
 
   return useMemo(() => {
     return _.uniq(
-      filtered.map(item => item.typeVersion().typeCategory())
+      filtered.map(item => item.typeVersion()?.typeCategory())
     ).filter(v => v != null) as HackyTypeCategory[];
   }, [filtered]);
 };

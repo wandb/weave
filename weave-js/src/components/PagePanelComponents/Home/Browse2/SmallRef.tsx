@@ -42,28 +42,20 @@ type WFDBTableType =
   | 'ObjectVersion';
 
 export const objectRefDisplayName = (objRef: ObjectRef) => {
-  let label = objRef.artifactName + ':' + objRef.artifactVersion.slice(0, 6);
-  let linkSuffix = '';
-
-  // TEMP HACK (Tim): This is a temporary hack to ensure that SmallRef renders
-  // the Evaluation rows with the correct label and link. There is a more full
-  // featured solution here: https://github.com/wandb/weave/pull/1080 that needs
-  // to be finished asap. This is just to fix the demo / first internal release.
-  if (objRef.artifactPath.endsWith('rows%2F0')) {
-    // decodeURIComponent is needed because the path is url encoded
-    const artPath = decodeURIComponent(objRef.artifactPath);
-    const parts = artPath.split('/');
-    const firstParts = parts.slice(0, parts.length - 2);
-    firstParts.push('rows');
-    const labelPath = '/' + firstParts.join('/');
-    label +=
-      labelPath + (objRef.objectRefExtra ? '/' + objRef.objectRefExtra : '');
-
-    linkSuffix =
-      labelPath +
-      (objRef.objectRefExtra ? '/index/' + objRef.objectRefExtra : '');
+  let label = `${objRef.artifactName}:${objRef.artifactVersion.slice(0, 6)}`;
+  if (objRef.artifactPath !== 'obj') {
+    label += '/' + objRef.artifactPath;
   }
-  return {label, linkSuffix};
+  if (objRef.artifactRefExtra) {
+    // Remove every other extra part
+    const parts = objRef.artifactRefExtra.split('/');
+    const newParts = [];
+    for (let i = 1; i < parts.length; i += 2) {
+      newParts.push(parts[i]);
+    }
+    label += '#' + newParts.join('/');
+  }
+  return {label};
 };
 export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   objRef,
@@ -78,7 +70,7 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   const refTypeQuery = useNodeValue(refTypeNode);
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);
-  const {label, linkSuffix} = objectRefDisplayName(objRef);
+  const {label} = objectRefDisplayName(objRef);
 
   const rootTypeName = getTypeName(rootType);
   let icon: IconName = IconNames.CubeContainer;
@@ -118,7 +110,7 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   return (
     <Link
       $variant="secondary"
-      to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable) + linkSuffix}>
+      to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
       {Item}
     </Link>
   );
