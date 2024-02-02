@@ -236,7 +236,7 @@ const CallPageInnerVertical: FC<{
   setVerticalLayout: (vertical: boolean) => void;
 }> = ({call, setVerticalLayout}) => {
   const callId = call.callID();
-  const spanName = call.spanName();
+  const spanName = opNiceName(call.spanName());
   const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   return (
