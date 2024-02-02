@@ -1087,8 +1087,6 @@ class ObjectType(Type):
 
     def _to_dict(self) -> dict:
         d = self.class_to_dict()
-        if hasattr(self, "_type_name"):
-            d["type"] = getattr(self, "_type_name")
 
         if self._relocatable:
             d["_relocatable"] = True
