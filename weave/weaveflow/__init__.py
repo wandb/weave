@@ -8,14 +8,13 @@ logs.configure_logger()
 
 from .dataset import *
 from .model import *
-
-# from .chat_model import *
-# from .structured_output import *
+from .chat_model import *
+from .structured_output import *
 
 from .evaluate import *
 
-# from .openai import *
-# from .anyscale import *
-# from .huggingface import *
+from .openai import *
+from .anyscale import *
+from .huggingface import *
 
 from .faiss import *
