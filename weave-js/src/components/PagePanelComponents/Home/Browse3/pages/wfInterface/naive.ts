@@ -878,6 +878,7 @@ type WFNaiveObjectVersionDictType = {
 };
 
 class WFNaiveReferencedObject implements ReferencedObject {
+  // TODO: I don't think this should be exposed
   artifactVersion(): WFNaiveArtifactVersion {
     throw new Error('Method not implemented.');
   }
