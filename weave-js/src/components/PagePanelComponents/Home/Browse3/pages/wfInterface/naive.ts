@@ -66,7 +66,7 @@ type WFNaiveRefDict = {
   }>;
 };
 
-const uriToRefDict = (uri: string): WFNaiveRefDict => {
+export const refStringToRefDict = (uri: string): WFNaiveRefDict => {
   const scheme = 'wandb-artifact:///';
   if (!uri.startsWith(scheme)) {
     throw new Error('Invalid uri: ' + uri);
@@ -105,16 +105,16 @@ const uriToRefDict = (uri: string): WFNaiveRefDict => {
   };
 };
 
-const stringIsUri = (uri: string): boolean => {
+export const stringIsRef = (maybeRef: string): boolean => {
   try {
-    uriToRefDict(uri);
+    refStringToRefDict(maybeRef);
     return true;
   } catch (e) {
     return false;
   }
 };
 
-const refDictToUri = (refDict: WFNaiveRefDict): string => {
+const refDictToRefString = (refDict: WFNaiveRefDict): string => {
   const {
     entity,
     project,
@@ -435,7 +435,7 @@ const bfdObjectsToArtifactVersions = (
   return new Map(
     objects.map(object => {
       return [
-        refDictToUri(objectVersionDictTypeToWFNaiveRefDict(object)),
+        refDictToRefString(objectVersionDictTypeToWFNaiveRefDict(object)),
         object,
       ];
     })
@@ -449,7 +449,7 @@ const bfdObjectsToObjectVersions = (
     objectVersions.map(objectVersion => {
       const reference = objectVersionDictTypeToWFNaiveRefDict(objectVersion);
       return [
-        refDictToUri(reference),
+        refDictToRefString(reference),
         {
           reference,
           artifactVersion:
@@ -468,7 +468,7 @@ const bfdOpsToOpVersions = (
     opVersions.map(opVersion => {
       const reference = objectVersionDictTypeToWFNaiveRefDict(opVersion);
       return [
-        refDictToUri(reference),
+        refDictToRefString(reference),
         {
           reference,
           artifactVersion:
@@ -560,7 +560,7 @@ const bfsCallsAndObjectsToCallsMap = (
     joinedCalls.map(call => {
       const name = call.name;
       let opVersionRef: string | undefined;
-      if (stringIsUri(name)) {
+      if (stringIsRef(name)) {
         opVersionRef = name;
       }
       const inputObjectVersionRefs: string[] = [];
@@ -568,7 +568,7 @@ const bfsCallsAndObjectsToCallsMap = (
 
       Object.values(call.inputs).forEach((input: any) => {
         if (typeof input === 'string') {
-          if (stringIsUri(input)) {
+          if (stringIsRef(input)) {
             inputObjectVersionRefs.push(input);
           }
         }
@@ -576,7 +576,7 @@ const bfsCallsAndObjectsToCallsMap = (
 
       Object.values(call.output ?? {}).forEach((output: any) => {
         if (typeof output === 'string') {
-          if (stringIsUri(output)) {
+          if (stringIsRef(output)) {
             outputObjectVersionRefs.push(output);
           }
         }
@@ -985,7 +985,7 @@ class WFNaiveObjectVersion
     );
   }
   inputTo(): WFCall[] {
-    const myRef = refDictToUri(this.objectVersionDict.reference);
+    const myRef = refDictToRefString(this.objectVersionDict.reference);
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
         return callDict.inputObjectVersionRefs?.includes(myRef);
@@ -995,7 +995,7 @@ class WFNaiveObjectVersion
       });
   }
   outputFrom(): WFCall[] {
-    const myRef = refDictToUri(this.objectVersionDict.reference);
+    const myRef = refDictToRefString(this.objectVersionDict.reference);
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
         return callDict.outputObjectVersionRefs?.includes(myRef);
@@ -1008,7 +1008,7 @@ class WFNaiveObjectVersion
     return this.objectVersionDict.artifactVersion.description;
   }
   refUri(): string {
-    return refDictToUri(this.objectVersionDict.reference);
+    return refDictToRefString(this.objectVersionDict.reference);
   }
 }
 
@@ -1085,7 +1085,7 @@ class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
     });
   }
   invokedBy(): WFOpVersion[] {
-    const myRef = refDictToUri(this.opVersionDict.reference);
+    const myRef = refDictToRefString(this.opVersionDict.reference);
     return Array.from(this.state.opVersionsMap.values())
       .filter(opVersionDict => {
         return opVersionDict.invokesOpVersionRefs.includes(myRef);
@@ -1095,7 +1095,7 @@ class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
       });
   }
   calls(): WFCall[] {
-    const myRef = refDictToUri(this.opVersionDict.reference);
+    const myRef = refDictToRefString(this.opVersionDict.reference);
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
         return callDict.opVersionRef === myRef;
@@ -1114,7 +1114,7 @@ class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
     return this.state.project;
   }
   refUri(): string {
-    return refDictToUri(this.opVersionDict.reference);
+    return refDictToRefString(this.opVersionDict.reference);
   }
 }
 
