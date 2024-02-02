@@ -92,7 +92,7 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const getInitialData = useCallback(() => {
     return orm.projectConnection.opVersions().map(o => {
-      return {id: o.version(), obj: o};
+      return {id: o.refUri(), obj: o};
     });
   }, [orm.projectConnection]);
 
@@ -118,7 +118,7 @@ export const FilterableOpVersionsTable: React.FC<{
         columnId: 'version',
         gridDisplay: {
           columnLabel: 'Op',
-          columnValue: obj => obj.obj.version(),
+          columnValue: obj => obj.obj.refUri(),
           gridColDefOptions: {
             hideable: false,
             renderCell: params => {
@@ -127,8 +127,8 @@ export const FilterableOpVersionsTable: React.FC<{
                   entityName={params.row.obj.entity()}
                   projectName={params.row.obj.project()}
                   opName={params.row.obj.op().name()}
-                  version={params.row.obj.version()}
-                  versionIndex={params.row.obj.versionIndex()}
+                  version={params.row.obj.artifactVersion().versionCommitHash()}
+                  versionIndex={params.row.obj.artifactVersion().versionIndex()}
                 />
               );
             },
@@ -159,11 +159,7 @@ export const FilterableOpVersionsTable: React.FC<{
                   project={params.row.obj.project()}
                   callCount={params.value as number}
                   filter={{
-                    opVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
+                    opVersionRefs: [params.row.obj.refUri()],
                   }}
                 />
               );
@@ -615,7 +611,10 @@ export const FilterableOpVersionsTable: React.FC<{
         filterControls: {
           filterKeys: ['isLatest'],
           filterPredicate: ({obj}, {isLatest}) => {
-            return !isLatest || obj.aliases().includes('latest') === isLatest;
+            return (
+              !isLatest ||
+              obj.artifactVersion().aliases().includes('latest') === isLatest
+            );
           },
           filterControlListItem: cellProps => {
             return (
@@ -953,7 +952,9 @@ const LatestOnlyControlListItem: React.FC<{
 }> = props => {
   const options = useMemo(() => {
     return _.uniq(
-      props.frozenData.map(o => o.obj.aliases().includes('latest'))
+      props.frozenData.map(o =>
+        o.obj.artifactVersion().aliases().includes('latest')
+      )
     );
   }, [props.frozenData]);
 
