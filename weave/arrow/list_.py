@@ -1320,9 +1320,6 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             result_rows, self.object_type, self._artifact
         )
         if isinstance(index, int):
-            from .. import ref_base
-            from .. import artifact_base
-
             result = awl.to_pylist_tagged()[0]
 
             return ref_util.val_with_relative_ref(
