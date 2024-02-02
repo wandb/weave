@@ -23,6 +23,9 @@ import {
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
+import {TabUseDataset} from './TabUseDataset';
+import {TabUseModel} from './TabUseModel';
+import {TabUseObject} from './TabUseObject';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {refDictToRefString} from './wfInterface/naive';
 import {WFCall, WFObjectVersion, WFOpVersion} from './wfInterface/types';
@@ -93,25 +96,22 @@ const ObjectVersionPageInner: React.FC<{
       headerContent={
         <SimpleKeyValueTable
           data={{
-            ...(refExtra
-              ? {
-                  Name: (
-                    <>
-                      {objectName} [
-                      <ObjectVersionsLink
-                        entity={entityName}
-                        project={projectName}
-                        filter={{
-                          objectName,
-                        }}
-                        versionCount={objectVersionCount}
-                        neverPeek
-                      />
-                      ]
-                    </>
-                  ),
-                }
-              : {}),
+            [refExtra ? 'Parent Object' : 'Name']: (
+              <>
+                {objectName} [
+                <ObjectVersionsLink
+                  entity={entityName}
+                  project={projectName}
+                  filter={{
+                    objectName,
+                  }}
+                  versionCount={objectVersionCount}
+                  neverPeek
+                  variant="secondary"
+                />
+                ]
+              </>
+            ),
             Version: <>{objectVersionIndex}</>,
             ...(objectTypeCategory
               ? {
@@ -210,6 +210,22 @@ const ObjectVersionPageInner: React.FC<{
             </WeaveEditorSourceContext.Provider>
           ),
         },
+        {
+          label: 'Use',
+          content:
+            objectTypeCategory === 'dataset' ? (
+              <TabUseDataset name={objectName} uri={refUri} />
+            ) : objectTypeCategory === 'model' ? (
+              <TabUseModel
+                name={objectName}
+                uri={refUri}
+                projectName={projectName}
+              />
+            ) : (
+              <TabUseObject name={objectName} uri={refUri} />
+            ),
+        },
+
         // {
         //   label: 'Metadata',
         //   content: (
@@ -425,6 +441,7 @@ const OpVersionCallsLink: React.FC<{
         opName={val.opVersion.op().name()}
         version={val.opVersion.commitHash()}
         versionIndex={val.opVersion.versionIndex()}
+        variant="secondary"
       />{' '}
       [
       <CallsLink
@@ -436,6 +453,7 @@ const OpVersionCallsLink: React.FC<{
           ...(partialFilter ?? {}),
         }}
         neverPeek
+        variant="secondary"
       />
       ]
     </>

@@ -203,9 +203,6 @@ const Browse3Mounted: FC<{
         height: `calc(100vh - ${props.headerOffset ?? 0}px)`,
         overflow: 'auto',
         flexDirection: 'column',
-        a: {
-          color: '#038194',
-        },
       }}>
       {weaveLoading && (
         <Box

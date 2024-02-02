@@ -61,8 +61,8 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowCurrentRouteContext} from '../Browse3/context';
+import {Link} from '../Browse3/pages/common/Links';
 import {flattenObject, unflattenObject} from './browse2Util';
-import {Link} from './CommonLib';
 import {
   mutationPublishArtifact,
   mutationSet,

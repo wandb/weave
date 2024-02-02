@@ -1,4 +1,4 @@
-import {Box, Typography} from '@material-ui/core';
+import {Alert, Box, Button, Typography} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -19,8 +19,8 @@ import React, {
 } from 'react';
 import {useParams} from 'react-router-dom';
 
-import {TEAL_600} from '../../../../common/css/color.styles';
-import {TargetBlank} from '../../../../common/util/links';
+import {MOON_250} from '../../../../common/css/color.styles';
+import {A, TargetBlank} from '../../../../common/util/links';
 import {Timestamp} from '../../../Timestamp';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
@@ -31,6 +31,11 @@ import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
+import {
+  computeTableStats,
+  getInputColumns,
+  useColumnVisibility,
+} from './tableStats';
 
 export type DataGridColumnGroupingModel = Exclude<
   ComponentProps<typeof DataGrid>['columnGroupingModel'],
@@ -40,7 +45,8 @@ export type DataGridColumnGroupingModel = Exclude<
 function addToTree(
   node: GridColumnGroup,
   fields: string[],
-  fullPath: string
+  fullPath: string,
+  depth: number
 ): void {
   if (!fields.length) {
     return;
@@ -54,15 +60,22 @@ function addToTree(
   }
 
   for (const child of node.children) {
-    if ('groupId' in child && child.groupId === fields[0]) {
-      addToTree(child as GridColumnGroup, fields.slice(1), fullPath);
+    if ('groupId' in child && child.headerName === fields[0]) {
+      addToTree(child as GridColumnGroup, fields.slice(1), fullPath, depth + 1);
       return;
     }
   }
 
-  const newNode: GridColumnGroup = {groupId: fields[0], children: []};
+  const newNode: GridColumnGroup = {
+    headerName: fields[0],
+    groupId: fullPath
+      .split('.')
+      .slice(0, depth + 2)
+      .join('.'),
+    children: [],
+  };
   node.children.push(newNode);
-  addToTree(newNode, fields.slice(1), fullPath);
+  addToTree(newNode, fields.slice(1), fullPath, depth + 1);
 }
 
 export function buildTree(
@@ -73,7 +86,7 @@ export function buildTree(
 
   for (const str of strings) {
     const fields = str.split('.');
-    addToTree(root, fields, rootGroupName + '.' + str);
+    addToTree(root, fields, rootGroupName + '.' + str, 0);
   }
 
   return root;
@@ -84,9 +97,11 @@ export const RunsTable: FC<{
   spans: SpanWithFeedback[];
   clearFilters?: null | (() => void);
 }> = ({loading, spans, clearFilters}) => {
-  const showIO = useMemo(() => {
-    return Array.from(new Set(spans.map(span => span.name))).length === 1;
+  const showIO = true;
+  const isSingleOpVersion = useMemo(() => {
+    return _.uniq(spans.map(span => span.name)).length === 1;
   }, [spans]);
+
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
   // side
@@ -128,7 +143,7 @@ export const RunsTable: FC<{
           _.mapKeys(
             _.omitBy(args, v => v == null),
             (v, k) => {
-              return 'input_' + k;
+              return 'input.' + k;
             }
           ),
           v =>
@@ -162,6 +177,12 @@ export const RunsTable: FC<{
       };
     });
   }, [orm?.projectConnection, spans, loading]);
+  const tableStats = useMemo(() => {
+    return computeTableStats(tableData);
+  }, [tableData]);
+  const {allShown, columnVisibilityModel, forceShowAll, setForceShowAll} =
+    useColumnVisibility(tableStats);
+  const showVisibilityAlert = !isSingleOpVersion && !allShown && !forceShowAll;
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
@@ -193,7 +214,7 @@ export const RunsTable: FC<{
     const cols: GridColDef[] = [
       {
         field: 'span_id',
-        headerName: 'Call',
+        headerName: 'Trace',
         width: 75,
         minWidth: 75,
         maxWidth: 75,
@@ -338,11 +359,12 @@ export const RunsTable: FC<{
         }
       }
 
-      const inputOrder =
-        row0.inputs._arg_order ??
-        Object.keys(_.omitBy(row0.inputs, v => v == null)).filter(
-          k => !k.startsWith('_')
-        );
+      const inputOrder = !isSingleOpVersion
+        ? getInputColumns(tableStats)
+        : row0.inputs._arg_order ??
+          Object.keys(_.omitBy(row0.inputs, v => v == null)).filter(
+            k => !k.startsWith('_')
+          );
       const inputGroup: Exclude<
         ComponentProps<typeof DataGrid>['columnGroupingModel'],
         undefined
@@ -354,13 +376,17 @@ export const RunsTable: FC<{
         cols.push({
           flex: 1,
           minWidth: 150,
-          field: 'input_' + key,
+          field: 'input.' + key,
           headerName: key,
           renderCell: cellParams => {
-            return renderCell(cellParams.row['input_' + key]);
+            const k = 'input.' + key;
+            if (k in cellParams.row) {
+              return renderCell(cellParams.row[k]);
+            }
+            return <NotApplicable />;
           },
         });
-        inputGroup.children.push({field: 'input_' + key});
+        inputGroup.children.push({field: 'input.' + key});
       }
       colGroupingModel.push(inputGroup);
 
@@ -392,7 +418,11 @@ export const RunsTable: FC<{
           field: 'output.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {
-            return renderCell(cellParams.row['output.' + key]);
+            const k = 'output.' + key;
+            if (k in cellParams.row) {
+              return renderCell(cellParams.row[k]);
+            }
+            return <NotApplicable />;
           },
         });
       }
@@ -433,7 +463,15 @@ export const RunsTable: FC<{
     }
 
     return {cols, colGroupingModel};
-  }, [orm, params.entity, params.project, showIO, spans]);
+  }, [
+    orm,
+    params.entity,
+    params.project,
+    showIO,
+    spans,
+    isSingleOpVersion,
+    tableStats,
+  ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();
   // const history = useHistory();
@@ -460,8 +498,11 @@ export const RunsTable: FC<{
         sorting: {
           sortModel: [{field: 'timestampMs', sort: 'desc'}],
         },
+        columns: {
+          columnVisibilityModel,
+        },
       };
-    }, [loading]);
+    }, [loading, columnVisibilityModel]);
 
   // This is a workaround.
   // initialState won't take effect if columns are not set.
@@ -473,71 +514,86 @@ export const RunsTable: FC<{
   }, [columns, initialState, apiRef]);
 
   return (
-    <StyledDataGrid
-      columnHeaderHeight={40}
-      apiRef={apiRef}
-      loading={loading}
-      rows={tableData}
-      // density="compact"
-      initialState={initialState}
-      rowHeight={38}
-      columns={columns.cols}
-      experimentalFeatures={{columnGrouping: true}}
-      disableRowSelectionOnClick
-      rowSelectionModel={rowSelectionModel}
-      columnGroupingModel={columns.colGroupingModel}
-      // onRowClick={({id}) => {
-      //   history.push(
-      //     peekingRouter.callUIUrl(
-      //       params.entity,
-      //       params.project,
-      //       '',
-      //       id as string
-      //     )
-      //   );
-      // }}
-      slots={{
-        noRowsOverlay: () => {
-          return (
-            <Box
-              sx={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}>
-              <Typography color="textSecondary">
-                No calls found.{' '}
-                {clearFilters != null ? (
-                  <>
-                    Try{' '}
-                    <span
-                      style={{
-                        cursor: 'pointer',
-                        color: TEAL_600,
-                      }}
-                      onClick={() => {
-                        clearFilters();
-                      }}>
-                      clearing the filters
-                    </span>{' '}
-                    or l
-                  </>
-                ) : (
-                  'L'
-                )}
-                earn more about how to log calls by visiting{' '}
-                <TargetBlank href="https://wandb.me/weave">
-                  the docs
-                </TargetBlank>
-                .
-              </Typography>
-            </Box>
-          );
-        },
-      }}
-    />
-    // </Box>
+    <>
+      {showVisibilityAlert && (
+        <Alert
+          severity="info"
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => setForceShowAll(true)}>
+              Show all
+            </Button>
+          }>
+          Columns having many empty values have been hidden.
+        </Alert>
+      )}
+      <StyledDataGrid
+        columnHeaderHeight={40}
+        apiRef={apiRef}
+        loading={loading}
+        rows={tableData}
+        // density="compact"
+        initialState={initialState}
+        rowHeight={38}
+        columns={columns.cols}
+        experimentalFeatures={{columnGrouping: true}}
+        disableRowSelectionOnClick
+        rowSelectionModel={rowSelectionModel}
+        columnGroupingModel={columns.colGroupingModel}
+        // onRowClick={({id}) => {
+        //   history.push(
+        //     peekingRouter.callUIUrl(
+        //       params.entity,
+        //       params.project,
+        //       '',
+        //       id as string
+        //     )
+        //   );
+        // }}
+        slots={{
+          noRowsOverlay: () => {
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                <Typography color="textSecondary">
+                  No calls found.{' '}
+                  {clearFilters != null ? (
+                    <>
+                      Try{' '}
+                      <A
+                        onClick={() => {
+                          clearFilters();
+                        }}>
+                        clearing the filters
+                      </A>{' '}
+                      or l
+                    </>
+                  ) : (
+                    'L'
+                  )}
+                  earn more about how to log calls by visiting{' '}
+                  <TargetBlank href="https://wandb.me/weave">
+                    the docs
+                  </TargetBlank>
+                  .
+                </Typography>
+              </Box>
+            );
+          },
+        }}
+      />
+    </>
   );
+};
+
+const NotApplicable = () => {
+  return <Box sx={{color: MOON_250}}>N/A</Box>;
 };

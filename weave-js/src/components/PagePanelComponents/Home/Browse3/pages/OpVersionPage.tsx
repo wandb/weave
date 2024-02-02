@@ -4,6 +4,7 @@ import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
 import {CategoryChip} from './common/CategoryChip';
 import {
   CallsLink,
+  opNiceName,
   OpVersionLink,
   OpVersionsLink,
   opVersionText,
@@ -14,6 +15,7 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
+import {TabUseOp} from './TabUseOp';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {refDictToRefString} from './wfInterface/naive';
 import {WFOpVersion} from './wfInterface/types';
@@ -71,6 +73,7 @@ const OpVersionPageInner: React.FC<{
                   }}
                   versionCount={opVersionCount}
                   neverPeek
+                  variant="secondary"
                 />
                 ]
               </>
@@ -85,6 +88,7 @@ const OpVersionPageInner: React.FC<{
                   opVersionRefs: [opVersion.refUri()],
                 }}
                 neverPeek
+                variant="secondary"
               />
             ),
             ...(opVersionCategory
@@ -152,6 +156,10 @@ const OpVersionPageInner: React.FC<{
             <Browse2OpDefCode uri={uri} />
             // </Box>
           ),
+        },
+        {
+          label: 'Use',
+          content: <TabUseOp name={opNiceName(opName)} uri={uri} />,
         },
         // {
         //   label: 'Calls',

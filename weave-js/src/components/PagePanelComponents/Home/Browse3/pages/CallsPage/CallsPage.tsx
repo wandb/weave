@@ -64,9 +64,9 @@ export const CallsPage: FC<{
 
   const title = useMemo(() => {
     if (filter.opCategory) {
-      return _.capitalize(filter.opCategory) + ' Calls';
+      return _.capitalize(filter.opCategory) + ' Traces';
     }
-    return 'Calls';
+    return 'Traces';
   }, [filter.opCategory]);
 
   return (

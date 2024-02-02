@@ -6,8 +6,10 @@ import {
   NavLink as RRNavLink,
   NavLinkProps as RRNavLinkProps,
 } from 'react-router-dom';
+import styled from 'styled-components';
 
 import getConfig from '../../config';
+import {TEAL_500, TEAL_600} from '../css/color.styles';
 import {FCWithRef} from './types';
 
 const URL_REGEXP = /https?:\/\/[^\s]+/g;
@@ -79,6 +81,15 @@ function linkifyWithRegex(
   return elems;
 }
 
+export const A = styled.a`
+  font-weight: 600;
+  color: ${TEAL_600};
+  &:hover {
+    color: ${TEAL_500};
+  }
+`;
+A.displayName = 'S.A';
+
 export const TargetBlank: FCWithRef<
   React.AnchorHTMLAttributes<HTMLAnchorElement>,
   HTMLAnchorElement
@@ -93,13 +104,13 @@ export const TargetBlank: FCWithRef<
     }
     return (
       // eslint-disable-next-line wandb/no-a-tags
-      <a
+      <A
         target="_blank"
         rel="noopener noreferrer"
         {...passthroughProps}
         ref={ref}>
         {children}
-      </a>
+      </A>
     );
   })
 );

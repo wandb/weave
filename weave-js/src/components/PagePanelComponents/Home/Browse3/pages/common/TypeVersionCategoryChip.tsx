@@ -1,13 +1,12 @@
-import {Chip} from '@mui/material';
 import _ from 'lodash';
 import React from 'react';
 
+import {Pill, TagColorName} from '../../../../../Tag';
 import {HackyTypeCategory} from '../wfInterface/types';
 
-const colorMap: {[key: string]: string} = {
-  model: 'success',
-  dataset: 'info',
-  // 'tune': 'warning',
+const colorMap: Record<HackyTypeCategory, TagColorName> = {
+  model: 'blue',
+  dataset: 'green',
 };
 
 export const TypeVersionCategoryChip: React.FC<{
@@ -16,13 +15,7 @@ export const TypeVersionCategoryChip: React.FC<{
   if (props.typeCategory == null) {
     return <></>;
   }
+  const label = _.capitalize(props.typeCategory);
   const color = colorMap[props.typeCategory];
-  return (
-    <Chip
-      label={_.capitalize(props.typeCategory)}
-      size="small"
-      sx={{height: '20px', lineHeight: 2}}
-      color={color as any}
-    />
-  );
+  return <Pill color={color} label={label} />;
 };

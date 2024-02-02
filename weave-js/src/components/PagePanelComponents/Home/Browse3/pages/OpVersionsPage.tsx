@@ -161,6 +161,7 @@ export const FilterableOpVersionsTable: React.FC<{
                   filter={{
                     opVersionRefs: [params.row.obj.refUri()],
                   }}
+                  variant="secondary"
                 />
               );
             },
@@ -265,6 +266,7 @@ export const FilterableOpVersionsTable: React.FC<{
                         opName: params.row.obj.op().name(),
                       }}
                       neverPeek
+                      variant="secondary"
                     />
                   );
                 },
