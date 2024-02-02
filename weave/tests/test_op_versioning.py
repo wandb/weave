@@ -231,7 +231,8 @@ def test_op_versioning_closure_dict_np(strict_op_saving, eager_mode):
     def versioned_op_closure_constant(a: int) -> float:
         return a + x["b"].mean() + x["a"]
 
-    ref = weave.obj_ref(versioned_op_closure_constant)
+    with weave.local_client():
+        ref = weave.publish(versioned_op_closure_constant)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -286,8 +287,7 @@ def test_op_versioning_closure_dict_ops(strict_op_saving, eager_mode):
             print("hello from pony()")
             return v + 99
 
-        ref = weave.obj_ref(pony)
-        print("REF", ref)
+        ref = weave.publish(pony)
         assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
         with ref.artifact.open("obj.py") as f:
@@ -346,7 +346,7 @@ def test_op_versioning_mixed(strict_op_saving, eager_mode):
             print("hello from pony()")
             return v + 99
 
-        ref = weave.obj_ref(pony)
+        ref = weave.publish(pony)
         print("REF", ref)
         assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
