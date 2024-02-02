@@ -84,7 +84,7 @@ export type WFHighLevelObjectVersionFilter = {
   typeVersions?: string[];
   latest?: boolean;
   typeCategory?: HackyTypeCategory | null;
-  inputToOpVersions?: string[];
+  inputToOpVersionRefs?: string[];
 };
 
 export const FilterableObjectVersionsTable: React.FC<{
@@ -216,11 +216,11 @@ export const FilterableObjectVersionsTable: React.FC<{
                 renderInput={params => (
                   <TextField {...params} label="Input To" />
                 )}
-                value={effectiveFilter.inputToOpVersions?.[0] ?? null}
+                value={effectiveFilter.inputToOpVersionRefs?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    inputToOpVersions: newValue ? [newValue] : [],
+                    inputToOpVersionRefs: newValue ? [newValue] : [],
                   });
                 }}
                 getOptionLabel={option => {
@@ -281,24 +281,22 @@ const ObjectVersionsTable: React.FC<{
       const firstOutputFromOpVersion =
         outputFrom.length > 0 ? outputFrom[0].opVersion() : null;
       const firstOutputFrom = firstOutputFromOpVersion
-        ? firstOutputFromOpVersion.op().name() +
-          ':' +
-          firstOutputFromOpVersion.version()
+        ? firstOutputFromOpVersion.refUri()
         : null;
       return {
-        id: ov.version(),
+        id: ov.refUri(),
         obj: ov,
         object: ov.object().name(),
         typeCategory: ov.typeVersion().typeCategory(),
-        version: ov.version(),
+        version: ov.artifactVersion().versionCommitHash(),
         typeVersion:
           ov.typeVersion().type().name() + ':' + ov.typeVersion().version(),
         inputTo: ov.inputTo().length,
         outputFrom: firstOutputFrom,
         // description: ov.description(),
-        versionIndex: ov.versionIndex(),
+        versionIndex: ov.artifactVersion().versionIndex(),
         createdAt: ov.createdAtMs(),
-        isLatest: ov.aliases().includes('latest'),
+        isLatest: ov.artifactVersion().aliases().includes('latest'),
       };
     });
   }, [props.objectVersions]);
@@ -512,7 +510,7 @@ const applyFilter = (
       }
     }
     if (effectiveFilter.latest) {
-      if (!ov.aliases().includes('latest')) {
+      if (!ov.artifactVersion().aliases().includes('latest')) {
         return false;
       }
     }
@@ -522,17 +520,15 @@ const applyFilter = (
       }
     }
     if (
-      effectiveFilter.inputToOpVersions &&
-      effectiveFilter.inputToOpVersions.length > 0
+      effectiveFilter.inputToOpVersionRefs &&
+      effectiveFilter.inputToOpVersionRefs.length > 0
     ) {
       const inputToOpVersions = ov.inputTo().map(i => i.opVersion());
       if (
         !inputToOpVersions.some(
           ovInner =>
             ovInner &&
-            effectiveFilter.inputToOpVersions?.includes(
-              ovInner.op().name() + ':' + ovInner.version()
-            )
+            effectiveFilter.inputToOpVersionRefs?.includes(ovInner.refUri())
         )
       ) {
         return false;
@@ -582,8 +578,11 @@ const useOpVersionOptions = (
     return _.fromPairs(
       versions.map(v => {
         return [
-          v.op().name() + ':' + v.version(),
-          v.op().name() + ' (' + truncateID(v.version()) + ')',
+          v.refUri(),
+          v.op().name() +
+            ' (' +
+            truncateID(v.artifactVersion().versionCommitHash()) +
+            ')',
         ];
       })
     );
@@ -617,6 +616,8 @@ const useLatestOnlyOptions = (
   }, [allObjectVersions, highLevelFilter]);
 
   return useMemo(() => {
-    return _.uniq(filtered.map(item => item.aliases().includes('latest')));
+    return _.uniq(
+      filtered.map(item => item.artifactVersion().aliases().includes('latest'))
+    );
   }, [filtered]);
 };

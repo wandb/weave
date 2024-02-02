@@ -114,7 +114,7 @@ export const stringIsRef = (maybeRef: string): boolean => {
   }
 };
 
-const refDictToRefString = (refDict: WFNaiveRefDict): string => {
+export const refDictToRefString = (refDict: WFNaiveRefDict): string => {
   const {
     entity,
     project,

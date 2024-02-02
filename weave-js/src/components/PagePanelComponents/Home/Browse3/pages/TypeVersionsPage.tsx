@@ -260,9 +260,7 @@ export const FilterableTypeVersionsTable: React.FC<{
               return true;
             }
             return obj.inputTo().some(version => {
-              return filter.inputTo?.includes(
-                version.op().name() + ':' + version.version()
-              );
+              return filter.inputTo?.includes(version.refUri());
             });
           },
           filterControlListItem: cellProps => {
@@ -318,9 +316,7 @@ export const FilterableTypeVersionsTable: React.FC<{
               return true;
             }
             return obj.outputFrom().some(version => {
-              return filter.outputFrom?.includes(
-                version.op().name() + ':' + version.version()
-              );
+              return filter.outputFrom?.includes(version.refUri());
             });
           },
           filterControlListItem: cellProps => {
@@ -534,12 +530,13 @@ const InputToFilterControlListItem: React.FC<{
   updateFilter: (update: Partial<WFHighLevelTypeVersionFilter>) => void;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
+  // TODO: this will probably need refactoring
   const options = useMemo(() => {
     return orm.projectConnection
       .opVersions()
       .filter(o => o.inputTypesVersions().length > 0)
       .map(o => {
-        return o.op().name() + ':' + o.version();
+        return o.refUri();
       });
   }, [orm.projectConnection]);
   return (
@@ -572,12 +569,13 @@ const OutputFromFilterControlListItem: React.FC<{
   updateFilter: (update: Partial<WFHighLevelTypeVersionFilter>) => void;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
+  // TODO: this will probably need refactoring
   const options = useMemo(() => {
     return orm.projectConnection
       .opVersions()
       .filter(o => o.outputTypeVersions().length > 0)
       .map(o => {
-        return o.op().name() + ':' + o.version();
+        return o.refUri();
       });
   }, [orm.projectConnection]);
   return (
