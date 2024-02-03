@@ -96,7 +96,8 @@ export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
   clearFilters?: null | (() => void);
-}> = ({loading, spans, clearFilters}) => {
+  ioColumnsOnly?: boolean;
+}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
   const showIO = true;
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.name)).length === 1;
@@ -247,7 +248,7 @@ export const RunsTable: FC<{
           );
         },
       },
-      ...(orm
+      ...(orm && !ioColumnsOnly
         ? [
             {
               flex: !showIO ? 1 : undefined,
@@ -271,7 +272,7 @@ export const RunsTable: FC<{
             },
           ]
         : []),
-      ...(orm
+      ...(orm && !ioColumnsOnly
         ? [
             {
               field: 'opCategory',
@@ -287,34 +288,36 @@ export const RunsTable: FC<{
             },
           ]
         : []),
-
-      {
-        field: 'timestampMs',
-        headerName: 'Called',
-        width: 100,
-        minWidth: 100,
-        maxWidth: 100,
-        renderCell: cellParams => {
-          return (
-            <Timestamp
-              value={cellParams.row.timestampMs / 1000}
-              format="relative"
-            />
-          );
-        },
-      },
-
-      {
-        field: 'latency',
-        headerName: 'Latency',
-        width: 100,
-        minWidth: 100,
-        maxWidth: 100,
-        // flex: !showIO ? 1 : undefined,
-        renderCell: cellParams => {
-          return monthRoundedTime(cellParams.row.latency);
-        },
-      },
+      ...(!ioColumnsOnly
+        ? [
+            {
+              field: 'timestampMs',
+              headerName: 'Called',
+              width: 100,
+              minWidth: 100,
+              maxWidth: 100,
+              renderCell: (cellParams: any) => {
+                return (
+                  <Timestamp
+                    value={cellParams.row.timestampMs / 1000}
+                    format="relative"
+                  />
+                );
+              },
+            },
+            {
+              field: 'latency',
+              headerName: 'Latency',
+              width: 100,
+              minWidth: 100,
+              maxWidth: 100,
+              // flex: !showIO ? 1 : undefined,
+              renderCell: (cellParams: any) => {
+                return monthRoundedTime(cellParams.row.latency);
+              },
+            },
+          ]
+        : []),
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = spans[0];
@@ -465,10 +468,11 @@ export const RunsTable: FC<{
     return {cols, colGroupingModel};
   }, [
     orm,
-    params.entity,
-    params.project,
+    ioColumnsOnly,
     showIO,
     spans,
+    params.entity,
+    params.project,
     isSingleOpVersion,
     tableStats,
   ]);

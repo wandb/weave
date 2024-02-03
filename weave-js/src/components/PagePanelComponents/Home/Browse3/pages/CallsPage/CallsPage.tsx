@@ -97,6 +97,8 @@ export const CallsTable: FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
+  hideControls?: boolean;
+  ioColumnsOnly?: boolean;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
@@ -207,7 +209,7 @@ export const CallsTable: FC<{
   }, [runsWithFeedbackQuery.result]);
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
-  const hideControls = true;
+  const hidePivotControls = true;
   const clearFilters = useMemo(() => {
     if (Object.keys(filter ?? {}).length > 0) {
       return () => setFilter({});
@@ -226,7 +228,8 @@ export const CallsTable: FC<{
       )}
       filterListSx={{
         // Hide until we show filters
-        pb: isPivoting && !hideControls ? 0 : 1,
+        pb: isPivoting && !hidePivotControls ? 0 : 1,
+        display: props.hideControls ? 'none' : 'flex',
       }}
       filterListItems={
         <>
@@ -404,13 +407,14 @@ export const CallsTable: FC<{
           // Since we have a very constrained pivot, we can hide
           // the controls for now as there is no need to change them.
           // Punting on design
-          hideControls={hideControls}
+          hideControls={hidePivotControls}
         />
       ) : (
         <RunsTable
           loading={runsWithFeedbackQuery.loading}
           spans={runsWithFeedbackQuery.result}
           clearFilters={clearFilters}
+          ioColumnsOnly={props.ioColumnsOnly}
         />
       )}
     </FilterLayoutTemplate>
