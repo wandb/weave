@@ -1,17 +1,17 @@
 import {Box, IconButton} from '@material-ui/core';
+import {OpenInNewRounded} from '@mui/icons-material';
 import {Typography} from '@mui/material';
 import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
+import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../../react';
 import {SmallRef} from '../../../Browse2/SmallRef';
+import {useWeaveflowRouteContext} from '../../context';
 import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {opNiceName} from '../common/Links';
 import {WFCall} from '../wfInterface/types';
-import {OpenInNewRounded} from '@mui/icons-material';
-import {useWeaveflowRouteContext} from '../../context';
-import {useHistory} from 'react-router-dom';
 
 export const CallDetails: FC<{
   wfCall: WFCall;

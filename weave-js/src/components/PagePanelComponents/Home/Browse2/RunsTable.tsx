@@ -468,10 +468,11 @@ export const RunsTable: FC<{
     return {cols, colGroupingModel};
   }, [
     orm,
-    params.entity,
-    params.project,
+    ioColumnsOnly,
     showIO,
     spans,
+    params.entity,
+    params.project,
     isSingleOpVersion,
     tableStats,
   ]);
