@@ -83,6 +83,8 @@ export const CallDetails: FC<{
               height: '500px',
               maxHeight: '95%',
               p: 2,
+              display: 'flex',
+              flexDirection: 'column',
             }}>
             <Box
               sx={{
@@ -107,35 +109,50 @@ export const CallDetails: FC<{
                 }}>
                 <OpenInNewRounded />
               </IconButton>
+            </Box>{' '}
+            <Box
+              sx={{
+                flex: '1 1 auto',
+                overflow: 'hidden',
+              }}>
+              <CallsTable
+                hideControls
+                ioColumnsOnly
+                initialFilter={{
+                  opVersionRefs: [ref],
+                  parentId: wfCall.callID(),
+                }}
+                entity={wfCall.entity()}
+                project={wfCall.project()}
+              />
             </Box>
-            <CallsTable
-              hideControls
-              ioColumnsOnly
-              initialFilter={{
-                opVersionRefs: [ref],
-                parentId: wfCall.callID(),
-              }}
-              entity={wfCall.entity()}
-              project={wfCall.project()}
-            />
           </Box>
         ))}
         {singularChildCalls.length > 0 && (
-          <Typography pl={1}>Singular Child Calls</Typography>
-        )}
-        {singularChildCalls.map(c => (
           <Box
-            key={c.callID()}
             sx={{
               flex: '0 0 auto',
-              p: 2,
             }}>
-            <KeyValueTable
-              headerTitle={opNiceName(c.spanName())}
-              data={getDisplayInputsAndOutput(c)}
-            />
+            {multipleChildCallOpRefs.length === 0 ? (
+              <Typography pl={1}>Child calls</Typography>
+            ) : (
+              <Typography pl={1}>Singular child calls</Typography>
+            )}
+            {singularChildCalls.map(c => (
+              <Box
+                key={c.callID()}
+                sx={{
+                  flex: '0 0 auto',
+                  p: 2,
+                }}>
+                <KeyValueTable
+                  headerTitle={opNiceName(c.spanName())}
+                  data={getDisplayInputsAndOutput(c)}
+                />
+              </Box>
+            ))}
           </Box>
-        ))}
+        )}
       </Box>
     </Box>
   );
