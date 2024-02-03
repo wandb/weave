@@ -96,8 +96,9 @@ export const CallDetails: FC<{
                 height: '50px',
               }}>
               <Typography sx={{display: 'flex', gap: 1}}>
-                Table of <SmallRef objRef={parseRef(ref)} /> child calls{' '}
-              </Typography>{' '}
+                Table of <SmallRef objRef={parseRef(ref)} wfTable="OpVersion" />{' '}
+                child calls
+              </Typography>
               <IconButton
                 onClick={() => {
                   history.push(
