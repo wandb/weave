@@ -122,9 +122,6 @@ def import_ecosystem():
 
 
 def log_system_info():
-    os.environ[
-        "WEAVE_WANDB_COOKIE"
-    ] = "MTcwNjMwNTM2NHxEdi1OQkFFQ180NEFBUkFCRUFBQUp2LU9BQUVHYzNSeWFXNW5EQXdBQ25ObGMzTnBiMjVmYVdRRmFXNTBOalFFQlFEOU9fYTh8-pS2tuGCCh7cdwHS4mZBhYUVSb8fjZQhudFm-oEMyBA="
     WEAVE_SERVER_URL = os.environ.get("WEAVE_SERVER_URL")
     WANDB_BASE_URL = os.environ.get("WANDB_BASE_URL", "http://api.wandb.ai")
     WEAVE_LOCAL_ARTIFACT_DIR = os.environ.get("WEAVE_LOCAL_ARTIFACT_DIR")
