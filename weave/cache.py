@@ -67,6 +67,7 @@ def get_cache_prefix_context() -> typing.Optional[str]:
     return context_state._cache_prefix_context.get()
 
 
+# deletes all items in the cache directory if they are not currently being used
 def clear_cache() -> None:
     # Read the directory address and threshold from the environment variable
     directory_path = environment.weave_filesystem_dir()
@@ -95,7 +96,15 @@ def clear_cache() -> None:
                 shutil.rmtree(item_path)
                 logging.info(f"Deleted {item}.")
         except:
-            logging.info(f"Error deleting {item}.")
+            # oftentimes we will except to here if the item is not a timestamp
+            try:
+                # If the item is not a timestamp, delete it
+                item_path = os.path.join(directory_path, item)
+                # Delete the data
+                shutil.rmtree(item_path)
+                logging.info(f"Deleted {item}.")
+            except:
+                logging.info(f"Error deleting {item}.")
             continue
 
 
