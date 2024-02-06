@@ -929,17 +929,18 @@ class WFNaiveObjectVersion
     state: WFNaiveProjectState,
     objectRefUri: string
   ): WFNaiveObjectVersion => {
-    let refExtraTuples: Array<{edgeType: string; edgeName: string}> = [];
-    let useUri = objectRefUri;
-
     // In the case that we are dealing with a refExtra, the objectVersionMap will
     // not contain that (it would be way too expensive)
     const refDict = refStringToRefDict(objectRefUri);
-    if (refDict.refExtraTuples.length > 0) {
-      refExtraTuples = refDict.refExtraTuples;
-      useUri = refDictToRefString({...refDict, refExtraTuples: []});
-    }
-    let objectVersionDict = state.objectVersionsMap.get(useUri);
+    const refExtraTuples = refDict.refExtraTuples;
+    const filePathParts = refDict.filePathParts;
+    const objBasedUri = refDictToRefString({
+      ...refDict,
+      filePathParts: ['obj'],
+      refExtraTuples: [],
+    });
+
+    let objectVersionDict = state.objectVersionsMap.get(objBasedUri);
     if (!objectVersionDict) {
       throw new Error(
         `Cannot find ObjectVersion with id: ${objectRefUri} in project: ${state.project}`
@@ -950,6 +951,7 @@ class WFNaiveObjectVersion
         ...objectVersionDict,
         reference: {
           ...objectVersionDict.reference,
+          filePathParts,
           refExtraTuples,
         },
         typeVersionHash: undefined,

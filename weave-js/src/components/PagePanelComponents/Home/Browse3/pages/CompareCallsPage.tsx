@@ -406,15 +406,6 @@ const useSubRunsFromFastestEngine = (
     selectedObjectVersionRef
   );
 
-  console.log({
-    entity,
-    project,
-    parentCallIds,
-    secondaryDim,
-    selectedOpVersionRef,
-    selectedObjectVersionRef,
-  });
-
   const ormResults = useSubRunsFromORM(
     entity,
     project,
