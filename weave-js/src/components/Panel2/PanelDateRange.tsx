@@ -7,10 +7,10 @@ import {
   voidNode,
 } from '@wandb/weave/core';
 import {useMutation, useNodeValue} from '@wandb/weave/react';
-import {monthRoundedTime} from '@wandb/weave/time';
 import React, {useCallback, useMemo} from 'react';
 import styled from 'styled-components';
 
+import {monthRoundedTime} from '../../common/util/time';
 import {ValidatingTextInput} from '../ValidatingTextInput';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel from './panel';

@@ -7,7 +7,6 @@ import {
   GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
 import React, {
   ComponentProps,
@@ -21,6 +20,7 @@ import {useParams} from 'react-router-dom';
 
 import {MOON_250} from '../../../../common/css/color.styles';
 import {A, TargetBlank} from '../../../../common/util/links';
+import {monthRoundedTime} from '../../../../common/util/time';
 import {Timestamp} from '../../../Timestamp';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
