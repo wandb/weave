@@ -230,7 +230,15 @@ const browse3ContextGen = (
       // public release.
       if (objRef.artifactPath.endsWith('rows%2F0')) {
         objRef.artifactPath = 'obj';
-        objRef.artifactRefExtra = 'atr/rows/ndx/' + objRef.artifactRefExtra;
+        let newArtifactRefExtra = 'atr/rows';
+        objRef.artifactRefExtra?.split('/').forEach(part => {
+          if (isNaN(parseInt(part))) {
+            newArtifactRefExtra += '/key/' + part;
+          } else {
+            newArtifactRefExtra += '/ndx/' + part;
+          }
+        });
+        objRef.artifactRefExtra = newArtifactRefExtra;
       }
 
       return browse3Context.objectVersionUIUrl(
