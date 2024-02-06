@@ -158,6 +158,21 @@ def _data_is_legacy_run_file_format(data):
 def _data_is_weave_file_format(data):
     return "columns" in data and "data" in data and "column_types" in data
 
+def _data_is_weave_file_with_mixed_type_settings(data):
+    # This is a special case that occurs when the user constructs a Table with
+    # "allow_mixed_types=True". In these cases the client does not report the
+    # type of the data, which results in all columns having the type
+    # Optional<Any>. When this occurs, we have absolutely no type information.
+    if not _data_is_weave_file_format(data):
+        return False
+    column_types = data["column_types"]
+    type_map = column_types.get("params", {}).get("type_map")
+    if not type_map:
+        return False
+    return all(
+        v == {"params": {"allowed_types": [{"wb_type": "any"}, {"wb_type": "none"}]}, "wb_type": "union"} for v in type_map.values()
+    )
+
 
 def _infer_type_from_cell(cell: typing.Any) -> types.Type:
     if isinstance(cell, dict) and "_type" in cell and isinstance(cell["_type"], str):
@@ -596,6 +611,32 @@ def _get_rows_and_object_type_from_weave_format(
 
     return rows, object_type
 
+def _get_rows_and_object_type_from_weave_format_mixed(
+    data: typing.Any,
+    file: artifact_fs.FilesystemArtifactFile,
+    sample_max_rows: int = 1000,
+) -> tuple[list, types.TypedDict]:
+    # In this case (see notes on
+    # `_data_is_weave_file_with_mixed_type_settings`), we have no useful type
+    # information available. If the data is small, we could dispatch to the
+    # `_get_rows_and_object_type_from_legacy_format`, however, in practice this
+    # can be prohibitively expensive. Instead, we will just convert all of the
+    # columns to strings and give a slightly better treatment in the UI. This is
+    # certainly a sub optimal situation because there could be cases where users
+    # set this setting to true, yet their types are homogenous enough where the
+    # old logic would be able to parse the content and make sense of it.
+    # However, in the degenerate cases, this is prohibitively expensive to
+    # parse, could error out, and the data is not even useful for the user.
+    # Let's at least give them a string representation of the data and ensure
+    # that it will be displayed.
+    rows = [{
+        col_key: json.dumps(r[col_ndx]) if type(r[col_ndx]) in [list, dict] else r[col_ndx]
+        for col_ndx, col_key in enumerate(data['columns'])
+    } for r  in data['data']]
+    sampled_rows = util.sample_rows(rows, sample_max_rows)
+    awl = ops_arrow.to_arrow(sampled_rows, None, file.artifact)
+    return rows, awl.object_type
+
 
 def _get_rows_and_object_type_from_legacy_format(
     data: dict, file: artifact_fs.FilesystemArtifactFile, sample_max_rows: int = 1000
@@ -661,7 +702,15 @@ def _get_rows_and_object_type_awl_from_file(
     object_type = None
     with tracer.trace("get_table:get_rows_and_object_type"):
         sample_max_rows = max(1000 // num_parts, 1)
-        if _data_is_weave_file_format(data):
+        if _data_is_weave_file_with_mixed_type_settings(data):
+            # `_data_is_weave_file_format` is known to be fallible, especially
+            # with large datasets of heterogenous types. In this case, the user
+            # explicitly told us that the types are mixed, so we will just
+            # convert everything to strings.
+            rows, object_type = _get_rows_and_object_type_from_weave_format_mixed(
+                data, file, sample_max_rows
+            )
+        elif _data_is_weave_file_format(data):
             rows, object_type = _get_rows_and_object_type_from_weave_format(
                 data, file, sample_max_rows
             )

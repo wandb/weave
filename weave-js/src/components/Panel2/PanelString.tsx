@@ -214,11 +214,29 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
     }
 
-    const contentPlaintext = (
-      <S.PreformattedProportionalString>
-        {fullStr}
-      </S.PreformattedProportionalString>
-    );
+    let parsed: any;
+    if (fullStr.startsWith('{') && fullStr.endsWith('}')) {
+      try {
+        parsed = JSON.parse(fullStr);
+      } catch (e) {
+        // ignore
+        console.error(e);
+      }
+    }
+    let contentPlaintext;
+    if (parsed) {
+      contentPlaintext = (
+        <S.PreformattedJSONString>
+          {JSON.stringify(parsed, null, 2)}
+        </S.PreformattedJSONString>
+      );
+    } else {
+      contentPlaintext = (
+        <S.PreformattedProportionalString>
+          {fullStr}
+        </S.PreformattedProportionalString>
+      );
+    }
 
     // plaintext
     return (
