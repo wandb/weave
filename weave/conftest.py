@@ -115,6 +115,13 @@ def pre_post_each_test(test_artifact_dir, caplog):
     del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
 
 
+@pytest.fixture(autouse=True)
+def throw_on_error():
+    os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
+    yield
+    del os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"]
+
+
 @pytest.fixture()
 def cache_mode_minimal():
     os.environ["WEAVE_NO_CACHE"] = "true"
