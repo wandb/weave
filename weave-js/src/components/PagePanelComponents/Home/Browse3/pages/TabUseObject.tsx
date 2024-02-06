@@ -11,7 +11,7 @@ type TabUseObjectProps = {
 };
 
 export const TabUseObject = ({name, uri}: TabUseObjectProps) => {
-  const pythonName = isValidVarName(name) ? name : 'object';
+  const pythonName = isValidVarName(name) ? name : 'obj';
   return (
     <Box m={2}>
       <Alert severity="info" variant="outlined">
