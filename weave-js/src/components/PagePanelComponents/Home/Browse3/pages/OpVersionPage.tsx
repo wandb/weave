@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {Browse2OpDefCode} from '../../Browse2/Browse2OpDefCode';
+import {OpCodeViewer} from '../OpCodeViewer';
 import {CategoryChip} from './common/CategoryChip';
 import {
   CallsLink,
@@ -50,7 +50,8 @@ const OpVersionPageInner: React.FC<{
   const entity = opVersion.entity();
   const project = opVersion.project();
   const opName = opVersion.op().name();
-  const opVersionCount = opVersion.op().opVersions().length;
+  const opVersions = opVersion.op().opVersions();
+  const opVersionCount = opVersions.length;
   const opVersionCallCount = opVersion.calls().length;
   const opVersionIndex = opVersion.versionIndex();
   const opVersionCategory = opVersion.opCategory();
@@ -153,7 +154,13 @@ const OpVersionPageInner: React.FC<{
             //     overflow: 'hidden',
             //     pt: 4,
             //   }}>
-            <Browse2OpDefCode uri={uri} />
+            <OpCodeViewer
+              entity={entity}
+              project={project}
+              opName={opName}
+              opVersions={opVersions.slice().reverse()} // put in increasing order
+              currentVersionURI={uri}
+            />
             // </Box>
           ),
         },
