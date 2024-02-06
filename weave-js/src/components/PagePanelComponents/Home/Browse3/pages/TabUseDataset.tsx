@@ -1,6 +1,7 @@
 import {Alert, Box} from '@mui/material';
 import React from 'react';
 
+import {isValidVarName} from '../../../../../core/util/var';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
 
@@ -10,6 +11,7 @@ type TabUseDatasetProps = {
 };
 
 export const TabUseDataset = ({name, uri}: TabUseDatasetProps) => {
+  const pythonName = isValidVarName(name) ? name : 'dataset';
   return (
     <Box m={2}>
       <Alert severity="info" variant="outlined">
@@ -29,8 +31,8 @@ export const TabUseDataset = ({name, uri}: TabUseDatasetProps) => {
       <Box mt={2}>
         Use the following code to retrieve this dataset version:
         <CopyableText
-          text={`${name} = weave.ref("<ref_uri>").get()`}
-          copyText={`${name} = weave.ref("${uri}").get()`}
+          text={`${pythonName} = weave.ref("<ref_uri>").get()`}
+          copyText={`${pythonName} = weave.ref("${uri}").get()`}
         />
       </Box>
     </Box>
