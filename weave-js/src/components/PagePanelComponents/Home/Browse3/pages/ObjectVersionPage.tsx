@@ -150,7 +150,7 @@ const ObjectVersionPageInner: React.FC<{
               : {}),
             ...(consumingCalls.length > 0
               ? {
-                  [maybePluralizeWord(producingCalls.length, 'Consuming Call')]:
+                  [maybePluralizeWord(consumingCalls.length, 'Consuming Call')]:
                     (
                       <ObjectVersionConsumingCallsItem
                         objectVersion={objectVersion}
