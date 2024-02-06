@@ -1,4 +1,5 @@
 import inspect
+import logging
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Iterator, Optional, TypeVar
 
@@ -53,11 +54,11 @@ def reconstruct_completion(
             # optional fields without default values to be included in the
             # constructor
             logprobs=None,
-            finish_reason=result.finish_reason,
+            finish_reason=result.finish_reason or "stop",
             index=index,
             message=ChatCompletionMessage(
                 content=result.content,
-                role=result.role,
+                role="assistant",
                 function_call=result.function_call,
                 tool_calls=result.tool_calls,
             ),
@@ -68,11 +69,16 @@ def reconstruct_completion(
     # Assume all chunks belong to the same completion
     first_chunk = output_chunks[0]
 
-    prompt_tokens = num_tokens_from_messages(input_messages)
-    completion_tokens = 0
-    for choice in combined_choices:
-        message = choice.message
-        completion_tokens += num_tokens_from_messages([message])
+    try:
+        prompt_tokens = num_tokens_from_messages(input_messages)
+        completion_tokens = 0
+        for choice in combined_choices:
+            message = choice.message
+            completion_tokens += num_tokens_from_messages([message])
+    except Exception as e:
+        logging.error(f"Error calculating tokens: {e}")
+        prompt_tokens = 0
+        completion_tokens = 0
 
     total_tokens = prompt_tokens + completion_tokens
     usage = CompletionUsage(

@@ -96,3 +96,11 @@ class RunStreamTableSpan:
         if self.parent_id is None:
             return None
         return client.run(self.parent_id)
+
+    def finish(self, output: typing.Any):
+        client = graph_client_context.require_graph_client()
+        client.finish_run(self, output, [])
+
+    def fail(self, e: Exception):
+        client = graph_client_context.require_graph_client()
+        client.fail_run(self, e)
