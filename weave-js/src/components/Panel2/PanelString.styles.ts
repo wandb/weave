@@ -48,13 +48,12 @@ export const PreformattedProportionalString = styled.pre`
 PreformattedProportionalString.displayName = 'S.PreformattedProportionalString';
 
 export const PreformattedJSONString = styled.pre`
-white-space: pre-wrap;
-word-wrap: break-word;
-overflow: auto;
-font-family: monospace;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: auto;
+  font-family: monospace;
 `;
 PreformattedJSONString.displayName = 'S.PreformattedJSONString';
-
 
 export const PreformattedMonoString = styled.pre`
   margin-top: 0.25em;

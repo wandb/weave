@@ -158,6 +158,7 @@ def _data_is_legacy_run_file_format(data):
 def _data_is_weave_file_format(data):
     return "columns" in data and "data" in data and "column_types" in data
 
+
 def _data_is_weave_file_with_mixed_type_settings(data):
     # This is a special case that occurs when the user constructs a Table with
     # "allow_mixed_types=True". In these cases the client does not report the
@@ -170,7 +171,12 @@ def _data_is_weave_file_with_mixed_type_settings(data):
     if not type_map:
         return False
     return all(
-        v == {"params": {"allowed_types": [{"wb_type": "any"}, {"wb_type": "none"}]}, "wb_type": "union"} for v in type_map.values()
+        v
+        == {
+            "params": {"allowed_types": [{"wb_type": "any"}, {"wb_type": "none"}]},
+            "wb_type": "union",
+        }
+        for v in type_map.values()
     )
 
 
@@ -611,6 +617,7 @@ def _get_rows_and_object_type_from_weave_format(
 
     return rows, object_type
 
+
 def _get_rows_and_object_type_from_weave_format_mixed(
     data: typing.Any,
     file: artifact_fs.FilesystemArtifactFile,
@@ -629,10 +636,15 @@ def _get_rows_and_object_type_from_weave_format_mixed(
     # parse, could error out, and the data is not even useful for the user.
     # Let's at least give them a string representation of the data and ensure
     # that it will be displayed.
-    rows = [{
-        col_key: json.dumps(r[col_ndx]) if type(r[col_ndx]) in [list, dict] else r[col_ndx]
-        for col_ndx, col_key in enumerate(data['columns'])
-    } for r  in data['data']]
+    rows = [
+        {
+            col_key: json.dumps(r[col_ndx])
+            if type(r[col_ndx]) in [list, dict]
+            else r[col_ndx]
+            for col_ndx, col_key in enumerate(data["columns"])
+        }
+        for r in data["data"]
+    ]
     sampled_rows = util.sample_rows(rows, sample_max_rows)
     awl = ops_arrow.to_arrow(sampled_rows, None, file.artifact)
     return rows, awl.object_type
