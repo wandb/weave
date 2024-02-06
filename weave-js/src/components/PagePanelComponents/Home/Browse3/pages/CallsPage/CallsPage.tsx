@@ -43,6 +43,7 @@ export type WFHighLevelCallFilter = {
   opCategory?: HackyOpCategory | null;
   opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
+  outputObjectVersionRefs?: string[];
   parentId?: string | null;
   traceId?: string | null;
   isPivot?: boolean;
@@ -510,6 +511,7 @@ const convertHighLevelFilterToLowLevelFilter = (
     traceRootsOnly: effectiveFilter.traceRootsOnly,
     opUris: Array.from(finalURISet),
     inputUris: effectiveFilter.inputObjectVersionRefs,
+    outputUris: effectiveFilter.outputObjectVersionRefs,
     traceId: effectiveFilter.traceId ?? undefined,
     parentIds: effectiveFilter.parentId ? [effectiveFilter.parentId] : [],
   };
