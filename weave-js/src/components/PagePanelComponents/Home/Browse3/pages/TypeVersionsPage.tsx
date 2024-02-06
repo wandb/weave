@@ -16,6 +16,7 @@ import {
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useWeaveflowORMContext} from './wfInterface/context';
+import {useAsyncToHook} from './wfInterface/niave_react';
 import {HackyTypeCategory, WFTypeVersion} from './wfInterface/types';
 
 export type WFHighLevelTypeVersionFilter = {
@@ -498,10 +499,14 @@ const TypeNameFilterControlListItem: React.FC<{
   filter: WFHighLevelTypeVersionFilter;
   updateFilter: (update: Partial<WFHighLevelTypeVersionFilter>) => void;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
+  const {projectConnection} = useWeaveflowORMContext(
+    props.entity,
+    props.project
+  );
+  const types = useAsyncToHook(projectConnection.types, [], projectConnection);
   const options = useMemo(() => {
-    return orm.projectConnection.types().map(o => o.name());
-  }, [orm.projectConnection]);
+    return (types.loading ? [] : types.data).map(o => o.name());
+  }, [types]);
   return (
     <ListItem>
       <FormControl fullWidth>

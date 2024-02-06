@@ -2,8 +2,8 @@ import {Type} from '../../../../../../core';
 import {Call} from '../../../Browse2/callTree';
 
 export interface WFProject extends ProjectOwned {
-  type: (name: string) => WFType | null;
-  types: () => WFType[];
+  type: (name: string) => Promise<WFType | null>;
+  types: () =>  Promise<WFType[]>;
   op: (name: string) => WFOp | null;
   ops: () => WFOp[];
   object: (name: string) => WFObject | null;

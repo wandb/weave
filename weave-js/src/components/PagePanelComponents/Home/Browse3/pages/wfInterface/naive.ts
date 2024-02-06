@@ -216,7 +216,7 @@ export class WFNaiveProject implements WFProject {
     return this.state.project;
   }
 
-  type(name: string): WFType | null {
+  async type(name: string): Promise<WFType | null> {
     if (!this.state.typesMap.has(name)) {
       return null;
       // throw new Error(
@@ -226,7 +226,7 @@ export class WFNaiveProject implements WFProject {
     return new WFNaiveType(this.state, name);
   }
 
-  types(): WFType[] {
+  async types(): Promise<WFType[]> {
     return Array.from(this.state.typesMap.keys()).map(typeName => {
       return new WFNaiveType(this.state, typeName);
     });
