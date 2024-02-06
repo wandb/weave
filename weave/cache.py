@@ -77,10 +77,10 @@ def clear_cache() -> None:
 
     # Validate the directory path
     if not directory_path:
-        logging.info("WEAVE_PYTHON_CACHE is not set.")
+        logger.info("WEAVE_PYTHON_CACHE is not set.")
         return
     if not os.path.isdir(directory_path):
-        logging.info(f"{directory_path} is not a valid directory.")
+        logger.info(f"{directory_path} is not a valid directory.")
         return
 
     # for each cache in the directory, check if its expired past the buffer
@@ -93,9 +93,9 @@ def clear_cache() -> None:
             if item_timestamp + buffer < now:
                 # Delete the data
                 shutil.rmtree(item_path)
-                logging.info(f"Deleted {item}.")
+                logger.info(f"Deleted {item}.")
         except:
-            logging.info(f"Error deleting {item}.")
+            logger.info(f"Error deleting {item}.")
             continue
 
 
