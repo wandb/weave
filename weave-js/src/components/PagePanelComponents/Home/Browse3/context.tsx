@@ -232,7 +232,7 @@ const browse3ContextGen = (
         objRef.artifactPath = 'obj';
         let newArtifactRefExtra = 'atr/rows';
         objRef.artifactRefExtra?.split('/').forEach(part => {
-          if (isNaN(parseInt(part))) {
+          if (isNaN(parseInt(part, 10))) {
             newArtifactRefExtra += '/key/' + part;
           } else {
             newArtifactRefExtra += '/ndx/' + part;
