@@ -215,9 +215,10 @@ export const PanelString: React.FC<PanelStringProps> = props => {
     }
 
     let parsed: any;
-    if (fullStr.startsWith('{') && fullStr.endsWith('}')) {
+    const trimmedStr = fullStr.trim();
+    if (trimmedStr.startsWith('{') && trimmedStr.endsWith('}')) {
       try {
-        parsed = JSON.parse(fullStr);
+        parsed = JSON.parse(trimmedStr);
       } catch (e) {
         // ignore
         console.error(e);
