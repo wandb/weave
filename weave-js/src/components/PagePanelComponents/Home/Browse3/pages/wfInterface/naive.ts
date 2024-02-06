@@ -933,8 +933,12 @@ class WFNaiveObjectVersion
     // not contain that (it would be way too expensive)
     const refDict = refStringToRefDict(objectRefUri);
     const refExtraTuples = refDict.refExtraTuples;
-    const filePathParts = refDict.filePathParts
-    const objBasedUri = refDictToRefString({...refDict, filePathParts:["obj"], refExtraTuples: []});
+    const filePathParts = refDict.filePathParts;
+    const objBasedUri = refDictToRefString({
+      ...refDict,
+      filePathParts: ['obj'],
+      refExtraTuples: [],
+    });
 
     let objectVersionDict = state.objectVersionsMap.get(objBasedUri);
     if (!objectVersionDict) {
