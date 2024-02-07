@@ -197,6 +197,13 @@ gql_prop_op(
     types.optional(types.Int()),
 )
 
+gql_prop_op(
+    "artifactVersion-fileCount",
+    wdt.ArtifactVersionType,
+    "fileCount",
+    types.Boolean(),
+)
+
 
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(

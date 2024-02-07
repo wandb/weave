@@ -55,5 +55,11 @@ if os.path.exists(zlib_path):
     if zlib_str.startswith(prefix):
         zlib_str = zlib_str[len(prefix) :]
 
-# Paste graphs below (from DD or Network tab to test)
+# Paste graphs into execute.json (from network console)
 execute_payloads: list[dict] = []
+execute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "execute.json")
+if os.path.exists(execute_path):
+    with open(execute_path, "r") as f:
+        execute_str = f.read()
+    if execute_str and execute_str != "":
+        execute_payloads: list[dict] = [json.loads(execute_str)]

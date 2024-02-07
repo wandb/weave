@@ -1112,6 +1112,8 @@ export const toGqlField = (
     return gqlBasicField('ttlDurationSeconds');
   } else if (forwardOp.op.name === 'artifactVersion-ttlIsInherited') {
     return gqlBasicField('ttlIsInherited');
+  } else if (forwardOp.op.name === 'artifactVersion-fileCount') {
+    return gqlBasicField('fileCount');
   } else if (forwardOp.op.name === 'artifactVersion-artifactType') {
     return [gqlObjectField(forwardGraph, forwardOp, 'artifactType')];
   } else if (forwardOp.op.name === 'artifactVersion-artifactCollections') {

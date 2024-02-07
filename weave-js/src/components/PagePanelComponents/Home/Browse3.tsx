@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
+import _ from 'lodash';
 import React, {
   ComponentProps,
   FC,
@@ -76,6 +77,7 @@ import {
   fnNaiveBootstrapFeedback,
   fnNaiveBootstrapObjects,
   fnNaiveBootstrapRuns,
+  refDictToRefString,
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
 import {SideNav} from './Browse3/SideNav';
@@ -120,7 +122,6 @@ type Browse3TabItemVersionParams = {
   tab: string;
   itemName: string;
   version: string;
-  refExtra?: string;
 };
 
 const tabOptions = [
@@ -202,9 +203,6 @@ const Browse3Mounted: FC<{
         height: `calc(100vh - ${props.headerOffset ?? 0}px)`,
         overflow: 'auto',
         flexDirection: 'column',
-        a: {
-          color: '#038194',
-        },
       }}>
       {weaveLoading && (
         <Box
@@ -628,6 +626,7 @@ const Browse3ProjectRoot: FC<{
 // TODO(tim/weaveflow_improved_nav): Generalize this
 const ObjectVersionRoutePageBinding = () => {
   const params = useParams<Browse3TabItemVersionParams>();
+  const query = useURLSearchParamsDict();
 
   const history = useHistory();
   const routerContext = useWeaveflowCurrentRouteContext();
@@ -659,7 +658,8 @@ const ObjectVersionRoutePageBinding = () => {
       project={params.project}
       objectName={params.itemName}
       version={params.version}
-      refExtra={params.refExtra}
+      filePath={query.path ?? 'obj'} // Default to obj
+      refExtra={query.extra ?? ''}
     />
   );
 };
@@ -748,7 +748,16 @@ const useCallPeekRedirect = () => {
         return;
       }
       const path = baseRouter.callsUIUrl(params.entity, params.project, {
-        opVersions: [opVersion.op().name() + ':*'],
+        opVersionRefs: [
+          refDictToRefString({
+            entity: opVersion.entity(),
+            project: opVersion.project(),
+            artifactName: opVersion.name(),
+            versionCommitHash: '*',
+            filePathParts: [],
+            refExtraTuples: [],
+          }),
+        ],
       });
       const searchParams = new URLSearchParams();
       searchParams.set(
@@ -1054,7 +1063,9 @@ const AppBarLink = (props: ComponentProps<typeof RouterLink>) => (
 
 const Browse3Breadcrumbs: FC = props => {
   const params = useParams<Browse3Params>();
-  const refFields = params.refExtra?.split('/') ?? [];
+  const query = useURLSearchParamsDict();
+  const filePathParts = query.path?.split('/') ?? [];
+  const refFields = query.extra?.split('/') ?? [];
 
   return (
     <Breadcrumbs>
@@ -1086,37 +1097,42 @@ const Browse3Breadcrumbs: FC = props => {
           {params.version}
         </AppBarLink>
       )}
-      {refFields.map((field, idx) =>
-        field === 'index' ? (
+      {filePathParts.map((part, idx) => (
+        <AppBarLink
+          key={idx}
+          to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
+            params.tab
+          }/${params.itemName}/versions/${
+            params.version
+          }?path=${encodeURIComponent(
+            filePathParts.slice(0, idx + 1).join('/')
+          )}`}>
+          {part}
+        </AppBarLink>
+      ))}
+      {_.range(0, refFields.length, 2).map(idx => (
+        <React.Fragment key={idx}>
           <Typography
-            key={idx}
             sx={{
               color: theme =>
                 theme.palette.getContrastText(theme.palette.primary.main),
             }}>
-            row
+            {refFields[idx]}
           </Typography>
-        ) : field === 'pick' ? (
-          <Typography
-            key={idx}
-            sx={{
-              color: theme =>
-                theme.palette.getContrastText(theme.palette.primary.main),
-            }}>
-            col
-          </Typography>
-        ) : (
           <AppBarLink
-            key={idx}
             to={`/${URL_BROWSE3}/${params.entity}/${params.project}/${
               params.tab
-            }/${params.itemName}/versions/${params.version}/${refFields
-              .slice(0, idx + 1)
-              .join('/')}`}>
-            {field}
+            }/${params.itemName}/versions/${
+              params.version
+            }?path=${encodeURIComponent(
+              filePathParts.join('/')
+            )}&extra=${encodeURIComponent(
+              refFields.slice(0, idx + 2).join('/')
+            )}`}>
+            {refFields[idx + 1]}
           </AppBarLink>
-        )
-      )}
+        </React.Fragment>
+      ))}
     </Breadcrumbs>
   );
 };

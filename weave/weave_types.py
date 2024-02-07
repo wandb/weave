@@ -15,6 +15,7 @@ from . import context_state
 from . import errors
 from . import mappers_python
 from . import timestamp as weave_timestamp
+from . import object_type_ref_util
 
 
 if typing.TYPE_CHECKING:
@@ -973,6 +974,9 @@ class Dict(Type):
             def get(_self, _):
                 return self.object_type
 
+            def __getitem__(_self, _):
+                return self.object_type
+
         return DictPropertyTypes()
 
     def __post_init__(self):
@@ -1190,20 +1194,10 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     )
     exec(object_init_code)
 
-    # Weave objects must auto-dereference refs when they are accessed.
-    def object_getattribute(self, name):
-        if name == "name":
-            name = "_name"
-        attribute = object.__getattribute__(self, name)
-        attr_type = type_attr_types.get(name)
-        if attr_type is None:
-            return attribute
-        from . import ref_base
-
-        if isinstance(attribute, ref_base.Ref):
-            # TODO: This should put a new ref as well, for ref-tracking
-            return attribute.get()
-        return attribute
+    object_getattribute = object_type_ref_util.make_object_getattribute(
+        list(type_attr_types.keys())
+    )
+    object_lookup_path = object_type_ref_util.make_object_lookup_path()
 
     new_object_class = type(
         object_class_name,
@@ -1211,6 +1205,7 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
         {
             "__init__": locals()["loaded_object_init"],
             "__getattribute__": object_getattribute,
+            "_lookup_path": object_lookup_path,
         },
     )
 
@@ -1819,7 +1814,11 @@ def simple_type(t: Type) -> Type:
 
 
 def is_list_like(t: Type) -> bool:
-    return List().assign_type(non_none(t))
+    return is_type_like(t, List())
+
+
+def is_type_like(t: Type, of_type: Type) -> bool:
+    return of_type.assign_type(non_none(t))
 
 
 def is_custom_type(t: Type) -> bool:

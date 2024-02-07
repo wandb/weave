@@ -26,6 +26,11 @@ import {
   WeaveflowORMContextType,
 } from '../wfInterface/context';
 import {
+  refDictToRefString,
+  refStringToRefDict,
+  stringIsRef,
+} from '../wfInterface/naive';
+import {
   HackyOpCategory,
   WFCall,
   WFObjectVersion,
@@ -36,8 +41,9 @@ import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
   opCategory?: HackyOpCategory | null;
-  opVersions?: string[];
-  inputObjectVersions?: string[];
+  opVersionRefs?: string[];
+  inputObjectVersionRefs?: string[];
+  outputObjectVersionRefs?: string[];
   parentId?: string | null;
   traceId?: string | null;
   isPivot?: boolean;
@@ -59,9 +65,9 @@ export const CallsPage: FC<{
 
   const title = useMemo(() => {
     if (filter.opCategory) {
-      return _.capitalize(filter.opCategory) + ' Calls';
+      return _.capitalize(filter.opCategory) + ' Traces';
     }
-    return 'Calls';
+    return 'Traces';
   }, [filter.opCategory]);
 
   return (
@@ -92,6 +98,8 @@ export const CallsTable: FC<{
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
+  hideControls?: boolean;
+  ioColumnsOnly?: boolean;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
@@ -202,7 +210,7 @@ export const CallsTable: FC<{
   }, [runsWithFeedbackQuery.result]);
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
-  const hideControls = true;
+  const hidePivotControls = true;
   const clearFilters = useMemo(() => {
     if (Object.keys(filter ?? {}).length > 0) {
       return () => setFilter({});
@@ -221,7 +229,8 @@ export const CallsTable: FC<{
       )}
       filterListSx={{
         // Hide until we show filters
-        pb: isPivoting && !hideControls ? 0 : 1,
+        pb: isPivoting && !hidePivotControls ? 0 : 1,
+        display: props.hideControls ? 'none' : 'flex',
       }}
       filterListItems={
         <>
@@ -281,11 +290,11 @@ export const CallsTable: FC<{
                   isPivoting ||
                   Object.keys(props.frozenFilter ?? {}).includes('opVersions')
                 }
-                value={effectiveFilter.opVersions?.[0] ?? null}
+                value={effectiveFilter.opVersionRefs?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    opVersions: newValue ? [newValue] : [],
+                    opVersionRefs: newValue ? [newValue] : [],
                   });
                 }}
                 renderInput={params => <TextField {...params} label="Op" />}
@@ -316,11 +325,11 @@ export const CallsTable: FC<{
                   <TextField {...params} label="Inputs" />
                   // <TextField {...params} label="Consumes Objects" />
                 )}
-                value={effectiveFilter.inputObjectVersions?.[0] ?? null}
+                value={effectiveFilter.inputObjectVersionRefs?.[0] ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
-                    inputObjectVersions: newValue ? [newValue] : [],
+                    inputObjectVersionRefs: newValue ? [newValue] : [],
                   });
                 }}
                 getOptionLabel={option => {
@@ -399,13 +408,14 @@ export const CallsTable: FC<{
           // Since we have a very constrained pivot, we can hide
           // the controls for now as there is no need to change them.
           // Punting on design
-          hideControls={hideControls}
+          hideControls={hidePivotControls}
         />
       ) : (
         <RunsTable
           loading={runsWithFeedbackQuery.loading}
           spans={runsWithFeedbackQuery.result}
           clearFilters={clearFilters}
+          ioColumnsOnly={props.ioColumnsOnly}
         />
       )}
     </FilterLayoutTemplate>
@@ -435,36 +445,38 @@ const useMakeBoardForCalls = (
   return useMakeNewBoard(runsNode);
 };
 
-const opVersionMatchesFilters = (
-  opVersion: WFOpVersion,
-  filters: string[][]
-): boolean => {
-  const name = opVersion.op().name();
-  for (const filter of filters) {
-    if (filter[0] === name) {
-      if (filter[1] === '*' || filter[1] === opVersion.version()) {
-        return true;
-      }
-    }
-  }
-  return false;
-};
-
 const convertHighLevelFilterToLowLevelFilter = (
   orm: WeaveflowORMContextType,
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   const allOpVersions = orm.projectConnection.opVersions();
   let opUrisFromVersions: string[] = [];
-  if (effectiveFilter.opVersions) {
-    const opVersionFilters = effectiveFilter.opVersions.map(f => f.split(':'));
-    for (const opVersion of allOpVersions) {
-      if (opVersionMatchesFilters(opVersion, opVersionFilters)) {
-        opUrisFromVersions.push(opVersion.refUri());
+  if (effectiveFilter.opVersionRefs) {
+    effectiveFilter.opVersionRefs.forEach(ref => {
+      if (stringIsRef(ref)) {
+        const refDict = refStringToRefDict(ref);
+        if (refDict.versionCommitHash === '*') {
+          allOpVersions.forEach(opVersion => {
+            if (
+              refDictToRefString({
+                entity: opVersion.op().entity(),
+                project: opVersion.op().project(),
+                artifactName: opVersion.name(),
+                versionCommitHash: '*',
+                filePathParts: [],
+                refExtraTuples: [],
+              }) === ref
+            ) {
+              opUrisFromVersions.push(opVersion.refUri());
+            }
+          });
+        } else {
+          opUrisFromVersions.push(ref);
+        }
       }
-    }
+    });
   }
-  if (opUrisFromVersions.length === 0 && effectiveFilter.opVersions) {
+  if (opUrisFromVersions.length === 0 && effectiveFilter.opVersionRefs) {
     opUrisFromVersions = ['DOES_NOT_EXIST:VALUE'];
   }
   let opUrisFromCategory = allOpVersions
@@ -478,8 +490,8 @@ const convertHighLevelFilterToLowLevelFilter = (
   const opUrisFromVersionsSet = new Set<string>(opUrisFromVersions);
   const opUrisFromCategorySet = new Set<string>(opUrisFromCategory);
   const includeVersions =
-    effectiveFilter.opVersions != null &&
-    effectiveFilter.opVersions.length >= 0;
+    effectiveFilter.opVersionRefs != null &&
+    effectiveFilter.opVersionRefs.length >= 0;
   const includeCategories = effectiveFilter.opCategory != null;
 
   if (includeVersions && includeCategories) {
@@ -498,16 +510,8 @@ const convertHighLevelFilterToLowLevelFilter = (
   return {
     traceRootsOnly: effectiveFilter.traceRootsOnly,
     opUris: Array.from(finalURISet),
-    inputUris: effectiveFilter.inputObjectVersions
-      ?.map(uri => {
-        const [objectName, version] = uri.split(':');
-        const objectVersion = orm.projectConnection.objectVersion(
-          objectName,
-          version
-        );
-        return objectVersion?.refUri();
-      })
-      .filter(item => item != null) as string[],
+    inputUris: effectiveFilter.inputObjectVersionRefs,
+    outputUris: effectiveFilter.outputObjectVersionRefs,
     traceId: effectiveFilter.traceId ?? undefined,
     parentIds: effectiveFilter.parentId ? [effectiveFilter.parentId] : [],
   };
@@ -558,11 +562,19 @@ const useOpVersionOptions = (
     for (const v of versions) {
       const opName = v.op().name();
       if (opName !== lastName) {
-        options[opName + ':*'] = opNiceName(opName);
+        options[
+          refDictToRefString({
+            entity: v.entity(),
+            project: v.project(),
+            artifactName: v.name(),
+            versionCommitHash: '*',
+            filePathParts: [],
+            refExtraTuples: [],
+          })
+        ] = opNiceName(opName);
         lastName = opName;
       }
-      options[opName + ':' + v.version()] =
-        opNiceName(opName) + ':v' + v.versionIndex();
+      options[v.refUri()] = opNiceName(opName) + ':v' + v.versionIndex();
     }
     return options;
   }, [orm.projectConnection, runs.loading, runs.result]);
@@ -609,10 +621,7 @@ const useConsumesObjectVersionOptions = (
 
     return _.fromPairs(
       versions.map(v => {
-        return [
-          v.object().name() + ':' + v.version(),
-          v.object().name() + ':v' + v.versionIndex(),
-        ];
+        return [v.refUri(), v.object().name() + ':v' + v.versionIndex()];
       })
     );
   }, [orm.projectConnection, runs.loading, runs.result]);

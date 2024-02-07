@@ -126,7 +126,8 @@ export const browse2Context = {
     projectName: string,
     objectName: string,
     objectVersionHash: string,
-    refExtra?: string[]
+    filePath: string,
+    refExtra?: string
   ) => {
     throw new Error('Not implemented');
   },
@@ -222,11 +223,31 @@ const browse3ContextGen = (
           objRef.artifactVersion
         );
       }
+
+      // TEMP HACK (Tim): This is a temp hack to handle old URIs logged with
+      // weave client before having landed and deployed
+      // https://github.com/wandb/weave/pull/1169. Should be removed before the
+      // public release.
+      if (objRef.artifactPath.endsWith('rows%2F0')) {
+        objRef.artifactPath = 'obj';
+        let newArtifactRefExtra = 'atr/rows';
+        objRef.artifactRefExtra?.split('/').forEach(part => {
+          if (isNaN(parseInt(part, 10))) {
+            newArtifactRefExtra += '/key/' + part;
+          } else {
+            newArtifactRefExtra += '/ndx/' + part;
+          }
+        });
+        objRef.artifactRefExtra = newArtifactRefExtra;
+      }
+
       return browse3Context.objectVersionUIUrl(
         objRef.entityName,
         objRef.projectName,
         objRef.artifactName,
-        objRef.artifactVersion
+        objRef.artifactVersion,
+        objRef.artifactPath,
+        objRef.artifactRefExtra
       );
     },
     entityUrl: (entityName: string) => {
@@ -281,13 +302,16 @@ const browse3ContextGen = (
       projectName: string,
       objectName: string,
       objectVersionHash: string,
-      refExtra?: string[]
+      filePath: string,
+      refExtra?: string
     ) => {
-      const extra = refExtra ? `/${refExtra.join('/')}` : '';
+      const extra = refExtra ? `&extra=${encodeURIComponent(refExtra)}` : '';
       return `${projectRoot(
         entityName,
         projectName
-      )}/objects/${objectName}/versions/${objectVersionHash}${extra}`;
+      )}/objects/${objectName}/versions/${objectVersionHash}?path=${encodeURIComponent(
+        filePath
+      )}${extra}`;
     },
     opVersionsUIUrl: (
       entityName: string,
@@ -443,7 +467,8 @@ type RouteType = {
     projectName: string,
     objectName: string,
     objectVersionHash: string,
-    refExtra?: string[]
+    filePath: string,
+    refExtra?: string
   ) => string;
   opVersionsUIUrl: (
     entityName: string,

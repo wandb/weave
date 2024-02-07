@@ -71,7 +71,8 @@ if engine_trace.datadog_is_enabled():
     # crashes
     import ddtrace
 
-    ddtrace.patch_all(logging=True)
+    if not os.environ.get("DISABLE_WEAVE_PII"):
+        ddtrace.patch_all(logging=True)
     custom_dd_patch()
 
 
@@ -352,13 +353,12 @@ def execute():
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
-    if root_span is not None:
-        root_span.set_tag("request_size", len(req_bytes), len(req_bytes))
-    fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
+    fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
     response_payload = _value_or_errors_to_response(fixed_response)
 
     if root_span is not None:
+        root_span.set_metric("request_size", len(req_bytes), True)
         root_span.set_metric("node_count", len(response_payload["data"]), True)
         root_span.set_metric(
             "error_count",

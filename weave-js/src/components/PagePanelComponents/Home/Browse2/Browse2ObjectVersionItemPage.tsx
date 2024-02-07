@@ -31,7 +31,7 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
     return node;
   }
-  if (extra[0] === 'index') {
+  if (extra[0] === 'ndx' || extra[0] === 'row') {
     return nodeFromExtra(
       callOpVeryUnsafe('index', {
         arr: node,
@@ -39,7 +39,7 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
       }) as Node,
       extra.slice(2)
     );
-  } else if (extra[0] === 'pick') {
+  } else if (extra[0] === 'key' || extra[0] === 'col') {
     return nodeFromExtra(
       callOpVeryUnsafe('pick', {
         obj: node,
@@ -47,14 +47,17 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
       }) as Node,
       extra.slice(2)
     );
+  } else if (extra[0] === 'atr') {
+    return nodeFromExtra(
+      callOpVeryUnsafe('Object-__getattr__', {
+        self: node,
+        name: constString(extra[1]),
+      }) as Node,
+      extra.slice(2)
+    );
+  } else {
+    throw new Error('Unknown extra type: ' + extra);
   }
-  return nodeFromExtra(
-    callOpVeryUnsafe('Object-__getattr__', {
-      self: node,
-      name: constString(extra[0]),
-    }) as Node,
-    extra.slice(1)
-  );
 };
 
 export const Browse2ObjectVersionItemPage: FC = props => {
