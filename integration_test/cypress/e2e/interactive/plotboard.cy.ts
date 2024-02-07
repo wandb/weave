@@ -6,6 +6,7 @@ import {
   getPanel,
   openPanelConfig,
   setPlotConfig,
+  switchToExpressionEditor,
 } from '../testlib';
 
 describe('plotboard', () => {
@@ -24,13 +25,20 @@ describe('plotboard', () => {
     const panel = getPanel(['main', 'panel0']);
     const configPanel = openPanelConfig(panel);
 
-    const xDimConfig = configPanel.get('[data-test="x-dim-config"]');
+    let xDimConfig = configPanel.get('[data-test="x-dim-config"]');
+    switchToExpressionEditor(xDimConfig);
+    // Not sure why switchToExpressionEditor affects its argument, but it does
+    xDimConfig = configPanel.get('[data-test="x-dim-config"]');
     setPlotConfig(xDimConfig, 'row');
 
-    const yDimConfig = configPanel.get('[data-test="y-dim-config"]');
+    let yDimConfig = configPanel.get('[data-test="y-dim-config"]');
+    switchToExpressionEditor(yDimConfig);
+    yDimConfig = configPanel.get('[data-test="y-dim-config"]');
     setPlotConfig(yDimConfig, 'sin(row / 31.4159)');
 
-    const colorDimConfig = configPanel.get('[data-test="label-dim-config"]');
+    let colorDimConfig = configPanel.get('[data-test="label-dim-config"]');
+    switchToExpressionEditor(colorDimConfig);
+    colorDimConfig = configPanel.get('[data-test="label-dim-config"]');
     setPlotConfig(colorDimConfig, 'row');
 
     ['line', 'bar'].forEach(mark => {

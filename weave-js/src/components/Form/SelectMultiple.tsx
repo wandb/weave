@@ -20,7 +20,7 @@ import {
 import {AdditionalProps, Select} from './Select';
 
 // Create a copy of the specified array, moving an item from one index to another.
-function arrayMove<T>(array: readonly T[], from: number, to: number) {
+export function arrayMove<T>(array: readonly T[], from: number, to: number) {
   const slicedArray = array.slice();
   slicedArray.splice(
     to < 0 ? array.length + to : to,
