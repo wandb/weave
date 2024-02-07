@@ -27,9 +27,17 @@ import {UnderConstruction} from './common/UnderConstruction';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
-import {useWeaveflowORMContext} from './wfInterface/context';
-import {refDictToRefString} from './wfInterface/naive';
-import {WFCall, WFObjectVersion, WFOpVersion} from './wfInterface/types';
+import {WFCall, WFOpVersion} from './wfInterface/types';
+import {
+  CallKey,
+  CallSchema,
+  objectVersionKeyToRefUri,
+  ObjectVersionSchema,
+  useCall,
+  useCalls,
+  useObjectVersion,
+  useRootObjectVersions,
+} from './wfReactInterface/interface';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -39,46 +47,46 @@ export const ObjectVersionPage: React.FC<{
   filePath: string;
   refExtra?: string;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const refExtraParts = props.refExtra ? props.refExtra.split('/') : [];
-  const objectVersion = orm.projectConnection.objectVersion(
-    refDictToRefString({
-      entity: props.entity,
-      project: props.project,
-      artifactName: props.objectName,
-      versionCommitHash: props.version,
-      // TODO: We need to get more of these from the URL!
-      filePathParts: props.filePath.split('/'),
-      refExtraTuples: _.range(0, refExtraParts.length, 2).map(i => ({
-        edgeType: refExtraParts[i],
-        edgeName: refExtraParts[i + 1],
-      })),
-    })
-  );
-  if (!objectVersion) {
+  const objectVersion = useObjectVersion({
+    entity: props.entity,
+    project: props.project,
+    objectId: props.objectName,
+    versionHash: props.version,
+    path: props.filePath,
+    refExtra: props.refExtra,
+  });
+  if (objectVersion.loading) {
     return <CenteredAnimatedLoader />;
+  } else if (objectVersion.result == null) {
+    return <div>Object not found</div>;
   }
-  return <ObjectVersionPageInner {...props} objectVersion={objectVersion} />;
+  return (
+    <ObjectVersionPageInner {...props} objectVersion={objectVersion.result} />
+  );
 };
 const ObjectVersionPageInner: React.FC<{
-  objectVersion: WFObjectVersion;
+  objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
-  const objectVersionHash = objectVersion.commitHash();
-  const entityName = objectVersion.entity();
-  const projectName = objectVersion.project();
-  const objectName = objectVersion.object().name();
-  const objectVersionIndex = objectVersion.versionIndex();
-  const objectFilePath = objectVersion.filePath();
-  const refExtra = objectVersion.refExtraPath();
-  const objectVersionCount = objectVersion.object().objectVersions().length;
-  const objectTypeCategory = objectVersion.typeVersion()?.typeCategory();
-  const producingCalls = objectVersion.outputFrom().filter(call => {
-    return call.opVersion() != null;
+  const objectVersionHash = objectVersion.versionHash;
+  const entityName = objectVersion.entity;
+  const projectName = objectVersion.project;
+  const objectName = objectVersion.objectId;
+  const objectVersionIndex = objectVersion.versionIndex;
+  const objectFilePath = objectVersion.path;
+  const refExtra = objectVersion.refExtra;
+  const objectVersions = useRootObjectVersions(entityName, projectName, {
+    objectIds: [objectName],
   });
-  const consumingCalls = objectVersion.inputTo().filter(call => {
-    return call.opVersion() != null;
+  const objectVersionCount = (objectVersions.result ?? []).length;
+  const objectTypeCategory = objectVersion.category;
+  const refUri = objectVersionKeyToRefUri(objectVersion);
+
+  const producingCalls = useCalls(entityName, projectName, {
+    outputObjectVersionRefs: [refUri],
   });
-  const refUri = objectVersion.refUri();
+  const consumingCalls = useCalls(entityName, projectName, {
+    inputObjectVersionRefs: [refUri],
+  });
 
   const itemNode = useMemo(() => {
     const uriParts = refUri.split('#');
@@ -138,24 +146,30 @@ const ObjectVersionPageInner: React.FC<{
             //   />
             // ),
             Ref: <span>{refUri}</span>,
-            ...(producingCalls.length > 0
+            ...((producingCalls.result?.length ?? 0) > 0
               ? {
-                  [maybePluralizeWord(producingCalls.length, 'Producing Call')]:
-                    (
-                      <ObjectVersionProducingCallsItem
-                        objectVersion={objectVersion}
-                      />
-                    ),
+                  [maybePluralizeWord(
+                    producingCalls.result!.length,
+                    'Producing Call'
+                  )]: (
+                    <ObjectVersionProducingCallsItem
+                      producingCalls={producingCalls.result!}
+                      refUri={refUri}
+                    />
+                  ),
                 }
               : {}),
-            ...(consumingCalls.length > 0
+            ...((consumingCalls.result?.length ?? 0) > 0
               ? {
-                  [maybePluralizeWord(consumingCalls.length, 'Consuming Call')]:
-                    (
-                      <ObjectVersionConsumingCallsItem
-                        objectVersion={objectVersion}
-                      />
-                    ),
+                  [maybePluralizeWord(
+                    consumingCalls.result!.length,
+                    'Consuming Call'
+                  )]: (
+                    <ObjectVersionConsumingCallsItem
+                      consumingCalls={consumingCalls.result!}
+                      refUri={refUri}
+                    />
+                  ),
                 }
               : {}),
           }}
@@ -312,90 +326,87 @@ const ObjectVersionPageInner: React.FC<{
 };
 
 const ObjectVersionProducingCallsItem: React.FC<{
-  objectVersion: WFObjectVersion;
+  producingCalls: CallSchema[];
+  refUri: string;
 }> = props => {
-  const producingCalls = props.objectVersion.outputFrom().filter(call => {
-    return call.opVersion() != null;
-  });
-  if (producingCalls.length === 1) {
-    const call = producingCalls[0];
-    const opVersion = call.opVersion();
-    if (opVersion == null) {
-      return <>{call.spanName()}</>;
+  if (props.producingCalls.length === 1) {
+    const call = props.producingCalls[0];
+    const opVersionRef = call.opVersionRef;
+    const spanName = call.spanName;
+    if (opVersionRef == null) {
+      return <>{spanName}</>;
     }
     return (
       <CallLink
-        entityName={call.entity()}
-        projectName={call.project()}
-        opName={opVersion.op().name()}
-        callId={call.callID()}
+        entityName={call.entity}
+        projectName={call.project}
+        opName={spanName}
+        callId={call.callId}
         variant="secondary"
       />
     );
   }
   return (
     <GroupedCalls
-      calls={producingCalls}
+      calls={props.producingCalls}
       partialFilter={{
-        outputObjectVersionRefs: [props.objectVersion.refUri()],
+        outputObjectVersionRefs: [props.refUri],
       }}
     />
   );
 };
 
 const ObjectVersionConsumingCallsItem: React.FC<{
-  objectVersion: WFObjectVersion;
+  consumingCalls: CallSchema[];
+  refUri: string;
 }> = props => {
-  const consumingCalls = props.objectVersion.inputTo().filter(call => {
-    return call.opVersion() != null;
-  });
-  if (consumingCalls.length === 1) {
-    const call = consumingCalls[0];
-    const opVersion = call.opVersion();
-    if (opVersion == null) {
-      return <>{call.spanName()}</>;
+  if (props.consumingCalls.length === 1) {
+    const call = props.consumingCalls[0];
+    const opVersionRef = call.opVersionRef;
+    const spanName = call.spanName;
+    if (opVersionRef == null) {
+      return <>{spanName}</>;
     }
     return (
       <CallLink
-        entityName={call.entity()}
-        projectName={call.project()}
-        opName={opVersion.op().name()}
-        callId={call.callID()}
+        entityName={call.entity}
+        projectName={call.project}
+        opName={spanName}
+        callId={call.callId}
         variant="secondary"
       />
     );
   }
   return (
     <GroupedCalls
-      calls={consumingCalls}
+      calls={props.consumingCalls}
       partialFilter={{
-        inputObjectVersionRefs: [props.objectVersion.refUri()],
+        inputObjectVersionRefs: [props.refUri],
       }}
     />
   );
 };
 
 export const GroupedCalls: React.FC<{
-  calls: WFCall[];
+  calls: CallSchema[];
   partialFilter?: WFHighLevelCallFilter;
 }> = ({calls, partialFilter}) => {
   const callGroups = useMemo(() => {
     const groups: {
       [key: string]: {
-        opVersion: WFOpVersion;
-        calls: WFCall[];
+        opVersionRef: string;
+        calls: CallSchema[];
       };
     } = {};
     calls.forEach(call => {
-      const opVersion = call.opVersion();
-      if (opVersion == null) {
+      const opVersionRef = call.opVersionRef;
+      if (opVersionRef == null) {
         return;
       }
-
-      const key = opVersion.refUri();
+      const key = opVersionRef;
       if (groups[key] == null) {
         groups[key] = {
-          opVersion,
+          opVersionRef: opVersionRef,
           calls: [],
         };
       }
@@ -430,8 +441,8 @@ export const GroupedCalls: React.FC<{
 
 const OpVersionCallsLink: React.FC<{
   val: {
-    opVersion: WFOpVersion;
-    calls: WFCall[];
+    opVersionRef: string;
+    calls: CallSchema[];
   };
   partialFilter?: WFHighLevelCallFilter;
 }> = ({val, partialFilter}) => {
