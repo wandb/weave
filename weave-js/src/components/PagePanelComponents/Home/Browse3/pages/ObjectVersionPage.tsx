@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
@@ -27,15 +26,14 @@ import {UnderConstruction} from './common/UnderConstruction';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
-import {WFCall, WFOpVersion} from './wfInterface/types';
 import {
-  CallKey,
   CallSchema,
   objectVersionKeyToRefUri,
   ObjectVersionSchema,
-  useCall,
+  refUriToOpVersionKey,
   useCalls,
   useObjectVersion,
+  useOpVersion,
   useRootObjectVersions,
 } from './wfReactInterface/interface';
 
@@ -406,7 +404,7 @@ export const GroupedCalls: React.FC<{
       const key = opVersionRef;
       if (groups[key] == null) {
         groups[key] = {
-          opVersionRef: opVersionRef,
+          opVersionRef,
           calls: [],
         };
       }
@@ -446,23 +444,29 @@ const OpVersionCallsLink: React.FC<{
   };
   partialFilter?: WFHighLevelCallFilter;
 }> = ({val, partialFilter}) => {
+  const opVersion = useOpVersion(refUriToOpVersionKey(val.opVersionRef));
+  if (opVersion.loading) {
+    return <></>;
+  } else if (opVersion.result == null) {
+    return <></>;
+  }
   return (
     <>
       <OpVersionLink
-        entityName={val.opVersion.entity()}
-        projectName={val.opVersion.project()}
-        opName={val.opVersion.op().name()}
-        version={val.opVersion.commitHash()}
-        versionIndex={val.opVersion.versionIndex()}
+        entityName={opVersion.result.entity}
+        projectName={opVersion.result.project}
+        opName={opVersion.result.opId}
+        version={opVersion.result.versionHash}
+        versionIndex={opVersion.result.versionIndex}
         variant="secondary"
       />{' '}
       [
       <CallsLink
-        entity={val.opVersion.entity()}
-        project={val.opVersion.project()}
+        entity={opVersion.result.entity}
+        project={opVersion.result.project}
         callCount={val.calls.length}
         filter={{
-          opVersionRefs: [val.opVersion.refUri()],
+          opVersionRefs: [val.opVersionRef],
           ...(partialFilter ?? {}),
         }}
         neverPeek

@@ -26,11 +26,11 @@ import {
   opRootProject,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
-import { useRuns } from '../../../Browse2/callTreeHooks';
-import { Call as CallTreeSpan } from '../../../Browse2/callTree';
+import {Call as CallTreeSpan} from '../../../Browse2/callTree';
+import {useRuns} from '../../../Browse2/callTreeHooks';
 
-const PROJECT_CALL_STREAM_NAME = 'stream'
-const WANDB_ARTIFACT_REF_PREFIX = 'wandb-artifact:///'
+const PROJECT_CALL_STREAM_NAME = 'stream';
+const WANDB_ARTIFACT_REF_PREFIX = 'wandb-artifact:///';
 
 type Loadable<T> = {
   loading: boolean;
@@ -50,78 +50,91 @@ export type CallSchema = CallKey & {
   opVersionRef: string | null;
 };
 
-const spanToCallSchema = (entity: string, project: string, span: CallTreeSpan): CallSchema => {
-return {
-    entity: entity,
-    project: project,
+const spanToCallSchema = (
+  entity: string,
+  project: string,
+  span: CallTreeSpan
+): CallSchema => {
+  return {
+    entity,
+    project,
     callId: span.span_id,
-    spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ? refUriToOpVersionKey(span.name).opId : span.name,
-    opVersionRef: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ? span.name : null,
-}
-}
-
+    spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? refUriToOpVersionKey(span.name).opId
+      : span.name,
+    opVersionRef: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? span.name
+      : null,
+  };
+};
 
 export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
-    const calls = useRuns({
-        entityName: key.entity,
-        projectName: key.project,
-        streamName: PROJECT_CALL_STREAM_NAME,
-    }, {
-        callIds: [key.callId],
-    })
+  const calls = useRuns(
+    {
+      entityName: key.entity,
+      projectName: key.project,
+      streamName: PROJECT_CALL_STREAM_NAME,
+    },
+    {
+      callIds: [key.callId],
+    }
+  );
 
-    return useMemo(() => {
-        const callResult = calls.result?.[0] ?? null
-        const result = callResult ? spanToCallSchema(key.entity, key.project, callResult) : null
-        if (calls.loading) {
-            return {
-                loading: true,
-                result,
-            };
-        } else {
-            return {
-                loading: false,
-                result,
-            };
-        }
-    }, [calls.loading, calls.result, key.entity, key.project]);
+  return useMemo(() => {
+    const callResult = calls.result?.[0] ?? null;
+    const result = callResult
+      ? spanToCallSchema(key.entity, key.project, callResult)
+      : null;
+    if (calls.loading) {
+      return {
+        loading: true,
+        result,
+      };
+    } else {
+      return {
+        loading: false,
+        result,
+      };
+    }
+  }, [calls.loading, calls.result, key.entity, key.project]);
 };
 
 type CallFilter = {
   // Filters are ANDed across the fields and ORed within the fields
   // Commented out means not yet implemented
-//   opVersionRefs?: string[];
+  //   opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
-//   traceIds?: string[];
-//   parentIds?: string[];
-//   callIds?: string[];
-//   traceRootsOnly?: boolean;
+  //   traceIds?: string[];
+  //   parentIds?: string[];
+  //   callIds?: string[];
+  //   traceRootsOnly?: boolean;
 };
 export const useCalls = (
   entity: string,
   project: string,
   filter: CallFilter
 ): Loadable<CallSchema[]> => {
-    const calls = useRuns({
-        entityName: entity,
-        projectName: project,
-        streamName: PROJECT_CALL_STREAM_NAME,
-    }, {
-        // opUris?: string[];
-        inputUris: filter.inputObjectVersionRefs,
-        outputUris: filter.outputObjectVersionRefs,
-        // traceId?: string;
-        // parentIds?: string[];
-        // traceRootsOnly?: boolean;
-        // callIds?: string[];
-    })
+  const calls = useRuns(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: PROJECT_CALL_STREAM_NAME,
+    },
+    {
+      // opUris?: string[];
+      inputUris: filter.inputObjectVersionRefs,
+      outputUris: filter.outputObjectVersionRefs,
+      // traceId?: string;
+      // parentIds?: string[];
+      // traceRootsOnly?: boolean;
+      // callIds?: string[];
+    }
+  );
   return useMemo(() => {
-    const result = (calls.result ?? []).map(run => (spanToCallSchema(
-        entity,
-        project,
-        run
-      )))
+    const result = (calls.result ?? []).map(run =>
+      spanToCallSchema(entity, project, run)
+    );
     if (calls.loading) {
       return {
         loading: true,
@@ -140,7 +153,7 @@ type OpVersionKey = {
   entity: string;
   project: string;
   opId: string;
-  version: string;
+  versionHash: string;
 };
 
 export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
@@ -156,23 +169,69 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
     entity: refDict.entity,
     project: refDict.project,
     opId: refDict.artifactName,
-    version: refDict.versionCommitHash,
+    versionHash: refDict.versionCommitHash,
   };
 };
 export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
-  return `wandb-artifact:///${key.entity}/${key.project}/${key.opId}:${key.version}/obj`;
+  return `wandb-artifact:///${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
 };
 
 type MVPOpCategory = 'train' | 'predict' | 'score' | 'evaluate' | 'tune';
 
 type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
+  versionIndex: number;
 };
 
 export const useOpVersion = (
   key: OpVersionKey
 ): Loadable<OpVersionSchema | null> => {
-  throw new Error('Not implemented');
+  const artifactNode = opProjectArtifactVersion({
+    project: opRootProject({
+      entity: constString(key.entity),
+      project: constString(key.project),
+    }),
+    artifactName: constString(key.opId),
+    artifactVersionAlias: constString(key.versionHash),
+  });
+  const versionIndexNode = opArtifactVersionVersionId({
+    artifactVersion: artifactNode,
+  });
+  //   const metadataNode = opArtifactVersionMetadata({
+  //     artifactVersion: artifactNode,
+  //   });
+  //   const typeNameNode = opPick({
+  //     obj: metadataNode,
+  //     key: constString('_weave_meta.type_name'),
+  //   });
+  const dataNode = opDict({
+    missing: opIsNone({val: artifactNode}),
+    // typeName: typeNameNode,
+    versionIndex: versionIndexNode,
+  } as any);
+  const dataValue = useNodeValue(dataNode);
+  return useMemo(() => {
+    const result =
+      dataValue.result == null || dataValue.result.missing
+        ? null
+        : {
+            ...key,
+            versionIndex: dataValue.result.versionIndex as number,
+            // typeName: dataValue.result.typeName as string,
+            // category: typeNameToCategory(dataValue.result.typeName as string),
+          };
+    if (dataValue.loading) {
+      return {
+        loading: true,
+        result,
+      };
+    } else {
+      return {
+        loading: false,
+        result,
+      };
+    }
+  }, [dataValue.loading, dataValue.result, key]);
 };
 
 type OpVersionFilter = {
@@ -264,14 +323,15 @@ export const useObjectVersion = (
   } as any);
   const dataValue = useNodeValue(dataNode);
   return useMemo(() => {
-    const result = dataValue.result == null || dataValue.result.missing
-    ? null
-    : {
-        ...key,
-        versionIndex: dataValue.result.versionIndex as number,
-        typeName: dataValue.result.typeName as string,
-        category: typeNameToCategory(dataValue.result.typeName as string),
-      };
+    const result =
+      dataValue.result == null || dataValue.result.missing
+        ? null
+        : {
+            ...key,
+            versionIndex: dataValue.result.versionIndex as number,
+            typeName: dataValue.result.typeName as string,
+            category: typeNameToCategory(dataValue.result.typeName as string),
+          };
     if (dataValue.loading) {
       return {
         loading: true,
@@ -368,13 +428,13 @@ export const useRootObjectVersions = (
 
   return useMemo(() => {
     const result = (dataValue.result ?? []).map((row: any) => ({
-        entity,
-        project,
-        objectId: row.objectId as string,
-        versionHash: row.versionHash as string,
-        path: 'obj',
-        refExtra: null,
-      }))
+      entity,
+      project,
+      objectId: row.objectId as string,
+      versionHash: row.versionHash as string,
+      path: 'obj',
+      refExtra: null,
+    }));
     if (dataValue.loading) {
       return {
         loading: true,
@@ -384,7 +444,6 @@ export const useRootObjectVersions = (
       return {
         loading: false,
         result,
-        
       };
     }
   }, [dataValue.loading, dataValue.result, entity, project]);
