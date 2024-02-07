@@ -1,3 +1,4 @@
+from typing import Optional
 import pydantic
 
 import weave
@@ -50,7 +51,12 @@ def test_pydantic_type_inference():
 
     obj = TestPydanticClass(a=1, b="2", c=3.0)
     t = types.TypeRegistry.type_of(obj)
-    assert t == types.ObjectType(a=types.Int(), b=types.String(), c=types.Number())
+    assert isinstance(t, types.ObjectType)
+    assert t.property_types() == {
+        "a": types.Int(),
+        "b": types.String(),
+        "c": types.Number(),
+    }
 
 
 def test_save_load_pydantic():
@@ -61,3 +67,28 @@ def test_save_load_pydantic():
     n = weave.save(obj)
     recovered = weave.use(n)
     assert recovered.a == 1
+
+
+def test_pydantic_saveload():
+    class Object(pydantic.BaseModel):
+        name: Optional[str] = "hello"
+        description: Optional[str] = None
+
+    class A(Object):
+        model_name: str
+
+    class B(A):
+        pass
+
+    a = B(name="my-a", model_name="my-model")
+
+    a_type = weave.type_of(a)
+    assert a_type.root_type_class().__name__ == "A"
+
+    weave.init_local_client()
+    weave.publish(a, name="my-a")
+
+    a2 = weave.ref("my-a").get()
+    assert a2.name == "my-a"
+    assert a2.description == None
+    assert a2.model_name == "my-model"
