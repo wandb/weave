@@ -412,6 +412,8 @@ export const CallsTable: FC<{
         />
       ) : (
         <RunsTable
+          entity={props.entity}
+          project={props.project}
           loading={runsWithFeedbackQuery.loading}
           spans={runsWithFeedbackQuery.result}
           clearFilters={clearFilters}

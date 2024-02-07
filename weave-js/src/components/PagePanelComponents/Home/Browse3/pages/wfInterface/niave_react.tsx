@@ -83,3 +83,19 @@ export const useProjectTypeVersion = (
 ) => {
   return useAsyncToHook(project.typeVersion, args, project);
 };
+
+export const useMappedProjectCall = (
+  project: WFProject,
+  args: Array<Parameters<WFProject['call']>>
+) => {
+  const mappedProjectCall = async (
+    innerArgs: Array<Parameters<WFProject['call']>>
+  ) => {
+    return Promise.all(
+      innerArgs.map(arg => {
+        return project.call(...arg);
+      })
+    );
+  };
+  return useAsyncToHook(mappedProjectCall, [args]);
+};

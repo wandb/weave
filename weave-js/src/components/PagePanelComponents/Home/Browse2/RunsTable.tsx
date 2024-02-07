@@ -26,7 +26,9 @@ import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
-import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
+import {useWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
+import {useMappedProjectCall} from '../Browse3/pages/wfInterface/niave_react';
+import {WFCall} from '../Browse3/pages/wfInterface/types';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
@@ -93,11 +95,13 @@ export function buildTree(
 }
 
 export const RunsTable: FC<{
+  entity: string;
+  project: string;
   loading: boolean;
   spans: SpanWithFeedback[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+}> = ({loading, spans, clearFilters, ioColumnsOnly, entity, project}) => {
   const showIO = true;
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.name)).length === 1;
@@ -114,11 +118,21 @@ export const RunsTable: FC<{
       })),
     [spans]
   );
-  const orm = useMaybeWeaveflowORMContext();
+  const orm = useWeaveflowORMContext(entity, project);
   const params = useParams<Browse2RootObjectVersionItemParams>();
+  const calls = useMappedProjectCall(
+    orm.projectConnection,
+    spans.map(span => [span.span_id])
+  );
   const tableData = useMemo(() => {
-    return spans.map((call: SpanWithFeedback) => {
-      const ormCall = orm?.projectConnection.call(call.span_id);
+    if (calls.loading) {
+      return [];
+    }
+    const zipped = _.zip(spans, calls.data).filter(
+      ([span, call]) => span != null && call != null
+    ) as Array<[SpanWithFeedback, WFCall]>;
+    return zipped.map(([call, ormCall]) => {
+      // const ormCall = orm?.projectConnection.call(call.span_id);
       const argOrder = call.inputs._input_order;
       let args = _.fromPairs(
         Object.entries(call.inputs).filter(
@@ -177,7 +191,7 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [orm?.projectConnection, spans, loading]);
+  }, [calls.loading, calls.data, spans, loading]);
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
