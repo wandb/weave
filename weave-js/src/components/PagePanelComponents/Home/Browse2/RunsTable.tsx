@@ -7,7 +7,6 @@ import {
   GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
 import React, {
   ComponentProps,
@@ -21,9 +20,10 @@ import {useParams} from 'react-router-dom';
 
 import {MOON_250} from '../../../../common/css/color.styles';
 import {A, TargetBlank} from '../../../../common/util/links';
+import {monthRoundedTime} from '../../../../common/util/time';
 import {Timestamp} from '../../../Timestamp';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
-import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
+import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
@@ -216,16 +216,18 @@ export const RunsTable: FC<{
       {
         field: 'span_id',
         headerName: 'Trace',
-        width: 75,
-        minWidth: 75,
-        maxWidth: 75,
+        width: 250,
         hideable: false,
         renderCell: rowParams => {
-          // return truncateID(rowParams.row.id);
+          const opVersion = rowParams.row.ormCall?.opVersion();
+          if (opVersion == null) {
+            return rowParams.row.ormCall?.spanName();
+          }
           return (
             <CallLink
               entityName={params.entity}
               projectName={params.project}
+              opName={opVersion.op().name()}
               callId={rowParams.row.id}
             />
           );
@@ -248,30 +250,6 @@ export const RunsTable: FC<{
           );
         },
       },
-      ...(orm && !ioColumnsOnly
-        ? [
-            {
-              flex: !showIO ? 1 : undefined,
-              field: 'opVersion',
-              headerName: 'Op',
-              renderCell: (rowParams: any) => {
-                const opVersion = rowParams.row.ormCall?.opVersion();
-                if (opVersion == null) {
-                  return rowParams.row.ormCall?.spanName();
-                }
-                return (
-                  <OpVersionLink
-                    entityName={opVersion.entity()}
-                    projectName={opVersion.project()}
-                    opName={opVersion.op().name()}
-                    version={opVersion.version()}
-                    versionIndex={opVersion.versionIndex()}
-                  />
-                );
-              },
-            },
-          ]
-        : []),
       ...(orm && !ioColumnsOnly
         ? [
             {
@@ -303,17 +281,6 @@ export const RunsTable: FC<{
                     format="relative"
                   />
                 );
-              },
-            },
-            {
-              field: 'latency',
-              headerName: 'Latency',
-              width: 100,
-              minWidth: 100,
-              maxWidth: 100,
-              // flex: !showIO ? 1 : undefined,
-              renderCell: (cellParams: any) => {
-                return monthRoundedTime(cellParams.row.latency);
               },
             },
           ]
@@ -464,6 +431,18 @@ export const RunsTable: FC<{
         });
       }
     }
+
+    cols.push({
+      field: 'latency',
+      headerName: 'Latency',
+      width: 100,
+      minWidth: 100,
+      maxWidth: 100,
+      // flex: !showIO ? 1 : undefined,
+      renderCell: cellParams => {
+        return monthRoundedTime(cellParams.row.latency);
+      },
+    });
 
     return {cols, colGroupingModel};
   }, [

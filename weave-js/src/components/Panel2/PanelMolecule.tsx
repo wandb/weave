@@ -7,7 +7,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
 import {Icon, Placeholder, PlaceholderImage} from 'semantic-ui-react';
 
-import {onNextExitFullscreen} from '../../fullscreen';
+import {onNextExitFullscreen} from '../../common/util/fullscreen';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
 import * as S from './PanelObject3D.styles';
