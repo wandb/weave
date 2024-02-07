@@ -2,6 +2,7 @@ import _ from 'lodash';
 import React, {useMemo} from 'react';
 
 import {constString, opGet} from '../../../../../core';
+import {maybePluralizeWord} from '../../../../../core/util/string';
 import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
 import {
   WeaveEditor,
@@ -137,24 +138,24 @@ const ObjectVersionPageInner: React.FC<{
             //   />
             // ),
             Ref: <span>{refUri}</span>,
-            // Hide consuming and producing calls since we don't have a
-            // good way to look this up yet
             ...(producingCalls.length > 0
               ? {
-                  'Producing Calls': (
-                    <ObjectVersionProducingCallsItem
-                      objectVersion={objectVersion}
-                    />
-                  ),
+                  [maybePluralizeWord(producingCalls.length, 'Producing Call')]:
+                    (
+                      <ObjectVersionProducingCallsItem
+                        objectVersion={objectVersion}
+                      />
+                    ),
                 }
               : {}),
             ...(consumingCalls.length > 0
               ? {
-                  'Consuming Calls': (
-                    <ObjectVersionConsumingCallsItem
-                      objectVersion={objectVersion}
-                    />
-                  ),
+                  [maybePluralizeWord(consumingCalls.length, 'Consuming Call')]:
+                    (
+                      <ObjectVersionConsumingCallsItem
+                        objectVersion={objectVersion}
+                      />
+                    ),
                 }
               : {}),
           }}
@@ -316,44 +317,29 @@ const ObjectVersionProducingCallsItem: React.FC<{
   const producingCalls = props.objectVersion.outputFrom().filter(call => {
     return call.opVersion() != null;
   });
-  if (producingCalls.length === 0) {
-    return <div>-</div>;
-  } else if (producingCalls.length === 1) {
+  if (producingCalls.length === 1) {
     const call = producingCalls[0];
+    const opVersion = call.opVersion();
+    if (opVersion == null) {
+      return <>{call.spanName()}</>;
+    }
     return (
       <CallLink
         entityName={call.entity()}
         projectName={call.project()}
+        opName={opVersion.op().name()}
         callId={call.callID()}
-        simpleText={{
-          opName: call.spanName(),
-          versionIndex: call.opVersion()?.versionIndex() ?? 0,
-        }}
+        variant="secondary"
       />
     );
   }
   return (
-    <ul
-      style={{
-        paddingInlineStart: '22px',
-        margin: 0,
-      }}>
-      {producingCalls.map(call => {
-        return (
-          <li key={call.callID()}>
-            <CallLink
-              entityName={call.entity()}
-              projectName={call.project()}
-              callId={call.callID()}
-              simpleText={{
-                opName: call.spanName(),
-                versionIndex: call.opVersion()?.versionIndex() ?? 0,
-              }}
-            />
-          </li>
-        );
-      })}
-    </ul>
+    <GroupedCalls
+      calls={producingCalls}
+      partialFilter={{
+        outputObjectVersionRefs: [props.objectVersion.refUri()],
+      }}
+    />
   );
 };
 
@@ -363,6 +349,22 @@ const ObjectVersionConsumingCallsItem: React.FC<{
   const consumingCalls = props.objectVersion.inputTo().filter(call => {
     return call.opVersion() != null;
   });
+  if (consumingCalls.length === 1) {
+    const call = consumingCalls[0];
+    const opVersion = call.opVersion();
+    if (opVersion == null) {
+      return <>{call.spanName()}</>;
+    }
+    return (
+      <CallLink
+        entityName={call.entity()}
+        projectName={call.project()}
+        opName={opVersion.op().name()}
+        callId={call.callID()}
+        variant="secondary"
+      />
+    );
+  }
   return (
     <GroupedCalls
       calls={consumingCalls}

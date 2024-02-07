@@ -1,6 +1,7 @@
 import {Alert, Box} from '@mui/material';
 import React from 'react';
 
+import {isValidVarName} from '../../../../../core/util/var';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
 
@@ -11,6 +12,7 @@ type TabUseModelProps = {
 };
 
 export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
+  const pythonName = isValidVarName(name) ? name : 'model';
   return (
     <Box m={2}>
       <Alert severity="info" variant="outlined">
@@ -30,8 +32,8 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
       <Box mt={2}>
         Use the following code to retrieve this model version:
         <CopyableText
-          text={`${name} = weave.ref("<ref_uri>").get()`}
-          copyText={`${name} = weave.ref("${uri}").get()`}
+          text={`${pythonName} = weave.ref("<ref_uri>").get()`}
+          copyText={`${pythonName} = weave.ref("${uri}").get()`}
         />
       </Box>
       <Box mt={2}>
