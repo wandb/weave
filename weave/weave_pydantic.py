@@ -15,14 +15,6 @@ class JSONType(enum.Enum):
     NULL = "null"
 
 
-class JSONSchema(typing.TypedDict, total=False):
-    title: str
-    type: JSONType
-    properties: "typing.Optional[typing.Dict[str, JSONSchema]]"
-    required: typing.Optional[typing.List[str]]
-    items: "typing.Optional[typing.Union[JSONSchema, JSONType]]"  # Type of array items
-
-
 def weave_type_to_pydantic(
     property_types: dict[str, types.Type], name: str
 ) -> BaseModel:
@@ -39,7 +31,7 @@ def weave_type_to_pydantic(
     return create_model(name, **field_defs)  # type: ignore
 
 
-def json_schema_to_weave_type(json_schema: JSONSchema) -> types.Type:
+def json_schema_to_weave_type(json_schema: typing.Dict[str, typing.Any]) -> types.Type:
     if "anyOf" in json_schema:
         return types.UnionType(
             *[json_schema_to_weave_type(s) for s in json_schema["anyOf"]]

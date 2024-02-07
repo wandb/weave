@@ -227,9 +227,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
-    instance_classes: typing.ClassVar[typing.Union[type, typing.List[type], None]] = (
-        None
-    )
+    instance_classes: typing.ClassVar[
+        typing.Union[type, typing.List[type], None]
+    ] = None
 
     _type_attrs = None
     _hash = None

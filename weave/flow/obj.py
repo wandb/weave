@@ -1,5 +1,5 @@
 import typing
-from typing import Optional
+from typing import Optional, Type, Tuple, Dict, Any
 from pydantic import ConfigDict
 from pydantic._internal._model_construction import ModelMetaclass
 import pydantic
@@ -9,7 +9,9 @@ from weave.op_def import OpDef, BoundOpDef
 
 
 class ObjectMeta(ModelMetaclass):
-    def __new__(cls, name, bases, dct):
+    def __new__(
+        cls: Type["ObjectMeta"], name: str, bases: Tuple[type, ...], dct: Dict[str, Any]
+    ) -> "ObjectMeta":
         # Modify an OpDef names to include the class name.
         original_class = super(ObjectMeta, cls).__new__(cls, name, bases, dct)
         for attr, bound_op_def in inspect.getmembers(
