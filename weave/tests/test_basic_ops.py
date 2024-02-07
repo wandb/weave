@@ -77,11 +77,15 @@ def test_string_ops():
     assert weave.use(foobar.endsWith("bar")) == False
 
     num_string = make_const_node(weave.types.String(), "123")
+    comma_num_string = make_const_node(weave.types.String(), "1,234")
     alpha_string = make_const_node(weave.types.String(), "ABC")
 
     assert weave.use(num_string.isAlpha()) == False
     assert weave.use(num_string.isNumeric()) == True
     assert weave.use(num_string.isAlnum()) == True
+    assert weave.use(comma_num_string.isAlpha()) == False
+    assert weave.use(comma_num_string.isNumeric()) == False
+    assert weave.use(comma_num_string.isAlnum()) == False
     assert weave.use(alpha_string.isAlpha()) == True
     assert weave.use(alpha_string.isNumeric()) == False
     assert weave.use(alpha_string.isAlnum()) == True
@@ -92,6 +96,7 @@ def test_string_ops():
     assert weave.use(foo_space.rStrip()) == "  Foo"
 
     assert weave.use(num_string.toNumber()) == 123
+    assert weave.use(comma_num_string.toNumber()) == 1234
     assert weave.use(alpha_string.toNumber()) == None
 
     # assert weave.use(foo in foobar) == True # Broken
