@@ -191,7 +191,7 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [calls.loading, calls.data, spans, loading]);
+  }, [calls, spans, loading]);
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
