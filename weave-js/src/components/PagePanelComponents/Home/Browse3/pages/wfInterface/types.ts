@@ -9,15 +9,15 @@ export interface WFProject extends ProjectOwned {
   object: (name: string) => Promise<WFObject | null>;
   objects: () => Promise<WFObject[]>;
   typeVersion: (name: string, version: string) => Promise<WFTypeVersion | null>;
-  typeVersions: () => WFTypeVersion[];
-  opVersion: (refUriStr: string) => WFOpVersion | null;
-  opVersions: () => WFOpVersion[];
-  objectVersion: (refUriStr: string) => WFObjectVersion | null;
-  objectVersions: () => WFObjectVersion[];
-  call: (callID: string) => WFCall | null;
-  calls: () => WFCall[];
+  typeVersions: () => Promise<WFTypeVersion[]>;
+  opVersion: (refUriStr: string) => Promise<WFOpVersion | null>;
+  opVersions: () => Promise<WFOpVersion[]>;
+  objectVersion: (refUriStr: string) => Promise<WFObjectVersion | null>;
+  objectVersions: () => Promise<WFObjectVersion[]>;
+  call: (callID: string) => Promise<WFCall | null>;
+  calls: () => Promise<WFCall[]>;
   // a bit hacky here:
-  traceRoots: (traceID: string) => WFCall[];
+  traceRoots: (traceID: string) => Promise<WFCall[]>;
   opCategories: () => HackyOpCategory[];
   typeCategories: () => HackyTypeCategory[];
 }

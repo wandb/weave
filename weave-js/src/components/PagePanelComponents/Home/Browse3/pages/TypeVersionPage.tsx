@@ -14,7 +14,7 @@ import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
 import {FilterableOpVersionsTable} from './OpVersionsPage';
 import {FilterableTypeVersionsTable} from './TypeVersionsPage';
 import {useWeaveflowORMContext} from './wfInterface/context';
-import {useAsyncToHook} from './wfInterface/niave_react';
+import {useProjectTypeVersion} from './wfInterface/niave_react';
 import {HackyTypeTree, WFTypeVersion} from './wfInterface/types';
 
 export const TypeVersionPage: React.FC<{
@@ -24,11 +24,10 @@ export const TypeVersionPage: React.FC<{
   version: string;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
-  const typeVersion = useAsyncToHook(
-    orm.projectConnection.typeVersion,
-    [props.typeName, props.version],
-    orm.projectConnection
-  );
+  const typeVersion = useProjectTypeVersion(orm.projectConnection, [
+    props.typeName,
+    props.version,
+  ]);
   if (typeVersion.loading || typeVersion.data == null) {
     return <CenteredAnimatedLoader />;
   }

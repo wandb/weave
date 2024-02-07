@@ -271,12 +271,12 @@ export class WFNaiveProject implements WFProject {
     }
     return new WFNaiveTypeVersion(this.state, version);
   }
-  typeVersions(): WFTypeVersion[] {
+  async typeVersions(): Promise<WFTypeVersion[]> {
     return Array.from(this.state.typeVersionsMap.keys()).map(opName => {
       return new WFNaiveTypeVersion(this.state, opName);
     });
   }
-  opVersion(refUriStr: string): WFOpVersion | null {
+  async opVersion(refUriStr: string): Promise<WFOpVersion | null> {
     // TODO: I think we need to do some more intelligent parsing here
     if (!this.state.opVersionsMap.has(refUriStr)) {
       return null;
@@ -289,22 +289,22 @@ export class WFNaiveProject implements WFProject {
       this.state.opVersionsMap.get(refUriStr)!
     );
   }
-  opVersions(): WFOpVersion[] {
+  async opVersions(): Promise<WFOpVersion[]> {
     return Array.from(this.state.opVersionsMap.values()).map(opVersionDict => {
       return new WFNaiveOpVersion(this.state, opVersionDict);
     });
   }
-  objectVersion(refUriStr: string): WFObjectVersion | null {
+  async objectVersion(refUriStr: string): Promise<WFObjectVersion | null> {
     return WFNaiveObjectVersion.fromURI(this.state, refUriStr);
   }
-  objectVersions(): WFObjectVersion[] {
+  async objectVersions(): Promise<WFObjectVersion[]> {
     return Array.from(this.state.objectVersionsMap.values()).map(
       objectVersionDict => {
         return new WFNaiveObjectVersion(this.state, objectVersionDict);
       }
     );
   }
-  call(callID: string): WFCall | null {
+  async call(callID: string): Promise<WFCall | null> {
     if (!this.state.callsMap.has(callID)) {
       return null;
       // throw new Error(
@@ -313,13 +313,13 @@ export class WFNaiveProject implements WFProject {
     }
     return new WFNaiveCall(this.state, callID);
   }
-  calls(): WFCall[] {
+  async calls(): Promise<WFCall[]> {
     return Array.from(this.state.callsMap.keys()).map(opName => {
       return new WFNaiveCall(this.state, opName);
     });
   }
 
-  traceRoots(traceID: string): WFCall[] {
+  async traceRoots(traceID: string): Promise<WFCall[]> {
     const rootCalls = Array.from(this.state.callsMap.values()).filter(
       callDict => {
         return callDict.callSpan.trace_id === traceID;
@@ -338,11 +338,11 @@ export class WFNaiveProject implements WFProject {
     return ['model', 'dataset'];
   }
 
-  private bootstrapFromData(
+  private async bootstrapFromData(
     weaveObjectsValue?: ObjectVersionDictType[],
     runsValue?: Call[],
     feedbackValue?: any[]
-  ): void {
+  ) {
     const objects = processWeaveObjects(weaveObjectsValue);
     const {opVersions, objectVersions} = splitWeaveObjects(objects);
     this.state.artifactVersionsMap = bfdObjectsToArtifactVersions(objects);
@@ -368,7 +368,7 @@ export class WFNaiveProject implements WFProject {
     this.state.typesMap = bfdTypeVersionsToTypeMap(this.state.typeVersionsMap);
 
     // Infer and populate OpVersion Relationships
-    this.opVersions().forEach(opVersion => {
+    (await this.opVersions()).forEach(opVersion => {
       const selfOpVersion = this.state.opVersionsMap.get(opVersion.refUri());
       if (!selfOpVersion) {
         return;

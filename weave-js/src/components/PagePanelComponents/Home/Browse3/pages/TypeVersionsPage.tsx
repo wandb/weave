@@ -16,7 +16,10 @@ import {
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useWeaveflowORMContext} from './wfInterface/context';
-import {useAsyncToHook} from './wfInterface/niave_react';
+import {
+  useProjectTypes,
+  useProjectTypeVersions,
+} from './wfInterface/niave_react';
 import {HackyTypeCategory, WFTypeVersion} from './wfInterface/types';
 
 export type WFHighLevelTypeVersionFilter = {
@@ -59,12 +62,12 @@ export const FilterableTypeVersionsTable: React.FC<{
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
-
+  const typeVersions = useProjectTypeVersions(orm.projectConnection);
   const getInitialData = useCallback(() => {
-    return orm.projectConnection.typeVersions().map(o => {
+    return (typeVersions.loading ? [] : typeVersions.data).map(o => {
       return {id: o.version(), obj: o};
     });
-  }, [orm.projectConnection]);
+  }, [typeVersions]);
 
   const getFilterPopoutTargetUrl = useCallback(
     (filter: WFHighLevelTypeVersionFilter) => {
@@ -503,7 +506,7 @@ const TypeNameFilterControlListItem: React.FC<{
     props.entity,
     props.project
   );
-  const types = useAsyncToHook(projectConnection.types, [], projectConnection);
+  const types = useProjectTypes(projectConnection);
   const options = useMemo(() => {
     return (types.loading ? [] : types.data).map(o => o.name());
   }, [types]);
@@ -615,14 +618,14 @@ const ParentTypeFilterControlListItem: React.FC<{
   updateFilter: (update: Partial<WFHighLevelTypeVersionFilter>) => void;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
+  const typeVersions = useProjectTypeVersions(orm.projectConnection);
   const options = useMemo(() => {
-    return orm.projectConnection
-      .typeVersions()
+    return (typeVersions.loading ? [] : typeVersions.data)
       .filter(o => o.childTypeVersions().length > 0)
       .map(o => {
         return o.type().name() + ':' + o.version();
       });
-  }, [orm.projectConnection]);
+  }, [typeVersions]);
   return (
     <ListItem>
       <FormControl fullWidth>

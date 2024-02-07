@@ -26,6 +26,7 @@ import {
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {truncateID, useInitializingFilter} from './util';
 import {useWeaveflowORMContext} from './wfInterface/context';
+import {useProjectOpVersions} from './wfInterface/niave_react';
 import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
 
 export type WFHighLevelOpVersionFilter = {
@@ -89,12 +90,12 @@ export const FilterableOpVersionsTable: React.FC<{
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
-
+  const opVersions = useProjectOpVersions(orm.projectConnection);
   const getInitialData = useCallback(() => {
-    return orm.projectConnection.opVersions().map(o => {
+    return (opVersions.loading ? [] : opVersions.data).map(o => {
       return {id: o.refUri(), obj: o};
     });
-  }, [orm.projectConnection]);
+  }, [opVersions]);
 
   const getFilterPopoutTargetUrl = useCallback(
     (innerFilter: WFHighLevelOpVersionFilter) => {

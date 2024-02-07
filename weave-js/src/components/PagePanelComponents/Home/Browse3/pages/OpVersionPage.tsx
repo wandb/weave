@@ -18,6 +18,7 @@ import {UnderConstruction} from './common/UnderConstruction';
 import {TabUseOp} from './TabUseOp';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {refDictToRefString} from './wfInterface/naive';
+import {useProjectOpVersion} from './wfInterface/niave_react';
 import {WFOpVersion} from './wfInterface/types';
 
 export const OpVersionPage: React.FC<{
@@ -27,20 +28,20 @@ export const OpVersionPage: React.FC<{
   version: string;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
-  const opVersion = orm.projectConnection.opVersion(
-    refDictToRefString({
-      entity: props.entity,
-      project: props.project,
-      artifactName: props.opName,
-      versionCommitHash: props.version,
-      filePathParts: ['obj'],
-      refExtraTuples: [],
-    })
-  );
-  if (opVersion == null) {
+  const refString = refDictToRefString({
+    entity: props.entity,
+    project: props.project,
+    artifactName: props.opName,
+    versionCommitHash: props.version,
+    filePathParts: ['obj'],
+    refExtraTuples: [],
+  });
+  const opVersion = useProjectOpVersion(orm.projectConnection, [refString]);
+
+  if (opVersion.loading || opVersion.data == null) {
     return <CenteredAnimatedLoader />;
   }
-  return <OpVersionPageInner opVersion={opVersion} />;
+  return <OpVersionPageInner opVersion={opVersion.data} />;
 };
 
 const OpVersionPageInner: React.FC<{

@@ -1,10 +1,17 @@
 import {useEffect, useMemo, useState} from 'react';
 
+import {WFProject} from './types';
+
 type Loadable<T> = {loading: true} | {loading: false; data: T};
 
-export const useAsyncToHook = <T,>(
-  asyncFn: (...args: any[]) => Promise<T>,
-  args: any[],
+// type UseAsyncToHookType<FT> = FT extends (...args: any[]) => Promise<infer T> ? T : never;
+
+const useAsyncToHook = <
+  FT extends (...args: any[]) => Promise<any>,
+  T = Awaited<ReturnType<FT>>
+>(
+  asyncFn: FT,
+  args: Parameters<FT>,
   self?: any
 ): Loadable<T> => {
   const [data, setData] = useState<T>();
@@ -16,7 +23,7 @@ export const useAsyncToHook = <T,>(
     async function doFetch() {
       let fn = asyncFn;
       if (self != null) {
-        fn = asyncFn.bind(self);
+        fn = asyncFn.bind(self) as FT;
       }
 
       const res = await fn(...args);
@@ -51,6 +58,28 @@ export const useAsyncToHook = <T,>(
   }, [data, loading]);
 };
 
-// export const useAllTypes = (projectConn: WFProject): Loadable<WFType[]> => {
-//   return useAsyncToHook(projectConn.types, []);
-// };
+export const useProjectTypeVersions = (project: WFProject) => {
+  return useAsyncToHook(project.typeVersions, [], project);
+};
+
+export const useProjectTypes = (project: WFProject) => {
+  return useAsyncToHook(project.types, [], project);
+};
+
+export const useProjectOpVersion = (
+  project: WFProject,
+  args: Parameters<WFProject['opVersion']>
+) => {
+  return useAsyncToHook(project.opVersion, args, project);
+};
+
+export const useProjectOpVersions = (project: WFProject) => {
+  return useAsyncToHook(project.opVersions, [], project);
+};
+
+export const useProjectTypeVersion = (
+  project: WFProject,
+  args: Parameters<WFProject['typeVersion']>
+) => {
+  return useAsyncToHook(project.typeVersion, args, project);
+};
