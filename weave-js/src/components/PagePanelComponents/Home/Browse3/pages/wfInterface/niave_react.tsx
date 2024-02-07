@@ -45,7 +45,7 @@ export const useAsyncToHook = <T,>(
       }
       return {
         loading: false as const,
-        data: data,
+        data,
       };
     }
   }, [data, loading]);

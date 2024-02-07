@@ -231,7 +231,7 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveType(this.state, typeName);
     });
   }
-  op(name: string): WFOp | null {
+  async op(name: string): Promise<WFOp | null> {
     if (!this.state.opsMap.has(name)) {
       return null;
       // throw new Error(
@@ -240,12 +240,12 @@ export class WFNaiveProject implements WFProject {
     }
     return new WFNaiveOp(this.state, name);
   }
-  ops(): WFOp[] {
+  async ops(): Promise<WFOp[]> {
     return Array.from(this.state.opsMap.keys()).map(opName => {
       return new WFNaiveOp(this.state, opName);
     });
   }
-  object(name: string): WFObject | null {
+  async object(name: string): Promise<WFObject | null> {
     if (!this.state.objectsMap.has(name)) {
       return null;
       // throw new Error(
@@ -254,12 +254,15 @@ export class WFNaiveProject implements WFProject {
     }
     return new WFNaiveObject(this.state, name);
   }
-  objects(): WFObject[] {
+  async objects(): Promise<WFObject[]> {
     return Array.from(this.state.objectsMap.keys()).map(opName => {
       return new WFNaiveObject(this.state, opName);
     });
   }
-  typeVersion(name: string, version: string): WFTypeVersion | null {
+  async typeVersion(
+    name: string,
+    version: string
+  ): Promise<WFTypeVersion | null> {
     if (!this.state.typeVersionsMap.has(version)) {
       return null;
       // throw new Error(

@@ -3,12 +3,12 @@ import {Call} from '../../../Browse2/callTree';
 
 export interface WFProject extends ProjectOwned {
   type: (name: string) => Promise<WFType | null>;
-  types: () =>  Promise<WFType[]>;
-  op: (name: string) => WFOp | null;
-  ops: () => WFOp[];
-  object: (name: string) => WFObject | null;
-  objects: () => WFObject[];
-  typeVersion: (name: string, version: string) => WFTypeVersion | null;
+  types: () => Promise<WFType[]>;
+  op: (name: string) => Promise<WFOp | null>;
+  ops: () => Promise<WFOp[]>;
+  object: (name: string) => Promise<WFObject | null>;
+  objects: () => Promise<WFObject[]>;
+  typeVersion: (name: string, version: string) => Promise<WFTypeVersion | null>;
   typeVersions: () => WFTypeVersion[];
   opVersion: (refUriStr: string) => WFOpVersion | null;
   opVersions: () => WFOpVersion[];
