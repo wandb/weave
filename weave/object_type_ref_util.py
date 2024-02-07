@@ -9,6 +9,8 @@ def make_object_getattribute(
 ) -> typing.Callable[[typing.Any, str], typing.Any]:
     # Weave objects must auto-dereference refs when they are accessed.
     def object_getattribute(self: typing.Any, name: str) -> typing.Any:
+        if name == "name":
+            name = "_name"
         attribute = object.__getattribute__(self, name)
         if name not in allowed_attributes:
             return attribute
@@ -19,9 +21,9 @@ def make_object_getattribute(
     return object_getattribute
 
 
-def make_object_lookup_path() -> typing.Callable[
-    [typing.Any, typing.List[str]], typing.Any
-]:
+def make_object_lookup_path() -> (
+    typing.Callable[[typing.Any, typing.List[str]], typing.Any]
+):
     def object_lookup_path(self: typing.Any, path: typing.List[str]) -> typing.Any:
         assert len(path) > 1
         edge_type = path[0]
