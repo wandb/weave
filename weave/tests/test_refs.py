@@ -1,8 +1,10 @@
+import pytest
 import weave
 from .. import artifact_local
 from .. import ref_util
 from .. import storage
 from .. import ops_arrow as arrow
+from weave.flow.obj import Object
 
 
 def test_laref_artifact_version_1():
@@ -231,12 +233,36 @@ def test_ref_extra_list(ref_tracking):
     assert storage.get(val._ref.uri) == 1
 
 
-def test_ref_extra_object(ref_tracking):
+def make_custom_object_classes_classic_type():
     @weave.type()
-    class CustomObject:
+    class CustomObjectA:
         inner_a: int
 
-    obj = CustomObject(inner_a=1)
+    @weave.type()
+    class CustomObjectB:
+        inner_b: CustomObjectA
+
+    return CustomObjectA, CustomObjectB
+
+
+def make_custom_object_classes_pydantic():
+    class CustomObjectA(Object):
+        inner_a: int
+
+    class CustomObjectB(Object):
+        inner_b: CustomObjectA
+
+    return CustomObjectA, CustomObjectB
+
+
+@pytest.mark.parametrize(
+    "get_custom_object_classes",
+    [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
+)
+def test_ref_extra_object(ref_tracking, get_custom_object_classes):
+    CustomObjectA, CustomObjectB = get_custom_object_classes()
+
+    obj = CustomObjectA(inner_a=1)
     saved_obj = weave.use(weave.save(obj))
 
     assert_local_ref(saved_obj, ["obj"], [])
@@ -274,17 +300,19 @@ def test_ref_extra_table(ref_tracking):
     assert storage.get(val._ref.uri).to_pylist_notags() == [1, 2]
 
 
-def test_ref_extra_table_very_nested(ref_tracking):
-    @weave.type()
-    class CustomObject:
-        inner_a: int
+@pytest.mark.parametrize(
+    "get_custom_object_classes",
+    [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
+)
+def test_ref_extra_table_very_nested(ref_tracking, get_custom_object_classes):
+    CustomObjectA, CustomObjectB = get_custom_object_classes()
 
     arrow_raw = arrow.to_arrow(
         [
             {
                 "a": arrow.to_arrow(
                     [
-                        [CustomObject(inner_a=1)],
+                        [CustomObjectA(inner_a=1)],
                     ]
                 )
             },
@@ -340,14 +368,12 @@ def test_refs_across_artifacts(ref_tracking):
     assert storage.get(val._ref.uri) == 1
 
 
-def test_ref_objects_across_artifacts(ref_tracking):
-    @weave.type()
-    class CustomObjectA:
-        inner_a: int
-
-    @weave.type()
-    class CustomObjectB:
-        inner_b: CustomObjectA
+@pytest.mark.parametrize(
+    "get_custom_object_classes",
+    [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
+)
+def test_ref_objects_across_artifacts(ref_tracking, get_custom_object_classes):
+    CustomObjectA, CustomObjectB = get_custom_object_classes()
 
     # Case 1: No Cross Ref
     obj_a = CustomObjectA(inner_a=1)
