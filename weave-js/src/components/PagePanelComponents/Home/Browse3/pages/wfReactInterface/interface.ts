@@ -28,9 +28,7 @@ import {
 import {useNodeValue} from '../../../../../../react';
 import {Call as CallTreeSpan} from '../../../Browse2/callTree';
 import {useRuns} from '../../../Browse2/callTreeHooks';
-
-const PROJECT_CALL_STREAM_NAME = 'stream';
-const WANDB_ARTIFACT_REF_PREFIX = 'wandb-artifact:///';
+import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 
 type Loadable<T> = {
   loading: boolean;
@@ -173,10 +171,10 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
   };
 };
 export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
-  return `wandb-artifact:///${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
+  return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
 };
 
-type MVPOpCategory = 'train' | 'predict' | 'score' | 'evaluate' | 'tune';
+type OpCategory = 'train' | 'predict' | 'score' | 'evaluate' | 'tune';
 
 type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
@@ -236,7 +234,7 @@ export const useOpVersion = (
 
 type OpVersionFilter = {
   // Filters are ANDed across the fields and ORed within the fields
-  category?: MVPOpCategory[];
+  category?: OpCategory[];
   opRefs?: string[];
   latestOnly?: boolean;
 };
@@ -272,24 +270,24 @@ export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
 };
 
 export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
-  return `wandb-artifact:///${key.entity}/${key.project}/${key.objectId}:${
-    key.versionHash
-  }/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
+  return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${
+    key.objectId
+  }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
 };
 
-export type MVPObjectCategory = 'model' | 'dataset';
+export type ObjectCategory = 'model' | 'dataset';
 export type ObjectVersionSchema = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   typeName: string;
-  category: MVPObjectCategory | null;
+  category: ObjectCategory | null;
 };
 
-const typeNameToCategory = (typeName: string): MVPObjectCategory | null => {
+const typeNameToCategory = (typeName: string): ObjectCategory | null => {
   const categories = ['model', 'dataset'];
   for (const category of categories) {
     if (typeName.toLocaleLowerCase().includes(category)) {
-      return category as MVPObjectCategory;
+      return category as ObjectCategory;
     }
   }
   return null;
