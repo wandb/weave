@@ -35,6 +35,17 @@ import {Call as CallTreeSpan} from '../../../Browse2/callTree';
 import {useRuns} from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 
+const OP_CATEGORIES = [
+  'train' as const,
+  'predict' as const,
+  'score' as const,
+  'evaluate' as const,
+  'tune' as const,
+];
+const OBJECT_CATEGORIES = ['model' as const, 'dataset' as const];
+type OpCategory = (typeof OP_CATEGORIES)[number];
+export type ObjectCategory = (typeof OBJECT_CATEGORIES)[number];
+
 type Loadable<T> = {
   loading: boolean;
   result: T | null;
@@ -178,8 +189,6 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
 export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
   return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
 };
-
-type OpCategory = 'train' | 'predict' | 'score' | 'evaluate' | 'tune';
 
 export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
@@ -397,7 +406,6 @@ export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
   }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
 };
 
-export type ObjectCategory = 'model' | 'dataset';
 export type ObjectVersionSchema = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
@@ -407,8 +415,7 @@ export type ObjectVersionSchema = ObjectVersionKey & {
 };
 
 const typeNameToCategory = (typeName: string): ObjectCategory | null => {
-  const categories = ['model', 'dataset'];
-  for (const category of categories) {
+  for (const category of OBJECT_CATEGORIES) {
     if (typeName.toLocaleLowerCase().includes(category)) {
       return category as ObjectCategory;
     }
@@ -417,8 +424,7 @@ const typeNameToCategory = (typeName: string): ObjectCategory | null => {
 };
 
 const opNameToCategory = (opName: string): OpCategory | null => {
-  const categories = ['train', 'predict', 'score', 'evaluate', 'tune'];
-  for (const category of categories) {
+  for (const category of OP_CATEGORIES) {
     if (opName.toLocaleLowerCase().includes(category)) {
       return category as OpCategory;
     }
