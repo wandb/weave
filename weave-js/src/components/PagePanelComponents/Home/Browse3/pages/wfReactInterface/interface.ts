@@ -37,13 +37,13 @@ import {useRuns} from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 
 const OP_CATEGORIES = [
-  'train' as const,
-  'predict' as const,
-  'score' as const,
-  'evaluate' as const,
-  'tune' as const,
-];
-const OBJECT_CATEGORIES = ['model' as const, 'dataset' as const];
+  'train',
+  'predict',
+  'score',
+  'evaluate',
+  'tune',
+] as const;
+const OBJECT_CATEGORIES = ['model', 'dataset'] as const;
 type OpCategory = (typeof OP_CATEGORIES)[number];
 export type ObjectCategory = (typeof OBJECT_CATEGORIES)[number];
 
