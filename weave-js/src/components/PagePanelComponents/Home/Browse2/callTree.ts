@@ -23,10 +23,13 @@ import {
   opOr,
   opPick,
   opRefEqual,
+  opStringEndsWith,
   opStringEqual,
+  opStringStartsWith,
   OutputType,
   Type,
   typedDictPropertyTypes,
+  VarNode,
   varNode,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
@@ -194,27 +197,42 @@ export const callsTableSelect = (stNode: Node) => {
   });
 };
 
-const makeFilterExpr = (filters: CallFilter): Node | undefined => {
-  const rowVar = varNode(listObjectType(callsTableWeaveType), 'row');
-  const filterClauses: Node[] = [];
-  if (filters.opUris != null && filters.opUris.length > 0) {
-    let clause = opStringEqual({
+const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string) => {
+  const suffix = ":*/obj"
+  if (opUri.endsWith(suffix)) {
+    return opAnd({lhs: opStringStartsWith({
       lhs: opPick({
         obj: rowVar,
         key: constString('name'),
       }),
-      rhs: constString(filters.opUris[0]),
-    });
+      rhs: constString(opUri.slice(0, -suffix.length)),
+    }), rhs: opStringEndsWith({
+      lhs: opPick({
+        obj: rowVar,
+        key: constString('name'),
+      }),
+      rhs: constString(":*/obj"),
+    })})
+  } else {
+  return opStringEqual({
+    lhs: opPick({
+      obj: rowVar,
+      key: constString('name'),
+    }),
+    rhs: constString(opUri),
+  })
+}
+}
+
+const makeFilterExpr = (filters: CallFilter): Node | undefined => {
+  const rowVar = varNode(listObjectType(callsTableWeaveType), 'row');
+  const filterClauses: Node[] = [];
+  if (filters.opUris != null && filters.opUris.length > 0) {
+    let clause = buildOpUriClause(rowVar, filters.opUris[0]);
     for (const uri of filters.opUris.slice(1)) {
       clause = opOr({
         lhs: clause,
-        rhs: opStringEqual({
-          lhs: opPick({
-            obj: rowVar,
-            key: constString('name'),
-          }),
-          rhs: constString(uri),
-        }),
+        rhs: buildOpUriClause(rowVar, uri),
       });
     }
     filterClauses.push(clause);
