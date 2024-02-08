@@ -734,5 +734,5 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
     }
 
     return {rows, expandKeys};
-  }, [call]);
+  }, [call, childCallLookup, traceCallMap]);
 };
