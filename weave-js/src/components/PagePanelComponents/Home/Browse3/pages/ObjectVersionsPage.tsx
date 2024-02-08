@@ -35,6 +35,11 @@ import {
   WFObjectVersion,
   WFOpVersion,
 } from './wfInterface/types';
+import {
+  objectVersionKeyToRefUri,
+  ObjectVersionSchema,
+  useRootObjectVersions,
+} from './wfReactInterface/interface';
 
 // TODO: This file follows the older pattern - need to update it to use the same
 // one as TypeVersionsPage or OpVersionsPage
@@ -63,9 +68,10 @@ export const ObjectVersionsPage: React.FC<{
     <SimplePageLayout
       // title="Object Versions"
       title={title}
+      hideTabsIfSingle
       tabs={[
         {
-          label: 'All',
+          label: '',
           content: (
             <FilterableObjectVersionsTable
               {...props}
@@ -96,6 +102,16 @@ export const FilterableObjectVersionsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
+  /**
+   * Note to future devs: this page can be dramatically simplified and optimized:
+   * 1. `inputToOpVersionRefs` is not used anywhere, so we can just drop it
+   * 2. We should always show `latest` only, except when there is a name set and remove from filters
+   * 3. `typeVersions` is not used an can be removed
+   * 4. hardcode type category instead of the expensive scan over all object versions
+   * 5. `name` is the last "filter" and should just be something that is displayed rather than a chosen filter.
+   * All of this can remove the need for the heavy pass over all objects.
+   */
+
   const {baseRouter} = useWeaveflowRouteContext();
   const orm = useWeaveflowORMContext(props.entity, props.project);
   const allObjectVersions = useMemo(() => {
@@ -111,40 +127,38 @@ export const FilterableObjectVersionsTable: React.FC<{
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);
 
-  const filteredObjectVersions = useMemo(() => {
-    return applyFilter(allObjectVersions, effectiveFilter);
-  }, [allObjectVersions, effectiveFilter]);
+  // const effectivelyLatestOnly = !(effectiveFilter.objectName || effectiveFilter.typeCategory)
 
-  // const objectOptions = useMemo(() => {
-  //   const objects = orm.projectConnection.objects();
-  //   const options = objects.map(v => v.name());
-  //   return options;
-  // }, [orm.projectConnection]);
-  const objectOptions = useObjectOptions(allObjectVersions, effectiveFilter);
-
-  // const typeCategoryOptions = useMemo(() => {
-  //   return orm.projectConnection.typeCategories();
-  // }, [orm.projectConnection]);
-  const typeCategoryOptions = useTypeCategoryOptions(
-    allObjectVersions,
-    effectiveFilter
+  const filteredObjectVersions = useRootObjectVersions(
+    props.entity,
+    props.project,
+    {
+      category: effectiveFilter.typeCategory
+        ? [effectiveFilter.typeCategory]
+        : undefined,
+      objectIds: effectiveFilter.objectName
+        ? [effectiveFilter.objectName]
+        : undefined,
+      latestOnly: effectiveFilter.latest ? true : undefined,
+    }
   );
 
-  // const opVersionOptions = useMemo(() => {
-  //   const versions = orm.projectConnection.opVersions();
-  //   // Note: this excludes the named ones without op versions
-  //   const options = versions.map(v => v.op().name() + ':' + v.version());
-  //   return options;
-  // }, [orm.projectConnection]);
+  const objectOptions = useObjectOptions(allObjectVersions, effectiveFilter);
+
+  // const typeCategoryOptions = useTypeCategoryOptions(
+  //   allObjectVersions,
+  //   effectiveFilter
+  // );
+
   const opVersionOptions = useOpVersionOptions(
     allObjectVersions,
     effectiveFilter
   );
 
-  const latestOnlyOptions = useLatestOnlyOptions(
-    allObjectVersions,
-    effectiveFilter
-  );
+  // const latestOnlyOptions = useLatestOnlyOptions(
+  //   allObjectVersions,
+  //   effectiveFilter
+  // );
 
   return (
     <FilterLayoutTemplate
@@ -157,7 +171,7 @@ export const FilterableObjectVersionsTable: React.FC<{
       )}
       filterListItems={
         <>
-          <ListItem>
+          {/* <ListItem>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
@@ -178,7 +192,7 @@ export const FilterableObjectVersionsTable: React.FC<{
                 options={typeCategoryOptions}
               />
             </FormControl>
-          </ListItem>
+          </ListItem> */}
 
           <ListItem>
             <FormControl fullWidth>
@@ -230,7 +244,7 @@ export const FilterableObjectVersionsTable: React.FC<{
               />
             </FormControl>
           </ListItem>
-          <ListItem
+          {/* <ListItem
             secondaryAction={
               <Checkbox
                 edge="end"
@@ -260,11 +274,11 @@ export const FilterableObjectVersionsTable: React.FC<{
               }}>
               <ListItemText primary="Latest Only" />
             </ListItemButton>
-          </ListItem>
+          </ListItem> */}
         </>
       }>
       <ObjectVersionsTable
-        objectVersions={filteredObjectVersions}
+        objectVersions={filteredObjectVersions.result ?? []}
         usingLatestFilter={effectiveFilter.latest}
       />
     </FilterLayoutTemplate>
@@ -272,50 +286,33 @@ export const FilterableObjectVersionsTable: React.FC<{
 };
 
 const ObjectVersionsTable: React.FC<{
-  objectVersions: WFObjectVersion[];
+  objectVersions: ObjectVersionSchema[];
   usingLatestFilter?: boolean;
 }> = props => {
   const rows: GridRowsProp = useMemo(() => {
     return props.objectVersions.map((ov, i) => {
-      const outputFrom = ov.outputFrom();
-      const firstOutputFromOpVersion =
-        outputFrom.length > 0 ? outputFrom[0].opVersion() : null;
-      const firstOutputFrom = firstOutputFromOpVersion
-        ? firstOutputFromOpVersion.refUri()
-        : null;
-      const typeVersion = ov.typeVersion();
       return {
-        id: ov.refUri(),
+        id: objectVersionKeyToRefUri(ov),
         obj: ov,
-        object: ov.object().name(),
-        typeCategory: ov.typeVersion()?.typeCategory(),
-        version: ov.commitHash(),
-        typeVersion: typeVersion
-          ? typeVersion.type().name() + ':' + typeVersion.version()
-          : null,
-        inputTo: ov.inputTo().length,
-        outputFrom: firstOutputFrom,
-        // description: ov.description(),
-        versionIndex: ov.versionIndex(),
-        createdAt: ov.createdAtMs(),
-        isLatest: ov.aliases().includes('latest'),
+        createdAt: ov.createdAtMs,
       };
     });
   }, [props.objectVersions]);
   const columns: GridColDef[] = [
     basicField('version', 'Object', {
       hideable: false,
-      renderCell: params => {
+      renderCell: cellParams => {
         // Icon to indicate navigation to the object version
+        const obj: ObjectVersionSchema = cellParams.row.obj;
         return (
           <ObjectVersionLink
-            entityName={params.row.obj.entity()}
-            projectName={params.row.obj.project()}
-            objectName={params.row.obj.object().name()}
-            version={params.row.obj.version()}
-            versionIndex={params.row.obj.versionIndex()}
-            filePath={params.row.obj.filePath()}
-            refExtra={params.row.obj.refExtraPath()}
+            entityName={obj.entity}
+            projectName={obj.project}
+            objectName={obj.objectId}
+            version={obj.versionHash}
+            versionIndex={obj.versionIndex}
+            filePath={obj.path}
+            refExtra={obj.refExtra}
           />
         );
       },
@@ -323,130 +320,28 @@ const ObjectVersionsTable: React.FC<{
     basicField('typeCategory', 'Category', {
       width: 100,
       renderCell: cellParams => {
-        return (
-          <TypeVersionCategoryChip typeCategory={cellParams.row.typeCategory} />
-        );
+        const obj: ObjectVersionSchema = cellParams.row.obj;
+        return <TypeVersionCategoryChip typeCategory={obj.category} />;
       },
     }),
     basicField('createdAt', 'Created', {
       width: 100,
-      renderCell: params => {
-        return (
-          <Timestamp
-            value={(params.value as number) / 1000}
-            format="relative"
-          />
-        );
+      renderCell: cellParams => {
+        const obj: ObjectVersionSchema = cellParams.row.obj;
+        return <Timestamp value={obj.createdAtMs / 1000} format="relative" />;
       },
     }),
-    // basicField('object', 'Object', {
-    //   renderCell: params => (
-    //     <ObjectLink
-    //       entityName={params.row.obj.entity()}
-    //       projectName={params.row.obj.project()}
-    //       objectName={params.value as string}
-    //     />
-    //   ),
-    // }),
-
-    // basicField('typeVersion', 'Type Version', {
-    //   renderCell: params => (
-    //     <TypeVersionLink
-    //       entityName={params.row.obj.entity()}
-    //       projectName={params.row.obj.project()}
-    //       typeName={params.row.obj.typeVersion().type().name()}
-    //       version={params.row.obj.typeVersion().version()}
-    //     />
-    //   ),
-    // }),
-    // basicField('inputTo', 'Input To', {
-    //   width: 100,
-    //   renderCell: params => {
-    //     if (params.value === 0) {
-    //       return '';
-    //     }
-
-    //     return (
-    //       <CallsLink
-    //         entity={params.row.obj.entity()}
-    //         project={params.row.obj.project()}
-    //         callCount={params.value}
-    //         filter={{
-    //           inputObjectVersions: [
-    //             params.row.obj.object().name() + ':' + params.row.obj.version(),
-    //           ],
-    //         }}
-    //       />
-    //     );
-    //   },
-    // }),
-    // basicField('outputFrom', 'Output From', {
-    //   width: 100,
-    //   renderCell: params => {
-    //     if (!params.value) {
-    //       return '';
-    //     }
-    //     const outputFrom = params.row.obj.outputFrom();
-    //     if (outputFrom.length === 0) {
-    //       return '';
-    //     }
-    //     // if (outputFrom.length === 1) {
-    //     return (
-    //       <OpVersionLink
-    //         entityName={outputFrom[0].entity()}
-    //         projectName={outputFrom[0].project()}
-    //         opName={outputFrom[0].opVersion().op().name()}
-    //         version={outputFrom[0].opVersion().version()}
-    //         versionIndex={outputFrom[0].opVersion().versionIndex()}
-    //       />
-    //     );
-    //   },
-    // }),
-    // basicField('versionIndex', 'Version', {
-    //   width: 100,
-    // }),
-
     ...(props.usingLatestFilter
       ? [
           basicField('peerVersions', 'Versions', {
             width: 100,
-            renderCell: params => {
-              return (
-                <ObjectVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  filter={{
-                    objectName: params.row.obj.object().name(),
-                  }}
-                  versionCount={params.row.obj.object().objectVersions().length}
-                  neverPeek
-                  variant="secondary"
-                />
-              );
+            renderCell: cellParams => {
+              const obj: ObjectVersionSchema = cellParams.row.obj;
+              return <PeerVersionsLink obj={obj} />;
             },
           }),
         ]
       : []),
-    // : [basicField('isLatest', 'Latest', {
-    //     width: 100,
-    //     renderCell: params => {
-    //       if (params.value) {
-    //         return (
-    //           <Box
-    //             sx={{
-    //               display: 'flex',
-    //               alignItems: 'center',
-    //               justifyContent: 'center',
-    //               height: '100%',
-    //               width: '100%',
-    //             }}>
-    //             <Chip label="Yes" size="small" />
-    //           </Box>
-    //         );
-    //       }
-    //       return '';
-    //     },
-    //   }),]
   ];
   const columnGroupingModel: GridColumnGroupingModel = [];
 
@@ -491,6 +386,25 @@ const ObjectVersionsTable: React.FC<{
       disableRowSelectionOnClick
       rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columnGroupingModel}
+    />
+  );
+};
+
+const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
+  const obj = props.obj;
+  const objectVersions = useRootObjectVersions(obj.entity, obj.project, {
+    objectIds: [obj.objectId],
+  });
+  return (
+    <ObjectVersionsLink
+      entity={obj.entity}
+      project={obj.project}
+      filter={{
+        objectName: obj.objectId,
+      }}
+      versionCount={(objectVersions.result ?? []).length}
+      neverPeek
+      variant="secondary"
     />
   );
 };
