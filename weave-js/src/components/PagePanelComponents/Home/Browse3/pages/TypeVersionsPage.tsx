@@ -3,7 +3,6 @@ import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
 import {
-  ObjectVersionsLink,
   OpVersionsLink,
   TypeLink,
   TypeVersionLink,

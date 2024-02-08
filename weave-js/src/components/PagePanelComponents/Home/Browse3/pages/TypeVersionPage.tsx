@@ -10,7 +10,6 @@ import {
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
-import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
 import {FilterableOpVersionsTable} from './OpVersionsPage';
 import {FilterableTypeVersionsTable} from './TypeVersionsPage';
 import {useWeaveflowORMContext} from './wfInterface/context';

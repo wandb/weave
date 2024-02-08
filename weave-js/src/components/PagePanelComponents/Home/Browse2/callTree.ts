@@ -230,12 +230,21 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
             }),
             rhs: constNodeUnsafe(refWeaveType, inputUri),
           }) as any,
-          rhs: opRefEqual({
-            lhs: opPick({
-              obj: rowVar,
-              key: constString('inputs._ref1'),
-            }),
-            rhs: constNodeUnsafe(refWeaveType, inputUri),
+          rhs: opOr({
+            lhs: opRefEqual({
+              lhs: opPick({
+                obj: rowVar,
+                key: constString('inputs._ref1'),
+              }),
+              rhs: constNodeUnsafe(refWeaveType, inputUri),
+            }) as any,
+            rhs: opRefEqual({
+              lhs: opPick({
+                obj: rowVar,
+                key: constString('inputs._ref2'),
+              }),
+              rhs: constNodeUnsafe(refWeaveType, inputUri),
+            }) as any,
           }) as any,
         }) as any
       );
