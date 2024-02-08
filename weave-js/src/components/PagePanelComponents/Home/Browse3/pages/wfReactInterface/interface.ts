@@ -114,8 +114,8 @@ type CallFilter = {
   opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
-  //   traceIds?: string[];
   parentIds?: string[];
+  traceId?: string;
   //   callIds?: string[];
   //   traceRootsOnly?: boolean;
 };
@@ -134,7 +134,7 @@ export const useCalls = (
       opUris: filter.opVersionRefs,
       inputUris: filter.inputObjectVersionRefs,
       outputUris: filter.outputObjectVersionRefs,
-      // traceId?: string;
+      traceId: filter.traceId,
       parentIds: filter.parentIds,
       // traceRootsOnly?: boolean;
       // callIds?: string[];
@@ -211,21 +211,28 @@ const artifactVersionNodeToOpVersionDictNode = (
 };
 
 export const useOpVersion = (
-  key: OpVersionKey
+  // Null value skips
+  key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
-      entity: constString(key.entity),
-      project: constString(key.project),
+      entity: constString(key?.entity ?? ''),
+      project: constString(key?.project ?? ''),
     }),
-    artifactName: constString(key.opId),
-    artifactVersionAlias: constString(key.versionHash),
+    artifactName: constString(key?.opId ?? ''),
+    artifactVersionAlias: constString(key?.versionHash ?? ''),
   });
   const dataNode = artifactVersionNodeToOpVersionDictNode(
     artifactVersionNode as any
   );
-  const dataValue = useNodeValue(dataNode);
+  const dataValue = useNodeValue(dataNode, {skip: key == null});
   return useMemo(() => {
+    if (key == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
     const result =
       dataValue.result == null || dataValue.result.missing
         ? null

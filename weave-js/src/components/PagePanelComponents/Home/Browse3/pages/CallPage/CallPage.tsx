@@ -36,8 +36,7 @@ import {
 import {CallStatusType, StatusChip} from '../common/StatusChip';
 import {UnderConstruction} from '../common/UnderConstruction';
 import {truncateID} from '../util';
-import {WFCall} from '../wfInterface/types';
-import {CallSchema, useCall} from '../wfReactInterface/interface';
+import {CallSchema, useCall, useCalls} from '../wfReactInterface/interface';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 
@@ -252,10 +251,8 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
       headerName: 'Inputs',
       flex: 1,
       renderCell: ({row}) => {
-        const rowCall = row.call as WFCall;
-        return (
-          <BasicInputOutputRenderer ioData={rowCall.rawCallSpan().inputs} />
-        );
+        const rowCall = row.call as CallSchema;
+        return <BasicInputOutputRenderer ioData={rowCall.rawSpan.inputs} />;
       },
     },
 
@@ -266,10 +263,8 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
       flex: 1,
       headerName: 'Output',
       renderCell: ({row}) => {
-        const rowCall = row.call as WFCall;
-        return (
-          <BasicInputOutputRenderer ioData={rowCall.rawCallSpan().output} />
-        );
+        const rowCall = row.call as CallSchema;
+        return <BasicInputOutputRenderer ioData={rowCall.rawSpan.output} />;
       },
     },
   ];
@@ -315,13 +310,13 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
       setSuppressScroll(true);
-      const rowCall = params.row.call as WFCall;
+      const rowCall = params.row.call as CallSchema;
       history.push(
         currentRouter.callUIUrl(
-          rowCall.entity(),
-          rowCall.project(),
+          rowCall.entity,
+          rowCall.project,
           '',
-          rowCall.callID()
+          rowCall.callId
         )
       );
     },
@@ -341,8 +336,8 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
   const callClass = `.callId-${call.callId}`;
   const getRowClassName: DataGridProProps['getRowClassName'] = useCallback(
     params => {
-      const rowCall = params.row.call as WFCall;
-      return `callId-${rowCall.callID()}`;
+      const rowCall = params.row.call as CallSchema;
+      return `callId-${rowCall.callId}`;
     },
     []
   );
@@ -427,7 +422,7 @@ const CustomGridTreeDataGroupingCell: FC<
   GridRenderCellParams & {onClick?: (event: MouseEvent) => void}
 > = props => {
   const {id, field, rowNode, row} = props;
-  const call = row.call as WFCall;
+  const call = row.call as CallSchema;
   const apiRef = useGridApiContext();
   const handleClick: ButtonProps['onClick'] = event => {
     if (rowNode.type !== 'group') {
@@ -560,7 +555,7 @@ const CustomGridTreeDataGroupingCell: FC<
           flex: '1 1 auto',
           fontWeight: 'bold',
         }}>
-        {opNiceName(call.spanName())}
+        {opNiceName(call.spanName)}
       </Box>
     </Box>
   );
@@ -661,6 +656,28 @@ type Row = {
   hierarchy: string[];
 };
 const useCallFlattenedTraceTree = (call: CallSchema) => {
+  const traceCalls = useCalls(call.entity, call.project, {
+    traceId: call.traceId,
+  });
+  const traceCallMap = useMemo(() => {
+    return _.fromPairs(
+      (traceCalls.result ?? []).map(c => {
+        return [c.callId, c];
+      })
+    );
+  }, [traceCalls]);
+  const childCallLookup = useMemo(() => {
+    const lookup: Record<string, string[]> = {};
+    for (const c of traceCalls.result ?? []) {
+      if (c.parentId) {
+        if (!lookup[c.parentId]) {
+          lookup[c.parentId] = [];
+        }
+        lookup[c.parentId].push(c.callId);
+      }
+    }
+    return lookup;
+  }, [traceCalls]);
   return useMemo(() => {
     const rows: Row[] = [];
     const expandKeys = new Set<string>();
@@ -671,7 +688,9 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
     while (currentCall != null) {
       lastCall = currentCall;
       expandKeys.add(currentCall.callId);
-      currentCall = currentCall.parentCall();
+      currentCall = currentCall.parentId
+        ? traceCallMap[currentCall.parentId]
+        : null;
     }
 
     // Descend to the leaves
@@ -688,9 +707,14 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
         status: targetCall.rawSpan.status_code,
         hierarchy: newHierarchy,
       });
-      for (const childCall of targetCall.childCalls()) {
+      const childIds = childCallLookup[targetCall.callId] ?? [];
+      childIds.forEach(c => {
+        const childCall = traceCallMap[c];
+        if (!childCall) {
+          return;
+        }
         queue.push({targetCall: childCall, parentHierarchy: newHierarchy});
-      }
+      });
     }
 
     // Update status indicators to reflect status of descendants.
