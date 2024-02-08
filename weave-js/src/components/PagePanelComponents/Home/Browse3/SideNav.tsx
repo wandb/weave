@@ -100,7 +100,6 @@ export const SideNav = () => {
         iconName: IconNames.Model,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
           typeCategory: 'model',
-          latest: true,
         }),
       },
       {
@@ -109,7 +108,6 @@ export const SideNav = () => {
         iconName: IconNames.Table,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
           typeCategory: 'dataset',
-          latest: true,
         }),
       },
     ],
@@ -134,9 +132,7 @@ export const SideNav = () => {
         id: 'objects',
         name: 'Objects',
         iconName: IconNames.CubeContainer,
-        path: baseRouter.objectVersionsUIUrl(entity, project, {
-          latest: true,
-        }),
+        path: baseRouter.objectVersionsUIUrl(entity, project, {}),
       },
     ],
   ];

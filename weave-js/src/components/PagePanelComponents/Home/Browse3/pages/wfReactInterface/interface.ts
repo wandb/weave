@@ -15,7 +15,6 @@ import {
   opArtifactVersionHash,
   opArtifactVersionIsWeaveObject,
   opArtifactVersionMetadata,
-  opArtifactVersionName,
   opArtifactVersions,
   opArtifactVersionVersionId,
   opDict,

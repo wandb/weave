@@ -183,17 +183,7 @@ const TypeHierarchy: React.FC<{typeVersion: WFTypeVersion}> = props => {
 const TypeVersionObjectVersions: React.FC<{
   typeVersion: WFTypeVersion;
 }> = props => {
-  return (
-    <FilterableObjectVersionsTable
-      entity={props.typeVersion.entity()}
-      project={props.typeVersion.project()}
-      frozenFilter={{
-        typeVersions: [
-          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
-        ],
-      }}
-    />
-  );
+  return <>Not Implemented</>;
 };
 
 const TypeVersionConsumingOps: React.FC<{
