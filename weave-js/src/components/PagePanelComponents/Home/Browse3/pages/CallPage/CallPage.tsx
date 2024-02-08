@@ -262,7 +262,6 @@ const CallTraceView: FC<{call: WFCall; treeOnly?: boolean}> = ({
   call,
   treeOnly,
 }) => {
-  console.log(call.rawCallSpan());
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
