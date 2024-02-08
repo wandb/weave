@@ -6,7 +6,7 @@ import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {CategoryChip} from '../common/CategoryChip';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {StatusChip} from '../common/StatusChip';
-import {GroupedCalls} from '../ObjectVersionPage';
+// import {GroupedCalls} from '../ObjectVersionPage';
 import {WFCall} from '../wfInterface/types';
 
 export const CallOverview: React.FC<{
@@ -14,9 +14,9 @@ export const CallOverview: React.FC<{
 }> = ({wfCall}) => {
   const call = wfCall.rawCallSpan();
   const opCategory = wfCall.opVersion()?.opCategory();
-  const childCalls = wfCall.childCalls().filter(c => {
-    return c.opVersion() != null;
-  });
+  // const childCalls = wfCall.childCalls().filter(c => {
+  //   return c.opVersion() != null;
+  // });
   const attributes = _.fromPairs(
     Object.entries(call.attributes ?? {}).filter(
       ([k, a]) => !k.startsWith('_') && a != null
