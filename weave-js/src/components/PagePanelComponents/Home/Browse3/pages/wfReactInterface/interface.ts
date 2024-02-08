@@ -1,4 +1,5 @@
 import _ from 'lodash';
+import LRUCache from 'lru-cache';
 import {useMemo} from 'react';
 
 import {
@@ -78,6 +79,7 @@ const spanToCallSchema = (
 };
 
 export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
+  const cachedCall = getCallFromCache(key);
   const calls = useRuns(
     {
       entityName: key.entity,
@@ -86,10 +88,17 @@ export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
     },
     {
       callIds: [key.callId],
-    }
+    },
+    {skip: cachedCall != null}
   );
 
   return useMemo(() => {
+    if (cachedCall != null) {
+      return {
+        loading: false,
+        result: cachedCall,
+      };
+    }
     const callResult = calls.result?.[0] ?? null;
     const result = callResult
       ? spanToCallSchema(key.entity, key.project, callResult)
@@ -100,12 +109,15 @@ export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
         result,
       };
     } else {
+      if (result) {
+        setCallInCache(key, result);
+      }
       return {
         loading: false,
         result,
       };
     }
-  }, [calls.loading, calls.result, key.entity, key.project]);
+  }, [cachedCall, calls.loading, calls.result, key]);
 };
 
 type CallFilter = {
@@ -150,6 +162,16 @@ export const useCalls = (
         result,
       };
     } else {
+      result.forEach(call => {
+        setCallInCache(
+          {
+            entity,
+            project,
+            callId: call.callId,
+          },
+          call
+        );
+      });
       return {
         loading: false,
         result,
@@ -214,6 +236,7 @@ export const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
+  const cachedOpVersion = key ? getOpVersionFromCache(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
       entity: constString(key?.entity ?? ''),
@@ -225,12 +248,19 @@ export const useOpVersion = (
   const dataNode = artifactVersionNodeToOpVersionDictNode(
     artifactVersionNode as any
   );
-  const dataValue = useNodeValue(dataNode, {skip: key == null});
+  const dataValue = useNodeValue(dataNode, {
+    skip: key == null || cachedOpVersion != null,
+  });
   return useMemo(() => {
     if (key == null) {
       return {
         loading: false,
         result: null,
+      };
+    } else if (cachedOpVersion != null) {
+      return {
+        loading: false,
+        result: cachedOpVersion,
       };
     }
     const result =
@@ -248,12 +278,15 @@ export const useOpVersion = (
         result,
       };
     } else {
+      if (result) {
+        setOpVersionInCache(key, result);
+      }
       return {
         loading: false,
         result,
       };
     }
-  }, [dataValue.loading, dataValue.result, key]);
+  }, [cachedOpVersion, dataValue.loading, dataValue.result, key]);
 };
 
 type OpVersionFilter = {
@@ -365,7 +398,7 @@ export const useOpVersions = (
         return (
           filter.category == null || filter.category.includes(row.category)
         );
-      });
+      }) as OpVersionSchema[];
 
     if (dataValue.loading) {
       return {
@@ -373,6 +406,17 @@ export const useOpVersions = (
         result,
       };
     } else {
+      result.forEach(op => {
+        setOpVersionInCache(
+          {
+            entity,
+            project,
+            opId: op.opId,
+            versionHash: op.versionHash,
+          },
+          op
+        );
+      });
       return {
         loading: false,
         result,
@@ -466,6 +510,7 @@ const artifactVersionNodeToObjectVersionDictNode = (
 export const useObjectVersion = (
   key: ObjectVersionKey
 ): Loadable<ObjectVersionSchema | null> => {
+  const cachedObjectVersion = getObjectVersionFromCache(key);
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
       entity: constString(key.entity),
@@ -477,9 +522,15 @@ export const useObjectVersion = (
   const dataNode = artifactVersionNodeToObjectVersionDictNode(
     artifactVersionNode as any
   );
-  const dataValue = useNodeValue(dataNode);
+  const dataValue = useNodeValue(dataNode, {skip: cachedObjectVersion != null});
 
   return useMemo(() => {
+    if (cachedObjectVersion != null) {
+      return {
+        loading: false,
+        result: cachedObjectVersion,
+      };
+    }
     const result =
       dataValue.result == null || dataValue.result.missing
         ? null
@@ -496,12 +547,15 @@ export const useObjectVersion = (
         result,
       };
     } else {
+      if (result) {
+        setObjectVersionInCache(key, result);
+      }
       return {
         loading: false,
         result,
       };
     }
-  }, [dataValue.loading, dataValue.result, key]);
+  }, [cachedObjectVersion, dataValue.loading, dataValue.result, key]);
 };
 
 type ObjectVersionFilter = {
@@ -608,7 +662,7 @@ export const useRootObjectVersions = (
       // TODO: Move this to the weave filters?
       .filter((row: any) => {
         return !['OpDef', 'stream_table', 'type'].includes(row.typeName);
-      });
+      }) as ObjectVersionSchema[];
 
     if (dataValue.loading) {
       return {
@@ -616,6 +670,19 @@ export const useRootObjectVersions = (
         result,
       };
     } else {
+      result.forEach(obj => {
+        setObjectVersionInCache(
+          {
+            entity,
+            project,
+            objectId: obj.objectId,
+            versionHash: obj.versionHash,
+            path: obj.path,
+            refExtra: obj.refExtra,
+          },
+          obj
+        );
+      });
       return {
         loading: false,
         result,
@@ -673,4 +740,68 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
     filePathParts,
     refExtraTuples,
   };
+};
+
+//// In Mem Cache Layer ////
+
+const callCache = new LRUCache<string, CallSchema>({
+  max: 2 ** 10,
+  updateAgeOnGet: true,
+});
+
+const callCacheKeyFn = (key: CallKey) => {
+  return 'call:' + key.entity + key.project + key.callId;
+};
+
+const getCallFromCache = (key: CallKey) => {
+  return callCache.get(callCacheKeyFn(key));
+};
+
+const setCallInCache = (key: CallKey, value: CallSchema) => {
+  callCache.set(callCacheKeyFn(key), value);
+};
+
+const opVersionCache = new LRUCache<string, OpVersionSchema>({
+  max: 2 ** 10,
+  updateAgeOnGet: true,
+});
+
+const opVersionCacheKeyFn = (key: OpVersionKey) => {
+  return 'opVersion:' + key.entity + key.project + key.opId + key.versionHash;
+};
+
+const getOpVersionFromCache = (key: OpVersionKey) => {
+  return opVersionCache.get(opVersionCacheKeyFn(key));
+};
+
+const setOpVersionInCache = (key: OpVersionKey, value: OpVersionSchema) => {
+  opVersionCache.set(opVersionCacheKeyFn(key), value);
+};
+
+const objectVersionCache = new LRUCache<string, ObjectVersionSchema>({
+  max: 2 ** 10,
+  updateAgeOnGet: true,
+});
+
+const objectVersionCacheKeyFn = (key: ObjectVersionKey) => {
+  return (
+    'objectVersion:' +
+    key.entity +
+    key.project +
+    key.objectId +
+    key.versionHash +
+    key.path +
+    key.refExtra
+  );
+};
+
+const getObjectVersionFromCache = (key: ObjectVersionKey) => {
+  return objectVersionCache.get(objectVersionCacheKeyFn(key));
+};
+
+const setObjectVersionInCache = (
+  key: ObjectVersionKey,
+  value: ObjectVersionSchema
+) => {
+  objectVersionCache.set(objectVersionCacheKeyFn(key), value);
 };

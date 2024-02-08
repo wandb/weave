@@ -11,6 +11,7 @@ import {useWeaveflowRouteContext} from '../../context';
 import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {opNiceName} from '../common/Links';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {CallSchema, useCalls} from '../wfReactInterface/interface';
 
 export const CallDetails: FC<{
@@ -24,8 +25,8 @@ export const CallDetails: FC<{
     parentIds: [call.callId],
   });
   const {singularChildCalls, multipleChildCallOpRefs} = useMemo(
-    () => callGrouping(childCalls.result ?? []),
-    [childCalls.result]
+    () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
+    [childCalls.loading, childCalls.result]
   );
   const {baseRouter} = useWeaveflowRouteContext();
   const history = useHistory();
@@ -132,6 +133,7 @@ export const CallDetails: FC<{
             </Box>
           </Box>
         ))}
+        {childCalls.loading && <CenteredAnimatedLoader />}
         {singularChildCalls.length > 0 && (
           <Box
             sx={{
