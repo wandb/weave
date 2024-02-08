@@ -198,31 +198,34 @@ export const callsTableSelect = (stNode: Node) => {
 };
 
 const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string) => {
-  const suffix = ":*/obj"
+  const suffix = ':*/obj';
   if (opUri.endsWith(suffix)) {
-    return opAnd({lhs: opStringStartsWith({
-      lhs: opPick({
-        obj: rowVar,
-        key: constString('name'),
+    return opAnd({
+      lhs: opStringStartsWith({
+        lhs: opPick({
+          obj: rowVar,
+          key: constString('name'),
+        }),
+        rhs: constString(opUri.slice(0, -suffix.length)),
       }),
-      rhs: constString(opUri.slice(0, -suffix.length)),
-    }), rhs: opStringEndsWith({
-      lhs: opPick({
-        obj: rowVar,
-        key: constString('name'),
+      rhs: opStringEndsWith({
+        lhs: opPick({
+          obj: rowVar,
+          key: constString('name'),
+        }),
+        rhs: constString(':*/obj'),
       }),
-      rhs: constString(":*/obj"),
-    })})
+    });
   } else {
-  return opStringEqual({
-    lhs: opPick({
-      obj: rowVar,
-      key: constString('name'),
-    }),
-    rhs: constString(opUri),
-  })
-}
-}
+    return opStringEqual({
+      lhs: opPick({
+        obj: rowVar,
+        key: constString('name'),
+      }),
+      rhs: constString(opUri),
+    });
+  }
+};
 
 const makeFilterExpr = (filters: CallFilter): Node | undefined => {
   const rowVar = varNode(listObjectType(callsTableWeaveType), 'row');

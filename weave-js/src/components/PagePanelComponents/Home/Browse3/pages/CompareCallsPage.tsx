@@ -86,7 +86,10 @@ export const CompareCallsPage: FC<{
     }
     return Object.fromEntries(
       childRunsOfFilteredParents.map(call => {
-        const opRef = call.name;
+        const opRef = call.opVersionRef;
+        if (opRef == null) {
+          throw new Error('opVersionRef is null');
+        }
         const parsed = parseRef(opRef);
         return [
           opRef,
