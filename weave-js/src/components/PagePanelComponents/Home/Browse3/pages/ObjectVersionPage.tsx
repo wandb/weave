@@ -329,8 +329,7 @@ const ObjectVersionProducingCallsItem: React.FC<{
 }> = props => {
   if (props.producingCalls.length === 1) {
     const call = props.producingCalls[0];
-    const opVersionRef = call.opVersionRef;
-    const spanName = call.spanName;
+    const {opVersionRef, spanName} = call;
     if (opVersionRef == null) {
       return <>{spanName}</>;
     }
@@ -360,8 +359,7 @@ const ObjectVersionConsumingCallsItem: React.FC<{
 }> = props => {
   if (props.consumingCalls.length === 1) {
     const call = props.consumingCalls[0];
-    const opVersionRef = call.opVersionRef;
-    const spanName = call.spanName;
+    const {opVersionRef, spanName} = call;
     if (opVersionRef == null) {
       return <>{spanName}</>;
     }
@@ -397,18 +395,17 @@ export const GroupedCalls: React.FC<{
       };
     } = {};
     calls.forEach(call => {
-      const opVersionRef = call.opVersionRef;
+      const {opVersionRef} = call;
       if (opVersionRef == null) {
         return;
       }
-      const key = opVersionRef;
-      if (groups[key] == null) {
-        groups[key] = {
+      if (groups[opVersionRef] == null) {
+        groups[opVersionRef] = {
           opVersionRef,
           calls: [],
         };
       }
-      groups[key].calls.push(call);
+      groups[opVersionRef].calls.push(call);
     });
     return groups;
   }, [calls]);
@@ -446,9 +443,9 @@ const OpVersionCallsLink: React.FC<{
 }> = ({val, partialFilter}) => {
   const opVersion = useOpVersion(refUriToOpVersionKey(val.opVersionRef));
   if (opVersion.loading) {
-    return <></>;
+    return null;
   } else if (opVersion.result == null) {
-    return <></>;
+    return null;
   }
   return (
     <>
