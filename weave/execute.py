@@ -8,7 +8,6 @@ import time
 import threading
 import typing
 import traceback
-import inspect
 
 # Configuration
 from . import wandb_api
@@ -37,18 +36,13 @@ from .language_features.tagging import process_opdef_resolve_fn
 from .language_features.tagging import opdef_util
 
 # Trace / cache
-from . import graph_client_context
-from . import run_context
-from . import storage
-from . import artifact_wandb
 from . import op_policy
 from . import trace_local
 from . import ref_base
 from . import object_context
 from . import memo
 from . import context_state
-from . import stream_data_interfaces
-from .monitoring import monitor
+from . import op_execute
 
 # Language Features
 from . import eager
@@ -392,10 +386,10 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                             span.finish()
 
                     if span is not None:
-                        span.set_tag(
+                        span.set_metric(
                             "bytes_read_to_arrow",
                             report["bytes_read_to_arrow"],
-                            report["bytes_read_to_arrow"],
+                            True,
                         )
 
                     stats.add_node(
@@ -438,116 +432,6 @@ def execute_async_op(
         args=(run_key, op_def.resolve_fn, inputs, wandb_api_ctx),
     )
     job.start()
-
-
-def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
-    import numpy as np
-
-    ref = storage.get_ref(obj)
-    if ref:
-        output_refs.append(ref)
-        return ref
-
-    if isinstance(obj, dict):
-        return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_auto_publish(v, output_refs) for v in obj]
-    weave_type = types.TypeRegistry.type_of(obj)
-    if weave_type == types.UnknownType():
-        return f"<UnknownType: {type(obj)}>"
-    if not (
-        types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
-    ):
-        return obj
-
-    client = graph_client_context.require_graph_client()
-    if not ref:
-        ref = client.save_object(obj, f"{obj.__class__.__name__}", "latest")
-
-    output_refs.append(ref)
-    return ref
-
-
-def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
-    refs: typing.List[ref_base.Ref] = []
-    return _auto_publish(obj, refs), refs
-
-
-def execute_sync_op(op_def: op_def.OpDef, inputs: Mapping[str, typing.Any]):
-    mon_span_inputs = {**inputs}
-    client = graph_client_context.get_graph_client()
-    if client is not None and context_state.eager_mode() and op_def.location:
-        op_def_ref = storage._get_ref(op_def)
-        if not client.ref_is_own(op_def_ref):
-            op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-        mon_span_inputs, refs = auto_publish(inputs)
-
-        # Memoization disabled for now.
-        # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
-        # if found_run:
-        #     return found_run.output
-
-        parent_run = run_context.get_current_run()
-        # if not parent_run:
-        #     print("Running ", op_def.name)
-        run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
-        try:
-            with run_context.current_run(run):
-                res = op_def.resolve_fn(**inputs)
-        except BaseException as e:
-            print("Error running ", op_def.name)
-            client.fail_run(run, e)
-            raise
-        if isinstance(res, box.BoxedNone):
-            res = None
-
-        # Don't use asyncio.iscoroutine. It returns True for non-async
-        # generators sometimes. Use inspect.iscoroutine instead.
-        if inspect.iscoroutine(res):
-
-            async def _run_async():
-                try:
-                    awaited_res = res
-                    with object_context.object_context():
-                        with run_context.current_run(run):
-                            # Need to do this in a loop for some reason to handle
-                            # async streaming openai. Like we get two co-routines
-                            # in a row.
-                            while inspect.iscoroutine(awaited_res):
-                                awaited_res = await awaited_res
-                    output, output_refs = auto_publish(awaited_res)
-                    # TODO: boxing enables full ref-tracking of run outputs
-                    # to other run inputs, but its not working yet.
-                    # output = box.box(output)
-                    client.finish_run(run, output, output_refs)
-                    if not parent_run:
-                        print("🍩 View run:", run.ui_url)
-                    if isinstance(output, ref_base.Ref):
-                        return output.get()
-                    return output
-                except Exception as e:
-                    client.fail_run(run, e)
-                    raise
-
-            return _run_async()
-        else:
-            output, output_refs = auto_publish(res)
-            # TODO: boxing enables full ref-tracking of run outputs
-            # to other run inputs, but its not working yet.
-            # output = box.box(output)
-
-            client.finish_run(run, output, output_refs)
-            if not parent_run:
-                print("🍩 View run:", run.ui_url)
-            if isinstance(output, ref_base.Ref):
-                res = output.get()
-            else:
-                res = output
-
-    else:
-        res = op_def.resolve_fn(**inputs)
-
-    return res
 
 
 def is_run_op(op_call: graph.Op):
@@ -752,7 +636,7 @@ def execute_forward_node(
                         next(iter(inputs.values())), box.box(result)
                     )
             else:
-                result = execute_sync_op(op_def, inputs)
+                result = op_execute.execute_op(op_def, inputs)
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)

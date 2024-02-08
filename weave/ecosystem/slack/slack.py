@@ -1,4 +1,5 @@
 import weave
+from weave.file_base import Dir
 
 from . import slackapi_readexport
 
@@ -66,8 +67,8 @@ class Slack:
 @weave.op(render_info={"type": "function"}, pure=False)
 def open_slack_export(d: str) -> Slack:
     # Note from Shawn: I changed this because I got rid of "VersionedDir". Now passing
-    # Dir which is more like DirInfo. Don't know if this still works.
-    return Slack(slackapi_readexport.SlackReadExportApi(weave.Dir(d, 0, {}, {})))
+    # Dir whch is more like DirInfo. Don't know if this still works.
+    return Slack(slackapi_readexport.SlackReadExportApi(Dir(d, 0, {}, {})))
 
 
 def all_messages(channels: list[Channel]) -> list[Message]:

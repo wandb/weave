@@ -8,14 +8,15 @@ import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {StatusChip} from '../common/StatusChip';
 import {GroupedCalls} from '../ObjectVersionPage';
 import {WFCall} from '../wfInterface/types';
+import {useCalls} from '../wfReactInterface/interface';
 
 export const CallOverview: React.FC<{
   wfCall: WFCall;
 }> = ({wfCall}) => {
   const call = wfCall.rawCallSpan();
   const opCategory = wfCall.opVersion()?.opCategory();
-  const childCalls = wfCall.childCalls().filter(c => {
-    return c.opVersion() != null;
+  const childCalls = useCalls(wfCall.entity(), wfCall.project(), {
+    parentIds: [wfCall.callID()],
   });
   const attributes = _.fromPairs(
     Object.entries(call.attributes ?? {}).filter(
@@ -50,11 +51,11 @@ export const CallOverview: React.FC<{
             }
           : {}),
         ...(call.exception ? {Exception: call.exception} : {}),
-        ...(childCalls.length > 0
+        ...((childCalls.result?.length ?? 0) > 0
           ? {
               'Child Calls': (
                 <GroupedCalls
-                  calls={childCalls}
+                  calls={childCalls.result!}
                   partialFilter={{
                     parentId: wfCall.callID(),
                   }}

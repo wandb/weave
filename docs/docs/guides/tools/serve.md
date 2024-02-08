@@ -19,7 +19,7 @@ to run a FastAPI server for that model.
 pip install fastapi uvicorn
 ```
 
-## Serve Model`
+## Serve Model
 
 In a terminal, call:
 ```bash

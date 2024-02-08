@@ -1,10 +1,10 @@
 import {Box, Chip, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {isWandbArtifactRef, parseRef} from '@wandb/weave/react';
-import {monthRoundedTime} from '@wandb/weave/time';
 import React, {FC} from 'react';
 import styled from 'styled-components';
 
+import {monthRoundedTime} from '../../../../common/util/time';
 import {Call} from './callTree';
 
 const callOpName = (call: Call) => {

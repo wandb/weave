@@ -42,8 +42,9 @@ export interface CallFilter {
   inputUris?: string[];
   outputUris?: string[];
   traceId?: string;
-  parentId?: string;
+  parentIds?: string[];
   traceRootsOnly?: boolean;
+  callIds?: string[];
 }
 
 export interface Call {
@@ -229,12 +230,21 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
             }),
             rhs: constNodeUnsafe(refWeaveType, inputUri),
           }) as any,
-          rhs: opRefEqual({
-            lhs: opPick({
-              obj: rowVar,
-              key: constString('inputs._ref1'),
-            }),
-            rhs: constNodeUnsafe(refWeaveType, inputUri),
+          rhs: opOr({
+            lhs: opRefEqual({
+              lhs: opPick({
+                obj: rowVar,
+                key: constString('inputs._ref1'),
+              }),
+              rhs: constNodeUnsafe(refWeaveType, inputUri),
+            }) as any,
+            rhs: opRefEqual({
+              lhs: opPick({
+                obj: rowVar,
+                key: constString('inputs._ref2'),
+              }),
+              rhs: constNodeUnsafe(refWeaveType, inputUri),
+            }) as any,
           }) as any,
         }) as any
       );
@@ -264,17 +274,29 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
       })
     );
   }
-  if (filters.parentId != null) {
-    filterClauses.push(
-      opStringEqual({
-        lhs: opPick({
-          obj: rowVar,
-          key: constString('parent_id'),
+  if (filters.parentIds != null && filters.parentIds.length > 0) {
+    let clause = opStringEqual({
+      lhs: opPick({
+        obj: rowVar,
+        key: constString('parent_id'),
+      }),
+      rhs: constString(filters.parentIds[0]),
+    });
+    for (const callId of filters.parentIds.slice(1)) {
+      clause = opOr({
+        lhs: clause,
+        rhs: opStringEqual({
+          lhs: opPick({
+            obj: rowVar,
+            key: constString('parent_id'),
+          }),
+          rhs: constString(callId),
         }),
-        rhs: constString(filters.parentId),
-      })
-    );
+      });
+    }
+    filterClauses.push(clause);
   }
+
   if (filters.traceRootsOnly) {
     filterClauses.push(
       opIsNone({
@@ -284,6 +306,28 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
         }),
       })
     );
+  }
+  if (filters.callIds != null && filters.callIds.length > 0) {
+    let clause = opStringEqual({
+      lhs: opPick({
+        obj: rowVar,
+        key: constString('span_id'),
+      }),
+      rhs: constString(filters.callIds[0]),
+    });
+    for (const callId of filters.callIds.slice(1)) {
+      clause = opOr({
+        lhs: clause,
+        rhs: opStringEqual({
+          lhs: opPick({
+            obj: rowVar,
+            key: constString('span_id'),
+          }),
+          rhs: constString(callId),
+        }),
+      });
+    }
+    filterClauses.push(clause);
   }
 
   let expr = filterClauses[0];

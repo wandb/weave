@@ -20,6 +20,7 @@ from ..ops_arrow import util
 from ..ops_domain import wb_domain_types as wdt
 
 from ..ops_domain import run_ops
+from .. import dispatch
 
 
 import datetime
@@ -589,7 +590,7 @@ def test_arrow_typeddict_nullable_merge(
         (
             "merge-scalar-vec",
             [{"b": "c"}, {"b": "q"}],
-            lambda x: weave.RuntimeConstNode(
+            lambda x: dispatch.RuntimeConstNode(
                 types.TypedDict({"c": types.Int()}), {"c": 4}
             ).merge(x),
             [{"b": "c", "c": 4}, {"b": "q", "c": 4}],

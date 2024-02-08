@@ -10,6 +10,7 @@ import typing
 import yarl
 import logging
 import requests
+import requests.auth
 
 
 from . import engine_trace
@@ -147,6 +148,7 @@ class Http:
         path: str,
         headers: typing.Optional[dict[str, str]] = None,
         cookies: typing.Optional[dict[str, str]] = None,
+        auth: typing.Optional[requests.auth.HTTPBasicAuth] = None,
     ) -> None:
         self.fs.makedirs(os.path.dirname(path), exist_ok=True)
         with tracer.trace("download_file_task"):
@@ -156,7 +158,10 @@ class Http:
             # will encode the url again and we'll get a 404 for things like
             # signed URLs
             with self.session.get(
-                str(yarl.URL(url, encoded=True)), headers=headers, cookies=cookies
+                str(yarl.URL(url, encoded=True)),
+                headers=headers,
+                cookies=cookies,
+                auth=auth,
             ) as r:
                 if r.status_code == 200:  # type: ignore
                     with self.fs.open_write(path, mode="wb") as f:

@@ -5,7 +5,7 @@ from ..decorator_op import op
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from . import util
-from .list_ import ArrowWeaveList, ArrowWeaveListType
+from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 
 
 nullable_binary_input_type = {

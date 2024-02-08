@@ -2,7 +2,7 @@ from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 from ..ops_primitives import obj as primitives_obj
 
-from .list_ import ArrowWeaveList, ArrowWeaveListType
+from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
 
 
 @arrow_op(

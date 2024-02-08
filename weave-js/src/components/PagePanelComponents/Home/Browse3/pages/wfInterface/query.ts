@@ -43,7 +43,7 @@ export const fnAllWeaveObjects = (entity: string, project: string) => {
   const asDictNode = opMap({
     arr: allObjectVersions,
     mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
-      return fnObjectVersionToDict(row as any);
+      return fnObjectVersionToDict(entity, project, row as any);
     }),
   });
   return asDictNode;
@@ -67,6 +67,8 @@ export const typeVersionFromTypeDict = (
 };
 
 export type ObjectVersionDictType = {
+  entity: string;
+  project: string;
   artifact_id: string;
   collection_name: string;
   type_version: TypeVersionTypeDictType;
@@ -87,11 +89,17 @@ type TypeVersionTypeDictType = {
   type_version_json_string?: string;
 };
 
-const fnObjectVersionToDict = (objectVersionNode: Node<'artifactVersion'>) => {
+const fnObjectVersionToDict = (
+  entity: string,
+  project: string,
+  objectVersionNode: Node<'artifactVersion'>
+) => {
   const sequenceNode = opArtifactVersionArtifactSequence({
     artifactVersion: objectVersionNode,
   });
   return opDict({
+    entity: constString(entity),
+    project: constString(project),
     artifact_id: opArtifactVersionId({artifactVersion: objectVersionNode}),
     collection_name: opArtifactName({artifact: sequenceNode}),
     type_version: fnObjectVersionTypeVersion(objectVersionNode),

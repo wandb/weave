@@ -10,7 +10,15 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {
+  FC,
+  MouseEvent,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRef} from '../../../../../../react';
@@ -18,6 +26,7 @@ import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {Call} from '../../../Browse2/callTree';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   SimplePageLayout,
@@ -38,14 +47,14 @@ const TRACE_PCT = 40;
 // Whether to show complex inputs/outputs in the table
 const SHOW_COMPLEX_IO = true;
 
-export const CallPage: React.FC<{
+export const CallPage: FC<{
   entity: string;
   project: string;
   callId: string;
 }> = props => {
   const orm = useWeaveflowORMContext(props.entity, props.project);
   const call = orm.projectConnection.call(props.callId);
-  const [verticalLayout, setVerticalLayout] = React.useState(true);
+  const [verticalLayout, setVerticalLayout] = useState(true);
   if (!call) {
     return <CenteredAnimatedLoader />;
   }
@@ -152,7 +161,7 @@ const useCallTabs = (call: WFCall) => {
 //   },
 // ];
 
-const CallPageInnerHorizontal: React.FC<{
+const CallPageInnerHorizontal: FC<{
   call: WFCall;
   setVerticalLayout: (vertical: boolean) => void;
 }> = ({call, setVerticalLayout}) => {
@@ -222,12 +231,12 @@ const CallPageInnerHorizontal: React.FC<{
   );
 };
 
-const CallPageInnerVertical: React.FC<{
+const CallPageInnerVertical: FC<{
   call: WFCall;
   setVerticalLayout: (vertical: boolean) => void;
 }> = ({call, setVerticalLayout}) => {
   const callId = call.callID();
-  const spanName = call.spanName();
+  const spanName = opNiceName(call.spanName());
   const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   return (
@@ -249,7 +258,7 @@ const CallPageInnerVertical: React.FC<{
   );
 };
 
-const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
+const CallTraceView: FC<{call: WFCall; treeOnly?: boolean}> = ({
   call,
   treeOnly,
 }) => {
@@ -257,7 +266,7 @@ const CallTraceView: React.FC<{call: WFCall; treeOnly?: boolean}> = ({
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
   const {rows, expandKeys: forcedExpandKeys} = useCallFlattenedTraceTree(call);
-  const [expandKeys, setExpandKeys] = React.useState(forcedExpandKeys);
+  const [expandKeys, setExpandKeys] = useState(forcedExpandKeys);
   useEffect(() => {
     setExpandKeys(curr => new Set([...curr, ...forcedExpandKeys]));
   }, [forcedExpandKeys]);
@@ -447,8 +456,8 @@ const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
  * Most of the work here is to rendering the tree structure (i.e. the
  * lines connecting the cells, expanding/collapsing the tree, etc).
  */
-const CustomGridTreeDataGroupingCell: React.FC<
-  GridRenderCellParams & {onClick?: (event: React.MouseEvent) => void}
+const CustomGridTreeDataGroupingCell: FC<
+  GridRenderCellParams & {onClick?: (event: MouseEvent) => void}
 > = props => {
   const {id, field, rowNode, row} = props;
   const call = row.call as WFCall;
@@ -584,14 +593,13 @@ const CustomGridTreeDataGroupingCell: React.FC<
           flex: '1 1 auto',
           fontWeight: 'bold',
         }}>
-        {/* {call.spanName() + ': ' + truncateID(call.callID())} */}
-        {call.spanName().split('-').slice(-1)[0]}
+        {opNiceName(call.spanName())}
       </Box>
     </Box>
   );
 };
 
-const BasicInputOutputRenderer: React.FC<{
+const BasicInputOutputRenderer: FC<{
   ioData: Call['inputs'] | Call['output'];
 }> = ({ioData}) => {
   return (
@@ -605,7 +613,7 @@ const BasicInputOutputRenderer: React.FC<{
       }}>
       {ioData?._keys?.map((k, i) => {
         const v = ioData![k];
-        let value: React.ReactNode = '';
+        let value: ReactNode = '';
 
         if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
           value = <SmallRef objRef={parseRef(v)} />;

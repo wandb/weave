@@ -18,8 +18,7 @@ from . import weave_internal
 from . import pyfunc_type_util
 from . import engine_trace
 from . import memo
-from . import weavify
-from . import eager
+from . import op_execute
 from . import object_context
 from .run import Run
 from . import graph_client_context
@@ -31,6 +30,7 @@ from .language_features.tagging import (
     tagged_value_type,
 )
 from . import language_autocall
+from . import op_def_type
 
 if typing.TYPE_CHECKING:
     from .run_streamtable_span import RunStreamTableSpan
@@ -386,12 +386,11 @@ class OpDef:
         ) or (any(isinstance(n, graph.Node) for n in kwargs.values())):
             output_node = _self.lazy_call(*args, **kwargs)
             return output_node
-        from . import execute
 
         sig = pyfunc_type_util.get_signature(_self.raw_resolve_fn)
         params = sig.bind(*args, **kwargs)
         with object_context.object_context():
-            return execute.execute_sync_op(_self, params.arguments)
+            return op_execute.execute_op(_self, params.arguments)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
@@ -658,3 +657,6 @@ def callable_output_type_to_dict(input_type, output_type, op_name):
     except errors.WeaveMakeFunctionError as e:
         # print(f"Failed to transform op {op_name}: Invalid output type function")
         return types.Any().to_dict()
+
+
+op_def_type.OpDefType.instance_classes = OpDef

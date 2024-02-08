@@ -1,3 +1,4 @@
+import {Alert, Box, Button, Typography} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -6,14 +7,23 @@ import {
   GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {monthRoundedTime} from '@wandb/weave/time';
 import * as _ from 'lodash';
-import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  ComponentProps,
+  FC,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useParams} from 'react-router-dom';
 
+import {MOON_250} from '../../../../common/css/color.styles';
+import {A, TargetBlank} from '../../../../common/util/links';
+import {monthRoundedTime} from '../../../../common/util/time';
 import {Timestamp} from '../../../Timestamp';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
-import {CallLink, OpVersionLink} from '../Browse3/pages/common/Links';
+import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
@@ -21,16 +31,22 @@ import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
+import {
+  computeTableStats,
+  getInputColumns,
+  useColumnVisibility,
+} from './tableStats';
 
 export type DataGridColumnGroupingModel = Exclude<
-  React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+  ComponentProps<typeof DataGrid>['columnGroupingModel'],
   undefined
 >;
 
 function addToTree(
   node: GridColumnGroup,
   fields: string[],
-  fullPath: string
+  fullPath: string,
+  depth: number
 ): void {
   if (!fields.length) {
     return;
@@ -44,15 +60,22 @@ function addToTree(
   }
 
   for (const child of node.children) {
-    if ('groupId' in child && child.groupId === fields[0]) {
-      addToTree(child as GridColumnGroup, fields.slice(1), fullPath);
+    if ('groupId' in child && child.headerName === fields[0]) {
+      addToTree(child as GridColumnGroup, fields.slice(1), fullPath, depth + 1);
       return;
     }
   }
 
-  const newNode: GridColumnGroup = {groupId: fields[0], children: []};
+  const newNode: GridColumnGroup = {
+    headerName: fields[0],
+    groupId: fullPath
+      .split('.')
+      .slice(0, depth + 2)
+      .join('.'),
+    children: [],
+  };
   node.children.push(newNode);
-  addToTree(newNode, fields.slice(1), fullPath);
+  addToTree(newNode, fields.slice(1), fullPath, depth + 1);
 }
 
 export function buildTree(
@@ -63,7 +86,7 @@ export function buildTree(
 
   for (const str of strings) {
     const fields = str.split('.');
-    addToTree(root, fields, rootGroupName + '.' + str);
+    addToTree(root, fields, rootGroupName + '.' + str, 0);
   }
 
   return root;
@@ -72,10 +95,14 @@ export function buildTree(
 export const RunsTable: FC<{
   loading: boolean;
   spans: SpanWithFeedback[];
-}> = ({loading, spans}) => {
-  const showIO = useMemo(() => {
-    return Array.from(new Set(spans.map(span => span.name))).length === 1;
+  clearFilters?: null | (() => void);
+  ioColumnsOnly?: boolean;
+}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+  const showIO = true;
+  const isSingleOpVersion = useMemo(() => {
+    return _.uniq(spans.map(span => span.name)).length === 1;
   }, [spans]);
+
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
   // side
@@ -117,7 +144,7 @@ export const RunsTable: FC<{
           _.mapKeys(
             _.omitBy(args, v => v == null),
             (v, k) => {
-              return 'input_' + k;
+              return 'input.' + k;
             }
           ),
           v =>
@@ -151,6 +178,12 @@ export const RunsTable: FC<{
       };
     });
   }, [orm?.projectConnection, spans, loading]);
+  const tableStats = useMemo(() => {
+    return computeTableStats(tableData);
+  }, [tableData]);
+  const {allShown, columnVisibilityModel, forceShowAll, setForceShowAll} =
+    useColumnVisibility(tableStats);
+  const showVisibilityAlert = !isSingleOpVersion && !allShown && !forceShowAll;
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
@@ -182,16 +215,19 @@ export const RunsTable: FC<{
     const cols: GridColDef[] = [
       {
         field: 'span_id',
-        headerName: 'Call',
-        width: 75,
-        minWidth: 75,
-        maxWidth: 75,
+        headerName: 'Trace',
+        width: 250,
+        hideable: false,
         renderCell: rowParams => {
-          // return truncateID(rowParams.row.id);
+          const opVersion = rowParams.row.ormCall?.opVersion();
+          if (opVersion == null) {
+            return rowParams.row.ormCall?.spanName();
+          }
           return (
             <CallLink
               entityName={params.entity}
               projectName={params.project}
+              opName={opVersion.op().name()}
               callId={rowParams.row.id}
             />
           );
@@ -214,31 +250,7 @@ export const RunsTable: FC<{
           );
         },
       },
-      ...(orm
-        ? [
-            {
-              flex: !showIO ? 1 : undefined,
-              field: 'opVersion',
-              headerName: 'Op',
-              renderCell: (rowParams: any) => {
-                const opVersion = rowParams.row.ormCall?.opVersion();
-                if (opVersion == null) {
-                  return rowParams.row.ormCall?.spanName();
-                }
-                return (
-                  <OpVersionLink
-                    entityName={opVersion.entity()}
-                    projectName={opVersion.project()}
-                    opName={opVersion.op().name()}
-                    version={opVersion.version()}
-                    versionIndex={opVersion.versionIndex()}
-                  />
-                );
-              },
-            },
-          ]
-        : []),
-      ...(orm
+      ...(orm && !ioColumnsOnly
         ? [
             {
               field: 'opCategory',
@@ -254,34 +266,25 @@ export const RunsTable: FC<{
             },
           ]
         : []),
-
-      {
-        field: 'timestampMs',
-        headerName: 'Called',
-        width: 100,
-        minWidth: 100,
-        maxWidth: 100,
-        renderCell: cellParams => {
-          return (
-            <Timestamp
-              value={cellParams.row.timestampMs / 1000}
-              format="relative"
-            />
-          );
-        },
-      },
-
-      {
-        field: 'latency',
-        headerName: 'Latency',
-        width: 100,
-        minWidth: 100,
-        maxWidth: 100,
-        // flex: !showIO ? 1 : undefined,
-        renderCell: cellParams => {
-          return monthRoundedTime(cellParams.row.latency);
-        },
-      },
+      ...(!ioColumnsOnly
+        ? [
+            {
+              field: 'timestampMs',
+              headerName: 'Called',
+              width: 100,
+              minWidth: 100,
+              maxWidth: 100,
+              renderCell: (cellParams: any) => {
+                return (
+                  <Timestamp
+                    value={cellParams.row.timestampMs / 1000}
+                    format="relative"
+                  />
+                );
+              },
+            },
+          ]
+        : []),
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = spans[0];
@@ -291,7 +294,9 @@ export const RunsTable: FC<{
 
     let attributesKeys: {[key: string]: true} = {};
     spans.forEach(span => {
-      for (const [k, v] of Object.entries(flattenObject(span.attributes!))) {
+      for (const [k, v] of Object.entries(
+        flattenObject(span.attributes ?? {})
+      )) {
         if (v != null && k !== '_keys') {
           attributesKeys[k] = true;
         }
@@ -324,13 +329,14 @@ export const RunsTable: FC<{
         }
       }
 
-      const inputOrder =
-        row0.inputs._arg_order ??
-        Object.keys(_.omitBy(row0.inputs, v => v == null)).filter(
-          k => !k.startsWith('_')
-        );
+      const inputOrder = !isSingleOpVersion
+        ? getInputColumns(tableStats)
+        : row0.inputs._arg_order ??
+          Object.keys(_.omitBy(row0.inputs, v => v == null)).filter(
+            k => !k.startsWith('_')
+          );
       const inputGroup: Exclude<
-        React.ComponentProps<typeof DataGrid>['columnGroupingModel'],
+        ComponentProps<typeof DataGrid>['columnGroupingModel'],
         undefined
       >[number] = {
         groupId: 'inputs',
@@ -340,20 +346,24 @@ export const RunsTable: FC<{
         cols.push({
           flex: 1,
           minWidth: 150,
-          field: 'input_' + key,
+          field: 'input.' + key,
           headerName: key,
           renderCell: cellParams => {
-            return renderCell(cellParams.row['input_' + key]);
+            const k = 'input.' + key;
+            if (k in cellParams.row) {
+              return renderCell(cellParams.row[k]);
+            }
+            return <NotApplicable />;
           },
         });
-        inputGroup.children.push({field: 'input_' + key});
+        inputGroup.children.push({field: 'input.' + key});
       }
       colGroupingModel.push(inputGroup);
 
       // All output keys as we don't have the order key yet.
       let outputKeys: {[key: string]: true} = {};
       spans.forEach(span => {
-        for (const [k, v] of Object.entries(flattenObject(span.output!))) {
+        for (const [k, v] of Object.entries(flattenObject(span.output ?? {}))) {
           if (v != null && (!k.startsWith('_') || k === '_result')) {
             outputKeys[k] = true;
           }
@@ -378,14 +388,20 @@ export const RunsTable: FC<{
           field: 'output.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {
-            return renderCell(cellParams.row['output.' + key]);
+            const k = 'output.' + key;
+            if (k in cellParams.row) {
+              return renderCell(cellParams.row[k]);
+            }
+            return <NotApplicable />;
           },
         });
       }
 
       let feedbackKeys: {[key: string]: true} = {};
       spans.forEach(span => {
-        for (const [k, v] of Object.entries(flattenObject(span.feedback!))) {
+        for (const [k, v] of Object.entries(
+          flattenObject(span.feedback ?? {})
+        )) {
           if (v != null && k !== '_keys') {
             feedbackKeys[k] = true;
           }
@@ -416,8 +432,29 @@ export const RunsTable: FC<{
       }
     }
 
+    cols.push({
+      field: 'latency',
+      headerName: 'Latency',
+      width: 100,
+      minWidth: 100,
+      maxWidth: 100,
+      // flex: !showIO ? 1 : undefined,
+      renderCell: cellParams => {
+        return monthRoundedTime(cellParams.row.latency);
+      },
+    });
+
     return {cols, colGroupingModel};
-  }, [orm, params.entity, params.project, showIO, spans]);
+  }, [
+    orm,
+    ioColumnsOnly,
+    showIO,
+    spans,
+    params.entity,
+    params.project,
+    isSingleOpVersion,
+    tableStats,
+  ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();
   // const history = useHistory();
@@ -434,7 +471,7 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
-  const initialState: React.ComponentProps<typeof DataGridPro>['initialState'] =
+  const initialState: ComponentProps<typeof DataGridPro>['initialState'] =
     useMemo(() => {
       if (loading) {
         return undefined;
@@ -444,8 +481,11 @@ export const RunsTable: FC<{
         sorting: {
           sortModel: [{field: 'timestampMs', sort: 'desc'}],
         },
+        columns: {
+          columnVisibilityModel,
+        },
       };
-    }, [loading]);
+    }, [loading, columnVisibilityModel]);
 
   // This is a workaround.
   // initialState won't take effect if columns are not set.
@@ -457,30 +497,86 @@ export const RunsTable: FC<{
   }, [columns, initialState, apiRef]);
 
   return (
-    <StyledDataGrid
-      columnHeaderHeight={40}
-      apiRef={apiRef}
-      loading={loading}
-      rows={tableData}
-      // density="compact"
-      initialState={initialState}
-      rowHeight={38}
-      columns={columns.cols}
-      experimentalFeatures={{columnGrouping: true}}
-      disableRowSelectionOnClick
-      rowSelectionModel={rowSelectionModel}
-      columnGroupingModel={columns.colGroupingModel}
-      // onRowClick={({id}) => {
-      //   history.push(
-      //     peekingRouter.callUIUrl(
-      //       params.entity,
-      //       params.project,
-      //       '',
-      //       id as string
-      //     )
-      //   );
-      // }}
-    />
-    // </Box>
+    <>
+      {showVisibilityAlert && (
+        <Alert
+          severity="info"
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => setForceShowAll(true)}>
+              Show all
+            </Button>
+          }>
+          Columns having many empty values have been hidden.
+        </Alert>
+      )}
+      <StyledDataGrid
+        columnHeaderHeight={40}
+        apiRef={apiRef}
+        loading={loading}
+        rows={tableData}
+        // density="compact"
+        initialState={initialState}
+        rowHeight={38}
+        columns={columns.cols}
+        experimentalFeatures={{columnGrouping: true}}
+        disableRowSelectionOnClick
+        rowSelectionModel={rowSelectionModel}
+        columnGroupingModel={columns.colGroupingModel}
+        // onRowClick={({id}) => {
+        //   history.push(
+        //     peekingRouter.callUIUrl(
+        //       params.entity,
+        //       params.project,
+        //       '',
+        //       id as string
+        //     )
+        //   );
+        // }}
+        slots={{
+          noRowsOverlay: () => {
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                <Typography color="textSecondary">
+                  No calls found.{' '}
+                  {clearFilters != null ? (
+                    <>
+                      Try{' '}
+                      <A
+                        onClick={() => {
+                          clearFilters();
+                        }}>
+                        clearing the filters
+                      </A>{' '}
+                      or l
+                    </>
+                  ) : (
+                    'L'
+                  )}
+                  earn more about how to log calls by visiting{' '}
+                  <TargetBlank href="https://wandb.me/weave">
+                    the docs
+                  </TargetBlank>
+                  .
+                </Typography>
+              </Box>
+            );
+          },
+        }}
+      />
+    </>
   );
+};
+
+const NotApplicable = () => {
+  return <Box sx={{color: MOON_250}}>N/A</Box>;
 };

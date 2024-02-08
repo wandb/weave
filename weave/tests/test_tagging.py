@@ -12,6 +12,7 @@ from ..language_features.tagging import (
 )
 from .. import weave_types as types
 from .. import box
+from .. import weave_internal
 
 
 def test_tagged_value():
@@ -300,7 +301,7 @@ def test_list_tags_accessible_to_map_elements(list_data):
     tagged = tag_store.add_tags(list_data(), {"run": run})
     saved_node = weave.save(tagged)
     map_fn = lambda row: run_tag_getter_op(row)
-    fn = weave.define_fn(
+    fn = weave_internal.define_fn(
         {"row": tagged_value_type.TaggedValueType(tag_type, types.Int())}, map_fn
     )
     mapped = list_ops.List.map(saved_node, fn)

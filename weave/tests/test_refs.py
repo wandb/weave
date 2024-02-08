@@ -1,5 +1,8 @@
+import weave
 from .. import artifact_local
 from .. import ref_util
+from .. import storage
+from .. import ops_arrow as arrow
 
 
 def test_laref_artifact_version_1():
@@ -88,3 +91,277 @@ def test_laref_artifact_version_path_extra2():
         "x.txt",
         ["5", "a"],
     )
+
+
+"""
+
+* Dict
+    * Key
+* List
+    * Index
+* Object
+    * Attribute
+* Table (ArrowWeaveList)
+    * Index
+    * Column
+    * Id (not implemented)
+
+"""
+
+
+def assert_local_ref(object, path_parts, extra_parts):
+    obj_ref = storage.get_ref(object)
+    parsed_obj_ref = ref_util.parse_ref_str(obj_ref.uri)
+
+    target_obj_ref = ref_util.ParsedRef(
+        scheme="local-artifact",
+        entity=None,
+        project=None,
+        artifact=obj_ref.name,
+        alias=obj_ref.version,
+        file_path_parts=path_parts,
+        ref_extra_tuples=[
+            ref_util.RefExtraTuple(*extra_parts[i : i + 2])
+            for i in range(0, len(extra_parts), 2)
+        ],
+    )
+    assert parsed_obj_ref == target_obj_ref
+
+
+def test_ref_parser():
+    assert ref_util.parse_ref_str(
+        "local-artifact:///art_name:version"
+    ) == ref_util.ParsedRef(
+        scheme="local-artifact",
+        entity=None,
+        project=None,
+        artifact="art_name",
+        alias="version",
+        file_path_parts=[],
+        ref_extra_tuples=[],
+    )
+    assert ref_util.parse_ref_str(
+        "local-artifact:///art_name:version/possibly/deep/path"
+    ) == ref_util.ParsedRef(
+        scheme="local-artifact",
+        entity=None,
+        project=None,
+        artifact="art_name",
+        alias="version",
+        file_path_parts=["possibly", "deep", "path"],
+        ref_extra_tuples=[],
+    )
+    assert ref_util.parse_ref_str(
+        "local-artifact:///art_name:version/possibly/deep/path#very/deep/ref/extra"
+    ) == ref_util.ParsedRef(
+        scheme="local-artifact",
+        entity=None,
+        project=None,
+        artifact="art_name",
+        alias="version",
+        file_path_parts=["possibly", "deep", "path"],
+        ref_extra_tuples=[
+            ref_util.RefExtraTuple("very", "deep"),
+            ref_util.RefExtraTuple("ref", "extra"),
+        ],
+    )
+    assert ref_util.parse_ref_str(
+        "wandb-artifact:///entity/project/art_name:version"
+    ) == ref_util.ParsedRef(
+        scheme="wandb-artifact",
+        entity="entity",
+        project="project",
+        artifact="art_name",
+        alias="version",
+        file_path_parts=[],
+        ref_extra_tuples=[],
+    )
+    assert ref_util.parse_ref_str(
+        "wandb-artifact:///entity/project/art_name:version/possibly/deep/path"
+    ) == ref_util.ParsedRef(
+        scheme="wandb-artifact",
+        entity="entity",
+        project="project",
+        artifact="art_name",
+        alias="version",
+        file_path_parts=["possibly", "deep", "path"],
+        ref_extra_tuples=[],
+    )
+    assert ref_util.parse_ref_str(
+        "wandb-artifact:///entity/project/art_name:version/possibly/deep/path#very/deep/ref/extra"
+    ) == ref_util.ParsedRef(
+        scheme="wandb-artifact",
+        entity="entity",
+        project="project",
+        artifact="art_name",
+        alias="version",
+        file_path_parts=["possibly", "deep", "path"],
+        ref_extra_tuples=[
+            ref_util.RefExtraTuple("very", "deep"),
+            ref_util.RefExtraTuple("ref", "extra"),
+        ],
+    )
+
+
+def test_ref_extra_dict(ref_tracking):
+    obj = {"a": 1}
+    saved_obj = weave.use(weave.save(obj))
+
+    assert saved_obj == obj
+    assert_local_ref(saved_obj, ["obj"], [])
+    assert storage.get(saved_obj._ref.uri) == obj
+
+    val = saved_obj["a"]
+    assert val == 1
+    assert_local_ref(val, ["obj"], ["key", "a"])
+    assert storage.get(val._ref.uri) == 1
+
+
+def test_ref_extra_list(ref_tracking):
+    obj = [1]
+    saved_obj = weave.use(weave.save(obj))
+
+    assert saved_obj == obj
+    assert_local_ref(saved_obj, ["obj"], [])
+    assert storage.get(saved_obj._ref.uri) == obj
+
+    val = saved_obj[0]
+    assert val == 1
+    assert_local_ref(val, ["obj"], ["ndx", "0"])
+    assert storage.get(val._ref.uri) == 1
+
+
+def test_ref_extra_object(ref_tracking):
+    @weave.type()
+    class CustomObject:
+        inner_a: int
+
+    obj = CustomObject(inner_a=1)
+    saved_obj = weave.use(weave.save(obj))
+
+    assert_local_ref(saved_obj, ["obj"], [])
+
+    val = saved_obj.inner_a
+    assert val == 1
+    assert_local_ref(val, ["obj"], ["atr", "inner_a"])
+    assert storage.get(val._ref.uri) == 1
+
+
+def test_ref_extra_table(ref_tracking):
+    arrow_raw = arrow.to_arrow(
+        [
+            {"a": 1},
+            {"a": 2},
+        ]
+    )
+    saved_obj = weave.use(weave.save(arrow_raw))
+
+    assert saved_obj.to_pylist_notags() == arrow_raw.to_pylist_notags()
+    assert_local_ref(saved_obj, ["obj"], [])
+    assert (
+        storage.get(saved_obj._ref.uri).to_pylist_notags()
+        == arrow_raw.to_pylist_notags()
+    )
+
+    val = saved_obj[0]
+    assert val == {"a": 1}
+    assert_local_ref(val, ["obj"], ["row", "0"])
+    assert storage.get(val._ref.uri) == {"a": 1}
+
+    val = saved_obj.column("a")
+    assert val.to_pylist_notags() == [1, 2]
+    assert_local_ref(val, ["obj"], ["col", "a"])
+    assert storage.get(val._ref.uri).to_pylist_notags() == [1, 2]
+
+
+def test_ref_extra_table_very_nested(ref_tracking):
+    @weave.type()
+    class CustomObject:
+        inner_a: int
+
+    arrow_raw = arrow.to_arrow(
+        [
+            {
+                "a": arrow.to_arrow(
+                    [
+                        [CustomObject(inner_a=1)],
+                    ]
+                )
+            },
+        ]
+    )
+
+    saved_obj = weave.use(weave.save(arrow_raw))
+
+    assert saved_obj.to_pylist_notags() == arrow_raw.to_pylist_notags()
+
+    val = saved_obj[0]["a"][0][0].inner_a
+    assert val == 1
+    assert_local_ref(
+        val,
+        ["obj"],
+        ["row", "0", "key", "a", "row", "0", "ndx", "0", "atr", "inner_a"],
+    )
+    assert storage.get(val._ref.uri) == 1
+
+
+def test_refs_across_artifacts(ref_tracking):
+    inner_obj = {"a": 1}
+    saved_inner_obj = weave.use(weave.save(inner_obj))
+    outer_obj = {"outer": inner_obj, "inner": saved_inner_obj}
+    saved_outer_obj = weave.use(weave.save(outer_obj))
+    obj = {"outer": inner_obj, "inner": {"a": 1}}
+
+    # TODO: These need to be uncommented as they highlight an issue with nested refs
+    # assert saved_outer_obj == obj
+    assert_local_ref(saved_outer_obj, ["obj"], [])
+    # assert storage.get(saved_outer_obj._ref.uri) == obj
+
+    # Non-saved children follow the same ref structure
+    val = saved_outer_obj["outer"]
+    assert val == inner_obj
+    assert_local_ref(val, ["obj"], ["key", "outer"])
+    assert storage.get(val._ref.uri) == inner_obj
+
+    val = saved_outer_obj["outer"]["a"]
+    assert val == 1
+    assert_local_ref(val, ["obj"], ["key", "outer", "key", "a"])
+    assert storage.get(val._ref.uri) == 1
+
+    # Jumping artifact boundaries uses new artifact refs
+    val = saved_outer_obj["inner"]
+    # assert val == inner_obj
+    assert_local_ref(val, ["obj"], [])
+    assert storage.get(val._ref.uri) == inner_obj
+
+    val = saved_outer_obj["inner"]["a"]
+    # assert val == inner_obj
+    assert_local_ref(val, ["obj"], ["key", "a"])
+    assert storage.get(val._ref.uri) == 1
+
+
+def test_ref_objects_across_artifacts(ref_tracking):
+    @weave.type()
+    class CustomObjectA:
+        inner_a: int
+
+    @weave.type()
+    class CustomObjectB:
+        inner_b: CustomObjectA
+
+    # Case 1: No Cross Ref
+    obj_a = CustomObjectA(inner_a=1)
+    obj_b = CustomObjectB(inner_b=obj_a)
+    saved_obj_b = weave.use(weave.save(obj_b))
+
+    val = saved_obj_b.inner_b
+    assert_local_ref(val, ["obj"], ["atr", "inner_b"])
+
+    # Case 2: Cross Ref
+    obj_a = CustomObjectA(inner_a=1)
+    obj_b = CustomObjectB(inner_b=weave.use(weave.save(obj_a, "COB")))
+    saved_obj_b = weave.use(weave.save(obj_b))
+
+    val = saved_obj_b.inner_b
+    # Notice that we have reset the ref structure here to the new artifact
+    assert_local_ref(val, ["obj"], [])

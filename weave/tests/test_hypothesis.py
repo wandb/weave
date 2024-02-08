@@ -41,7 +41,7 @@ import pyarrow as pa
 import pytest
 
 from weave import ops_arrow
-from weave.ops_arrow import convert
+from weave.arrow import convert
 from weave import ops_primitives
 from weave import storage
 from weave import artifact_local

@@ -1,7 +1,9 @@
 import {
   constFunction,
   isAssignableTo,
+  isListLike,
   isVoidNode,
+  listObjectTypePassTags,
   Node,
   NodeOrVoidNode,
   opGetRunTag,
@@ -20,13 +22,17 @@ import {usePanelContext} from '.././PanelContext';
 export const useColorNode = (inputNode: Node): NodeOrVoidNode => {
   const {frame} = usePanelContext();
   return useMemo(() => {
+    let rowType = inputNode.type;
+    // Arbitrarily limit the number of times we unnest
+    let limit = 10;
+    while (isListLike(rowType) && limit > 0) {
+      rowType = listObjectTypePassTags(rowType);
+      limit--;
+    }
     if (
       frame.runColors == null ||
       isVoidNode(frame.runColors) ||
-      !isAssignableTo(
-        inputNode.type,
-        taggedValue(typedDict({run: 'run'}), 'any')
-      )
+      !isAssignableTo(rowType, taggedValue(typedDict({run: 'run'}), 'any'))
     ) {
       return voidNode();
     }

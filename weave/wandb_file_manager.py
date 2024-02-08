@@ -7,6 +7,7 @@ import json
 import typing
 import urllib
 from aiohttp import BasicAuth
+from requests.auth import HTTPBasicAuth
 
 from wandb.sdk.lib import hashutil
 
@@ -325,14 +326,14 @@ class WandbFileManager:
             wandb_api_context = wandb_api.get_wandb_api_context()
             headers = None
             cookies = None
+            auth = None
             if wandb_api_context is not None:
                 headers = wandb_api_context.headers
                 cookies = wandb_api_context.cookies
+                if wandb_api_context.api_key is not None:
+                    auth = HTTPBasicAuth("api", wandb_api_context.api_key)
             self.http.download_file(
-                download_url,
-                file_path,
-                headers=headers,
-                cookies=cookies,
+                download_url, file_path, headers=headers, cookies=cookies, auth=auth
             )
             return file_path
 
@@ -355,14 +356,14 @@ class WandbFileManager:
             wandb_api_context = wandb_api.get_wandb_api_context()
             headers = None
             cookies = None
+            auth = None
             if wandb_api_context is not None:
                 headers = wandb_api_context.headers
                 cookies = wandb_api_context.cookies
+                if wandb_api_context.api_key is not None:
+                    auth = HTTPBasicAuth("api", wandb_api_context.api_key)
             self.http.download_file(
-                download_url,
-                file_path,
-                headers=headers,
-                cookies=cookies,
+                download_url, file_path, headers=headers, cookies=cookies, auth=auth
             )
             return file_path
 

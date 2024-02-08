@@ -92,7 +92,7 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const getInitialData = useCallback(() => {
     return orm.projectConnection.opVersions().map(o => {
-      return {id: o.version(), obj: o};
+      return {id: o.refUri(), obj: o};
     });
   }, [orm.projectConnection]);
 
@@ -118,15 +118,16 @@ export const FilterableOpVersionsTable: React.FC<{
         columnId: 'version',
         gridDisplay: {
           columnLabel: 'Op',
-          columnValue: obj => obj.obj.version(),
+          columnValue: obj => obj.obj.refUri(),
           gridColDefOptions: {
+            hideable: false,
             renderCell: params => {
               return (
                 <OpVersionLink
                   entityName={params.row.obj.entity()}
                   projectName={params.row.obj.project()}
                   opName={params.row.obj.op().name()}
-                  version={params.row.obj.version()}
+                  version={params.row.obj.commitHash()}
                   versionIndex={params.row.obj.versionIndex()}
                 />
               );
@@ -158,12 +159,9 @@ export const FilterableOpVersionsTable: React.FC<{
                   project={params.row.obj.project()}
                   callCount={params.value as number}
                   filter={{
-                    opVersions: [
-                      params.row.obj.op().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
+                    opVersionRefs: [params.row.obj.refUri()],
                   }}
+                  variant="secondary"
                 />
               );
             },
@@ -268,6 +266,7 @@ export const FilterableOpVersionsTable: React.FC<{
                         opName: params.row.obj.op().name(),
                       }}
                       neverPeek
+                      variant="secondary"
                     />
                   );
                 },

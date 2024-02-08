@@ -17,7 +17,6 @@ from . import monitoring
 from .monitoring import monitor
 from . import artifact_wandb
 from . import op_def
-from . import ops_primitives
 from .ref_base import Ref
 from . import stream_data_interfaces
 from .eager import WeaveIter, select_all
@@ -83,6 +82,8 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
     def find_op_run(
         self, op_name: str, inputs: dict[str, typing.Any]
     ) -> typing.Optional[RunStreamTableSpan]:
+        from . import ops_primitives
+
         inputs_digest = hash_inputs(inputs)
         from . import compile
 
