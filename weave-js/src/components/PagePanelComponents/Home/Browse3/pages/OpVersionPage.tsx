@@ -69,33 +69,41 @@ const OpVersionPageInner: React.FC<{
           data={{
             Name: (
               <>
-                {opName} [
-                <OpVersionsLink
-                  entity={entity}
-                  project={project}
-                  filter={{
-                    opName,
-                  }}
-                  versionCount={opVersionCount}
-                  neverPeek
-                  variant="secondary"
-                />
-                ]
+                {opName}{' '}
+                {(!opVersions.loading || opVersionCount > 0) && (
+                  <>
+                    [
+                    <OpVersionsLink
+                      entity={entity}
+                      project={project}
+                      filter={{
+                        opName,
+                      }}
+                      versionCount={opVersionCount}
+                      neverPeek
+                      variant="secondary"
+                    />
+                    ]
+                  </>
+                )}
               </>
             ),
             Version: <>{opVersionIndex}</>,
-            Calls: (
-              <CallsLink
-                entity={entity}
-                project={project}
-                callCount={opVersionCallCount}
-                filter={{
-                  opVersionRefs: [uri],
-                }}
-                neverPeek
-                variant="secondary"
-              />
-            ),
+            Calls:
+              !calls.loading || opVersionCallCount > 0 ? (
+                <CallsLink
+                  entity={entity}
+                  project={project}
+                  callCount={opVersionCallCount}
+                  filter={{
+                    opVersionRefs: [uri],
+                  }}
+                  neverPeek
+                  variant="secondary"
+                />
+              ) : (
+                <></>
+              ),
             ...(opVersionCategory
               ? {
                   Category: <CategoryChip value={opVersionCategory} />,
@@ -112,7 +120,7 @@ const OpVersionPageInner: React.FC<{
               entity={entity}
               project={project}
               opName={opName}
-              opVersions={(opVersions.result ?? []).slice().reverse()} // put in increasing order
+              opVersions={opVersions.result ?? []} // put in increasing order
               currentVersionURI={uri}
             />
           ),

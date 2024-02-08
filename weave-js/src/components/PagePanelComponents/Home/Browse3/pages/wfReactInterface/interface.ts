@@ -325,7 +325,7 @@ export const useOpVersions = (
     arr: weaveObjectsNode,
     mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
       return opDict({
-        objectId: opArtifactName({
+        opId: opArtifactName({
           artifact: opArtifactVersionArtifactSequence({artifactVersion: row}),
         }),
         versionHash: opArtifactVersionHash({artifactVersion: row}),
@@ -341,13 +341,13 @@ export const useOpVersions = (
       .map((row: any) => ({
         entity,
         project,
-        objectId: row.objectId as string,
+        opId: row.opId as string,
         versionHash: row.versionHash as string,
         path: 'obj',
         refExtra: null,
         versionIndex: row.dataDict.versionIndex as number,
         typeName: row.dataDict.typeName as string,
-        category: opNameToCategory(row.objectId as string),
+        category: opNameToCategory(row.opId as string),
         createdAtMs: row.dataDict.createdAtMs as number,
       }))
       .filter((row: any) => {
