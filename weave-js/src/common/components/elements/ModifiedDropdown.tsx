@@ -206,8 +206,20 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       return itemCount() >= itemLimit;
     }, [itemLimit, itemCount]);
 
+    const computedOptions = searchQuery ? options : propsOptions;
     const displayOptions = getDisplayOptions(
-      searchQuery ? options : propsOptions,
+      multiple
+        ? computedOptions
+        : computedOptions.map(opt => ({
+            ...opt,
+            content: (
+              <div
+                style={{padding: '13px 18px', margin: '-13px -18px'}}
+                onClick={() => setSearchQuery('')}>
+                {opt.text}
+              </div>
+            ),
+          })),
       resultLimit,
       searchQuery,
       value
@@ -428,9 +440,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
           if (!atItemLimit()) {
             setSearchQuery(data.searchQuery);
           }
-        }}
-        onClose={() => {
-          setSearchQuery('');
         }}
         onChange={(e, {value: val}) => {
           setSearchQuery('');
