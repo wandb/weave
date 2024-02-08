@@ -3,7 +3,6 @@ import {Link as LinkComp} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {
-  MOON_550,
   MOON_700,
   TEAL_500,
   TEAL_600,
@@ -26,7 +25,7 @@ export const Link = styled(LinkComp)<LinkProps>`
   font-weight: 600;
   color: ${p => (p.$variant === 'secondary' ? MOON_700 : TEAL_600)};
   &:hover {
-    color: ${p => (p.$variant === 'secondary' ? MOON_550 : TEAL_500)};
+    color: ${TEAL_500};
   }
 `;
 Link.displayName = 'S.Link';
