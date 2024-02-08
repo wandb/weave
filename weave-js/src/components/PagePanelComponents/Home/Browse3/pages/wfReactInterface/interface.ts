@@ -750,7 +750,7 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
 
 //// In Mem Cache Layer ////
 
-const CACHE_SIZE = 4 * 2 ** 20; // 5MB
+const CACHE_SIZE = 5 * 2 ** 20; // 5MB
 
 const callCache = new LRUCache<string, CallSchema>({
   max: CACHE_SIZE,
@@ -758,7 +758,7 @@ const callCache = new LRUCache<string, CallSchema>({
 });
 
 const callCacheKeyFn = (key: CallKey) => {
-  return 'call:' + key.entity + key.project + key.callId;
+  return `call:${key.entity}/${key.project}/${key.callId}`;
 };
 
 const getCallFromCache = (key: CallKey) => {
@@ -775,7 +775,7 @@ const opVersionCache = new LRUCache<string, OpVersionSchema>({
 });
 
 const opVersionCacheKeyFn = (key: OpVersionKey) => {
-  return 'opVersion:' + key.entity + key.project + key.opId + key.versionHash;
+  return `op:${key.entity}/${key.project}/${key.opId}/${key.versionHash}`;
 };
 
 const getOpVersionFromCache = (key: OpVersionKey) => {
@@ -792,15 +792,7 @@ const objectVersionCache = new LRUCache<string, ObjectVersionSchema>({
 });
 
 const objectVersionCacheKeyFn = (key: ObjectVersionKey) => {
-  return (
-    'objectVersion:' +
-    key.entity +
-    key.project +
-    key.objectId +
-    key.versionHash +
-    key.path +
-    key.refExtra
-  );
+  return `obj:${key.entity}/${key.project}/${key.objectId}/${key.versionHash}/${key.path}/${key.refExtra}`;
 };
 
 const getObjectVersionFromCache = (key: ObjectVersionKey) => {
