@@ -47,29 +47,26 @@ const OpVersionPageInner: React.FC<{
   opVersion: OpVersionSchema;
 }> = ({opVersion}) => {
   const uri = opVersionKeyToRefUri(opVersion);
-  const entity = opVersion.entity;
-  const project = opVersion.project;
-  const opName = opVersion.opId;
+  const {entity, project, opId, versionIndex, category} = opVersion;
+
   const opVersions = useOpVersions(entity, project, {
-    opIds: [opName],
+    opIds: [opId],
   });
   const opVersionCount = (opVersions.result ?? []).length;
   const calls = useCalls(entity, project, {
     opVersionRefs: [uri],
   });
   const opVersionCallCount = (calls.result ?? []).length;
-  const opVersionIndex = opVersion.versionIndex;
-  const opVersionCategory = opVersion.category;
 
   return (
     <SimplePageLayoutWithHeader
-      title={opVersionText(opName, opVersionIndex)}
+      title={opVersionText(opId, versionIndex)}
       headerContent={
         <SimpleKeyValueTable
           data={{
             Name: (
               <>
-                {opName}{' '}
+                {opId}{' '}
                 {(!opVersions.loading || opVersionCount > 0) && (
                   <>
                     [
@@ -77,7 +74,7 @@ const OpVersionPageInner: React.FC<{
                       entity={entity}
                       project={project}
                       filter={{
-                        opName,
+                        opName: opId,
                       }}
                       versionCount={opVersionCount}
                       neverPeek
@@ -88,7 +85,7 @@ const OpVersionPageInner: React.FC<{
                 )}
               </>
             ),
-            Version: <>{opVersionIndex}</>,
+            Version: <>{versionIndex}</>,
             Calls:
               !calls.loading || opVersionCallCount > 0 ? (
                 <CallsLink
@@ -104,9 +101,9 @@ const OpVersionPageInner: React.FC<{
               ) : (
                 <></>
               ),
-            ...(opVersionCategory
+            ...(category
               ? {
-                  Category: <CategoryChip value={opVersionCategory} />,
+                  Category: <CategoryChip value={category} />,
                 }
               : {}),
           }}
@@ -119,7 +116,7 @@ const OpVersionPageInner: React.FC<{
             <OpCodeViewer
               entity={entity}
               project={project}
-              opName={opName}
+              opName={opId}
               opVersions={opVersions.result ?? []} // put in increasing order
               currentVersionURI={uri}
             />
@@ -127,7 +124,7 @@ const OpVersionPageInner: React.FC<{
         },
         {
           label: 'Use',
-          content: <TabUseOp name={opNiceName(opName)} uri={uri} />,
+          content: <TabUseOp name={opNiceName(opId)} uri={uri} />,
         },
         {
           label: 'Execute',
