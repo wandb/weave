@@ -29,6 +29,12 @@ export const CallOverview: React.FC<{
   const childCalls = useCalls(call.entity, call.project, {
     parentIds: [call.callId],
   });
+  const safeChildCalls = useMemo(() => {
+    if (childCalls.loading) {
+      return [];
+    }
+    return (childCalls.result ?? []).filter(c => c.opVersionRef != null);
+  }, [childCalls.loading, childCalls.result]);
   const attributes = _.fromPairs(
     Object.entries(span.attributes ?? {}).filter(
       ([k, a]) => !k.startsWith('_') && a != null
@@ -62,11 +68,11 @@ export const CallOverview: React.FC<{
             }
           : {}),
         ...(span.exception ? {Exception: span.exception} : {}),
-        ...((childCalls.result?.length ?? 0) > 0
+        ...((safeChildCalls.length ?? 0) > 0
           ? {
               'Child Calls': (
                 <GroupedCalls
-                  calls={childCalls.result!}
+                  calls={safeChildCalls}
                   partialFilter={{
                     parentId: call.callId,
                   }}

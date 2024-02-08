@@ -28,14 +28,15 @@ export const fnRunsNode = (streamId: StreamId, filters: CallFilter) => {
 
 export const useRuns = (
   streamId: StreamId,
-  filters: CallFilter
+  filters: CallFilter,
+  opts?: {skip?: boolean}
 ): {loading: boolean; result: Span[]} => {
   const traceSpansNode = useMemo(
     () => fnRunsNode(streamId, filters),
     [filters, streamId]
   );
 
-  const traceSpansQuery = useNodeValue(traceSpansNode);
+  const traceSpansQuery = useNodeValue(traceSpansNode, {skip: opts?.skip});
 
   return useMemo(
     () =>
