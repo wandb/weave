@@ -106,7 +106,7 @@ type CallFilter = {
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
   //   traceIds?: string[];
-    parentIds?: string[];
+  parentIds?: string[];
   //   callIds?: string[];
   //   traceRootsOnly?: boolean;
 };
