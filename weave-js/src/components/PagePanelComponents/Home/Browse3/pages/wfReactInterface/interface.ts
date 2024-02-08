@@ -353,9 +353,6 @@ export const useOpVersions = (
           filter.category == null || filter.category.includes(row.category)
         );
       });
-    // .filter((row: any) => {
-    //   return !['OpDef', 'stream_table', 'type'].includes(row.typeName);
-    // });
 
     if (dataValue.loading) {
       return {
