@@ -4,14 +4,17 @@ import {useMemo} from 'react';
 import {
   constFunction,
   constString,
+  Node,
   opArray,
   opArtifactLastMembership,
   opArtifactMembershipArtifactVersion,
+  opArtifactName,
   opArtifactTypeArtifacts,
+  opArtifactVersionArtifactSequence,
+  opArtifactVersionCreatedAt,
   opArtifactVersionHash,
   opArtifactVersionIsWeaveObject,
   opArtifactVersionMetadata,
-  opArtifactVersionName,
   opArtifactVersions,
   opArtifactVersionVersionId,
   opDict,
@@ -281,6 +284,7 @@ export type ObjectVersionSchema = ObjectVersionKey & {
   versionIndex: number;
   typeName: string;
   category: ObjectCategory | null;
+  createdAtMs: number;
 };
 
 const typeNameToCategory = (typeName: string): ObjectCategory | null => {
@@ -293,10 +297,34 @@ const typeNameToCategory = (typeName: string): ObjectCategory | null => {
   return null;
 };
 
+const objectArtifactVersionNodeToDictNode = (
+  artifactVersionNode: Node<'artifactVersion'>
+) => {
+  const versionIndexNode = opArtifactVersionVersionId({
+    artifactVersion: artifactVersionNode,
+  });
+  const metadataNode = opArtifactVersionMetadata({
+    artifactVersion: artifactVersionNode,
+  });
+  const typeNameNode = opPick({
+    obj: metadataNode,
+    key: constString('_weave_meta.type_name'),
+  });
+  const createdAtNode = opArtifactVersionCreatedAt({
+    artifactVersion: artifactVersionNode,
+  });
+  return opDict({
+    missing: opIsNone({val: artifactVersionNode}),
+    typeName: typeNameNode,
+    versionIndex: versionIndexNode,
+    createdAtMs: createdAtNode,
+  } as any);
+};
+
 export const useObjectVersion = (
   key: ObjectVersionKey
 ): Loadable<ObjectVersionSchema | null> => {
-  const artifactNode = opProjectArtifactVersion({
+  const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
       entity: constString(key.entity),
       project: constString(key.project),
@@ -304,22 +332,11 @@ export const useObjectVersion = (
     artifactName: constString(key.objectId),
     artifactVersionAlias: constString(key.versionHash),
   });
-  const versionIndexNode = opArtifactVersionVersionId({
-    artifactVersion: artifactNode,
-  });
-  const metadataNode = opArtifactVersionMetadata({
-    artifactVersion: artifactNode,
-  });
-  const typeNameNode = opPick({
-    obj: metadataNode,
-    key: constString('_weave_meta.type_name'),
-  });
-  const dataNode = opDict({
-    missing: opIsNone({val: artifactNode}),
-    typeName: typeNameNode,
-    versionIndex: versionIndexNode,
-  } as any);
+  const dataNode = objectArtifactVersionNodeToDictNode(
+    artifactVersionNode as any
+  );
   const dataValue = useNodeValue(dataNode);
+
   return useMemo(() => {
     const result =
       dataValue.result == null || dataValue.result.missing
@@ -329,6 +346,7 @@ export const useObjectVersion = (
             versionIndex: dataValue.result.versionIndex as number,
             typeName: dataValue.result.typeName as string,
             category: typeNameToCategory(dataValue.result.typeName as string),
+            createdAtMs: dataValue.result.createdAtMs as number,
           };
     if (dataValue.loading) {
       return {
@@ -346,7 +364,7 @@ export const useObjectVersion = (
 
 type ObjectVersionFilter = {
   // Filters are ANDed across the fields and ORed within the fields
-  //   category?: MVPObjectCategory[];
+  category?: ObjectCategory[];
   objectIds?: string[];
   latestOnly?: boolean;
 };
@@ -356,7 +374,7 @@ export const useRootObjectVersions = (
   project: string,
   filter: ObjectVersionFilter
   // Question: Should this return the entire schema or just the key?
-): Loadable<ObjectVersionKey[]> => {
+): Loadable<ObjectVersionSchema[]> => {
   // Note: Root objects will always have a single path and refExtra will be null
   const projectNode = opRootProject({
     entityName: constString(entity),
@@ -416,8 +434,11 @@ export const useRootObjectVersions = (
     arr: weaveObjectsNode,
     mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
       return opDict({
-        objectId: opArtifactVersionName({artifactVersion: row}),
+        objectId: opArtifactName({
+          artifact: opArtifactVersionArtifactSequence({artifactVersion: row}),
+        }),
         versionHash: opArtifactVersionHash({artifactVersion: row}),
+        dataDict: objectArtifactVersionNodeToDictNode(row as any),
       } as any);
     }),
   });
@@ -425,14 +446,28 @@ export const useRootObjectVersions = (
   const dataValue = useNodeValue(dataNode);
 
   return useMemo(() => {
-    const result = (dataValue.result ?? []).map((row: any) => ({
-      entity,
-      project,
-      objectId: row.objectId as string,
-      versionHash: row.versionHash as string,
-      path: 'obj',
-      refExtra: null,
-    }));
+    const result = (dataValue.result ?? [])
+      .map((row: any) => ({
+        entity,
+        project,
+        objectId: row.objectId as string,
+        versionHash: row.versionHash as string,
+        path: 'obj',
+        refExtra: null,
+        versionIndex: row.dataDict.versionIndex as number,
+        typeName: row.dataDict.typeName as string,
+        category: typeNameToCategory(row.dataDict.typeName as string),
+        createdAtMs: row.dataDict.createdAtMs as number,
+      }))
+      .filter((row: any) => {
+        return (
+          filter.category == null || filter.category.includes(row.category)
+        );
+      })
+      .filter((row: any) => {
+        return !['OpDef', 'stream_table', 'type'].includes(row.typeName);
+      });
+
     if (dataValue.loading) {
       return {
         loading: true,
@@ -444,7 +479,7 @@ export const useRootObjectVersions = (
         result,
       };
     }
-  }, [dataValue.loading, dataValue.result, entity, project]);
+  }, [dataValue.loading, dataValue.result, entity, filter.category, project]);
 };
 
 type WFNaiveRefDict = {

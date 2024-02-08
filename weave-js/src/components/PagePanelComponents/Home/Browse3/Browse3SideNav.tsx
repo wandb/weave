@@ -435,9 +435,7 @@ const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
               ),
             icon: <Category />,
             onClick: () => {
-              props.navigateToObjectVersions({
-                latest: true,
-              });
+              props.navigateToObjectVersions({});
             },
             // TODO: Get Feedback from team on this
             // children: [

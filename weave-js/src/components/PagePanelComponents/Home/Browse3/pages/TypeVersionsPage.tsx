@@ -3,7 +3,6 @@ import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
 import {
-  ObjectVersionsLink,
   OpVersionsLink,
   TypeLink,
   TypeVersionLink,
@@ -201,20 +200,7 @@ export const FilterableTypeVersionsTable: React.FC<{
               if (params.value == null || params.value === 0) {
                 return null;
               }
-              return (
-                <ObjectVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value}
-                  filter={{
-                    typeVersions: [
-                      params.row.obj.type().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
+              return <>Not Implemented</>;
             },
           },
         },
