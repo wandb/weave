@@ -185,7 +185,7 @@ export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   createdAtMs: number;
-  category: MVPOpCategory | null;
+  category: OpCategory | null;
 };
 
 const artifactVersionNodeToOpVersionDictNode = (
@@ -419,11 +419,11 @@ const typeNameToCategory = (typeName: string): ObjectCategory | null => {
   return null;
 };
 
-const opNameToCategory = (opName: string): MVPOpCategory | null => {
+const opNameToCategory = (opName: string): OpCategory | null => {
   const categories = ['train', 'predict', 'score', 'evaluate', 'tune'];
   for (const category of categories) {
     if (opName.toLocaleLowerCase().includes(category)) {
-      return category as MVPOpCategory;
+      return category as OpCategory;
     }
   }
   return null;
