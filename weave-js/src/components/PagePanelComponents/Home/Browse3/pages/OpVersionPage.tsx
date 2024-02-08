@@ -5,7 +5,6 @@ import {CategoryChip} from './common/CategoryChip';
 import {
   CallsLink,
   opNiceName,
-  OpVersionLink,
   OpVersionsLink,
   opVersionText,
 } from './common/Links';
@@ -16,9 +15,13 @@ import {
 } from './common/SimplePageLayout';
 import {UnderConstruction} from './common/UnderConstruction';
 import {TabUseOp} from './TabUseOp';
-import {useWeaveflowORMContext} from './wfInterface/context';
-import {refDictToRefString} from './wfInterface/naive';
-import {WFOpVersion} from './wfInterface/types';
+import {
+  opVersionKeyToRefUri,
+  OpVersionSchema,
+  useCalls,
+  useOpVersion,
+  useOpVersions,
+} from './wfReactInterface/interface';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -26,118 +29,82 @@ export const OpVersionPage: React.FC<{
   opName: string;
   version: string;
 }> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const opVersion = orm.projectConnection.opVersion(
-    refDictToRefString({
-      entity: props.entity,
-      project: props.project,
-      artifactName: props.opName,
-      versionCommitHash: props.version,
-      filePathParts: ['obj'],
-      refExtraTuples: [],
-    })
-  );
-  if (opVersion == null) {
+  const opVersion = useOpVersion({
+    entity: props.entity,
+    project: props.project,
+    opId: props.opName,
+    versionHash: props.version,
+  });
+  if (opVersion.loading) {
     return <CenteredAnimatedLoader />;
+  } else if (opVersion.result == null) {
+    return <div>Op version not found</div>;
   }
-  return <OpVersionPageInner opVersion={opVersion} />;
+  return <OpVersionPageInner opVersion={opVersion.result} />;
 };
 
 const OpVersionPageInner: React.FC<{
-  opVersion: WFOpVersion;
+  opVersion: OpVersionSchema;
 }> = ({opVersion}) => {
-  const uri = opVersion.refUri();
-  const entity = opVersion.entity();
-  const project = opVersion.project();
-  const opName = opVersion.op().name();
-  const opVersions = opVersion.op().opVersions();
-  const opVersionCount = opVersions.length;
-  const opVersionCallCount = opVersion.calls().length;
-  const opVersionIndex = opVersion.versionIndex();
-  const opVersionCategory = opVersion.opCategory();
-  const opInvokes = opVersion.invokes();
+  const uri = opVersionKeyToRefUri(opVersion);
+  const {entity, project, opId, versionIndex, category} = opVersion;
+
+  const opVersions = useOpVersions(entity, project, {
+    opIds: [opId],
+  });
+  const opVersionCount = (opVersions.result ?? []).length;
+  const calls = useCalls(entity, project, {
+    opVersionRefs: [uri],
+  });
+  const opVersionCallCount = (calls.result ?? []).length;
 
   return (
     <SimplePageLayoutWithHeader
-      title={opVersionText(opName, opVersionIndex)}
+      title={opVersionText(opId, versionIndex)}
       headerContent={
         <SimpleKeyValueTable
           data={{
             Name: (
               <>
-                {opName} [
-                <OpVersionsLink
+                {opId}{' '}
+                {(!opVersions.loading || opVersionCount > 0) && (
+                  <>
+                    [
+                    <OpVersionsLink
+                      entity={entity}
+                      project={project}
+                      filter={{
+                        opName: opId,
+                      }}
+                      versionCount={opVersionCount}
+                      neverPeek
+                      variant="secondary"
+                    />
+                    ]
+                  </>
+                )}
+              </>
+            ),
+            Version: <>{versionIndex}</>,
+            Calls:
+              !calls.loading || opVersionCallCount > 0 ? (
+                <CallsLink
                   entity={entity}
                   project={project}
+                  callCount={opVersionCallCount}
                   filter={{
-                    opName,
+                    opVersionRefs: [uri],
                   }}
-                  versionCount={opVersionCount}
                   neverPeek
                   variant="secondary"
                 />
-                ]
-              </>
-            ),
-            Version: <>{opVersionIndex}</>,
-            Calls: (
-              <CallsLink
-                entity={entity}
-                project={project}
-                callCount={opVersionCallCount}
-                filter={{
-                  opVersionRefs: [opVersion.refUri()],
-                }}
-                neverPeek
-                variant="secondary"
-              />
-            ),
-            ...(opVersionCategory
+              ) : (
+                <></>
+              ),
+            ...(category
               ? {
-                  Category: <CategoryChip value={opVersionCategory} />,
+                  Category: <CategoryChip value={category} />,
                 }
-              : {}),
-
-            // Dropping input types and output types for the time being since
-            // we have de-prioritized type version navigation.
-            // ...(opInputTypes.length > 0
-            //   ? {
-            //       'Input Types': (
-            //         <ul style={{margin: 0}}>
-            //           {opInputTypes.map((t, i) => (
-            //             <li key={i}>
-            //               <TypeVersionLink
-            //                 entityName={t.entity()}
-            //                 projectName={t.project()}
-            //                 typeName={t.type().name()}
-            //                 version={t.version()}
-            //               />
-            //             </li>
-            //           ))}
-            //         </ul>
-            //       ),
-            //     }
-            //   : {}),
-            // ...(opOutputTypes.length > 0
-            //   ? {
-            //       'Output Types': (
-            //         <ul style={{margin: 0}}>
-            //           {opOutputTypes.map((t, i) => (
-            //             <li key={i}>
-            //               <TypeVersionLink
-            //                 entityName={t.entity()}
-            //                 projectName={t.project()}
-            //                 typeName={t.type().name()}
-            //                 version={t.version()}
-            //               />
-            //             </li>
-            //           ))}
-            //         </ul>
-            //       ),
-            //     }
-            //   : {}),
-            ...(opInvokes.length > 0
-              ? {'Call Tree': <OpVersionOpTree opVersion={opVersion} />}
               : {}),
           }}
         />
@@ -146,126 +113,22 @@ const OpVersionPageInner: React.FC<{
         {
           label: 'Code',
           content: (
-            // <Box
-            //   sx={{
-            //     height: '100%',
-            //     width: '100%',
-            //     flexGrow: 1,
-            //     overflow: 'hidden',
-            //     pt: 4,
-            //   }}>
             <OpCodeViewer
               entity={entity}
               project={project}
-              opName={opName}
-              opVersions={opVersions.slice().reverse()} // put in increasing order
+              opName={opId}
+              opVersions={(opVersions.result ?? []).slice().reverse()} // put in increasing order
               currentVersionURI={uri}
             />
-            // </Box>
           ),
         },
         {
           label: 'Use',
-          content: <TabUseOp name={opNiceName(opName)} uri={uri} />,
+          content: <TabUseOp name={opNiceName(opId)} uri={uri} />,
         },
-        // {
-        //   label: 'Calls',
-        //   content: (
-        //     <CallsTable
-        //       entity={entity}
-        //       project={project}
-        //       frozenFilter={{
-        //         opVersions: [opName + ':' + opVersionHash],
-        //         traceRootsOnly: false,
-        //       }}
-        //     />
-        //   ),
-        // },
-        // {
-        //   label: 'Metadata',
-        //   content: (
-        //     <ScrollableTabContent>
-        //       <SimpleKeyValueTable
-        //         data={{
-        //           Name: (
-        //             <OpLink
-        //               entityName={opVersion.entity()}
-        //               projectName={opVersion.project()}
-        //               opName={opName}
-        //             />
-        //           ),
-        //           Category: (
-        //             <OpVersionCategoryChip
-        //               opCategory={opVersion.opCategory()}
-        //             />
-        //           ),
-        //           Version: opVersionHash,
-        //           'Input Types': (
-        //             <ul style={{margin: 0}}>
-        //               {opVersion.inputTypesVersions().map((t, i) => (
-        //                 <li key={i}>
-        //                   <TypeVersionLink
-        //                     entityName={t.entity()}
-        //                     projectName={t.project()}
-        //                     typeName={t.type().name()}
-        //                     version={t.version()}
-        //                   />
-        //                 </li>
-        //               ))}
-        //             </ul>
-        //           ),
-        //           'Output Types': (
-        //             <ul style={{margin: 0}}>
-        //               {opVersion.outputTypeVersions().map((t, i) => (
-        //                 <li key={i}>
-        //                   <TypeVersionLink
-        //                     entityName={t.entity()}
-        //                     projectName={t.project()}
-        //                     typeName={t.type().name()}
-        //                     version={t.version()}
-        //                   />
-        //                 </li>
-        //               ))}
-        //             </ul>
-        //           ),
-        //           'Call Tree': <OpVersionOpTree opVersion={opVersion} />,
-        //         }}
-        //       />
-        //     </ScrollableTabContent>
-        //   ),
-        // },
-        // {
-        //   label: 'Invokes',
-        //   content: (
-        //     <FilterableOpVersionsTable
-        //       entity={opVersion.entity()}
-        //       project={opVersion.project()}
-        //       frozenFilter={{
-        //         invokedByOpVersions: [
-        //           opVersion.op().name() + ':' + opVersion.version(),
-        //         ],
-        //       }}
-        //     />
-        //   ),
-        // },
-        // {
-        //   label: 'Invoked By',
-        //   content: (
-        //     <FilterableOpVersionsTable
-        //       entity={opVersion.entity()}
-        //       project={opVersion.project()}
-        //       frozenFilter={{
-        //         invokesOpVersions: [
-        //           opVersion.op().name() + ':' + opVersion.version(),
-        //         ],
-        //       }}
-        //     />
-        //   ),
-        // },
         {
           label: 'Execute',
           content: (
-            // <ScrollableTabContent><OpVersionExecute streamId={streamId} uri={uri} /> </ScrollableTabContent>
             <UnderConstruction
               title="Execute"
               message={
@@ -277,7 +140,6 @@ const OpVersionPageInner: React.FC<{
             />
           ),
         },
-
         {
           label: 'DAG',
           content: (
@@ -295,66 +157,4 @@ const OpVersionPageInner: React.FC<{
       ]}
     />
   );
-  // return ;
 };
-
-const OpVersionOpTree: React.FC<{opVersion: WFOpVersion}> = ({opVersion}) => {
-  return (
-    <ul
-      style={{
-        paddingInlineStart: '22px',
-        margin: 0,
-      }}>
-      {opVersion.invokes().map((v, i) => {
-        return (
-          <li key={i}>
-            <OpVersionLink
-              entityName={v.entity()}
-              projectName={v.project()}
-              opName={v.op().name()}
-              version={v.commitHash()}
-              versionIndex={v.versionIndex()}
-            />
-            <OpVersionOpTree opVersion={v} />
-          </li>
-        );
-      })}
-    </ul>
-  );
-};
-
-// const OpVersionExecute: React.FC<{
-//   streamId: StreamId;
-//   uri: string;
-// }> = ({streamId, uri}) => {
-//   const firstCall = useFirstCall(streamId, uri);
-//   const opSignature = useOpSignature(streamId, uri);
-//   return (
-//     <Paper>
-//       <Typography variant="h6" gutterBottom>
-//         Call Op
-//       </Typography>
-//       <Box sx={{width: 400}}>
-//         {opSignature.result != null &&
-//           Object.keys(opSignature.result.inputTypes).map(k => (
-//             <Box key={k} mb={2}>
-//               <TextField
-//                 label={k}
-//                 fullWidth
-//                 value={
-//                   firstCall.result != null
-//                     ? firstCall.result.inputs[k]
-//                     : undefined
-//                 }
-//               />
-//             </Box>
-//           ))}
-//       </Box>
-//       <Box pt={1}>
-//         <Button variant="outlined" sx={{backgroundColor: globals.lightYellow}}>
-//           Execute
-//         </Button>
-//       </Box>
-//     </Paper>
-//   );
-// };
