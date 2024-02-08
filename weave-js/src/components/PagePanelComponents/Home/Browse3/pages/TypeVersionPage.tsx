@@ -188,33 +188,13 @@ const TypeVersionObjectVersions: React.FC<{
 const TypeVersionConsumingOps: React.FC<{
   typeVersion: WFTypeVersion;
 }> = props => {
-  return (
-    <FilterableOpVersionsTable
-      entity={props.typeVersion.entity()}
-      project={props.typeVersion.project()}
-      frozenFilter={{
-        consumesTypeVersions: [
-          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
-        ],
-      }}
-    />
-  );
+  return <>Not Implemented</>;
 };
 
 const TypeVersionProducingOps: React.FC<{
   typeVersion: WFTypeVersion;
 }> = props => {
-  return (
-    <FilterableOpVersionsTable
-      entity={props.typeVersion.entity()}
-      project={props.typeVersion.project()}
-      frozenFilter={{
-        producesTypeVersions: [
-          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
-        ],
-      }}
-    />
-  );
+  return <>Not Implemented</>;
 };
 
 const TypeVersionChildTypes: React.FC<{

@@ -1,4 +1,3 @@
-import {Autocomplete, FormControl, ListItem, TextField} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroupingModel,
@@ -12,15 +11,10 @@ import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {CategoryChip} from './common/CategoryChip';
 import {basicField} from './common/DataTable';
-import {
-  CallsLink,
-  opNiceName,
-  OpVersionLink,
-  OpVersionsLink,
-} from './common/Links';
+import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
-import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
+import {HackyOpCategory} from './wfInterface/types';
 import {
   opVersionKeyToRefUri,
   OpVersionSchema,
@@ -205,79 +199,6 @@ export const FilterableOpVersionsTable: React.FC<{
       rowSelectionModel={rowSelectionModel}
       columnGroupingModel={columnGroupingModel}
     />
-  );
-};
-
-const OpCategoryFilterControlListItem: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelOpVersionFilter;
-  filter: WFHighLevelOpVersionFilter;
-  updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
-  frozenData: Array<{obj: WFOpVersion}>;
-}> = props => {
-  const options = useMemo(() => {
-    return _.uniq(props.frozenData.map(item => item.obj.opCategory()))
-      .filter(item => item != null)
-      .sort() as HackyOpCategory[];
-  }, [props.frozenData]);
-  return (
-    <ListItem>
-      <FormControl fullWidth>
-        <Autocomplete
-          size={'small'}
-          disabled={Object.keys(props.frozenFilter ?? {}).includes(
-            'opCategory'
-          )}
-          renderInput={params => <TextField {...params} label="Category" />}
-          value={props.filter.opCategory ?? null}
-          onChange={(event, newValue) => {
-            props.updateFilter({
-              opCategory: newValue,
-            });
-          }}
-          options={options}
-        />
-      </FormControl>
-    </ListItem>
-  );
-};
-
-const OpNameFilterControlListItem: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelOpVersionFilter;
-  filter: WFHighLevelOpVersionFilter;
-  updateFilter: (update: Partial<WFHighLevelOpVersionFilter>) => void;
-  frozenData: Array<{obj: WFOpVersion}>;
-}> = props => {
-  const options = useMemo(() => {
-    return _.uniq(props.frozenData.map(item => item.obj.op().name())).sort(
-      (a, b) => {
-        const nameA = opNiceName(a);
-        const nameB = opNiceName(b);
-        return nameA.localeCompare(nameB);
-      }
-    );
-  }, [props.frozenData]);
-  return (
-    <ListItem>
-      <FormControl fullWidth>
-        <Autocomplete
-          size={'small'}
-          disabled={Object.keys(props.frozenFilter ?? {}).includes('opName')}
-          renderInput={params => <TextField {...params} label="Name" />}
-          value={props.filter.opName ?? null}
-          onChange={(event, newValue) => {
-            props.updateFilter({
-              opName: newValue,
-            });
-          }}
-          getOptionLabel={option => opNiceName(option)}
-          options={options}
-        />
-      </FormControl>
-    </ListItem>
   );
 };
 
