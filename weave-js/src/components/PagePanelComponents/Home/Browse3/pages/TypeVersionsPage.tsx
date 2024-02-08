@@ -2,12 +2,7 @@ import {Autocomplete, FormControl, ListItem, TextField} from '@mui/material';
 import React, {useCallback, useMemo} from 'react';
 
 import {useWeaveflowRouteContext} from '../context';
-import {
-  OpVersionsLink,
-  TypeLink,
-  TypeVersionLink,
-  TypeVersionsLink,
-} from './common/Links';
+import {TypeLink, TypeVersionLink, TypeVersionsLink} from './common/Links';
 import {
   FilterableTable,
   WFHighLevelDataColumn,
@@ -223,20 +218,7 @@ export const FilterableTypeVersionsTable: React.FC<{
               if (params.value == null || params.value === 0) {
                 return null;
               }
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value}
-                  filter={{
-                    consumesTypeVersions: [
-                      params.row.obj.type().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
+              return <>Not Implemented</>;
             },
           },
         },
@@ -279,20 +261,7 @@ export const FilterableTypeVersionsTable: React.FC<{
               if (params.value == null || params.value === 0) {
                 return null;
               }
-              return (
-                <OpVersionsLink
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  versionCount={params.value}
-                  filter={{
-                    producesTypeVersions: [
-                      params.row.obj.type().name() +
-                        ':' +
-                        params.row.obj.version(),
-                    ],
-                  }}
-                />
-              );
+              return <>Not Implemented</>;
             },
           },
         },

@@ -516,9 +516,7 @@ const ProjectRedirect: FC = () => {
   useEffect(() => {
     if (params.tab == null) {
       history.replace(
-        baseRouter.opVersionsUIUrl(params.entity, params.project, {
-          isLatest: true,
-        })
+        baseRouter.opVersionsUIUrl(params.entity, params.project, {})
         // baseRouter.callsUIUrl(params.entity ?? '', params.project ?? '', {
         //   traceRootsOnly: true,
         // })

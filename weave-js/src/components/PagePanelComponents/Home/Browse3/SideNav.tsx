@@ -116,9 +116,7 @@ export const SideNav = () => {
         id: 'ops',
         name: 'Operations',
         iconName: IconNames.JobProgramCode,
-        path: baseRouter.opVersionsUIUrl(entity, project, {
-          isLatest: true,
-        }),
+        path: baseRouter.opVersionsUIUrl(entity, project, {}),
       },
       {
         id: 'calls',
