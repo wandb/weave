@@ -6,17 +6,18 @@ import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {CategoryChip} from '../common/CategoryChip';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {StatusChip} from '../common/StatusChip';
-// import {GroupedCalls} from '../ObjectVersionPage';
+import {GroupedCalls} from '../ObjectVersionPage';
 import {WFCall} from '../wfInterface/types';
+import {useCalls} from '../wfReactInterface/interface';
 
 export const CallOverview: React.FC<{
   wfCall: WFCall;
 }> = ({wfCall}) => {
   const call = wfCall.rawCallSpan();
   const opCategory = wfCall.opVersion()?.opCategory();
-  // const childCalls = wfCall.childCalls().filter(c => {
-  //   return c.opVersion() != null;
-  // });
+  const childCalls = useCalls(wfCall.entity(), wfCall.project(), {
+    parentIds: [wfCall.callID()],
+  });
   const attributes = _.fromPairs(
     Object.entries(call.attributes ?? {}).filter(
       ([k, a]) => !k.startsWith('_') && a != null
@@ -50,19 +51,18 @@ export const CallOverview: React.FC<{
             }
           : {}),
         ...(call.exception ? {Exception: call.exception} : {}),
-        // Commenting out for now until the interface aligns.
-        // ...(childCalls.length > 0
-        //   ? {
-        //       'Child Calls': (
-        //         <GroupedCalls
-        //           calls={childCalls}
-        //           partialFilter={{
-        //             parentId: wfCall.callID(),
-        //           }}
-        //         />
-        //       ),
-        //     }
-        //   : {}),
+        ...((childCalls.result?.length ?? 0) > 0
+          ? {
+              'Child Calls': (
+                <GroupedCalls
+                  calls={childCalls.result!}
+                  partialFilter={{
+                    parentId: wfCall.callID(),
+                  }}
+                />
+              ),
+            }
+          : {}),
         ...(Object.keys(attributes).length > 0 ? {Attributes: attributes} : {}),
         ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
       }}
