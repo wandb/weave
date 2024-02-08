@@ -1,24 +1,32 @@
 import {Autocomplete, FormControl, ListItem, TextField} from '@mui/material';
+import {
+  GridColDef,
+  GridColumnGroupingModel,
+  GridRowSelectionModel,
+  GridRowsProp,
+} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
-import {useWeaveflowRouteContext} from '../context';
+import {StyledDataGrid} from '../StyledDataGrid';
 import {CategoryChip} from './common/CategoryChip';
+import {basicField} from './common/DataTable';
 import {
   CallsLink,
   opNiceName,
   OpVersionLink,
   OpVersionsLink,
 } from './common/Links';
-import {
-  FilterableTable,
-  WFHighLevelDataColumn,
-} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useInitializingFilter} from './util';
-import {useWeaveflowORMContext} from './wfInterface/context';
+import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyOpCategory, WFOpVersion} from './wfInterface/types';
+import {
+  opVersionKeyToRefUri,
+  OpVersionSchema,
+  useCalls,
+  useOpVersions,
+} from './wfReactInterface/interface';
 
 export type WFHighLevelOpVersionFilter = {
   opCategory?: HackyOpCategory | null;
@@ -76,233 +84,126 @@ export const FilterableOpVersionsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
-  const {baseRouter} = useWeaveflowRouteContext();
-  const orm = useWeaveflowORMContext(props.entity, props.project);
+  const effectiveFilter = useMemo(() => {
+    return {...props.initialFilter, ...props.frozenFilter};
+  }, [props.initialFilter, props.frozenFilter]);
 
-  const getInitialData = useCallback(() => {
-    return orm.projectConnection.opVersions().map(o => {
-      return {id: o.refUri(), obj: o};
+  const effectivelyLatestOnly = !effectiveFilter.opName;
+
+  const filteredObjectVersions = useOpVersions(props.entity, props.project, {
+    category: effectiveFilter.opCategory
+      ? [effectiveFilter.opCategory]
+      : undefined,
+    opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
+    latestOnly: effectivelyLatestOnly,
+  });
+
+  const rows: GridRowsProp = useMemo(() => {
+    return (filteredObjectVersions.result ?? []).map((ov, i) => {
+      return {
+        id: opVersionKeyToRefUri(ov),
+        obj: ov,
+        createdAt: ov.createdAtMs,
+      };
     });
-  }, [orm.projectConnection]);
+  }, [filteredObjectVersions.result]);
+  const columns: GridColDef[] = [
+    basicField('version', 'Op', {
+      hideable: false,
+      renderCell: cellParams => {
+        // Icon to indicate navigation to the object version
+        const obj: OpVersionSchema = cellParams.row.obj;
+        return (
+          <OpVersionLink
+            entityName={obj.entity}
+            projectName={obj.project}
+            opName={obj.opId}
+            version={obj.versionHash}
+            versionIndex={obj.versionIndex}
+          />
+        );
+      },
+    }),
 
-  const getFilterPopoutTargetUrl = useCallback(
-    (innerFilter: WFHighLevelOpVersionFilter) => {
-      return baseRouter.opVersionsUIUrl(
-        props.entity,
-        props.project,
-        innerFilter
-      );
-    },
-    [props.entity, props.project, baseRouter]
-  );
+    basicField('calls', 'Calls', {
+      width: 100,
+      renderCell: cellParams => {
+        const obj: OpVersionSchema = cellParams.row.obj;
+        return <OpCallsLink obj={obj} />;
+      },
+    }),
 
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
-    props.onFilterUpdate
-  );
+    basicField('typeCategory', 'Category', {
+      width: 100,
+      renderCell: cellParams => {
+        const obj: OpVersionSchema = cellParams.row.obj;
+        return obj.category && <CategoryChip value={obj.category} />;
+      },
+    }),
 
-  const showLatestOnly = !filter.opName;
+    basicField('createdAt', 'Created', {
+      width: 100,
+      renderCell: cellParams => {
+        const obj: OpVersionSchema = cellParams.row.obj;
+        return <Timestamp value={obj.createdAtMs / 1000} format="relative" />;
+      },
+    }),
 
-  const columns = useMemo(() => {
-    return {
-      version: {
-        columnId: 'version',
-        gridDisplay: {
-          columnLabel: 'Op',
-          columnValue: obj => obj.obj.refUri(),
-          gridColDefOptions: {
-            hideable: false,
-            renderCell: params => {
-              return (
-                <OpVersionLink
-                  entityName={params.row.obj.entity()}
-                  projectName={params.row.obj.project()}
-                  opName={params.row.obj.op().name()}
-                  version={params.row.obj.commitHash()}
-                  versionIndex={params.row.obj.versionIndex()}
-                />
-              );
-            },
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        any,
-        string,
-        'version',
-        WFHighLevelOpVersionFilter
-      >,
-
-      calls: {
-        columnId: 'calls',
-        gridDisplay: {
-          columnLabel: 'Calls',
-          columnValue: obj => obj.obj.calls().length,
-          gridColDefOptions: {
-            renderCell: params => {
-              if (params.value === 0) {
-                return '';
-              }
-              return (
-                <CallsLink
-                  neverPeek
-                  entity={params.row.obj.entity()}
-                  project={params.row.obj.project()}
-                  callCount={params.value as number}
-                  filter={{
-                    opVersionRefs: [params.row.obj.refUri()],
-                  }}
-                  variant="secondary"
-                />
-              );
-            },
+    ...(effectivelyLatestOnly
+      ? [
+          basicField('peerVersions', 'Versions', {
             width: 100,
-            minWidth: 100,
-            maxWidth: 100,
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string[],
-        number,
-        'calls',
-        WFHighLevelOpVersionFilter
-      >,
-
-      opCategory: {
-        columnId: 'opCategory',
-        gridDisplay: {
-          columnLabel: 'Category',
-          columnValue: obj => obj.obj.opCategory(),
-          gridColDefOptions: {
-            renderCell: params => {
-              return params.value && <CategoryChip value={params.value} />;
+            renderCell: cellParams => {
+              const obj: OpVersionSchema = cellParams.row.obj;
+              return <PeerVersionsLink obj={obj} />;
             },
-            width: 100,
-            minWidth: 100,
-            maxWidth: 100,
-          },
-        },
-        filterControls: {
-          filterKeys: ['opCategory'],
-          filterPredicate: ({obj}, innerFilter) => {
-            if (innerFilter.opCategory == null) {
-              return true;
-            }
-            return obj.opCategory() === innerFilter.opCategory;
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <OpCategoryFilterControlListItem
-                entity={props.entity}
-                project={props.project}
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string,
-        string,
-        'opCategory',
-        WFHighLevelOpVersionFilter
-      >,
+          }),
+        ]
+      : []),
+  ];
+  const columnGroupingModel: GridColumnGroupingModel = [];
 
-      createdAt: {
-        columnId: 'createdAt',
-        gridDisplay: {
-          columnLabel: 'Created',
-          columnValue: obj => obj.obj.createdAtMs(),
-          gridColDefOptions: {
-            renderCell: params => {
-              return (
-                <Timestamp
-                  value={(params.value as number) / 1000}
-                  format="relative"
-                />
-              );
-            },
-            width: 100,
-            minWidth: 100,
-            maxWidth: 100,
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        any,
-        number,
-        'createdAt',
-        WFHighLevelOpVersionFilter
-      >,
-
-      opName: {
-        columnId: 'opName',
-        // This grid display does not match the data for the column
-        // ... a bit of a hack
-        gridDisplay: !showLatestOnly
-          ? undefined
-          : {
-              columnLabel: 'Versions',
-              columnValue: obj => obj.obj.op().name(),
-              gridColDefOptions: {
-                renderCell: params => {
-                  return (
-                    <OpVersionsLink
-                      entity={params.row.obj.entity()}
-                      project={params.row.obj.project()}
-                      versionCount={params.row.obj.op().opVersions().length}
-                      filter={{
-                        opName: params.row.obj.op().name(),
-                      }}
-                      neverPeek
-                      variant="secondary"
-                    />
-                  );
-                },
-                width: 100,
-                minWidth: 100,
-                maxWidth: 100,
-              },
-            },
-        filterControls: {
-          filterKeys: ['opName'],
-          filterPredicate: ({obj}, innerFilter) => {
-            if (innerFilter.opName == null) {
-              return true;
-            }
-            return obj.op().name() === innerFilter.opName;
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <OpNameFilterControlListItem
-                entity={props.entity}
-                project={props.project}
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFOpVersion},
-        string,
-        string,
-        'opName',
-        WFHighLevelOpVersionFilter
-      >,
-    };
-  }, [props.entity, props.frozenFilter, props.project, showLatestOnly]);
+  // Highlight table row if it matches peek drawer.
+  const query = useURLSearchParamsDict();
+  const {peekPath} = query;
+  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const rowIds = useMemo(() => {
+    return rows.map(row => row.id);
+  }, [rows]);
+  const [rowSelectionModel, setRowSelectionModel] =
+    useState<GridRowSelectionModel>([]);
+  useEffect(() => {
+    if (rowIds.length === 0) {
+      // Data may have not loaded
+      return;
+    }
+    if (peekId == null) {
+      // No peek drawer, clear any selection
+      setRowSelectionModel([]);
+    } else {
+      // If peek drawer matches a row, select it.
+      // If not, don't modify selection.
+      if (rowIds.includes(peekId)) {
+        setRowSelectionModel([peekId]);
+      }
+    }
+  }, [rowIds, peekId]);
 
   return (
-    <FilterableTable
-      getInitialData={getInitialData}
+    <StyledDataGrid
+      rows={rows}
+      initialState={{
+        sorting: {
+          sortModel: [{field: 'createdAt', sort: 'desc'}],
+        },
+      }}
+      columnHeaderHeight={40}
+      rowHeight={38}
       columns={columns}
-      getFilterPopoutTargetUrl={getFilterPopoutTargetUrl}
-      frozenFilter={props.frozenFilter}
-      initialFilter={filter}
-      onFilterUpdate={setFilter}
+      experimentalFeatures={{columnGrouping: true}}
+      disableRowSelectionOnClick
+      rowSelectionModel={rowSelectionModel}
+      columnGroupingModel={columnGroupingModel}
     />
   );
 };
@@ -377,5 +278,49 @@ const OpNameFilterControlListItem: React.FC<{
         />
       </FormControl>
     </ListItem>
+  );
+};
+
+const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
+  const obj = props.obj;
+  const opVersions = useOpVersions(obj.entity, obj.project, {
+    opIds: [obj.opId],
+  });
+  return (
+    <OpVersionsLink
+      entity={obj.entity}
+      project={obj.project}
+      filter={{
+        opName: obj.opId,
+      }}
+      versionCount={(opVersions.result ?? []).length}
+      neverPeek
+      variant="secondary"
+    />
+  );
+};
+
+const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
+  const obj = props.obj;
+  const refUri = opVersionKeyToRefUri(obj);
+  const calls = useCalls(obj.entity, obj.project, {
+    opVersionRefs: [refUri],
+  });
+  const callCount = (calls.result ?? []).length;
+
+  if (callCount === 0) {
+    return null;
+  }
+  return (
+    <CallsLink
+      neverPeek
+      entity={obj.entity}
+      project={obj.project}
+      callCount={callCount}
+      filter={{
+        opVersionRefs: [refUri],
+      }}
+      variant="secondary"
+    />
   );
 };
