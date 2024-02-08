@@ -5,6 +5,7 @@ import {
   constFunction,
   constString,
   Node,
+  opAnd,
   opArray,
   opArtifactLastMembership,
   opArtifactMembershipArtifactVersion,
@@ -27,6 +28,7 @@ import {
   opProjectArtifactTypes,
   opProjectArtifactVersion,
   opRootProject,
+  opStringEqual,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
 import {Call as CallTreeSpan} from '../../../Browse2/callTree';
@@ -105,7 +107,7 @@ export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
 type CallFilter = {
   // Filters are ANDed across the fields and ORed within the fields
   // Commented out means not yet implemented
-  //   opVersionRefs?: string[];
+  opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
   //   traceIds?: string[];
@@ -125,7 +127,7 @@ export const useCalls = (
       streamName: PROJECT_CALL_STREAM_NAME,
     },
     {
-      // opUris?: string[];
+      opUris: filter.opVersionRefs,
       inputUris: filter.inputObjectVersionRefs,
       outputUris: filter.outputObjectVersionRefs,
       // traceId?: string;
@@ -181,15 +183,33 @@ export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
 
 type MVPOpCategory = 'train' | 'predict' | 'score' | 'evaluate' | 'tune';
 
-type OpVersionSchema = OpVersionKey & {
+export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
+  createdAtMs: number;
+  category: MVPOpCategory | null;
+};
+
+const artifactVersionNodeToOpVersionDictNode = (
+  artifactVersionNode: Node<'artifactVersion'>
+) => {
+  const versionIndexNode = opArtifactVersionVersionId({
+    artifactVersion: artifactVersionNode,
+  });
+  const createdAtNode = opArtifactVersionCreatedAt({
+    artifactVersion: artifactVersionNode,
+  });
+  return opDict({
+    missing: opIsNone({val: artifactVersionNode}),
+    versionIndex: versionIndexNode,
+    createdAtMs: createdAtNode,
+  } as any);
 };
 
 export const useOpVersion = (
   key: OpVersionKey
 ): Loadable<OpVersionSchema | null> => {
-  const artifactNode = opProjectArtifactVersion({
+  const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
       entity: constString(key.entity),
       project: constString(key.project),
@@ -197,21 +217,9 @@ export const useOpVersion = (
     artifactName: constString(key.opId),
     artifactVersionAlias: constString(key.versionHash),
   });
-  const versionIndexNode = opArtifactVersionVersionId({
-    artifactVersion: artifactNode,
-  });
-  //   const metadataNode = opArtifactVersionMetadata({
-  //     artifactVersion: artifactNode,
-  //   });
-  //   const typeNameNode = opPick({
-  //     obj: metadataNode,
-  //     key: constString('_weave_meta.type_name'),
-  //   });
-  const dataNode = opDict({
-    missing: opIsNone({val: artifactNode}),
-    // typeName: typeNameNode,
-    versionIndex: versionIndexNode,
-  } as any);
+  const dataNode = artifactVersionNodeToOpVersionDictNode(
+    artifactVersionNode as any
+  );
   const dataValue = useNodeValue(dataNode);
   return useMemo(() => {
     const result =
@@ -220,8 +228,8 @@ export const useOpVersion = (
         : {
             ...key,
             versionIndex: dataValue.result.versionIndex as number,
-            // typeName: dataValue.result.typeName as string,
-            // category: typeNameToCategory(dataValue.result.typeName as string),
+            category: opNameToCategory(key.opId as string),
+            createdAtMs: dataValue.result.createdAtMs as number,
           };
     if (dataValue.loading) {
       return {
@@ -240,15 +248,129 @@ export const useOpVersion = (
 type OpVersionFilter = {
   // Filters are ANDed across the fields and ORed within the fields
   category?: MVPOpCategory[];
-  opRefs?: string[];
+  opIds?: string[];
   latestOnly?: boolean;
 };
 export const useOpVersions = (
   entity: string,
   project: string,
   filter: OpVersionFilter
-): Loadable<OpVersionKey[]> => {
-  throw new Error('Not implemented');
+): Loadable<OpVersionSchema[]> => {
+  const projectNode = opRootProject({
+    entityName: constString(entity),
+    projectName: constString(project),
+  });
+  let artifactsNode = opArray({} as any);
+
+  if (filter.opIds == null) {
+    artifactsNode = opFlatten({
+      arr: opArtifactTypeArtifacts({
+        artifactType: opProjectArtifactTypes({
+          project: projectNode,
+        }),
+      }) as any,
+    });
+  } else {
+    artifactsNode = opArray(
+      _.fromPairs(
+        filter.opIds.map(opId => {
+          return [
+            opId,
+            opProjectArtifact({
+              project: projectNode,
+              artifactName: constString(opId),
+            }),
+          ];
+        })
+      ) as any
+    );
+  }
+
+  let artifactVersionsNode = opArray({} as any);
+  if (filter.latestOnly) {
+    artifactVersionsNode = opArtifactMembershipArtifactVersion({
+      artifactMembership: opArtifactLastMembership({
+        artifact: artifactsNode,
+      }),
+    }) as any;
+  } else {
+    artifactVersionsNode = opFlatten({
+      arr: opArtifactVersions({
+        artifact: artifactsNode,
+      }) as any,
+    });
+  }
+
+  // Filter to only Weave Objects
+  const weaveObjectsNode = opFilter({
+    arr: artifactVersionsNode,
+    filterFn: constFunction({row: 'artifactVersion'}, ({row}) => {
+      return opAnd({
+        lhs: opArtifactVersionIsWeaveObject({artifactVersion: row}),
+        rhs: opStringEqual({
+          lhs: opPick({
+            obj: opArtifactVersionMetadata({
+              artifactVersion: row,
+            }),
+            key: constString('_weave_meta.type_name'),
+          }),
+          rhs: constString('OpDef'),
+        }),
+      });
+    }),
+  });
+
+  // Build Keys
+  const dataNode = opMap({
+    arr: weaveObjectsNode,
+    mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
+      return opDict({
+        objectId: opArtifactName({
+          artifact: opArtifactVersionArtifactSequence({artifactVersion: row}),
+        }),
+        versionHash: opArtifactVersionHash({artifactVersion: row}),
+        dataDict: artifactVersionNodeToOpVersionDictNode(row as any),
+      } as any);
+    }),
+  });
+
+  const dataValue = useNodeValue(dataNode);
+
+  return useMemo(() => {
+    const result = (dataValue.result ?? [])
+      .map((row: any) => ({
+        entity,
+        project,
+        objectId: row.objectId as string,
+        versionHash: row.versionHash as string,
+        path: 'obj',
+        refExtra: null,
+        versionIndex: row.dataDict.versionIndex as number,
+        typeName: row.dataDict.typeName as string,
+        category: opNameToCategory(row.objectId as string),
+        createdAtMs: row.dataDict.createdAtMs as number,
+      }))
+      .filter((row: any) => {
+        return (
+          filter.category == null || filter.category.includes(row.category)
+        );
+      });
+    // .filter((row: any) => {
+    //   return !['OpDef', 'stream_table', 'type'].includes(row.typeName);
+    // });
+
+    if (dataValue.loading) {
+      return {
+        loading: true,
+        result,
+      };
+    } else {
+      return {
+        loading: false,
+        result,
+      };
+    }
+  }, [dataValue.loading, dataValue.result, entity, filter.category, project]);
 };
 
 type ObjectVersionKey = {
@@ -299,7 +421,17 @@ const typeNameToCategory = (typeName: string): MVPObjectCategory | null => {
   return null;
 };
 
-const objectArtifactVersionNodeToDictNode = (
+const opNameToCategory = (opName: string): MVPOpCategory | null => {
+  const categories = ['train', 'predict', 'score', 'evaluate', 'tune'];
+  for (const category of categories) {
+    if (opName.toLocaleLowerCase().includes(category)) {
+      return category as MVPOpCategory;
+    }
+  }
+  return null;
+};
+
+const artifactVersionNodeToObjectVersionDictNode = (
   artifactVersionNode: Node<'artifactVersion'>
 ) => {
   const versionIndexNode = opArtifactVersionVersionId({
@@ -334,7 +466,7 @@ export const useObjectVersion = (
     artifactName: constString(key.objectId),
     artifactVersionAlias: constString(key.versionHash),
   });
-  const dataNode = objectArtifactVersionNodeToDictNode(
+  const dataNode = artifactVersionNodeToObjectVersionDictNode(
     artifactVersionNode as any
   );
   const dataValue = useNodeValue(dataNode);
@@ -375,7 +507,6 @@ export const useRootObjectVersions = (
   entity: string,
   project: string,
   filter: ObjectVersionFilter
-  // Question: Should this return the entire schema or just the key?
 ): Loadable<ObjectVersionSchema[]> => {
   // Note: Root objects will always have a single path and refExtra will be null
   const projectNode = opRootProject({
@@ -440,7 +571,7 @@ export const useRootObjectVersions = (
           artifact: opArtifactVersionArtifactSequence({artifactVersion: row}),
         }),
         versionHash: opArtifactVersionHash({artifactVersion: row}),
-        dataDict: objectArtifactVersionNodeToDictNode(row as any),
+        dataDict: artifactVersionNodeToObjectVersionDictNode(row as any),
       } as any);
     }),
   });
@@ -466,6 +597,7 @@ export const useRootObjectVersions = (
           filter.category == null || filter.category.includes(row.category)
         );
       })
+      // TODO: Move this to the weave filters?
       .filter((row: any) => {
         return !['OpDef', 'stream_table', 'type'].includes(row.typeName);
       });
