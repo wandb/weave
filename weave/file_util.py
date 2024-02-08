@@ -3,6 +3,7 @@ import pathlib
 import typing
 
 from . import environment
+from . import filesystem
 from . import path_util
 from . import cache
 
@@ -13,7 +14,7 @@ def get_allowed_dir() -> pathlib.Path:
     cache_namespace = cache.get_user_cache_key()
     if cache_namespace is None:
         raise ValueError("cache_namespace is None but is_public() is True")
-    return pathlib.Path(environment.weave_filesystem_dir()) / cache_namespace
+    return pathlib.Path(filesystem.get_filesystem_dir()) / cache_namespace
 
 
 def path_ext(path: str) -> str:

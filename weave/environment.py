@@ -144,6 +144,7 @@ def wandb_base_url() -> str:
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
 
 
+# use filesystem.get_filesystem_dir() instead of directly accessing the env var
 def weave_filesystem_dir() -> str:
     # WEAVE_LOCAL_ARTIFACT_DIR should be renamed to WEAVE_FILESYSTEM_DIR
     # TODO
