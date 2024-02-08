@@ -26,7 +26,6 @@ import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
-import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
 import {
   CallSchema,
   opVersionRefOpCategory,
@@ -34,7 +33,6 @@ import {
 } from '../Browse3/pages/wfReactInterface/interface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
-import {SpanWithFeedback} from './callTree';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {
   computeTableStats,
@@ -119,7 +117,6 @@ export const RunsTable: FC<{
       })),
     [spans]
   );
-  const orm = useMaybeWeaveflowORMContext();
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const tableData = useMemo(() => {
     return spans.map((call: CallSchema) => {
@@ -257,7 +254,7 @@ export const RunsTable: FC<{
           );
         },
       },
-      ...(orm && !ioColumnsOnly
+      ...(!ioColumnsOnly
         ? [
             {
               field: 'opCategory',
@@ -455,7 +452,6 @@ export const RunsTable: FC<{
 
     return {cols, colGroupingModel};
   }, [
-    orm,
     ioColumnsOnly,
     showIO,
     spans,

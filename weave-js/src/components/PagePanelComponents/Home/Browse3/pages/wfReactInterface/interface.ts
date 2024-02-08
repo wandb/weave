@@ -141,7 +141,7 @@ export type CallFilter = {
   outputObjectVersionRefs?: string[];
   parentIds?: string[];
   traceId?: string;
-  //   callIds?: string[];
+  callIds?: string[];
   traceRootsOnly?: boolean;
   opCategory?: OpCategory[];
 };
@@ -163,7 +163,7 @@ export const useCalls = (
       traceId: filter.traceId,
       parentIds: filter.parentIds,
       traceRootsOnly: filter.traceRootsOnly,
-      // callIds?: string[];
+      callIds: filter.callIds,
     },
     // TODO: Re-Enable feedback once we actually have it!
     true

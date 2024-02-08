@@ -273,9 +273,9 @@ const Browse3Mounted: FC<{
                 flexDirection: 'column',
               }}>
               <ErrorBoundary>
-                <Browse3ProjectRootORMProvider>
-                  <MainPeekingLayout />
-                </Browse3ProjectRootORMProvider>
+                {/* <Browse3ProjectRootORMProvider> */}
+                <MainPeekingLayout />
+                {/* </Browse3ProjectRootORMProvider> */}
               </ErrorBoundary>
             </Box>
           </Box>

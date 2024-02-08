@@ -16,6 +16,7 @@ import {CenteredAnimatedLoader} from './common/Loader';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {WFCall} from './wfInterface/types';
+import {CallSchema, useCalls} from './wfReactInterface/interface';
 
 export const CompareCallsPage: FC<{
   entity: string;
@@ -38,7 +39,7 @@ export const CompareCallsPage: FC<{
     childRunsOfFilteredParents,
     childRunsFilteredToOpVersion,
     loading,
-  } = useSubRunsFromFastestEngine(
+  } = useSubRunsFromWeaveQuery(
     props.entity,
     props.project,
     props.callIds,
@@ -262,10 +263,10 @@ export const CompareCallsPage: FC<{
 };
 
 type SubRunsReturnType = {
-  parentRuns: Call[];
-  parentRunsFilteredToInputSelection: Call[];
-  childRunsOfFilteredParents: Call[];
-  childRunsFilteredToOpVersion: Call[];
+  parentRuns: CallSchema[];
+  parentRunsFilteredToInputSelection: CallSchema[];
+  childRunsOfFilteredParents: CallSchema[];
+  childRunsFilteredToOpVersion: CallSchema[];
   loading: boolean;
 };
 
@@ -277,200 +278,200 @@ const useSubRunsFromWeaveQuery = (
   selectedOpVersionRef: string | null,
   selectedObjectVersionRef: string | null
 ): SubRunsReturnType => {
-  const parentRunsQuery = useRuns(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    {
-      callIds: parentCallIds,
-    }
-  );
+  const parentRunsQuery = useCalls(entity, project, {
+    callIds: parentCallIds,
+  });
   const parentRuns = parentRunsQuery.result;
 
   const parentRunsFilteredToInputSelection = useMemo(() => {
-    return parentRuns.filter(
+    return (parentRuns ?? []).filter(
       call =>
         secondaryDim &&
-        getValueAtNestedKey(call, secondaryDim) === selectedObjectVersionRef
+        getValueAtNestedKey(call.rawSpan, secondaryDim) ===
+          selectedObjectVersionRef
     );
   }, [parentRuns, secondaryDim, selectedObjectVersionRef]);
 
-  const childCallsQuery = useRuns(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    {
-      parentIds: parentRunsFilteredToInputSelection.map(call => call.span_id),
-    }
-  );
+  const childCallsQuery = useCalls(entity, project, {
+    parentIds: parentRunsFilteredToInputSelection.map(call => call.callId),
+  });
 
   const childRunsOfFilteredParents = childCallsQuery.result;
 
   const childRunsFilteredToOpVersion = useMemo(() => {
-    return childRunsOfFilteredParents.filter(
-      call => selectedOpVersionRef && call.name.includes(selectedOpVersionRef)
+    return (childRunsOfFilteredParents ?? []).filter(
+      call =>
+        selectedOpVersionRef &&
+        call.opVersionRef?.includes(selectedOpVersionRef)
     );
   }, [childRunsOfFilteredParents, selectedOpVersionRef]);
 
-  return {
-    parentRuns,
-    parentRunsFilteredToInputSelection,
-    childRunsOfFilteredParents,
-    childRunsFilteredToOpVersion,
-    loading: parentRunsQuery.loading || childCallsQuery.loading,
-  };
-};
-
-const useSubRunsFromORM = (
-  entity: string,
-  project: string,
-  parentCallIds: string[] | undefined,
-  secondaryDim: string | undefined,
-  selectedOpVersionRef: string | null,
-  selectedObjectVersionRef: string | null
-): SubRunsReturnType => {
-  const orm = useWeaveflowORMContext(entity, project);
-
-  const parentCalls = useMemo(() => {
-    return (
-      (parentCallIds
-        ?.map(cid => orm.projectConnection.call(cid))
-        ?.filter(item => item != null) as WFCall[]) ?? []
-    );
-  }, [orm.projectConnection, parentCallIds]);
-
-  const parentCallsFilteredToInputSelection = useMemo(() => {
-    return parentCalls.filter(
-      call =>
-        secondaryDim &&
-        getValueAtNestedKey(call.rawCallSpan(), secondaryDim) ===
-          selectedObjectVersionRef
-    );
-  }, [parentCalls, secondaryDim, selectedObjectVersionRef]);
-
-  const childCallsOfFilteredParents = useMemo(() => {
-    return parentCallsFilteredToInputSelection.flatMap(call =>
-      call.childCalls()
-    );
-  }, [parentCallsFilteredToInputSelection]);
-
-  const childCallsFilteredToOpVersion = useMemo(() => {
-    return childCallsOfFilteredParents.filter(
-      item => item.opVersion()?.refUri() === selectedOpVersionRef
-    );
-  }, [childCallsOfFilteredParents, selectedOpVersionRef]);
-
-  const parentRuns = useMemo(() => {
-    return parentCalls.map(c => c.rawCallSpan());
-  }, [parentCalls]);
-
-  const parentRunsFilteredToInputSelection = useMemo(() => {
-    return parentCallsFilteredToInputSelection.map(c => c.rawCallSpan());
-  }, [parentCallsFilteredToInputSelection]);
-
-  const childRunsOfFilteredParents = useMemo(() => {
-    return childCallsOfFilteredParents.map(call => call.rawCallSpan());
-  }, [childCallsOfFilteredParents]);
-
-  const childRunsFilteredToOpVersion = useMemo(() => {
-    return childCallsFilteredToOpVersion.map(call => call.rawCallSpan());
-  }, [childCallsFilteredToOpVersion]);
-
-  return {
-    parentRuns,
-    parentRunsFilteredToInputSelection,
-    childRunsOfFilteredParents,
-    childRunsFilteredToOpVersion,
-    loading: parentRuns.length === 0,
-  };
-};
-
-const useSubRunsFromFastestEngine = (
-  entity: string,
-  project: string,
-  parentCallIds: string[] | undefined,
-  secondaryDim: string | undefined,
-  selectedOpVersionRef: string | null,
-  selectedObjectVersionRef: string | null
-): SubRunsReturnType => {
-  const weaveQueryResults = useSubRunsFromWeaveQuery(
-    entity,
-    project,
-    parentCallIds,
-    secondaryDim,
-    selectedOpVersionRef,
-    selectedObjectVersionRef
+  return useMemo(
+    () => ({
+      parentRuns: parentRuns ?? [],
+      parentRunsFilteredToInputSelection:
+        parentRunsFilteredToInputSelection ?? [],
+      childRunsOfFilteredParents: childRunsOfFilteredParents ?? [],
+      childRunsFilteredToOpVersion: childRunsFilteredToOpVersion ?? [],
+      loading: parentRunsQuery.loading || childCallsQuery.loading,
+    }),
+    [
+      childCallsQuery.loading,
+      childRunsFilteredToOpVersion,
+      childRunsOfFilteredParents,
+      parentRuns,
+      parentRunsFilteredToInputSelection,
+      parentRunsQuery.loading,
+    ]
   );
-
-  const ormResults = useSubRunsFromORM(
-    entity,
-    project,
-    parentCallIds,
-    secondaryDim,
-    selectedOpVersionRef,
-    selectedObjectVersionRef
-  );
-
-  if (!weaveQueryResults.loading && !ormResults.loading) {
-    if (weaveQueryResults.parentRuns.length !== ormResults.parentRuns.length) {
-      console.error(
-        'parentRuns mismatch',
-        weaveQueryResults.parentRuns,
-        ormResults.parentRuns
-      );
-    } else if (
-      weaveQueryResults.parentRunsFilteredToInputSelection.length !==
-      ormResults.parentRunsFilteredToInputSelection.length
-    ) {
-      console.error(
-        'parentRunsFilteredToInputSelection mismatch',
-        weaveQueryResults.parentRunsFilteredToInputSelection,
-        ormResults.parentRunsFilteredToInputSelection
-      );
-    } else if (
-      weaveQueryResults.childRunsOfFilteredParents.length !==
-      ormResults.childRunsOfFilteredParents.length
-    ) {
-      console.error(
-        'childRunsOfFilteredParents mismatch',
-        weaveQueryResults.childRunsOfFilteredParents,
-        ormResults.childRunsOfFilteredParents
-      );
-    } else if (
-      weaveQueryResults.childRunsFilteredToOpVersion.length !==
-      ormResults.childRunsFilteredToOpVersion.length
-    ) {
-      console.error(
-        'childRunsFilteredToOpVersion mismatch',
-        weaveQueryResults.childRunsFilteredToOpVersion,
-        ormResults.childRunsFilteredToOpVersion
-      );
-    }
-  }
-
-  // We don't want to switch between ORM and weave query results
-  // as they result in the table reloading. Just choose one for a
-  // given render and stick with it.
-  const [usingORM, setUsingORM] = useState<boolean | undefined>(undefined);
-
-  return useMemo(() => {
-    if (!ormResults.loading && usingORM !== false) {
-      if (usingORM !== true) {
-        setUsingORM(true);
-      }
-      return ormResults;
-    } else {
-      if (
-        usingORM !== false &&
-        weaveQueryResults.childRunsFilteredToOpVersion.length > 0
-      ) {
-        setUsingORM(false);
-      }
-      return weaveQueryResults;
-    }
-  }, [ormResults, usingORM, weaveQueryResults]);
 };
+
+// const useSubRunsFromORM = (
+//   entity: string,
+//   project: string,
+//   parentCallIds: string[] | undefined,
+//   secondaryDim: string | undefined,
+//   selectedOpVersionRef: string | null,
+//   selectedObjectVersionRef: string | null
+// ): SubRunsReturnType => {
+//   const orm = useWeaveflowORMContext(entity, project);
+
+//   const parentCalls = useMemo(() => {
+//     return (
+//       (parentCallIds
+//         ?.map(cid => orm.projectConnection.call(cid))
+//         ?.filter(item => item != null) as WFCall[]) ?? []
+//     );
+//   }, [orm.projectConnection, parentCallIds]);
+
+//   const parentCallsFilteredToInputSelection = useMemo(() => {
+//     return parentCalls.filter(
+//       call =>
+//         secondaryDim &&
+//         getValueAtNestedKey(call.rawCallSpan(), secondaryDim) ===
+//           selectedObjectVersionRef
+//     );
+//   }, [parentCalls, secondaryDim, selectedObjectVersionRef]);
+
+//   const childCallsOfFilteredParents = useMemo(() => {
+//     return parentCallsFilteredToInputSelection.flatMap(call =>
+//       call.childCalls()
+//     );
+//   }, [parentCallsFilteredToInputSelection]);
+
+//   const childCallsFilteredToOpVersion = useMemo(() => {
+//     return childCallsOfFilteredParents.filter(
+//       item => item.opVersion()?.refUri() === selectedOpVersionRef
+//     );
+//   }, [childCallsOfFilteredParents, selectedOpVersionRef]);
+
+//   const parentRuns = useMemo(() => {
+//     return parentCalls.map(c => c.rawCallSpan());
+//   }, [parentCalls]);
+
+//   const parentRunsFilteredToInputSelection = useMemo(() => {
+//     return parentCallsFilteredToInputSelection.map(c => c.rawCallSpan());
+//   }, [parentCallsFilteredToInputSelection]);
+
+//   const childRunsOfFilteredParents = useMemo(() => {
+//     return childCallsOfFilteredParents.map(call => call.rawCallSpan());
+//   }, [childCallsOfFilteredParents]);
+
+//   const childRunsFilteredToOpVersion = useMemo(() => {
+//     return childCallsFilteredToOpVersion.map(call => call.rawCallSpan());
+//   }, [childCallsFilteredToOpVersion]);
+
+//   return {
+//     parentRuns,
+//     parentRunsFilteredToInputSelection,
+//     childRunsOfFilteredParents,
+//     childRunsFilteredToOpVersion,
+//     loading: parentRuns.length === 0,
+//   };
+// };
+
+// const useSubRunsFromFastestEngine = (
+//   entity: string,
+//   project: string,
+//   parentCallIds: string[] | undefined,
+//   secondaryDim: string | undefined,
+//   selectedOpVersionRef: string | null,
+//   selectedObjectVersionRef: string | null
+// ): SubRunsReturnType => {
+//   const weaveQueryResults = useSubRunsFromWeaveQuery(
+//     entity,
+//     project,
+//     parentCallIds,
+//     secondaryDim,
+//     selectedOpVersionRef,
+//     selectedObjectVersionRef
+//   );
+
+//   const ormResults = useSubRunsFromORM(
+//     entity,
+//     project,
+//     parentCallIds,
+//     secondaryDim,
+//     selectedOpVersionRef,
+//     selectedObjectVersionRef
+//   );
+
+//   if (!weaveQueryResults.loading && !ormResults.loading) {
+//     if (weaveQueryResults.parentRuns.length !== ormResults.parentRuns.length) {
+//       console.error(
+//         'parentRuns mismatch',
+//         weaveQueryResults.parentRuns,
+//         ormResults.parentRuns
+//       );
+//     } else if (
+//       weaveQueryResults.parentRunsFilteredToInputSelection.length !==
+//       ormResults.parentRunsFilteredToInputSelection.length
+//     ) {
+//       console.error(
+//         'parentRunsFilteredToInputSelection mismatch',
+//         weaveQueryResults.parentRunsFilteredToInputSelection,
+//         ormResults.parentRunsFilteredToInputSelection
+//       );
+//     } else if (
+//       weaveQueryResults.childRunsOfFilteredParents.length !==
+//       ormResults.childRunsOfFilteredParents.length
+//     ) {
+//       console.error(
+//         'childRunsOfFilteredParents mismatch',
+//         weaveQueryResults.childRunsOfFilteredParents,
+//         ormResults.childRunsOfFilteredParents
+//       );
+//     } else if (
+//       weaveQueryResults.childRunsFilteredToOpVersion.length !==
+//       ormResults.childRunsFilteredToOpVersion.length
+//     ) {
+//       console.error(
+//         'childRunsFilteredToOpVersion mismatch',
+//         weaveQueryResults.childRunsFilteredToOpVersion,
+//         ormResults.childRunsFilteredToOpVersion
+//       );
+//     }
+//   }
+
+//   // We don't want to switch between ORM and weave query results
+//   // as they result in the table reloading. Just choose one for a
+//   // given render and stick with it.
+//   const [usingORM, setUsingORM] = useState<boolean | undefined>(undefined);
+
+//   return useMemo(() => {
+//     if (!ormResults.loading && usingORM !== false) {
+//       if (usingORM !== true) {
+//         setUsingORM(true);
+//       }
+//       return ormResults;
+//     } else {
+//       if (
+//         usingORM !== false &&
+//         weaveQueryResults.childRunsFilteredToOpVersion.length > 0
+//       ) {
+//         setUsingORM(false);
+//       }
+//       return weaveQueryResults;
+//     }
+//   }, [ormResults, usingORM, weaveQueryResults]);
+// };
