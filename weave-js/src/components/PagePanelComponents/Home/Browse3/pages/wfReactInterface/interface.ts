@@ -51,6 +51,9 @@ export type CallSchema = CallKey & {
   // TODO: Add more fields & FKs
   spanName: string;
   opVersionRef: string | null;
+  traceId: string;
+  parentId: string | null;
+  rawSpan: CallTreeSpan;
 };
 
 const spanToCallSchema = (
@@ -62,12 +65,15 @@ const spanToCallSchema = (
     entity,
     project,
     callId: span.span_id,
+    traceId: span.trace_id,
+    parentId: span.parent_id,
     spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
       ? refUriToOpVersionKey(span.name).opId
       : span.name,
     opVersionRef: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
       ? span.name
       : null,
+    rawSpan: span,
   };
 };
 
