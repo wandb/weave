@@ -39,6 +39,7 @@ import {
 } from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {renderCell} from '../util';
+import {CallSchema} from '../wfReactInterface/interface';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
@@ -47,7 +48,7 @@ export type WFHighLevelPivotSpec = {
 
 type PivotRunsTablePropsType = {
   loading: boolean;
-  runs: Call[];
+  runs: CallSchema[];
   entity: string;
   project: string;
   colDimAtLeafMode?: boolean;
@@ -80,7 +81,7 @@ export const PivotRunsView: FC<
     }
     const firstRun = runs[0];
     const options: string[] = [];
-    Object.entries(firstRun.inputs).forEach(([key, value]) => {
+    Object.entries(firstRun.rawSpan.inputs).forEach(([key, value]) => {
       if (
         typeof value === 'string' &&
         value.startsWith('wandb-artifact:///') &&

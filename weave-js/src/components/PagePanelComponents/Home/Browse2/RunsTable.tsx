@@ -27,6 +27,11 @@ import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useMaybeWeaveflowORMContext} from '../Browse3/pages/wfInterface/context';
+import {
+  CallSchema,
+  opVersionRefOpCategory,
+  opVersionRefOpName,
+} from '../Browse3/pages/wfReactInterface/interface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {SpanWithFeedback} from './callTree';
@@ -94,13 +99,13 @@ export function buildTree(
 
 export const RunsTable: FC<{
   loading: boolean;
-  spans: SpanWithFeedback[];
+  spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
 }> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
   const showIO = true;
   const isSingleOpVersion = useMemo(() => {
-    return _.uniq(spans.map(span => span.name)).length === 1;
+    return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
   }, [spans]);
 
   const apiRef = useGridApiRef();
@@ -110,18 +115,18 @@ export const RunsTable: FC<{
     () =>
       spans.map(s => ({
         ...s,
-        output: s.output == null ? {_result: null} : s.output,
+        output: s.rawSpan.output == null ? {_result: null} : s.rawSpan.output,
       })),
     [spans]
   );
   const orm = useMaybeWeaveflowORMContext();
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const tableData = useMemo(() => {
-    return spans.map((call: SpanWithFeedback) => {
-      const ormCall = orm?.projectConnection.call(call.span_id);
-      const argOrder = call.inputs._input_order;
+    return spans.map((call: CallSchema) => {
+      // const ormCall = orm?.projectConnection.call(call.span_id);
+      const argOrder = call.rawSpan.inputs._input_order;
       let args = _.fromPairs(
-        Object.entries(call.inputs).filter(
+        Object.entries(call.rawSpan.inputs).filter(
           ([k, c]) => c != null && !k.startsWith('_')
         )
       );
@@ -130,16 +135,18 @@ export const RunsTable: FC<{
       }
 
       return {
-        id: call.span_id,
-        ormCall,
+        id: call.callId,
+        call,
         loading,
-        opVersion: ormCall?.opVersion()?.op()?.name(),
-        isRoot: ormCall?.parentCall() == null,
-        opCategory: ormCall?.opVersion()?.opCategory(),
-        trace_id: call.trace_id,
-        status_code: call.status_code,
-        timestampMs: call.timestamp,
-        latency: call.summary.latency_s,
+        opVersion: call.opVersionRef,
+        isRoot: call.parentId == null,
+        opCategory: call.opVersionRef
+          ? opVersionRefOpCategory(call.opVersionRef)
+          : null,
+        trace_id: call.traceId,
+        status_code: call.rawSpan.status_code,
+        timestampMs: call.rawSpan.timestamp,
+        latency: call.rawSpan.summary.latency_s,
         ..._.mapValues(
           _.mapKeys(
             _.omitBy(args, v => v == null),
@@ -155,7 +162,7 @@ export const RunsTable: FC<{
         ..._.mapValues(
           _.mapKeys(
             _.omitBy(
-              flattenObject(call.output!),
+              flattenObject(call.rawSpan.output!),
               (v, k) => v == null || (k.startsWith('_') && k !== '_result')
             ),
             (v, k) => {
@@ -168,16 +175,16 @@ export const RunsTable: FC<{
               : JSON.stringify(v)
         ),
         ..._.mapKeys(
-          flattenObject(call.feedback ?? {}),
+          flattenObject(call.rawFeedback ?? {}),
           (v, k) => 'feedback.' + k
         ),
         ..._.mapKeys(
-          flattenObject(call.attributes ?? {}),
+          flattenObject(call.rawSpan.attributes ?? {}),
           (v, k) => 'attributes.' + k
         ),
       };
     });
-  }, [orm?.projectConnection, spans, loading]);
+  }, [spans, loading]);
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
@@ -212,22 +219,22 @@ export const RunsTable: FC<{
   }, [rowIds, peekId]);
 
   const columns = useMemo(() => {
-    const cols: GridColDef[] = [
+    const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
         field: 'span_id',
         headerName: 'Trace',
         width: 250,
         hideable: false,
         renderCell: rowParams => {
-          const opVersion = rowParams.row.ormCall?.opVersion();
+          const opVersion = rowParams.row.call.opVersionRef;
           if (opVersion == null) {
-            return rowParams.row.ormCall?.spanName();
+            return rowParams.row.call.spanName;
           }
           return (
             <CallLink
               entityName={params.entity}
               projectName={params.project}
-              opName={opVersion.op().name()}
+              opName={opVersionRefOpName(opVersion)}
               callId={rowParams.row.id}
             />
           );
@@ -295,7 +302,7 @@ export const RunsTable: FC<{
     let attributesKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(
-        flattenObject(span.attributes ?? {})
+        flattenObject(span.rawSpan.attributes ?? {})
       )) {
         if (v != null && k !== '_keys') {
           attributesKeys[k] = true;
@@ -323,7 +330,7 @@ export const RunsTable: FC<{
             field: 'attributes.' + key,
             headerName: key.split('.').slice(-1)[0],
             renderCell: cellParams => {
-              return renderCell(cellParams.row['attributes.' + key]);
+              return renderCell((cellParams.row as any)['attributes.' + key]);
             },
           });
         }
@@ -331,8 +338,8 @@ export const RunsTable: FC<{
 
       const inputOrder = !isSingleOpVersion
         ? getInputColumns(tableStats)
-        : row0.inputs._arg_order ??
-          Object.keys(_.omitBy(row0.inputs, v => v == null)).filter(
+        : row0.rawSpan.inputs._arg_order ??
+          Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
             k => !k.startsWith('_')
           );
       const inputGroup: Exclude<
@@ -351,7 +358,7 @@ export const RunsTable: FC<{
           renderCell: cellParams => {
             const k = 'input.' + key;
             if (k in cellParams.row) {
-              return renderCell(cellParams.row[k]);
+              return renderCell((cellParams.row as any)[k]);
             }
             return <NotApplicable />;
           },
@@ -363,7 +370,9 @@ export const RunsTable: FC<{
       // All output keys as we don't have the order key yet.
       let outputKeys: {[key: string]: true} = {};
       spans.forEach(span => {
-        for (const [k, v] of Object.entries(flattenObject(span.output ?? {}))) {
+        for (const [k, v] of Object.entries(
+          flattenObject(span.rawSpan.output ?? {})
+        )) {
           if (v != null && (!k.startsWith('_') || k === '_result')) {
             outputKeys[k] = true;
           }
@@ -390,7 +399,7 @@ export const RunsTable: FC<{
           renderCell: cellParams => {
             const k = 'output.' + key;
             if (k in cellParams.row) {
-              return renderCell(cellParams.row[k]);
+              return renderCell((cellParams.row as any)[k]);
             }
             return <NotApplicable />;
           },
@@ -400,7 +409,7 @@ export const RunsTable: FC<{
       let feedbackKeys: {[key: string]: true} = {};
       spans.forEach(span => {
         for (const [k, v] of Object.entries(
-          flattenObject(span.feedback ?? {})
+          flattenObject(span.rawFeedback ?? {})
         )) {
           if (v != null && k !== '_keys') {
             feedbackKeys[k] = true;
@@ -426,7 +435,7 @@ export const RunsTable: FC<{
           field: 'feedback.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {
-            return renderCell(cellParams.row['feedback.' + key]);
+            return renderCell((cellParams.row as any)['feedback.' + key]);
           },
         });
       }

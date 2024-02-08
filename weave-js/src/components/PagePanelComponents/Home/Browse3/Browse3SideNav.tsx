@@ -475,7 +475,7 @@ const useSectionsForProject = (props: Browse3ProjectSideNavProps) => {
             icon: <Segment />,
             onClick: () => {
               props.navigateToCalls({
-                traceRootsOnly: true,
+                // traceRootsOnly: true,
               });
             },
             // TODO: Get Feedback from team on this

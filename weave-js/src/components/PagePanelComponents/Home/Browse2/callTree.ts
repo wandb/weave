@@ -64,7 +64,7 @@ export interface Call {
 }
 
 export type Span = Call;
-export type SpanWithFeedback = Span & {feedback: any};
+export type SpanWithFeedback = Span & {feedback?: any};
 
 export interface TraceSpan {
   traceId: string;

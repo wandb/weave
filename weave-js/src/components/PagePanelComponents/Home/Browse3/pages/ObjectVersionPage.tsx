@@ -327,30 +327,30 @@ const ObjectVersionProducingCallsItem: React.FC<{
   producingCalls: CallSchema[];
   refUri: string;
 }> = props => {
-  if (props.producingCalls.length === 1) {
-    const call = props.producingCalls[0];
-    const {opVersionRef, spanName} = call;
-    if (opVersionRef == null) {
-      return <>{spanName}</>;
-    }
-    return (
-      <CallLink
-        entityName={call.entity}
-        projectName={call.project}
-        opName={spanName}
-        callId={call.callId}
-        variant="secondary"
-      />
-    );
+  // if (props.producingCalls.length === 1) {
+  const call = props.producingCalls[0];
+  const {opVersionRef, spanName} = call;
+  if (opVersionRef == null) {
+    return <>{spanName}</>;
   }
   return (
-    <GroupedCalls
-      calls={props.producingCalls}
-      partialFilter={{
-        outputObjectVersionRefs: [props.refUri],
-      }}
+    <CallLink
+      entityName={call.entity}
+      projectName={call.project}
+      opName={spanName}
+      callId={call.callId}
+      variant="secondary"
     />
   );
+  // }
+  // return (
+  //   <GroupedCalls
+  //     calls={props.producingCalls}
+  //     partialFilter={{
+  //       outputObjectVersionRefs: [props.refUri],
+  //     }}
+  //   />
+  // );
 };
 
 const ObjectVersionConsumingCallsItem: React.FC<{

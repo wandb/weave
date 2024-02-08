@@ -32,8 +32,8 @@ import {
   opStringEqual,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
-import {Call as CallTreeSpan} from '../../../Browse2/callTree';
-import {useRuns} from '../../../Browse2/callTreeHooks';
+import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
+import {useRuns, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 
 const OP_CATEGORIES = [
@@ -65,13 +65,14 @@ export type CallSchema = CallKey & {
   opVersionRef: string | null;
   traceId: string;
   parentId: string | null;
-  rawSpan: CallTreeSpan;
+  rawSpan: Span;
+  rawFeedback?: any;
 };
 
 const spanToCallSchema = (
   entity: string,
   project: string,
-  span: CallTreeSpan
+  span: SpanWithFeedback
 ): CallSchema => {
   return {
     entity,
@@ -86,6 +87,7 @@ const spanToCallSchema = (
       ? span.name
       : null,
     rawSpan: span,
+    rawFeedback: span.feedback,
   };
 };
 
@@ -131,7 +133,7 @@ export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
   }, [cachedCall, calls.loading, calls.result, key]);
 };
 
-type CallFilter = {
+export type CallFilter = {
   // Filters are ANDed across the fields and ORed within the fields
   // Commented out means not yet implemented
   opVersionRefs?: string[];
@@ -140,14 +142,15 @@ type CallFilter = {
   parentIds?: string[];
   traceId?: string;
   //   callIds?: string[];
-  //   traceRootsOnly?: boolean;
+  traceRootsOnly?: boolean;
+  opCategory?: OpCategory[];
 };
 export const useCalls = (
   entity: string,
   project: string,
   filter: CallFilter
 ): Loadable<CallSchema[]> => {
-  const calls = useRuns(
+  const calls = useRunsWithFeedback(
     {
       entityName: entity,
       projectName: project,
@@ -159,21 +162,34 @@ export const useCalls = (
       outputUris: filter.outputObjectVersionRefs,
       traceId: filter.traceId,
       parentIds: filter.parentIds,
-      // traceRootsOnly?: boolean;
+      traceRootsOnly: filter.traceRootsOnly,
       // callIds?: string[];
-    }
+    },
+    // TODO: Re-Enable feedback once we actually have it!
+    true
   );
   return useMemo(() => {
-    const result = (calls.result ?? []).map(run =>
+    const allResults = (calls.result ?? []).map(run =>
       spanToCallSchema(entity, project, run)
     );
+    // Unfortunately, we can't filter by category in the query level yet
+    const result = allResults.filter((row: any) => {
+      return (
+        filter.opCategory == null ||
+        (row.opVersionRef &&
+          filter.opCategory.includes(
+            opVersionRefOpCategory(row.opVersionRef) as OpCategory
+          ))
+      );
+    });
+
     if (calls.loading) {
       return {
         loading: true,
         result,
       };
     } else {
-      result.forEach(call => {
+      allResults.forEach(call => {
         setCallInCache(
           {
             entity,
@@ -188,7 +204,7 @@ export const useCalls = (
         result,
       };
     }
-  }, [entity, project, calls.loading, calls.result]);
+  }, [calls.result, calls.loading, entity, project, filter.opCategory]);
 };
 
 type OpVersionKey = {
@@ -205,7 +221,9 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
     refDict.refExtraTuples.length !== 0 ||
     refDict.filePathParts[0] !== 'obj'
   ) {
-    throw new Error('Invalid refUri: ' + refUri);
+    if (refDict.versionCommitHash !== '*') {
+      throw new Error('Invalid refUri: ' + refUri);
+    }
   }
   return {
     entity: refDict.entity,
@@ -804,4 +822,16 @@ const setObjectVersionInCache = (
   value: ObjectVersionSchema
 ) => {
   objectVersionCache.set(objectVersionCacheKeyFn(key), value);
+};
+
+//// Utilities ////
+export const opVersionRefOpName = (opVersionRef: string) => {
+  return refUriToOpVersionKey(opVersionRef).opId;
+};
+
+// This one is a huge hack b/c it is based on the name. Once this
+// is added to the data model, we will need to make a query
+// wherever this is used!
+export const opVersionRefOpCategory = (opVersionRef: string) => {
+  return opNameToCategory(opVersionRefOpName(opVersionRef));
 };
