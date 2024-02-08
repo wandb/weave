@@ -69,17 +69,14 @@ import {TypesPage} from './Browse3/pages/TypesPage';
 import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
-import {
-  useWeaveflowORMContext,
-  WeaveflowORMContextProvider,
-} from './Browse3/pages/wfInterface/context';
+import {WeaveflowORMContextProvider} from './Browse3/pages/wfInterface/context';
 import {
   fnNaiveBootstrapFeedback,
   fnNaiveBootstrapObjects,
   fnNaiveBootstrapRuns,
-  refDictToRefString,
   WFNaiveProject,
 } from './Browse3/pages/wfInterface/naive';
+import {useCall} from './Browse3/pages/wfReactInterface/interface';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 import {useFlexDirection} from './useFlexDirection';
@@ -736,26 +733,20 @@ const useCallPeekRedirect = () => {
   const params = useParams<Browse3TabItemParams>();
   const {baseRouter} = useWeaveflowRouteContext();
   const history = useHistory();
-  const orm = useWeaveflowORMContext(params.entity, params.project);
-  const call = orm.projectConnection.call(params.itemName);
+  const {result: call} = useCall({
+    entity: params.entity,
+    project: params.project,
+    callId: params.itemName,
+  });
   const query = useURLSearchParamsDict();
   useEffect(() => {
     if (call && query.convertToPeek) {
-      const opVersion = call.opVersion();
-      if (!opVersion) {
+      const opVersionRef = call.opVersionRef;
+      if (!opVersionRef) {
         return;
       }
       const path = baseRouter.callsUIUrl(params.entity, params.project, {
-        opVersionRefs: [
-          refDictToRefString({
-            entity: opVersion.entity(),
-            project: opVersion.project(),
-            artifactName: opVersion.name(),
-            versionCommitHash: '*',
-            filePathParts: [],
-            refExtraTuples: [],
-          }),
-        ],
+        opVersionRefs: [opVersionRef],
       });
       const searchParams = new URLSearchParams();
       searchParams.set(
@@ -763,7 +754,7 @@ const useCallPeekRedirect = () => {
         baseContext.callUIUrl(
           params.entity,
           params.project,
-          call.traceID(),
+          call.traceId,
           params.itemName
         )
       );
