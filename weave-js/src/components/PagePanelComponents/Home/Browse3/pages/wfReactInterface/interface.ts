@@ -744,8 +744,10 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
 
 //// In Mem Cache Layer ////
 
+const CACHE_SIZE = 4 * (2**20) // 5MB
+
 const callCache = new LRUCache<string, CallSchema>({
-  max: 2 ** 10,
+  max: CACHE_SIZE,
   updateAgeOnGet: true,
 });
 
@@ -762,7 +764,7 @@ const setCallInCache = (key: CallKey, value: CallSchema) => {
 };
 
 const opVersionCache = new LRUCache<string, OpVersionSchema>({
-  max: 2 ** 10,
+  max: CACHE_SIZE,
   updateAgeOnGet: true,
 });
 
@@ -779,7 +781,7 @@ const setOpVersionInCache = (key: OpVersionKey, value: OpVersionSchema) => {
 };
 
 const objectVersionCache = new LRUCache<string, ObjectVersionSchema>({
-  max: 2 ** 10,
+  max: CACHE_SIZE,
   updateAgeOnGet: true,
 });
 

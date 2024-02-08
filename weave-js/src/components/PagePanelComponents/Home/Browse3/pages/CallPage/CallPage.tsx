@@ -231,7 +231,11 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
-  const {rows, expandKeys: forcedExpandKeys} = useCallFlattenedTraceTree(call);
+  const {
+    rows,
+    expandKeys: forcedExpandKeys,
+    loading: treeLoading,
+  } = useCallFlattenedTraceTree(call);
   const [expandKeys, setExpandKeys] = useState(forcedExpandKeys);
   useEffect(() => {
     setExpandKeys(curr => new Set([...curr, ...forcedExpandKeys]));
@@ -395,8 +399,9 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
       rowHeight={38}
       columnHeaderHeight={treeOnly ? 0 : 56}
       treeData
+      loading={treeLoading}
       onRowClick={onRowClick}
-      rows={rows}
+      rows={treeLoading ? [] : rows}
       columns={treeOnly ? [] : columns}
       getTreeDataPath={getTreeDataPath}
       groupingColDef={groupingColDef}
@@ -733,6 +738,6 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
       }
     }
 
-    return {rows, expandKeys};
-  }, [call, childCallLookup, traceCallMap]);
+    return {rows, expandKeys, loading: traceCalls.loading};
+  }, [call, childCallLookup, traceCallMap, traceCalls.loading]);
 };
