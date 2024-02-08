@@ -396,7 +396,7 @@ export const useRootObjectVersions = (
       artifactMembership: opArtifactLastMembership({
         artifact: artifactsNode,
       }),
-    });
+    }) as any;
   } else {
     artifactVersionsNode = opFlatten({
       arr: opArtifactVersions({

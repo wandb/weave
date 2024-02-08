@@ -50,18 +50,19 @@ export const CallOverview: React.FC<{
             }
           : {}),
         ...(call.exception ? {Exception: call.exception} : {}),
-        ...(childCalls.length > 0
-          ? {
-              'Child Calls': (
-                <GroupedCalls
-                  calls={childCalls}
-                  partialFilter={{
-                    parentId: wfCall.callID(),
-                  }}
-                />
-              ),
-            }
-          : {}),
+        // Commenting out for now until the interface aligns.
+        // ...(childCalls.length > 0
+        //   ? {
+        //       'Child Calls': (
+        //         <GroupedCalls
+        //           calls={childCalls}
+        //           partialFilter={{
+        //             parentId: wfCall.callID(),
+        //           }}
+        //         />
+        //       ),
+        //     }
+        //   : {}),
         ...(Object.keys(attributes).length > 0 ? {Attributes: attributes} : {}),
         ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
       }}
