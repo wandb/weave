@@ -744,7 +744,7 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
 
 //// In Mem Cache Layer ////
 
-const CACHE_SIZE = 4 * (2**20) // 5MB
+const CACHE_SIZE = 4 * 2 ** 20; // 5MB
 
 const callCache = new LRUCache<string, CallSchema>({
   max: CACHE_SIZE,
