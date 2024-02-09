@@ -3,6 +3,7 @@
  * Step 2: Allow lazy loading of options? (how do we re-narrow this down?)
  * Step 3: Perf of the compare view is really bad
  * TODO: The Pivot Table and Calls Compare are pretty jank and the typing is off: really should refactor since it is likely needed to push the grouping down to the server.
+ *   // Rules: Show all if loading and inexpensive (if expensive, none), show options based on the filtered data if not loading.... (new) always allow additions
  */
 
 // import {
@@ -40,12 +41,16 @@ import {WeaveflowORMContextType} from '../wfInterface/context';
 import {HackyOpCategory, WFCall, WFObjectVersion} from '../wfInterface/types';
 import {
   CallFilter,
+  objectVersionKeyToRefUri,
   OP_CATEGORIES,
   opVersionKeyToRefUri,
   opVersionRefOpName,
+  refUriToObjectVersionKey,
   refUriToOpVersionKey,
   useCalls,
+  useObjectVersion,
   useOpVersions,
+  useRootObjectVersions,
 } from '../wfReactInterface/interface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
@@ -139,24 +144,20 @@ export const CallsTable: FC<{
     return convertHighLevelFilterToLowLevelFilter(effectiveFilter);
   }, [effectiveFilter]);
 
+  console.log({lowLevelFilter});
   const calls = useCalls(props.entity, props.project, lowLevelFilter);
 
-  // # TODO: All of these need to be handled much more logically since
-  // we need to calculate the options based on everything except a specific filter.
-  // Rules: Show all if loading and inexpensive (if expensive, none), show options based on the filtered data if not loading.... (new) always allow additions
   const opVersionOptions = useOpVersionOptions(
     props.entity,
     props.project,
     effectiveFilter
   );
 
-  const consumesObjectVersionOptions: {[key: string]: string} = {};
-  // const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
-  //   orm,
-  //   props.entity,
-  //   props.project,
-  //   effectiveFilter
-  // );
+  const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
   const parentIdOptions: {[key: string]: string} = {};
   // const parentIdOptions = useParentIdOptions(
   //   orm,
@@ -360,9 +361,9 @@ export const CallsTable: FC<{
                     inputObjectVersionRefs: newValue ? [newValue] : [],
                   });
                 }}
-                // getOptionLabel={option => {
-                //   return consumesObjectVersionOptions[option] ?? option;
-                // }}
+                getOptionLabel={option => {
+                  return consumesObjectVersionOptions[option] ?? option;
+                }}
                 options={Object.keys(consumesObjectVersionOptions)}
               />
             </FormControl>
@@ -502,7 +503,7 @@ const useOpVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
   // Get all the "latest" versions
-  const latestOpVersions = useOpVersions(entity, project, {
+  const latestVersions = useOpVersions(entity, project, {
     latestOnly: true,
   });
 
@@ -523,7 +524,7 @@ const useOpVersionOptions = (
   return useMemo(() => {
     let result: Array<{title: string; ref: string; group: string}> = [];
 
-    latestOpVersions.result?.forEach(ov => {
+    latestVersions.result?.forEach(ov => {
       const ref = opVersionKeyToRefUri({
         ...ov,
         versionHash: '*',
@@ -547,53 +548,30 @@ const useOpVersionOptions = (
     return _.fromPairs(
       _.sortBy(result, r => `${r.group}:${r.title}`).map(r => [r.ref, r])
     );
-  }, [currentOpId, currentVersions.result, latestOpVersions.result]);
+  }, [currentOpId, currentVersions.result, latestVersions.result]);
 };
 
 const useConsumesObjectVersionOptions = (
-  orm: WeaveflowORMContextType,
   entity: string,
   project: string,
-  highLevelFilter: WFHighLevelCallFilter
+  effectiveFilter: WFHighLevelCallFilter
 ) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        _.omit(highLevelFilter, ['inputObjectVersions'])
-      );
-    }, [highLevelFilter])
+  // We don't populate this one because it is expensive
+  const currentRef = effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
+  const objectVersion = useObjectVersion(
+    currentRef ? refUriToObjectVersionKey(currentRef) : null
   );
   return useMemo(() => {
-    let versions: WFObjectVersion[] = [];
-    if (runs.loading) {
-      versions = orm.projectConnection.objectVersions();
-    } else {
-      versions = runs.result.flatMap(
-        r => orm.projectConnection.call(r.span_id)?.inputs() ?? []
-      );
+    if (!currentRef || objectVersion.loading || !objectVersion.result) {
+      return {};
     }
-
-    // Sort by name ascending, then version descending.
-    versions.sort((a, b) => {
-      const nameA = a.object().name();
-      const nameB = b.object().name();
-      if (nameA !== nameB) {
-        return nameA.localeCompare(nameB);
-      }
-      return b.versionIndex() - a.versionIndex();
-    });
-
-    return _.fromPairs(
-      versions.map(v => {
-        return [v.refUri(), v.object().name() + ':v' + v.versionIndex()];
-      })
-    );
-  }, [orm.projectConnection, runs.loading, runs.result]);
+    return {
+      [currentRef]:
+        objectVersion.result.objectId +
+        ':v' +
+        objectVersion.result.versionIndex,
+    };
+  }, [currentRef, objectVersion.loading, objectVersion.result]);
 };
 
 const useParentIdOptions = (

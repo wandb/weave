@@ -561,23 +561,30 @@ const artifactVersionNodeToObjectVersionDictNode = (
 };
 
 export const useObjectVersion = (
-  key: ObjectVersionKey
+  // Null value skips
+  key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
-  const cachedObjectVersion = getObjectVersionFromCache(key);
+  const cachedObjectVersion = key ? getObjectVersionFromCache(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
-      entity: constString(key.entity),
-      project: constString(key.project),
+      entity: constString(key?.entity ?? ""),
+      project: constString(key?.project ?? ""),
     }),
-    artifactName: constString(key.objectId),
-    artifactVersionAlias: constString(key.versionHash),
+    artifactName: constString(key?.objectId ?? ""),
+    artifactVersionAlias: constString(key?.versionHash ?? ""),
   });
   const dataNode = artifactVersionNodeToObjectVersionDictNode(
     artifactVersionNode as any
   );
-  const dataValue = useNodeValue(dataNode, {skip: cachedObjectVersion != null});
+  const dataValue = useNodeValue(dataNode, {skip: key == null || cachedObjectVersion != null});
 
   return useMemo(() => {
+    if (key == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    } 
     if (cachedObjectVersion != null) {
       return {
         loading: false,
@@ -621,7 +628,8 @@ type ObjectVersionFilter = {
 export const useRootObjectVersions = (
   entity: string,
   project: string,
-  filter: ObjectVersionFilter
+  filter: ObjectVersionFilter,
+  opts?: {skip?: boolean}
 ): Loadable<ObjectVersionSchema[]> => {
   // Note: Root objects will always have a single path and refExtra will be null
   const projectNode = opRootProject({
@@ -691,9 +699,15 @@ export const useRootObjectVersions = (
     }),
   });
 
-  const dataValue = useNodeValue(dataNode);
+  const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
   return useMemo(() => {
+    if (opts?.skip) {
+      return {
+        loading: false,
+        result: [],
+      };
+    }
     const result = (dataValue.result ?? [])
       .map((row: any) => ({
         entity,

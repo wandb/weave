@@ -199,13 +199,13 @@ export const callsTableSelect = (stNode: Node) => {
   });
 };
 
-const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string) => {
+const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string, key: string) => {
   if (opUri.endsWith(WILDCARD_ARTIFACT_VERSION_AND_PATH)) {
     return opAnd({
       lhs: opStringStartsWith({
         lhs: opPick({
           obj: rowVar,
-          key: constString('name'),
+          key: constString(key),
         }),
         rhs: constString(
           opUri.slice(0, -WILDCARD_ARTIFACT_VERSION_AND_PATH.length)
@@ -214,7 +214,7 @@ const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string) => {
       rhs: opStringEndsWith({
         lhs: opPick({
           obj: rowVar,
-          key: constString('name'),
+          key: constString(key),
         }),
         rhs: constString('/obj'),
       }),
@@ -223,7 +223,7 @@ const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string) => {
     return opStringEqual({
       lhs: opPick({
         obj: rowVar,
-        key: constString('name'),
+        key: constString(key),
       }),
       rhs: constString(opUri),
     });
@@ -234,11 +234,11 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
   const rowVar = varNode(listObjectType(callsTableWeaveType), 'row');
   const filterClauses: Node[] = [];
   if (filters.opUris != null && filters.opUris.length > 0) {
-    let clause = buildOpUriClause(rowVar, filters.opUris[0]);
+    let clause = buildOpUriClause(rowVar, filters.opUris[0], 'name');
     for (const uri of filters.opUris.slice(1)) {
       clause = opOr({
         lhs: clause,
-        rhs: buildOpUriClause(rowVar, uri),
+        rhs: buildOpUriClause(rowVar, uri, 'name'),
       });
     }
     filterClauses.push(clause);
