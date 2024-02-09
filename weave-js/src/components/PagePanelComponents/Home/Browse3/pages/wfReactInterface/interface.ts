@@ -357,12 +357,13 @@ type OpVersionFilter = {
   opIds?: string[];
   latestOnly?: boolean;
 };
-export const useOpVersions = (
+
+export const useOpVersionsNode = (
   entity: string,
   project: string,
   filter: OpVersionFilter,
   opts?: {skip?: boolean}
-): Loadable<OpVersionSchema[]> => {
+): Node => {
   const projectNode = opRootProject({
     entityName: constString(entity),
     projectName: constString(project),
@@ -440,6 +441,17 @@ export const useOpVersions = (
       } as any);
     }),
   });
+
+  return dataNode;
+}
+
+export const useOpVersions = (
+  entity: string,
+  project: string,
+  filter: OpVersionFilter,
+  opts?: {skip?: boolean}
+): Loadable<OpVersionSchema[]> => {
+  const dataNode = useOpVersionsNode(entity, project, filter);
 
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
@@ -647,13 +659,12 @@ type ObjectVersionFilter = {
   latestOnly?: boolean;
 };
 
-export const useRootObjectVersions = (
+export const useRootObjectVersionsNode = (
   entity: string,
   project: string,
   filter: ObjectVersionFilter,
   opts?: {skip?: boolean}
-): Loadable<ObjectVersionSchema[]> => {
-  // Note: Root objects will always have a single path and refExtra will be null
+): Node => {
   const projectNode = opRootProject({
     entityName: constString(entity),
     projectName: constString(project),
@@ -721,6 +732,18 @@ export const useRootObjectVersions = (
     }),
   });
 
+  return dataNode;
+}
+
+
+export const useRootObjectVersions = (
+  entity: string,
+  project: string,
+  filter: ObjectVersionFilter,
+  opts?: {skip?: boolean}
+): Loadable<ObjectVersionSchema[]> => {
+  
+  const dataNode = useRootObjectVersionsNode(entity, project, filter);
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
   return useMemo(() => {

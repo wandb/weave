@@ -22,6 +22,7 @@ import {
   opVersionKeyToRefUri,
   OpVersionSchema,
   useOpVersions,
+  useOpVersionsNode,
 } from './wfReactInterface/interface';
 
 export type WFHighLevelOpVersionFilter = {
@@ -206,9 +207,10 @@ export const FilterableOpVersionsTable: React.FC<{
 
 const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
   const obj = props.obj;
-  const opVersions = useOpVersions(obj.entity, obj.project, {
+  const opVersionsNode = useOpVersionsNode(obj.entity, obj.project, {
     opIds: [obj.opId],
   });
+  const countValue = useNodeValue(opCount({arr: opVersionsNode}));
   return (
     <OpVersionsLink
       entity={obj.entity}
@@ -216,7 +218,7 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
       filter={{
         opName: obj.opId,
       }}
-      versionCount={(opVersions.result ?? []).length}
+      versionCount={countValue.result ?? 0}
       neverPeek
       variant="secondary"
     />
