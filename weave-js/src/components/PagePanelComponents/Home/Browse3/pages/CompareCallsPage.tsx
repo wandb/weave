@@ -3,7 +3,17 @@ import {Autocomplete} from '@mui/material';
 import _ from 'lodash';
 import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 
-import {parseRef} from '../../../../../react';
+import {
+  constBoolean,
+  constFunction,
+  constString,
+  opArray,
+  opJoin,
+  opPick,
+  typedDict,
+} from '../../../../../core';
+import {parseRef, useNodeValue} from '../../../../../react';
+import {Span} from '../../Browse2/callTree';
 import {objectRefDisplayName} from '../../Browse2/SmallRef';
 import {
   getValueAtNestedKey,
@@ -11,7 +21,11 @@ import {
   WFHighLevelPivotSpec,
 } from './CallsPage/PivotRunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {CallSchema, useCalls} from './wfReactInterface/interface';
+import {
+  CallSchema,
+  callsNode,
+  spanToCallSchema,
+} from './wfReactInterface/interface';
 
 export const CompareCallsPage: FC<{
   entity: string;
@@ -28,13 +42,24 @@ export const CompareCallsPage: FC<{
     string | null
   >(null);
 
-  const {
-    parentRuns,
-    parentRunsFilteredToInputSelection,
-    childRunsOfFilteredParents,
-    childRunsFilteredToOpVersion,
-    loading,
-  } = useSubRunsFromWeaveQuery(
+  // console.log(selectedOpVersionRef, selectedObjectVersionRef);
+
+  // const {
+  //   parentRuns,
+  //   parentRunsFilteredToInputSelection,
+  //   childRunsOfFilteredParents,
+  //   childRunsFilteredToOpVersion,
+  //   loading,
+  // } = useSubRunsFromWeaveQuery(
+  //   props.entity,
+  //   props.project,
+  //   props.callIds,
+  //   props.secondaryDim,
+  //   selectedOpVersionRef,
+  //   selectedObjectVersionRef
+  // );
+
+  const {loading, result: subRuns} = useSubRunsFromWeaveQuery(
     props.entity,
     props.project,
     props.callIds,
@@ -43,14 +68,31 @@ export const CompareCallsPage: FC<{
     selectedObjectVersionRef
   );
 
+  const childRunsFilteredToOpVersion = useMemo(() => {
+    return subRuns.map(subRun => {
+      return spanToCallSchema(props.entity, props.project, subRun.child);
+    });
+  }, [props.entity, props.project, subRuns]);
+
+  const parentCallChildCallsNode = callsNode(props.entity, props.project, {
+    parentIds: props.callIds ?? [],
+  });
+  const parentCallsValue = useNodeValue(parentCallChildCallsNode, {
+    skip: !props.callIds,
+  });
+
   const objectVersionOptions = useMemo(() => {
-    if (props.secondaryDim == null) {
+    if (
+      props.secondaryDim == null ||
+      parentCallsValue.loading ||
+      parentCallsValue.result.length === 0
+    ) {
       return {};
     }
     return Object.fromEntries(
       _.uniq(
-        parentRuns.map(call =>
-          getValueAtNestedKey(call.rawSpan, props.secondaryDim!)
+        parentCallsValue.result.map((parent: Span) =>
+          getValueAtNestedKey(parent, props.secondaryDim!)
         )
       )
         .filter(item => item != null)
@@ -64,7 +106,7 @@ export const CompareCallsPage: FC<{
           return [item, item];
         })
     );
-  }, [parentRuns, props.secondaryDim]);
+  }, [parentCallsValue.loading, parentCallsValue.result, props.secondaryDim]);
 
   const initialSelectedObjectVersionRef =
     Object.keys(objectVersionOptions)?.[0];
@@ -78,13 +120,15 @@ export const CompareCallsPage: FC<{
   }, [initialSelectedObjectVersionRef, selectedObjectVersionRef]);
 
   const subOpVersionOptions = useMemo(() => {
-    if (parentRunsFilteredToInputSelection.length === 0) {
+    if (parentCallsValue.loading || parentCallsValue.result.length === 0) {
       return {};
     }
+    const uniqueOpRefs = _.uniq(
+      parentCallsValue.result.map((r: any) => r.name) as string[]
+    );
     return Object.fromEntries(
-      childRunsOfFilteredParents.map(call => {
-        const opRef = call.opVersionRef;
-        if (opRef == null) {
+      uniqueOpRefs.map(opRef => {
+        if (opRef == null || !opRef.startsWith('wandb-artifact://')) {
           throw new Error('opVersionRef is null');
         }
         const parsed = parseRef(opRef);
@@ -94,7 +138,7 @@ export const CompareCallsPage: FC<{
         ];
       })
     );
-  }, [parentRunsFilteredToInputSelection.length, childRunsOfFilteredParents]);
+  }, [parentCallsValue.loading, parentCallsValue.result]);
 
   const initialSelectedOpVersionRef = Object.keys(subOpVersionOptions)?.[0];
 
@@ -262,14 +306,6 @@ export const CompareCallsPage: FC<{
   );
 };
 
-type SubRunsReturnType = {
-  parentRuns: CallSchema[];
-  parentRunsFilteredToInputSelection: CallSchema[];
-  childRunsOfFilteredParents: CallSchema[];
-  childRunsFilteredToOpVersion: CallSchema[];
-  loading: boolean;
-};
-
 const useSubRunsFromWeaveQuery = (
   entity: string,
   project: string,
@@ -277,55 +313,103 @@ const useSubRunsFromWeaveQuery = (
   secondaryDim: string | undefined,
   selectedOpVersionRef: string | null,
   selectedObjectVersionRef: string | null
-): SubRunsReturnType => {
-  const parentRunsQuery = useCalls(entity, project, {
-    callIds: parentCallIds,
+): {
+  loading: boolean;
+  result: Array<{
+    parent: Span;
+    child: Span;
+  }>;
+} => {
+  // const parentRunsQuery = useCalls(entity, project, {
+  //   callIds: parentCallIds,
+  // });
+  // const parentRuns = parentRunsQuery.result;
+
+  // const parentRunsFilteredToInputSelection = useMemo(() => {
+  //   return (parentRuns ?? []).filter(
+  //     call =>
+  //       secondaryDim &&
+  //       getValueAtNestedKey(call.rawSpan, secondaryDim) ===
+  //         selectedObjectVersionRef
+  //   );
+  // }, [parentRuns, secondaryDim, selectedObjectVersionRef]);
+
+  // const childCallsQuery = useCalls(entity, project, {
+  //   parentIds: parentRunsFilteredToInputSelection.map(call => call.callId),
+  // });
+
+  // const childRunsOfFilteredParents = childCallsQuery.result;
+
+  // const childRunsFilteredToOpVersion = useMemo(() => {
+  //   return (childRunsOfFilteredParents ?? []).filter(
+  //     call =>
+  //       selectedOpVersionRef &&
+  //       call.opVersionRef?.includes(selectedOpVersionRef)
+  //   );
+  // }, [childRunsOfFilteredParents, selectedOpVersionRef]);
+
+  const parentRunsNode = selectedObjectVersionRef
+    ? callsNode(entity, project, {
+        callIds: parentCallIds,
+        inputObjectVersionRefs: [selectedObjectVersionRef],
+      })
+    : opArray({} as any);
+  const childRunsNode = selectedOpVersionRef
+    ? callsNode(entity, project, {
+        opVersionRefs: [selectedOpVersionRef],
+      })
+    : opArray({} as any);
+  const joinedRuns = opJoin({
+    arr1: parentRunsNode,
+    arr2: childRunsNode,
+    join1Fn: constFunction({row: typedDict({span_id: 'string'})}, ({row}) => {
+      return opPick({obj: row, key: constString('span_id')});
+    }) as any,
+    join2Fn: constFunction({row: typedDict({parent_id: 'string'})}, ({row}) => {
+      return opPick({obj: row, key: constString('parent_id')});
+    }) as any,
+    alias1: constString('parent'),
+    alias2: constString('child'),
+    leftOuter: constBoolean(true),
+    rightOuter: constBoolean(false),
   });
-  const parentRuns = parentRunsQuery.result;
+  const nodeValue = useNodeValue(joinedRuns);
+  // console.log(
+  //   parentCallIds,
+  //   selectedObjectVersionRef,
+  //   selectedOpVersionRef,
+  //   nodeValue
+  // );
+  return useMemo(() => {
+    return {
+      loading: nodeValue.loading,
+      result: nodeValue.result ?? [],
+    };
+  }, [nodeValue.loading, nodeValue.result]);
 
-  const parentRunsFilteredToInputSelection = useMemo(() => {
-    return (parentRuns ?? []).filter(
-      call =>
-        secondaryDim &&
-        getValueAtNestedKey(call.rawSpan, secondaryDim) ===
-          selectedObjectVersionRef
-    );
-  }, [parentRuns, secondaryDim, selectedObjectVersionRef]);
-
-  const childCallsQuery = useCalls(entity, project, {
-    parentIds: parentRunsFilteredToInputSelection.map(call => call.callId),
-  });
-
-  const childRunsOfFilteredParents = childCallsQuery.result;
-
-  const childRunsFilteredToOpVersion = useMemo(() => {
-    return (childRunsOfFilteredParents ?? []).filter(
-      call =>
-        selectedOpVersionRef &&
-        call.opVersionRef?.includes(selectedOpVersionRef)
-    );
-  }, [childRunsOfFilteredParents, selectedOpVersionRef]);
-
-  return useMemo(
-    () => ({
-      parentRuns: parentRuns ?? [],
-      parentRunsFilteredToInputSelection:
-        parentRunsFilteredToInputSelection ?? [],
-      childRunsOfFilteredParents: childRunsOfFilteredParents ?? [],
-      childRunsFilteredToOpVersion: childRunsFilteredToOpVersion ?? [],
-      loading: parentRunsQuery.loading || childCallsQuery.loading,
-    }),
-    [
-      childCallsQuery.loading,
-      childRunsFilteredToOpVersion,
-      childRunsOfFilteredParents,
-      parentRuns,
-      parentRunsFilteredToInputSelection,
-      parentRunsQuery.loading,
-    ]
-  );
+  // return useMemo(
+  //   () => ({
+  //     parentRuns: parentRuns ?? [],
+  //     parentRunsFilteredToInputSelection:
+  //       parentRunsFilteredToInputSelection ?? [],
+  //     childRunsOfFilteredParents: childRunsOfFilteredParents ?? [],
+  //     childRunsFilteredToOpVersion: childRunsFilteredToOpVersion ?? [],
+  //     loading: parentRunsQuery.loading || childCallsQuery.loading,
+  //   }),
+  //   [
+  //     childCallsQuery.loading,
+  //     childRunsFilteredToOpVersion,
+  //     childRunsOfFilteredParents,
+  //     parentRuns,
+  //     parentRunsFilteredToInputSelection,
+  //     parentRunsQuery.loading,
+  //   ]
+  // );
 };
 
+// function spanToCallSchema(child: Call): any {
+//   throw new Error('Function not implemented.');
+// }
 // const useSubRunsFromORM = (
 //   entity: string,
 //   project: string,

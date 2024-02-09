@@ -73,7 +73,7 @@ export type CallSchema = CallKey & {
   rawFeedback?: any;
 };
 
-const spanToCallSchema = (
+export const spanToCallSchema = (
   entity: string,
   project: string,
   span: SpanWithFeedback
