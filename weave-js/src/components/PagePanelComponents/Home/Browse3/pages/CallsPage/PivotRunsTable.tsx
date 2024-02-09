@@ -26,7 +26,7 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
-import {Call, SpanWithFeedback} from '../../../Browse2/callTree';
+import {SpanWithFeedback} from '../../../Browse2/callTree';
 import {
   buildTree,
   DataGridColumnGroupingModel,

@@ -4,8 +4,6 @@ import _ from 'lodash';
 import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 
 import {parseRef} from '../../../../../react';
-import {Call} from '../../Browse2/callTree';
-import {useRuns} from '../../Browse2/callTreeHooks';
 import {objectRefDisplayName} from '../../Browse2/SmallRef';
 import {
   getValueAtNestedKey,
@@ -14,8 +12,6 @@ import {
 } from './CallsPage/PivotRunsTable';
 import {CenteredAnimatedLoader} from './common/Loader';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useWeaveflowORMContext} from './wfInterface/context';
-import {WFCall} from './wfInterface/types';
 import {CallSchema, useCalls} from './wfReactInterface/interface';
 
 export const CompareCallsPage: FC<{

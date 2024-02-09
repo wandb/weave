@@ -31,7 +31,6 @@ import {
 
 import {MOON_200} from '../../../common/css/color.styles';
 import {useWeaveContext} from '../../../context';
-import {useNodeValue} from '../../../react';
 import {URL_BROWSE3} from '../../../urls';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
@@ -69,13 +68,6 @@ import {TypesPage} from './Browse3/pages/TypesPage';
 import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
-import {WeaveflowORMContextProvider} from './Browse3/pages/wfInterface/context';
-import {
-  fnNaiveBootstrapFeedback,
-  fnNaiveBootstrapObjects,
-  fnNaiveBootstrapRuns,
-  WFNaiveProject,
-} from './Browse3/pages/wfInterface/naive';
 import {useCall} from './Browse3/pages/wfReactInterface/interface';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
@@ -444,64 +436,6 @@ const MainPeekingLayout: FC = () => {
         )}
       </Drawer>
     </Box>
-  );
-};
-
-const useNaiveProjectDataConnection = (entity: string, project: string) => {
-  const objectsNode = useMemo(() => {
-    return fnNaiveBootstrapObjects(entity, project);
-  }, [entity, project]);
-  const runsNode = useMemo(() => {
-    return fnNaiveBootstrapRuns(entity, project);
-  }, [entity, project]);
-  const feedbackNode = useMemo(() => {
-    return fnNaiveBootstrapFeedback(entity, project);
-  }, [entity, project]);
-  const objectsValue = useNodeValue(objectsNode);
-  const runsValue = useNodeValue(runsNode);
-  const feedbackValue = useNodeValue(feedbackNode);
-  return useMemo(() => {
-    if (
-      objectsValue.result == null &&
-      runsValue.result == null &&
-      feedbackValue.result == null &&
-      objectsValue.loading &&
-      runsValue.loading &&
-      feedbackValue.loading
-    ) {
-      return null;
-    }
-    const connection = new WFNaiveProject(entity, project, {
-      objects: objectsValue.result,
-      runs: runsValue.result,
-      feedback: feedbackValue.result,
-    });
-    return connection;
-  }, [
-    entity,
-    feedbackValue.loading,
-    feedbackValue.result,
-    objectsValue.loading,
-    objectsValue.result,
-    project,
-    runsValue.loading,
-    runsValue.result,
-  ]);
-};
-
-const Browse3ProjectRootORMProvider: FC = props => {
-  const params = useParams<Browse3ProjectMountedParams>();
-  const projectData = useNaiveProjectDataConnection(
-    params.entity,
-    params.project
-  );
-  if (!projectData) {
-    return <CenteredAnimatedLoader />;
-  }
-  return (
-    <WeaveflowORMContextProvider projectConnection={projectData}>
-      {props.children}
-    </WeaveflowORMContextProvider>
   );
 };
 
