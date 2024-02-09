@@ -10,7 +10,6 @@ import {
   PivotRunsView,
   WFHighLevelPivotSpec,
 } from './CallsPage/PivotRunsTable';
-import {CenteredAnimatedLoader} from './common/Loader';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {CallSchema, useCalls} from './wfReactInterface/interface';
 

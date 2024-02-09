@@ -1,11 +1,4 @@
-import {
-  Box,
-  CircularProgress,
-  FormControl,
-  Snackbar,
-  TextField,
-  Typography,
-} from '@mui/material';
+import {Box, FormControl, Snackbar, TextField, Typography} from '@mui/material';
 import {Autocomplete, ListItem} from '@mui/material';
 import {
   GRID_CHECKBOX_SELECTION_COL_DEF,
@@ -38,9 +31,9 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {renderCell} from '../util';
 import {CallSchema} from '../wfReactInterface/interface';
-import {CenteredAnimatedLoader} from '../common/Loader';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
@@ -219,7 +212,7 @@ export const PivotRunsView: FC<
   );
 };
 
-const filterNulls = <T,>(arr: (T | null | undefined)[]): T[] => {
+const filterNulls = <T,>(arr: Array<T | null | undefined>): T[] => {
   return arr.filter(
     (e): e is Exclude<Exclude<typeof e, null>, undefined> => e !== null
   );
