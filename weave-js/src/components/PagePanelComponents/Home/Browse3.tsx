@@ -1,5 +1,5 @@
 import {LinearProgress} from '@material-ui/core';
-import {Close, Fullscreen, Home} from '@mui/icons-material';
+import {Home} from '@mui/icons-material';
 import {
   AppBar,
   Box,
@@ -21,6 +21,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import useMousetrap from 'react-hook-mousetrap';
 import {
   Link as RouterLink,
   Route,
@@ -32,6 +33,7 @@ import {
 import {MOON_200} from '../../../common/css/color.styles';
 import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
+import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
@@ -309,6 +311,8 @@ const MainPeekingLayout: FC = () => {
   const {handleMousedown, drawerWidthPct, drawerHeightPct} = useDrawerResize();
   const closePeek = useClosePeek();
 
+  useMousetrap('esc', closePeek);
+
   return (
     <Box
       sx={{
@@ -333,7 +337,7 @@ const MainPeekingLayout: FC = () => {
             !isDrawerOpen || !isFlexRow
               ? 0
               : `${(drawerWidthPct * windowSize.width) / 100}px`,
-          // this is px hack to account for the navbar hiehgt
+          // this is px hack to account for the navbar height
           marginBottom:
             !isDrawerOpen || isFlexRow
               ? 0
@@ -392,37 +396,31 @@ const MainPeekingLayout: FC = () => {
           <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
             <SimplePageLayoutContext.Provider
               value={{
-                headerPrefix: (
-                  <>
-                    <Box
-                      sx={{
-                        flex: '0 0 auto',
-                        height: '47px',
-                      }}>
-                      <IconButton
-                        onClick={() => {
-                          closePeek();
-                        }}>
-                        <Close />
-                      </IconButton>
-                    </Box>
-                    <Box
-                      sx={{
-                        flex: '0 0 auto',
-                        height: '47px',
-                      }}>
-                      <IconButton
-                        onClick={() => {
-                          const targetPath = query.peekPath!.replace(
-                            generalBase,
-                            targetBase
-                          );
-                          history.push(targetPath);
-                        }}>
-                        <Fullscreen />
-                      </IconButton>
-                    </Box>
-                  </>
+                headerSuffix: (
+                  <Box
+                    sx={{
+                      height: '47px',
+                      flex: '0 0 auto',
+                    }}>
+                    <Button
+                      tooltip="Open full page for this object"
+                      icon="full-screen-mode-expand"
+                      variant="ghost"
+                      onClick={() => {
+                        const targetPath = query.peekPath!.replace(
+                          generalBase,
+                          targetBase
+                        );
+                        history.push(targetPath);
+                      }}
+                    />
+                    <Button
+                      tooltip="Close drawer"
+                      icon="close"
+                      variant="ghost"
+                      onClick={closePeek}
+                    />
+                  </Box>
                 ),
               }}>
               <Browse3ProjectRoot
