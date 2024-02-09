@@ -525,7 +525,7 @@ export const RunsTable: FC<{
         // density="compact"
         initialState={initialState}
         rowHeight={38}
-        columns={columns.cols}
+        columns={columns.cols as any}
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}

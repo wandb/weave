@@ -123,7 +123,7 @@ export const SideNav = () => {
         name: 'Traces',
         iconName: IconNames.RunningRepeat,
         path: baseRouter.callsUIUrl(entity, project, {
-          // traceRootsOnly: true,
+          traceRootsOnly: true,
         }),
       },
       {

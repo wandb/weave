@@ -36,7 +36,7 @@ import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
 import {useRuns, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 
-const OP_CATEGORIES = [
+export const OP_CATEGORIES = [
   'train',
   'predict',
   'score',

@@ -1,4 +1,9 @@
-import {CircularProgress, IconButton} from '@material-ui/core';
+/**
+ * Step 2: Allow lazy loading of options?
+ * Step 3: Re-enable roots only
+ */
+
+import {Box, CircularProgress, IconButton} from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
@@ -15,6 +20,7 @@ import React, {FC, useCallback, useMemo} from 'react';
 import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
+import {CategoryChip} from '../common/CategoryChip';
 import {useMakeNewBoard} from '../common/hooks';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
@@ -38,14 +44,17 @@ import {
 import {
   CallFilter,
   CallSchema,
+  OP_CATEGORIES,
   opVersionRefOpName,
   refUriToOpVersionKey,
   useCalls,
+  useOpVersion,
+  useOpVersions,
 } from '../wfReactInterface/interface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
-  // traceRootsOnly?: boolean;
+  traceRootsOnly?: boolean;
   opCategory?: HackyOpCategory | null;
   opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
@@ -70,12 +79,22 @@ export const CallsPage: FC<{
   );
 
   const title = useMemo(() => {
+    // const traceRootsOnly = !(
+    //   !!filter.opVersionRefs ||
+    //   !!filter.inputObjectVersionRefs ||
+    //   !!filter.parentId
+    // );
+    // if (traceRootsOnly) {
+    //   return 'Root Traces';
+    // }
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
       return opNiceName(opName) + ' Traces';
+    } else if (filter.opCategory) {
+      return _.capitalize(filter.opCategory) + ' Traces';
     }
     return 'Traces';
-  }, [filter.opVersionRefs]);
+  }, [filter.opCategory, filter.opVersionRefs]);
 
   return (
     <SimplePageLayout
@@ -109,7 +128,7 @@ export const CallsTable: FC<{
   ioColumnsOnly?: boolean;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
-  const orm = useWeaveflowORMContext(props.entity, props.project);
+  // const orm = useWeaveflowORMContext(props.entity, props.project);
 
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
@@ -128,31 +147,41 @@ export const CallsTable: FC<{
 
   // # TODO: All of these need to be handled much more logically since
   // we need to calculate the options based on everything except a specific filter.
-  const opVersionOptions = useOpVersionOptions(calls.result ?? []);
+  // Rules: Show all if loading and inexpensive (if expensive, none), show options based on the filtered data if not loading.... (new) always allow additions
+  const opVersionOptions: {[key: string]: string} = {};
+  // const opVersionOptions = useOpVersionOptions(
+  //   calls.result ?? [],
+  //   filter.opVersionRefs?.[0]
+  // );
   //   orm,
   //   props.entity,
   //   props.project,
   //   effectiveFilter
   // );
-  console.log('opVersionOptions', opVersionOptions);
-  const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
-  const parentIdOptions = useParentIdOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
-  const opCategoryOptions = useOpCategoryOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
+  // console.log('opVersionOptions', opVersionOptions);
+
+  const consumesObjectVersionOptions: {[key: string]: string} = {};
+  // const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
+  //   orm,
+  //   props.entity,
+  //   props.project,
+  //   effectiveFilter
+  // );
+  const parentIdOptions: {[key: string]: string} = {};
+  // const parentIdOptions = useParentIdOptions(
+  //   orm,
+  //   props.entity,
+  //   props.project,
+  //   effectiveFilter
+  // );
+  const opCategoryOptions = OP_CATEGORIES;
+  // const opCategoryOptions = useOpCategoryOptions(
+  //   orm,
+  //   props.entity,
+  //   props.project,
+  //   effectiveFilter
+  // );
+  const traceRootOptions = [true, false];
   // const traceRootOptions = useTraceRootOptions(
   //   orm,
   //   props.entity,
@@ -299,13 +328,17 @@ export const CallsTable: FC<{
                   });
                 }}
                 renderInput={params => <TextField {...params} label="Op" />}
-                getOptionLabel={option => {
-                  if (option.endsWith(':*')) {
-                    return opNiceName(option.slice(0, -2));
-                  }
-                  return opVersionOptions[option] ?? option;
-                }}
+                // getOptionLabel={option => {
+                //   if (opVersionOptions[option]) {
+                //     return opVersionOptions[option];
+                //   }
+                //   if (option.endsWith(':*/obj')) {
+                //     return opNiceName(option.slice(0, -6));
+                //   }
+                //   return option;
+                // }}
                 options={Object.keys(opVersionOptions)}
+                // freeSolo
               />
             </FormControl>
           </ListItem>
@@ -333,9 +366,9 @@ export const CallsTable: FC<{
                     inputObjectVersionRefs: newValue ? [newValue] : [],
                   });
                 }}
-                getOptionLabel={option => {
-                  return consumesObjectVersionOptions[option] ?? option;
-                }}
+                // getOptionLabel={option => {
+                //   return consumesObjectVersionOptions[option] ?? option;
+                // }}
                 options={Object.keys(consumesObjectVersionOptions)}
               />
             </FormControl>
@@ -356,14 +389,14 @@ export const CallsTable: FC<{
                     parentId: newValue,
                   });
                 }}
-                getOptionLabel={option => {
-                  return parentIdOptions[option] ?? option;
-                }}
+                // getOptionLabel={option => {
+                //   return parentIdOptions[option] ?? option;
+                // }}
                 options={Object.keys(parentIdOptions)}
               />
             </FormControl>
           </ListItem>
-          {/* <ListItem
+          <ListItem
             secondaryAction={
               <Checkbox
                 edge="end"
@@ -394,7 +427,7 @@ export const CallsTable: FC<{
               }}>
               <ListItemText primary="Roots Only" />
             </ListItemButton>
-          </ListItem> */}
+          </ListItem>
         </>
       }>
       {isPivoting ? (
@@ -450,11 +483,12 @@ const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   return {
-    traceRootsOnly: !(
-      !!effectiveFilter.opVersionRefs ||
-      !!effectiveFilter.inputObjectVersionRefs ||
-      !!effectiveFilter.parentId
-    ),
+    // traceRootsOnly: !(
+    //   !!effectiveFilter.opVersionRefs ||
+    //   !!effectiveFilter.inputObjectVersionRefs ||
+    //   !!effectiveFilter.parentId
+    // ),
+    traceRootsOnly: effectiveFilter.traceRootsOnly,
     opVersionRefs: effectiveFilter.opVersionRefs,
     inputObjectVersionRefs: effectiveFilter.inputObjectVersionRefs,
     // outputUris: effectiveFilter.outputObjectVersionRefs,
@@ -468,7 +502,18 @@ const convertHighLevelFilterToLowLevelFilter = (
   };
 };
 
-const useOpVersionOptions = (calls: CallSchema[]): Record<string, string> => {
+const useOpVersionOptions = (
+  calls: CallSchema[],
+  selectedOpVersionRef?: string
+): Record<string, string> => {
+  const selectedOpVersionKey = useMemo(() => {
+    if (selectedOpVersionRef) {
+      return refUriToOpVersionKey(selectedOpVersionRef);
+    }
+    return null;
+  }, [selectedOpVersionRef]);
+  const selectedOpVersion = useOpVersion(selectedOpVersionKey);
+
   return useMemo(() => {
     // Just get the unique Ops (not versions).
     const versions = _.uniqBy(
@@ -491,6 +536,11 @@ const useOpVersionOptions = (calls: CallSchema[]): Record<string, string> => {
     // Build up options object, injecting options for all versions of an op.
 
     const options: Record<string, string> = {};
+    if (selectedOpVersion.result && selectedOpVersionRef) {
+      options[selectedOpVersionRef] = `${opNiceName(
+        selectedOpVersion.result.opId
+      )}:v${selectedOpVersion.result.versionIndex}`;
+    }
     for (const v of versions) {
       options[
         refDictToRefString({
@@ -504,7 +554,7 @@ const useOpVersionOptions = (calls: CallSchema[]): Record<string, string> => {
       ] = opNiceName(v.opId);
     }
     return options;
-  }, [calls]);
+  }, [calls, selectedOpVersion.result, selectedOpVersionRef]);
 };
 
 const useConsumesObjectVersionOptions = (
