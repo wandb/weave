@@ -5,12 +5,21 @@
  * TODO: The Pivot Table and Calls Compare are pretty jank and the typing is off: really should refactor since it is likely needed to push the grouping down to the server.
  */
 
-import {CircularProgress, IconButton} from '@material-ui/core';
+// import {
+//   CircularProgress,
+//   IconButton,
+//   InputLabel,
+//   MenuItem,
+//   OutlinedInput,
+//   Select,
+// } from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
+  CircularProgress,
   FormControl,
+  IconButton,
   ListItem,
   ListItemButton,
   ListItemText,
@@ -28,16 +37,15 @@ import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {truncateID, useInitializingFilter} from '../util';
 import {WeaveflowORMContextType} from '../wfInterface/context';
-import {refDictToRefString} from '../wfInterface/naive';
 import {HackyOpCategory, WFCall, WFObjectVersion} from '../wfInterface/types';
 import {
   CallFilter,
-  CallSchema,
   OP_CATEGORIES,
+  opVersionKeyToRefUri,
   opVersionRefOpName,
   refUriToOpVersionKey,
   useCalls,
-  useOpVersion,
+  useOpVersions,
 } from '../wfReactInterface/interface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
@@ -136,17 +144,11 @@ export const CallsTable: FC<{
   // # TODO: All of these need to be handled much more logically since
   // we need to calculate the options based on everything except a specific filter.
   // Rules: Show all if loading and inexpensive (if expensive, none), show options based on the filtered data if not loading.... (new) always allow additions
-  const opVersionOptions: {[key: string]: string} = {};
-  // const opVersionOptions = useOpVersionOptions(
-  //   calls.result ?? [],
-  //   filter.opVersionRefs?.[0]
-  // );
-  //   orm,
-  //   props.entity,
-  //   props.project,
-  //   effectiveFilter
-  // );
-  // console.log('opVersionOptions', opVersionOptions);
+  const opVersionOptions = useOpVersionOptions(
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
 
   const consumesObjectVersionOptions: {[key: string]: string} = {};
   // const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
@@ -283,9 +285,11 @@ export const CallsTable: FC<{
                   isPivoting ||
                   Object.keys(props.frozenFilter ?? {}).includes('opCategory')
                 }
-                renderInput={params => (
-                  <TextField {...params} label="Category" />
-                )}
+                renderInput={params => {
+                  console.log(params);
+
+                  return <TextField {...params} label="Category" />;
+                }}
                 value={effectiveFilter.opCategory ?? null}
                 onChange={(event, newValue) => {
                   setFilter({
@@ -294,6 +298,13 @@ export const CallsTable: FC<{
                   });
                 }}
                 options={opCategoryOptions}
+                // renderOption={(props, option, {selected}) => {
+                //   return (
+                //     <li {...props}>
+                //       <CategoryChip value={option} />
+                //     </li>
+                //   );
+                // }}
               />
             </FormControl>
           </ListItem>
@@ -316,15 +327,10 @@ export const CallsTable: FC<{
                   });
                 }}
                 renderInput={params => <TextField {...params} label="Op" />}
-                // getOptionLabel={option => {
-                //   if (opVersionOptions[option]) {
-                //     return opVersionOptions[option];
-                //   }
-                //   if (option.endsWith(':*/obj')) {
-                //     return opNiceName(option.slice(0, -6));
-                //   }
-                //   return option;
-                // }}
+                getOptionLabel={option => {
+                  return opVersionOptions[option]?.title;
+                }}
+                groupBy={option => opVersionOptions[option]?.group}
                 options={Object.keys(opVersionOptions)}
                 // freeSolo
               />
@@ -491,58 +497,57 @@ const convertHighLevelFilterToLowLevelFilter = (
 };
 
 const useOpVersionOptions = (
-  calls: CallSchema[],
-  selectedOpVersionRef?: string
-): Record<string, string> => {
-  const selectedOpVersionKey = useMemo(() => {
-    if (selectedOpVersionRef) {
-      return refUriToOpVersionKey(selectedOpVersionRef);
+  entity: string,
+  project: string,
+  effectiveFilter: WFHighLevelCallFilter
+) => {
+  // Get all the "latest" versions
+  const latestOpVersions = useOpVersions(entity, project, {
+    latestOnly: true,
+  });
+
+  // Get all the versions of the currently selected op
+  const currentRef = effectiveFilter.opVersionRefs?.[0] ?? null;
+  const currentOpId = currentRef ? refUriToOpVersionKey(currentRef).opId : null;
+  const currentVersions = useOpVersions(
+    entity,
+    project,
+    {
+      opIds: [currentOpId ?? ''],
+    },
+    {
+      skip: !currentOpId,
     }
-    return null;
-  }, [selectedOpVersionRef]);
-  const selectedOpVersion = useOpVersion(selectedOpVersionKey);
+  );
 
   return useMemo(() => {
-    // Just get the unique Ops (not versions).
-    const versions = _.uniqBy(
-      (calls.map(c => c.opVersionRef).filter(v => v != null) as string[]).map(
-        v => refUriToOpVersionKey(v)
-      ),
-      v => v.opId
-    );
+    let result: Array<{title: string; ref: string; group: string}> = [];
 
-    // Sort by name ascending
-    versions.sort((a, b) => {
-      const nameA = opNiceName(a.opId);
-      const nameB = opNiceName(b.opId);
-      if (nameA !== nameB) {
-        return nameA.localeCompare(nameB);
-      }
-      return a.opId.localeCompare(b.opId);
+    latestOpVersions.result?.forEach(ov => {
+      const ref = opVersionKeyToRefUri({
+        ...ov,
+        versionHash: '*',
+      });
+      result.push({
+        title: opNiceName(ov.opId),
+        ref,
+        group: 'Ops',
+      });
     });
 
-    // Build up options object, injecting options for all versions of an op.
+    currentVersions.result?.forEach(ov => {
+      const ref = opVersionKeyToRefUri(ov);
+      result.push({
+        title: ov.opId + ':v' + ov.versionIndex,
+        ref,
+        group: `Versions of ${opNiceName(currentOpId!)}`,
+      });
+    });
 
-    const options: Record<string, string> = {};
-    if (selectedOpVersion.result && selectedOpVersionRef) {
-      options[selectedOpVersionRef] = `${opNiceName(
-        selectedOpVersion.result.opId
-      )}:v${selectedOpVersion.result.versionIndex}`;
-    }
-    for (const v of versions) {
-      options[
-        refDictToRefString({
-          entity: v.entity,
-          project: v.project,
-          artifactName: v.opId,
-          versionCommitHash: '*',
-          filePathParts: ['obj'],
-          refExtraTuples: [],
-        })
-      ] = opNiceName(v.opId);
-    }
-    return options;
-  }, [calls, selectedOpVersion.result, selectedOpVersionRef]);
+    return _.fromPairs(
+      _.sortBy(result, r => `${r.group}:${r.title}`).map(r => [r.ref, r])
+    );
+  }, [currentOpId, currentVersions.result, latestOpVersions.result]);
 };
 
 const useConsumesObjectVersionOptions = (

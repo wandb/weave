@@ -33,7 +33,7 @@ import {
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
 import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
-import {useRuns, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
+import {fnRunsNode, useRuns, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 
 export const OP_CATEGORIES = [
@@ -145,6 +145,28 @@ export type CallFilter = {
   traceRootsOnly?: boolean;
   opCategory?: OpCategory[];
 };
+
+// NOTE: THis method does not follow the standard pattern of the other hooks
+// Need to think about how to make it more consistent or generalize the pattern
+export const callsNode  = (
+  entity: string,
+  project: string,
+  filter: CallFilter
+): Node => {
+  return fnRunsNode({
+    entityName: entity,
+    projectName: project,
+    streamName: PROJECT_CALL_STREAM_NAME,
+  }, {
+    opUris: filter.opVersionRefs,
+    inputUris: filter.inputObjectVersionRefs,
+    outputUris: filter.outputObjectVersionRefs,
+    traceId: filter.traceId,
+    parentIds: filter.parentIds,
+    traceRootsOnly: filter.traceRootsOnly,
+    callIds: filter.callIds,
+  })
+}
 export const useCalls = (
   entity: string,
   project: string,
@@ -325,7 +347,8 @@ type OpVersionFilter = {
 export const useOpVersions = (
   entity: string,
   project: string,
-  filter: OpVersionFilter
+  filter: OpVersionFilter,
+  opts?: {skip?: boolean}
 ): Loadable<OpVersionSchema[]> => {
   const projectNode = opRootProject({
     entityName: constString(entity),
@@ -405,9 +428,15 @@ export const useOpVersions = (
     }),
   });
 
-  const dataValue = useNodeValue(dataNode);
+  const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
   return useMemo(() => {
+    if (opts?.skip) {
+      return {
+        loading: false,
+        result: [],
+      };
+    }
     const result = (dataValue.result ?? [])
       .map((row: any) => ({
         entity,

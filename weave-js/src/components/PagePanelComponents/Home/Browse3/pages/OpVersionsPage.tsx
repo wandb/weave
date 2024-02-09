@@ -7,6 +7,8 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {opCount} from '../../../../../core';
+import {useNodeValue} from '../../../../../react';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {CategoryChip} from './common/CategoryChip';
@@ -16,9 +18,9 @@ import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyOpCategory} from './wfInterface/types';
 import {
+  callsNode,
   opVersionKeyToRefUri,
   OpVersionSchema,
-  useCalls,
   useOpVersions,
 } from './wfReactInterface/interface';
 
@@ -224,10 +226,11 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
 const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
-  const calls = useCalls(obj.entity, obj.project, {
+  const node = callsNode(obj.entity, obj.project, {
     opVersionRefs: [refUri],
   });
-  const callCount = (calls.result ?? []).length;
+  const countVal = useNodeValue(opCount({arr: node}));
+  const callCount = countVal?.result ?? 0;
 
   if (callCount === 0) {
     return null;
