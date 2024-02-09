@@ -39,6 +39,7 @@ import {truncateID, useInitializingFilter} from '../util';
 import {HackyOpCategory} from '../wfInterface/types';
 import {
   CallFilter,
+  objectVersionNiceString,
   OP_CATEGORIES,
   opVersionKeyToRefUri,
   opVersionRefOpName,
@@ -403,7 +404,7 @@ export const CallsTable: FC<{
           </ListItem> */}
           {inputObjectVersion && (
             <Chip
-              label={`Input: ${inputObjectVersion.objectId}:v${inputObjectVersion.versionIndex}`}
+              label={`Input: ${objectVersionNiceString(inputObjectVersion)}`}
               onDelete={() => {
                 setFilter({
                   ...filter,

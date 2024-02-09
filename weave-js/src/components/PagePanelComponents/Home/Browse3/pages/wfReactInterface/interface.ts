@@ -907,3 +907,18 @@ export const opVersionRefOpName = (opVersionRef: string) => {
 export const opVersionRefOpCategory = (opVersionRef: string) => {
   return opNameToCategory(opVersionRefOpName(opVersionRef));
 };
+
+export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
+  let result = ov.objectId
+  if (ov.versionHash === "*") {
+    return result;
+  }
+  result += `:v${ov.versionIndex}`;
+  if (ov.path !== "obj") {
+    result += `/${ov.path}`;
+  }
+  if (ov.refExtra) {
+    result += `#${ov.refExtra}`;
+  }
+  return result;
+}
