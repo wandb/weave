@@ -352,14 +352,21 @@ function getDisjointGraphs(
   graphs: EditingNode[],
   mergeInexpensiveOps: boolean = false
 ): [EditingNode[][], number[][]] {
-  const nodeSubgraphMap: Map<EditingNode, number> = new Map();
+  const hasher = new MemoizedHasher();
+  const nodeSubgraphMap: Map<string, number> = new Map();
+  const subgraphSet = (node: EditingNode, subgraph: number) => {
+    nodeSubgraphMap.set(hasher.nodeId(node), subgraph);
+  };
+  const subgraphGet = (node: EditingNode) => {
+    return nodeSubgraphMap.get(hasher.nodeId(node));
+  };
   const expensiveSubgraphs: Set<number> = new Set();
 
   let currentSubgraph = 0;
   let nextSubgraph = 1;
 
   function markSubgraph(node: EditingNode, subgraph: number) {
-    nodeSubgraphMap.set(node, subgraph);
+    subgraphSet(node, subgraph);
     if (node.nodeType === 'output') {
       if (opIsExpensive(node.fromOp)) {
         expensiveSubgraphs.add(subgraph);
@@ -372,7 +379,7 @@ function getDisjointGraphs(
 
   // Return true if we've encountered an existing subgraph
   function walkAndCheck(node: EditingNode, root: EditingNode): boolean {
-    const existingSubgraph = nodeSubgraphMap.get(node);
+    const existingSubgraph = subgraphGet(node);
     if (existingSubgraph != null) {
       // encountered an existing subgraph, assign root and its descendants to existing subgraph
       markSubgraph(root, existingSubgraph);
@@ -380,7 +387,7 @@ function getDisjointGraphs(
     }
 
     // Otherwise, assign node to current subgraph
-    nodeSubgraphMap.set(node, currentSubgraph);
+    subgraphSet(node, currentSubgraph);
 
     // Recurse into inputs
     if (node.nodeType === 'output') {
@@ -409,7 +416,7 @@ function getDisjointGraphs(
   const originalIndexes: number[][] = [];
   for (let i = 0; i < graphs.length; i++) {
     const graph = graphs[i];
-    const subgraph = nodeSubgraphMap.get(graph)!;
+    const subgraph = subgraphGet(graph)!;
     if (result[subgraph] == null) {
       result[subgraph] = [];
       originalIndexes[subgraph] = [];
