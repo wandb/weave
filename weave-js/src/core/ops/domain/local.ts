@@ -828,3 +828,16 @@ export const opRefEqual = makeEqualOp({
   name: 'Ref-__eq__',
   argType: {type: 'Ref'},
 });
+
+
+export const opRefToUri = makeOp({
+  hidden: true,
+  name: 'ref-toUri',
+  argTypes: {
+    self: {type: 'Ref'},
+  },
+  returnType: 'string',
+  resolver: inputs => {
+    throw new Error('cant resolve op-ref-toUri in js');
+  },
+});

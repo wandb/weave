@@ -22,7 +22,11 @@ import {
   opNumberMult,
   opOr,
   opPick,
+  opProjectRun,
   opRefEqual,
+  opRefToUri,
+  opRootProject,
+  opRunHistory3,
   opStringEndsWith,
   opStringEqual,
   opStringStartsWith,
@@ -121,12 +125,22 @@ const callsTableWeaveType: Type = {
 };
 
 export const callsTableNode = (streamId: StreamId) => {
-  const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
-  const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
-    stream_table: opGet({
-      uri: constString(predsRefStr),
-    }),
-  }) as Node;
+  // Going straight to the opRunHistory call saves about 1 second per request in lookup time
+  // const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
+  // const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
+  //   stream_table: opGet({
+  //     uri: constString(predsRefStr),
+  //   }),
+  // }) as Node;
+  const streamTableRowsNode = opRunHistory3({
+    run: opProjectRun({
+      project: opRootProject({
+        entityName: constString(streamId.entityName),
+        projectName: constString(streamId.projectName),
+      }),
+      runName: constString(streamId.streamName),
+    })
+  })
   streamTableRowsNode.type = callsTableWeaveType;
   return streamTableRowsNode;
 };
@@ -251,27 +265,27 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
     for (const inputUri of filters.inputUris) {
       filterClauses.push(
         opOr({
-          lhs: opRefEqual({
-            lhs: opPick({
+          lhs: opStringEqual({
+            lhs: opRefToUri({self: opPick({
               obj: rowVar,
               key: constString('inputs._ref0'),
-            }),
-            rhs: constNodeUnsafe(refWeaveType, inputUri),
+            }) as any}),
+            rhs: constString(inputUri),
           }) as any,
           rhs: opOr({
-            lhs: opRefEqual({
-              lhs: opPick({
+            lhs: opStringEqual({
+              lhs:  opRefToUri({self: opPick({
                 obj: rowVar,
                 key: constString('inputs._ref1'),
-              }),
-              rhs: constNodeUnsafe(refWeaveType, inputUri),
+              })as any}),
+              rhs: constString(inputUri),
             }) as any,
-            rhs: opRefEqual({
-              lhs: opPick({
+            rhs: opStringEqual({
+              lhs:  opRefToUri({self: opPick({
                 obj: rowVar,
                 key: constString('inputs._ref2'),
-              }),
-              rhs: constNodeUnsafe(refWeaveType, inputUri),
+              })as any}),
+              rhs: constString(inputUri),
             }) as any,
           }) as any,
         }) as any

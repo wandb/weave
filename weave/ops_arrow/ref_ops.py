@@ -44,3 +44,15 @@ def ref_equal(self, other):
     # self_arrow_data = pc.cast(self._arrow_data, pa.string())
     result = util.equal(self_._arrow_data, other)
     return ArrowWeaveList(result, types.Boolean(), self._artifact)
+
+@arrow_op(
+    name="ArrowWeaveListRef-toUri",
+    input_type={
+        "self": ArrowWeaveListType(types.optional(types.RefType())),
+    },
+    output_type=ArrowWeaveListType(types.optional(types.String())),
+)
+def ref_equal(self):
+    return self.map_column(
+        lambda col, path: ArrowWeaveList(col._arrow_data, types.String())
+    )

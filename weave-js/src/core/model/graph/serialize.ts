@@ -321,7 +321,7 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
   };
 }
 
-const expensiveOpNames = new Set(['get', 'set', 'getReturnType']);
+const expensiveOpNames = new Set(['get', 'set', 'getReturnType', "Ref-type", 'ref']);
 
 // Heuristic to determine if an op is expensive. We should merge
 // all subgraphs with non-expensive ops into a single graph, since
@@ -378,6 +378,9 @@ function getDisjointGraphs(
 
     // Recurse into inputs
     if (node.nodeType === 'output') {
+      if (opIsExpensive(node.fromOp)) {
+        expensiveSubgraphs.add(currentSubgraph);
+      }
       for (const input of Object.values(node.fromOp.inputs)) {
         if (walkAndCheck(input, root)) {
           return true;
