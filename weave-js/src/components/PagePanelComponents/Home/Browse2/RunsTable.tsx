@@ -216,6 +216,7 @@ export const RunsTable: FC<{
       {
         field: 'span_id',
         headerName: 'Trace',
+        minWidth: 100,
         width: 250,
         hideable: false,
         renderCell: rowParams => {
@@ -229,6 +230,7 @@ export const RunsTable: FC<{
               projectName={params.project}
               opName={opVersion.op().name()}
               callId={rowParams.row.id}
+              fullWidth={true}
             />
           );
         },
