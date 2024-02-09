@@ -21,11 +21,7 @@ import {
   WFHighLevelPivotSpec,
 } from './CallsPage/PivotRunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {
-  CallSchema,
-  callsNode,
-  spanToCallSchema,
-} from './wfReactInterface/interface';
+import {callsNode, spanToCallSchema} from './wfReactInterface/interface';
 
 export const CompareCallsPage: FC<{
   entity: string;
