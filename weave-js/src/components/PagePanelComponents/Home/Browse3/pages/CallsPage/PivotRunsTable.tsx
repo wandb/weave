@@ -40,6 +40,7 @@ import {
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {renderCell} from '../util';
 import {CallSchema} from '../wfReactInterface/interface';
+import {CenteredAnimatedLoader} from '../common/Loader';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
@@ -211,7 +212,8 @@ export const PivotRunsView: FC<
           }
         />
       ) : (
-        <>Please select pivot dimensions</>
+        <CenteredAnimatedLoader />
+        // <>Please select pivot dimensions</>
       )}
     </Box>
   );
@@ -458,7 +460,7 @@ export const PivotRunsTable: FC<
   }, [peekLocation, pivotColumns, pivotData, props.showCompareButton]);
 
   if (props.loading) {
-    return <CircularProgress />;
+    return <CenteredAnimatedLoader />;
   }
 
   return (

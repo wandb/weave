@@ -109,7 +109,7 @@ export const CompareCallsPage: FC<{
     option => {
       const version = objectVersionOptions[option];
       if (version == null) {
-        return option;
+        return 'loading...';
       }
       return version;
     },
@@ -137,22 +137,22 @@ export const CompareCallsPage: FC<{
   const hideControls = true;
 
   const pageDetails = useMemo(() => {
-    if (loading) {
-      return <CenteredAnimatedLoader />;
-    }
-    if (!props.primaryDim) {
-      return <>Need a primary dimension</>;
-    }
-    if (!props.secondaryDim) {
-      return <>Need a secondary dimension</>;
-    }
-    if (!props.callIds || props.callIds.length < 1) {
-      return <>Need more calls</>;
+    if (!loading) {
+      // return <CenteredAnimatedLoader />;
+      if (!props.primaryDim) {
+        return <>Need a primary dimension</>;
+      }
+      if (!props.secondaryDim) {
+        return <>Need a secondary dimension</>;
+      }
+      if (!props.callIds || props.callIds.length < 1) {
+        return <>Need more calls</>;
+      }
     }
 
     return (
       <PivotRunsView
-        loading={false}
+        loading={loading}
         runs={childRunsFilteredToOpVersion}
         entity={props.entity}
         project={props.project}
@@ -199,8 +199,8 @@ export const CompareCallsPage: FC<{
                   flex: '0 0 auto',
                   width: '100%',
                   transition: 'width 0.1s ease-in-out',
-                  display:
-                    childRunsFilteredToOpVersion.length === 0 ? 'none' : 'flex',
+                  // display:
+                  //   childRunsFilteredToOpVersion.length === 0 ? 'none' : 'flex',
                   flexDirection: 'row',
                   overflowX: 'auto',
                   overflowY: 'hidden',
