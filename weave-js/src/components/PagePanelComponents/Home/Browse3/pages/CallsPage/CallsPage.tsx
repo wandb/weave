@@ -1,9 +1,7 @@
 /**
- * Step 1: Nicer treatment of displays
- * Step 2: Allow lazy loading of options? (how do we re-narrow this down?)
  * Step 3: Perf of the compare view is really bad
  * TODO: The Pivot Table and Calls Compare are pretty jank and the typing is off: really should refactor since it is likely needed to push the grouping down to the server.
- *   // Rules: Show all if loading and inexpensive (if expensive, none), show options based on the filtered data if not loading.... (new) always allow additions
+ * Trace roots is still pretty confusing...
  */
 
 // import {
@@ -17,7 +15,6 @@
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
-  Box,
   Checkbox,
   Chip,
   CircularProgress,
@@ -31,7 +28,7 @@ import {
 import _ from 'lodash';
 import React, {FC, useCallback, useMemo} from 'react';
 
-import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
+import {fnRunsNode} from '../../../Browse2/callTreeHooks';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
 import {useMakeNewBoard} from '../common/hooks';
@@ -39,12 +36,9 @@ import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {truncateID, useInitializingFilter} from '../util';
-import {WeaveflowORMContextType} from '../wfInterface/context';
-import {HackyOpCategory, WFCall, WFObjectVersion} from '../wfInterface/types';
+import {HackyOpCategory} from '../wfInterface/types';
 import {
   CallFilter,
-  objectVersionKeyToRefUri,
-  ObjectVersionSchema,
   OP_CATEGORIES,
   opVersionKeyToRefUri,
   opVersionRefOpName,
@@ -55,7 +49,6 @@ import {
   useCalls,
   useObjectVersion,
   useOpVersions,
-  useRootObjectVersions,
 } from '../wfReactInterface/interface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
@@ -95,12 +88,19 @@ export const CallsPage: FC<{
     // }
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
+      const niceName = opNiceName(opName);
+      if (niceName == 'Evaluation-evaluate') {
+        // Very special case for now
+        if (filter.isPivot) {
+          return 'Evaluation Leaderboard';
+        }
+      }
       return opNiceName(opName) + ' Traces';
     } else if (filter.opCategory) {
       return _.capitalize(filter.opCategory) + ' Traces';
     }
     return 'Traces';
-  }, [filter.opCategory, filter.opVersionRefs]);
+  }, [filter.isPivot, filter.opCategory, filter.opVersionRefs]);
 
   return (
     <SimplePageLayout
@@ -259,7 +259,8 @@ export const CallsTable: FC<{
   const forcingNonTraceRootsOnly =
     (effectiveFilter.inputObjectVersionRefs?.length ?? 0) > 0 ||
     (effectiveFilter.opVersionRefs?.length ?? 0) > 0 ||
-    effectiveFilter.parentId != null;
+    effectiveFilter.parentId != null ||
+    effectiveFilter.opCategory != null;
 
   const rootsOnlyDisabled =
     forcingNonTraceRootsOnly ||
@@ -295,18 +296,19 @@ export const CallsTable: FC<{
               <DashboardCustomize />
             )}
           </IconButton>
-          {qualifiesForPivoting && (
-            <IconButton
-              style={{width: '37px', height: '37px'}}
-              size="small"
-              color={userEnabledPivot ? 'primary' : 'default'}
-              onClick={() => {
-                setUserEnabledPivot(!userEnabledPivot);
-              }}>
-              <PivotTableChart />
-            </IconButton>
-          )}
-          <ListItem sx={{width: '200px', flex: '0 0 200px'}}>
+
+          <IconButton
+            style={{width: '37px', height: '37px'}}
+            size="small"
+            color={userEnabledPivot ? 'primary' : 'default'}
+            disabled={!qualifiesForPivoting}
+            onClick={() => {
+              setUserEnabledPivot(!userEnabledPivot);
+            }}>
+            <PivotTableChart />
+          </IconButton>
+
+          <ListItem sx={{width: '190px', flex: '0 0 190px'}}>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
@@ -340,7 +342,7 @@ export const CallsTable: FC<{
               />
             </FormControl>
           </ListItem>
-          <ListItem sx={{minWidth: '200px'}}>
+          <ListItem sx={{minWidth: '190px'}}>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
@@ -445,7 +447,11 @@ export const CallsTable: FC<{
             />
           )}
           <ListItem
-            sx={{width: '200px', flex: '0 0 200px'}}
+            sx={{
+              width: '190px',
+              flex: '0 0 190px',
+              // borderLeft: '1px solid #e0e0e0',
+            }}
             secondaryAction={
               <Checkbox
                 edge="end"
@@ -523,13 +529,18 @@ const useMakeBoardForCalls = (
 const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
+  const forcingNonTraceRootsOnly =
+    (effectiveFilter.inputObjectVersionRefs?.length ?? 0) > 0 ||
+    (effectiveFilter.opVersionRefs?.length ?? 0) > 0 ||
+    effectiveFilter.parentId != null ||
+    effectiveFilter.opCategory != null;
   return {
     // traceRootsOnly: !(
     //   !!effectiveFilter.opVersionRefs ||
     //   !!effectiveFilter.inputObjectVersionRefs ||
     //   !!effectiveFilter.parentId
     // ),
-    traceRootsOnly: effectiveFilter.traceRootsOnly,
+    traceRootsOnly: !forcingNonTraceRootsOnly && effectiveFilter.traceRootsOnly,
     opVersionRefs: effectiveFilter.opVersionRefs,
     inputObjectVersionRefs: effectiveFilter.inputObjectVersionRefs,
     // outputUris: effectiveFilter.outputObjectVersionRefs,
