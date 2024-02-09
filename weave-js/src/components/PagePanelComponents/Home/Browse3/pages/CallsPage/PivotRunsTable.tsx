@@ -550,8 +550,6 @@ export const PivotRunsTable: FC<
             })
           );
 
-          console.log(newSelection, callIds);
-
           history.push(
             peekingRouter.compareCallsUIUrl(
               props.entity,

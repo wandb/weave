@@ -1,9 +1,11 @@
 /**
- * Step 2: Allow lazy loading of options?
- * Step 3: Re-enable roots only
+ * Step 1: Nicer treatment of displays
+ * Step 2: Allow lazy loading of options? (how do we re-narrow this down?)
+ * Step 3: Perf of the compare view is really bad
+ * TODO: The Pivot Table and Calls Compare are pretty jank and the typing is off: really should refactor since it is likely needed to push the grouping down to the server.
  */
 
-import {Box, CircularProgress, IconButton} from '@material-ui/core';
+import {CircularProgress, IconButton} from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
@@ -20,27 +22,14 @@ import React, {FC, useCallback, useMemo} from 'react';
 import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
-import {CategoryChip} from '../common/CategoryChip';
 import {useMakeNewBoard} from '../common/hooks';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {truncateID, useInitializingFilter} from '../util';
-import {
-  useWeaveflowORMContext,
-  WeaveflowORMContextType,
-} from '../wfInterface/context';
-import {
-  refDictToRefString,
-  refStringToRefDict,
-  stringIsRef,
-} from '../wfInterface/naive';
-import {
-  HackyOpCategory,
-  WFCall,
-  WFObjectVersion,
-  WFOpVersion,
-} from '../wfInterface/types';
+import {WeaveflowORMContextType} from '../wfInterface/context';
+import {refDictToRefString} from '../wfInterface/naive';
+import {HackyOpCategory, WFCall, WFObjectVersion} from '../wfInterface/types';
 import {
   CallFilter,
   CallSchema,
@@ -49,7 +38,6 @@ import {
   refUriToOpVersionKey,
   useCalls,
   useOpVersion,
-  useOpVersions,
 } from '../wfReactInterface/interface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 

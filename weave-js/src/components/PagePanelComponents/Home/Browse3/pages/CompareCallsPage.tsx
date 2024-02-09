@@ -50,7 +50,9 @@ export const CompareCallsPage: FC<{
     }
     return Object.fromEntries(
       _.uniq(
-        parentRuns.map(call => getValueAtNestedKey(call, props.secondaryDim!))
+        parentRuns.map(call =>
+          getValueAtNestedKey(call.rawSpan, props.secondaryDim!)
+        )
       )
         .filter(item => item != null)
         .map(item => {

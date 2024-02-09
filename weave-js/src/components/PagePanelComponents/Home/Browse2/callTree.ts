@@ -33,7 +33,8 @@ import {
   varNode,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
-import { WILDCARD_ARTIFACT_VERSION_AND_PATH } from '../Browse3/pages/wfReactInterface/constants';
+
+import {WILDCARD_ARTIFACT_VERSION_AND_PATH} from '../Browse3/pages/wfReactInterface/constants';
 
 export interface StreamId {
   entityName: string;
@@ -199,7 +200,6 @@ export const callsTableSelect = (stNode: Node) => {
 };
 
 const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string) => {
-
   if (opUri.endsWith(WILDCARD_ARTIFACT_VERSION_AND_PATH)) {
     return opAnd({
       lhs: opStringStartsWith({
@@ -207,14 +207,16 @@ const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string) => {
           obj: rowVar,
           key: constString('name'),
         }),
-        rhs: constString(opUri.slice(0, -WILDCARD_ARTIFACT_VERSION_AND_PATH.length)),
+        rhs: constString(
+          opUri.slice(0, -WILDCARD_ARTIFACT_VERSION_AND_PATH.length)
+        ),
       }),
       rhs: opStringEndsWith({
         lhs: opPick({
           obj: rowVar,
           key: constString('name'),
         }),
-        rhs: constString("/obj"),
+        rhs: constString('/obj'),
       }),
     });
   } else {
