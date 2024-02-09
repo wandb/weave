@@ -150,7 +150,6 @@ export const CallsTable: FC<{
     return convertHighLevelFilterToLowLevelFilter(effectiveFilter);
   }, [effectiveFilter]);
 
-  console.log({lowLevelFilter});
   const calls = useCalls(props.entity, props.project, lowLevelFilter);
 
   const opVersionOptions = useOpVersionOptions(
@@ -363,7 +362,7 @@ export const CallsTable: FC<{
                 }}
                 renderInput={params => <TextField {...params} label="Op" />}
                 getOptionLabel={option => {
-                  return opVersionOptions[option]?.title;
+                  return opVersionOptions[option]?.title ?? 'loading...';
                 }}
                 groupBy={option => opVersionOptions[option]?.group}
                 options={Object.keys(opVersionOptions)}
@@ -459,6 +458,15 @@ export const CallsTable: FC<{
                 checked={
                   !forcingNonTraceRootsOnly && !!effectiveFilter.traceRootsOnly
                 }
+                onClick={() => {
+                  if (rootsOnlyDisabled) {
+                    return;
+                  }
+                  setFilter({
+                    ...filter,
+                    traceRootsOnly: !effectiveFilter.traceRootsOnly,
+                  });
+                }}
               />
             }
             disabled={rootsOnlyDisabled}

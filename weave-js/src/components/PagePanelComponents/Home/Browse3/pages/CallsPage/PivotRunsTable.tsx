@@ -217,7 +217,17 @@ export const PivotRunsView: FC<
   );
 };
 
-type PivotDataRowType = {[col: string]: CallSchema | null};
+const filterNulls = <T,>(arr: (T | null | undefined)[]): T[] => {
+  return arr.filter(
+    (e): e is Exclude<Exclude<typeof e, null>, undefined> => e !== null
+  );
+};
+
+type PivotDataRowType = {
+  id: string;
+  rows: {[row: string]: string};
+  cols: {[col: string]: CallSchema | null};
+};
 
 export const PivotRunsTable: FC<
   PivotRunsTablePropsType & {
@@ -262,11 +272,13 @@ export const PivotRunsTable: FC<
     const rows: PivotDataRowType[] = [];
     Object.keys(values).forEach(rowKey => {
       const row: PivotDataRowType = {
-        id: rowKey as any,
+        id: rowKey,
+        rows: {},
+        cols: {},
       };
-      row[props.pivotSpec.rowDim] = rowKey as any;
+      row.rows[props.pivotSpec.rowDim] = rowKey;
       Object.keys(values[rowKey]).forEach(colKey => {
-        row[colKey] = aggregationFn(values[rowKey][colKey]);
+        row.cols[colKey] = aggregationFn(values[rowKey][colKey]);
       });
       rows.push(row);
     });
@@ -276,13 +288,11 @@ export const PivotRunsTable: FC<
 
   const opsInPlay = useMemo(() => {
     return _.uniq(
-      pivotData
-        .flatMap(pivotRow =>
-          Array.from(pivotColumns).map(
-            col => (pivotRow[col] as CallSchema | null)?.opVersionRef
-          )
+      filterNulls(
+        pivotData.flatMap(pivotRow =>
+          Array.from(pivotColumns).map(col => pivotRow.cols[col]?.opVersionRef)
         )
-        .filter(name => name != null)
+      )
     );
   }, [pivotColumns, pivotData]);
 
@@ -296,7 +306,8 @@ export const PivotRunsTable: FC<
         field: props.pivotSpec.rowDim,
         headerName: props.pivotSpec.rowDim,
         renderCell: cellParams => {
-          return renderCell(cellParams.row[props.pivotSpec.rowDim]);
+          const row: PivotDataRowType = cellParams.row;
+          return renderCell(row.rows[props.pivotSpec.rowDim]);
         },
       },
     ];
@@ -312,7 +323,7 @@ export const PivotRunsTable: FC<
         // All output keys as we don't have the order key yet.
         const outputKeys: {[key: string]: true} = {};
         pivotData.forEach(pivotRow => {
-          const pivotCol = pivotRow[col];
+          const pivotCol = pivotRow.cols[col];
           if (pivotCol) {
             for (const [k, v] of Object.entries(
               flattenObject(pivotCol.rawSpan.output!)
@@ -338,8 +349,9 @@ export const PivotRunsTable: FC<
             field: col + '.' + key,
             headerName: key.split('.').slice(-1)[0],
             renderCell: cellParams => {
+              const row: PivotDataRowType = cellParams.row;
               return renderCell(
-                getValueAtNestedKey(cellParams.row[col]?.rawSpan.output, key)
+                getValueAtNestedKey(row.cols[col]?.rawSpan.output, key)
               );
             },
           });
@@ -350,12 +362,12 @@ export const PivotRunsTable: FC<
       if (opsInPlay.length !== 1) {
         throw new Error('All rows must be from the same op');
       }
-      const op = opsInPlay[0] as string;
+      const op = opsInPlay[0];
       // All output keys as we don't have the order key yet.
       const outputKeys: {[key: string]: true} = {};
       pivotColumns.forEach(col => {
         pivotData.forEach(pivotRow => {
-          const pivotCol = pivotRow[col];
+          const pivotCol = pivotRow.cols[col];
           if (pivotCol) {
             for (const [k, v] of Object.entries(
               flattenObject(pivotCol.rawSpan.output!)
@@ -389,8 +401,9 @@ export const PivotRunsTable: FC<
               return renderCell(col);
             },
             renderCell: cellParams => {
+              const row: PivotDataRowType = cellParams.row;
               return renderCell(
-                getValueAtNestedKey(cellParams.row[col]?.rawSpan.output, key)
+                getValueAtNestedKey(row.cols[col]?.rawSpan.output, key)
               );
             },
           });
@@ -429,16 +442,16 @@ export const PivotRunsTable: FC<
     const entries = Array.from(params.entries());
     const searchDict = _.fromPairs(entries);
     const callIds: string[] = JSON.parse(searchDict.callIds ?? '[]');
-    const rowIds: string[] = _.uniq(
-      callIds
-        .map(callId => {
+    const rowIds = _.uniq(
+      filterNulls(
+        callIds.map(callId => {
           return pivotData.find(row => {
             return Array.from(pivotColumns).find(col => {
-              return row[col]?.callId === callId;
+              return row.cols[col]?.callId === callId;
             });
           })?.id;
         })
-        .filter(id => id != null)
+      )
     );
 
     setRowSelectionModel(rowIds);
@@ -509,7 +522,8 @@ export const PivotRunsTable: FC<
           const col = usingLeafMode
             ? fieldParts[fieldParts.length - 1]
             : fieldParts[0];
-          const cellSpan = params.row[col] as CallSchema;
+          const row: PivotDataRowType = params.row;
+          const cellSpan = row.cols[col];
           if (!cellSpan) {
             return;
           }
@@ -543,9 +557,9 @@ export const PivotRunsTable: FC<
                 }
                 return Array.from(pivotColumns)
                   .map(col => {
-                    return row[col]?.callId;
+                    return row.cols[col]?.callId;
                   })
-                  .filter(maybeId => maybeId != null);
+                  .filter(maybeId => maybeId != null) as string[];
               });
             })
           );
