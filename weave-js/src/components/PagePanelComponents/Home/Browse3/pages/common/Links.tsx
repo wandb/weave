@@ -1,13 +1,14 @@
-import React from 'react';
-import {Link as LinkComp} from 'react-router-dom';
-import styled from 'styled-components';
-
 import {
-  MOON_550,
+  MOON_150,
+  MOON_200,
   MOON_700,
   TEAL_500,
   TEAL_600,
-} from '../../../../../../common/css/color.styles';
+} from '@wandb/weave/common/css/color.styles';
+import React from 'react';
+import {Link as LinkComp, useHistory} from 'react-router-dom';
+import styled, {css} from 'styled-components';
+
 import {TargetBlank} from '../../../../../../common/util/links';
 import {useWeaveflowRouteContext} from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
@@ -26,10 +27,57 @@ export const Link = styled(LinkComp)<LinkProps>`
   font-weight: 600;
   color: ${p => (p.$variant === 'secondary' ? MOON_700 : TEAL_600)};
   &:hover {
-    color: ${p => (p.$variant === 'secondary' ? MOON_550 : TEAL_500)};
+    color: ${TEAL_500};
   }
 `;
 Link.displayName = 'S.Link';
+
+const CallLinkWrapper = styled.div<{fullWidth?: boolean}>`
+  ${p =>
+    p.fullWidth &&
+    css`
+      width: 100%;
+    `};
+
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 2px;
+  &:hover {
+    & a {
+      color: ${TEAL_500};
+    }
+    & > .callId {
+      background-color: ${MOON_200};
+      color: ${TEAL_500};
+    }
+  }
+`;
+CallLinkWrapper.displayName = 'S.CallLinkWrapper';
+
+const CallLinkOp = styled.div<{fullWidth?: boolean}>`
+  ${p =>
+    p.fullWidth &&
+    css`
+      flex: 1 1 auto;
+    `};
+
+  text-overflow: ellipsis;
+  overflow: hidden;
+`;
+CallLinkOp.displayName = 'S.CallLinkOp';
+
+const CallId = styled.div`
+  padding: 0 4px;
+  background-color: ${MOON_150};
+  border-radius: 4px;
+  margin-left: 4px;
+  font-weight: 600;
+  font-family: monospace;
+  font-size: 10px;
+  line-height: 20px;
+`;
+CallId.displayName = 'S.CallId';
 
 export const docUrl = (path: string): string => {
   return 'https://wandb.github.io/weave/' + path;
@@ -199,21 +247,31 @@ export const CallLink: React.FC<{
   opName: string;
   callId: string;
   variant?: LinkVariant;
+  fullWidth?: boolean;
 }> = props => {
+  const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   const opName = opNiceName(props.opName);
-  const truncatedId = truncateID(props.callId);
+  const truncatedId = props.callId.slice(-4);
+  const to = peekingRouter.callUIUrl(
+    props.entityName,
+    props.projectName,
+    '',
+    props.callId
+  );
+  const onClick = () => {
+    history.push(to);
+  };
+
   return (
-    <Link
-      $variant={props.variant}
-      to={peekingRouter.callUIUrl(
-        props.entityName,
-        props.projectName,
-        '',
-        props.callId
-      )}>
-      {opName} ({truncatedId})
-    </Link>
+    <CallLinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
+      <CallLinkOp fullWidth={props.fullWidth}>
+        <Link $variant={props.variant} to={to}>
+          {opName}
+        </Link>
+      </CallLinkOp>
+      <CallId className="callId">{truncatedId}</CallId>
+    </CallLinkWrapper>
   );
 };
 
