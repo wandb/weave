@@ -199,7 +199,11 @@ export const callsTableSelect = (stNode: Node) => {
   });
 };
 
-const buildOpUriClause = (rowVar: VarNode<Type>, opUri: string, key: string) => {
+const buildOpUriClause = (
+  rowVar: VarNode<Type>,
+  opUri: string,
+  key: string
+) => {
   if (opUri.endsWith(WILDCARD_ARTIFACT_VERSION_AND_PATH)) {
     return opAnd({
       lhs: opStringStartsWith({

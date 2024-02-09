@@ -89,7 +89,7 @@ export const CallsPage: FC<{
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
       const niceName = opNiceName(opName);
-      if (niceName == 'Evaluation-evaluate') {
+      if (niceName === 'Evaluation-evaluate') {
         // Very special case for now
         if (filter.isPivot) {
           return 'Evaluation Leaderboard';
@@ -579,7 +579,7 @@ const useOpVersionOptions = (
   );
 
   return useMemo(() => {
-    let result: Array<{
+    const result: Array<{
       title: string;
       ref: string;
       group: string;

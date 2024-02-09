@@ -33,7 +33,11 @@ import {
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
 import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
-import {fnRunsNode, useRuns, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
+import {
+  fnRunsNode,
+  useRuns,
+  useRunsWithFeedback,
+} from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 
 export const OP_CATEGORIES = [
@@ -95,12 +99,12 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? getCallFromCache(key) : null;
   const calls = useRuns(
     {
-      entityName: key?.entity ?? "",
-      projectName: key?.project ?? "",
+      entityName: key?.entity ?? '',
+      projectName: key?.project ?? '',
       streamName: PROJECT_CALL_STREAM_NAME,
     },
     {
-      callIds: [key?.callId ?? ""],
+      callIds: [key?.callId ?? ''],
     },
     {skip: key == null || cachedCall != null}
   );
@@ -111,7 +115,7 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         loading: false,
         result: null,
       };
-    } 
+    }
     if (cachedCall != null) {
       return {
         loading: false,
@@ -154,25 +158,28 @@ export type CallFilter = {
 
 // NOTE: THis method does not follow the standard pattern of the other hooks
 // Need to think about how to make it more consistent or generalize the pattern
-export const callsNode  = (
+export const callsNode = (
   entity: string,
   project: string,
   filter: CallFilter
 ): Node => {
-  return fnRunsNode({
-    entityName: entity,
-    projectName: project,
-    streamName: PROJECT_CALL_STREAM_NAME,
-  }, {
-    opUris: filter.opVersionRefs,
-    inputUris: filter.inputObjectVersionRefs,
-    outputUris: filter.outputObjectVersionRefs,
-    traceId: filter.traceId,
-    parentIds: filter.parentIds,
-    traceRootsOnly: filter.traceRootsOnly,
-    callIds: filter.callIds,
-  })
-}
+  return fnRunsNode(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: PROJECT_CALL_STREAM_NAME,
+    },
+    {
+      opUris: filter.opVersionRefs,
+      inputUris: filter.inputObjectVersionRefs,
+      outputUris: filter.outputObjectVersionRefs,
+      traceId: filter.traceId,
+      parentIds: filter.parentIds,
+      traceRootsOnly: filter.traceRootsOnly,
+      callIds: filter.callIds,
+    }
+  );
+};
 export const useCalls = (
   entity: string,
   project: string,
@@ -484,7 +491,14 @@ export const useOpVersions = (
         result,
       };
     }
-  }, [dataValue.loading, dataValue.result, entity, filter.category, project]);
+  }, [
+    dataValue.loading,
+    dataValue.result,
+    entity,
+    filter.category,
+    opts?.skip,
+    project,
+  ]);
 };
 
 type ObjectVersionKey = {
@@ -573,16 +587,18 @@ export const useObjectVersion = (
   const cachedObjectVersion = key ? getObjectVersionFromCache(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
-      entity: constString(key?.entity ?? ""),
-      project: constString(key?.project ?? ""),
+      entity: constString(key?.entity ?? ''),
+      project: constString(key?.project ?? ''),
     }),
-    artifactName: constString(key?.objectId ?? ""),
-    artifactVersionAlias: constString(key?.versionHash ?? ""),
+    artifactName: constString(key?.objectId ?? ''),
+    artifactVersionAlias: constString(key?.versionHash ?? ''),
   });
   const dataNode = artifactVersionNodeToObjectVersionDictNode(
     artifactVersionNode as any
   );
-  const dataValue = useNodeValue(dataNode, {skip: key == null || cachedObjectVersion != null});
+  const dataValue = useNodeValue(dataNode, {
+    skip: key == null || cachedObjectVersion != null,
+  });
 
   return useMemo(() => {
     if (key == null) {
@@ -590,7 +606,7 @@ export const useObjectVersion = (
         loading: false,
         result: null,
       };
-    } 
+    }
     if (cachedObjectVersion != null) {
       return {
         loading: false,
@@ -761,7 +777,14 @@ export const useRootObjectVersions = (
         result,
       };
     }
-  }, [dataValue.loading, dataValue.result, entity, filter.category, project]);
+  }, [
+    dataValue.loading,
+    dataValue.result,
+    entity,
+    filter.category,
+    opts?.skip,
+    project,
+  ]);
 };
 
 type WFNaiveRefDict = {
