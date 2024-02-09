@@ -1,17 +1,3 @@
-/**
- * Step 3: Perf of the compare view is really bad
- * TODO: The Pivot Table and Calls Compare are pretty jank and the typing is off: really should refactor since it is likely needed to push the grouping down to the server.
- * Trace roots is still pretty confusing...
- */
-
-// import {
-//   CircularProgress,
-//   IconButton,
-//   InputLabel,
-//   MenuItem,
-//   OutlinedInput,
-//   Select,
-// } from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
@@ -58,9 +44,7 @@ export type WFHighLevelCallFilter = {
   opCategory?: HackyOpCategory | null;
   opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
-  // outputObjectVersionRefs?: string[];
   parentId?: string | null;
-  // traceId?: string | null;
   isPivot?: boolean;
   pivotSpec?: Partial<WFHighLevelPivotSpec>;
 };
@@ -79,14 +63,6 @@ export const CallsPage: FC<{
   );
 
   const title = useMemo(() => {
-    // const traceRootsOnly = !(
-    //   !!filter.opVersionRefs ||
-    //   !!filter.inputObjectVersionRefs ||
-    //   !!filter.parentId
-    // );
-    // if (traceRootsOnly) {
-    //   return 'Root Traces';
-    // }
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
       const niceName = opNiceName(opName);
@@ -135,8 +111,6 @@ export const CallsTable: FC<{
   ioColumnsOnly?: boolean;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
-  // const orm = useWeaveflowORMContext(props.entity, props.project);
-
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
     props.onFilterUpdate
@@ -162,18 +136,14 @@ export const CallsTable: FC<{
     ? opVersionOptions[opVersionRef]?.objectVersion
     : null;
 
-  const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
+  const consumesObjectVersionOptions =
+    useConsumesObjectVersionOptions(effectiveFilter);
   const inputObjectVersionRef =
     effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
   const inputObjectVersion = inputObjectVersionRef
     ? consumesObjectVersionOptions[inputObjectVersionRef]
     : null;
 
-  // const parentIdOptions: {[key: string]: string} = {};
   const parentIdOptions = useParentIdOptions(
     props.entity,
     props.project,
@@ -183,19 +153,7 @@ export const CallsTable: FC<{
     ? parentIdOptions[effectiveFilter.parentId]
     : null;
   const opCategoryOptions = OP_CATEGORIES;
-  // const opCategoryOptions = useOpCategoryOptions(
-  //   orm,
-  //   props.entity,
-  //   props.project,
-  //   effectiveFilter
-  // );
   const traceRootOptions = [true, false];
-  // const traceRootOptions = useTraceRootOptions(
-  //   orm,
-  //   props.entity,
-  //   props.project,
-  //   effectiveFilter
-  // );
   const {onMakeBoard, isGenerating} = useMakeBoardForCalls(
     props.entity,
     props.project,
@@ -257,10 +215,7 @@ export const CallsTable: FC<{
   }, [filter, setFilter]);
 
   const forcingNonTraceRootsOnly =
-    (effectiveFilter.inputObjectVersionRefs?.length ?? 0) > 0 ||
-    (effectiveFilter.opVersionRefs?.length ?? 0) > 0 ||
-    effectiveFilter.parentId != null ||
-    effectiveFilter.opCategory != null;
+    shouldForceNonTraceRootsOnly(effectiveFilter);
 
   const rootsOnlyDisabled =
     forcingNonTraceRootsOnly ||
@@ -332,13 +287,6 @@ export const CallsTable: FC<{
                   });
                 }}
                 options={opCategoryOptions}
-                // renderOption={(props, option, {selected}) => {
-                //   return (
-                //     <li {...props}>
-                //       <CategoryChip value={option} />
-                //     </li>
-                //   );
-                // }}
               />
             </FormControl>
           </ListItem>
@@ -366,41 +314,9 @@ export const CallsTable: FC<{
                 }}
                 groupBy={option => opVersionOptions[option]?.group}
                 options={Object.keys(opVersionOptions)}
-                // freeSolo
               />
             </FormControl>
           </ListItem>
-          {/* <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                limitTags={1}
-                // Temp disable multiple for simplicity - may want to re-enable
-                // multiple
-                disabled={
-                  isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes(
-                    'inputObjectVersions'
-                  )
-                }
-                renderInput={params => (
-                  <TextField {...params} label="Inputs" />
-                  // <TextField {...params} label="Consumes Objects" />
-                )}
-                value={effectiveFilter.inputObjectVersionRefs?.[0] ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    inputObjectVersionRefs: newValue ? [newValue] : [],
-                  });
-                }}
-                getOptionLabel={option => {
-                  return consumesObjectVersionOptions[option] ?? option;
-                }}
-                options={Object.keys(consumesObjectVersionOptions)}
-              />
-            </FormControl>
-          </ListItem> */}
           {inputObjectVersion && (
             <Chip
               label={`Input: ${objectVersionNiceString(inputObjectVersion)}`}
@@ -412,29 +328,6 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          {/* <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={
-                  isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes('parentId')
-                }
-                renderInput={params => <TextField {...params} label="Parent" />}
-                value={effectiveFilter.parentId ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    parentId: newValue,
-                  });
-                }}
-                // getOptionLabel={option => {
-                //   return parentIdOptions[option] ?? option;
-                // }}
-                options={Object.keys(parentIdOptions)}
-              />
-            </FormControl>
-          </ListItem> */}
           {parentOpDisplay && (
             <Chip
               label={`Parent: ${parentOpDisplay}`}
@@ -450,7 +343,6 @@ export const CallsTable: FC<{
             sx={{
               width: '190px',
               flex: '0 0 190px',
-              // borderLeft: '1px solid #e0e0e0',
             }}
             secondaryAction={
               <Checkbox
@@ -535,25 +427,24 @@ const useMakeBoardForCalls = (
   return useMakeNewBoard(runsNode);
 };
 
+const shouldForceNonTraceRootsOnly = (filter: WFHighLevelCallFilter) => {
+  return (
+    (filter.inputObjectVersionRefs?.length ?? 0) > 0 ||
+    (filter.opVersionRefs?.length ?? 0) > 0 ||
+    filter.parentId != null ||
+    filter.opCategory != null
+  );
+};
+
 const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   const forcingNonTraceRootsOnly =
-    (effectiveFilter.inputObjectVersionRefs?.length ?? 0) > 0 ||
-    (effectiveFilter.opVersionRefs?.length ?? 0) > 0 ||
-    effectiveFilter.parentId != null ||
-    effectiveFilter.opCategory != null;
+    shouldForceNonTraceRootsOnly(effectiveFilter);
   return {
-    // traceRootsOnly: !(
-    //   !!effectiveFilter.opVersionRefs ||
-    //   !!effectiveFilter.inputObjectVersionRefs ||
-    //   !!effectiveFilter.parentId
-    // ),
     traceRootsOnly: !forcingNonTraceRootsOnly && effectiveFilter.traceRootsOnly,
     opVersionRefs: effectiveFilter.opVersionRefs,
     inputObjectVersionRefs: effectiveFilter.inputObjectVersionRefs,
-    // outputUris: effectiveFilter.outputObjectVersionRefs,
-    // traceId: effectiveFilter.traceId ?? undefined,
     parentIds: effectiveFilter.parentId
       ? [effectiveFilter.parentId]
       : undefined,
@@ -624,8 +515,6 @@ const useOpVersionOptions = (
 };
 
 const useConsumesObjectVersionOptions = (
-  entity: string,
-  project: string,
   effectiveFilter: WFHighLevelCallFilter
 ) => {
   // We don't populate this one because it is expensive

@@ -9,7 +9,6 @@ export const Browse2Calls: FC<{
   streamId: StreamId;
   filters: CallFilter;
 }> = ({streamId, filters}) => {
-  // const selectedQuery = useRunsWithFeedback(streamId, filters);
   return (
     <Paper>
       <Typography variant="h6" gutterBottom>
@@ -31,7 +30,6 @@ export const Browse2Calls: FC<{
         </div>
       )}
       Not Implemented
-      {/* <RunsTable loading={selectedQuery.loading} spans={selectedQuery.result} /> */}
     </Paper>
   );
 };

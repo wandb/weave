@@ -19,7 +19,6 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
-// import {SpanWithFeedback} from '../../../Browse2/callTree';
 import {
   buildTree,
   DataGridColumnGroupingModel,
@@ -206,7 +205,6 @@ export const PivotRunsView: FC<
         />
       ) : (
         <CenteredAnimatedLoader />
-        // <>Please select pivot dimensions</>
       )}
     </Box>
   );

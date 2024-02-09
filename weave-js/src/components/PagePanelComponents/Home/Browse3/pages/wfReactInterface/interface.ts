@@ -156,8 +156,6 @@ export type CallFilter = {
   opCategory?: OpCategory[];
 };
 
-// NOTE: THis method does not follow the standard pattern of the other hooks
-// Need to think about how to make it more consistent or generalize the pattern
 export const callsNode = (
   entity: string,
   project: string,

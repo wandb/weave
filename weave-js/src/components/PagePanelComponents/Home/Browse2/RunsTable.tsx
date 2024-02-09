@@ -120,7 +120,6 @@ export const RunsTable: FC<{
   const params = useParams<Browse2RootObjectVersionItemParams>();
   const tableData = useMemo(() => {
     return spans.map((call: CallSchema) => {
-      // const ormCall = orm?.projectConnection.call(call.span_id);
       const argOrder = call.rawSpan.inputs._input_order;
       let args = _.fromPairs(
         Object.entries(call.rawSpan.inputs).filter(
