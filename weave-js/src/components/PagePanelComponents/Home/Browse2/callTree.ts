@@ -139,8 +139,8 @@ export const callsTableNode = (streamId: StreamId) => {
         projectName: constString(streamId.projectName),
       }),
       runName: constString(streamId.streamName),
-    })
-  })
+    }),
+  });
   streamTableRowsNode.type = callsTableWeaveType;
   return streamTableRowsNode;
 };
@@ -266,25 +266,31 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
       filterClauses.push(
         opOr({
           lhs: opStringEqual({
-            lhs: opRefToUri({self: opPick({
-              obj: rowVar,
-              key: constString('inputs._ref0'),
-            }) as any}),
+            lhs: opRefToUri({
+              self: opPick({
+                obj: rowVar,
+                key: constString('inputs._ref0'),
+              }) as any,
+            }),
             rhs: constString(inputUri),
           }) as any,
           rhs: opOr({
             lhs: opStringEqual({
-              lhs:  opRefToUri({self: opPick({
-                obj: rowVar,
-                key: constString('inputs._ref1'),
-              })as any}),
+              lhs: opRefToUri({
+                self: opPick({
+                  obj: rowVar,
+                  key: constString('inputs._ref1'),
+                }) as any,
+              }),
               rhs: constString(inputUri),
             }) as any,
             rhs: opStringEqual({
-              lhs:  opRefToUri({self: opPick({
-                obj: rowVar,
-                key: constString('inputs._ref2'),
-              })as any}),
+              lhs: opRefToUri({
+                self: opPick({
+                  obj: rowVar,
+                  key: constString('inputs._ref2'),
+                }) as any,
+              }),
               rhs: constString(inputUri),
             }) as any,
           }) as any,

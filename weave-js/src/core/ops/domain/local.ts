@@ -829,7 +829,6 @@ export const opRefEqual = makeEqualOp({
   argType: {type: 'Ref'},
 });
 
-
 export const opRefToUri = makeOp({
   hidden: true,
   name: 'ref-toUri',

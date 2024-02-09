@@ -321,7 +321,13 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
   };
 }
 
-const expensiveOpNames = new Set(['get', 'set', 'getReturnType', "Ref-type", 'ref']);
+const expensiveOpNames = new Set([
+  'get',
+  'set',
+  'getReturnType',
+  'Ref-type',
+  'ref',
+]);
 
 // Heuristic to determine if an op is expensive. We should merge
 // all subgraphs with non-expensive ops into a single graph, since
