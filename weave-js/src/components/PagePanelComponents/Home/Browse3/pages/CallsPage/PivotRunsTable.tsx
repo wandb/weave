@@ -26,7 +26,7 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
-import {SpanWithFeedback} from '../../../Browse2/callTree';
+// import {SpanWithFeedback} from '../../../Browse2/callTree';
 import {
   buildTree,
   DataGridColumnGroupingModel,
@@ -217,7 +217,7 @@ export const PivotRunsView: FC<
   );
 };
 
-type PivotDataRowType = {[col: string]: any};
+type PivotDataRowType = {[col: string]: CallSchema | null};
 
 export const PivotRunsTable: FC<
   PivotRunsTablePropsType & {
@@ -232,19 +232,19 @@ export const PivotRunsTable: FC<
   const history = useHistory();
 
   const {pivotData, pivotColumns} = useMemo(() => {
-    const aggregationFn = (internalRows: SpanWithFeedback[]) => {
+    const aggregationFn = (internalRows: CallSchema[]): CallSchema | null => {
       if (internalRows.length === 0) {
         return null;
       }
-      return _.sortBy(internalRows, r => -r.timestamp)[0];
+      return _.sortBy(internalRows, r => -r.rawSpan.timestamp)[0];
     };
 
     // Step 1: Create a map of values
-    const values: {[rowId: string]: {[colId: string]: any[]}} = {};
+    const values: {[rowId: string]: {[colId: string]: CallSchema[]}} = {};
     const pivotColumnsInner: Set<string> = new Set();
     props.runs.forEach(r => {
-      const rowValue = getValueAtNestedKey(r, props.pivotSpec.rowDim);
-      const colValue = getValueAtNestedKey(r, props.pivotSpec.colDim);
+      const rowValue = getValueAtNestedKey(r.rawSpan, props.pivotSpec.rowDim);
+      const colValue = getValueAtNestedKey(r.rawSpan, props.pivotSpec.colDim);
       if (rowValue == null || colValue == null) {
         return;
       }
@@ -262,9 +262,9 @@ export const PivotRunsTable: FC<
     const rows: PivotDataRowType[] = [];
     Object.keys(values).forEach(rowKey => {
       const row: PivotDataRowType = {
-        id: rowKey,
+        id: rowKey as any,
       };
-      row[props.pivotSpec.rowDim] = rowKey;
+      row[props.pivotSpec.rowDim] = rowKey as any;
       Object.keys(values[rowKey]).forEach(colKey => {
         row[colKey] = aggregationFn(values[rowKey][colKey]);
       });
@@ -279,7 +279,7 @@ export const PivotRunsTable: FC<
       pivotData
         .flatMap(pivotRow =>
           Array.from(pivotColumns).map(
-            col => (pivotRow[col] as SpanWithFeedback | null)?.name
+            col => (pivotRow[col] as CallSchema | null)?.opVersionRef
           )
         )
         .filter(name => name != null)
@@ -312,9 +312,10 @@ export const PivotRunsTable: FC<
         // All output keys as we don't have the order key yet.
         const outputKeys: {[key: string]: true} = {};
         pivotData.forEach(pivotRow => {
-          if (pivotRow[col]) {
+          const pivotCol = pivotRow[col];
+          if (pivotCol) {
             for (const [k, v] of Object.entries(
-              flattenObject(pivotRow[col].output!)
+              flattenObject(pivotCol.rawSpan.output!)
             )) {
               if (v != null && (!k.startsWith('_') || k === '_result')) {
                 outputKeys[k] = true;
@@ -338,7 +339,7 @@ export const PivotRunsTable: FC<
             headerName: key.split('.').slice(-1)[0],
             renderCell: cellParams => {
               return renderCell(
-                getValueAtNestedKey(cellParams.row[col]?.output, key)
+                getValueAtNestedKey(cellParams.row[col]?.rawSpan.output, key)
               );
             },
           });
@@ -354,9 +355,10 @@ export const PivotRunsTable: FC<
       const outputKeys: {[key: string]: true} = {};
       pivotColumns.forEach(col => {
         pivotData.forEach(pivotRow => {
-          if (pivotRow[col]) {
+          const pivotCol = pivotRow[col];
+          if (pivotCol) {
             for (const [k, v] of Object.entries(
-              flattenObject(pivotRow[col].output!)
+              flattenObject(pivotCol.rawSpan.output!)
             )) {
               if (v != null && (!k.startsWith('_') || k === '_result')) {
                 outputKeys[k] = true;
@@ -432,7 +434,7 @@ export const PivotRunsTable: FC<
         .map(callId => {
           return pivotData.find(row => {
             return Array.from(pivotColumns).find(col => {
-              return row[col]?.span_id === callId;
+              return row[col]?.callId === callId;
             });
           })?.id;
         })
@@ -507,7 +509,7 @@ export const PivotRunsTable: FC<
           const col = usingLeafMode
             ? fieldParts[fieldParts.length - 1]
             : fieldParts[0];
-          const cellSpan = params.row[col] as SpanWithFeedback;
+          const cellSpan = params.row[col] as CallSchema;
           if (!cellSpan) {
             return;
           }
@@ -516,7 +518,7 @@ export const PivotRunsTable: FC<
               props.entity,
               props.project,
               '',
-              cellSpan.span_id
+              cellSpan.callId
             )
           );
         }}
@@ -541,12 +543,14 @@ export const PivotRunsTable: FC<
                 }
                 return Array.from(pivotColumns)
                   .map(col => {
-                    return row[col]?.span_id;
+                    return row[col]?.callId;
                   })
                   .filter(maybeId => maybeId != null);
               });
             })
           );
+
+          console.log(newSelection, callIds);
 
           history.push(
             peekingRouter.compareCallsUIUrl(

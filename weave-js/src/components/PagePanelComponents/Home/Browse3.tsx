@@ -722,7 +722,6 @@ const CallPageBinding = () => {
 };
 
 const CompareCallsBinding = () => {
-  useCallPeekRedirect();
   const params = useParams<Browse3TabItemParams>();
   const query = useURLSearchParamsDict();
   const compareSpec = useMemo(() => {
