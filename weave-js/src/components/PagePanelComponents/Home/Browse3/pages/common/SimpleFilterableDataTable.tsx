@@ -263,7 +263,7 @@ export const FilterLayoutTemplate: React.FC<{
             p: 1,
             '& li': {
               padding: 0,
-              minWidth: '150px',
+              minWidth: '200px',
             },
             '& input, & label, & .MuiTypography-root': {
               fontSize: '0.875rem',

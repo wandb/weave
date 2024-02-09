@@ -17,7 +17,9 @@
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
+  Box,
   Checkbox,
+  Chip,
   CircularProgress,
   FormControl,
   IconButton,
@@ -42,11 +44,14 @@ import {HackyOpCategory, WFCall, WFObjectVersion} from '../wfInterface/types';
 import {
   CallFilter,
   objectVersionKeyToRefUri,
+  ObjectVersionSchema,
   OP_CATEGORIES,
   opVersionKeyToRefUri,
   opVersionRefOpName,
+  OpVersionSchema,
   refUriToObjectVersionKey,
   refUriToOpVersionKey,
+  useCall,
   useCalls,
   useObjectVersion,
   useOpVersions,
@@ -152,19 +157,31 @@ export const CallsTable: FC<{
     props.project,
     effectiveFilter
   );
+  const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
+  const opVersion = opVersionRef
+    ? opVersionOptions[opVersionRef]?.objectVersion
+    : null;
 
   const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
     props.entity,
     props.project,
     effectiveFilter
   );
-  const parentIdOptions: {[key: string]: string} = {};
-  // const parentIdOptions = useParentIdOptions(
-  //   orm,
-  //   props.entity,
-  //   props.project,
-  //   effectiveFilter
-  // );
+  const inputObjectVersionRef =
+    effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
+  const inputObjectVersion = inputObjectVersionRef
+    ? consumesObjectVersionOptions[inputObjectVersionRef]
+    : null;
+
+  // const parentIdOptions: {[key: string]: string} = {};
+  const parentIdOptions = useParentIdOptions(
+    props.entity,
+    props.project,
+    effectiveFilter
+  );
+  const parentOpDisplay = effectiveFilter.parentId
+    ? parentIdOptions[effectiveFilter.parentId]
+    : null;
   const opCategoryOptions = OP_CATEGORIES;
   // const opCategoryOptions = useOpCategoryOptions(
   //   orm,
@@ -239,6 +256,17 @@ export const CallsTable: FC<{
     return null;
   }, [filter, setFilter]);
 
+  const forcingNonTraceRootsOnly =
+    (effectiveFilter.inputObjectVersionRefs?.length ?? 0) > 0 ||
+    (effectiveFilter.opVersionRefs?.length ?? 0) > 0 ||
+    effectiveFilter.parentId != null;
+
+  const rootsOnlyDisabled =
+    forcingNonTraceRootsOnly ||
+    isPivoting ||
+    traceRootOptions.length <= 1 ||
+    Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly');
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -278,20 +306,23 @@ export const CallsTable: FC<{
               <PivotTableChart />
             </IconButton>
           )}
-          <ListItem>
+          <ListItem sx={{width: '200px', flex: '0 0 200px'}}>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
                 disabled={
                   isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes('opCategory')
+                  Object.keys(props.frozenFilter ?? {}).includes(
+                    'opCategory'
+                  ) ||
+                  (effectiveFilter.opVersionRefs ?? []).length > 0
                 }
                 renderInput={params => {
-                  console.log(params);
-
                   return <TextField {...params} label="Category" />;
                 }}
-                value={effectiveFilter.opCategory ?? null}
+                value={
+                  effectiveFilter.opCategory ?? opVersion?.category ?? null
+                }
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
@@ -309,7 +340,7 @@ export const CallsTable: FC<{
               />
             </FormControl>
           </ListItem>
-          <ListItem>
+          <ListItem sx={{minWidth: '200px'}}>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
@@ -337,7 +368,7 @@ export const CallsTable: FC<{
               />
             </FormControl>
           </ListItem>
-          <ListItem>
+          {/* <ListItem>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
@@ -367,8 +398,19 @@ export const CallsTable: FC<{
                 options={Object.keys(consumesObjectVersionOptions)}
               />
             </FormControl>
-          </ListItem>
-          <ListItem>
+          </ListItem> */}
+          {inputObjectVersion && (
+            <Chip
+              label={`Input: ${inputObjectVersion.objectId}:v${inputObjectVersion.versionIndex}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  inputObjectVersionRefs: undefined,
+                });
+              }}
+            />
+          )}
+          {/* <ListItem>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
@@ -390,31 +432,35 @@ export const CallsTable: FC<{
                 options={Object.keys(parentIdOptions)}
               />
             </FormControl>
-          </ListItem>
+          </ListItem> */}
+          {parentOpDisplay && (
+            <Chip
+              label={`Parent: ${parentOpDisplay}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  parentId: undefined,
+                });
+              }}
+            />
+          )}
           <ListItem
+            sx={{width: '200px', flex: '0 0 200px'}}
             secondaryAction={
               <Checkbox
                 edge="end"
                 checked={
-                  !!effectiveFilter.traceRootsOnly ||
-                  (traceRootOptions.length === 1 && traceRootOptions[0])
+                  !forcingNonTraceRootsOnly && !!effectiveFilter.traceRootsOnly
                 }
-                onChange={() => {
-                  setFilter({
-                    ...filter,
-                    traceRootsOnly: !effectiveFilter.traceRootsOnly,
-                  });
-                }}
               />
             }
-            disabled={
-              isPivoting ||
-              traceRootOptions.length <= 1 ||
-              Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
-            }
+            disabled={rootsOnlyDisabled}
             disablePadding>
             <ListItemButton
               onClick={() => {
+                if (rootsOnlyDisabled) {
+                  return;
+                }
                 setFilter({
                   ...filter,
                   traceRootsOnly: !effectiveFilter.traceRootsOnly,
@@ -522,7 +568,12 @@ const useOpVersionOptions = (
   );
 
   return useMemo(() => {
-    let result: Array<{title: string; ref: string; group: string}> = [];
+    let result: Array<{
+      title: string;
+      ref: string;
+      group: string;
+      objectVersion?: OpVersionSchema;
+    }> = [];
 
     latestVersions.result?.forEach(ov => {
       const ref = opVersionKeyToRefUri({
@@ -542,6 +593,7 @@ const useOpVersionOptions = (
         title: ov.opId + ':v' + ov.versionIndex,
         ref,
         group: `Versions of ${opNiceName(currentOpId!)}`,
+        objectVersion: ov,
       });
     });
 
@@ -566,121 +618,33 @@ const useConsumesObjectVersionOptions = (
       return {};
     }
     return {
-      [currentRef]:
-        objectVersion.result.objectId +
-        ':v' +
-        objectVersion.result.versionIndex,
+      [currentRef]: objectVersion.result,
     };
   }, [currentRef, objectVersion.loading, objectVersion.result]);
 };
 
 const useParentIdOptions = (
-  orm: WeaveflowORMContextType,
   entity: string,
   project: string,
-  highLevelFilter: WFHighLevelCallFilter
+  effectiveFilter: WFHighLevelCallFilter
 ) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        _.omit(highLevelFilter, ['parentId'])
-      );
-    }, [highLevelFilter])
-  );
-  return useMemo(() => {
-    let parents: WFCall[] = [];
-    if (runs.loading) {
-      parents = orm.projectConnection
-        .calls()
-        .map(c => c.parentCall())
-        .filter(v => v != null) as WFCall[];
-    } else {
-      parents = runs.result
-        .map(r => orm.projectConnection.call(r.span_id)?.parentCall())
-        .filter(v => v != null) as WFCall[];
-    }
-
-    const pairs = _.uniqBy(
-      parents.map(c => {
-        const version = c.opVersion();
-        if (!version) {
-          return [c.traceID(), c.spanName()];
+  const parentCall = useCall(
+    effectiveFilter.parentId
+      ? {
+          entity,
+          project,
+          callId: effectiveFilter.parentId,
         }
-        return [
-          c.callID(),
-          opNiceName(version.op().name()) + ' (' + truncateID(c.callID()) + ')',
-        ];
-      }),
-      p => p[1]
-    );
-
-    pairs.sort((a, b) => {
-      return a[1].localeCompare(b[1]);
-    });
-
-    return _.fromPairs(pairs);
-  }, [orm.projectConnection, runs.loading, runs.result]);
-};
-
-const useOpCategoryOptions = (
-  orm: WeaveflowORMContextType,
-  entity: string,
-  project: string,
-  highLevelFilter: WFHighLevelCallFilter
-) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        _.omit(highLevelFilter, ['opCategory'])
-      );
-    }, [highLevelFilter])
+      : null
   );
   return useMemo(() => {
-    if (runs.loading) {
-      return orm.projectConnection.opCategories();
+    if (parentCall.loading || parentCall.result == null) {
+      return {};
     }
-    return _.uniq(
-      runs.result.map(r =>
-        orm.projectConnection.call(r.span_id)?.opVersion()?.opCategory()
-      )
-    )
-      .filter(v => v != null)
-      .sort() as HackyOpCategory[];
-  }, [orm.projectConnection, runs.loading, runs.result]);
+    return {
+      [parentCall.result.callId]: `${parentCall.result.spanName} (${truncateID(
+        parentCall.result.callId
+      )})`,
+    };
+  }, [parentCall.loading, parentCall.result]);
 };
-
-// const useTraceRootOptions = (
-//   orm: WeaveflowORMContextType,
-//   entity: string,
-//   project: string,
-//   highLevelFilter: WFHighLevelCallFilter
-// ) => {
-//   const runs = useRunsWithFeedback(
-//     {
-//       entityName: entity,
-//       projectName: project,
-//       streamName: 'stream',
-//     },
-//     useMemo(() => {
-//       return convertHighLevelFilterToLowLevelFilter(
-//         _.omit(highLevelFilter, ['traceRootsOnly'])
-//       );
-//     }, [highLevelFilter])
-//   );
-//   return useMemo(() => {
-//     if (runs.loading) {
-//       return [true, false];
-//     }
-//     return _.uniq(runs.result.map(r => r.parent_id == null));
-//   }, [runs.loading, runs.result]);
-// };

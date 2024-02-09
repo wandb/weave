@@ -91,21 +91,27 @@ const spanToCallSchema = (
   };
 };
 
-export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
-  const cachedCall = getCallFromCache(key);
+export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
+  const cachedCall = key ? getCallFromCache(key) : null;
   const calls = useRuns(
     {
-      entityName: key.entity,
-      projectName: key.project,
+      entityName: key?.entity ?? "",
+      projectName: key?.project ?? "",
       streamName: PROJECT_CALL_STREAM_NAME,
     },
     {
-      callIds: [key.callId],
+      callIds: [key?.callId ?? ""],
     },
-    {skip: cachedCall != null}
+    {skip: key == null || cachedCall != null}
   );
 
   return useMemo(() => {
+    if (key == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    } 
     if (cachedCall != null) {
       return {
         loading: false,
