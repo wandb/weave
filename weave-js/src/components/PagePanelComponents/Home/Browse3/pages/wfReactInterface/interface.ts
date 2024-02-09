@@ -443,7 +443,7 @@ export const useOpVersionsNode = (
   });
 
   return dataNode;
-}
+};
 
 export const useOpVersions = (
   entity: string,
@@ -733,8 +733,7 @@ export const useRootObjectVersionsNode = (
   });
 
   return dataNode;
-}
-
+};
 
 export const useRootObjectVersions = (
   entity: string,
@@ -742,7 +741,6 @@ export const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   opts?: {skip?: boolean}
 ): Loadable<ObjectVersionSchema[]> => {
-  
   const dataNode = useRootObjectVersionsNode(entity, project, filter);
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
@@ -932,16 +930,16 @@ export const opVersionRefOpCategory = (opVersionRef: string) => {
 };
 
 export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
-  let result = ov.objectId
-  if (ov.versionHash === "*") {
+  let result = ov.objectId;
+  if (ov.versionHash === '*') {
     return result;
   }
   result += `:v${ov.versionIndex}`;
-  if (ov.path !== "obj") {
+  if (ov.path !== 'obj') {
     result += `/${ov.path}`;
   }
   if (ov.refExtra) {
     result += `#${ov.refExtra}`;
   }
   return result;
-}
+};

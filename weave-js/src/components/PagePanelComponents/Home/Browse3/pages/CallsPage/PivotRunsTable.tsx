@@ -390,7 +390,7 @@ export const PivotRunsTable: FC<
             },
             renderCell: cellParams => {
               return renderCell(
-                getValueAtNestedKey(cellParams.row[col]?.output, key)
+                getValueAtNestedKey(cellParams.row[col]?.rawSpan.output, key)
               );
             },
           });
