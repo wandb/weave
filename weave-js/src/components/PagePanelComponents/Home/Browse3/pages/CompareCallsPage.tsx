@@ -369,7 +369,9 @@ const useSubRunsFromWeaveQuery = (
     leftOuter: constBoolean(true),
     rightOuter: constBoolean(false),
   });
-  const nodeValue = useNodeValue(joinedRuns);
+  const nodeValue = useNodeValue(joinedRuns, {
+    skip: !selectedObjectVersionRef || !selectedOpVersionRef,
+  });
   // console.log(
   //   parentCallIds,
   //   selectedObjectVersionRef,
