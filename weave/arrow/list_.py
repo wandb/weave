@@ -580,6 +580,16 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         assert len(path) > 1
         edge_type = path[0]
         edge_path = path[1]
+
+        # The client might send over refs without knowing the underlying list type is a table.
+        if (
+            edge_type == ref_util.DICT_KEY_EDGE_TYPE
+            or edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE
+        ):
+            edge_type = ref_util.TABLE_COLUMN_EDGE_TYPE
+        elif edge_type == ref_util.LIST_INDEX_EDGE_TYPE:
+            edge_type = ref_util.TABLE_ROW_EDGE_TYPE
+
         assert edge_type in [
             ref_util.TABLE_ROW_EDGE_TYPE,
             ref_util.TABLE_COLUMN_EDGE_TYPE,

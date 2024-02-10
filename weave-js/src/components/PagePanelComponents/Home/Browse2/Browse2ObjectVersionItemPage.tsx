@@ -15,6 +15,13 @@ import {useParams} from 'react-router-dom';
 
 import {usePanelContext} from '../../../Panel2/PanelContext';
 import {useMakeLocalBoardFromNode} from '../../../Panel2/pyBoardGen';
+import {
+  DICT_KEY_EDGE_TYPE,
+  LIST_INDEX_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+  TABLE_COLUMN_EDGE_TYPE,
+  TABLE_ROW_EDGE_TYPE,
+} from '../Browse3/pages/wfReactInterface/constants';
 import {SEED_BOARD_OP_NAME} from '../HomePreviewSidebar';
 import {Browse2CallsPage} from './Browse2CallsPage';
 import {Browse2OpDefPage} from './Browse2OpDefPage';
@@ -31,7 +38,7 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
     return node;
   }
-  if (extra[0] === 'ndx' || extra[0] === 'row') {
+  if (extra[0] === LIST_INDEX_EDGE_TYPE || extra[0] === TABLE_ROW_EDGE_TYPE) {
     return nodeFromExtra(
       callOpVeryUnsafe('index', {
         arr: node,
@@ -39,7 +46,10 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
       }) as Node,
       extra.slice(2)
     );
-  } else if (extra[0] === 'key' || extra[0] === 'col') {
+  } else if (
+    extra[0] === DICT_KEY_EDGE_TYPE ||
+    extra[0] === TABLE_COLUMN_EDGE_TYPE
+  ) {
     return nodeFromExtra(
       callOpVeryUnsafe('pick', {
         obj: node,
@@ -47,7 +57,7 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
       }) as Node,
       extra.slice(2)
     );
-  } else if (extra[0] === 'atr') {
+  } else if (extra[0] === OBJECT_ATTRIBUTE_EDGE_TYPE) {
     return nodeFromExtra(
       callOpVeryUnsafe('Object-__getattr__', {
         self: node,

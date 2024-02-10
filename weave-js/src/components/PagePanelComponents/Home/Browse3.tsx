@@ -586,7 +586,7 @@ const ObjectVersionRoutePageBinding = () => {
       objectName={params.itemName}
       version={params.version}
       filePath={query.path ?? 'obj'} // Default to obj
-      refExtra={query.extra ?? ''}
+      refExtra={query.extra}
     />
   );
 };
