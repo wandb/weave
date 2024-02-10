@@ -2,7 +2,6 @@ import {toWeaveType} from '@wandb/weave/components/Panel2/toWeaveType';
 import {
   callOpVeryUnsafe,
   constFunction,
-  constNodeUnsafe,
   constNumber,
   constString,
   InputTypes,
@@ -23,7 +22,6 @@ import {
   opOr,
   opPick,
   opProjectRun,
-  opRefEqual,
   opRefToUri,
   opRootProject,
   opRunHistory3,
