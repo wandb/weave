@@ -44,6 +44,7 @@ export type WFHighLevelCallFilter = {
   opCategory?: HackyOpCategory | null;
   opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
+  outputObjectVersionRefs?: string[];
   parentId?: string | null;
   isPivot?: boolean;
   pivotSpec?: Partial<WFHighLevelPivotSpec>;
@@ -120,6 +121,18 @@ export const CallsTable: FC<{
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);
 
+  if ((effectiveFilter.opVersionRefs?.length ?? 0) > 1) {
+    throw new Error('Multiple op versions not yet supported');
+  }
+
+  if ((effectiveFilter.inputObjectVersionRefs?.length ?? 0) > 1) {
+    throw new Error('Multiple input object versions not yet supported');
+  }
+
+  if ((effectiveFilter.outputObjectVersionRefs?.length ?? 0) > 1) {
+    throw new Error('Multiple output object versions not yet supported');
+  }
+
   const lowLevelFilter: CallFilter = useMemo(() => {
     return convertHighLevelFilterToLowLevelFilter(effectiveFilter);
   }, [effectiveFilter]);
@@ -142,6 +155,14 @@ export const CallsTable: FC<{
     effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
   const inputObjectVersion = inputObjectVersionRef
     ? consumesObjectVersionOptions[inputObjectVersionRef]
+    : null;
+
+  const producesObjectVersionOptions =
+    useProducesObjectVersionOptions(effectiveFilter);
+  const outputObjectVersionRef =
+    effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
+  const outputObjectVersion = outputObjectVersionRef
+    ? producesObjectVersionOptions[outputObjectVersionRef]
     : null;
 
   const parentIdOptions = useParentIdOptions(
@@ -330,6 +351,17 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          {outputObjectVersion && (
+            <Chip
+              label={`Output: ${objectVersionNiceString(outputObjectVersion)}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  outputObjectVersionRefs: undefined,
+                });
+              }}
+            />
+          )}
           {parentOpDisplay && (
             <Chip
               label={`Parent: ${parentOpDisplay}`}
@@ -447,6 +479,7 @@ const convertHighLevelFilterToLowLevelFilter = (
     traceRootsOnly: !forcingNonTraceRootsOnly && effectiveFilter.traceRootsOnly,
     opVersionRefs: effectiveFilter.opVersionRefs,
     inputObjectVersionRefs: effectiveFilter.inputObjectVersionRefs,
+    outputObjectVersionRefs: effectiveFilter.outputObjectVersionRefs,
     parentIds: effectiveFilter.parentId
       ? [effectiveFilter.parentId]
       : undefined,
@@ -524,6 +557,24 @@ const useConsumesObjectVersionOptions = (
 ) => {
   // We don't populate this one because it is expensive
   const currentRef = effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
+  const objectVersion = useObjectVersion(
+    currentRef ? refUriToObjectVersionKey(currentRef) : null
+  );
+  return useMemo(() => {
+    if (!currentRef || objectVersion.loading || !objectVersion.result) {
+      return {};
+    }
+    return {
+      [currentRef]: objectVersion.result,
+    };
+  }, [currentRef, objectVersion.loading, objectVersion.result]);
+};
+
+const useProducesObjectVersionOptions = (
+  effectiveFilter: WFHighLevelCallFilter
+) => {
+  // We don't populate this one because it is expensive
+  const currentRef = effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
   const objectVersion = useObjectVersion(
     currentRef ? refUriToObjectVersionKey(currentRef) : null
   );

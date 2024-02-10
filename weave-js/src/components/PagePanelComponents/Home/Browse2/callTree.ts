@@ -301,12 +301,14 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
   if (filters.outputUris != null) {
     for (const outputUri of filters.outputUris) {
       filterClauses.push(
-        opRefEqual({
-          lhs: opPick({
-            obj: rowVar,
-            key: constString('output._ref0'),
+        opStringEqual({
+          lhs: opRefToUri({
+            self: opPick({
+              obj: rowVar,
+              key: constString('output._ref0'),
+            }) as any,
           }),
-          rhs: constNodeUnsafe(refWeaveType, outputUri),
+          rhs: constString(outputUri),
         })
       );
     }
