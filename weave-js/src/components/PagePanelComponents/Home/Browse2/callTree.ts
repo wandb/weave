@@ -2,7 +2,6 @@ import {toWeaveType} from '@wandb/weave/components/Panel2/toWeaveType';
 import {
   callOpVeryUnsafe,
   constFunction,
-  constNodeUnsafe,
   constNumber,
   constString,
   InputTypes,
@@ -22,14 +21,22 @@ import {
   opNumberMult,
   opOr,
   opPick,
-  opRefEqual,
+  opProjectRun,
+  opRefToUri,
+  opRootProject,
+  opRunHistory3,
+  opStringEndsWith,
   opStringEqual,
+  opStringStartsWith,
   OutputType,
   Type,
   typedDictPropertyTypes,
+  VarNode,
   varNode,
 } from '@wandb/weave/core';
 import * as _ from 'lodash';
+
+import {WILDCARD_ARTIFACT_VERSION_AND_PATH} from '../Browse3/pages/wfReactInterface/constants';
 
 export interface StreamId {
   entityName: string;
@@ -64,7 +71,7 @@ export interface Call {
 }
 
 export type Span = Call;
-export type SpanWithFeedback = Span & {feedback: any};
+export type SpanWithFeedback = Span & {feedback?: any};
 
 export interface TraceSpan {
   traceId: string;
@@ -116,12 +123,22 @@ const callsTableWeaveType: Type = {
 };
 
 export const callsTableNode = (streamId: StreamId) => {
-  const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
-  const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
-    stream_table: opGet({
-      uri: constString(predsRefStr),
+  // Going straight to the opRunHistory call saves about 1 second per request in lookup time
+  // const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
+  // const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
+  //   stream_table: opGet({
+  //     uri: constString(predsRefStr),
+  //   }),
+  // }) as Node;
+  const streamTableRowsNode = opRunHistory3({
+    run: opProjectRun({
+      project: opRootProject({
+        entityName: constString(streamId.entityName),
+        projectName: constString(streamId.projectName),
+      }),
+      runName: constString(streamId.streamName),
     }),
-  }) as Node;
+  });
   streamTableRowsNode.type = callsTableWeaveType;
   return streamTableRowsNode;
 };
@@ -194,27 +211,50 @@ export const callsTableSelect = (stNode: Node) => {
   });
 };
 
+const buildOpUriClause = (
+  rowVar: VarNode<Type>,
+  opUri: string,
+  key: string
+) => {
+  if (opUri.endsWith(WILDCARD_ARTIFACT_VERSION_AND_PATH)) {
+    return opAnd({
+      lhs: opStringStartsWith({
+        lhs: opPick({
+          obj: rowVar,
+          key: constString(key),
+        }),
+        rhs: constString(
+          opUri.slice(0, -WILDCARD_ARTIFACT_VERSION_AND_PATH.length)
+        ),
+      }),
+      rhs: opStringEndsWith({
+        lhs: opPick({
+          obj: rowVar,
+          key: constString(key),
+        }),
+        rhs: constString('/obj'),
+      }),
+    });
+  } else {
+    return opStringEqual({
+      lhs: opPick({
+        obj: rowVar,
+        key: constString(key),
+      }),
+      rhs: constString(opUri),
+    });
+  }
+};
+
 const makeFilterExpr = (filters: CallFilter): Node | undefined => {
   const rowVar = varNode(listObjectType(callsTableWeaveType), 'row');
   const filterClauses: Node[] = [];
   if (filters.opUris != null && filters.opUris.length > 0) {
-    let clause = opStringEqual({
-      lhs: opPick({
-        obj: rowVar,
-        key: constString('name'),
-      }),
-      rhs: constString(filters.opUris[0]),
-    });
+    let clause = buildOpUriClause(rowVar, filters.opUris[0], 'name');
     for (const uri of filters.opUris.slice(1)) {
       clause = opOr({
         lhs: clause,
-        rhs: opStringEqual({
-          lhs: opPick({
-            obj: rowVar,
-            key: constString('name'),
-          }),
-          rhs: constString(uri),
-        }),
+        rhs: buildOpUriClause(rowVar, uri, 'name'),
       });
     }
     filterClauses.push(clause);
@@ -223,27 +263,33 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
     for (const inputUri of filters.inputUris) {
       filterClauses.push(
         opOr({
-          lhs: opRefEqual({
-            lhs: opPick({
-              obj: rowVar,
-              key: constString('inputs._ref0'),
+          lhs: opStringEqual({
+            lhs: opRefToUri({
+              self: opPick({
+                obj: rowVar,
+                key: constString('inputs._ref0'),
+              }) as any,
             }),
-            rhs: constNodeUnsafe(refWeaveType, inputUri),
+            rhs: constString(inputUri),
           }) as any,
           rhs: opOr({
-            lhs: opRefEqual({
-              lhs: opPick({
-                obj: rowVar,
-                key: constString('inputs._ref1'),
+            lhs: opStringEqual({
+              lhs: opRefToUri({
+                self: opPick({
+                  obj: rowVar,
+                  key: constString('inputs._ref1'),
+                }) as any,
               }),
-              rhs: constNodeUnsafe(refWeaveType, inputUri),
+              rhs: constString(inputUri),
             }) as any,
-            rhs: opRefEqual({
-              lhs: opPick({
-                obj: rowVar,
-                key: constString('inputs._ref2'),
+            rhs: opStringEqual({
+              lhs: opRefToUri({
+                self: opPick({
+                  obj: rowVar,
+                  key: constString('inputs._ref2'),
+                }) as any,
               }),
-              rhs: constNodeUnsafe(refWeaveType, inputUri),
+              rhs: constString(inputUri),
             }) as any,
           }) as any,
         }) as any
@@ -253,12 +299,14 @@ const makeFilterExpr = (filters: CallFilter): Node | undefined => {
   if (filters.outputUris != null) {
     for (const outputUri of filters.outputUris) {
       filterClauses.push(
-        opRefEqual({
-          lhs: opPick({
-            obj: rowVar,
-            key: constString('output._ref0'),
+        opStringEqual({
+          lhs: opRefToUri({
+            self: opPick({
+              obj: rowVar,
+              key: constString('output._ref0'),
+            }) as any,
           }),
-          rhs: constNodeUnsafe(refWeaveType, outputUri),
+          rhs: constString(outputUri),
         })
       );
     }

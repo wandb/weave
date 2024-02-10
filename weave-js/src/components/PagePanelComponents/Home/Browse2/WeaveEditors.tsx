@@ -62,6 +62,11 @@ import {useHistory} from 'react-router-dom';
 
 import {useWeaveflowCurrentRouteContext} from '../Browse3/context';
 import {Link} from '../Browse3/pages/common/Links';
+import {
+  DICT_KEY_EDGE_TYPE,
+  LIST_INDEX_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+} from '../Browse3/pages/wfReactInterface/constants';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {
   mutationPublishArtifact,
@@ -112,9 +117,9 @@ const weaveEditorPathUrlPathPart = (path: WeaveEditorPathEl[]) => {
   // Return the url path for a given editor path
   return path.flatMap(pathEl => {
     if (pathEl.type === 'getattr') {
-      return ['atr', pathEl.key];
+      return [OBJECT_ATTRIBUTE_EDGE_TYPE, pathEl.key];
     } else if (pathEl.type === 'pick') {
-      return ['key', pathEl.key];
+      return [DICT_KEY_EDGE_TYPE, pathEl.key];
     } else {
       throw new Error('invalid pathEl type');
     }
@@ -554,7 +559,7 @@ export const WeaveEditorTypedDict: FC<{
                 <Link
                   to={makeLinkPath([
                     ...weaveEditorPathUrlPathPart(path),
-                    'key',
+                    DICT_KEY_EDGE_TYPE,
                     key,
                   ])}>
                   {key}
@@ -597,7 +602,7 @@ export const WeaveEditorObject: FC<{
                 <Link
                   to={makeLinkPath([
                     ...weaveEditorPathUrlPathPart(path),
-                    'atr',
+                    OBJECT_ATTRIBUTE_EDGE_TYPE,
                     key,
                   ])}>
                   {key}
@@ -783,7 +788,7 @@ export const WeaveEditorTable: FC<{
           <Link
             to={makeLinkPath([
               ...weaveEditorPathUrlPathPart(path),
-              'ndx',
+              LIST_INDEX_EDGE_TYPE,
               params.row._origIndex,
             ])}>
             <LinkIcon />

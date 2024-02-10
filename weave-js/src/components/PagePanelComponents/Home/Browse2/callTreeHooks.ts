@@ -105,19 +105,26 @@ export const fnFeedbackNode = (entityName: string, projectName: string) => {
   return listSelectAll(feedbackTableNode(entityName, projectName));
 };
 
-export const useAllFeedback = (entityName: string, projectName: string) => {
+export const useAllFeedback = (
+  entityName: string,
+  projectName: string,
+  opts?: {skip?: boolean}
+) => {
   const feedbackNode = useMemo(
     () => fnFeedbackNode(entityName, projectName),
     [entityName, projectName]
   );
-  const feedbackQuery = useNodeValue(feedbackNode);
+  const feedbackQuery = useNodeValue(feedbackNode, {skip: opts?.skip});
   return useMemo(() => {
+    if (opts?.skip) {
+      return {loading: false, result: []};
+    }
     const feedback = feedbackQuery.result ?? [];
     return {
       loading: feedbackQuery.loading,
       result: feedback,
     };
-  }, [feedbackQuery.loading, feedbackQuery.result]);
+  }, [feedbackQuery.loading, feedbackQuery.result, opts?.skip]);
 };
 
 export const useLastRunFeedback = (
@@ -153,7 +160,8 @@ export const joinRunsWithFeedback = (runs: Call[], feedback: any) => {
 
 export const useRunsWithFeedback = (
   streamId: StreamId,
-  filters: CallFilter
+  filters: CallFilter,
+  skipFeedback?: boolean
 ): {loading: boolean; result: SpanWithFeedback[]} => {
   const runsQuery = useRuns(streamId, filters);
 
@@ -161,12 +169,16 @@ export const useRunsWithFeedback = (
   // We should use a real join!
   const feedbackQuery = useAllFeedback(
     streamId.entityName,
-    streamId.projectName
+    streamId.projectName,
+    {skip: skipFeedback}
   );
 
   return useMemo(() => {
     if (runsQuery.loading || feedbackQuery.loading) {
       return {loading: true, result: []};
+    }
+    if (skipFeedback) {
+      return runsQuery;
     }
     // TODO: (HACK) Not sure why we are getting duplicates yet, but duplicates
     //        will mess up the UI downstream, so uniquify here.
@@ -178,10 +190,5 @@ export const useRunsWithFeedback = (
       loading: false,
       result,
     };
-  }, [
-    feedbackQuery.loading,
-    feedbackQuery.result,
-    runsQuery.loading,
-    runsQuery.result,
-  ]);
+  }, [feedbackQuery.loading, feedbackQuery.result, runsQuery, skipFeedback]);
 };

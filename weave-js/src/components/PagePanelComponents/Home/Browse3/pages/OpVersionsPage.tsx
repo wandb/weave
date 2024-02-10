@@ -7,6 +7,8 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {opCount} from '../../../../../core';
+import {useNodeValue} from '../../../../../react';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {CategoryChip} from './common/CategoryChip';
@@ -16,10 +18,11 @@ import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyOpCategory} from './wfInterface/types';
 import {
+  callsNode,
   opVersionKeyToRefUri,
   OpVersionSchema,
-  useCalls,
   useOpVersions,
+  useOpVersionsNode,
 } from './wfReactInterface/interface';
 
 export type WFHighLevelOpVersionFilter = {
@@ -204,9 +207,10 @@ export const FilterableOpVersionsTable: React.FC<{
 
 const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
   const obj = props.obj;
-  const opVersions = useOpVersions(obj.entity, obj.project, {
+  const opVersionsNode = useOpVersionsNode(obj.entity, obj.project, {
     opIds: [obj.opId],
   });
+  const countValue = useNodeValue(opCount({arr: opVersionsNode}));
   return (
     <OpVersionsLink
       entity={obj.entity}
@@ -214,7 +218,7 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
       filter={{
         opName: obj.opId,
       }}
-      versionCount={(opVersions.result ?? []).length}
+      versionCount={countValue.result ?? 0}
       neverPeek
       variant="secondary"
     />
@@ -224,10 +228,11 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
 const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
-  const calls = useCalls(obj.entity, obj.project, {
+  const node = callsNode(obj.entity, obj.project, {
     opVersionRefs: [refUri],
   });
-  const callCount = (calls.result ?? []).length;
+  const countVal = useNodeValue(opCount({arr: node}));
+  const callCount = countVal?.result ?? 0;
 
   if (callCount === 0) {
     return null;

@@ -87,7 +87,7 @@ export const SideNav = () => {
               project: currentProject,
               artifactName: 'Evaluation-evaluate',
               versionCommitHash: '*',
-              filePathParts: [],
+              filePathParts: ['obj'],
               refExtraTuples: [],
             }),
           ],

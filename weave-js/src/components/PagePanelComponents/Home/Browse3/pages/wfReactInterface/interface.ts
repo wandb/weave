@@ -32,11 +32,15 @@ import {
   opStringEqual,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
-import {Call as CallTreeSpan} from '../../../Browse2/callTree';
-import {useRuns} from '../../../Browse2/callTreeHooks';
+import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
+import {
+  fnRunsNode,
+  useRuns,
+  useRunsWithFeedback,
+} from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 
-const OP_CATEGORIES = [
+export const OP_CATEGORIES = [
   'train',
   'predict',
   'score',
@@ -65,13 +69,14 @@ export type CallSchema = CallKey & {
   opVersionRef: string | null;
   traceId: string;
   parentId: string | null;
-  rawSpan: CallTreeSpan;
+  rawSpan: Span;
+  rawFeedback?: any;
 };
 
-const spanToCallSchema = (
+export const spanToCallSchema = (
   entity: string,
   project: string,
-  span: CallTreeSpan
+  span: SpanWithFeedback
 ): CallSchema => {
   return {
     entity,
@@ -86,24 +91,31 @@ const spanToCallSchema = (
       ? span.name
       : null,
     rawSpan: span,
+    rawFeedback: span.feedback,
   };
 };
 
-export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
-  const cachedCall = getCallFromCache(key);
+export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
+  const cachedCall = key ? getCallFromCache(key) : null;
   const calls = useRuns(
     {
-      entityName: key.entity,
-      projectName: key.project,
+      entityName: key?.entity ?? '',
+      projectName: key?.project ?? '',
       streamName: PROJECT_CALL_STREAM_NAME,
     },
     {
-      callIds: [key.callId],
+      callIds: [key?.callId ?? ''],
     },
-    {skip: cachedCall != null}
+    {skip: key == null || cachedCall != null}
   );
 
   return useMemo(() => {
+    if (key == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
     if (cachedCall != null) {
       return {
         loading: false,
@@ -131,7 +143,7 @@ export const useCall = (key: CallKey): Loadable<CallSchema | null> => {
   }, [cachedCall, calls.loading, calls.result, key]);
 };
 
-type CallFilter = {
+export type CallFilter = {
   // Filters are ANDed across the fields and ORed within the fields
   // Commented out means not yet implemented
   opVersionRefs?: string[];
@@ -139,15 +151,17 @@ type CallFilter = {
   outputObjectVersionRefs?: string[];
   parentIds?: string[];
   traceId?: string;
-  //   callIds?: string[];
-  //   traceRootsOnly?: boolean;
+  callIds?: string[];
+  traceRootsOnly?: boolean;
+  opCategory?: OpCategory[];
 };
-export const useCalls = (
+
+export const callsNode = (
   entity: string,
   project: string,
   filter: CallFilter
-): Loadable<CallSchema[]> => {
-  const calls = useRuns(
+): Node => {
+  return fnRunsNode(
     {
       entityName: entity,
       projectName: project,
@@ -159,21 +173,56 @@ export const useCalls = (
       outputUris: filter.outputObjectVersionRefs,
       traceId: filter.traceId,
       parentIds: filter.parentIds,
-      // traceRootsOnly?: boolean;
-      // callIds?: string[];
+      traceRootsOnly: filter.traceRootsOnly,
+      callIds: filter.callIds,
     }
   );
+};
+export const useCalls = (
+  entity: string,
+  project: string,
+  filter: CallFilter
+): Loadable<CallSchema[]> => {
+  const calls = useRunsWithFeedback(
+    {
+      entityName: entity,
+      projectName: project,
+      streamName: PROJECT_CALL_STREAM_NAME,
+    },
+    {
+      opUris: filter.opVersionRefs,
+      inputUris: filter.inputObjectVersionRefs,
+      outputUris: filter.outputObjectVersionRefs,
+      traceId: filter.traceId,
+      parentIds: filter.parentIds,
+      traceRootsOnly: filter.traceRootsOnly,
+      callIds: filter.callIds,
+    },
+    // TODO: Re-Enable feedback once we actually have it!
+    true
+  );
   return useMemo(() => {
-    const result = (calls.result ?? []).map(run =>
+    const allResults = (calls.result ?? []).map(run =>
       spanToCallSchema(entity, project, run)
     );
+    // Unfortunately, we can't filter by category in the query level yet
+    const result = allResults.filter((row: any) => {
+      return (
+        filter.opCategory == null ||
+        (row.opVersionRef &&
+          filter.opCategory.includes(
+            opVersionRefOpCategory(row.opVersionRef) as OpCategory
+          ))
+      );
+    });
+
     if (calls.loading) {
       return {
         loading: true,
         result,
       };
     } else {
-      result.forEach(call => {
+      allResults.forEach(call => {
         setCallInCache(
           {
             entity,
@@ -188,7 +237,7 @@ export const useCalls = (
         result,
       };
     }
-  }, [entity, project, calls.loading, calls.result]);
+  }, [calls.result, calls.loading, entity, project, filter.opCategory]);
 };
 
 type OpVersionKey = {
@@ -205,7 +254,9 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
     refDict.refExtraTuples.length !== 0 ||
     refDict.filePathParts[0] !== 'obj'
   ) {
-    throw new Error('Invalid refUri: ' + refUri);
+    if (refDict.versionCommitHash !== '*') {
+      throw new Error('Invalid refUri: ' + refUri);
+    }
   }
   return {
     entity: refDict.entity,
@@ -304,11 +355,13 @@ type OpVersionFilter = {
   opIds?: string[];
   latestOnly?: boolean;
 };
-export const useOpVersions = (
+
+export const useOpVersionsNode = (
   entity: string,
   project: string,
-  filter: OpVersionFilter
-): Loadable<OpVersionSchema[]> => {
+  filter: OpVersionFilter,
+  opts?: {skip?: boolean}
+): Node => {
   const projectNode = opRootProject({
     entityName: constString(entity),
     projectName: constString(project),
@@ -387,9 +440,26 @@ export const useOpVersions = (
     }),
   });
 
-  const dataValue = useNodeValue(dataNode);
+  return dataNode;
+};
+
+export const useOpVersions = (
+  entity: string,
+  project: string,
+  filter: OpVersionFilter,
+  opts?: {skip?: boolean}
+): Loadable<OpVersionSchema[]> => {
+  const dataNode = useOpVersionsNode(entity, project, filter);
+
+  const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
   return useMemo(() => {
+    if (opts?.skip) {
+      return {
+        loading: false,
+        result: [],
+      };
+    }
     const result = (dataValue.result ?? [])
       .map((row: any) => ({
         entity,
@@ -431,7 +501,14 @@ export const useOpVersions = (
         result,
       };
     }
-  }, [dataValue.loading, dataValue.result, entity, filter.category, project]);
+  }, [
+    dataValue.loading,
+    dataValue.result,
+    entity,
+    filter.category,
+    opts?.skip,
+    project,
+  ]);
 };
 
 type ObjectVersionKey = {
@@ -514,23 +591,32 @@ const artifactVersionNodeToObjectVersionDictNode = (
 };
 
 export const useObjectVersion = (
-  key: ObjectVersionKey
+  // Null value skips
+  key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
-  const cachedObjectVersion = getObjectVersionFromCache(key);
+  const cachedObjectVersion = key ? getObjectVersionFromCache(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
-      entity: constString(key.entity),
-      project: constString(key.project),
+      entity: constString(key?.entity ?? ''),
+      project: constString(key?.project ?? ''),
     }),
-    artifactName: constString(key.objectId),
-    artifactVersionAlias: constString(key.versionHash),
+    artifactName: constString(key?.objectId ?? ''),
+    artifactVersionAlias: constString(key?.versionHash ?? ''),
   });
   const dataNode = artifactVersionNodeToObjectVersionDictNode(
     artifactVersionNode as any
   );
-  const dataValue = useNodeValue(dataNode, {skip: cachedObjectVersion != null});
+  const dataValue = useNodeValue(dataNode, {
+    skip: key == null || cachedObjectVersion != null,
+  });
 
   return useMemo(() => {
+    if (key == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
     if (cachedObjectVersion != null) {
       return {
         loading: false,
@@ -571,12 +657,12 @@ type ObjectVersionFilter = {
   latestOnly?: boolean;
 };
 
-export const useRootObjectVersions = (
+export const useRootObjectVersionsNode = (
   entity: string,
   project: string,
-  filter: ObjectVersionFilter
-): Loadable<ObjectVersionSchema[]> => {
-  // Note: Root objects will always have a single path and refExtra will be null
+  filter: ObjectVersionFilter,
+  opts?: {skip?: boolean}
+): Node => {
   const projectNode = opRootProject({
     entityName: constString(entity),
     projectName: constString(project),
@@ -644,9 +730,25 @@ export const useRootObjectVersions = (
     }),
   });
 
-  const dataValue = useNodeValue(dataNode);
+  return dataNode;
+};
+
+export const useRootObjectVersions = (
+  entity: string,
+  project: string,
+  filter: ObjectVersionFilter,
+  opts?: {skip?: boolean}
+): Loadable<ObjectVersionSchema[]> => {
+  const dataNode = useRootObjectVersionsNode(entity, project, filter);
+  const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
   return useMemo(() => {
+    if (opts?.skip) {
+      return {
+        loading: false,
+        result: [],
+      };
+    }
     const result = (dataValue.result ?? [])
       .map((row: any) => ({
         entity,
@@ -694,7 +796,14 @@ export const useRootObjectVersions = (
         result,
       };
     }
-  }, [dataValue.loading, dataValue.result, entity, filter.category, project]);
+  }, [
+    dataValue.loading,
+    dataValue.result,
+    entity,
+    filter.category,
+    opts?.skip,
+    project,
+  ]);
 };
 
 type WFNaiveRefDict = {
@@ -804,4 +913,31 @@ const setObjectVersionInCache = (
   value: ObjectVersionSchema
 ) => {
   objectVersionCache.set(objectVersionCacheKeyFn(key), value);
+};
+
+//// Utilities ////
+export const opVersionRefOpName = (opVersionRef: string) => {
+  return refUriToOpVersionKey(opVersionRef).opId;
+};
+
+// This one is a huge hack b/c it is based on the name. Once this
+// is added to the data model, we will need to make a query
+// wherever this is used!
+export const opVersionRefOpCategory = (opVersionRef: string) => {
+  return opNameToCategory(opVersionRefOpName(opVersionRef));
+};
+
+export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
+  let result = ov.objectId;
+  if (ov.versionHash === '*') {
+    return result;
+  }
+  result += `:v${ov.versionIndex}`;
+  if (ov.path !== 'obj') {
+    result += `/${ov.path}`;
+  }
+  if (ov.refExtra) {
+    result += `#${ov.refExtra}`;
+  }
+  return result;
 };

@@ -1,9 +1,11 @@
-import {CircularProgress, IconButton} from '@material-ui/core';
 import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
+  Chip,
+  CircularProgress,
   FormControl,
+  IconButton,
   ListItem,
   ListItemButton,
   ListItemText,
@@ -12,8 +14,7 @@ import {
 import _ from 'lodash';
 import React, {FC, useCallback, useMemo} from 'react';
 
-import {CallFilter} from '../../../Browse2/callTree';
-import {fnRunsNode, useRunsWithFeedback} from '../../../Browse2/callTreeHooks';
+import {fnRunsNode} from '../../../Browse2/callTreeHooks';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
 import {useMakeNewBoard} from '../common/hooks';
@@ -21,21 +22,21 @@ import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {truncateID, useInitializingFilter} from '../util';
+import {HackyOpCategory} from '../wfInterface/types';
 import {
-  useWeaveflowORMContext,
-  WeaveflowORMContextType,
-} from '../wfInterface/context';
-import {
-  refDictToRefString,
-  refStringToRefDict,
-  stringIsRef,
-} from '../wfInterface/naive';
-import {
-  HackyOpCategory,
-  WFCall,
-  WFObjectVersion,
-  WFOpVersion,
-} from '../wfInterface/types';
+  CallFilter,
+  objectVersionNiceString,
+  OP_CATEGORIES,
+  opVersionKeyToRefUri,
+  opVersionRefOpName,
+  OpVersionSchema,
+  refUriToObjectVersionKey,
+  refUriToOpVersionKey,
+  useCall,
+  useCalls,
+  useObjectVersion,
+  useOpVersions,
+} from '../wfReactInterface/interface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
@@ -45,7 +46,6 @@ export type WFHighLevelCallFilter = {
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
   parentId?: string | null;
-  traceId?: string | null;
   isPivot?: boolean;
   pivotSpec?: Partial<WFHighLevelPivotSpec>;
 };
@@ -64,11 +64,21 @@ export const CallsPage: FC<{
   );
 
   const title = useMemo(() => {
-    if (filter.opCategory) {
+    if (filter.opVersionRefs?.length === 1) {
+      const opName = opVersionRefOpName(filter.opVersionRefs[0]);
+      const niceName = opNiceName(opName);
+      if (niceName === 'Evaluation-evaluate') {
+        // Very special case for now
+        if (filter.isPivot) {
+          return 'Evaluation Leaderboard';
+        }
+      }
+      return opNiceName(opName) + ' Traces';
+    } else if (filter.opCategory) {
       return _.capitalize(filter.opCategory) + ' Traces';
     }
     return 'Traces';
-  }, [filter.opCategory]);
+  }, [filter.isPivot, filter.opCategory, filter.opVersionRefs]);
 
   return (
     <SimplePageLayout
@@ -102,8 +112,6 @@ export const CallsTable: FC<{
   ioColumnsOnly?: boolean;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
     props.onFilterUpdate
@@ -113,51 +121,62 @@ export const CallsTable: FC<{
     return {...filter, ...props.frozenFilter};
   }, [filter, props.frozenFilter]);
 
+  if ((effectiveFilter.opVersionRefs?.length ?? 0) > 1) {
+    throw new Error('Multiple op versions not yet supported');
+  }
+
+  if ((effectiveFilter.inputObjectVersionRefs?.length ?? 0) > 1) {
+    throw new Error('Multiple input object versions not yet supported');
+  }
+
+  if ((effectiveFilter.outputObjectVersionRefs?.length ?? 0) > 1) {
+    throw new Error('Multiple output object versions not yet supported');
+  }
+
   const lowLevelFilter: CallFilter = useMemo(() => {
-    return convertHighLevelFilterToLowLevelFilter(orm, effectiveFilter);
-  }, [effectiveFilter, orm]);
+    return convertHighLevelFilterToLowLevelFilter(effectiveFilter);
+  }, [effectiveFilter]);
 
-  const runsWithFeedbackQuery = useRunsWithFeedback(
-    {
-      entityName: props.entity,
-      projectName: props.project,
-      streamName: 'stream',
-    },
-    lowLevelFilter
-  );
+  const calls = useCalls(props.entity, props.project, lowLevelFilter);
 
-  // # TODO: All of these need to be handled much more logically since
-  // we need to calculate the options based on everything except a specific filter.
   const opVersionOptions = useOpVersionOptions(
-    orm,
     props.entity,
     props.project,
     effectiveFilter
   );
-  const consumesObjectVersionOptions = useConsumesObjectVersionOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
+  const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
+  const opVersion = opVersionRef
+    ? opVersionOptions[opVersionRef]?.objectVersion
+    : null;
+
+  const consumesObjectVersionOptions =
+    useConsumesObjectVersionOptions(effectiveFilter);
+  const inputObjectVersionRef =
+    effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
+  const inputObjectVersion = inputObjectVersionRef
+    ? consumesObjectVersionOptions[inputObjectVersionRef]
+    : null;
+
+  const producesObjectVersionOptions =
+    useProducesObjectVersionOptions(effectiveFilter);
+  const outputObjectVersionRef =
+    effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
+  const outputObjectVersion = outputObjectVersionRef
+    ? producesObjectVersionOptions[outputObjectVersionRef]
+    : null;
+
   const parentIdOptions = useParentIdOptions(
-    orm,
     props.entity,
     props.project,
     effectiveFilter
   );
-  const opCategoryOptions = useOpCategoryOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
-  const traceRootOptions = useTraceRootOptions(
-    orm,
-    props.entity,
-    props.project,
-    effectiveFilter
-  );
+  const parentOpDisplay = effectiveFilter.parentId
+    ? parentIdOptions[effectiveFilter.parentId]
+    : null;
+  const opCategoryOptions = useMemo(() => {
+    return _.sortBy(OP_CATEGORIES, _.identity);
+  }, []);
+  const traceRootOptions = [true, false];
   const {onMakeBoard, isGenerating} = useMakeBoardForCalls(
     props.entity,
     props.project,
@@ -199,7 +218,7 @@ export const CallsTable: FC<{
 
   const qualifiesForPivoting = useMemo(() => {
     const shownSpanNames = _.uniq(
-      runsWithFeedbackQuery.result.map(span => span.name)
+      (calls.result ?? []).map(span => span.spanName)
     );
     // Super restrictive for now - just showing pivot when
     // there is only one span name and it is the evaluation.
@@ -207,7 +226,7 @@ export const CallsTable: FC<{
       shownSpanNames.length === 1 &&
       shownSpanNames[0].includes('Evaluation-evaluate')
     );
-  }, [runsWithFeedbackQuery.result]);
+  }, [calls.result]);
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
   const hidePivotControls = true;
@@ -217,6 +236,15 @@ export const CallsTable: FC<{
     }
     return null;
   }, [filter, setFilter]);
+
+  const forcingNonTraceRootsOnly =
+    shouldForceNonTraceRootsOnly(effectiveFilter);
+
+  const rootsOnlyDisabled =
+    forcingNonTraceRootsOnly ||
+    isPivoting ||
+    traceRootOptions.length <= 1 ||
+    Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly');
 
   return (
     <FilterLayoutTemplate
@@ -246,29 +274,35 @@ export const CallsTable: FC<{
               <DashboardCustomize />
             )}
           </IconButton>
-          {qualifiesForPivoting && (
-            <IconButton
-              style={{width: '37px', height: '37px'}}
-              size="small"
-              color={userEnabledPivot ? 'primary' : 'default'}
-              onClick={() => {
-                setUserEnabledPivot(!userEnabledPivot);
-              }}>
-              <PivotTableChart />
-            </IconButton>
-          )}
-          <ListItem>
+
+          <IconButton
+            style={{width: '37px', height: '37px'}}
+            size="small"
+            color={userEnabledPivot ? 'primary' : 'default'}
+            disabled={!qualifiesForPivoting}
+            onClick={() => {
+              setUserEnabledPivot(!userEnabledPivot);
+            }}>
+            <PivotTableChart />
+          </IconButton>
+
+          <ListItem sx={{width: '190px', flex: '0 0 190px'}}>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
                 disabled={
                   isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes('opCategory')
+                  Object.keys(props.frozenFilter ?? {}).includes(
+                    'opCategory'
+                  ) ||
+                  (effectiveFilter.opVersionRefs ?? []).length > 0
                 }
-                renderInput={params => (
-                  <TextField {...params} label="Category" />
-                )}
-                value={effectiveFilter.opCategory ?? null}
+                renderInput={params => {
+                  return <TextField {...params} label="Category" />;
+                }}
+                value={
+                  effectiveFilter.opCategory ?? opVersion?.category ?? null
+                }
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
@@ -279,7 +313,7 @@ export const CallsTable: FC<{
               />
             </FormControl>
           </ListItem>
-          <ListItem>
+          <ListItem sx={{minWidth: '190px'}}>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
@@ -299,78 +333,61 @@ export const CallsTable: FC<{
                 }}
                 renderInput={params => <TextField {...params} label="Op" />}
                 getOptionLabel={option => {
-                  if (option.endsWith(':*')) {
-                    return opNiceName(option.slice(0, -2));
-                  }
-                  return opVersionOptions[option] ?? option;
+                  return opVersionOptions[option]?.title ?? 'loading...';
                 }}
+                groupBy={option => opVersionOptions[option]?.group}
                 options={Object.keys(opVersionOptions)}
               />
             </FormControl>
           </ListItem>
-          <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                limitTags={1}
-                // Temp disable multiple for simplicity - may want to re-enable
-                // multiple
-                disabled={
-                  isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes(
-                    'inputObjectVersions'
-                  )
-                }
-                renderInput={params => (
-                  <TextField {...params} label="Inputs" />
-                  // <TextField {...params} label="Consumes Objects" />
-                )}
-                value={effectiveFilter.inputObjectVersionRefs?.[0] ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    inputObjectVersionRefs: newValue ? [newValue] : [],
-                  });
-                }}
-                getOptionLabel={option => {
-                  return consumesObjectVersionOptions[option] ?? option;
-                }}
-                options={Object.keys(consumesObjectVersionOptions)}
-              />
-            </FormControl>
-          </ListItem>
-          <ListItem>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={
-                  isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes('parentId')
-                }
-                renderInput={params => <TextField {...params} label="Parent" />}
-                value={effectiveFilter.parentId ?? null}
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    parentId: newValue,
-                  });
-                }}
-                getOptionLabel={option => {
-                  return parentIdOptions[option] ?? option;
-                }}
-                options={Object.keys(parentIdOptions)}
-              />
-            </FormControl>
-          </ListItem>
+          {inputObjectVersion && (
+            <Chip
+              label={`Input: ${objectVersionNiceString(inputObjectVersion)}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  inputObjectVersionRefs: undefined,
+                });
+              }}
+            />
+          )}
+          {outputObjectVersion && (
+            <Chip
+              label={`Output: ${objectVersionNiceString(outputObjectVersion)}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  outputObjectVersionRefs: undefined,
+                });
+              }}
+            />
+          )}
+          {parentOpDisplay && (
+            <Chip
+              label={`Parent: ${parentOpDisplay}`}
+              onDelete={() => {
+                setFilter({
+                  ...filter,
+                  parentId: undefined,
+                });
+              }}
+            />
+          )}
           <ListItem
+            sx={{
+              width: '190px',
+              flex: '0 0 190px',
+            }}
             secondaryAction={
               <Checkbox
                 edge="end"
                 checked={
-                  !!effectiveFilter.traceRootsOnly ||
-                  (traceRootOptions.length === 1 && traceRootOptions[0])
+                  !forcingNonTraceRootsOnly && !!effectiveFilter.traceRootsOnly
                 }
-                onChange={() => {
+                onClick={() => {
+                  if (rootsOnlyDisabled) {
+                    return;
+                  }
                   setFilter({
                     ...filter,
                     traceRootsOnly: !effectiveFilter.traceRootsOnly,
@@ -378,14 +395,13 @@ export const CallsTable: FC<{
                 }}
               />
             }
-            disabled={
-              isPivoting ||
-              traceRootOptions.length <= 1 ||
-              Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly')
-            }
+            disabled={rootsOnlyDisabled}
             disablePadding>
             <ListItemButton
               onClick={() => {
+                if (rootsOnlyDisabled) {
+                  return;
+                }
                 setFilter({
                   ...filter,
                   traceRootsOnly: !effectiveFilter.traceRootsOnly,
@@ -398,8 +414,8 @@ export const CallsTable: FC<{
       }>
       {isPivoting ? (
         <PivotRunsView
-          loading={runsWithFeedbackQuery.loading}
-          runs={runsWithFeedbackQuery.result}
+          loading={calls.loading}
+          runs={calls.result ?? []}
           pivotSpec={effectiveFilter.pivotSpec ?? {}}
           onPivotSpecChange={setPivotDims}
           entity={props.entity}
@@ -412,8 +428,8 @@ export const CallsTable: FC<{
         />
       ) : (
         <RunsTable
-          loading={runsWithFeedbackQuery.loading}
-          spans={runsWithFeedbackQuery.result}
+          loading={calls.loading}
+          spans={calls.result ?? []}
           clearFilters={clearFilters}
           ioColumnsOnly={props.ioColumnsOnly}
         />
@@ -445,298 +461,155 @@ const useMakeBoardForCalls = (
   return useMakeNewBoard(runsNode);
 };
 
+const shouldForceNonTraceRootsOnly = (filter: WFHighLevelCallFilter) => {
+  return (
+    (filter.inputObjectVersionRefs?.length ?? 0) > 0 ||
+    (filter.opVersionRefs?.length ?? 0) > 0 ||
+    filter.parentId != null ||
+    filter.opCategory != null
+  );
+};
+
 const convertHighLevelFilterToLowLevelFilter = (
-  orm: WeaveflowORMContextType,
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
-  const allOpVersions = orm.projectConnection.opVersions();
-  let opUrisFromVersions: string[] = [];
-  if (effectiveFilter.opVersionRefs) {
-    effectiveFilter.opVersionRefs.forEach(ref => {
-      if (stringIsRef(ref)) {
-        const refDict = refStringToRefDict(ref);
-        if (refDict.versionCommitHash === '*') {
-          allOpVersions.forEach(opVersion => {
-            if (
-              refDictToRefString({
-                entity: opVersion.op().entity(),
-                project: opVersion.op().project(),
-                artifactName: opVersion.name(),
-                versionCommitHash: '*',
-                filePathParts: [],
-                refExtraTuples: [],
-              }) === ref
-            ) {
-              opUrisFromVersions.push(opVersion.refUri());
-            }
-          });
-        } else {
-          opUrisFromVersions.push(ref);
-        }
-      }
-    });
-  }
-  if (opUrisFromVersions.length === 0 && effectiveFilter.opVersionRefs) {
-    opUrisFromVersions = ['DOES_NOT_EXIST:VALUE'];
-  }
-  let opUrisFromCategory = allOpVersions
-    .filter(ov => ov.opCategory() === effectiveFilter.opCategory)
-    .map(ov => ov.refUri());
-  if (opUrisFromCategory.length === 0 && effectiveFilter.opCategory) {
-    opUrisFromCategory = ['DOES_NOT_EXIST:VALUE'];
-  }
-
-  let finalURISet = new Set<string>([]);
-  const opUrisFromVersionsSet = new Set<string>(opUrisFromVersions);
-  const opUrisFromCategorySet = new Set<string>(opUrisFromCategory);
-  const includeVersions =
-    effectiveFilter.opVersionRefs != null &&
-    effectiveFilter.opVersionRefs.length >= 0;
-  const includeCategories = effectiveFilter.opCategory != null;
-
-  if (includeVersions && includeCategories) {
-    // intersect the two sets
-    finalURISet = new Set<string>(
-      [...opUrisFromVersionsSet].filter(x => opUrisFromCategorySet.has(x))
-    );
-  } else if (includeVersions) {
-    finalURISet = opUrisFromVersionsSet;
-  } else if (includeCategories) {
-    finalURISet = opUrisFromCategorySet;
-  } else {
-    finalURISet = new Set<string>([]);
-  }
-
+  const forcingNonTraceRootsOnly =
+    shouldForceNonTraceRootsOnly(effectiveFilter);
   return {
-    traceRootsOnly: effectiveFilter.traceRootsOnly,
-    opUris: Array.from(finalURISet),
-    inputUris: effectiveFilter.inputObjectVersionRefs,
-    outputUris: effectiveFilter.outputObjectVersionRefs,
-    traceId: effectiveFilter.traceId ?? undefined,
-    parentIds: effectiveFilter.parentId ? [effectiveFilter.parentId] : [],
+    traceRootsOnly: !forcingNonTraceRootsOnly && effectiveFilter.traceRootsOnly,
+    opVersionRefs: effectiveFilter.opVersionRefs,
+    inputObjectVersionRefs: effectiveFilter.inputObjectVersionRefs,
+    outputObjectVersionRefs: effectiveFilter.outputObjectVersionRefs,
+    parentIds: effectiveFilter.parentId
+      ? [effectiveFilter.parentId]
+      : undefined,
+    opCategory: effectiveFilter.opCategory
+      ? [effectiveFilter.opCategory]
+      : undefined,
   };
 };
 
 const useOpVersionOptions = (
-  orm: WeaveflowORMContextType,
   entity: string,
   project: string,
-  highLevelFilter: WFHighLevelCallFilter
-): Record<string, string> => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        orm,
-        _.omit(highLevelFilter, ['opVersions'])
-      );
-    }, [highLevelFilter, orm])
-  );
-  return useMemo(() => {
-    let versions: WFOpVersion[] = [];
-    if (runs.loading) {
-      versions = orm.projectConnection.opVersions();
-    } else {
-      versions = runs.result
-        .map(r => orm.projectConnection.call(r.span_id)?.opVersion())
-        .filter(v => v != null) as WFOpVersion[];
-    }
+  effectiveFilter: WFHighLevelCallFilter
+) => {
+  // Get all the "latest" versions
+  const latestVersions = useOpVersions(entity, project, {
+    latestOnly: true,
+  });
 
-    // Sort by name ascending, then version descending.
-    versions.sort((a, b) => {
-      const nameA = opNiceName(a.op().name());
-      const nameB = opNiceName(b.op().name());
-      if (nameA !== nameB) {
-        return nameA.localeCompare(nameB);
-      }
-      return b.versionIndex() - a.versionIndex();
+  // Get all the versions of the currently selected op
+  const currentRef = effectiveFilter.opVersionRefs?.[0] ?? null;
+  const currentOpId = currentRef ? refUriToOpVersionKey(currentRef).opId : null;
+  const currentVersions = useOpVersions(
+    entity,
+    project,
+    {
+      opIds: [currentOpId ?? ''],
+    },
+    {
+      skip: !currentOpId,
+    }
+  );
+
+  return useMemo(() => {
+    const result: Array<{
+      title: string;
+      ref: string;
+      group: string;
+      objectVersion?: OpVersionSchema;
+    }> = [];
+
+    _.sortBy(latestVersions.result ?? [], ov => [
+      opNiceName(ov.opId).toLowerCase(),
+      ov.opId.toLowerCase(),
+    ]).forEach(ov => {
+      const ref = opVersionKeyToRefUri({
+        ...ov,
+        versionHash: '*',
+      });
+      result.push({
+        title: opNiceName(ov.opId),
+        ref,
+        group: 'Ops',
+      });
     });
 
-    // Build up options object, injecting options for all versions of an op.
-    let lastName = null;
-    const options: Record<string, string> = {};
-    for (const v of versions) {
-      const opName = v.op().name();
-      if (opName !== lastName) {
-        options[
-          refDictToRefString({
-            entity: v.entity(),
-            project: v.project(),
-            artifactName: v.name(),
-            versionCommitHash: '*',
-            filePathParts: [],
-            refExtraTuples: [],
-          })
-        ] = opNiceName(opName);
-        lastName = opName;
+    _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
+      ov => {
+        const ref = opVersionKeyToRefUri(ov);
+        result.push({
+          title: ov.opId + ':v' + ov.versionIndex,
+          ref,
+          group: `Versions of ${opNiceName(currentOpId!)}`,
+          objectVersion: ov,
+        });
       }
-      options[v.refUri()] = opNiceName(opName) + ':v' + v.versionIndex();
-    }
-    return options;
-  }, [orm.projectConnection, runs.loading, runs.result]);
+    );
+
+    return _.fromPairs(result.map(r => [r.ref, r]));
+  }, [currentOpId, currentVersions.result, latestVersions.result]);
 };
 
 const useConsumesObjectVersionOptions = (
-  orm: WeaveflowORMContextType,
-  entity: string,
-  project: string,
-  highLevelFilter: WFHighLevelCallFilter
+  effectiveFilter: WFHighLevelCallFilter
 ) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        orm,
-        _.omit(highLevelFilter, ['inputObjectVersions'])
-      );
-    }, [highLevelFilter, orm])
+  // We don't populate this one because it is expensive
+  const currentRef = effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
+  const objectVersion = useObjectVersion(
+    currentRef ? refUriToObjectVersionKey(currentRef) : null
   );
   return useMemo(() => {
-    let versions: WFObjectVersion[] = [];
-    if (runs.loading) {
-      versions = orm.projectConnection.objectVersions();
-    } else {
-      versions = runs.result.flatMap(
-        r => orm.projectConnection.call(r.span_id)?.inputs() ?? []
-      );
+    if (!currentRef || objectVersion.loading || !objectVersion.result) {
+      return {};
     }
+    return {
+      [currentRef]: objectVersion.result,
+    };
+  }, [currentRef, objectVersion.loading, objectVersion.result]);
+};
 
-    // Sort by name ascending, then version descending.
-    versions.sort((a, b) => {
-      const nameA = a.object().name();
-      const nameB = b.object().name();
-      if (nameA !== nameB) {
-        return nameA.localeCompare(nameB);
-      }
-      return b.versionIndex() - a.versionIndex();
-    });
-
-    return _.fromPairs(
-      versions.map(v => {
-        return [v.refUri(), v.object().name() + ':v' + v.versionIndex()];
-      })
-    );
-  }, [orm.projectConnection, runs.loading, runs.result]);
+const useProducesObjectVersionOptions = (
+  effectiveFilter: WFHighLevelCallFilter
+) => {
+  // We don't populate this one because it is expensive
+  const currentRef = effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
+  const objectVersion = useObjectVersion(
+    currentRef ? refUriToObjectVersionKey(currentRef) : null
+  );
+  return useMemo(() => {
+    if (!currentRef || objectVersion.loading || !objectVersion.result) {
+      return {};
+    }
+    return {
+      [currentRef]: objectVersion.result,
+    };
+  }, [currentRef, objectVersion.loading, objectVersion.result]);
 };
 
 const useParentIdOptions = (
-  orm: WeaveflowORMContextType,
   entity: string,
   project: string,
-  highLevelFilter: WFHighLevelCallFilter
+  effectiveFilter: WFHighLevelCallFilter
 ) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        orm,
-        _.omit(highLevelFilter, ['parentId'])
-      );
-    }, [highLevelFilter, orm])
-  );
-  return useMemo(() => {
-    let parents: WFCall[] = [];
-    if (runs.loading) {
-      parents = orm.projectConnection
-        .calls()
-        .map(c => c.parentCall())
-        .filter(v => v != null) as WFCall[];
-    } else {
-      parents = runs.result
-        .map(r => orm.projectConnection.call(r.span_id)?.parentCall())
-        .filter(v => v != null) as WFCall[];
-    }
-
-    const pairs = _.uniqBy(
-      parents.map(c => {
-        const version = c.opVersion();
-        if (!version) {
-          return [c.traceID(), c.spanName()];
+  const parentCall = useCall(
+    effectiveFilter.parentId
+      ? {
+          entity,
+          project,
+          callId: effectiveFilter.parentId,
         }
-        return [
-          c.callID(),
-          opNiceName(version.op().name()) + ' (' + truncateID(c.callID()) + ')',
-        ];
-      }),
-      p => p[1]
-    );
-
-    pairs.sort((a, b) => {
-      return a[1].localeCompare(b[1]);
-    });
-
-    return _.fromPairs(pairs);
-  }, [orm.projectConnection, runs.loading, runs.result]);
-};
-
-const useOpCategoryOptions = (
-  orm: WeaveflowORMContextType,
-  entity: string,
-  project: string,
-  highLevelFilter: WFHighLevelCallFilter
-) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        orm,
-        _.omit(highLevelFilter, ['opCategory'])
-      );
-    }, [highLevelFilter, orm])
+      : null
   );
   return useMemo(() => {
-    if (runs.loading) {
-      return orm.projectConnection.opCategories();
+    if (parentCall.loading || parentCall.result == null) {
+      return {};
     }
-    return _.uniq(
-      runs.result.map(r =>
-        orm.projectConnection.call(r.span_id)?.opVersion()?.opCategory()
-      )
-    )
-      .filter(v => v != null)
-      .sort() as HackyOpCategory[];
-  }, [orm.projectConnection, runs.loading, runs.result]);
-};
-
-const useTraceRootOptions = (
-  orm: WeaveflowORMContextType,
-  entity: string,
-  project: string,
-  highLevelFilter: WFHighLevelCallFilter
-) => {
-  const runs = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: 'stream',
-    },
-    useMemo(() => {
-      return convertHighLevelFilterToLowLevelFilter(
-        orm,
-        _.omit(highLevelFilter, ['traceRootsOnly'])
-      );
-    }, [highLevelFilter, orm])
-  );
-  return useMemo(() => {
-    if (runs.loading) {
-      return [true, false];
-    }
-    return _.uniq(runs.result.map(r => r.parent_id == null));
-  }, [runs.loading, runs.result]);
+    return {
+      [parentCall.result.callId]: `${parentCall.result.spanName} (${truncateID(
+        parentCall.result.callId
+      )})`,
+    };
+  }, [parentCall.loading, parentCall.result]);
 };

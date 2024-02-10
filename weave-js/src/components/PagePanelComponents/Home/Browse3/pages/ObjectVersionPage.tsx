@@ -352,7 +352,6 @@ const ObjectVersionProducingCallsItem: React.FC<{
     />
   );
 };
-
 const ObjectVersionConsumingCallsItem: React.FC<{
   consumingCalls: CallSchema[];
   refUri: string;

@@ -7,6 +7,8 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {opCount} from '../../../../../core';
+import {useNodeValue} from '../../../../../react';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
@@ -21,6 +23,7 @@ import {
   objectVersionKeyToRefUri,
   ObjectVersionSchema,
   useRootObjectVersions,
+  useRootObjectVersionsNode,
 } from './wfReactInterface/interface';
 
 export const ObjectVersionsPage: React.FC<{
@@ -225,9 +228,14 @@ const ObjectVersionsTable: React.FC<{
 
 const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
   const obj = props.obj;
-  const objectVersions = useRootObjectVersions(obj.entity, obj.project, {
-    objectIds: [obj.objectId],
-  });
+  const objectVersionsNode = useRootObjectVersionsNode(
+    obj.entity,
+    obj.project,
+    {
+      objectIds: [obj.objectId],
+    }
+  );
+  const countValue = useNodeValue(opCount({arr: objectVersionsNode}));
   return (
     <ObjectVersionsLink
       entity={obj.entity}
@@ -235,7 +243,7 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
       filter={{
         objectName: obj.objectId,
       }}
-      versionCount={(objectVersions.result ?? []).length}
+      versionCount={countValue.result ?? 0}
       neverPeek
       variant="secondary"
     />
