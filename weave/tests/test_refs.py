@@ -372,7 +372,7 @@ def test_refs_across_artifacts(ref_tracking):
     "get_custom_object_classes",
     [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
 )
-def test_ref_objects_across_artifacts(ref_tracking, get_custom_object_classes):
+def test_ref_objects_across_artifacts_nocross(ref_tracking, get_custom_object_classes):
     CustomObjectA, CustomObjectB = get_custom_object_classes()
 
     # Case 1: No Cross Ref
@@ -383,9 +383,19 @@ def test_ref_objects_across_artifacts(ref_tracking, get_custom_object_classes):
     val = saved_obj_b.inner_b
     assert_local_ref(val, ["obj"], ["atr", "inner_b"])
 
+
+@pytest.mark.parametrize(
+    "get_custom_object_classes",
+    [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
+)
+def test_ref_objects_across_artifacts_cross(ref_tracking, get_custom_object_classes):
+    CustomObjectA, CustomObjectB = get_custom_object_classes()
+
     # Case 2: Cross Ref
     obj_a = CustomObjectA(inner_a=1)
-    obj_b = CustomObjectB(inner_b=weave.use(weave.save(obj_a, "COB")))
+    obj_a_ref = weave.use(weave.save(obj_a, "COB"))
+    obj_b = CustomObjectB(inner_b=obj_a_ref)
+    weave.types.type_of_with_refs(obj_b.inner_b)
     saved_obj_b = weave.use(weave.save(obj_b))
 
     val = saved_obj_b.inner_b

@@ -79,7 +79,7 @@ def instance_class_to_potential_type(cls):
     result = []
     for instance_class, type_classes in mapping.items():
         if issubclass(cls, instance_class):
-            result += type_classes
+            result += [tc.typeclass_of_class(cls) for tc in type_classes]
     return result
 
 
@@ -228,9 +228,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
-    instance_classes: typing.ClassVar[
-        typing.Union[type, typing.List[type], None]
-    ] = None
+    instance_classes: typing.ClassVar[typing.Union[type, typing.List[type], None]] = (
+        None
+    )
 
     _type_attrs = None
     _hash = None
@@ -296,6 +296,10 @@ class Type(metaclass=_TypeSubclassWatcher):
             if isinstance(obj, ic):
                 return ic
         return None
+
+    @classmethod
+    def typeclass_of_class(cls, check_class):
+        return cls
 
     @classmethod
     def type_of(cls, obj) -> typing.Optional["Type"]:
@@ -1035,10 +1039,10 @@ class ObjectType(Type):
 
     @classmethod
     def typeclass_of_class(cls, check_class):
+        from . import weave_pydantic
+
         if not issubclass(check_class, pydantic.BaseModel):
-            raise errors.WeaveTypeError(
-                "ObjectType.type_of_class only support pydantic models"
-            )
+            return cls
 
         bases = check_class.__bases__
         base_type = ObjectType
@@ -1051,36 +1055,36 @@ class ObjectType(Type):
             ):
                 base_type = cls.typeclass_of_class(base0)
 
-        attr_types = {"_relocatable": True}
+        type_attrs = {}
+        for k, v in weave_pydantic.pydantic_class_to_attr_types(check_class).items():
+            if k == "name":
+                type_attrs["_name"] = v
+            else:
+                type_attrs[k] = v
+
+        attr_types = {
+            "_relocatable": True,
+            "instance_classes": check_class,
+            "__annotations__": {k: Type for k in type_attrs.keys()},
+        }
+
+        attr_types.update(type_attrs)
 
         # TODO: need to use type class cache
         new_cls = type(check_class.__name__, (base_type,), attr_types)
-        return new_cls
+        return dataclasses.dataclass(frozen=True)(new_cls)
 
     @classmethod
     def type_of_instance(cls, obj):
         if isinstance(obj, pydantic.BaseModel):
             type_class = cls.typeclass_of_class(obj.__class__)
-            from . import weave_pydantic
-
-            schema = obj.schema()
-            # TODO: I think we want the type of the actual object here, not
-            # the schema type.
-            schema_type = weave_pydantic.json_schema_to_weave_type(schema)
-            assert isinstance(schema_type, TypedDict), "Bad schema type"
-
-            attr_types = schema_type.property_types
-            from . import op_def
-            from . import op_def_type
-
-            for attr_name, attr_val in inspect.getmembers(
-                obj, lambda m: isinstance(m, op_def.OpDef)
-            ):
-                attr_types[attr_name] = op_def_type.OpDefType()
-
-            res = type_class(**schema_type.property_types)
-
-            return res
+            attr_types = {}
+            for k, field in obj.model_fields.items():
+                set_k = k
+                if set_k == "name":
+                    set_k = "_name"
+                attr_types[set_k] = TypeRegistry.type_of(getattr(obj, k))
+            return type_class(**attr_types)
 
         variable_prop_types = {}
         for prop_name in cls.type_attrs():

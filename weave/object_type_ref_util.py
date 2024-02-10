@@ -9,8 +9,6 @@ def make_object_getattribute(
 ) -> typing.Callable[[typing.Any, str], typing.Any]:
     # Weave objects must auto-dereference refs when they are accessed.
     def object_getattribute(self: typing.Any, name: str) -> typing.Any:
-        if name == "name":
-            name = "_name"
         attribute = object.__getattribute__(self, name)
         if name not in allowed_attributes:
             return attribute

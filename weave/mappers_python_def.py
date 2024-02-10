@@ -72,9 +72,8 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
                 if get_k == "_name":
                     get_k = "name"
                 obj_val = obj.get(get_k)
-                if obj_val is not None or serializer.type == types.UnknownType():
-                    v = serializer.apply(obj_val)
-                    result[k] = v
+                v = serializer.apply(obj_val)
+                result[k] = v
 
         for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):
@@ -97,10 +96,13 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             # with overridden op methods. The op_methods are unbound on the class,
             # and will bind self upon construction as usual.
             if self.type._relocatable:
+                # Attach fields to the relocated object, so we can
+                # detect and reconstruct later.
+                attrs = {"_weave_obj_fields": list(result), **op_methods}
                 new_class = type(
                     instance_class.__name__,
                     (instance_class,),
-                    op_methods,
+                    attrs,
                 )
 
                 return new_class(**result)

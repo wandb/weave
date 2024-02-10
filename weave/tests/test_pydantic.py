@@ -3,44 +3,6 @@ import pydantic
 
 import weave
 from weave import weave_types as types
-from weave.weave_pydantic import json_schema_to_weave_type
-
-
-def test_jsonschema_to_weave_type():
-
-    assert json_schema_to_weave_type({"type": "integer"}) == types.Int()
-    assert json_schema_to_weave_type(
-        {"type": "array", "items": {"type": "integer"}}
-    ) == types.List(types.Int())
-
-    assert json_schema_to_weave_type(
-        {
-            "type": "object",
-            "properties": {"a": {"type": "integer"}},
-            "required": ["a"],
-        }
-    ) == types.TypedDict({"a": types.Int()})
-
-    assert json_schema_to_weave_type({"type": "null"}) == types.NoneType()
-
-    assert json_schema_to_weave_type(
-        {
-            "type": "object",
-            "properties": {
-                "a": {
-                    "type": "integer",
-                },
-                "b": {"type": "object", "properties": {"b": {"type": "string"}}},
-            },
-            "required": ["a"],
-        }
-    ) == types.TypedDict(
-        {
-            "a": types.Int(),
-            "b": types.TypedDict({"b": types.String()}, not_required_keys={"b"}),
-        },
-        not_required_keys={"b"},
-    )
 
 
 def test_pydantic_type_inference():
@@ -55,7 +17,7 @@ def test_pydantic_type_inference():
     assert t.property_types() == {
         "a": types.Int(),
         "b": types.String(),
-        "c": types.Number(),
+        "c": types.Float(),
     }
 
 
@@ -92,3 +54,32 @@ def test_pydantic_saveload():
         assert a2.name == "my-a"
         assert a2.description == None
         assert a2.model_name == "my-model"
+
+
+def test_pydantic_nested_type():
+
+    class Child(pydantic.BaseModel):
+        a: str
+
+    class Parent(pydantic.BaseModel):
+        child: Child
+        b: int
+
+    p = Parent(child=Child(a="hello"), b=1)
+    t = weave.type_of(p)
+
+    assert str(t) == "Parent(child=Child(a=String()), b=Int())"
+    assert t.to_dict() == {
+        "type": "Parent",
+        "_base_type": {"type": "Object"},
+        "_relocatable": True,
+        "_is_object": True,
+        "child": {
+            "type": "Child",
+            "_base_type": {"type": "Object"},
+            "_relocatable": True,
+            "_is_object": True,
+            "a": "string",
+        },
+        "b": "int",
+    }
