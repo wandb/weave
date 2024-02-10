@@ -488,19 +488,20 @@ const useOpVersionOptions = (
       objectVersion?: OpVersionSchema;
     }> = [];
 
-    _.sortBy(latestVersions.result ?? [], ov => opNiceName(ov.opId)).forEach(
-      ov => {
-        const ref = opVersionKeyToRefUri({
-          ...ov,
-          versionHash: '*',
-        });
-        result.push({
-          title: opNiceName(ov.opId),
-          ref,
-          group: 'Ops',
-        });
-      }
-    );
+    _.sortBy(latestVersions.result ?? [], ov => [
+      opNiceName(ov.opId).toLowerCase(),
+      ov.opId.toLowerCase(),
+    ]).forEach(ov => {
+      const ref = opVersionKeyToRefUri({
+        ...ov,
+        versionHash: '*',
+      });
+      result.push({
+        title: opNiceName(ov.opId),
+        ref,
+        group: 'Ops',
+      });
+    });
 
     _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
       ov => {
