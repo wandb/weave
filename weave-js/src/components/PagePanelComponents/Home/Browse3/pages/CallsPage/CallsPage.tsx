@@ -486,31 +486,33 @@ const useOpVersionOptions = (
       objectVersion?: OpVersionSchema;
     }> = [];
 
-    latestVersions.result?.forEach(ov => {
-      const ref = opVersionKeyToRefUri({
-        ...ov,
-        versionHash: '*',
-      });
-      result.push({
-        title: opNiceName(ov.opId),
-        ref,
-        group: 'Ops',
-      });
-    });
-
-    currentVersions.result?.forEach(ov => {
-      const ref = opVersionKeyToRefUri(ov);
-      result.push({
-        title: ov.opId + ':v' + ov.versionIndex,
-        ref,
-        group: `Versions of ${opNiceName(currentOpId!)}`,
-        objectVersion: ov,
-      });
-    });
-
-    return _.fromPairs(
-      _.sortBy(result, r => `${r.group}:${r.title}`).map(r => [r.ref, r])
+    _.sortBy(latestVersions.result ?? [], ov => opNiceName(ov.opId)).forEach(
+      ov => {
+        const ref = opVersionKeyToRefUri({
+          ...ov,
+          versionHash: '*',
+        });
+        result.push({
+          title: opNiceName(ov.opId),
+          ref,
+          group: 'Ops',
+        });
+      }
     );
+
+    _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
+      ov => {
+        const ref = opVersionKeyToRefUri(ov);
+        result.push({
+          title: ov.opId + ':v' + ov.versionIndex,
+          ref,
+          group: `Versions of ${opNiceName(currentOpId!)}`,
+          objectVersion: ov,
+        });
+      }
+    );
+
+    return _.fromPairs(result.map(r => [r.ref, r]));
   }, [currentOpId, currentVersions.result, latestVersions.result]);
 };
 
