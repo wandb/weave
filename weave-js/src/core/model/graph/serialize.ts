@@ -353,12 +353,14 @@ function getDisjointGraphs(
   mergeInexpensiveOps: boolean = false
 ): [EditingNode[][], number[][]] {
   const hasher = new MemoizedHasher();
-  const nodeSubgraphMap: Map<string, number> = new Map();
+  const nodeSubgraphMap: Map<string | EditingNode, number> = new Map();
   const subgraphSet = (node: EditingNode, subgraph: number) => {
-    nodeSubgraphMap.set(hasher.nodeId(node), subgraph);
+    const key = node.nodeType === 'output' ? hasher.nodeId(node) : node;
+    nodeSubgraphMap.set(key, subgraph);
   };
   const subgraphGet = (node: EditingNode) => {
-    return nodeSubgraphMap.get(hasher.nodeId(node));
+    const key = node.nodeType === 'output' ? hasher.nodeId(node) : node;
+    return nodeSubgraphMap.get(key);
   };
   const expensiveSubgraphs: Set<number> = new Set();
 
