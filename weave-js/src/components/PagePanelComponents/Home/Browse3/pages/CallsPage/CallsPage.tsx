@@ -152,7 +152,9 @@ export const CallsTable: FC<{
   const parentOpDisplay = effectiveFilter.parentId
     ? parentIdOptions[effectiveFilter.parentId]
     : null;
-  const opCategoryOptions = OP_CATEGORIES;
+  const opCategoryOptions = useMemo(() => {
+    return _.sortBy(OP_CATEGORIES, _.identity);
+  }, []);
   const traceRootOptions = [true, false];
   const {onMakeBoard, isGenerating} = useMakeBoardForCalls(
     props.entity,
