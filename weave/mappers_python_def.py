@@ -68,12 +68,8 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
             if serializer.type != OpDefType() and k in constructor_sig.parameters:
-                get_k = k
-                if get_k == "_name":
-                    get_k = "name"
-                obj_val = obj.get(get_k)
-                v = serializer.apply(obj_val)
-                result[k] = v
+                obj_val = obj.get(k)
+                result[k] = serializer.apply(obj_val)
 
         for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):
@@ -98,11 +94,10 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             if self.type._relocatable:
                 # Attach fields to the relocated object, so we can
                 # detect and reconstruct later.
-                attrs = {"_weave_obj_fields": list(result), **op_methods}
                 new_class = type(
                     instance_class.__name__,
                     (instance_class,),
-                    attrs,
+                    op_methods,
                 )
 
                 return new_class(**result)

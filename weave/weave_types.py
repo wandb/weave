@@ -228,9 +228,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
-    instance_classes: typing.ClassVar[typing.Union[type, typing.List[type], None]] = (
-        None
-    )
+    instance_classes: typing.ClassVar[
+        typing.Union[type, typing.List[type], None]
+    ] = None
 
     _type_attrs = None
     _hash = None
@@ -1016,6 +1016,16 @@ class ObjectType(Type):
     _relocatable = False
     instance_classes = pydantic.BaseModel
 
+    # ObjectType gets its attribute types from actual attributes that
+    # attached to subclasses. Which means that ObjectTypes can't have
+    # attributes that collide with methods or other attributes of the
+    # class itself. We do a bunch of fixups here specifically for the
+    # "name" attribute (which would collide with Type.name) since we
+    # want objects to be able to have a "name" attribute.
+    # NOTE: These fixups should not "leak" out into the rest of the code
+    # base. All interactions with types go through methods here, so
+    # fixups can be contained.
+
     def __init__(self, **attr_types: Type):
         fixed_attr_types = {}
         for k, v in attr_types.items():
@@ -1030,9 +1040,15 @@ class ObjectType(Type):
     @property
     def type_vars(self):
         if hasattr(self, "attr_types"):
-            return self.attr_types
+            tv = self.attr_types
         else:
-            return super().type_vars
+            tv = super().type_vars
+        result = {}
+        for k, v in tv.items():
+            if k == "_name":
+                k = "name"
+            result[k] = v
+        return result
 
     def property_types(self) -> dict[str, Type]:
         return self.type_vars
@@ -1095,6 +1111,7 @@ class ObjectType(Type):
 
     def _to_dict(self) -> dict:
         d = self.class_to_dict()
+        d["type"] = self.__class__.__name__
 
         if self._relocatable:
             d["_relocatable"] = True
@@ -1210,6 +1227,7 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
             "__init__": locals()["loaded_object_init"],
             "__getattribute__": object_getattribute,
             "_lookup_path": object_lookup_path,
+            "_weave_obj_fields": object_constructor_arg_names,
         },
     )
 

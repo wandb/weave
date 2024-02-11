@@ -44,7 +44,7 @@ class Object(pydantic.BaseModel, metaclass=ObjectMeta):
     @classmethod
     def handle_relocatable_object(
         cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
-    ):
+    ) -> Any:
         if hasattr(v, "_weave_obj_fields"):
             # This is a relocated weave object, so destructure it into a dictionary
             # so pydantic can validate it.

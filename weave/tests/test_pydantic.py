@@ -57,7 +57,6 @@ def test_pydantic_saveload():
 
 
 def test_pydantic_nested_type():
-
     class Child(pydantic.BaseModel):
         a: str
 
