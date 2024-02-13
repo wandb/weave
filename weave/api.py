@@ -176,6 +176,15 @@ def local_client() -> typing.Iterator[_graph_client.GraphClient]:
         inited_client.reset()
 
 
+@contextlib.contextmanager
+def sql_client() -> typing.Iterator[_graph_client.GraphClient]:
+    inited_client = _weave_init.init_sql()
+    try:
+        yield inited_client.client
+    finally:
+        inited_client.reset()
+
+
 def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
     """Save and version a python object.
 

@@ -2,6 +2,7 @@ import typing
 from . import graph_client
 from . import graph_client_local
 from . import graph_client_wandb_art_st
+from . import graph_client_sql
 from . import context_state
 from . import errors
 from . import autopatch
@@ -61,4 +62,9 @@ def init_wandb(project_name: str) -> InitializedClient:
 
 def init_local() -> InitializedClient:
     client = graph_client_local.GraphClientLocal()
+    return InitializedClient(client)
+
+
+def init_sql() -> InitializedClient:
+    client = graph_client_sql.GraphClientSql()
     return InitializedClient(client)

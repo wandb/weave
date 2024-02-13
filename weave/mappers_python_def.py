@@ -348,7 +348,7 @@ class DefaultToPy(mappers.Mapper):
 
         ref = None
 
-        if gc and isinstance(obj, op_def.OpDef):
+        if gc and isinstance(obj, op_def.OpDef) and self._path != []:
             # This is a hack to ensure op_defs are always published as
             # top-level objects. This should be achieved by a policy
             # instead. There is a parallel policy in to_weavejs_with_refs
