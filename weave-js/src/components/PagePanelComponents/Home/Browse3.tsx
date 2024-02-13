@@ -384,7 +384,7 @@ const MainPeekingLayout: FC = () => {
             left: 0,
             zIndex: 100,
             backgroundColor: '#f4f7f9',
-            cursor: isFlexRow ? 'ew-resize' : 'ns-resize',
+            cursor: isFlexRow ? 'col-resize' : 'row-resize',
             padding: isFlexRow ? '4px 0 0' : '0 4px 0 0',
             bottom: isFlexRow ? 0 : 'auto',
             right: isFlexRow ? 'auto' : 0,
@@ -406,6 +406,7 @@ const MainPeekingLayout: FC = () => {
                       tooltip="Open full page for this object"
                       icon="full-screen-mode-expand"
                       variant="ghost"
+                      className="ml-4"
                       onClick={() => {
                         const targetPath = query.peekPath!.replace(
                           generalBase,
@@ -418,6 +419,7 @@ const MainPeekingLayout: FC = () => {
                       tooltip="Close drawer"
                       icon="close"
                       variant="ghost"
+                      className="ml-4"
                       onClick={closePeek}
                     />
                   </Box>

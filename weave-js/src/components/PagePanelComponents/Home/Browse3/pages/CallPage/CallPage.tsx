@@ -32,7 +32,7 @@ import {
   queryGetBoolean,
   querySetBoolean,
   queryToggleBoolean,
-} from '../../queryUtil';
+} from '../../urlQueryUtil';
 import {opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {

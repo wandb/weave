@@ -194,7 +194,6 @@ export const SimplePageLayoutWithHeader: FC<{
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'flex-end',
-          gap: 1,
           pl: 2,
           pr: 2,
           // merge line
@@ -231,6 +230,8 @@ export const SimplePageLayoutWithHeader: FC<{
       <div style={{marginLeft: 4, flex: '1 1 auto', overflow: 'hidden'}}>
         <SplitPanel
           minWidth={150}
+          defaultWidth={200}
+          maxWidth="50%"
           isDrawerOpen={props.isSidebarOpen ?? false}
           drawer={props.leftSidebar}
           main={
