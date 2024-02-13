@@ -408,11 +408,18 @@ const MainPeekingLayout: FC = () => {
                       variant="ghost"
                       className="ml-4"
                       onClick={() => {
-                        const targetPath = query.peekPath!.replace(
+                        const pathname = query.peekPath!.replace(
                           generalBase,
                           targetBase
                         );
-                        history.push(targetPath);
+                        const preservedQuery = _.pick(query, ['tracetree']);
+                        const search = new URLSearchParams(
+                          preservedQuery
+                        ).toString();
+                        history.push({
+                          pathname,
+                          search,
+                        });
                       }}
                     />
                     <Button
