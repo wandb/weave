@@ -41,11 +41,11 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CallStatusType, StatusChip} from '../common/StatusChip';
-import {UnderConstruction} from '../common/UnderConstruction';
 import {truncateID} from '../util';
 import {CallSchema, useCall, useCalls} from '../wfReactInterface/interface';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
+import {CallSummary} from './CallSummary';
 
 // % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
@@ -103,43 +103,8 @@ const useCallTabs = (call: CallSchema) => {
         ]
       : []),
     {
-      label: 'Feedback',
-      content: (
-        <UnderConstruction
-          title="Feedback"
-          message={
-            <>
-              Allows users to add key-value pairs to the Call. TODO: Bring over
-              from browse2.
-            </>
-          }
-        />
-      ),
-    },
-    {
-      label: 'Datasets',
-      content: (
-        <UnderConstruction
-          title="Datasets"
-          message={
-            <>Shows all the datasets which this Call has been added to</>
-          }
-        />
-      ),
-    },
-    {
-      label: 'DAG',
-      content: (
-        <UnderConstruction
-          title="Record DAG"
-          message={
-            <>
-              This page will show a "Record" DAG of Objects and Calls centered
-              at this particular Call.
-            </>
-          }
-        />
-      ),
+      label: 'Summary',
+      content: <CallSummary call={call} />,
     },
   ];
 };
