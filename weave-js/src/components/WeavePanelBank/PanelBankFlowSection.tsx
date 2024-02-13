@@ -256,7 +256,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
         }
           ${mobile ? 'mobile' : ''}`}
         style={{
-          height: noPanels ? DEFAULT_PANEL_SIZE : pageHeight + paginationHeight,
+          height: DEFAULT_PANEL_SIZE,
         }}>
         <div
           // TODO: do we even still need this div?
