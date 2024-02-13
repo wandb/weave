@@ -15,7 +15,8 @@ def clickhouse():
         id String,
         type String,
         val String,
-        files Map(String, String))
+        files Map(String, String),
+        art_meta String)
     ENGINE = MergeTree()
     ORDER BY id
     PRIMARY KEY (id)
@@ -65,3 +66,13 @@ def test_op(clickhouse):
         op_ref = weave.obj_ref(my_op)
         assert client.ref_is_own(op_ref)
         got_op = weave.storage.get(str(op_ref))
+
+
+def test_dataset(clickhouse):
+    from weave.weaveflow import Dataset
+
+    d = Dataset([{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    with weave.sql_client() as client:
+        ref = weave.publish(d)
+        d2 = weave.storage.get(str(ref))
+    assert d2.rows == d2.rows

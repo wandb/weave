@@ -33,10 +33,13 @@ from . import storage
 class MemFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
 
-    def __init__(self, path_contents=None):
+    def __init__(self, path_contents=None, metadata=None):
         if path_contents is None:
             path_contents = {}
         self.path_contents = path_contents
+        if metadata is None:
+            metadata = {}
+        self._metadata = metadata
         self.temp_read_dir = None
 
     @contextlib.contextmanager
@@ -53,13 +56,17 @@ class MemFilesArtifact(artifact_fs.FilesystemArtifact):
     def is_saved(self):
         return True
 
+    @property
+    def version(self):
+        return None
+
     @contextlib.contextmanager
     def open(self, path, binary=False):
         try:
             if binary:
                 f = io.BytesIO(self.path_contents[path])
             else:
-                f = io.StringIO(self.path_contents[path])
+                f = io.StringIO(self.path_contents[path].decode("utf-8"))
         except KeyError:
             raise FileNotFoundError(path)
         yield f
@@ -73,7 +80,7 @@ class MemFilesArtifact(artifact_fs.FilesystemArtifact):
         if self.temp_read_dir is None:
             self.temp_read_dir = tempfile.mkdtemp()
         path = os.path.join(self.temp_read_dir, name)
-        with open(path, "w") as f:
+        with open(path, "wb") as f:
             f.write(self.path_contents[name])
         return path
 
@@ -87,6 +94,10 @@ class MemFilesArtifact(artifact_fs.FilesystemArtifact):
             "entity",
             "project",
         )
+
+    @property
+    def metadata(self):
+        return self._metadata
 
 
 def refs_to_str(val: typing.Any) -> typing.Any:
@@ -226,6 +237,10 @@ class SqlTableRef(ref_base.Ref):
         self._table_name = table_name
         self._row_id = row_id
         self._row_version = row_version
+
+        # Needed because mappers_python checks this
+        self.artifact = None
+
         super().__init__(obj=obj, type=type)
 
     @classmethod
@@ -277,10 +292,14 @@ class SqlTableRef(ref_base.Ref):
         assert self._row_id
         client = gc.client
         query_result = client.query(
-            f"SELECT * FROM objects WHERE id = '{self._row_id}'"
+            f"SELECT * FROM objects WHERE id = '{self._row_id}'",
+            # Tell clickhouse_connect to return the files map as bytes. But this
+            # also returns the keys as bytes...
+            column_formats={"files": {"string": "bytes"}},
         )
         item = query_result.first_item
-        art = MemFilesArtifact(item["files"])
+        files = {k.decode("utf-8"): v for k, v in item["files"].items()}
+        art = MemFilesArtifact(files, metadata=json.loads(item["art_meta"]))
         wb_type = types.TypeRegistry.type_from_dict(json.loads(item["type"]))
         mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
         res = mapper.apply(json.loads(item["val"]))
@@ -288,6 +307,25 @@ class SqlTableRef(ref_base.Ref):
 
     def __repr__(self) -> str:
         return f"<{self.__class__}({id(self)}) entity_name={self._entity_name} project_name={self._project_name} table_name={self._table_name} row_id={self._row_id} row_version={self._row_version} obj={self._obj} type={self._type}>"
+
+    def with_extra(
+        self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
+    ) -> "SqlTableRef":
+        new_extra = self.extra
+        if self.extra is None:
+            new_extra = []
+        else:
+            new_extra = self.extra.copy()
+        new_extra += extra
+        return self.__class__(
+            entity_name=self._entity_name,
+            project_name=self._project_name,
+            table_name=self._table_name,
+            row_id=self._row_id,
+            row_version=self._row_version,
+            obj=obj,
+            extra=new_extra,
+        )
 
 
 @dataclasses.dataclass
@@ -356,6 +394,12 @@ class GraphClientSql(GraphClient[WeaveRunObj]):
 
         # type_val = storage.to_python(obj, ref_persister=save_custom_object)
         id_ = str(uuid.uuid4())
+        encoded_path_contents = {}
+        for k, v in art.path_contents.items():
+            if isinstance(v, str):
+                encoded_path_contents[k] = v.encode("utf-8")
+            else:
+                encoded_path_contents[k] = v
         self.client.insert(
             "objects",
             [
@@ -363,7 +407,8 @@ class GraphClientSql(GraphClient[WeaveRunObj]):
                     id_,
                     json.dumps(wb_type.to_dict()),
                     json.dumps(val),
-                    art.path_contents,
+                    encoded_path_contents,
+                    json.dumps(art.metadata),
                 )
             ],
         )
@@ -405,7 +450,7 @@ class GraphClientSql(GraphClient[WeaveRunObj]):
             start_time=cur_time,
             end_time=None,
             attributes=json.dumps({}),
-            inputs=json.dumps(inputs),
+            inputs=json.dumps(refs_to_str(inputs)),
             outputs=None,
             summary=None,
             exception=None,
@@ -427,7 +472,7 @@ class GraphClientSql(GraphClient[WeaveRunObj]):
         output_refs: Sequence[Ref],
     ) -> None:
         span = run._attrs
-        span["outputs"] = json.dumps(output)
+        span["outputs"] = json.dumps(refs_to_str(output))
         self.client.insert("calls", [list(span.values())])
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
