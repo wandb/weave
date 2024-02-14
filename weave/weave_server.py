@@ -71,8 +71,10 @@ if engine_trace.datadog_is_enabled():
     # crashes
     import ddtrace
 
+    ddtrace.patch_all(logging=False)
     if not os.environ.get("DISABLE_WEAVE_PII"):
-        ddtrace.patch_all(logging=True)
+        ddtrace.patch(logging=True)
+        
     custom_dd_patch()
 
 
