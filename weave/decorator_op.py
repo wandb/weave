@@ -118,7 +118,7 @@ def op(
         # only in the case where an op is lazily called. But no need for now.
         op_version = registry_mem.memory_registry.register_op(op)
 
-        if not loading_builtins:
+        if loading_builtins:
             derive_op.derive_ops(op)
 
         functools.update_wrapper(op_version, f)
