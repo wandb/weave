@@ -1,11 +1,4 @@
-import {
-  Box,
-  CircularProgress,
-  FormControl,
-  Snackbar,
-  TextField,
-  Typography,
-} from '@mui/material';
+import {Box, FormControl, Snackbar, TextField, Typography} from '@mui/material';
 import {Autocomplete, ListItem} from '@mui/material';
 import {
   GRID_CHECKBOX_SELECTION_COL_DEF,
@@ -26,7 +19,6 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {flattenObject} from '../../../Browse2/browse2Util';
-import {Call, SpanWithFeedback} from '../../../Browse2/callTree';
 import {
   buildTree,
   DataGridColumnGroupingModel,
@@ -38,7 +30,9 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {CenteredAnimatedLoader} from '../common/Loader';
 import {renderCell} from '../util';
+import {CallSchema} from '../wfReactInterface/interface';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
@@ -47,7 +41,7 @@ export type WFHighLevelPivotSpec = {
 
 type PivotRunsTablePropsType = {
   loading: boolean;
-  runs: Call[];
+  runs: CallSchema[];
   entity: string;
   project: string;
   colDimAtLeafMode?: boolean;
@@ -80,7 +74,7 @@ export const PivotRunsView: FC<
     }
     const firstRun = runs[0];
     const options: string[] = [];
-    Object.entries(firstRun.inputs).forEach(([key, value]) => {
+    Object.entries(firstRun.rawSpan.inputs).forEach(([key, value]) => {
       if (
         typeof value === 'string' &&
         value.startsWith('wandb-artifact:///') &&
@@ -210,13 +204,23 @@ export const PivotRunsView: FC<
           }
         />
       ) : (
-        <>Please select pivot dimensions</>
+        <CenteredAnimatedLoader />
       )}
     </Box>
   );
 };
 
-type PivotDataRowType = {[col: string]: any};
+const filterNulls = <T,>(arr: Array<T | null | undefined>): T[] => {
+  return arr.filter(
+    (e): e is Exclude<Exclude<typeof e, null>, undefined> => e !== null
+  );
+};
+
+type PivotDataRowType = {
+  id: string;
+  rows: {[row: string]: string};
+  cols: {[col: string]: CallSchema | null};
+};
 
 export const PivotRunsTable: FC<
   PivotRunsTablePropsType & {
@@ -231,19 +235,19 @@ export const PivotRunsTable: FC<
   const history = useHistory();
 
   const {pivotData, pivotColumns} = useMemo(() => {
-    const aggregationFn = (internalRows: SpanWithFeedback[]) => {
+    const aggregationFn = (internalRows: CallSchema[]): CallSchema | null => {
       if (internalRows.length === 0) {
         return null;
       }
-      return _.sortBy(internalRows, r => -r.timestamp)[0];
+      return _.sortBy(internalRows, r => -r.rawSpan.timestamp)[0];
     };
 
     // Step 1: Create a map of values
-    const values: {[rowId: string]: {[colId: string]: any[]}} = {};
+    const values: {[rowId: string]: {[colId: string]: CallSchema[]}} = {};
     const pivotColumnsInner: Set<string> = new Set();
     props.runs.forEach(r => {
-      const rowValue = getValueAtNestedKey(r, props.pivotSpec.rowDim);
-      const colValue = getValueAtNestedKey(r, props.pivotSpec.colDim);
+      const rowValue = getValueAtNestedKey(r.rawSpan, props.pivotSpec.rowDim);
+      const colValue = getValueAtNestedKey(r.rawSpan, props.pivotSpec.colDim);
       if (rowValue == null || colValue == null) {
         return;
       }
@@ -262,10 +266,12 @@ export const PivotRunsTable: FC<
     Object.keys(values).forEach(rowKey => {
       const row: PivotDataRowType = {
         id: rowKey,
+        rows: {},
+        cols: {},
       };
-      row[props.pivotSpec.rowDim] = rowKey;
+      row.rows[props.pivotSpec.rowDim] = rowKey;
       Object.keys(values[rowKey]).forEach(colKey => {
-        row[colKey] = aggregationFn(values[rowKey][colKey]);
+        row.cols[colKey] = aggregationFn(values[rowKey][colKey]);
       });
       rows.push(row);
     });
@@ -275,13 +281,11 @@ export const PivotRunsTable: FC<
 
   const opsInPlay = useMemo(() => {
     return _.uniq(
-      pivotData
-        .flatMap(pivotRow =>
-          Array.from(pivotColumns).map(
-            col => (pivotRow[col] as SpanWithFeedback | null)?.name
-          )
+      filterNulls(
+        pivotData.flatMap(pivotRow =>
+          Array.from(pivotColumns).map(col => pivotRow.cols[col]?.opVersionRef)
         )
-        .filter(name => name != null)
+      )
     );
   }, [pivotColumns, pivotData]);
 
@@ -295,7 +299,8 @@ export const PivotRunsTable: FC<
         field: props.pivotSpec.rowDim,
         headerName: props.pivotSpec.rowDim,
         renderCell: cellParams => {
-          return renderCell(cellParams.row[props.pivotSpec.rowDim]);
+          const row: PivotDataRowType = cellParams.row;
+          return renderCell(row.rows[props.pivotSpec.rowDim]);
         },
       },
     ];
@@ -311,9 +316,10 @@ export const PivotRunsTable: FC<
         // All output keys as we don't have the order key yet.
         const outputKeys: {[key: string]: true} = {};
         pivotData.forEach(pivotRow => {
-          if (pivotRow[col]) {
+          const pivotCol = pivotRow.cols[col];
+          if (pivotCol) {
             for (const [k, v] of Object.entries(
-              flattenObject(pivotRow[col].output!)
+              flattenObject(pivotCol.rawSpan.output!)
             )) {
               if (v != null && (!k.startsWith('_') || k === '_result')) {
                 outputKeys[k] = true;
@@ -336,8 +342,9 @@ export const PivotRunsTable: FC<
             field: col + '.' + key,
             headerName: key.split('.').slice(-1)[0],
             renderCell: cellParams => {
+              const row: PivotDataRowType = cellParams.row;
               return renderCell(
-                getValueAtNestedKey(cellParams.row[col]?.output, key)
+                getValueAtNestedKey(row.cols[col]?.rawSpan.output, key)
               );
             },
           });
@@ -348,14 +355,15 @@ export const PivotRunsTable: FC<
       if (opsInPlay.length !== 1) {
         throw new Error('All rows must be from the same op');
       }
-      const op = opsInPlay[0] as string;
+      const op = opsInPlay[0];
       // All output keys as we don't have the order key yet.
       const outputKeys: {[key: string]: true} = {};
       pivotColumns.forEach(col => {
         pivotData.forEach(pivotRow => {
-          if (pivotRow[col]) {
+          const pivotCol = pivotRow.cols[col];
+          if (pivotCol) {
             for (const [k, v] of Object.entries(
-              flattenObject(pivotRow[col].output!)
+              flattenObject(pivotCol.rawSpan.output!)
             )) {
               if (v != null && (!k.startsWith('_') || k === '_result')) {
                 outputKeys[k] = true;
@@ -386,8 +394,9 @@ export const PivotRunsTable: FC<
               return renderCell(col);
             },
             renderCell: cellParams => {
+              const row: PivotDataRowType = cellParams.row;
               return renderCell(
-                getValueAtNestedKey(cellParams.row[col]?.output, key)
+                getValueAtNestedKey(row.cols[col]?.rawSpan.output, key)
               );
             },
           });
@@ -426,23 +435,23 @@ export const PivotRunsTable: FC<
     const entries = Array.from(params.entries());
     const searchDict = _.fromPairs(entries);
     const callIds: string[] = JSON.parse(searchDict.callIds ?? '[]');
-    const rowIds: string[] = _.uniq(
-      callIds
-        .map(callId => {
+    const rowIds = _.uniq(
+      filterNulls(
+        callIds.map(callId => {
           return pivotData.find(row => {
             return Array.from(pivotColumns).find(col => {
-              return row[col]?.span_id === callId;
+              return row.cols[col]?.callId === callId;
             });
           })?.id;
         })
-        .filter(id => id != null)
+      )
     );
 
     setRowSelectionModel(rowIds);
   }, [peekLocation, pivotColumns, pivotData, props.showCompareButton]);
 
   if (props.loading) {
-    return <CircularProgress />;
+    return <CenteredAnimatedLoader />;
   }
 
   return (
@@ -506,7 +515,8 @@ export const PivotRunsTable: FC<
           const col = usingLeafMode
             ? fieldParts[fieldParts.length - 1]
             : fieldParts[0];
-          const cellSpan = params.row[col] as SpanWithFeedback;
+          const row: PivotDataRowType = params.row;
+          const cellSpan = row.cols[col];
           if (!cellSpan) {
             return;
           }
@@ -515,7 +525,7 @@ export const PivotRunsTable: FC<
               props.entity,
               props.project,
               '',
-              cellSpan.span_id
+              cellSpan.callId
             )
           );
         }}
@@ -540,9 +550,9 @@ export const PivotRunsTable: FC<
                 }
                 return Array.from(pivotColumns)
                   .map(col => {
-                    return row[col]?.span_id;
+                    return row.cols[col]?.callId;
                   })
-                  .filter(maybeId => maybeId != null);
+                  .filter(maybeId => maybeId != null) as string[];
               });
             })
           );

@@ -21,6 +21,7 @@ import {
   HackyOpCategory,
   HackyTypeCategory,
   HackyTypeTree,
+  ReferencedObject,
   WFCall,
   WFObject,
   WFObjectVersion,
@@ -41,6 +42,116 @@ type WFNaiveProjectState = {
   opVersionsMap: Map<string, WFNaiveOpVersionDictType>;
   objectVersionsMap: Map<string, WFNaiveObjectVersionDictType>;
   callsMap: Map<string, WFNaiveCallDictType>;
+  // Implementation Details
+  artifactVersionsMap: Map<string, ObjectVersionDictType>;
+};
+
+type WFNaiveArtifactVersionDictType = {
+  description: string;
+  versionIndex: number;
+  createdAt: number;
+  aliases: string[];
+};
+
+type WFNaiveRefDict = {
+  entity: string;
+  project: string;
+  artifactName: string;
+  versionCommitHash: string;
+  filePathParts: string[];
+  refExtraTuples: Array<{
+    edgeType: string;
+    edgeName: string;
+  }>;
+};
+
+export const refStringToRefDict = (uri: string): WFNaiveRefDict => {
+  const scheme = 'wandb-artifact:///';
+  if (!uri.startsWith(scheme)) {
+    throw new Error('Invalid uri: ' + uri);
+  }
+  const uriWithoutScheme = uri.slice(scheme.length);
+  let uriParts = uriWithoutScheme;
+  let refExtraPath = '';
+  const refExtraTuples = [];
+  if (uriWithoutScheme.includes('#')) {
+    [uriParts, refExtraPath] = uriWithoutScheme.split('#');
+    const refExtraParts = refExtraPath.split('/');
+    if (refExtraParts.length % 2 !== 0) {
+      throw new Error('Invalid uri: ' + uri);
+    }
+    for (let i = 0; i < refExtraParts.length; i += 2) {
+      refExtraTuples.push({
+        edgeType: refExtraParts[i],
+        edgeName: refExtraParts[i + 1],
+      });
+    }
+  }
+  const [entity, project, artifactNameAndVersion, filePath] = uriParts.split(
+    '/',
+    4
+  );
+  const [artifactName, versionCommitHash] = artifactNameAndVersion.split(':');
+  const filePathParts = filePath.split('/');
+
+  return {
+    entity,
+    project,
+    artifactName,
+    versionCommitHash,
+    filePathParts,
+    refExtraTuples,
+  };
+};
+
+export const stringIsRef = (maybeRef: string): boolean => {
+  try {
+    refStringToRefDict(maybeRef);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+export const refDictToRefString = (refDict: WFNaiveRefDict): string => {
+  const {
+    entity,
+    project,
+    artifactName,
+    versionCommitHash,
+    filePathParts,
+    refExtraTuples,
+  } = refDict;
+  const refExtraPath = refExtraTuples
+    .map(({edgeType, edgeName}) => `${edgeType}/${edgeName}`)
+    .join('/');
+  return `wandb-artifact:///${entity}/${project}/${artifactName}:${versionCommitHash}/${filePathParts.join(
+    '/'
+  )}${refExtraPath ? `#${refExtraPath}` : ''}`;
+};
+
+const objectVersionDictTypeToWFNaiveRefDict = (
+  objectVersionDict: ObjectVersionDictType
+): WFNaiveRefDict => {
+  return {
+    entity: objectVersionDict.entity,
+    project: objectVersionDict.project,
+    artifactName: objectVersionDict.collection_name,
+    versionCommitHash: objectVersionDict.hash,
+    filePathParts: ['obj'],
+    refExtraTuples: [],
+  };
+};
+
+const objectVersionDictTypeToArtifactVersionDict = (
+  objectVersionDict: ObjectVersionDictType
+): WFNaiveArtifactVersionDictType => {
+  return {
+    description: objectVersionDict.description,
+    versionIndex: objectVersionDict.version_index,
+    createdAt: objectVersionDict.created_at_ms,
+    aliases: objectVersionDict.aliases,
+  };
 };
 
 export const fnNaiveBootstrapObjects = (
@@ -88,6 +199,7 @@ export class WFNaiveProject implements WFProject {
       opVersionsMap: new Map(),
       objectVersionsMap: new Map(),
       callsMap: new Map(),
+      artifactVersionsMap: new Map(),
     };
 
     this.bootstrapFromData(
@@ -161,33 +273,33 @@ export class WFNaiveProject implements WFProject {
       return new WFNaiveTypeVersion(this.state, opName);
     });
   }
-  opVersion(name: string, version: string): WFOpVersion | null {
-    if (!this.state.opVersionsMap.has(version)) {
+  opVersion(refUriStr: string): WFOpVersion | null {
+    // TODO: I think we need to do some more intelligent parsing here
+    if (!this.state.opVersionsMap.has(refUriStr)) {
       return null;
       // throw new Error(
       //   `Cannot find version: ${version} in project: ${this.state.project}`
       // );
     }
-    return new WFNaiveOpVersion(this.state, version);
+    return new WFNaiveOpVersion(
+      this.state,
+      this.state.opVersionsMap.get(refUriStr)!
+    );
   }
   opVersions(): WFOpVersion[] {
-    return Array.from(this.state.opVersionsMap.keys()).map(opName => {
-      return new WFNaiveOpVersion(this.state, opName);
+    return Array.from(this.state.opVersionsMap.values()).map(opVersionDict => {
+      return new WFNaiveOpVersion(this.state, opVersionDict);
     });
   }
-  objectVersion(name: string, version: string): WFObjectVersion | null {
-    if (!this.state.objectVersionsMap.has(version)) {
-      return null;
-      // throw new Error(
-      //   `Cannot find version: ${version} in project: ${this.state.project}`
-      // );
-    }
-    return new WFNaiveObjectVersion(this.state, version);
+  objectVersion(refUriStr: string): WFObjectVersion | null {
+    return WFNaiveObjectVersion.fromURI(this.state, refUriStr);
   }
   objectVersions(): WFObjectVersion[] {
-    return Array.from(this.state.objectVersionsMap.keys()).map(opName => {
-      return new WFNaiveObjectVersion(this.state, opName);
-    });
+    return Array.from(this.state.objectVersionsMap.values()).map(
+      objectVersionDict => {
+        return new WFNaiveObjectVersion(this.state, objectVersionDict);
+      }
+    );
   }
   call(callID: string): WFCall | null {
     if (!this.state.callsMap.has(callID)) {
@@ -228,12 +340,262 @@ export class WFNaiveProject implements WFProject {
     runsValue?: Call[],
     feedbackValue?: any[]
   ): void {
-    const joinedCalls = joinRunsWithFeedback(
+    const objects = processWeaveObjects(weaveObjectsValue);
+    const {opVersions, objectVersions} = splitWeaveObjects(objects);
+    this.state.artifactVersionsMap = bfdObjectsToArtifactVersions(objects);
+    this.state.objectVersionsMap = bfdObjectsToObjectVersions(objectVersions);
+    this.state.opVersionsMap = bfdOpsToOpVersions(opVersions);
+    this.state.callsMap = bfsCallsAndObjectsToCallsMap(
       runsValue ?? [],
-      feedbackValue ?? []
+      feedbackValue ?? [],
+      this.state.opVersionsMap,
+      this.state.objectVersionsMap
     );
-    const objects =
-      weaveObjectsValue?.map(obj => {
+
+    // Likely can be removed in future
+    this.state.typeVersionsMap =
+      bfdObjectVersionsToTypeVersions(objectVersions);
+    // Likely can be removed in future
+    this.state.objectsMap = bfdObjectVersionsMapToObjectsMap(
+      this.state.objectVersionsMap
+    );
+    // Likely can be removed in future
+    this.state.opsMap = bfdOpVersionsMapToOpsMap(this.state.opVersionsMap);
+    // Likely can be removed in future
+    this.state.typesMap = bfdTypeVersionsToTypeMap(this.state.typeVersionsMap);
+
+    // Infer and populate OpVersion Relationships
+    this.opVersions().forEach(opVersion => {
+      const selfOpVersion = this.state.opVersionsMap.get(opVersion.refUri());
+      if (!selfOpVersion) {
+        return;
+      }
+      const calls = opVersion.calls();
+      if (calls.length === 0) {
+        return;
+      }
+      const exampleCall = calls[0];
+
+      // Populate invokesOpVersionRefs
+      const invokesMap: Set<string> = new Set();
+      const childCalls = exampleCall.childCalls();
+      childCalls.forEach(childCall => {
+        const childCallVersion = childCall.opVersion();
+        if (!childCallVersion) {
+          return;
+        }
+
+        invokesMap.add(childCallVersion.refUri());
+      });
+      selfOpVersion.invokesOpVersionRefs = Array.from(invokesMap);
+
+      // Populate inputTypeVersionRefs and outputTypeVersionRefs
+      const inputTypeVersionMap: Set<string> = new Set();
+      const outputTypeVersionMap: Set<string> = new Set();
+      const exampleCallDict = this.state.callsMap.get(exampleCall.callID());
+      if (!exampleCallDict) {
+        return;
+      }
+      exampleCall.inputs().forEach(input => {
+        const inputType = input.typeVersion();
+        if (inputType) {
+          inputTypeVersionMap.add(inputType.version());
+        }
+      });
+      exampleCall.output().forEach(output => {
+        const outputType = output.typeVersion();
+        if (outputType) {
+          outputTypeVersionMap.add(outputType.version());
+        }
+      });
+      selfOpVersion.inputTypeVersionRefs = Array.from(inputTypeVersionMap);
+      selfOpVersion.outputTypeVersionRefs = Array.from(outputTypeVersionMap);
+    });
+  }
+}
+
+// const uriToParts = (uri: string) => {
+//   if (uri.startsWith('wandb-artifact:///') && uri.endsWith('/obj')) {
+//     const inner = uri.slice('wandb-artifact:///'.length, -'/obj'.length);
+//     const [entity, project, nameAndVersion] = inner.split('/');
+//     const [name, version] = nameAndVersion.split(':');
+//     return {entity, project, name, version};
+//   }
+//   return null;
+// };
+
+const bfdObjectsToArtifactVersions = (
+  objects: ObjectVersionDictType[]
+): Map<string, ObjectVersionDictType> => {
+  return new Map(
+    objects.map(object => {
+      return [
+        refDictToRefString(objectVersionDictTypeToWFNaiveRefDict(object)),
+        object,
+      ];
+    })
+  );
+};
+
+const bfdObjectsToObjectVersions = (
+  objectVersions: ObjectVersionDictType[]
+): Map<string, WFNaiveObjectVersionDictType> => {
+  return new Map(
+    objectVersions.map(objectVersion => {
+      const reference = objectVersionDictTypeToWFNaiveRefDict(objectVersion);
+      return [
+        refDictToRefString(reference),
+        {
+          reference,
+          artifactVersion:
+            objectVersionDictTypeToArtifactVersionDict(objectVersion),
+          typeVersionHash: objectVersion.type_version.type_version,
+        },
+      ];
+    })
+  );
+};
+
+const bfdOpsToOpVersions = (
+  opVersions: ObjectVersionDictType[]
+): Map<string, WFNaiveOpVersionDictType> => {
+  return new Map(
+    opVersions.map(opVersion => {
+      const reference = objectVersionDictTypeToWFNaiveRefDict(opVersion);
+      return [
+        refDictToRefString(reference),
+        {
+          reference,
+          artifactVersion:
+            objectVersionDictTypeToArtifactVersionDict(opVersion),
+          invokesOpVersionRefs: [],
+          inputTypeVersionRefs: [],
+          outputTypeVersionRefs: [],
+        },
+      ];
+    })
+  );
+};
+
+const bfdObjectVersionsToTypeVersions = (
+  objectVersions: ObjectVersionDictType[]
+): Map<string, WFNaiveTypeVersionDictType> => {
+  const typeVersionsDict: {[key: string]: WFNaiveTypeVersionDictType} = {};
+  const objectTypeVersions = objectVersions.map(obj => obj.type_version);
+  const objectTypeVersionsQueue = [...objectTypeVersions];
+  while (objectTypeVersionsQueue.length > 0) {
+    const typeVersion = objectTypeVersionsQueue.pop();
+    if (!typeVersion) {
+      continue;
+    }
+    if (typeVersion.type_version in typeVersionsDict) {
+      continue;
+    }
+    typeVersionsDict[typeVersion.type_version] = {
+      name: typeVersion.type_name,
+      versionHash: typeVersion.type_version,
+      parentTypeVersionHash: typeVersion.parent_type?.type_version ?? undefined,
+      rawWeaveType: typeVersion.type_version_json_string
+        ? JSON.parse(typeVersion.type_version_json_string)
+        : 'unknown',
+    };
+    if (
+      typeVersion.parent_type &&
+      !(typeVersion.parent_type.type_version in typeVersionsDict)
+    ) {
+      objectTypeVersionsQueue.push(typeVersion.parent_type);
+    }
+  }
+
+  return new Map(Object.entries(typeVersionsDict));
+};
+
+const bfdObjectVersionsMapToObjectsMap = (
+  objectVersionsMap: Map<string, WFNaiveObjectVersionDictType>
+): Map<string, WFNaiveObjectDictType> => {
+  return new Map(
+    Array.from(objectVersionsMap.entries()).map(
+      ([objectVersionHash, objectVersionDict]) => {
+        return [objectVersionDict.reference.artifactName, {}];
+      }
+    )
+  );
+};
+
+const bfdOpVersionsMapToOpsMap = (
+  opVersionsMap: Map<string, WFNaiveOpVersionDictType>
+): Map<string, WFNaiveOpDictType> => {
+  return new Map(
+    Array.from(opVersionsMap.entries()).map(([opVersionRef, opVersionDict]) => {
+      return [opVersionDict.reference.artifactName, {}];
+    })
+  );
+};
+
+const bfdTypeVersionsToTypeMap = (
+  typeVersionsMap: Map<string, WFNaiveTypeVersionDictType>
+): Map<string, WFNaiveTypeDictType> => {
+  return new Map(
+    Array.from(typeVersionsMap.entries()).map(
+      ([typeVersionHash, typeVersionDict]) => {
+        return [typeVersionDict.name, {}];
+      }
+    )
+  );
+};
+
+const bfsCallsAndObjectsToCallsMap = (
+  runsValue: Call[],
+  feedbackValue: any[],
+  opVersionsMap: Map<string, WFNaiveOpVersionDictType>,
+  objectVersionsMap: Map<string, WFNaiveObjectVersionDictType>
+): Map<string, WFNaiveCallDictType> => {
+  const joinedCalls = joinRunsWithFeedback(runsValue, feedbackValue);
+  return new Map(
+    joinedCalls.map(call => {
+      const name = call.name;
+      let opVersionRef: string | undefined;
+      if (stringIsRef(name)) {
+        opVersionRef = name;
+      }
+      const inputObjectVersionRefs: string[] = [];
+      const outputObjectVersionRefs: string[] = [];
+
+      Object.values(call.inputs).forEach((input: any) => {
+        if (typeof input === 'string') {
+          if (stringIsRef(input)) {
+            inputObjectVersionRefs.push(input);
+          }
+        }
+      });
+
+      Object.values(call.output ?? {}).forEach((output: any) => {
+        if (typeof output === 'string') {
+          if (stringIsRef(output)) {
+            outputObjectVersionRefs.push(output);
+          }
+        }
+      });
+
+      return [
+        call.span_id,
+        {
+          callSpan: call,
+          opVersionRef,
+          inputObjectVersionRefs,
+          outputObjectVersionRefs,
+        },
+      ];
+    })
+  );
+};
+
+const processWeaveObjects = (
+  weaveObjectsValue?: ObjectVersionDictType[]
+): ObjectVersionDictType[] => {
+  return (
+    weaveObjectsValue
+      ?.map(obj => {
         if (
           obj.type_version.type_version === 'unknown' &&
           obj.type_version.type_version_json_string
@@ -250,214 +612,25 @@ export class WFNaiveProject implements WFProject {
           };
         }
         return obj;
-      }) ?? [];
-    const opVersions = objects.filter(
-      obj => obj.type_version.type_name === 'OpDef'
-    );
-    const objectVersions = objects.filter(
-      obj =>
-        !['OpDef', 'stream_table', 'type'].includes(obj.type_version.type_name)
-    );
-    const objectTypeVersions = objectVersions.map(obj => obj.type_version);
-
-    this.state.objectVersionsMap = new Map(
-      objectVersions.map(objectVersion => {
-        return [
-          objectVersion.hash,
-          {
-            name: objectVersion.collection_name,
-            versionHash: objectVersion.hash,
-            createdAt: objectVersion.created_at_ms,
-            aliases: objectVersion.aliases,
-            description: objectVersion.description,
-            versionIndex: objectVersion.version_index,
-            typeVersionHash: objectVersion.type_version.type_version,
-          },
-        ];
       })
-    );
+      .filter(
+        obj => !['stream_table', 'type'].includes(obj.type_version.type_name)
+      ) ?? []
+  );
+};
 
-    this.state.objectsMap = new Map(
-      Array.from(this.state.objectVersionsMap.entries()).map(
-        ([objectVersionHash, objectVersionDict]) => {
-          return [objectVersionDict.name, {}];
-        }
-      )
-    );
-
-    this.state.opVersionsMap = new Map(
-      opVersions.map(opVersion => {
-        return [
-          opVersion.hash,
-          {
-            name: opVersion.collection_name,
-            versionHash: opVersion.hash,
-            createdAt: opVersion.created_at_ms,
-            aliases: opVersion.aliases,
-            description: opVersion.description,
-            versionIndex: opVersion.version_index,
-            // inputTypes: {},
-            // outputType: null,
-            invokesOpVersionHashes: [],
-            code: undefined,
-            inputTypeVersionHashes: [],
-            outputTypeVersionHashes: [],
-          },
-        ];
-      })
-    );
-
-    this.state.opsMap = new Map(
-      Array.from(this.state.opVersionsMap.entries()).map(
-        ([opVersionHash, opVersionDict]) => {
-          return [opVersionDict.name, {}];
-        }
-      )
-    );
-
-    const typeVersionsDict: {[key: string]: WFNaiveTypeVersionDictType} = {};
-    const objectTypeVersionsQueue = [...objectTypeVersions];
-    while (objectTypeVersionsQueue.length > 0) {
-      const typeVersion = objectTypeVersionsQueue.pop();
-      if (!typeVersion) {
-        continue;
-      }
-      if (typeVersion.type_version in typeVersionsDict) {
-        continue;
-      }
-      typeVersionsDict[typeVersion.type_version] = {
-        name: typeVersion.type_name,
-        versionHash: typeVersion.type_version,
-        parentTypeVersionHash:
-          typeVersion.parent_type?.type_version ?? undefined,
-        rawWeaveType: typeVersion.type_version_json_string
-          ? JSON.parse(typeVersion.type_version_json_string)
-          : 'unknown',
-      };
-      if (
-        typeVersion.parent_type &&
-        !(typeVersion.parent_type.type_version in typeVersionsDict)
-      ) {
-        objectTypeVersionsQueue.push(typeVersion.parent_type);
-      }
-    }
-
-    this.state.typeVersionsMap = new Map(Object.entries(typeVersionsDict));
-
-    this.state.typesMap = new Map(
-      Array.from(this.state.typeVersionsMap.entries()).map(
-        ([typeVersionHash, typeVersionDict]) => {
-          return [typeVersionDict.name, {}];
-        }
-      )
-    );
-
-    this.state.callsMap = new Map(
-      joinedCalls.map(call => {
-        const name = call.name;
-        const nameParts = uriToParts(name);
-        let opVersionHash: string | undefined;
-        if (nameParts) {
-          const opVersion = this.state.opVersionsMap.get(nameParts.version);
-          if (opVersion) {
-            opVersionHash = nameParts.version;
-          }
-        }
-        const inputObjectVersionHashes: string[] = [];
-        const outputObjectVersionHashes: string[] = [];
-
-        Object.values(call.inputs).forEach((input: any) => {
-          if (typeof input === 'string') {
-            const inputCallNameParts = uriToParts(input);
-            if (inputCallNameParts) {
-              const objectVersion = this.state.objectVersionsMap.get(
-                inputCallNameParts.version
-              );
-              if (objectVersion) {
-                inputObjectVersionHashes.push(inputCallNameParts.version);
-              }
-            }
-          }
-        });
-
-        Object.values(call.output ?? {}).forEach((output: any) => {
-          if (typeof output === 'string') {
-            const outputCallnameParts = uriToParts(output);
-            if (outputCallnameParts) {
-              const objectVersion = this.state.objectVersionsMap.get(
-                outputCallnameParts.version
-              );
-              if (objectVersion) {
-                outputObjectVersionHashes.push(outputCallnameParts.version);
-              }
-            }
-          }
-        });
-
-        return [
-          call.span_id,
-          {
-            callSpan: call,
-            opVersionHash,
-            inputObjectVersionHashes,
-            outputObjectVersionHashes,
-          },
-        ];
-      })
-    );
-
-    // Populate invokesOpVersionHashes
-    this.opVersions().forEach(opVersion => {
-      const selfOpVersion = this.state.opVersionsMap.get(opVersion.version());
-      if (!selfOpVersion) {
-        return;
-      }
-      const calls = opVersion.calls();
-      if (calls.length === 0) {
-        return;
-      }
-      const exampleCall = calls[0];
-
-      // Populate invokesOpVersionHashes
-      const invokesMap: Set<string> = new Set();
-      const childCalls = exampleCall.childCalls();
-      childCalls.forEach(childCall => {
-        const childCallVersion = childCall.opVersion();
-        if (!childCallVersion) {
-          return;
-        }
-
-        invokesMap.add(childCallVersion.version());
-      });
-      selfOpVersion.invokesOpVersionHashes = Array.from(invokesMap);
-
-      // Populate inputTypeVersionHashes and outputTypeVersionHashes
-      const inputTypeVersionMap: Set<string> = new Set();
-      const outputTypeVersionMap: Set<string> = new Set();
-      const exampleCallDict = this.state.callsMap.get(exampleCall.callID());
-      if (!exampleCallDict) {
-        return;
-      }
-      exampleCall.inputs().forEach(input => {
-        inputTypeVersionMap.add(input.typeVersion().version());
-      });
-      exampleCall.output().forEach(output => {
-        outputTypeVersionMap.add(output.typeVersion().version());
-      });
-      selfOpVersion.inputTypeVersionHashes = Array.from(inputTypeVersionMap);
-      selfOpVersion.outputTypeVersionHashes = Array.from(outputTypeVersionMap);
-    });
-  }
-}
-
-const uriToParts = (uri: string) => {
-  if (uri.startsWith('wandb-artifact:///') && uri.endsWith('/obj')) {
-    const inner = uri.slice('wandb-artifact:///'.length, -'/obj'.length);
-    const [entity, project, nameAndVersion] = inner.split('/');
-    const [name, version] = nameAndVersion.split(':');
-    return {entity, project, name, version};
-  }
-  return null;
+const splitWeaveObjects = (
+  objects: ObjectVersionDictType[]
+): {
+  opVersions: ObjectVersionDictType[];
+  objectVersions: ObjectVersionDictType[];
+} => {
+  return {
+    opVersions: objects.filter(obj => obj.type_version.type_name === 'OpDef'),
+    objectVersions: objects.filter(
+      obj => obj.type_version.type_name !== 'OpDef'
+    ),
+  };
 };
 
 type WFNaiveTypeDictType = {};
@@ -524,10 +697,13 @@ class WFNaiveObject implements WFObject {
   }
   objectVersions(): WFObjectVersion[] {
     return Array.from(this.state.objectVersionsMap.values())
-      .filter(objectVersionDict => objectVersionDict.name === this.objectName)
+      .filter(
+        objectVersionDict =>
+          objectVersionDict.reference.artifactName === this.objectName
+      )
       .map(
         objectVersionDict =>
-          new WFNaiveObjectVersion(this.state, objectVersionDict.versionHash)
+          new WFNaiveObjectVersion(this.state, objectVersionDict)
       );
   }
 }
@@ -559,11 +735,10 @@ class WFNaiveOp implements WFOp {
   }
   opVersions(): WFOpVersion[] {
     return Array.from(this.state.opVersionsMap.values())
-      .filter(opVersionDict => opVersionDict.name === this.opName)
-      .map(
-        opVersionDict =>
-          new WFNaiveOpVersion(this.state, opVersionDict.versionHash)
-      );
+      .filter(
+        opVersionDict => opVersionDict.reference.artifactName === this.opName
+      )
+      .map(opVersionDict => new WFNaiveOpVersion(this.state, opVersionDict));
   }
 }
 
@@ -639,23 +814,23 @@ class WFNaiveTypeVersion implements WFTypeVersion {
   inputTo(): WFOpVersion[] {
     return Array.from(this.state.opVersionsMap.values())
       .filter(opVersionDict => {
-        return opVersionDict.inputTypeVersionHashes.includes(
+        return opVersionDict.inputTypeVersionRefs.includes(
           this.typeVersionDict.versionHash
         );
       })
       .map(opVersionDict => {
-        return new WFNaiveOpVersion(this.state, opVersionDict.versionHash);
+        return new WFNaiveOpVersion(this.state, opVersionDict);
       });
   }
   outputFrom(): WFOpVersion[] {
     return Array.from(this.state.opVersionsMap.values())
       .filter(opVersionDict => {
-        return opVersionDict.outputTypeVersionHashes.includes(
+        return opVersionDict.outputTypeVersionRefs.includes(
           this.typeVersionDict.versionHash
         );
       })
       .map(opVersionDict => {
-        return new WFNaiveOpVersion(this.state, opVersionDict.versionHash);
+        return new WFNaiveOpVersion(this.state, opVersionDict);
       });
   }
   objectVersions(): WFObjectVersion[] {
@@ -665,10 +840,7 @@ class WFNaiveTypeVersion implements WFTypeVersion {
           objectVersionDict.typeVersionHash === this.typeVersionDict.versionHash
       )
       .map(objectVersionDict => {
-        return new WFNaiveObjectVersion(
-          this.state,
-          objectVersionDict.versionHash
-        );
+        return new WFNaiveObjectVersion(this.state, objectVersionDict);
       });
   }
 }
@@ -694,41 +866,113 @@ const typeToTypeTree = (type: Type): HackyTypeTree => {
 };
 
 type WFNaiveObjectVersionDictType = {
-  // Standard Artifact properties
-  name: string;
-  versionHash: string;
-  description: string;
-  versionIndex: number;
-  createdAt: number;
-  aliases: string[];
+  reference: WFNaiveRefDict;
+  artifactVersion: WFNaiveArtifactVersionDictType;
 
-  // Op Specific properties
-  typeVersionHash: string;
-
-  // Relationships
+  typeVersionHash?: string;
 };
-class WFNaiveObjectVersion implements WFObjectVersion {
-  private readonly objectVersionDict: WFNaiveObjectVersionDictType;
+
+class WFNaiveReferencedObject implements ReferencedObject {
   constructor(
-    private readonly state: WFNaiveProjectState,
-    private readonly objectVersionId: string
-  ) {
-    const objectVersionDict = this.state.objectVersionsMap.get(objectVersionId);
-    if (!objectVersionDict) {
-      throw new Error(
-        `Cannot find ObjectVersion with id: ${objectVersionId} in project: ${this.state.project}`
-      );
-    }
-    this.objectVersionDict = objectVersionDict;
+    private readonly reference: WFNaiveRefDict,
+    private readonly artifactVersion: WFNaiveArtifactVersionDictType
+  ) {}
+  // TODO: I don't think this should be exposed
+  entity(): string {
+    return this.reference.entity;
   }
-  createdAtMs(): number {
-    return this.objectVersionDict.createdAt;
+  project(): string {
+    return this.reference.project;
+  }
+  name(): string {
+    return this.reference.artifactName;
+  }
+  commitHash(): string {
+    return this.reference.versionCommitHash;
+  }
+  filePath(): string {
+    return this.reference.filePathParts.join('/');
+  }
+  refExtraPath(): null | string {
+    if (this.reference.refExtraTuples.length === 0) {
+      return null;
+    }
+    return this.reference.refExtraTuples
+      .map(({edgeType, edgeName}) => `${edgeType}/${edgeName}`)
+      .join('/');
+  }
+  parentObject(): ReferencedObject {
+    throw new Error('Method not implemented.');
+  }
+  childObject(
+    refExtraEdgeType: string,
+    refExtraEdgeName: string
+  ): ReferencedObject {
+    throw new Error('Method not implemented.');
+  }
+  refUri(): string {
+    return refDictToRefString(this.reference);
   }
   versionIndex(): number {
-    return this.objectVersionDict.versionIndex;
+    return this.artifactVersion.versionIndex;
   }
   aliases(): string[] {
-    return this.objectVersionDict.aliases;
+    return this.artifactVersion.aliases;
+  }
+}
+
+class WFNaiveObjectVersion
+  extends WFNaiveReferencedObject
+  implements WFObjectVersion
+{
+  static fromURI = (
+    state: WFNaiveProjectState,
+    objectRefUri: string
+  ): WFNaiveObjectVersion => {
+    // In the case that we are dealing with a refExtra, the objectVersionMap will
+    // not contain that (it would be way too expensive)
+    const refDict = refStringToRefDict(objectRefUri);
+    const refExtraTuples = refDict.refExtraTuples;
+    const filePathParts = refDict.filePathParts;
+    const objBasedUri = refDictToRefString({
+      ...refDict,
+      filePathParts: ['obj'],
+      refExtraTuples: [],
+    });
+
+    let objectVersionDict = state.objectVersionsMap.get(objBasedUri);
+    if (!objectVersionDict) {
+      throw new Error(
+        `Cannot find ObjectVersion with id: ${objectRefUri} in project: ${state.project}`
+      );
+    }
+    if (refExtraTuples.length > 0) {
+      objectVersionDict = {
+        ...objectVersionDict,
+        reference: {
+          ...objectVersionDict.reference,
+          filePathParts,
+          refExtraTuples,
+        },
+        typeVersionHash: undefined,
+      };
+    }
+    return new WFNaiveObjectVersion(state, objectVersionDict);
+  };
+  constructor(
+    private readonly state: WFNaiveProjectState,
+    private readonly objectVersionDict: WFNaiveObjectVersionDictType
+  ) {
+    super(objectVersionDict.reference, objectVersionDict.artifactVersion);
+  }
+  createdAtMs(): number {
+    return this.objectVersionDict.artifactVersion.createdAt;
+  }
+  versionIndex(): number {
+    return this.objectVersionDict.artifactVersion.versionIndex;
+  }
+  aliases(): string[] {
+    return this.objectVersionDict.artifactVersion.aliases;
   }
   entity(): string {
     return this.state.entity;
@@ -737,10 +981,13 @@ class WFNaiveObjectVersion implements WFObjectVersion {
     return this.state.project;
   }
   object(): WFObject {
-    return new WFNaiveObject(this.state, this.objectVersionDict.name);
+    return new WFNaiveObject(
+      this.state,
+      this.objectVersionDict.reference.artifactName
+    );
   }
   version(): string {
-    return this.objectVersionDict.versionHash;
+    return this.objectVersionDict.reference.versionCommitHash;
   }
   properties(): {[propName: string]: WFObjectVersion} {
     throw new Error('Method not implemented.');
@@ -748,74 +995,76 @@ class WFNaiveObjectVersion implements WFObjectVersion {
   parentObjectVersion(): {path: string; objectVersion: WFObjectVersion} | null {
     throw new Error('Method not implemented.');
   }
-  typeVersion(): WFTypeVersion {
+  typeVersion(): null | WFTypeVersion {
+    if (!this.objectVersionDict.typeVersionHash) {
+      return null;
+    }
     return new WFNaiveTypeVersion(
       this.state,
       this.objectVersionDict.typeVersionHash
     );
   }
   inputTo(): WFCall[] {
+    const myRef = refDictToRefString(this.objectVersionDict.reference);
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
-        return callDict.inputObjectVersionHashes?.includes(
-          this.objectVersionDict.versionHash
-        );
+        return callDict.inputObjectVersionRefs?.includes(myRef);
       })
       .map(callDict => {
         return new WFNaiveCall(this.state, callDict.callSpan.span_id);
       });
   }
   outputFrom(): WFCall[] {
+    const myRef = refDictToRefString(this.objectVersionDict.reference);
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
-        return callDict.outputObjectVersionHashes?.includes(
-          this.objectVersionDict.versionHash
-        );
+        return callDict.outputObjectVersionRefs?.includes(myRef);
       })
       .map(callDict => {
         return new WFNaiveCall(this.state, callDict.callSpan.span_id);
       });
   }
   description(): string {
-    return this.objectVersionDict.description;
-  }
-  refUri(): string {
-    return `wandb-artifact:///${this.state.entity}/${this.state.project}/${this.objectVersionDict.name}:${this.objectVersionDict.versionHash}/obj`;
+    return this.objectVersionDict.artifactVersion.description;
   }
 }
 
 type WFNaiveOpVersionDictType = {
   // Standard Artifact properties
-  name: string;
-  versionHash: string;
-  description: string;
-  versionIndex: number;
-  createdAt: number;
-  aliases: string[];
+  reference: WFNaiveRefDict;
+  artifactVersion: WFNaiveArtifactVersionDictType;
 
   // Op Specific properties
-  inputTypeVersionHashes: string[];
-  outputTypeVersionHashes: string[];
+  inputTypeVersionRefs: string[];
+  outputTypeVersionRefs: string[];
 
   // Relationships
-  invokesOpVersionHashes: string[];
+  invokesOpVersionRefs: string[];
 };
-class WFNaiveOpVersion implements WFOpVersion {
-  private readonly opVersionDict: WFNaiveOpVersionDictType;
-  constructor(
-    private readonly state: WFNaiveProjectState,
-    private readonly opVersionHash: string
-  ) {
-    const opVersionDict = this.state.opVersionsMap.get(opVersionHash);
+class WFNaiveOpVersion extends WFNaiveReferencedObject implements WFOpVersion {
+  static fromURI = (
+    state: WFNaiveProjectState,
+    opRefUri: string
+  ): WFNaiveOpVersion => {
+    // For now this works for now since there is only a single op stored in an
+    // artifact. If we ever store most stuff in op artifacts, then we might need
+    // to extend this to be more like the ObjectVersion.fromURI
+    const opVersionDict = state.opVersionsMap.get(opRefUri);
     if (!opVersionDict) {
       throw new Error(
-        `Cannot find OpVersion with id: ${opVersionHash} in project: ${this.state.project}`
+        `Cannot find OpVersion with id: ${opRefUri} in project: ${state.project}`
       );
     }
-    this.opVersionDict = opVersionDict;
+    return new WFNaiveOpVersion(state, opVersionDict);
+  };
+  constructor(
+    private readonly state: WFNaiveProjectState,
+    private readonly opVersionDict: WFNaiveOpVersionDictType
+  ) {
+    super(opVersionDict.reference, opVersionDict.artifactVersion);
   }
   opCategory(): HackyOpCategory | null {
-    const opNames = this.opVersionDict.name.split('-');
+    const opNames = this.opVersionDict.reference.artifactName.split('-');
     const opName = opNames[opNames.length - 1];
     const categories = ['train', 'predict', 'score', 'evaluate', 'tune'];
     for (const category of categories) {
@@ -826,57 +1075,57 @@ class WFNaiveOpVersion implements WFOpVersion {
     return null;
   }
   createdAtMs(): number {
-    return this.opVersionDict.createdAt;
+    return this.opVersionDict.artifactVersion.createdAt;
   }
   versionIndex(): number {
-    return this.opVersionDict.versionIndex;
+    return this.opVersionDict.artifactVersion.versionIndex;
   }
   aliases(): string[] {
-    return this.opVersionDict.aliases;
+    return this.opVersionDict.artifactVersion.aliases;
   }
   op(): WFOp {
-    return new WFNaiveOp(this.state, this.opVersionDict.name);
+    return new WFNaiveOp(this.state, this.opVersionDict.reference.artifactName);
   }
   version(): string {
-    return this.opVersionDict.versionHash;
+    return this.opVersionDict.reference.versionCommitHash;
   }
   inputTypesVersions(): WFTypeVersion[] {
-    return this.opVersionDict.inputTypeVersionHashes.map(typeVersionHash => {
+    return this.opVersionDict.inputTypeVersionRefs.map(typeVersionHash => {
       return new WFNaiveTypeVersion(this.state, typeVersionHash);
     });
   }
   outputTypeVersions(): WFTypeVersion[] {
-    return this.opVersionDict.outputTypeVersionHashes.map(typeVersionHash => {
+    return this.opVersionDict.outputTypeVersionRefs.map(typeVersionHash => {
       return new WFNaiveTypeVersion(this.state, typeVersionHash);
     });
   }
   invokes(): WFOpVersion[] {
-    return this.opVersionDict.invokesOpVersionHashes.map(opVersionHash => {
-      return new WFNaiveOpVersion(this.state, opVersionHash);
+    return this.opVersionDict.invokesOpVersionRefs.map(opVersionRef => {
+      return WFNaiveOpVersion.fromURI(this.state, opVersionRef);
     });
   }
   invokedBy(): WFOpVersion[] {
+    const myRef = refDictToRefString(this.opVersionDict.reference);
     return Array.from(this.state.opVersionsMap.values())
       .filter(opVersionDict => {
-        return opVersionDict.invokesOpVersionHashes.includes(
-          this.opVersionDict.versionHash
-        );
+        return opVersionDict.invokesOpVersionRefs.includes(myRef);
       })
       .map(opVersionDict => {
-        return new WFNaiveOpVersion(this.state, opVersionDict.versionHash);
+        return new WFNaiveOpVersion(this.state, opVersionDict);
       });
   }
   calls(): WFCall[] {
+    const myRef = refDictToRefString(this.opVersionDict.reference);
     return Array.from(this.state.callsMap.values())
       .filter(callDict => {
-        return callDict.opVersionHash === this.opVersionDict.versionHash;
+        return callDict.opVersionRef === myRef;
       })
       .map(callDict => {
         return new WFNaiveCall(this.state, callDict.callSpan.span_id);
       });
   }
   description(): string {
-    return this.opVersionDict.description;
+    return this.opVersionDict.artifactVersion.description;
   }
   entity(): string {
     return this.state.entity;
@@ -884,16 +1133,13 @@ class WFNaiveOpVersion implements WFOpVersion {
   project(): string {
     return this.state.project;
   }
-  refUri(): string {
-    return `wandb-artifact:///${this.state.entity}/${this.state.project}/${this.opVersionDict.name}:${this.opVersionDict.versionHash}/obj`;
-  }
 }
 
 type WFNaiveCallDictType = {
   callSpan: Call;
-  opVersionHash?: string;
-  inputObjectVersionHashes: string[];
-  outputObjectVersionHashes: string[];
+  opVersionRef?: string;
+  inputObjectVersionRefs: string[];
+  outputObjectVersionRefs: string[];
 };
 class WFNaiveCall implements WFCall {
   private readonly callDict: WFNaiveCallDictType;
@@ -916,19 +1162,19 @@ class WFNaiveCall implements WFCall {
     return this.callDict.callSpan.span_id;
   }
   opVersion(): WFOpVersion | null {
-    if (!this.callDict.opVersionHash) {
+    if (!this.callDict.opVersionRef) {
       return null;
     }
-    return new WFNaiveOpVersion(this.state, this.callDict.opVersionHash);
+    return WFNaiveOpVersion.fromURI(this.state, this.callDict.opVersionRef);
   }
   inputs(): WFObjectVersion[] {
-    return this.callDict.inputObjectVersionHashes.map(objectVersionHash => {
-      return new WFNaiveObjectVersion(this.state, objectVersionHash);
+    return this.callDict.inputObjectVersionRefs.map(objectVersionRef => {
+      return WFNaiveObjectVersion.fromURI(this.state, objectVersionRef);
     });
   }
   output(): WFObjectVersion[] {
-    return this.callDict.outputObjectVersionHashes.map(objectVersionHash => {
-      return new WFNaiveObjectVersion(this.state, objectVersionHash);
+    return this.callDict.outputObjectVersionRefs.map(objectVersionRef => {
+      return WFNaiveObjectVersion.fromURI(this.state, objectVersionRef);
     });
   }
   parentCall(): WFCall | null {

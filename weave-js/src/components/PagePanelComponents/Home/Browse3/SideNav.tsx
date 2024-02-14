@@ -4,6 +4,7 @@ import {useParams} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from './context';
 import {useURLSearchParamsDict} from './pages/util';
+import {refDictToRefString} from './pages/wfInterface/naive';
 import {Sidebar, SidebarItem} from './Sidebar';
 
 export const SideNav = () => {
@@ -80,7 +81,16 @@ export const SideNav = () => {
         iconName: IconNames.TypeNumber,
         path: baseRouter.callsUIUrl(entity, project, {
           opCategory: 'evaluate',
-          opVersions: ['Evaluation-evaluate:*'],
+          opVersionRefs: [
+            refDictToRefString({
+              entity: currentEntity,
+              project: currentProject,
+              artifactName: 'Evaluation-evaluate',
+              versionCommitHash: '*',
+              filePathParts: ['obj'],
+              refExtraTuples: [],
+            }),
+          ],
           isPivot: true,
         }),
       },
@@ -90,7 +100,6 @@ export const SideNav = () => {
         iconName: IconNames.Model,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
           typeCategory: 'model',
-          latest: true,
         }),
       },
       {
@@ -99,7 +108,6 @@ export const SideNav = () => {
         iconName: IconNames.Table,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
           typeCategory: 'dataset',
-          latest: true,
         }),
       },
     ],
@@ -108,9 +116,7 @@ export const SideNav = () => {
         id: 'ops',
         name: 'Operations',
         iconName: IconNames.JobProgramCode,
-        path: baseRouter.opVersionsUIUrl(entity, project, {
-          isLatest: true,
-        }),
+        path: baseRouter.opVersionsUIUrl(entity, project, {}),
       },
       {
         id: 'calls',
@@ -124,9 +130,7 @@ export const SideNav = () => {
         id: 'objects',
         name: 'Objects',
         iconName: IconNames.CubeContainer,
-        path: baseRouter.objectVersionsUIUrl(entity, project, {
-          latest: true,
-        }),
+        path: baseRouter.objectVersionsUIUrl(entity, project, {}),
       },
     ],
   ];

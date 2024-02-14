@@ -59,9 +59,15 @@ import React, {
   useState,
 } from 'react';
 import {useHistory} from 'react-router-dom';
+import styled from 'styled-components';
 
 import {useWeaveflowCurrentRouteContext} from '../Browse3/context';
 import {Link} from '../Browse3/pages/common/Links';
+import {
+  DICT_KEY_EDGE_TYPE,
+  LIST_INDEX_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+} from '../Browse3/pages/wfReactInterface/constants';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {
   mutationPublishArtifact,
@@ -112,9 +118,9 @@ const weaveEditorPathUrlPathPart = (path: WeaveEditorPathEl[]) => {
   // Return the url path for a given editor path
   return path.flatMap(pathEl => {
     if (pathEl.type === 'getattr') {
-      return [pathEl.key];
+      return [OBJECT_ATTRIBUTE_EDGE_TYPE, pathEl.key];
     } else if (pathEl.type === 'pick') {
-      return ['pick', pathEl.key];
+      return [DICT_KEY_EDGE_TYPE, pathEl.key];
     } else {
       throw new Error('invalid pathEl type');
     }
@@ -254,6 +260,7 @@ export const WeaveEditorSourceContext = createContext<{
   projectName: string;
   objectName: string;
   objectVersionHash: string;
+  filePath: string;
   refExtra?: string[];
 } | null>(null);
 
@@ -264,17 +271,20 @@ const useObjectVersionLinkPathForPath = () => {
     throw new Error('invalid weaveEditorSourceContext');
   }
   return useCallback(
-    (path: string[]) =>
-      router.objectVersionUIUrl(
+    (path: string[]) => {
+      return router.objectVersionUIUrl(
         weaveEditorSourceContext.entityName,
         weaveEditorSourceContext.projectName,
         weaveEditorSourceContext.objectName,
         weaveEditorSourceContext.objectVersionHash,
-        (weaveEditorSourceContext.refExtra ?? []).concat(path)
-      ),
+        weaveEditorSourceContext.filePath,
+        (weaveEditorSourceContext.refExtra ?? []).concat(path).join('/')
+      );
+    },
     [
       router,
       weaveEditorSourceContext.entityName,
+      weaveEditorSourceContext.filePath,
       weaveEditorSourceContext.objectName,
       weaveEditorSourceContext.objectVersionHash,
       weaveEditorSourceContext.projectName,
@@ -550,7 +560,7 @@ export const WeaveEditorTypedDict: FC<{
                 <Link
                   to={makeLinkPath([
                     ...weaveEditorPathUrlPathPart(path),
-                    'pick',
+                    DICT_KEY_EDGE_TYPE,
                     key,
                   ])}>
                   {key}
@@ -575,6 +585,18 @@ export const WeaveEditorTypedDict: FC<{
   );
 };
 
+const Table = styled.div`
+  display: grid;
+  grid-template-columns: auto 1fr; /* Two columns */
+  gap: 16px 8px;
+`;
+Table.displayName = 'S.Table';
+
+const Row = styled.div`
+  grid-column: span 2;
+`;
+Row.displayName = 'S.Row';
+
 export const WeaveEditorObject: FC<{
   node: Node;
   path: WeaveEditorPathEl[];
@@ -582,32 +604,44 @@ export const WeaveEditorObject: FC<{
 }> = ({node, path, disableEdits}) => {
   const makeLinkPath = useObjectVersionLinkPathForPath();
   return (
-    <Grid container spacing={2}>
+    <Table>
       {Object.entries(node.type)
         .filter(([key, value]) => key !== 'type' && !key.startsWith('_'))
         .flatMap(([key, valueType]) => {
           const singleRow = displaysAsSingleRow(valueType);
+          const label = (
+            <Typography>
+              <Link
+                to={makeLinkPath([
+                  ...weaveEditorPathUrlPathPart(path),
+                  OBJECT_ATTRIBUTE_EDGE_TYPE,
+                  key,
+                ])}>
+                {key}
+              </Link>
+            </Typography>
+          );
+          const value = (
+            <Box>
+              <WeaveEditorField
+                node={opObjGetAttr({self: node, name: constString(key)})}
+                path={[...path, {type: 'getattr', key}]}
+                disableEdits={disableEdits}
+              />
+            </Box>
+          );
+          if (singleRow) {
+            return [
+              <div key={key + '-key'}>{label}</div>,
+              <div key={key + '-value'}>{value}</div>,
+            ];
+          }
           return [
-            <Grid item key={key + '-key'} xs={singleRow ? 2 : 12}>
-              <Typography>
-                <Link
-                  to={makeLinkPath([...weaveEditorPathUrlPathPart(path), key])}>
-                  {key}
-                </Link>
-              </Typography>
-            </Grid>,
-            <Grid item key={key + '-value'} xs={singleRow ? 10 : 12}>
-              <Box ml={singleRow ? 0 : 2}>
-                <WeaveEditorField
-                  node={opObjGetAttr({self: node, name: constString(key)})}
-                  path={[...path, {type: 'getattr', key}]}
-                  disableEdits={disableEdits}
-                />
-              </Box>
-            </Grid>,
+            <Row key={key + '-key'}>{label}</Row>,
+            <Row key={key + '-value'}>{value}</Row>,
           ];
         })}
-    </Grid>
+    </Table>
   );
 };
 
@@ -775,7 +809,7 @@ export const WeaveEditorTable: FC<{
           <Link
             to={makeLinkPath([
               ...weaveEditorPathUrlPathPart(path),
-              'index',
+              LIST_INDEX_EDGE_TYPE,
               params.row._origIndex,
             ])}>
             <LinkIcon />

@@ -162,6 +162,22 @@ export const opArtifactVersionCreatedAt = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.createdAt,
 });
 
+export const opArtifactVersionFileCount = makeArtifactVersionOp({
+  name: 'artifactVersion-fileCount',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns the file count of the artifact ${docType(
+    'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns the file count of the artifact ${docType(
+    'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'boolean',
+  resolver: ({artifactVersion}) => artifactVersion.fileCount,
+});
+
 export const opArtifactVersionFiles = makeArtifactVersionOp({
   name: 'artifactVersion-files',
   argTypes: artifactVersionArgTypes,

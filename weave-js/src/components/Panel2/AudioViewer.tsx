@@ -5,7 +5,7 @@ import {useRef} from 'react';
 import {Button, Card} from 'semantic-ui-react';
 import WaveSurfer from 'wavesurfer.js';
 
-import {formatDurationWithColons} from '../../time';
+import {formatDurationWithColons} from '../../common/util/time';
 
 interface AudioViewerProps {
   ariaMetadata?: string; // Run metadata for screenreader aria-labels

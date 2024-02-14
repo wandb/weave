@@ -10,8 +10,6 @@ import {
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
-import {FilterableObjectVersionsTable} from './ObjectVersionsPage';
-import {FilterableOpVersionsTable} from './OpVersionsPage';
 import {FilterableTypeVersionsTable} from './TypeVersionsPage';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {HackyTypeTree, WFTypeVersion} from './wfInterface/types';
@@ -183,49 +181,19 @@ const TypeHierarchy: React.FC<{typeVersion: WFTypeVersion}> = props => {
 const TypeVersionObjectVersions: React.FC<{
   typeVersion: WFTypeVersion;
 }> = props => {
-  return (
-    <FilterableObjectVersionsTable
-      entity={props.typeVersion.entity()}
-      project={props.typeVersion.project()}
-      frozenFilter={{
-        typeVersions: [
-          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
-        ],
-      }}
-    />
-  );
+  return <>Not Implemented</>;
 };
 
 const TypeVersionConsumingOps: React.FC<{
   typeVersion: WFTypeVersion;
 }> = props => {
-  return (
-    <FilterableOpVersionsTable
-      entity={props.typeVersion.entity()}
-      project={props.typeVersion.project()}
-      frozenFilter={{
-        consumesTypeVersions: [
-          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
-        ],
-      }}
-    />
-  );
+  return <>Not Implemented</>;
 };
 
 const TypeVersionProducingOps: React.FC<{
   typeVersion: WFTypeVersion;
 }> = props => {
-  return (
-    <FilterableOpVersionsTable
-      entity={props.typeVersion.entity()}
-      project={props.typeVersion.project()}
-      frozenFilter={{
-        producesTypeVersions: [
-          props.typeVersion.type().name() + ':' + props.typeVersion.version(),
-        ],
-      }}
-    />
-  );
+  return <>Not Implemented</>;
 };
 
 const TypeVersionChildTypes: React.FC<{

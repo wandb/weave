@@ -1,13 +1,14 @@
-import React from 'react';
-import {Link as LinkComp} from 'react-router-dom';
-import styled from 'styled-components';
-
 import {
-  MOON_550,
+  MOON_150,
+  MOON_200,
   MOON_700,
   TEAL_500,
   TEAL_600,
-} from '../../../../../../common/css/color.styles';
+} from '@wandb/weave/common/css/color.styles';
+import React from 'react';
+import {Link as LinkComp, useHistory} from 'react-router-dom';
+import styled, {css} from 'styled-components';
+
 import {TargetBlank} from '../../../../../../common/util/links';
 import {useWeaveflowRouteContext} from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
@@ -26,10 +27,57 @@ export const Link = styled(LinkComp)<LinkProps>`
   font-weight: 600;
   color: ${p => (p.$variant === 'secondary' ? MOON_700 : TEAL_600)};
   &:hover {
-    color: ${p => (p.$variant === 'secondary' ? MOON_550 : TEAL_500)};
+    color: ${TEAL_500};
   }
 `;
 Link.displayName = 'S.Link';
+
+const CallLinkWrapper = styled.div<{fullWidth?: boolean}>`
+  ${p =>
+    p.fullWidth &&
+    css`
+      width: 100%;
+    `};
+
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 2px;
+  &:hover {
+    & a {
+      color: ${TEAL_500};
+    }
+    & > .callId {
+      background-color: ${MOON_200};
+      color: ${TEAL_500};
+    }
+  }
+`;
+CallLinkWrapper.displayName = 'S.CallLinkWrapper';
+
+const CallLinkOp = styled.div<{fullWidth?: boolean}>`
+  ${p =>
+    p.fullWidth &&
+    css`
+      flex: 1 1 auto;
+    `};
+
+  text-overflow: ellipsis;
+  overflow: hidden;
+`;
+CallLinkOp.displayName = 'S.CallLinkOp';
+
+const CallId = styled.div`
+  padding: 0 4px;
+  background-color: ${MOON_150};
+  border-radius: 4px;
+  margin-left: 4px;
+  font-weight: 600;
+  font-family: monospace;
+  font-size: 10px;
+  line-height: 20px;
+`;
+CallId.displayName = 'S.CallId';
 
 export const docUrl = (path: string): string => {
   return 'https://wandb.github.io/weave/' + path;
@@ -111,6 +159,8 @@ export const ObjectVersionLink: React.FC<{
   objectName: string;
   version: string;
   versionIndex: number;
+  filePath: string;
+  refExtra?: string;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
   // const text = props.hideName
@@ -123,7 +173,9 @@ export const ObjectVersionLink: React.FC<{
         props.entityName,
         props.projectName,
         props.objectName,
-        props.version
+        props.version,
+        props.filePath,
+        props.refExtra
       )}>
       {text}
     </Link>
@@ -192,30 +244,34 @@ export const OpVersionLink: React.FC<{
 export const CallLink: React.FC<{
   entityName: string;
   projectName: string;
+  opName: string;
   callId: string;
-  simpleText?: {
-    opName: string;
-    versionIndex: number;
-  };
+  variant?: LinkVariant;
+  fullWidth?: boolean;
 }> = props => {
+  const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
-  let text = truncateID(props.callId);
-  if (props.simpleText) {
-    text = opVersionText(
-      props.simpleText.opName,
-      props.simpleText.versionIndex
-    );
-  }
+  const opName = opNiceName(props.opName);
+  const truncatedId = props.callId.slice(-4);
+  const to = peekingRouter.callUIUrl(
+    props.entityName,
+    props.projectName,
+    '',
+    props.callId
+  );
+  const onClick = () => {
+    history.push(to);
+  };
+
   return (
-    <Link
-      to={peekingRouter.callUIUrl(
-        props.entityName,
-        props.projectName,
-        '',
-        props.callId
-      )}>
-      {text}
-    </Link>
+    <CallLinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
+      <CallLinkOp fullWidth={props.fullWidth}>
+        <Link $variant={props.variant} to={to}>
+          {opName}
+        </Link>
+      </CallLinkOp>
+      <CallId className="callId">{truncatedId}</CallId>
+    </CallLinkWrapper>
   );
 };
 

@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {Timestamp} from '../../../../../Timestamp';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
@@ -7,23 +7,41 @@ import {CategoryChip} from '../common/CategoryChip';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {StatusChip} from '../common/StatusChip';
 import {GroupedCalls} from '../ObjectVersionPage';
-import {WFCall} from '../wfInterface/types';
+import {
+  CallSchema,
+  refUriToOpVersionKey,
+  useCalls,
+  useOpVersion,
+} from '../wfReactInterface/interface';
 
 export const CallOverview: React.FC<{
-  wfCall: WFCall;
-}> = ({wfCall}) => {
-  const call = wfCall.rawCallSpan();
-  const opCategory = wfCall.opVersion()?.opCategory();
-  const childCalls = wfCall.childCalls().filter(c => {
-    return c.opVersion() != null;
+  call: CallSchema;
+}> = ({call}) => {
+  const span = call.rawSpan;
+  const opVersionKey = useMemo(() => {
+    if (call.opVersionRef) {
+      return refUriToOpVersionKey(call.opVersionRef);
+    }
+    return null;
+  }, [call.opVersionRef]);
+  const callOp = useOpVersion(opVersionKey);
+  const opCategory = callOp.result?.category;
+  const childCalls = useCalls(call.entity, call.project, {
+    parentIds: [call.callId],
   });
+  const safeChildCalls = useMemo(() => {
+    if (childCalls.loading) {
+      return [];
+    }
+    return (childCalls.result ?? []).filter(c => c.opVersionRef != null);
+  }, [childCalls.loading, childCalls.result]);
   const attributes = _.fromPairs(
-    Object.entries(call.attributes ?? {}).filter(
+    Object.entries(span.attributes ?? {}).filter(
       ([k, a]) => !k.startsWith('_') && a != null
     )
   );
   const summary = _.fromPairs(
-    Object.entries(call.summary ?? {}).filter(
+    Object.entries(span.summary ?? {}).filter(
       ([k, a]) => !k.startsWith('_') && k !== 'latency_s' && a != null
     )
   );
@@ -32,31 +50,31 @@ export const CallOverview: React.FC<{
     <SimpleKeyValueTable
       data={{
         Operation:
-          parseRefMaybe(call.name) != null ? (
-            <SmallRef objRef={parseRefMaybe(call.name)!} wfTable="OpVersion" />
+          parseRefMaybe(span.name) != null ? (
+            <SmallRef objRef={parseRefMaybe(span.name)!} wfTable="OpVersion" />
           ) : (
-            call.name
+            span.name
           ),
         ...(opCategory
           ? {
               Category: <CategoryChip value={opCategory} />,
             }
           : {}),
-        Status: <StatusChip value={call.status_code} />,
-        Called: <Timestamp value={call.timestamp / 1000} format="relative" />,
-        ...(call.summary.latency_s != null
+        Status: <StatusChip value={span.status_code} />,
+        Called: <Timestamp value={span.timestamp / 1000} format="relative" />,
+        ...(span.summary.latency_s != null
           ? {
-              Latency: call.summary.latency_s.toFixed(3) + 's',
+              Latency: span.summary.latency_s.toFixed(3) + 's',
             }
           : {}),
-        ...(call.exception ? {Exception: call.exception} : {}),
-        ...(childCalls.length > 0
+        ...(span.exception ? {Exception: span.exception} : {}),
+        ...((safeChildCalls.length ?? 0) > 0
           ? {
               'Child Calls': (
                 <GroupedCalls
-                  calls={childCalls}
+                  calls={safeChildCalls}
                   partialFilter={{
-                    parentId: wfCall.callID(),
+                    parentId: call.callId,
                   }}
                 />
               ),

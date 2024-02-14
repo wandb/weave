@@ -134,9 +134,8 @@ class Evaluation:
         score_errors = 0
         n_complete = 0
         with console.status("Evaluating...") as status:
-            async for example, eval_row in util.async_foreach(
-                self.dataset.rows, eval_example, 30
-            ):
+            _rows = self.dataset.rows
+            async for example, eval_row in util.async_foreach(_rows, eval_example, 30):
                 n_complete += 1
                 prediction_errors += int(eval_row["prediction_error"])
                 score_errors += eval_row["score_errors"]
