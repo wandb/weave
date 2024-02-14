@@ -626,12 +626,10 @@ const CustomGridTreeDataGroupingCell: FC<
       </Box>
       <Box
         sx={{
-          // ml: 1,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           flex: '1 1 auto',
-          fontWeight: 'bold',
         }}>
         {opNiceName(call.spanName)}
       </Box>
