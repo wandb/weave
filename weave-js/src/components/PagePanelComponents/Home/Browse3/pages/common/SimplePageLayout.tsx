@@ -13,6 +13,7 @@ import React, {
   ReactNode,
   SyntheticEvent,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -42,15 +43,24 @@ export const SimplePageLayout: FC<{
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
 }> = props => {
+  const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
-  const [tabId, setTabId] = useState(0);
+
+  // We try to preserve the selected tab even if the set of tabs changes,
+  // falling back to the first tab.
+  const [tabId, setTabId] = useState(tabs[0].label);
+  const idxSelected = tabs.findIndex(t => t.label === tabId);
+  const tabValue = idxSelected !== -1 ? idxSelected : 0;
   const handleTabChange = (event: SyntheticEvent, newValue: number) => {
-    setTabId(newValue);
+    setTabId(tabs[newValue].label);
   };
-  const tabContent = useMemo(
-    () => props.tabs[tabId].content,
-    [props.tabs, tabId]
-  );
+  useEffect(() => {
+    if (idxSelected === -1) {
+      setTabId(tabs[0].label);
+    }
+  }, [tabs, idxSelected]);
+  const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
+
   return (
     <Box
       sx={{
@@ -108,14 +118,14 @@ export const SimplePageLayout: FC<{
           </Box>
           {simplePageLayoutContextValue.headerSuffix}
         </Box>
-        {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
+        {(!props.hideTabsIfSingle || tabs.length > 1) && (
           <Tabs
             variant="scrollable"
             scrollButtons="auto"
-            value={tabId}
+            value={tabValue}
             onChange={handleTabChange}>
-            {props.tabs.map((tab, i) => (
-              <Tab key={i} label={tab.label} />
+            {tabs.map(tab => (
+              <Tab key={tab.label} label={tab.label} />
             ))}
           </Tabs>
         )}
@@ -170,15 +180,24 @@ export const SimplePageLayoutWithHeader: FC<{
   hideTabsIfSingle?: boolean;
   isSidebarOpen?: boolean;
 }> = props => {
+  const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
-  const [tabId, setTabId] = useState(0);
+
+  // We try to preserve the selected tab even if the set of tabs changes,
+  // falling back to the first tab.
+  const [tabId, setTabId] = useState(tabs[0].label);
+  const idxSelected = tabs.findIndex(t => t.label === tabId);
+  const tabValue = idxSelected !== -1 ? idxSelected : 0;
   const handleTabChange = (event: SyntheticEvent, newValue: number) => {
-    setTabId(newValue);
+    setTabId(tabs[newValue].label);
   };
-  const tabContent = useMemo(
-    () => props.tabs[tabId].content,
-    [props.tabs, tabId]
-  );
+  useEffect(() => {
+    if (idxSelected === -1) {
+      setTabId(tabs[0].label);
+    }
+  }, [tabs, idxSelected]);
+  const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
+
   return (
     <Box
       sx={{
@@ -254,7 +273,7 @@ export const SimplePageLayoutWithHeader: FC<{
                 }}>
                 {props.headerContent}
               </Box>
-              {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
+              {(!props.hideTabsIfSingle || tabs.length > 1) && (
                 <Tabs
                   style={{
                     borderBottom: '1px solid #e0e0e0',
@@ -262,10 +281,10 @@ export const SimplePageLayoutWithHeader: FC<{
                   variant="scrollable"
                   // These scroll buttons are not working
                   scrollButtons={false}
-                  value={tabId}
+                  value={tabValue}
                   onChange={handleTabChange}>
-                  {props.tabs.map((tab, i) => (
-                    <Tab key={i} label={tab.label} />
+                  {tabs.map(tab => (
+                    <Tab key={tab.label} label={tab.label} />
                   ))}
                 </Tabs>
               )}
