@@ -442,6 +442,15 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
     querySetBoolean(history, 'tracetree', false);
   };
 
+  // This is used because when we first load the trace view in a drawer, the animation cant handle all the rows
+  // so we delay for the first render
+  const [animationBuffer, setAnimationBuffer] = useState(true);
+  useEffect(() => {
+    setTimeout(() => {
+      setAnimationBuffer(false);
+    }, 0);
+  }, []);
+
   return (
     <CallTrace>
       <CallTraceHeader>
@@ -454,9 +463,9 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
           rowHeight={38}
           columnHeaderHeight={treeOnly ? 0 : 56}
           treeData
-          loading={treeLoading}
+          loading={treeLoading || animationBuffer}
           onRowClick={onRowClick}
-          rows={treeLoading ? [] : rows}
+          rows={treeLoading || animationBuffer ? [] : rows}
           columns={treeOnly ? [] : columns}
           getTreeDataPath={getTreeDataPath}
           groupingColDef={groupingColDef}
