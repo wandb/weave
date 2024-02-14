@@ -1,4 +1,5 @@
 import {Box} from '@mui/material';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import _ from 'lodash';
 import moment from 'moment';
 import React, {useContext, useEffect, useState} from 'react';
@@ -18,7 +19,7 @@ export const KeyValueTable: React.FC<{
   return (
     <Box
       sx={{
-        border: '1px solid rgba(224, 224, 224, 1)',
+        border: `1px solid ${MOON_250}`,
         borderRadius: '4px',
       }}>
       <table
@@ -31,7 +32,7 @@ export const KeyValueTable: React.FC<{
           <thead>
             <tr
               style={{
-                borderBottom: '1px solid rgba(224, 224, 224, 1)',
+                borderBottom: `1px solid ${MOON_250}`,
                 backgroundColor: '#FAFAFA',
               }}>
               <th colSpan={VALUE_SPACE + 1}>{props.headerTitle}</th>
@@ -60,8 +61,8 @@ const baseKeyStyle: React.CSSProperties = {
 
 const parentKeyStyle: React.CSSProperties = {
   ...baseKeyStyle,
-  borderTop: '1px solid rgba(224, 224, 224, 1)',
-  borderBottom: '1px solid rgba(224, 224, 224, 1)',
+  borderTop: `1px solid ${MOON_250}`,
+  borderBottom: `1px solid ${MOON_250}`,
   backgroundColor: '#FAFAFA',
   color: '#979a9e',
   position: 'sticky',
@@ -72,17 +73,17 @@ const parentKeyStyle: React.CSSProperties = {
 const leafKeyStyle: React.CSSProperties = {
   ...baseKeyStyle,
   textAlign: 'right',
-  borderRight: '1px solid rgba(224, 224, 224, 1)',
+  borderRight: `1px solid ${MOON_250}`,
   paddingRight: '8px',
   verticalAlign: 'top',
   backgroundColor: '#fff',
-  borderBottom: '1px solid rgba(224, 224, 224, 1)',
+  borderBottom: `1px solid ${MOON_250}`,
 };
 
 const valueStyle: React.CSSProperties = {
   paddingLeft: '8px',
   verticalAlign: 'top',
-  borderBottom: '1px solid rgba(224, 224, 224, 1)',
+  borderBottom: `1px solid ${MOON_250}`,
 };
 
 const KeyValueRow: React.FC<{
