@@ -1,4 +1,4 @@
-import {Box, Button} from '@material-ui/core';
+import {Box, Button as MuiButton} from '@material-ui/core';
 import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
 import {
@@ -20,12 +20,19 @@ import React, {
   useState,
 } from 'react';
 import {useHistory} from 'react-router-dom';
+import styled from 'styled-components';
 
 import {parseRef} from '../../../../../../react';
+import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {Call} from '../../../Browse2/callTree';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../../context';
+import {
+  queryGetBoolean,
+  querySetBoolean,
+  queryToggleBoolean,
+} from '../../urlQueryUtil';
 import {opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
@@ -205,24 +212,62 @@ const CallPageInnerVertical: FC<{
   const spanName = opNiceName(call.spanName);
   const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
+  const history = useHistory();
+  const showTraceTree = queryGetBoolean(history, 'tracetree', true);
+  const onToggleTraceTree = () => {
+    queryToggleBoolean(history, 'tracetree', true);
+  };
   return (
     <SimplePageLayoutWithHeader
       title={title}
-      // menuItems={[
-      //   {
-      //     label: 'View Horizontal',
-      //     onClick: () => {
-      //       setVerticalLayout(false);
-      //     },
-      //   },
-      //   // ...callMenuItems,
-      // ]}
+      headerExtra={
+        <Box
+          sx={{
+            height: '47px',
+          }}>
+          <Button
+            icon="layout-tabs"
+            tooltip={`${showTraceTree ? 'Hide' : 'Show'} trace tree`}
+            variant="ghost"
+            active={showTraceTree ?? false}
+            onClick={onToggleTraceTree}
+          />
+        </Box>
+      }
+      isSidebarOpen={showTraceTree}
       headerContent={<CallOverview call={call} />}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />
   );
 };
+
+const CallTrace = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+`;
+CallTrace.displayName = 'S.CallTrace';
+
+const CallTraceHeader = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 8px 4px 8px 16px;
+`;
+CallTraceHeader.displayName = 'S.CallTraceHeader';
+
+const CallTraceHeaderTitle = styled.div`
+  font-weight: 600;
+  font-size: 18px;
+  flex: 1 1 auto;
+`;
+CallTraceHeaderTitle.displayName = 'S.CallTraceHeaderTitle';
+
+const CallTraceTree = styled.div`
+  overflow: auto;
+  flex: 1 1 auto;
+`;
+CallTraceTree.displayName = 'S.CallTraceTree';
 
 const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
   call,
@@ -393,30 +438,49 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiRef, callId]);
 
+  const onCloseTraceTree = () => {
+    querySetBoolean(history, 'tracetree', false);
+  };
+
   return (
-    <DataGridPro
-      apiRef={apiRef}
-      rowHeight={38}
-      columnHeaderHeight={treeOnly ? 0 : 56}
-      treeData
-      loading={treeLoading}
-      onRowClick={onRowClick}
-      rows={treeLoading ? [] : rows}
-      columns={treeOnly ? [] : columns}
-      getTreeDataPath={getTreeDataPath}
-      groupingColDef={groupingColDef}
-      isGroupExpandedByDefault={isGroupExpandedByDefault}
-      getRowClassName={getRowClassName}
-      hideFooter
-      rowSelection={false}
-      sx={sx}
-    />
+    <CallTrace>
+      <CallTraceHeader>
+        <CallTraceHeaderTitle>Trace tree</CallTraceHeaderTitle>
+        <Button icon="close" variant="ghost" onClick={onCloseTraceTree} />
+      </CallTraceHeader>
+      <CallTraceTree>
+        <DataGridPro
+          apiRef={apiRef}
+          rowHeight={38}
+          columnHeaderHeight={treeOnly ? 0 : 56}
+          treeData
+          loading={treeLoading}
+          onRowClick={onRowClick}
+          rows={treeLoading ? [] : rows}
+          columns={treeOnly ? [] : columns}
+          getTreeDataPath={getTreeDataPath}
+          groupingColDef={groupingColDef}
+          isGroupExpandedByDefault={isGroupExpandedByDefault}
+          getRowClassName={getRowClassName}
+          hideFooter
+          rowSelection={false}
+          sx={sx}
+        />
+      </CallTraceTree>
+    </CallTrace>
   );
 };
 
 const INSET_SPACING = 54;
 const TREE_COLOR = '#aaaeb2';
 const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
+
+// MUI Box doesn't support cursor
+// https://github.com/mui/material-ui/issues/19983
+const CursorBox = styled(Box)`
+  cursor: pointer;
+`;
+CursorBox.displayName = 'S.CursorBox';
 
 /**
  * Utility component to render the grouping cell for the trace tree.
@@ -462,7 +526,7 @@ const CustomGridTreeDataGroupingCell: FC<
     return rowNode.id === lastChildId;
   }, [apiRef, rowNode.id, rowNode.parent]);
   return (
-    <Box
+    <CursorBox
       sx={{
         height: '100%',
         display: 'flex',
@@ -511,7 +575,7 @@ const CustomGridTreeDataGroupingCell: FC<
           justifyContent: 'center',
         }}>
         {rowNode.type === 'group' ? (
-          <Button
+          <MuiButton
             onClick={handleClick}
             tabIndex={-1}
             size="small"
@@ -523,7 +587,7 @@ const CustomGridTreeDataGroupingCell: FC<
               color: TREE_COLOR,
             }}>
             {rowNode.childrenExpanded ? <ExpandMore /> : <KeyboardArrowRight />}
-          </Button>
+          </MuiButton>
         ) : (
           <Box
             sx={{
@@ -562,7 +626,7 @@ const CustomGridTreeDataGroupingCell: FC<
         }}>
         {opNiceName(call.spanName)}
       </Box>
-    </Box>
+    </CursorBox>
   );
 };
 
