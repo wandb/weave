@@ -8,37 +8,39 @@ import numpy as np
 import typing
 
 
-def test_op_versioning_saveload():
-    @weave.op()
-    def versioned_op(a: int, b: int) -> int:
-        return a + b
+def test_op_versioning_saveload(eager_mode):
+    with weave.local_client():
 
-    assert weave.use(versioned_op(1, 2)) == 3
+        @weave.op()
+        def versioned_op(a: int, b: int) -> int:
+            return a + b
 
-    @weave.op()
-    def versioned_op(a: int, b: int) -> int:
-        return a - b
+        assert versioned_op(1, 2) == 3
 
-    # Because it is a new version with different code, this
-    # should not hit memoized cache.
-    assert weave.use(versioned_op(1, 2)) == -1
+        @weave.op()
+        def versioned_op(a: int, b: int) -> int:
+            return a - b
 
-    v0_ref = weave.versions(versioned_op)[0]
-    v0 = v0_ref.get()
-    assert weave.use(v0(1, 2)) == 3
+        # Because it is a new version with different code, this
+        # should not hit memoized cache.
+        assert versioned_op(1, 2) == -1
 
-    # This should refer to v1, even though we just loaded v0
-    v_latest = weave.use(weave.get("local-artifact:///op-versioned_op:latest/obj"))
-    assert weave.use(v_latest(4, 20)) == -16
+        v0_ref = weave.versions(versioned_op)[0]
+        v0 = v0_ref.get()
+        assert v0(1, 2) == 3
 
-    v1_ref = weave.versions(versioned_op)[1]
-    v1 = v1_ref.get()
-    assert weave.use(v1(1, 2)) == -1
+        # This should refer to v1, even though we just loaded v0
+        v_latest = weave.ref("local-artifact:///op-versioned_op:latest/obj").get()
+        assert v_latest(4, 20) == -16
 
-    v0_again = weave.use(
-        weave.get(f"local-artifact:///op-versioned_op:{v0.version}/obj")
-    )
-    assert weave.use(v0_again(5, 6)) == 11
+        v1_ref = weave.versions(versioned_op)[1]
+        v1 = v1_ref.get()
+        assert v1(1, 2) == -1
+
+        v0_again = weave.ref(
+            f"local-artifact:///op-versioned_op:{v0.version}/obj"
+        ).get()
+        assert v0_again(5, 6) == 11
 
 
 EXPECTED_SOLO_OP_CODE = """import weave
@@ -54,7 +56,8 @@ def solo_versioned_op(a: int) -> float:
 def test_solo_op_versioning(strict_op_saving):
     from . import op_versioning_solo
 
-    ref = weave.obj_ref(op_versioning_solo.solo_versioned_op)
+    with weave.local_client():
+        ref = weave.publish(op_versioning_solo.solo_versioned_op)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -79,7 +82,11 @@ def versioned_op(self, a: int) -> float:
 def test_object_op_versioning(strict_op_saving):
     from . import op_versioning_obj
 
-    ref = weave.obj_ref(op_versioning_obj.MyTestObjWithOp.versioned_op)
+    with weave.local_client():
+        obj = op_versioning_obj.MyTestObjWithOp(5)
+        # Call it to publish
+        obj.versioned_op(5)
+        ref = weave.obj_ref(obj.versioned_op)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -102,7 +109,8 @@ def versioned_op_importfrom(a: int) -> float:
 def test_op_versioning_importfrom(strict_op_saving):
     from . import op_versioning_importfrom
 
-    ref = weave.obj_ref(op_versioning_importfrom.versioned_op_importfrom)
+    with weave.local_client():
+        ref = weave.publish(op_versioning_importfrom.versioned_op_importfrom)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -164,6 +172,8 @@ def test_op_versioning_closure_contant(strict_op_saving):
         return a + x
 
     ref = weave.obj_ref(versioned_op_closure_constant)
+    with weave.local_client():
+        ref = weave.publish(versioned_op_closure_constant)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -194,7 +204,8 @@ def test_op_versioning_closure_dict_simple(strict_op_saving):
     def versioned_op_closure_constant(a: int) -> float:
         return a + x["a"]
 
-    ref = weave.obj_ref(versioned_op_closure_constant)
+    with weave.local_client():
+        ref = weave.publish(versioned_op_closure_constant)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -226,7 +237,8 @@ def test_op_versioning_closure_dict_np(strict_op_saving, eager_mode):
     def versioned_op_closure_constant(a: int) -> float:
         return a + x["b"].mean() + x["a"]
 
-    ref = weave.obj_ref(versioned_op_closure_constant)
+    with weave.local_client():
+        ref = weave.publish(versioned_op_closure_constant)
     assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
     with ref.artifact.open("obj.py") as f:
@@ -281,8 +293,7 @@ def test_op_versioning_closure_dict_ops(strict_op_saving, eager_mode):
             print("hello from pony()")
             return v + 99
 
-        ref = weave.obj_ref(pony)
-        print("REF", ref)
+        ref = weave.publish(pony)
         assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
         with ref.artifact.open("obj.py") as f:
@@ -341,7 +352,7 @@ def test_op_versioning_mixed(strict_op_saving, eager_mode):
             print("hello from pony()")
             return v + 99
 
-        ref = weave.obj_ref(pony)
+        ref = weave.publish(pony)
         print("REF", ref)
         assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 

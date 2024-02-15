@@ -18,6 +18,7 @@ from .monitoring import monitor
 from . import artifact_wandb
 from . import op_def
 from .ref_base import Ref
+from . import ref_base
 from . import stream_data_interfaces
 from .eager import WeaveIter, select_all
 from .run import RunKey, Run
@@ -114,10 +115,13 @@ class GraphClientWandbArtStreamTable(GraphClient[RunStreamTableSpan]):
 
     # Hmm... I want this to be a ref to an op I think?
     def op_runs(self, op_def: op_def.OpDef) -> WeaveIter[RunStreamTableSpan]:
+        op_def_ref = ref_base.get_ref(op_def)
+        if op_def_ref is None:
+            raise ValueError(f"Can't get runs for unpublished op: {op_def_ref}")
         with context_state.lazy_execution():
             rows_node = self.runs_st.rows()
             filter_node = rows_node.filter(  # type: ignore
-                lambda row: row["name"] == str(op_def.location)
+                lambda row: row["name"] == str(op_def_ref)
             )
             return WeaveIter(filter_node, cls=RunStreamTableSpan)
 

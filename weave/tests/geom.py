@@ -3,6 +3,11 @@ import math
 import typing
 import weave
 
+from .. import context_state as _context_state
+from weave import panels
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
+
 
 @weave.type()
 class Point2d:
@@ -13,9 +18,9 @@ class Point2d:
 @weave.op()
 def points_render(
     points_node: weave.Node[list[Point2d]],
-) -> weave.panels.Table:
+) -> panels.Table:
     points = typing.cast(list[Point2d], points_node)  # type: ignore
-    return weave.panels.Table(
+    return panels.Table(
         points,
         columns=[
             lambda point: point.x,
@@ -44,3 +49,6 @@ class LineSegment:
         x = self.x0 + (self.x1 - self.x0) / 2
         y = self.y0 + (self.y1 - self.y0) / 2
         return Point2d(x, y)
+
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)

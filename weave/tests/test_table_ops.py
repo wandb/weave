@@ -7,6 +7,7 @@ from .. import weave_types as types
 from .. import ops
 from .. import storage
 from .. import context
+from .. import context_state
 from .. import weave_internal
 from .. import graph
 from .. import box
@@ -15,6 +16,29 @@ from ..ops_domain import table as table_ops
 from . import weavejs_ops
 
 TABLE_TYPES = ["list", "pandas", "sql"]
+
+_loading_builtins_token = context_state.set_loading_built_ins()
+
+
+@weave.op(
+    name="test_table_ops-op_list_table",
+    input_type={"n": types.Int()},
+    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
+)
+def op_list_table(n):
+    return [{"a": i, "b": str(i)} for i in range(n)]
+
+
+@weave.op(
+    name="test_table_ops-op_list",
+    input_type={"n": types.Int()},
+    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
+)
+def op_list(n):
+    return [{"a": i, "b": str(i)} for i in range(n)]
+
+
+context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def get_test_table(table_type):
@@ -182,15 +206,6 @@ def test_map(table_type):
     assert weave.use(mapped[0]) == 280
 
 
-@weave.op(
-    name="test_table_ops-op_list_table",
-    input_type={"n": types.Int()},
-    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
-)
-def op_list_table(n):
-    return [{"a": i, "b": str(i)} for i in range(n)]
-
-
 def test_list_returning_op():
     res = weave.use(op_list_table(2))
     expected = [{"a": 0, "b": str(0)}, {"a": 1, "b": str(1)}]
@@ -207,15 +222,6 @@ def test_list_map():
     )
     res = weave.use(op_list_table(2).map(map_fn))
     assert res == [0, 1]
-
-
-@weave.op(
-    name="test_table_ops-op_list",
-    input_type={"n": types.Int()},
-    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
-)
-def op_list(n):
-    return [{"a": i, "b": str(i)} for i in range(n)]
 
 
 def test_list_get_and_op():

@@ -3,6 +3,7 @@ import math
 
 from .. import api as weave
 from .. import context
+from .. import context_state
 
 
 class XOnly(typing.TypedDict):
@@ -14,12 +15,18 @@ class Point(typing.TypedDict):
     y: float
 
 
+_loading_builtins_token = context_state.set_loading_built_ins()
+
+
 @weave.op()
 def _test_compute_points_compute_points(xs: list[XOnly], freq: float) -> list[Point]:
     res: list[Point] = []
     for row in xs:
         res.append({"x": row["x"], "y": math.sin(freq * row["x"])})
     return res
+
+
+context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_compute_points():
