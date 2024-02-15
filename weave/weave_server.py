@@ -416,6 +416,7 @@ def _disable_eager_mode():
 def frontend_env():
     """If you add vars here, make sure to define their types in weave-js/src/config.ts"""
     return {
+        "TESTING_TESTING": "TESTING_TESTING===========================================",
         "PREFIX": environment.weave_link_prefix(),
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
         "ONPREM": environment.weave_onprem(),
