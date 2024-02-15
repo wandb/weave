@@ -2,7 +2,7 @@ import {Box} from '@mui/material';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import _ from 'lodash';
 import moment from 'moment';
-import React, {useContext, useEffect, useState} from 'react';
+import React, {ReactNode, useContext, useEffect, useState} from 'react';
 
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {isPrimitive} from './util';
@@ -14,7 +14,7 @@ const MAX_HEIGHT_MULT = 5;
 
 export const KeyValueTable: React.FC<{
   data: {[key: string]: any};
-  headerTitle?: string;
+  headerTitle?: ReactNode;
 }> = props => {
   return (
     <Box

@@ -33,7 +33,7 @@ import {
   querySetBoolean,
   queryToggleBoolean,
 } from '../../urlQueryUtil';
-import {opNiceName} from '../common/Links';
+import {CallId, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   SimplePageLayout,
@@ -44,7 +44,6 @@ import {CallStatusType, StatusChip} from '../common/StatusChip';
 import {truncateID} from '../util';
 import {CallSchema, useCall, useCalls} from '../wfReactInterface/interface';
 import {CallDetails} from './CallDetails';
-import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 
 // % of screen to give the trace view in horizontal mode
@@ -175,16 +174,25 @@ const CallPageInnerVertical: FC<{
 }> = ({call, setVerticalLayout}) => {
   const {callId} = call;
   const spanName = opNiceName(call.spanName);
-  const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   const history = useHistory();
   const showTraceTree = queryGetBoolean(history, 'tracetree', true);
   const onToggleTraceTree = () => {
     queryToggleBoolean(history, 'tracetree', true);
   };
+
+  const statusCode = call.rawSpan.status_code;
+  const truncatedId = callId.slice(-4);
+
   return (
     <SimplePageLayoutWithHeader
-      title={title}
+      title={
+        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+          <StatusChip value={statusCode} iconOnly />
+          {spanName}
+          <CallId>{truncatedId}</CallId>
+        </div>
+      }
       headerExtra={
         <Box
           sx={{
@@ -200,7 +208,6 @@ const CallPageInnerVertical: FC<{
         </Box>
       }
       isSidebarOpen={showTraceTree}
-      headerContent={<CallOverview call={call} />}
       leftSidebar={<CallTraceView call={call} treeOnly />}
       tabs={callTabs}
     />

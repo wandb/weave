@@ -165,7 +165,7 @@ export const SimplePageLayout: FC<{
 };
 
 export const SimplePageLayoutWithHeader: FC<{
-  title: string;
+  title: ReactNode;
   tabs: Array<{
     label: string;
     content: ReactNode;
@@ -175,7 +175,7 @@ export const SimplePageLayoutWithHeader: FC<{
     onClick: () => void;
   }>;
   headerExtra?: ReactNode;
-  headerContent: ReactNode;
+  headerContent?: ReactNode;
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
   isSidebarOpen?: boolean;
@@ -262,17 +262,19 @@ export const SimplePageLayoutWithHeader: FC<{
                 height: '100%',
                 overflow: 'hidden',
               }}>
-              <Box
-                sx={{
-                  maxHeight: '50%',
-                  flex: '0 0 auto',
-                  width: '100%',
-                  overflow: 'auto',
-                  borderBottom: '1px solid #e0e0e0',
-                  p: 1,
-                }}>
-                {props.headerContent}
-              </Box>
+              {props.headerContent && (
+                <Box
+                  sx={{
+                    maxHeight: '50%',
+                    flex: '0 0 auto',
+                    width: '100%',
+                    overflow: 'auto',
+                    borderBottom: '1px solid #e0e0e0',
+                    p: 1,
+                  }}>
+                  {props.headerContent}
+                </Box>
+              )}
               {(!props.hideTabsIfSingle || tabs.length > 1) && (
                 <Tabs
                   style={{
