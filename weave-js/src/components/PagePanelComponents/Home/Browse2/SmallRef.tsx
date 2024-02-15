@@ -57,10 +57,11 @@ export const objectRefDisplayName = (objRef: ObjectRef) => {
   }
   return {label};
 };
-export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
-  objRef,
-  wfTable,
-}) => {
+export const SmallRef: FC<{
+  objRef: ObjectRef;
+  wfTable?: WFDBTableType;
+  noIcon?: boolean;
+}> = ({objRef, wfTable, noIcon}) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const refTypeNode = useMemo(() => {
     const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
@@ -73,8 +74,10 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   const {label} = objectRefDisplayName(objRef);
 
   const rootTypeName = getTypeName(rootType);
-  let icon: IconName = IconNames.CubeContainer;
-  if (rootTypeName === 'Dataset') {
+  let icon: IconName | undefined;
+  if (noIcon) {
+    icon = undefined;
+  } else if (rootTypeName === 'Dataset') {
     icon = IconNames.Table;
   } else if (rootTypeName === 'Model') {
     icon = IconNames.Model;
@@ -82,22 +85,27 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
     icon = IconNames.List;
   } else if (rootTypeName === 'OpDef') {
     icon = IconNames.JobProgramCode;
+  } else {
+    icon = IconNames.CubeContainer;
   }
+
   const Item = (
     <Box display="flex" alignItems="center">
-      <Box
-        mr="4px"
-        bgcolor={hexToRGB(MOON_300, 0.48)}
-        sx={{
-          height: '22px',
-          width: '22px',
-          borderRadius: '16px',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-        <Icon name={icon} width={14} height={14} />
-      </Box>
+      {icon && (
+        <Box
+          mr="4px"
+          bgcolor={hexToRGB(MOON_300, 0.48)}
+          sx={{
+            height: '22px',
+            width: '22px',
+            borderRadius: '16px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <Icon name={icon} width={14} height={14} />
+        </Box>
+      )}
       {label}
     </Box>
   );
