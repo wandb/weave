@@ -45,11 +45,15 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
         # fields.
         result = {"_type": self.type.name}
         for prop_name, prop_serializer in self._property_serializers.items():
-            if prop_name == "_name":
-                prop_name = "name"
             if prop_serializer is not None:
-                v = prop_serializer.apply(getattr(obj, prop_name))
-                result[prop_name] = v
+                obj_val = getattr(obj, prop_name, None)
+                if obj_val is None:
+                    # Shortcut if there is a None here. In boards there are some cases where
+                    # we have incorrect types that are missing optional designation. Fixes
+                    # plotboard.cy.ts
+                    result[prop_name] = None
+                else:
+                    result[prop_name] = prop_serializer.apply(obj_val)
         return result
 
 
