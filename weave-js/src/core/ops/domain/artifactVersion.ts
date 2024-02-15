@@ -228,13 +228,13 @@ export const opArtifactVersionIsGenerated = makeArtifactVersionOp({
   name: 'artifactVersion-isGenerated',
   argTypes: artifactVersionArgTypes,
   description: `Returns if the artifact is system-generated ${docType(
-      'artifactVersion'
+    'artifactVersion'
   )}`,
   argDescriptions: {
     artifactVersion: artifactVersionArgDescription,
   },
   returnValueDescription: `Returns if the artifact is system-generated ${docType(
-      'artifactVersion'
+    'artifactVersion'
   )}`,
   returnType: inputTypes => 'boolean',
   resolver: ({artifactVersion}) => artifactVersion.isGenerated,
