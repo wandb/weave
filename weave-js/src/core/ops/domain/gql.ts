@@ -1116,6 +1116,8 @@ export const toGqlField = (
     return gqlBasicField('fileCount');
   } else if (forwardOp.op.name === 'artifactVersion-artifactType') {
     return [gqlObjectField(forwardGraph, forwardOp, 'artifactType')];
+  } else if (forwardOp.op.name === 'artifactVersion-isGenerated') {
+    return gqlBasicField('isGenerated');
   } else if (forwardOp.op.name === 'artifactVersion-artifactCollections') {
     return [
       {

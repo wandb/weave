@@ -174,7 +174,7 @@ export const opArtifactVersionFileCount = makeArtifactVersionOp({
   returnValueDescription: `Returns the file count of the artifact ${docType(
     'artifactVersion'
   )}`,
-  returnType: inputTypes => 'boolean',
+  returnType: inputTypes => 'number',
   resolver: ({artifactVersion}) => artifactVersion.fileCount,
 });
 
@@ -222,6 +222,22 @@ export const opArtifactVersionFiles = makeArtifactVersionOp({
       return [];
     }
   },
+});
+
+export const opArtifactVersionIsGenerated = makeArtifactVersionOp({
+  name: 'artifactVersion-isGenerated',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns if the artifact is system-generated ${docType(
+      'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns if the artifact is system-generated ${docType(
+      'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'boolean',
+  resolver: ({artifactVersion}) => artifactVersion.isGenerated,
 });
 
 const mediaTypeExtensions = BASIC_MEDIA_TYPES.map(mediaType => mediaType.type);
