@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import openai
 import pytest
+from openai.types.chat import ChatCompletionSystemMessageParam
 from openai.types.chat.chat_completion import ChatCompletion, Choice
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceDelta
 from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
@@ -22,7 +23,7 @@ from weave.wandb_interface.wandb_stream_table import StreamTable
 @pytest.fixture
 def chat_completion_request_message():
     return [
-        ChatCompletionRequestMessage(
+        ChatCompletionSystemMessageParam(
             content="Tell me a joke", role="system", function_call=None, tool_calls=None
         )
     ]

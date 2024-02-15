@@ -3,14 +3,14 @@ __all__ = ["patch", "unpatch"]
 import functools
 from contextlib import contextmanager
 from functools import partialmethod
-from typing import Callable, Type, Union
+from typing import Callable, Type, Union, AsyncIterator
 
 import openai
 from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion
 from packaging import version
 
-from weave import graph_client_context, run_context
+from weave import graph_client_context, run_context, start_as_current_span, run
 
 from ..monitor import _get_global_monitor
 from .models import *
@@ -25,6 +25,35 @@ class partialmethod_with_self(partialmethod):
         return self._make_unbound_method().__get__(obj, cls)  # type: ignore
 
 
+class WeaveAsyncStream(AsyncStream):
+    def __init__(
+        self,
+        *,
+        base_stream: AsyncStream,
+        inputs: ChatCompletionRequest, 
+        span: run.Run,
+    ) -> None:
+        self._inputs = inputs
+        self._chunks = []
+        self._span = span
+        super().__init__(
+            cast_to=ChatCompletionChunk,
+            client=base_stream._client,
+            response=base_stream.response
+        )
+
+    async def __anext__(self) -> ChatCompletionChunk:
+        item = await self._iterator.__anext__()
+        self._chunks.append(item)
+        return item
+
+    async def __aiter__(self) -> AsyncIterator[ChatCompletionChunk]:
+        async for item in self._iterator:
+            self._chunks.append(item)
+            yield item
+        result = reconstruct_completion(self._inputs.messages, self._chunks)  # type: ignore
+        self._span.finish(result.model_dump(exclude_unset=True))
+
 class AsyncChatCompletions:
     def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
@@ -33,40 +62,35 @@ class AsyncChatCompletions:
         self, *args: Any, **kwargs: Any
     ) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
         if kwargs.get("stream", False):
-            return self._streaming_create(*args, **kwargs)
+            return await self._streaming_create(*args, **kwargs)
         return await self._create(*args, **kwargs)
 
     async def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
-        named_args = bind_params(old_create, *args, **kwargs)
+        named_args = bind_params(old_async_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args).dict()
-        with log_run("openai.chat.completions.create", inputs) as finish_run:
+        with start_as_current_span("openai.chat.completions.create", inputs) as span:
             result = await self._base_create(*args, **kwargs)
-            finish_run(result.model_dump(exclude_unset=True))
+            span.finish(result.model_dump(exclude_unset=True))
         return result
 
     async def _streaming_create(
         self, *args: Any, **kwargs: Any
     ) -> AsyncStream[ChatCompletionChunk]:
-        named_args = bind_params(old_create, *args, **kwargs)
+        named_args = bind_params(old_async_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run(
+        with start_as_current_span(
             "openai.chat.completions.create", inputs.model_dump()
-        ) as finish_run:
-            # Need to put in a function so the outer function is not a
-            # generator. Generators don't execute any of their body's
-            # code until next() is called. But we want to create the run
-            # as a child of whatever the parent is, at function call time,
-            # not generator start time.
-            async def _stream_create_gen():  # type: ignore
-                chunks = []
-                stream = await self._base_create(*args, **kwargs)
-                async for chunk in stream:
-                    chunks.append(chunk)
-                    yield chunk
-                result = reconstruct_completion(inputs.messages, chunks)  # type: ignore
-                finish_run(result.model_dump(exclude_unset=True))
+        ) as span:
+            # We return a special stream that mimics the underlying
+            # one, but also logs the result of the completion.
+            base_stream = await self._base_create(*args, **kwargs)
+            stream = WeaveAsyncStream(
+                base_stream=base_stream,
+                inputs=inputs,
+                span=span,
+            )   
 
-        return _stream_create_gen()  # type: ignore
+        return stream  # type: ignore
 
 
 class ChatCompletions:
@@ -84,9 +108,9 @@ class ChatCompletions:
     def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args).dict()
-        with log_run("openai.chat.completions.create", inputs) as finish_run:
+        with start_as_current_span("openai.chat.completions.create", inputs) as span:
             result = self._base_create(*args, **kwargs)
-            finish_run(result.model_dump(exclude_unset=True))
+            span.finish(result.model_dump(exclude_unset=True))
         return result
 
     def _streaming_create(
@@ -94,9 +118,9 @@ class ChatCompletions:
     ) -> Stream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run(
+        with start_as_current_span(
             "openai.chat.completions.create", inputs.model_dump()
-        ) as finish_run:
+        ) as span:
 
             def _stream_create_gen():  # type: ignore
                 chunks = []
@@ -105,7 +129,7 @@ class ChatCompletions:
                     chunks.append(chunk)
                     yield chunk
                 result = reconstruct_completion(inputs.messages, chunks)  # type: ignore
-                finish_run(result.model_dump(exclude_unset=True))
+                span.finish(result.model_dump(exclude_unset=True))
 
         return _stream_create_gen()  # type: ignore
 
@@ -147,23 +171,3 @@ def unpatch() -> None:
         info("Unpatching OpenAI completions")
         openai.resources.chat.completions.Completions.create = old_create
         openai.resources.chat.completions.AsyncCompletions.create = old_async_create
-
-
-# TODO: centralize
-@contextmanager
-def log_run(call_name: str, inputs: dict[str, Any]) -> Iterator[Callable]:
-    client = graph_client_context.require_graph_client()
-    parent_run = run_context.get_current_run()
-    # TODO: client should not need refs passed in.
-    run = client.create_run(call_name, parent_run, inputs, [])
-
-    def finish_run(output: Any) -> None:
-        # TODO: client should not need refs passed in.
-        client.finish_run(run, output, [])
-
-    try:
-        with run_context.current_run(run):
-            yield finish_run
-    except Exception as e:
-        client.fail_run(run, e)
-        raise

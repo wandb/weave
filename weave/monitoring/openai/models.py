@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from .. import monitor
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionMessageParam
 from pydantic import BaseModel, Field
 from ... import weave_types as types
 
@@ -19,16 +19,12 @@ class CombinedChoice(BaseModel):
     tool_calls: Optional[str] = None
 
 
-class ChatCompletionRequestMessage(ChatCompletionMessage):
-    role: str = ""
-
-
 class ChatCompletionRequest(BaseModel):
     class Config:
         use_enum_values = True
 
     model: str = ""
-    messages: List[ChatCompletionRequestMessage] = Field(default_factory=list)
+    messages: List[ChatCompletionMessageParam] = Field(default_factory=list)
     max_tokens: Optional[int] = None
     temperature: Optional[float] = None
     stream: Optional[bool] = None

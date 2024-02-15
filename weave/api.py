@@ -3,10 +3,11 @@
 
 import time
 import typing
+import logging
 import os
 import contextlib
 import dataclasses
-from typing import Any
+from typing import Any, Callable, Iterator
 
 from . import urls
 
@@ -34,6 +35,7 @@ from . import graph_client as _graph_client
 from . import graph_client_local as _graph_client_local
 from . import graph_client_wandb_art_st as _graph_client_wandb_art_st
 from . import graph_client_context as _graph_client_context
+from . import run_context as _run_context
 from weave.monitoring import monitor as _monitor
 
 # exposed as part of api
@@ -160,6 +162,31 @@ def wandb_client(project_name: str) -> typing.Iterator[_graph_client.GraphClient
     finally:
         inited_client.reset()
 
+@contextlib.contextmanager
+def start_as_current_span(call_name: str, inputs: dict[str, Any]) -> Iterator[_run.Run | None]:
+    client = _graph_client_context.get_graph_client()
+    if client is None:
+        logging.warning("`weave.init(<project_name>)` not called, dropping span: %s", call_name)
+        yield None
+        return
+    parent_run = _run_context.get_current_run()
+    # TODO: client should not need refs passed in.
+    run = client.create_run(call_name, parent_run, inputs, [])
+
+    try:
+        with _run_context.current_run(run):
+            yield run
+    except Exception as e:
+        run.fail(e)
+        raise
+
+def start_span(call_name: str, inputs: dict[str, Any]) -> Callable | None:
+    client = _graph_client_context.get_graph_client()
+    if client is None:
+        logging.warning("`weave.init(<project_name>)` not called, dropping span: %s", call_name)
+        return None
+    parent_run = _run_context.get_current_run()
+    return client.create_run(call_name, parent_run, inputs, [])
 
 # This is currently an internal interface. We'll expose something like it though ("offline" mode)
 def init_local_client() -> _graph_client.GraphClient:
