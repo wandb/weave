@@ -330,7 +330,6 @@ class SqlTableRef(ref_base.Ref):
 
 @dataclasses.dataclass
 class GraphClientSql(GraphClient[WeaveRunObj]):
-
     def __init__(self):
         self.client = get_client(host="localhost")
 

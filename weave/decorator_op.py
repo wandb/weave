@@ -114,7 +114,6 @@ def op(
 
             op.weave_fn = op_to_weave_fn(op)
 
-
         # if not loading_builtins:
         #     return op
 
@@ -128,7 +127,6 @@ def op(
 
         if loading_builtins:
             derive_op.derive_ops(op)
-
 
         functools.update_wrapper(op_version, f)
 

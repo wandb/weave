@@ -204,9 +204,9 @@ class FilesystemArtifact(artifact_base.Artifact):
 
 FilesystemArtifactType.instance_classes = FilesystemArtifact
 
-_loading_artifact: contextvars.ContextVar[typing.Optional[FilesystemArtifact]] = (
-    contextvars.ContextVar("_loading_artifact", default=None)
-)
+_loading_artifact: contextvars.ContextVar[
+    typing.Optional[FilesystemArtifact]
+] = contextvars.ContextVar("_loading_artifact", default=None)
 
 
 @contextlib.contextmanager
