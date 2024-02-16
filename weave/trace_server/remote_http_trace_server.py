@@ -3,7 +3,7 @@ import typing as t
 import requests
 from . import trace_server_interface as tsi
 
-class RemoteHTTPTraceServer(tsi.WeaveflowAPI):
+class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
 
     def __init__(self, trace_server_url:str):

@@ -767,7 +767,7 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
       if (row.status === 'ERROR') {
         for (const p of row.hierarchy) {
           const parent = rowMap[p];
-          if (parent.status === 'SUCCESS') {
+          if (parent.status === 'OK') {
             parent.status = 'DESCENDANT_ERROR';
           }
         }

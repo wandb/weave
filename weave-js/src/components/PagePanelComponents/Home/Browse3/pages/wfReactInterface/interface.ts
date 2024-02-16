@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import LRUCache from 'lru-cache';
-import {useMemo} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 
 import {
   constFunction,
@@ -39,6 +39,7 @@ import {
   useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import { fetchAllCalls } from './trace_server_client';
 
 export const OP_CATEGORIES = [
   'train',
@@ -81,14 +82,14 @@ export const spanToCallSchema = (
   return {
     entity,
     project,
-    callId: span.span_id,
+    callId: span.span_id ?? span.id,
     traceId: span.trace_id,
     parentId: span.parent_id,
-    spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
-      ? refUriToOpVersionKey(span.name).opId
-      : span.name,
-    opVersionRef: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
-      ? span.name
+    spanName: (span.name ?? span.op_name).startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? refUriToOpVersionKey((span.name ?? span.op_name)).opId
+      : (span.name ?? span.op_name),
+    opVersionRef: (span.name ?? span.op_name).startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? (span.name ?? span.op_name)
       : null,
     rawSpan: span,
     rawFeedback: span.feedback,
@@ -183,26 +184,32 @@ export const useCalls = (
   project: string,
   filter: CallFilter
 ): Loadable<CallSchema[]> => {
-  const calls = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: PROJECT_CALL_STREAM_NAME,
-    },
-    {
-      opUris: filter.opVersionRefs,
-      inputUris: filter.inputObjectVersionRefs,
-      outputUris: filter.outputObjectVersionRefs,
-      traceId: filter.traceId,
-      parentIds: filter.parentIds,
-      traceRootsOnly: filter.traceRootsOnly,
-      callIds: filter.callIds,
-    },
-    // TODO: Re-Enable feedback once we actually have it!
-    true
-  );
+  const [calls, setCalls] = useState<SpanWithFeedback[] | null>(null);
+  useEffect(() => {
+    fetchAllCalls().then((data) => {
+      setCalls(data.calls);
+    })
+  }, []);
+  // const calls = useRunsWithFeedback(
+  //   {
+  //     entityName: entity,
+  //     projectName: project,
+  //     streamName: PROJECT_CALL_STREAM_NAME,
+  //   },
+  //   {
+  //     opUris: filter.opVersionRefs,
+  //     inputUris: filter.inputObjectVersionRefs,
+  //     outputUris: filter.outputObjectVersionRefs,
+  //     traceId: filter.traceId,
+  //     parentIds: filter.parentIds,
+  //     traceRootsOnly: filter.traceRootsOnly,
+  //     callIds: filter.callIds,
+  //   },
+  //   // TODO: Re-Enable feedback once we actually have it!
+  //   true
+  // );
   return useMemo(() => {
-    const allResults = (calls.result ?? []).map(run =>
+    const allResults = (calls ?? []).map(run =>
       spanToCallSchema(entity, project, run)
     );
     // Unfortunately, we can't filter by category in the query level yet
@@ -216,7 +223,7 @@ export const useCalls = (
       );
     });
 
-    if (calls.loading) {
+    if (calls == null) {
       return {
         loading: true,
         result,
@@ -237,7 +244,7 @@ export const useCalls = (
         result,
       };
     }
-  }, [calls.result, calls.loading, entity, project, filter.opCategory]);
+  }, [calls, entity, project, filter.opCategory]);
 };
 
 type OpVersionKey = {

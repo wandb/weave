@@ -142,7 +142,7 @@ export const RunsTable: FC<{
         trace_id: call.traceId,
         status_code: call.rawSpan.status_code,
         timestampMs: call.rawSpan.timestamp,
-        latency: call.rawSpan.summary.latency_s,
+        latency: call.rawSpan.start_time - call.rawSpan.end_time,
         ..._.mapValues(
           _.mapKeys(
             _.omitBy(args, v => v == null),

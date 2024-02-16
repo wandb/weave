@@ -14,6 +14,8 @@ from clickhouse_connect import get_client
 
 from collections.abc import Mapping
 
+from weave.graph_client_sql import MemFilesArtifact
+
 from ..graph_client import GraphClient
 from ..op_def import OpDef
 from ..ref_base import Ref
@@ -147,193 +149,180 @@ def refs_to_str(val: typing.Any) -> typing.Any:
 
 
 
-# @dataclasses.dataclass
-# class TraceObjectURI(uris.WeaveURI):
-#     SCHEME = "trace-object"
-#     entity_name: str
-#     project_name: str
-#     netloc: Optional[str] = None
-#     row_id: Optional[str] = None
-#     row_version: Optional[str] = None
-#     extra: Optional[list[str]] = None
+@dataclasses.dataclass
+class TraceObjectURI(uris.WeaveURI):
+    SCHEME = "trace-object"
+    name: str
+    version: typing.Optional[str]
+    entity_name: str
+    project_name: str
+    extra: Optional[list[str]] = None
 
-#     @classmethod
-#     def from_parsed_uri(
-#         cls,
-#         uri: str,
-#         schema: str,
-#         netloc: str,
-#         path: str,
-#         params: str,
-#         query: dict[str, list[str]],
-#         fragment: str,
-#     ):
-#         parts = path.strip("/").split("/")
-#         parts = [parse.unquote(part) for part in parts]
-#         if len(parts) < 3:
-#             raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
-#         entity_name = parts[0]
-#         project_name = parts[1]
-#         table_name = parts[2]
-#         row_id = None
-#         if len(parts) > 3:
-#             row_id = parts[3]
-#         row_version = None
-#         if len(parts) > 4:
-#             row_version = parts[4]
+    @classmethod
+    def from_parsed_uri(
+        cls,
+        uri: str,
+        schema: str,
+        netloc: str,
+        path: str,
+        params: str,
+        query: dict[str, list[str]],
+        fragment: str,
+    ):
+        parts = path.strip("/").split("/")
+        parts = [parse.unquote(part) for part in parts]
+        if len(parts) < 3:
+            raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
+        entity_name = parts[0]
+        project_name = parts[1]
+        name = parts[2]
+        version = parts[3]
 
-#         extra: Optional[list[str]] = None
-#         if fragment:
-#             extra = fragment.split("/")
-#         return cls(
-#             table_name,
-#             None,
-#             entity_name,
-#             project_name,
-#             netloc,
-#             row_id,
-#             row_version,
-#             extra,
-#         )
+        extra: Optional[list[str]] = None
+        if fragment:
+            extra = fragment.split("/")
+        return cls(
+            name,
+            version,
+            entity_name,
+            project_name,
+            extra,
+        )
 
-#     def __str__(self) -> str:
-#         netloc = self.netloc or ""
-#         uri = (
-#             f"{self.SCHEME}://"
-#             f"{quote_slashes(netloc)}/"
-#             f"{quote_slashes(self.entity_name)}/"
-#             f"{quote_slashes(self.project_name)}/"
-#             f"{quote_slashes(self.name)}"
-#         )
-#         if self.row_id:
-#             uri += f"/{quote_slashes(self.row_id)}"
-#         if self.row_version:
-#             uri += f"/{quote_slashes(self.row_version)}"
-#         if self.extra:
-#             uri += f"#{'/'.join(self.extra)}"
-#         return uri
+    def __str__(self) -> str:
+        uri = (
+            f"{self.SCHEME}:///"
+            f"{quote_slashes(self.entity_name)}/"
+            f"{quote_slashes(self.project_name)}/"
+            f"{quote_slashes(self.name)}"
+            f":{quote_slashes(self.version)}"
+        )
+        # if self.row_id:
+        #     uri += f"/{quote_slashes(self.row_id)}"
+        # if self.version_hash:
+        #     uri += f"/{quote_slashes(self.version_hash)}"
+        if self.extra:
+            uri += f"#{'/'.join(self.extra)}"
+        return uri
 
-#     def to_ref(self) -> "TraceObjectRef":
-#         return TraceObjectRef.from_uri(self)
+    def to_ref(self) -> "TraceObjectRef":
+        return TraceObjectRef.from_uri(self)
 
-#     def with_path(self, path: str) -> "TraceObjectURI":
-#         return TraceObjectURI(
-#             self.name,
-#             self.version,
-#             self.entity_name,
-#             self.project_name,
-#             self.netloc,
-#             path,
-#             self.extra,
-#         )
+    def with_path(self, path: str) -> "TraceObjectURI":
+        return TraceObjectURI(
+            self.name,
+            self.version,
+            self.entity_name,
+            self.project_name,
+            # path,
+            self.extra,
+        )
 
 
-# class TraceObjectRef(ref_base.Ref):
-#     def __init__(
-#         self,
-#         entity_name: str,
-#         project_name: str,
-#         table_name: str,
-#         row_id: Optional[str],
-#         row_version: Optional[str],
-#         obj: Optional[Any] = None,
-#         type: Optional["types.Type"] = None,
-#         extra: Optional[list[str]] = None,
-#     ):
-#         self._entity_name = entity_name
-#         self._project_name = project_name
-#         self._table_name = table_name
-#         self._row_id = row_id
-#         self._row_version = row_version
+class TraceObjectRef(ref_base.Ref):
+    def __init__(
+        self,
+        entity_name: str,
+        project_name: str,
+        object_name: str,
+        version_hash: Optional[str],
+        obj: Optional[Any] = None,
+        type: Optional["types.Type"] = None,
+        extra: Optional[list[str]] = None,
+    ):
+        self._entity_name = entity_name
+        self._project_name = project_name
+        self._object_name = object_name
+        self._version_hash = version_hash
+        self._extra = extra
 
-#         # Needed because mappers_python checks this
-#         self.artifact = None
+        # Needed because mappers_python checks this
+        self.artifact = None
 
-#         super().__init__(obj=obj, type=type)
+        super().__init__(obj=obj, type=type)
 
-#     @classmethod
-#     def from_uri(cls, uri: uris.WeaveURI) -> "TraceObjectRef":
-#         if not isinstance(uri, TraceObjectURI):
-#             raise ValueError("Expected WandbTableURI")
-#         return cls(
-#             uri.entity_name,
-#             uri.project_name,
-#             uri.name,
-#             uri.row_id,
-#             uri.row_version,
-#             extra=uri.extra,
-#         )
+    @classmethod
+    def from_uri(cls, uri: uris.WeaveURI) -> "TraceObjectRef":
+        if not isinstance(uri, TraceObjectURI):
+            raise ValueError("Expected WandbTableURI")
+        return cls(
+            uri.entity_name,
+            uri.project_name,
+            uri.name,
+            uri.version_hash,
+            uri.row_version,
+            extra=uri.extra,
+        )
 
-#     @property
-#     def is_saved(self) -> bool:
-#         return True
+    @property
+    def is_saved(self) -> bool:
+        return True
 
-#     @property
-#     def type(self) -> "types.Type":
-#         if self._type is None:
-#             # TODO: expensive
-#             self._type = types.TypeRegistry.type_of(self.obj)
-#         return self._type
+    @property
+    def type(self) -> "types.Type":
+        if self._type is None:
+            # TODO: expensive
+            self._type = types.TypeRegistry.type_of(self.obj)
+        return self._type
 
-#     @property
-#     def initial_uri(self) -> str:
-#         return self.uri
+    @property
+    def initial_uri(self) -> str:
+        return self.uri
 
-#     @property
-#     def uri(self) -> str:
-#         return str(
-#             TraceObjectURI(
-#                 self._table_name,
-#                 None,
-#                 self._entity_name,
-#                 self._project_name,
-#                 None,  # netloc ?
-#                 row_id=self._row_id,
-#                 row_version=self._row_version,
-#                 extra=self.extra,
-#             )
-#         )
+    @property
+    def uri(self) -> str:
+        return str(
+            TraceObjectURI(
+                self._object_name,
+                self._version_hash,
+                self._entity_name,
+                self._project_name,
+                # None,  # netloc ?
+                # row_version=self._row_version,
+                extra=self.extra,
+            )
+        )
 
-#     def _get(self) -> Any:
-#         gc = graph_client_context.require_graph_client()
-#         assert isinstance(gc, GraphClientSql)
-#         assert self._row_id
-#         client = gc.client
-#         query_result = client.query(
-#             f"SELECT * FROM objects WHERE id = '{self._row_id}'",
-#             # Tell clickhouse_connect to return the files map as bytes. But this
-#             # also returns the keys as bytes...
-#             column_formats={"files": {"string": "bytes"}},
-#         )
-#         item = query_result.first_item
-#         files = {k.decode("utf-8"): v for k, v in item["files"].items()}
-#         art = MemFilesArtifact(files, metadata=json.loads(item["art_meta"]))
-#         wb_type = types.TypeRegistry.type_from_dict(json.loads(item["type"]))
-#         mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
-#         res = mapper.apply(json.loads(item["val"]))
-#         return res
+    def _get(self) -> Any:
+        raise NotImplementedError
+        # gc = graph_client_context.require_graph_client()
+        # assert isinstance(gc, GraphClientTrace)
+        # assert self._version_hash
+        # client = gc.client
+        # query_result = client.query(
+        #     f"SELECT * FROM objects WHERE id = '{self._version_hash}'",
+        #     # Tell clickhouse_connect to return the files map as bytes. But this
+        #     # also returns the keys as bytes...
+        #     column_formats={"files": {"string": "bytes"}},
+        # )
+        # item = query_result.first_item
+        # files = {k.decode("utf-8"): v for k, v in item["files"].items()}
+        # art = MemFilesArtifact(files, metadata=json.loads(item["art_meta"]))
+        # wb_type = types.TypeRegistry.type_from_dict(json.loads(item["type"]))
+        # mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
+        # res = mapper.apply(json.loads(item["val"]))
+        # return res
 
-#     def __repr__(self) -> str:
-#         return f"<{self.__class__}({id(self)}) entity_name={self._entity_name} project_name={self._project_name} table_name={self._table_name} row_id={self._row_id} row_version={self._row_version} obj={self._obj} type={self._type}>"
+    def __repr__(self) -> str:
+        return f"<{self.__class__}({id(self)}) entity_name={self._entity_name} project_name={self._project_name} object_name={self._object_name} version_hash={self._version_hash} row_version={self._row_version} obj={self._obj} type={self._type}>"
 
-#     def with_extra(
-#         self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
-#     ) -> "TraceObjectRef":
-#         new_extra = self.extra
-#         if self.extra is None:
-#             new_extra = []
-#         else:
-#             new_extra = self.extra.copy()
-#         new_extra += extra
-#         return self.__class__(
-#             entity_name=self._entity_name,
-#             project_name=self._project_name,
-#             table_name=self._table_name,
-#             row_id=self._row_id,
-#             row_version=self._row_version,
-#             obj=obj,
-#             extra=new_extra,
-#         )
+    def with_extra(
+        self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
+    ) -> "TraceObjectRef":
+        new_extra = self.extra
+        if self.extra is None:
+            new_extra = []
+        else:
+            new_extra = self.extra.copy()
+        new_extra += extra
+        return self.__class__(
+            entity_name=self._entity_name,
+            project_name=self._project_name,
+            object_name=self._object_name,
+            version_hash=self._version_hash,
+            obj=obj,
+            extra=new_extra,
+        )
 
 
 @dataclasses.dataclass
@@ -379,7 +368,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
     # Helpers
 
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
-        raise NotImplementedError
+        # raise NotImplementedError
+        return False
         # return isinstance(ref, TraceObjectRef)
 
     def ref_uri(
@@ -394,22 +384,22 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
     # def save_object(self, obj: typing.Any, name: str, branch_name: str) -> TraceObjectRef:
     def save_object(self, obj: typing.Any, name: str, branch_name: str) -> ref_base.Ref:
-        raise NotImplementedError
-        # wb_type = types.type_of_with_refs(obj)
+        wb_type = types.type_of_with_refs(obj)
 
-        # art = MemFilesArtifact()
+        art = MemFilesArtifact()
 
-        # mapper = mappers_python.map_to_python(wb_type, art)
-        # val = mapper.apply(obj)
+        mapper = mappers_python.map_to_python(wb_type, art)
+        val = mapper.apply(obj)
 
-        # # type_val = storage.to_python(obj, ref_persister=save_custom_object)
-        # id_ = str(uuid.uuid4())
-        # encoded_path_contents = {}
-        # for k, v in art.path_contents.items():
-        #     if isinstance(v, str):
-        #         encoded_path_contents[k] = v.encode("utf-8")
-        #     else:
-        #         encoded_path_contents[k] = v
+        # type_val = storage.to_python(obj, ref_persister=save_custom_object)
+        id_ = str(uuid.uuid4())
+        encoded_path_contents = {}
+        for k, v in art.path_contents.items():
+            if isinstance(v, str):
+                encoded_path_contents[k] = v.encode("utf-8")
+            else:
+                encoded_path_contents[k] = v
+        # TODO: Make this work
         # self.client.insert(
         #     "objects",
         #     [
@@ -422,11 +412,11 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         #         )
         #     ],
         # )
-        # # TODO  we have have already computed type here, should construct
-        # # ref with it (type_val["_type"])
-        # ref = TraceObjectRef("entity", "project", "objects", id_, None, obj, None, None)
-        # ref_base._put_ref(obj, ref)
-        # return ref
+        # TODO  we have have already computed type here, should construct
+        # ref with it (type_val["_type"])
+        ref = TraceObjectRef("entity", "project", name, id_, obj, None, None)
+        ref_base._put_ref(obj, ref)
+        return ref
 
     def create_run(
         self,
@@ -449,15 +439,15 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             parent_id = None
 
         cur_time = datetime.datetime.now()
-        call=tsi.CallSchema(
+        call=tsi.PartialCallSchema(
             entity="test_entity",
             project="test_project",
             id=str(uuid.uuid4()),
             op_name=op_name,
             trace_id=trace_id,
-            start_time=cur_time,
+            start_time=cur_time.timestamp() * 1000,
             parent_id=parent_id,
-            inputs=json.dumps(refs_to_str(inputs)),
+            inputs=refs_to_str(inputs),
         )
         self.trace_server.call_create({"call": call})
         return RunSql(call.model_dump())
@@ -479,12 +469,15 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         output_refs: Sequence[Ref],
     ) -> None:
         # TODO process outputs into Refs
+        output = refs_to_str(output)
+        if not isinstance(output, dict):
+            output = {"_result": output}
         self.trace_server.call_update({
             "entity": "test_entity",
             "project": "test_project",
             "id": run.id,
             "fields": {
-                "outputs": json.dumps(refs_to_str(output))
+                "outputs":output
             },
         })
 
