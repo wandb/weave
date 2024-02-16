@@ -18,7 +18,7 @@ class CallSchema(BaseModel):
     id: str 
     trace_id: str
     parent_id: typing.Optional[str] = None
-    op_name: str
+    name: str
     status_code: StatusCodeEnum
     start_time: float
     end_time: typing.Optional[float] = None
@@ -34,7 +34,7 @@ class PartialCallSchema(BaseModel):
     project: str
     
     id: typing.Optional[str] = None
-    op_name: typing.Optional[str] = None
+    name: typing.Optional[str] = None
     trace_id: typing.Optional[str] = None
     status_code: typing.Optional[StatusCodeEnum] = None
     start_time: typing.Optional[float] = None
@@ -92,7 +92,7 @@ class CallDeleteRes(BaseModel): pass
 
 
 class _CallsFilter(BaseModel):
-    op_names: typing.Optional[typing.List[str]] = None
+    names: typing.Optional[typing.List[str]] = None
     input_object_version_refs: typing.Optional[typing.List[str]] = None
     output_object_version_refs: typing.Optional[typing.List[str]] = None
     parent_ids: typing.Optional[typing.List[str]] = None

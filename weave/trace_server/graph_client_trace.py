@@ -443,7 +443,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             entity="test_entity",
             project="test_project",
             id=str(uuid.uuid4()),
-            op_name=op_name,
+            name=op_name,
             trace_id=trace_id,
             start_time=cur_time.timestamp() * 1000,
             parent_id=parent_id,

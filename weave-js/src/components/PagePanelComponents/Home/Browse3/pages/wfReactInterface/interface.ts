@@ -85,11 +85,11 @@ export const spanToCallSchema = (
     callId: span.span_id ?? span.id,
     traceId: span.trace_id,
     parentId: span.parent_id,
-    spanName: (span.name ?? span.op_name).startsWith(WANDB_ARTIFACT_REF_PREFIX)
-      ? refUriToOpVersionKey((span.name ?? span.op_name)).opId
-      : (span.name ?? span.op_name),
-    opVersionRef: (span.name ?? span.op_name).startsWith(WANDB_ARTIFACT_REF_PREFIX)
-      ? (span.name ?? span.op_name)
+    spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? refUriToOpVersionKey(span.name).opId
+      : span.name,
+    opVersionRef: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? span.name
       : null,
     rawSpan: span,
     rawFeedback: span.feedback,
