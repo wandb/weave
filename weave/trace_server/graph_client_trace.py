@@ -14,7 +14,7 @@ from clickhouse_connect import get_client
 
 from collections.abc import Mapping
 
-from weave.graph_client_sql import MemFilesArtifact
+# from weave.graph_client_sql import MemFilesArtifact
 
 from ..graph_client import GraphClient
 from ..op_def import OpDef
@@ -50,74 +50,74 @@ quote_slashes = functools.partial(parse.quote, safe="")
 
 
 # # From Tim: This feels really heavy and I need to understand it better
-# class MemFilesArtifact(artifact_fs.FilesystemArtifact):
-#     RefClass = artifact_fs.FilesystemArtifactRef
+class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
+    RefClass = artifact_fs.FilesystemArtifactRef
 
-#     def __init__(self, path_contents=None, metadata=None):
-#         if path_contents is None:
-#             path_contents = {}
-#         self.path_contents = path_contents
-#         if metadata is None:
-#             metadata = {}
-#         self._metadata = metadata
-#         self.temp_read_dir = None
+    def __init__(self, path_contents=None, metadata=None):
+        if path_contents is None:
+            path_contents = {}
+        self.path_contents = path_contents
+        if metadata is None:
+            metadata = {}
+        self._metadata = metadata
+        self.temp_read_dir = None
 
-#     @contextlib.contextmanager
-#     def new_file(self, path, binary=False):
-#         if binary:
-#             f = io.BytesIO()
-#         else:
-#             f = io.StringIO()
-#         yield f
-#         self.path_contents[path] = f.getvalue()
-#         f.close()
+    @contextlib.contextmanager
+    def new_file(self, path, binary=False):
+        if binary:
+            f = io.BytesIO()
+        else:
+            f = io.StringIO()
+        yield f
+        self.path_contents[path] = f.getvalue()
+        f.close()
 
-#     @property
-#     def is_saved(self):
-#         return True
+    @property
+    def is_saved(self):
+        return True
 
-#     @property
-#     def version(self):
-#         return None
+    @property
+    def version(self):
+        return None
 
-#     @contextlib.contextmanager
-#     def open(self, path, binary=False):
-#         try:
-#             if binary:
-#                 f = io.BytesIO(self.path_contents[path])
-#             else:
-#                 f = io.StringIO(self.path_contents[path].decode("utf-8"))
-#         except KeyError:
-#             raise FileNotFoundError(path)
-#         yield f
-#         f.close()
+    @contextlib.contextmanager
+    def open(self, path, binary=False):
+        try:
+            if binary:
+                f = io.BytesIO(self.path_contents[path])
+            else:
+                f = io.StringIO(self.path_contents[path].decode("utf-8"))
+        except KeyError:
+            raise FileNotFoundError(path)
+        yield f
+        f.close()
 
-#     def path(self, name: str) -> str:
-#         if name not in self.path_contents:
-#             raise FileNotFoundError(name)
-#         import tempfile
+    def path(self, name: str) -> str:
+        if name not in self.path_contents:
+            raise FileNotFoundError(name)
+        import tempfile
 
-#         if self.temp_read_dir is None:
-#             self.temp_read_dir = tempfile.mkdtemp()
-#         path = os.path.join(self.temp_read_dir, name)
-#         with open(path, "wb") as f:
-#             f.write(self.path_contents[name])
-#         return path
+        if self.temp_read_dir is None:
+            self.temp_read_dir = tempfile.mkdtemp()
+        path = os.path.join(self.temp_read_dir, name)
+        with open(path, "wb") as f:
+            f.write(self.path_contents[name])
+        return path
 
-#     @property
-#     def uri_obj(self) -> uris.WeaveURI:
-#         # TODO: This is why wrong, but why do we need it here?
-#         # because OpDefType.load_instance tries to use it
-#         return TraceObjectURI(
-#             "name",
-#             "version",
-#             "entity",
-#             "project",
-#         )
+    @property
+    def uri_obj(self) -> uris.WeaveURI:
+        # TODO: This is why wrong, but why do we need it here?
+        # because OpDefType.load_instance tries to use it
+        return TraceObjectURI(
+            "name",
+            "version",
+            "entity",
+            "project",
+        )
 
-#     @property
-#     def metadata(self):
-#         return self._metadata
+    @property
+    def metadata(self):
+        return self._metadata
 
 
 def refs_to_str(val: typing.Any) -> typing.Any:
@@ -369,8 +369,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         # raise NotImplementedError
-        return False
-        # return isinstance(ref, TraceObjectRef)
+        # return False
+        return isinstance(ref, TraceObjectRef)
 
     def ref_uri(
         self, name: str, version: str, path: str
@@ -386,10 +386,10 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
     def save_object(self, obj: typing.Any, name: str, branch_name: str) -> ref_base.Ref:
         wb_type = types.type_of_with_refs(obj)
 
-        art = MemFilesArtifact()
+        art = MemTraceFilesArtifact()
 
         mapper = mappers_python.map_to_python(wb_type, art)
-        val = mapper.apply(obj)
+        # val = mapper.apply(obj)
 
         # type_val = storage.to_python(obj, ref_persister=save_custom_object)
         id_ = str(uuid.uuid4())

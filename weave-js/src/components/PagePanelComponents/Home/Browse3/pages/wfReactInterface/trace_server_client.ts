@@ -23,11 +23,30 @@ export type TraceCallSchema = {
     outputs?: Record<string, any>;
     summary?: Record<string, any>;
 }
-type CallQueryRes = {
+type TraceCallQueryRes = {
     calls: Array<TraceCallSchema>
 }
 
-export const fetchAllCalls = async (): Promise<CallQueryRes> => {
+type Trace_CallsFilter = {
+    names?: string[];
+    input_object_version_refs?: string[];
+    output_object_version_refs?: string[];
+    parent_ids?: string[];
+    trace_ids?: string[];
+    call_ids?: string[];
+    trace_roots_only?: boolean;
+}
+
+type TraceCallsQueryReq= {
+    entity: string,
+    project: string,
+    filter?: Trace_CallsFilter
+    // # TODO: Bring other fields from `trace_server_interface.py::TraceCallsQueryReq`
+}
+
+
+
+export const fetchAllCalls = async (req: TraceCallsQueryReq): Promise<TraceCallQueryRes> => {
     const url = "http://127.0.0.1:6345/calls/query"
     // eslint-disable-next-line wandb/no-unprefixed-urls
     const response = await fetch(url, {
@@ -35,10 +54,9 @@ export const fetchAllCalls = async (): Promise<CallQueryRes> => {
         headers: {
         'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            "entity": "test_entity",
-            "project": "test_project",
-        }),
+        body: JSON.stringify(req),
     });
-    return response.json();
+    const res = await response.json();
+    console.log("Retrieved trace calls: ", res.calls.length)
+    return res;
 }

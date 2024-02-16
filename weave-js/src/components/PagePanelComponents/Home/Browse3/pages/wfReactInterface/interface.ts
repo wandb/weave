@@ -213,10 +213,22 @@ export const useCalls = (
 ): Loadable<CallSchema[]> => {
   const [calls, setCalls] = useState<SpanWithFeedback[] | null>(null);
   useEffect(() => {
-    fetchAllCalls().then((data) => {
+    fetchAllCalls({
+      "entity": "test_entity",
+      "project": "test_project",
+      "filter": {
+        "names": filter.opVersionRefs,
+        "input_object_version_refs": filter.inputObjectVersionRefs,
+        "output_object_version_refs": filter.outputObjectVersionRefs,
+        "parent_ids": filter.parentIds,
+        "trace_ids": filter.traceId ? [filter.traceId] : undefined,
+        "call_ids": filter.callIds,
+        "trace_roots_only": filter.traceRootsOnly,
+      }
+  }).then((data) => {
       setCalls(data.calls.map(traceCallToSpanWithFeedback));
     })
-  }, []);
+  }, [filter.callIds, filter.inputObjectVersionRefs, filter.opVersionRefs, filter.outputObjectVersionRefs, filter.parentIds, filter.traceId, filter.traceRootsOnly]);
   // const calls = useRunsWithFeedback(
   //   {
   //     entityName: entity,
