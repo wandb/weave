@@ -1111,7 +1111,8 @@ class ObjectType(Type):
 
     def _to_dict(self) -> dict:
         d = self.class_to_dict()
-        d["type"] = self.__class__.__name__
+        # Commenting out during merge of master into clickhouse
+        # d["type"] = self.__class__.__name__
 
         if self._relocatable:
             d["_relocatable"] = True
@@ -1190,15 +1191,26 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     object_class_name = t["type"]
     type_class_name = object_class_name + "Type"
 
-    type_attr_types = {
-        k: TypeRegistry.type_from_dict(v)
-        for k, v in t.items()
-        if k == "_name" or (not k.startswith("_") and k != "type")
-    }
+    # Commenting out during merge of master into clickhouse
+    # type_attr_types = {
+    #     k: TypeRegistry.type_from_dict(v)
+    #     for k, v in t.items()
+    #     if k == "_name" or (not k.startswith("_") and k != "type")
+    # }
+
+    type_attr_types = {}
+    for k, v in t.items():
+        if k == "name":
+            type_attr_types["_name"] = TypeRegistry.type_from_dict(v)
+        elif k != "type" and not k.startswith("_"):
+            type_attr_types[k] = TypeRegistry.type_from_dict(v)
+
     import textwrap
 
     object_constructor_arg_names = [
-        k for k, t in type_attr_types.items() if t.name != "OpDef"
+        k if k != "_name" else "name"
+        for k, t in type_attr_types.items()
+        if t.name != "OpDef"
     ]
     # Sanitize
     for k in object_constructor_arg_names:

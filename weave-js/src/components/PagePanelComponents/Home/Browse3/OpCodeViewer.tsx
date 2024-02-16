@@ -6,14 +6,17 @@ import {Button} from '../../../Button';
 import {Browse2OpDefCode} from '../Browse2/Browse2OpDefCode';
 import {useWeaveflowCurrentRouteContext} from './context';
 import {OpCodeViewerDiff} from './OpCodeViewerDiff';
-import {WFOpVersion} from './pages/wfInterface/types';
+import {
+  opVersionKeyToRefUri,
+  OpVersionSchema,
+} from './pages/wfReactInterface/interface';
 import {SelectOpVersion} from './SelectOpVersion';
 
 type OpCodeViewerProps = {
   entity: string;
   project: string;
   opName: string;
-  opVersions: WFOpVersion[];
+  opVersions: OpVersionSchema[];
 
   // Op we are currently viewing, and will go back to if we exit diff mode.
   currentVersionURI: string;
@@ -63,7 +66,7 @@ export const OpCodeViewer = ({
     left: null,
     right: null,
   });
-  const uris = opVersions.map(opv => opv.refUri());
+  const uris = opVersions.map(opv => opVersionKeyToRefUri(opv));
 
   const onEnterDiff = () => {
     const i = uris.indexOf(currentVersionURI);
@@ -95,8 +98,8 @@ export const OpCodeViewer = ({
   };
 
   const openVersion = (uri: string) => {
-    const opVersion = opVersions.find(opv => opv.refUri() === uri);
-    const hash = opVersion?.commitHash()!;
+    const opVersion = opVersions.find(opv => opVersionKeyToRefUri(opv) === uri);
+    const hash = opVersion?.versionHash!;
     const url = routerContext.opVersionUIUrl(entity, project, opName, hash);
     history.push(url);
     onExitDiff();

@@ -26,7 +26,6 @@ from openai import OpenAI
 # highlight-next-line
 @weave.op()
 def extract_fruit(sentence: str) -> dict:
-    from openai import OpenAI
     client = OpenAI()
 
     response = client.chat.completions.create(

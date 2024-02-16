@@ -235,7 +235,7 @@ const browse3ContextGen = (
           if (isNaN(parseInt(part, 10))) {
             newArtifactRefExtra += '/key/' + part;
           } else {
-            newArtifactRefExtra += '/ndx/' + part;
+            newArtifactRefExtra += '/row/' + part;
           }
         });
         objRef.artifactRefExtra = newArtifactRefExtra;

@@ -11,18 +11,22 @@ import {useWeaveflowRouteContext} from '../../context';
 import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {opNiceName} from '../common/Links';
-import {WFCall} from '../wfInterface/types';
+import {CenteredAnimatedLoader} from '../common/Loader';
+import {CallSchema, useCalls} from '../wfReactInterface/interface';
 
 export const CallDetails: FC<{
-  wfCall: WFCall;
-}> = ({wfCall}) => {
+  call: CallSchema;
+}> = ({call}) => {
   const {inputs, output} = useMemo(
-    () => getDisplayInputsAndOutput(wfCall),
-    [wfCall]
+    () => getDisplayInputsAndOutput(call),
+    [call]
   );
+  const childCalls = useCalls(call.entity, call.project, {
+    parentIds: [call.callId],
+  });
   const {singularChildCalls, multipleChildCallOpRefs} = useMemo(
-    () => callGrouping(wfCall),
-    [wfCall]
+    () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
+    [childCalls.loading, childCalls.result]
   );
   const {baseRouter} = useWeaveflowRouteContext();
   const history = useHistory();
@@ -102,9 +106,9 @@ export const CallDetails: FC<{
               <IconButton
                 onClick={() => {
                   history.push(
-                    baseRouter.callsUIUrl(wfCall.entity(), wfCall.project(), {
+                    baseRouter.callsUIUrl(call.entity, call.project, {
                       opVersionRefs: [ref],
-                      parentId: wfCall.callID(),
+                      parentId: call.callId,
                     })
                   );
                 }}>
@@ -121,14 +125,15 @@ export const CallDetails: FC<{
                 ioColumnsOnly
                 initialFilter={{
                   opVersionRefs: [ref],
-                  parentId: wfCall.callID(),
+                  parentId: call.callId,
                 }}
-                entity={wfCall.entity()}
-                project={wfCall.project()}
+                entity={call.entity}
+                project={call.project}
               />
             </Box>
           </Box>
         ))}
+        {childCalls.loading && <CenteredAnimatedLoader />}
         {singularChildCalls.length > 0 && (
           <Box
             sx={{
@@ -141,13 +146,13 @@ export const CallDetails: FC<{
             )}
             {singularChildCalls.map(c => (
               <Box
-                key={c.callID()}
+                key={c.callId}
                 sx={{
                   flex: '0 0 auto',
                   p: 2,
                 }}>
                 <KeyValueTable
-                  headerTitle={opNiceName(c.spanName())}
+                  headerTitle={opNiceName(c.spanName)}
                   data={getDisplayInputsAndOutput(c)}
                 />
               </Box>
@@ -159,16 +164,16 @@ export const CallDetails: FC<{
   );
 };
 
-const getDisplayInputsAndOutput = (wfCall: WFCall) => {
-  const call = wfCall.rawCallSpan();
+const getDisplayInputsAndOutput = (call: CallSchema) => {
+  const span = call.rawSpan;
   const inputKeys =
-    call.inputs._keys ??
-    Object.entries(call.inputs)
+    span.inputs._keys ??
+    Object.entries(span.inputs)
       .filter(([k, c]) => c != null && !k.startsWith('_'))
       .map(([k, c]) => k);
-  const inputs = _.fromPairs(inputKeys.map(k => [k, call.inputs[k]]));
+  const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
 
-  const callOutput = call.output ?? {};
+  const callOutput = span.output ?? {};
   const outputKeys =
     callOutput._keys ??
     Object.entries(callOutput)
@@ -178,25 +183,23 @@ const getDisplayInputsAndOutput = (wfCall: WFCall) => {
   return {inputs, output};
 };
 
-const callGrouping = (wfCall: WFCall) => {
-  const sortedChildCalls = wfCall
-    .childCalls()
-    .sort(
-      (a, b) => a.rawCallSpan().start_time_ms - b.rawCallSpan().start_time_ms
-    );
+const callGrouping = (childCalls: CallSchema[]) => {
+  const sortedChildCalls = childCalls.sort(
+    (a, b) => a.rawSpan.start_time_ms - b.rawSpan.start_time_ms
+  );
 
   const childCallOpCounts: {[ref: string]: number} = {};
   sortedChildCalls.forEach(c => {
-    const opRef = c.opVersion()?.refUri();
-    if (opRef === undefined) {
+    const opRef = c.opVersionRef;
+    if (opRef == null) {
       return;
     }
     childCallOpCounts[opRef] = (childCallOpCounts[opRef] ?? 0) + 1;
   });
 
   const singularChildCalls = sortedChildCalls.filter(c => {
-    const opRef = c.opVersion()?.refUri();
-    if (opRef === undefined) {
+    const opRef = c.opVersionRef;
+    if (opRef == null) {
       return true;
     }
     return childCallOpCounts[opRef] === 1;

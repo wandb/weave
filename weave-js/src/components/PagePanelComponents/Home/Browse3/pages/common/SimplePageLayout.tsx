@@ -13,15 +13,18 @@ import React, {
   ReactNode,
   SyntheticEvent,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
 
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
+import {SplitPanel} from './SplitPanel';
 import {isPrimitive} from './util';
 
 type SimplePageLayoutContextType = {
   headerPrefix?: ReactNode;
+  headerSuffix?: ReactNode;
 };
 
 export const SimplePageLayoutContext =
@@ -40,15 +43,24 @@ export const SimplePageLayout: FC<{
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
 }> = props => {
+  const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
-  const [tabId, setTabId] = useState(0);
+
+  // We try to preserve the selected tab even if the set of tabs changes,
+  // falling back to the first tab.
+  const [tabId, setTabId] = useState(tabs[0].label);
+  const idxSelected = tabs.findIndex(t => t.label === tabId);
+  const tabValue = idxSelected !== -1 ? idxSelected : 0;
   const handleTabChange = (event: SyntheticEvent, newValue: number) => {
-    setTabId(newValue);
+    setTabId(tabs[newValue].label);
   };
-  const tabContent = useMemo(
-    () => props.tabs[tabId].content,
-    [props.tabs, tabId]
-  );
+  useEffect(() => {
+    if (idxSelected === -1) {
+      setTabId(tabs[0].label);
+    }
+  }, [tabs, idxSelected]);
+  const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
+
   return (
     <Box
       sx={{
@@ -104,15 +116,16 @@ export const SimplePageLayout: FC<{
             }}>
             {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
           </Box>
+          {simplePageLayoutContextValue.headerSuffix}
         </Box>
-        {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
+        {(!props.hideTabsIfSingle || tabs.length > 1) && (
           <Tabs
             variant="scrollable"
             scrollButtons="auto"
-            value={tabId}
+            value={tabValue}
             onChange={handleTabChange}>
-            {props.tabs.map((tab, i) => (
-              <Tab key={i} label={tab.label} />
+            {tabs.map(tab => (
+              <Tab key={tab.label} label={tab.label} />
             ))}
           </Tabs>
         )}
@@ -161,19 +174,30 @@ export const SimplePageLayoutWithHeader: FC<{
     label: string;
     onClick: () => void;
   }>;
+  headerExtra?: ReactNode;
   headerContent: ReactNode;
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
+  isSidebarOpen?: boolean;
 }> = props => {
+  const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
-  const [tabId, setTabId] = useState(0);
+
+  // We try to preserve the selected tab even if the set of tabs changes,
+  // falling back to the first tab.
+  const [tabId, setTabId] = useState(tabs[0].label);
+  const idxSelected = tabs.findIndex(t => t.label === tabId);
+  const tabValue = idxSelected !== -1 ? idxSelected : 0;
   const handleTabChange = (event: SyntheticEvent, newValue: number) => {
-    setTabId(newValue);
+    setTabId(tabs[newValue].label);
   };
-  const tabContent = useMemo(
-    () => props.tabs[tabId].content,
-    [props.tabs, tabId]
-  );
+  useEffect(() => {
+    if (idxSelected === -1) {
+      setTabId(tabs[0].label);
+    }
+  }, [tabs, idxSelected]);
+  const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
+
   return (
     <Box
       sx={{
@@ -189,7 +213,6 @@ export const SimplePageLayoutWithHeader: FC<{
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'flex-end',
-          gap: 1,
           pl: 2,
           pr: 2,
           // merge line
@@ -220,75 +243,64 @@ export const SimplePageLayoutWithHeader: FC<{
           }}>
           {props.menuItems && <ActionMenu menuItems={props.menuItems} />}
         </Box>
+        {props.headerExtra}
+        {simplePageLayoutContextValue.headerSuffix}
       </Box>
-      <Box
-        sx={{
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'row',
-          flex: '1 1 auto',
-          height: '100%',
-          maxHeight: '100%',
-        }}>
-        {props.leftSidebar && (
-          <Box
-            sx={{
-              width: '30%',
-              flex: '0 0 30%',
-              overflow: 'hidden',
-              height: '100%',
-              maxHeight: '100%',
-              borderRight: '1px solid #e0e0e0',
-            }}>
-            {props.leftSidebar}
-          </Box>
-        )}
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            flexGrow: 1,
-            height: '100%',
-            overflow: 'hidden',
-          }}>
-          <Box
-            sx={{
-              maxHeight: '50%',
-              flex: '0 0 auto',
-              width: '100%',
-              overflow: 'auto',
-              borderBottom: '1px solid #e0e0e0',
-              p: 1,
-            }}>
-            {props.headerContent}
-          </Box>
-          {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
-            <Tabs
-              style={{
-                borderBottom: '1px solid #e0e0e0',
-              }}
-              variant="scrollable"
-              // These scroll buttons are not working
-              scrollButtons={false}
-              value={tabId}
-              onChange={handleTabChange}>
-              {props.tabs.map((tab, i) => (
-                <Tab key={i} label={tab.label} />
-              ))}
-            </Tabs>
-          )}
-
-          <Box
-            sx={{
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              flex: '1 1 auto',
-            }}>
-            <ErrorBoundary key={tabId}>{tabContent}</ErrorBoundary>
-          </Box>
-        </Box>
-      </Box>
+      <div style={{marginLeft: 4, flex: '1 1 auto', overflow: 'hidden'}}>
+        <SplitPanel
+          minWidth={150}
+          defaultWidth={200}
+          maxWidth="50%"
+          isDrawerOpen={props.isSidebarOpen ?? false}
+          drawer={props.leftSidebar}
+          main={
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                flexGrow: 1,
+                height: '100%',
+                overflow: 'hidden',
+              }}>
+              <Box
+                sx={{
+                  maxHeight: '50%',
+                  flex: '0 0 auto',
+                  width: '100%',
+                  overflow: 'auto',
+                  borderBottom: '1px solid #e0e0e0',
+                  p: 1,
+                }}>
+                {props.headerContent}
+              </Box>
+              {(!props.hideTabsIfSingle || tabs.length > 1) && (
+                <Tabs
+                  style={{
+                    borderBottom: '1px solid #e0e0e0',
+                  }}
+                  variant="scrollable"
+                  // These scroll buttons are not working
+                  scrollButtons={false}
+                  value={tabValue}
+                  onChange={handleTabChange}>
+                  {tabs.map(tab => (
+                    <Tab key={tab.label} label={tab.label} />
+                  ))}
+                </Tabs>
+              )}
+              <Box
+                sx={{
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  flex: '1 1 auto',
+                }}>
+                <ErrorBoundary key={tabId}>{tabContent}</ErrorBoundary>
+              </Box>
+            </Box>
+          }
+        />
+      </div>
     </Box>
   );
 };
@@ -312,6 +324,7 @@ const ActionMenu: FC<{
     <Box
       sx={{
         height: '47px',
+        flex: '0 0 auto',
       }}>
       <IconButton
         aria-label="more"

@@ -48,8 +48,14 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
             if prop_name == "_name":
                 prop_name = "name"
             if prop_serializer is not None:
-                v = prop_serializer.apply(getattr(obj, prop_name))
-                result[prop_name] = v
+                obj_val = getattr(obj, prop_name, None)
+                if obj_val is None:
+                    # Shortcut if there is a None here. In boards there are some cases where
+                    # we have incorrect types that are missing optional designation. Fixes
+                    # plotboard.cy.ts
+                    result[prop_name] = None
+                else:
+                    result[prop_name] = prop_serializer.apply(obj_val)
         return result
 
 
@@ -69,7 +75,17 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         for k, serializer in self._property_serializers.items():
             if serializer.type != OpDefType() and k in constructor_sig.parameters:
                 obj_val = obj.get(k)
-                result[k] = serializer.apply(obj_val)
+
+                # Commenting out during merge into clickhouse
+                # result[k] = serializer.apply(obj_val)
+
+                if obj_val is None:
+                    # Shortcut if there is a None here. In boards there are some cases where
+                    # we have incorrect types that are missing optional designation. Fixes
+                    # plotboard.cy.ts
+                    result[k] = None
+                else:
+                    result[k] = serializer.apply(obj_val)
 
         for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):

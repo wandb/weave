@@ -47,6 +47,10 @@ class RefNodeMethods:
         other_ref = storage._get_ref(other)
         return str(self) == str(other_ref)
 
+    @op()
+    def toUri(self) -> str:
+        return str(self)
+
 
 @op(
     input_type={

@@ -25,11 +25,13 @@ labels = [
 ]
 
 weave.init('intro-example')
+# highlight-next-line
 dataset = weaveflow.Dataset([
     {'id': '0', 'sentence': sentences[0], 'extracted': labels[0]},
     {'id': '1', 'sentence': sentences[1], 'extracted': labels[1]},
     {'id': '2', 'sentence': sentences[2], 'extracted': labels[2]}
 ])
+# highlight-next-line
 dataset_ref = weave.publish(dataset, 'example_labels')
 ```
 
@@ -59,14 +61,18 @@ Like `Dataset`s, Weave automatically captures when they are used and update the 
 
 ```python
 from weave.weaveflow import Model
+import weave
 
 @weave.type()
-class GrammarModel(Model):
+# highlight-next-line
+class ExtractFruitsModel(Model):
     system_message: str
-    model_name: str = "gpt-3.5-turbo"
+    model_name: str = "gpt-3.5-turbo-1106"
 
+    # highlight-next-line
     @weave.op()
-    async def predict(self, sentence: str) -> str:
+    # highlight-next-line
+    async def predict(self, sentence: str) -> dict:
         from openai import OpenAI
         client = OpenAI()
         response = client.chat.completions.create(
@@ -77,14 +83,15 @@ class GrammarModel(Model):
                     "content": self.system_message
                 },
                 {
-                "role": "user",
-                "content": sentence
+                    "role": "user",
+                    "content": sentence
                 }
             ],
             temperature=0.7,
-            max_tokens=64
+            response_format={ "type": "json_object" }
         )
-        return response.choices[0].message.content
+        extracted = response.choices[0].message.content
+        return json.loads(extracted)
 ```
 
 You can instantiate `@weave.type()` objects like this.
@@ -92,7 +99,8 @@ You can instantiate `@weave.type()` objects like this.
 ```python
 model = ExtractFruitsModel("You will be provided with unstructured data, and your task is to parse it one JSON dictionary with fruit, color and flavor as keys.")
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
-await model.predict(sentence)
+print(asyncio.run(model.predict(sentence))) 
+# note: you can also call `await model.predict(sentence)` within async functions
 ```
 
 :::note
@@ -109,6 +117,7 @@ Here, we'll add two scoring functions to test the extracted data matches our lab
 
 ```python
 from weave.weaveflow import evaluate
+import weave
 
 @weave.op()
 def color_score(example: dict, prediction: dict) -> dict:
@@ -124,29 +133,36 @@ def example_to_model_input(example: dict) -> str:
     # example is a row from the Dataset, the output of this function should be the input to model.predict.
     return example["sentence"]
 
+# highlight-next-line
 evaluation = evaluate.Evaluation(
+    # highlight-next-line
     dataset, scores=[color_score, fruit_name_score], example_to_model_input=example_to_model_input
+# highlight-next-line
 )
-await evaluation.evaluate(model)
+print(asyncio.run(evaluation.evaluate(model)))
 ```
 
 ## Pulling it all together
 
 ```python
+# highlight-next-line
 import weave
 import asyncio
+# highlight-next-line
 from weave.weaveflow import Model, Evaluation, Dataset
 import json
 
 # We create a model class with one predict function. 
 # All inputs, predictions and parameters are automatically captured for easy inspection.
 @weave.type()
+# highlight-next-line
 class ExtractFruitsModel(Model):
     system_message: str
     model_name: str = "gpt-3.5-turbo-1106"
 
     @weave.op()
-    async def predict(self, sentence: str) -> str:
+    # highlight-next-line
+    async def predict(self, sentence: str) -> dict:
         from openai import OpenAI
         client = OpenAI()
         response = client.chat.completions.create(
@@ -182,11 +198,13 @@ labels = [
 ]
 # Here, we track a Dataset in weave. This makes it easy to 
 # automatically score a given model and compare outputs from different configurations.
+# highlight-next-line
 dataset = Dataset([
     {'id': '0', 'sentence': sentences[0], 'extracted': labels[0]},
     {'id': '1', 'sentence': sentences[1], 'extracted': labels[1]},
     {'id': '2', 'sentence': sentences[2], 'extracted': labels[2]}
 ])
+# highlight-next-line
 dataset_ref = weave.publish(dataset, 'example_labels')
 # If you have already published the Dataset, you can run:
 # dataset = weave.ref('example_labels').get()
@@ -208,8 +226,11 @@ def example_to_model_input(example: dict) -> str:
 
 # Finally, we run an evaluation of this model. 
 # This will generate a prediction for each input example, and then score it with each scoring function.
+# highlight-next-line
 evaluation = Evaluation(
+    # highlight-next-line
     dataset, scores=[color_score, fruit_name_score], example_to_model_input=example_to_model_input
+# highlight-next-line
 )
 print(asyncio.run(evaluation.evaluate(model)))
 # if you're in a Jupyter Notebook, run:

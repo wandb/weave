@@ -5,7 +5,10 @@ import styled from 'styled-components';
 
 import {Pill} from '../../../Tag';
 import {Timestamp} from '../../../Timestamp';
-import {WFOpVersion} from './pages/wfInterface/types';
+import {
+  opVersionKeyToRefUri,
+  OpVersionSchema,
+} from './pages/wfReactInterface/interface';
 
 const Option = styled.li`
   display: flex;
@@ -25,7 +28,7 @@ export const OptionTimestamp = styled.div`
 OptionTimestamp.displayName = 'S.OptionTimestamp';
 
 type SelectOpVersionProps = {
-  opVersions: WFOpVersion[];
+  opVersions: OpVersionSchema[];
 
   valueURI: string;
 
@@ -42,10 +45,10 @@ export const SelectOpVersion = ({
   onChange,
 }: SelectOpVersionProps) => {
   const options = opVersions.map(opv => ({
-    id: opv.refUri(),
-    label: 'v' + opv.versionIndex(),
-    created: opv.createdAtMs(),
-    isCurrent: opv.refUri() === currentVersionURI,
+    id: opVersionKeyToRefUri(opv),
+    label: 'v' + opv.versionIndex,
+    created: opv.createdAtMs,
+    isCurrent: opVersionKeyToRefUri(opv) === currentVersionURI,
   }));
   const value = options.find(o => o.id === valueURI);
   return (
