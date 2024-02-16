@@ -438,14 +438,13 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             trace_id = str(uuid.uuid4())
             parent_id = None
 
-        cur_time = datetime.datetime.now()
         call=tsi.PartialCallSchema(
             entity="test_entity",
             project="test_project",
             id=str(uuid.uuid4()),
             name=op_name,
             trace_id=trace_id,
-            start_time_s=cur_time.timestamp(),
+            start_time_s=time.time(),
             parent_id=parent_id,
             inputs=refs_to_str(inputs),
         )
@@ -458,6 +457,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             "project": "test_project",
             "id": run.id,
             "fields": {
+                "end_time_s": time.time(),
                 "exception": str(exception),
             },
         })
@@ -477,6 +477,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             "project": "test_project",
             "id": run.id,
             "fields": {
+                "end_time_s": time.time(),
                 "outputs":output
             },
         })

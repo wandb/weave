@@ -187,7 +187,7 @@ const traceCallToSpanWithFeedback = (call: PartialCallSchema): SpanWithFeedback 
   // All these are weird conversions from the new data model to the way the UI expects it
   const latency_s = (call.end_time_s && call.start_time_s) ? (call.end_time_s - call.start_time_s) : 0;
   const summary =  call.summary ?? {}
-  summary.latency_s = latency_s / 1000
+  summary.latency_s = latency_s
   let status_code: string = call.status_code ?? "UNSET"
   if (status_code === "OK") 
     {status_code = "SUCCESS"}
