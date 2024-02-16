@@ -16,5 +16,3 @@ from .evaluate import *
 from .openai import *
 from .anyscale import *
 from .huggingface import *
-
-from .faiss import *
