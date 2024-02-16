@@ -32,8 +32,8 @@ class CallSchema(BaseModel):
 class PartialCallSchema(BaseModel): 
     entity: str
     project: str
-    id: str 
-
+    
+    id: typing.Optional[str] = None
     op_name: typing.Optional[str] = None
     trace_id: typing.Optional[str] = None
     status_code: typing.Optional[StatusCodeEnum] = None
