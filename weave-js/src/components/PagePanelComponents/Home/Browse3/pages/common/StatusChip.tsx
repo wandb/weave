@@ -8,7 +8,7 @@ import React from 'react';
 
 import {Tooltip} from '../../../../../Tooltip';
 
-export const CALL_STATUS = ['OK', 'DESCENDANT_ERROR', 'ERROR'];
+export const CALL_STATUS = ['SUCCESS', 'DESCENDANT_ERROR', 'ERROR'];
 export type CallStatusType = (typeof CALL_STATUS)[number];
 
 type StatusChipProps = {
@@ -23,7 +23,7 @@ type CallStatusInfo = {
   tooltip: string;
 };
 const STATUS_INFO: Record<CallStatusType, CallStatusInfo> = {
-  OK: {
+  SUCCESS: {
     icon: 'checkmark-circle',
     label: 'Finished',
     color: 'green',
