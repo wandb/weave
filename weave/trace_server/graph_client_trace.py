@@ -445,7 +445,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             id=str(uuid.uuid4()),
             name=op_name,
             trace_id=trace_id,
-            start_time=cur_time.timestamp() * 1000,
+            start_time_s=cur_time.timestamp(),
             parent_id=parent_id,
             inputs=refs_to_str(inputs),
         )

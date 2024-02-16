@@ -20,8 +20,8 @@ class CallSchema(BaseModel):
     parent_id: typing.Optional[str] = None
     name: str
     status_code: StatusCodeEnum
-    start_time: float
-    end_time: typing.Optional[float] = None
+    start_time_s: float
+    end_time_s: typing.Optional[float] = None
     attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
     inputs: typing.Optional[typing.Dict[str, typing.Any]] = None
     outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -32,15 +32,15 @@ class CallSchema(BaseModel):
 class PartialCallSchema(BaseModel): 
     entity: str
     project: str
+    id: str
     
-    id: typing.Optional[str] = None
     name: typing.Optional[str] = None
     trace_id: typing.Optional[str] = None
     status_code: typing.Optional[StatusCodeEnum] = None
-    start_time: typing.Optional[float] = None
+    start_time_s: typing.Optional[float] = None
 
     parent_id: typing.Optional[str] = None
-    end_time: typing.Optional[float] = None
+    end_time_s: typing.Optional[float] = None
     attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
     inputs: typing.Optional[typing.Dict[str, typing.Any]] = None
     outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -67,7 +67,7 @@ class CallReadRes(BaseModel):
 
 class _CallUpdateFields(BaseModel):
     status_code: typing.Optional[StatusCodeEnum] = None
-    end_time: typing.Optional[float] = None
+    end_time_s: typing.Optional[float] = None
     outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
     exception: typing.Optional[str] = None

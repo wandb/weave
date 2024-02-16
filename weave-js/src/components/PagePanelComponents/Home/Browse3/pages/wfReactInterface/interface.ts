@@ -1,4 +1,4 @@
-import _ from 'lodash';
+import _, { sum } from 'lodash';
 import LRUCache from 'lru-cache';
 import {useEffect, useMemo, useState} from 'react';
 
@@ -39,7 +39,7 @@ import {
   useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
-import { fetchAllCalls } from './trace_server_client';
+import { fetchAllCalls, PartialCallSchema } from './trace_server_client';
 
 export const OP_CATEGORIES = [
   'train',
@@ -82,9 +82,9 @@ export const spanToCallSchema = (
   return {
     entity,
     project,
-    callId: span.span_id ?? span.id,
+    callId: span.span_id,
     traceId: span.trace_id,
-    parentId: span.parent_id,
+    parentId: span.parent_id ?? null,
     spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
       ? refUriToOpVersionKey(span.name).opId
       : span.name,
@@ -179,6 +179,30 @@ export const callsNode = (
     }
   );
 };
+
+const traceCallToSpanWithFeedback = (call: PartialCallSchema): SpanWithFeedback => {
+  // This is still hacky. Need to:
+  // 1. Have better output types so these don't look like nulls.
+  const latency_s = (call.end_time_s && call.start_time_s) ? (call.end_time_s - call.start_time_s) : 0;
+  const summary =  call.summary ?? {}
+  summary.latency_s = latency_s / 1000
+  return {
+    name: call.name ?? "UNKNOWN",
+    inputs: call.inputs ?? {},
+    output: call.outputs ?? {},
+    status_code: call.status_code ?? "UNSET",
+    exception: call.exception,
+    attributes: call.attributes ?? {},
+    summary: summary as any,
+    span_id: call.id,
+    trace_id: call.trace_id ?? "UNKNOWN",
+    parent_id: call.parent_id,
+    timestamp: (call.start_time_s ?? 0) * 1000,
+    start_time_ms: (call.start_time_s ?? 0) * 1000,
+    end_time_ms: (call.end_time_s ?? 0) * 1000,
+  }
+}
+
 export const useCalls = (
   entity: string,
   project: string,
@@ -187,7 +211,7 @@ export const useCalls = (
   const [calls, setCalls] = useState<SpanWithFeedback[] | null>(null);
   useEffect(() => {
     fetchAllCalls().then((data) => {
-      setCalls(data.calls);
+      setCalls(data.calls.map(traceCallToSpanWithFeedback));
     })
   }, []);
   // const calls = useRunsWithFeedback(
