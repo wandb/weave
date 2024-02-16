@@ -13,43 +13,70 @@ class StatusCodeEnum(str, Enum):
 
 
 class CallSchema(BaseModel):
+    # Identity Fields:
     entity: str
     project: str
     id: str 
-    trace_id: str
-    parent_id: typing.Optional[str] = None
+
+    # Name of the calling function (op)
     name: str
+
+    # Trace Context Fields
+
+    ## Trace ID
+    trace_id: str
+    ## Parent ID is optional because the call may be a root
+    parent_id: typing.Optional[str] = None
+
+    # Status Fields
+
+    ## Status Code -> UNSET, OK, ERROR
     status_code: StatusCodeEnum
+    ## Start time is required
     start_time_s: float
+    ## End time is optional because the call may not have finished yet
     end_time_s: typing.Optional[float] = None
+    ## Exception is optional because the call may not have errored
+    exception: typing.Optional[str] = None
+
+    # Optional fields:
+
+    ## Attributes: properties of the call
     attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    ## Inputs and Outputs
     inputs: typing.Optional[typing.Dict[str, typing.Any]] = None
     outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+    ## Summary: a summary of the call
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
-    exception: typing.Optional[str] = None
+
 
 # YIKES! Why can't this just inherit from CallSchema and override the fields?
-class PartialCallSchema(BaseModel): 
+# These should be EXACTLY the same as CallSchema, but with some fields optional
+class PartialCallForCreationSchema(BaseModel): 
     entity: str
     project: str
-    id: str
-    
+    id: typing.Optional[str] = None
+
     name: typing.Optional[str] = None
+
     trace_id: typing.Optional[str] = None
+    parent_id: typing.Optional[str] = None
+    
     status_code: typing.Optional[StatusCodeEnum] = None
     start_time_s: typing.Optional[float] = None
-
-    parent_id: typing.Optional[str] = None
     end_time_s: typing.Optional[float] = None
+    exception: typing.Optional[str] = None
+
     attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
     inputs: typing.Optional[typing.Dict[str, typing.Any]] = None
     outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
-    exception: typing.Optional[str] = None
 
 
 class CallCreateReq(BaseModel):
-    call: PartialCallSchema
+    call: PartialCallForCreationSchema
 
 class CallCreateRes(BaseModel): 
     entity: str
@@ -63,7 +90,7 @@ class CallReadReq(BaseModel):
     columns: typing.Optional[typing.List[str]] = None
 
 class CallReadRes(BaseModel):
-    call: PartialCallSchema
+    call: CallSchema
 
 class _CallUpdateFields(BaseModel):
     status_code: typing.Optional[StatusCodeEnum] = None
@@ -116,7 +143,7 @@ class CallsQueryReq(BaseModel):
     limit: typing.Optional[int] = None
 
 class CallQueryRes(BaseModel): 
-    calls: typing.List[PartialCallSchema]
+    calls: typing.List[CallSchema]
 
 class OpCreateReq(BaseModel): pass
 class OpCreateRes(BaseModel): pass

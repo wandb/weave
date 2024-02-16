@@ -39,7 +39,7 @@ import {
   useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
-import { fetchAllCalls, PartialCallSchema } from './trace_server_client';
+import { fetchAllCalls, TraceCallSchema } from './trace_server_client';
 
 export const OP_CATEGORIES = [
   'train',
@@ -180,20 +180,17 @@ export const callsNode = (
   );
 };
 
-const traceCallToSpanWithFeedback = (call: PartialCallSchema): SpanWithFeedback => {
-  // This is still hacky. Need to:
-  // 1. Have better output types so these don't look like nulls.
-
+const traceCallToSpanWithFeedback = (call: TraceCallSchema): SpanWithFeedback => {
   // All these are weird conversions from the new data model to the way the UI expects it
-  const latency_s = (call.end_time_s && call.start_time_s) ? (call.end_time_s - call.start_time_s) : 0;
+  const latency_s = call.end_time_s ? (call.end_time_s - call.start_time_s) : 0;
   const summary =  call.summary ?? {}
   summary.latency_s = latency_s
-  let status_code: string = call.status_code ?? "UNSET"
+  let status_code: string = call.status_code
   if (status_code === "OK") 
     {status_code = "SUCCESS"}
-
+  const start_time_ms =  call.start_time_s * 1000
   return {
-    name: call.name ?? "UNKNOWN",
+    name: call.name,
     inputs: call.inputs ?? {},
     output: call.outputs ?? {},
     status_code: status_code,
@@ -201,10 +198,10 @@ const traceCallToSpanWithFeedback = (call: PartialCallSchema): SpanWithFeedback 
     attributes: call.attributes ?? {},
     summary: summary as any,
     span_id: call.id,
-    trace_id: call.trace_id ?? "UNKNOWN",
+    trace_id: call.trace_id,
     parent_id: call.parent_id,
-    timestamp: (call.start_time_s ?? 0) * 1000,
-    start_time_ms: (call.start_time_s ?? 0) * 1000,
+    timestamp: start_time_ms,
+    start_time_ms: start_time_ms,
     end_time_ms: (call.end_time_s ?? 0) * 1000,
   }
 }

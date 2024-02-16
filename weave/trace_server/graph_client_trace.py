@@ -438,7 +438,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             trace_id = str(uuid.uuid4())
             parent_id = None
 
-        call=tsi.PartialCallSchema(
+        call=tsi.PartialCallForCreationSchema(
             entity="test_entity",
             project="test_project",
             id=str(uuid.uuid4()),

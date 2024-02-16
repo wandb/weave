@@ -2,26 +2,29 @@ import fetch from 'isomorphic-unfetch';
 
 type StatusCodeEnum = "OK" | "ERROR" | "UNSET"
 
-export type PartialCallSchema = {
+// This should match `trace_server_interface.py::CallSchema` exactly!!
+export type TraceCallSchema = {
     entity: string;
     project: string;
     id: string;
     
-    name?: string;
-    trace_id?: string;
-    status_code?: StatusCodeEnum;
-    start_time_s?: number;
+    name: string;
 
+    trace_id: string;
     parent_id?: string;
+    
+    status_code: StatusCodeEnum;
+    start_time_s: number;
     end_time_s?: number;
+    exception?: string;
+    
     attributes?: Record<string, any>;
     inputs?: Record<string, any>;
     outputs?: Record<string, any>;
     summary?: Record<string, any>;
-    exception?: string;
 }
 type CallQueryRes = {
-    calls: Array<PartialCallSchema>
+    calls: Array<TraceCallSchema>
 }
 
 export const fetchAllCalls = async (): Promise<CallQueryRes> => {
