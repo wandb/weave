@@ -2,17 +2,16 @@ import asyncio
 import pytest
 import weave
 from weave import ref_base
-from weave import weaveflow
+from weave.flow import Dataset, Model, Evaluation
 
 
 def test_evaluate_basic():
     with weave.local_client():
-        dataset = weaveflow.Dataset(
-            [{"input": "1 + 2", "output": "3"}, {"input": "2**4", "output": "16"}]
+        dataset = Dataset(
+            rows=[{"input": "1 + 2", "output": "3"}, {"input": "2**4", "output": "16"}]
         )
 
-        @weave.type()
-        class EvalModel:
+        class EvalModel(Model):
             @weave.op()
             async def predict(self, input: str) -> str:
                 return eval(input)
@@ -25,8 +24,10 @@ def test_evaluate_basic():
         def example_to_model_input(example):
             return example["input"]
 
-        evaluation = weaveflow.evaluate.Evaluation(
-            dataset, [score], example_to_model_input=example_to_model_input
+        evaluation = Evaluation(
+            dataset=dataset,
+            scores=[score],
+            example_to_model_input=example_to_model_input,
         )
         model = EvalModel()
         result = asyncio.run(evaluation.evaluate(model))
@@ -43,7 +44,7 @@ def test_evaluate_basic():
             "dataset",
             "atr",
             "rows",
-            "row",
+            "ndx",
             "0",
         ]
         assert example_to_model_input0_run_example.get() == {
@@ -59,7 +60,7 @@ def test_evaluate_basic():
             "dataset",
             "atr",
             "rows",
-            "row",
+            "ndx",
             "0",
             "key",
             "input",
@@ -74,7 +75,7 @@ def test_evaluate_basic():
             "dataset",
             "atr",
             "rows",
-            "row",
+            "ndx",
             "1",
             "key",
             "input",
