@@ -22,7 +22,6 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {UnderConstruction} from './common/UnderConstruction';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
@@ -289,35 +288,6 @@ const ObjectVersionPageInner: React.FC<{
         //     />
         //   ),
         // },
-
-        {
-          label: 'Boards',
-          content: (
-            <UnderConstruction
-              title="Boards"
-              message={
-                <>
-                  This will show a listing of all boards that reference this
-                  object.
-                </>
-              }
-            />
-          ),
-        },
-        {
-          label: 'DAG',
-          content: (
-            <UnderConstruction
-              title="Record DAG"
-              message={
-                <>
-                  This page will show a "Record" DAG of Objects and Calls
-                  centered at this particular Object Version.
-                </>
-              }
-            />
-          ),
-        },
       ]}
     />
   );
