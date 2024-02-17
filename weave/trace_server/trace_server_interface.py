@@ -79,12 +79,6 @@ class CallCreateReq(BaseModel):
     call: PartialCallForCreationSchema
 
 class CallCreateRes(BaseModel): 
-    entity: str
-    project: str
-    id: str
-
-
-class CallCreateAsyncRes(BaseModel): 
     pass
     # In a buffered/async world, we can't return anything here.
     # entity: str
@@ -114,12 +108,6 @@ class CallUpdateReq(BaseModel):
     fields: _CallUpdateFields
 
 class CallUpdateRes(BaseModel): 
-    entity: str
-    project: str
-    id: str
-
-
-class CallUpdateAsyncRes(BaseModel): 
     pass
     # In a buffered/async world, we can't return anything here.
     # entity: str
