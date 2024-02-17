@@ -83,6 +83,14 @@ class CallCreateRes(BaseModel):
     project: str
     id: str
 
+
+class CallCreateAsyncRes(BaseModel): 
+    pass
+    # In a buffered/async world, we can't return anything here.
+    # entity: str
+    # project: str
+    # id: str
+
 class CallReadReq(BaseModel):
     entity: str
     project: str
@@ -109,6 +117,14 @@ class CallUpdateRes(BaseModel):
     entity: str
     project: str
     id: str
+
+
+class CallUpdateAsyncRes(BaseModel): 
+    pass
+    # In a buffered/async world, we can't return anything here.
+    # entity: str
+    # project: str
+    # id: str
 
 class CallDeleteReq(BaseModel): 
     entity: str
