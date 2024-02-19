@@ -63,9 +63,13 @@ def type(
         type_vars: dict[str, types.Type] = {}
         static_property_types: dict[str, types.Type] = {}
         for field in fields:
+            # Name fixup for ObjectType, see weave_types.ObjectType
+            field_name = field.name
+            if field_name == "name":
+                field_name = "_name"
             if isinstance(field.type, typing.TypeVar):
                 # This is a Python type variable
-                type_vars[field.name] = types.Any()
+                type_vars[field_name] = types.Any()
             else:
                 try:
                     weave_type = infer_types.python_type_to_type(field.type)
@@ -82,9 +86,9 @@ def type(
 
                 if types.type_is_variable(weave_type):
                     # this is a Weave type with a type variable in it
-                    type_vars[field.name] = weave_type
+                    type_vars[field_name] = weave_type
                 else:
-                    static_property_types[field.name] = weave_type
+                    static_property_types[field_name] = weave_type
 
         relocatable = not context_state.get_loading_built_ins()
 

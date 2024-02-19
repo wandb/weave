@@ -363,6 +363,9 @@ class Type(metaclass=_TypeSubclassWatcher):
         for prop_name in self.type_vars:
             if not hasattr(next_type, prop_name):
                 return False
+            # Name fixup for ObjectType, see ObjectType comments.
+            if prop_name == "name":
+                prop_name = "_name"
             if not getattr(self, prop_name).assign_type(getattr(next_type, prop_name)):
                 return False
         return True
