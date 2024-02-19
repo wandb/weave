@@ -1,4 +1,3 @@
-
 # Super cheap way to get buffering - not the best
 import threading
 import time
@@ -19,7 +18,7 @@ class InMemFlushableBuffer:
     def insert(self, row: typing.List):
         with self._lock:
             self.buffer.append(row)
-    
+
     def flush(self):
         to_flush = []
         with self._lock:
@@ -32,7 +31,7 @@ class InMemAutoFlushingBuffer(InMemFlushableBuffer):
     max_buffer_size: int
     max_age_s: int
 
-    def __init__(self, max_buffer_size: int, max_age_s:int, on_flush: typing.Callable):
+    def __init__(self, max_buffer_size: int, max_age_s: int, on_flush: typing.Callable):
         super().__init__(on_flush)
         self.max_buffer_size = max_buffer_size
         self.max_age_s = max_age_s

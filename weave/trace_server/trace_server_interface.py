@@ -6,17 +6,16 @@ from enum import Enum
 
 
 class StatusCodeEnum(str, Enum):
-    UNSET='UNSET'
-    OK='OK'
-    ERROR='ERROR'
-
+    UNSET = "UNSET"
+    OK = "OK"
+    ERROR = "ERROR"
 
 
 class CallSchema(BaseModel):
     # Identity Fields:
     entity: str
     project: str
-    id: str 
+    id: str
 
     # Name of the calling function (op)
     name: str
@@ -54,7 +53,7 @@ class CallSchema(BaseModel):
 
 # YIKES! Why can't this just inherit from CallSchema and override the fields?
 # These should be EXACTLY the same as CallSchema, but with some fields optional
-class PartialCallForCreationSchema(BaseModel): 
+class PartialCallForCreationSchema(BaseModel):
     entity: str
     project: str
     id: typing.Optional[str] = None
@@ -63,7 +62,7 @@ class PartialCallForCreationSchema(BaseModel):
 
     trace_id: typing.Optional[str] = None
     parent_id: typing.Optional[str] = None
-    
+
     status_code: typing.Optional[StatusCodeEnum] = None
     start_time_s: typing.Optional[float] = None
     end_time_s: typing.Optional[float] = None
@@ -79,14 +78,12 @@ class CallCreateReq(BaseModel):
     call: PartialCallForCreationSchema
 
 
-
-class CallCreateRes(BaseModel): 
+class CallCreateRes(BaseModel):
     pass
     # In a buffered/async world, we can't return anything here.
     # entity: str
     # project: str
     # id: str
-
 
 
 class CallReadReq(BaseModel):
@@ -95,8 +92,10 @@ class CallReadReq(BaseModel):
     id: str
     columns: typing.Optional[typing.List[str]] = None
 
+
 class CallReadRes(BaseModel):
     call: CallSchema
+
 
 class _CallUpdateFields(BaseModel):
     status_code: typing.Optional[StatusCodeEnum] = None
@@ -105,25 +104,30 @@ class _CallUpdateFields(BaseModel):
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
     exception: typing.Optional[str] = None
 
+
 class CallUpdateReq(BaseModel):
     entity: str
     project: str
     id: str
     fields: _CallUpdateFields
 
-class CallUpdateRes(BaseModel): 
+
+class CallUpdateRes(BaseModel):
     pass
     # In a buffered/async world, we can't return anything here.
     # entity: str
     # project: str
     # id: str
 
-class CallDeleteReq(BaseModel): 
+
+class CallDeleteReq(BaseModel):
     entity: str
     project: str
     id: str
 
-class CallDeleteRes(BaseModel): pass
+
+class CallDeleteRes(BaseModel):
+    pass
 
 
 class _CallsFilter(BaseModel):
@@ -136,7 +140,8 @@ class _CallsFilter(BaseModel):
     trace_roots_only: typing.Optional[bool] = None
     # op_category: typing.Optional[typing.List[str]] = None
 
-class CallsQueryReq(BaseModel): 
+
+class CallsQueryReq(BaseModel):
     entity: str
     project: str
     filter: typing.Optional[_CallsFilter] = None
@@ -150,64 +155,136 @@ class CallsQueryReq(BaseModel):
     offset: typing.Optional[int] = None
     limit: typing.Optional[int] = None
 
-class CallQueryRes(BaseModel): 
+
+class CallQueryRes(BaseModel):
     calls: typing.List[CallSchema]
 
-class OpCreateReq(BaseModel): pass
-class OpCreateRes(BaseModel): pass
-class OpReadReq(BaseModel): pass
-class OpReadRes(BaseModel): pass
-class OpUpdateReq(BaseModel): pass
-class OpUpdateRes(BaseModel): pass
-class OpDeleteReq(BaseModel): pass
-class OpDeleteRes(BaseModel): pass
-class OpQueryReq(BaseModel): pass
-class OpQueryRes(BaseModel): pass
-class ObjCreateReq(BaseModel): pass
-class ObjCreateRes(BaseModel): pass
-class ObjReadReq(BaseModel): pass
-class ObjReadRes(BaseModel): pass
-class ObjUpdateReq(BaseModel): pass
-class ObjUpdateRes(BaseModel): pass
-class ObjDeleteReq(BaseModel): pass
-class ObjDeleteRes(BaseModel): pass
-class ObjQueryReq(BaseModel): pass
-class ObjQueryRes(BaseModel): pass
+
+class OpCreateReq(BaseModel):
+    pass
+
+
+class OpCreateRes(BaseModel):
+    pass
+
+
+class OpReadReq(BaseModel):
+    pass
+
+
+class OpReadRes(BaseModel):
+    pass
+
+
+class OpUpdateReq(BaseModel):
+    pass
+
+
+class OpUpdateRes(BaseModel):
+    pass
+
+
+class OpDeleteReq(BaseModel):
+    pass
+
+
+class OpDeleteRes(BaseModel):
+    pass
+
+
+class OpQueryReq(BaseModel):
+    pass
+
+
+class OpQueryRes(BaseModel):
+    pass
+
+
+class ObjCreateReq(BaseModel):
+    pass
+
+
+class ObjCreateRes(BaseModel):
+    pass
+
+
+class ObjReadReq(BaseModel):
+    pass
+
+
+class ObjReadRes(BaseModel):
+    pass
+
+
+class ObjUpdateReq(BaseModel):
+    pass
+
+
+class ObjUpdateRes(BaseModel):
+    pass
+
+
+class ObjDeleteReq(BaseModel):
+    pass
+
+
+class ObjDeleteRes(BaseModel):
+    pass
+
+
+class ObjQueryReq(BaseModel):
+    pass
+
+
+class ObjQueryRes(BaseModel):
+    pass
 
 
 class TraceServerInterface:
     # Call API
     def call_create(self, req: CallCreateReq) -> CallCreateRes:
         ...
+
     def call_read(self, req: CallReadReq) -> CallReadRes:
         ...
+
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
         ...
+
     def call_delete(self, req: CallDeleteReq) -> CallDeleteRes:
         ...
+
     def calls_query(self, req: CallsQueryReq) -> CallQueryRes:
         ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
         ...
+
     def op_read(self, req: OpReadReq) -> OpReadRes:
         ...
+
     def op_update(self, req: OpUpdateReq) -> OpUpdateRes:
         ...
+
     def op_delete(self, req: OpDeleteReq) -> OpDeleteRes:
         ...
+
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
         ...
 
     # Obj API
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
         ...
+
     def obj_read(self, req: ObjReadReq) -> ObjReadRes:
         ...
+
     def obj_update(self, req: ObjUpdateReq) -> ObjUpdateRes:
         ...
+
     def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes:
         ...
+
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
         ...

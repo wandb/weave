@@ -69,6 +69,11 @@ def init_sql() -> InitializedClient:
     client = graph_client_sql.GraphClientSql()
     return InitializedClient(client)
 
-def init_trace_remote(trace_server_url:str = "http://127.0.0.1:6345") -> InitializedClient:
-    client = graph_client_trace.GraphClientTrace(remote_http_trace_server.RemoteHTTPTraceServer(trace_server_url))
+
+def init_trace_remote(
+    trace_server_url: str = "http://127.0.0.1:6345",
+) -> InitializedClient:
+    client = graph_client_trace.GraphClientTrace(
+        remote_http_trace_server.RemoteHTTPTraceServer(trace_server_url)
+    )
     return InitializedClient(client)

@@ -48,7 +48,6 @@ from . import trace_server_interface as tsi
 quote_slashes = functools.partial(parse.quote, safe="")
 
 
-
 # # From Tim: This feels really heavy and I need to understand it better
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
@@ -145,8 +144,6 @@ def refs_to_str(val: typing.Any) -> typing.Any:
 #     hasher.update(op_name.encode())
 #     hasher.update(input_hash.encode())
 #     return hasher.hexdigest()
-
-
 
 
 @dataclasses.dataclass
@@ -327,17 +324,19 @@ class TraceObjectRef(ref_base.Ref):
 
 @dataclasses.dataclass
 class GraphClientTrace(GraphClient[WeaveRunObj]):
-    def __init__(self, trace_server:tsi.TraceServerInterface):
+    def __init__(self, trace_server: tsi.TraceServerInterface):
         self.trace_server = trace_server
 
     ##### Read API
 
     # Implement the required members from the "GraphClient" protocol class
     def runs(self) -> Sequence[Run]:
-        res = self.trace_server.calls_query(tsi.CallsQueryReq(
-            entity="test_entity",
-            project="test_project",
-        ))
+        res = self.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity="test_entity",
+                project="test_project",
+            )
+        )
         return res.calls
 
     def run(self, run_id: str) -> typing.Optional[Run]:
@@ -442,7 +441,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             trace_id = str(uuid.uuid4())
             parent_id = None
 
-        call=tsi.PartialCallForCreationSchema(
+        call = tsi.PartialCallForCreationSchema(
             entity="test_entity",
             project="test_project",
             id=str(uuid.uuid4()),
@@ -456,15 +455,17 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         return RunSql(call.model_dump())
 
     def fail_run(self, run: Run, exception: BaseException) -> None:
-        self.trace_server.call_update({
-            "entity": "test_entity",
-            "project": "test_project",
-            "id": run.id,
-            "fields": {
-                "end_time_s": time.time(),
-                "exception": str(exception),
-            },
-        })
+        self.trace_server.call_update(
+            {
+                "entity": "test_entity",
+                "project": "test_project",
+                "id": run.id,
+                "fields": {
+                    "end_time_s": time.time(),
+                    "exception": str(exception),
+                },
+            }
+        )
 
     def finish_run(
         self,
@@ -476,15 +477,16 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         output = refs_to_str(output)
         if not isinstance(output, dict):
             output = {"_result": output}
-        self.trace_server.call_update(tsi.CallUpdateReq.model_validate({
-            "entity": "test_entity",
-            "project": "test_project",
-            "id": run.id,
-            "fields": {
-                "end_time_s": time.time(),
-                "outputs":output
-            },
-        }))
+        self.trace_server.call_update(
+            tsi.CallUpdateReq.model_validate(
+                {
+                    "entity": "test_entity",
+                    "project": "test_project",
+                    "id": run.id,
+                    "fields": {"end_time_s": time.time(), "outputs": output},
+                }
+            )
+        )
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
         raise NotImplementedError

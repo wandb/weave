@@ -1189,7 +1189,6 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     object_class_name = t["type"]
     type_class_name = object_class_name + "Type"
 
-
     type_attr_types = {}
     for k, v in t.items():
         if k == "name":
