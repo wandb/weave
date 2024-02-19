@@ -179,11 +179,6 @@ def local_client() -> typing.Iterator[_graph_client.GraphClient]:
 def init_sql_client() -> _graph_client.GraphClient:
     return _weave_init.init_sql().client
 
-
-def init_trace_client() -> _graph_client.GraphClient:
-    return _weave_init.init_trace().client
-
-
 @contextlib.contextmanager
 def sql_client() -> typing.Iterator[_graph_client.GraphClient]:
     inited_client = _weave_init.init_sql()

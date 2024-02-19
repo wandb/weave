@@ -1111,8 +1111,6 @@ class ObjectType(Type):
 
     def _to_dict(self) -> dict:
         d = self.class_to_dict()
-        # Commenting out during merge of master into clickhouse
-        # d["type"] = self.__class__.__name__
 
         if self._relocatable:
             d["_relocatable"] = True
@@ -1191,12 +1189,6 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
     object_class_name = t["type"]
     type_class_name = object_class_name + "Type"
 
-    # Commenting out during merge of master into clickhouse
-    # type_attr_types = {
-    #     k: TypeRegistry.type_from_dict(v)
-    #     for k, v in t.items()
-    #     if k == "_name" or (not k.startswith("_") and k != "type")
-    # }
 
     type_attr_types = {}
     for k, v in t.items():

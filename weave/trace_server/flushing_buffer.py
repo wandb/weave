@@ -4,7 +4,8 @@ import threading
 import time
 import typing
 
-
+# Super cheap way to get buffering before implementing a proper buffer
+# using a queue.
 class InMemFlushableBuffer:
     buffer: typing.List
     on_flush: typing.Callable

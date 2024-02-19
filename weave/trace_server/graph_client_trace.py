@@ -327,14 +327,18 @@ class TraceObjectRef(ref_base.Ref):
 
 @dataclasses.dataclass
 class GraphClientTrace(GraphClient[WeaveRunObj]):
-    def __init__(self, trace_server_url="http://127.0.0.1:6345"):
-        self.trace_server = RemoteHTTPTraceServer(trace_server_url)
+    def __init__(self, trace_server:tsi.TraceServerInterface):
+        self.trace_server = trace_server
 
     ##### Read API
 
     # Implement the required members from the "GraphClient" protocol class
     def runs(self) -> Sequence[Run]:
-        raise NotImplementedError
+        res = self.trace_server.calls_query(tsi.CallsQueryReq(
+            entity="test_entity",
+            project="test_project",
+        ))
+        return res.calls
 
     def run(self, run_id: str) -> typing.Optional[Run]:
         raise NotImplementedError
@@ -448,7 +452,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             parent_id=parent_id,
             inputs=refs_to_str(inputs),
         )
-        self.trace_server.call_create({"call": call})
+        self.trace_server.call_create(tsi.CallCreateReq(call=call))
         return RunSql(call.model_dump())
 
     def fail_run(self, run: Run, exception: BaseException) -> None:
@@ -472,7 +476,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         output = refs_to_str(output)
         if not isinstance(output, dict):
             output = {"_result": output}
-        self.trace_server.call_update({
+        self.trace_server.call_update(tsi.CallUpdateReq.model_validate({
             "entity": "test_entity",
             "project": "test_project",
             "id": run.id,
@@ -480,7 +484,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
                 "end_time_s": time.time(),
                 "outputs":output
             },
-        })
+        }))
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
         raise NotImplementedError
