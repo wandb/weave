@@ -34,7 +34,7 @@ if __name__ == "__main__":
         tools=[run_command],
     )
 
-    agent_state = AgentState(
+    initial_state = AgentState(
         history=[
             {
                 "role": "user",
@@ -43,4 +43,4 @@ if __name__ == "__main__":
         ]
     )
 
-    agent.run(agent_state)
+    agent.run(initial_state)
