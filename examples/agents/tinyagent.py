@@ -34,9 +34,6 @@ if __name__ == "__main__":
         tools=[run_command],
     )
 
-    # I'm not sure if we want to run the user loop, or just show a bunch of different
-    # ways to write agents using this library. Taking over control removes flexibility.
-
     agent_state = AgentState(
         history=[
             {
