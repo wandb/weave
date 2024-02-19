@@ -228,9 +228,9 @@ class Type(metaclass=_TypeSubclassWatcher):
     _base_type: typing.ClassVar[typing.Optional[typing.Type["Type"]]] = None
 
     instance_class: typing.ClassVar[typing.Optional[type]]
-    instance_classes: typing.ClassVar[
-        typing.Union[type, typing.List[type], None]
-    ] = None
+    instance_classes: typing.ClassVar[typing.Union[type, typing.List[type], None]] = (
+        None
+    )
 
     _type_attrs = None
     _hash = None
@@ -1107,7 +1107,10 @@ class ObjectType(Type):
 
         variable_prop_types = {}
         for prop_name in cls.type_attrs():
-            prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
+            get_k = prop_name
+            if get_k == "_name":
+                get_k = "name"
+            prop_type = TypeRegistry.type_of(getattr(obj, get_k))
             # print("TYPE_OF", cls, prop_name, prop_type, type(getattr(obj, prop_name)))
             variable_prop_types[prop_name] = prop_type
         return cls(**variable_prop_types)

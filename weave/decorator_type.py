@@ -84,7 +84,7 @@ def type(
                 #         f"Weave doesn't yet handle the type '{field.type}' at {target}.{field.name}"
                 #     )
 
-                if types.type_is_variable(weave_type):
+                if types.type_is_variable(weave_type) or field_name == "_name":
                     # this is a Weave type with a type variable in it
                     type_vars[field_name] = weave_type
                 else:
@@ -112,7 +112,10 @@ def type(
         def property_types_method(self):
             property_types = {}
             for name in type_vars:
-                property_types[name] = getattr(self, name)
+                set_k = name
+                if set_k == "_name":
+                    set_k = "name"
+                property_types[set_k] = getattr(self, name)
             for name, prop_type in static_property_types.items():
                 property_types[name] = prop_type
             return property_types
