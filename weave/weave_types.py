@@ -363,6 +363,9 @@ class Type(metaclass=_TypeSubclassWatcher):
         for prop_name in self.type_vars:
             if not hasattr(next_type, prop_name):
                 return False
+            # Name fixup for ObjectType, see ObjectType comments.
+            if prop_name == "name":
+                prop_name = "_name"
             if not getattr(self, prop_name).assign_type(getattr(next_type, prop_name)):
                 return False
         return True
@@ -1104,7 +1107,10 @@ class ObjectType(Type):
 
         variable_prop_types = {}
         for prop_name in cls.type_attrs():
-            prop_type = TypeRegistry.type_of(getattr(obj, prop_name))
+            get_k = prop_name
+            if get_k == "_name":
+                get_k = "name"
+            prop_type = TypeRegistry.type_of(getattr(obj, get_k))
             # print("TYPE_OF", cls, prop_name, prop_type, type(getattr(obj, prop_name)))
             variable_prop_types[prop_name] = prop_type
         return cls(**variable_prop_types)

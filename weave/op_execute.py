@@ -78,7 +78,8 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
         run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
         try:
             with run_context.current_run(run):
-                res = op_def.resolve_fn(**inputs)
+                res = op_def.raw_resolve_fn(**inputs)
+                res = box.box(res)
         except BaseException as e:
             print("Error running ", op_def.name)
             client.fail_run(run, e)

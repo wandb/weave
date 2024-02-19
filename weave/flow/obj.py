@@ -11,6 +11,7 @@ import pydantic
 import inspect
 
 from weave.op_def import OpDef, BoundOpDef
+from .. import ref_util
 from .. import box
 from .. import ref_base
 
@@ -36,7 +37,15 @@ class Object(pydantic.BaseModel, metaclass=ObjectMeta):
     description: Optional[str] = None
 
     # Allow OpDef attributes
-    model_config = ConfigDict(ignored_types=(OpDef,))
+    model_config = ConfigDict(ignored_types=(OpDef,), arbitrary_types_allowed=True)
+
+    def __getattribute__(self, name: str) -> Any:
+        attribute = super().__getattribute__(name)
+        if name not in super().__getattribute__("model_fields"):
+            return attribute
+        return ref_util.val_with_relative_ref(
+            self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
+        )
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.

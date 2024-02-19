@@ -41,3 +41,16 @@ def test_type_is_reloctable():
     ref = weave.storage.save(obj)
     obj2 = weave.storage.get(str(ref))
     assert obj2.a == 1
+
+
+def test_type_with_name():
+    @weave.type()
+    class CoolObjWithName:
+        name: str
+        a: int
+
+    obj = CoolObjWithName("my-name", 15)
+    ref = weave.storage.save(obj)
+    obj2 = weave.storage.get(str(ref))
+    assert obj2.a == 15
+    assert obj2.name == "my-name"
