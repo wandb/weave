@@ -1,11 +1,5 @@
-import {
-  constNumber,
-  isListLike,
-  opArray,
-  opIndex,
-  OutputNode,
-} from '@wandb/weave/core';
-import {useNodeValue, useNodeWithServerType} from '@wandb/weave/react';
+import {constNumber, opIndex} from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
 import _ from 'lodash';
 import {useMemo} from 'react';
 
@@ -37,28 +31,13 @@ export const useRuns = (
   filters: CallFilter,
   opts?: {skip?: boolean}
 ): {loading: boolean; result: Span[]} => {
-  const rowsNode = callsTableNode(streamId);
-
-  // Added as a short term patch before better backend data model. We have to
-  // refine here else we don't know the full typing of the history node. This is
-  // very sad, but will change soon. When we don't have the full typing, then
-  // the live set will not have all the data and non compacted rows will be
-  // partially loaded (missing input fields essentially).
-  const refinedRowsNode = useNodeWithServerType(rowsNode);
-  const assumeLoading =
-    refinedRowsNode.loading || !isListLike(refinedRowsNode.result.type);
   const traceSpansNode = useMemo(
-    () =>
-      assumeLoading
-        ? opArray({} as any)
-        : callsTableSelect(
-            callsTableFilter(refinedRowsNode.result as OutputNode, filters)
-          ),
-    [filters, assumeLoading, refinedRowsNode.result]
+    () => fnRunsNode(streamId, filters),
+    [filters, streamId]
   );
-  const traceSpansQuery = useNodeValue(traceSpansNode, {
-    skip: opts?.skip || assumeLoading,
-  });
+
+  const traceSpansQuery = useNodeValue(traceSpansNode, {skip: opts?.skip});
+
   return useMemo(
     () =>
       ({
