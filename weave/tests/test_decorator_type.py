@@ -44,13 +44,10 @@ def test_type_is_reloctable():
 
 
 def test_type_with_name():
-
     @weave.type()
     class CoolObjWithName:
         name: str
         a: int
-
-    t = CoolObjWithName.WeaveType().to_dict()
 
     obj = CoolObjWithName("my-name", 15)
     ref = weave.storage.save(obj)
