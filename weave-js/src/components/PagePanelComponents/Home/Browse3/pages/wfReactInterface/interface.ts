@@ -78,7 +78,6 @@ export const spanToCallSchema = (
   project: string,
   span: SpanWithFeedback
 ): CallSchema => {
-
   // This rawSpan construction fixes issues with crashed runs using the
   // streamtable graph client (will be fixed in the future)
   const rawSpan = span as Span;
@@ -214,9 +213,10 @@ export const useCalls = (
   );
   return useMemo(() => {
     // This `uniqBy` fixes gorilla duplication bug.
-    const allResults = _.uniqBy((calls.result ?? []).map(run =>
-      spanToCallSchema(entity, project, run)
-    ), 'callId');
+    const allResults = _.uniqBy(
+      (calls.result ?? []).map(run => spanToCallSchema(entity, project, run)),
+      'callId'
+    );
     // Unfortunately, we can't filter by category in the query level yet
     const result = allResults.filter((row: any) => {
       return (
