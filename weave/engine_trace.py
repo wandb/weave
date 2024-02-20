@@ -297,11 +297,7 @@ def patch_ddtrace_set_tag():
 
         # Log metric if flag is off or if flag is on and redacted
         def set_metric(self, key, val, is_pii_redacted=False):
-            if (
-                not environment.disable_weave_pii()
-                or is_pii_redacted
-                or "_dd." in key
-            ):
+            if not environment.disable_weave_pii() or is_pii_redacted or "_dd." in key:
                 old_set_metric(self, key, val)
 
         ddtrace_span.Span.set_metric = set_metric
