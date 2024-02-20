@@ -12,7 +12,7 @@ def version_hash_for_object(obj: tsi.PartialObjForCreationSchema) -> str:
     # val_dict = _order_dict(obj.val_dict)
 
     hasher = hashlib.md5()
-    
+
     hasher.update(json.dumps(type_dict).encode())
     # hasher.update(json.dumps(val_dict).encode())
 
@@ -28,6 +28,7 @@ def version_hash_for_object(obj: tsi.PartialObjForCreationSchema) -> str:
 
     return hasher.hexdigest()
 
+
 # def version_hash_for_op(op: tsi.PartialOpForCreationSchema) -> str:
 
 #     hasher = hashlib.md5()
@@ -36,7 +37,7 @@ def version_hash_for_object(obj: tsi.PartialObjForCreationSchema) -> str:
 #         hasher.update(op.code.encode())
 #     if op.environment_state_identity:
 #         hasher.update(op.environment_state_identity.encode())
-    
+
 #     return hasher.hexdigest()
 
 

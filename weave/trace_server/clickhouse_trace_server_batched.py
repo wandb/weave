@@ -132,7 +132,6 @@ class SelectableCHCallSchema(BaseModel):
     created_at: datetime.datetime
 
 
-
 class InsertableCHObjSchema(BaseModel):
     entity: str
     project: str
@@ -547,8 +546,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for row in raw_res.result_rows:
             calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
         return _deduplicate_calls(calls)
-    
-    def _obj_read(self, req: tsi.ObjReadReq, only_ops: bool = False) -> SelectableCHObjSchema:
+
+    def _obj_read(
+        self, req: tsi.ObjReadReq, only_ops: bool = False
+    ) -> SelectableCHObjSchema:
         conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
         if only_ops:
             conditions.append("is_op = 1")
@@ -569,7 +570,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"Obj with id {req.id} not found")
 
         return ch_objs[0]
-    
 
     def _select_objs_query(
         self,
@@ -606,7 +606,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions.append(
             "entity = {entity_scope: String} AND project = {project_scope: String}"
         )
-
 
         conditions_part = " AND ".join(conditions)
 
@@ -662,7 +661,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for row in raw_res.result_rows:
             objs.append(_raw_obj_dict_to_ch_obj(dict(zip(columns, row))))
         return objs
-    
 
     def _execute_update(self, req: tsi.CallUpdateReq) -> None:
         # raw_read_res = self._call_read(tsi.CallReadReq(entity=req.entity, project=req.project, id=req.id))
@@ -800,11 +798,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def _query(
-        self, query: str, parameters: typing.Dict[str, typing.Any], column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None
+        self,
+        query: str,
+        parameters: typing.Dict[str, typing.Any],
+        column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> QueryResult:
         print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(query, parameters=parameters, column_formats=column_formats, use_none=True)
+        res = self.ch_client.query(
+            query, parameters=parameters, column_formats=column_formats, use_none=True
+        )
         # print("Summary: " + json.dumps(res.summary, indent=2))
         return res
 
@@ -873,13 +876,11 @@ def _raw_call_dict_to_ch_call(
 ) -> SelectableCHCallSchema:
     return SelectableCHCallSchema.model_validate(call)
 
-def _raw_obj_dict_to_ch_obj(
-    obj: typing.Dict[str, typing.Any]
-) -> SelectableCHObjSchema:
-    if obj['encoded_file_map']:
-        obj['encoded_file_map'] = {
-            k.decode('utf-8'): v
-            for k, v in obj['encoded_file_map'].items()
+
+def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHObjSchema:
+    if obj["encoded_file_map"]:
+        obj["encoded_file_map"] = {
+            k.decode("utf-8"): v for k, v in obj["encoded_file_map"].items()
         }
     return SelectableCHObjSchema.model_validate(obj)
 
@@ -927,10 +928,8 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         name=ch_obj.name,
         # `version_hash`` should always be present
         version_hash=ch_obj.version_hash,
-
         # `is_op`` should always be present
         is_op=ch_obj.is_op,
-
         # `type_dict`` should always be present
         type_dict=json.loads(ch_obj.type_dict_dump),
         # `val_dict`` should always be present
@@ -938,8 +937,9 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         # `encoded_file_map`` should always be present
         encoded_file_map=ch_obj.encoded_file_map,
         # `metadata_dict`` may be null (represented as `\\N`)
-        metadata_dict=json.loads(ch_obj.metadata_dict_dump) if ch_obj.metadata_dict_dump else None,
-
+        metadata_dict=json.loads(ch_obj.metadata_dict_dump)
+        if ch_obj.metadata_dict_dump
+        else None,
         # `created_at`` should always be present
         created_at_s=_datetime_to_sec_float(ch_obj.created_at),
     )

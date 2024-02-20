@@ -265,7 +265,6 @@ class ObjReadReq(BaseModel):
     project: str
     name: str
     version_hash: str
-    
 
 
 class ObjReadRes(BaseModel):

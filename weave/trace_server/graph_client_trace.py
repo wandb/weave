@@ -51,7 +51,15 @@ quote_slashes = functools.partial(parse.quote, safe="")
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
 
-    def __init__(self, entity:str, project: str, name: str, version:str=None, path_contents=None, metadata=None):
+    def __init__(
+        self,
+        entity: str,
+        project: str,
+        name: str,
+        version: str = None,
+        path_contents=None,
+        metadata=None,
+    ):
         if path_contents is None:
             path_contents = {}
         self.path_contents = path_contents
@@ -350,10 +358,13 @@ class TraceNounRef(ref_base.Ref):
                 )
             )
             art = MemTraceFilesArtifact(
-                                    self._entity,
-                    self._project,
-                    self._name,
-                self._version, {k: v for k, v in res.op_obj.encoded_file_map.items()}, metadata=res.op_obj.metadata_dict)
+                self._entity,
+                self._project,
+                self._name,
+                self._version,
+                {k: v for k, v in res.op_obj.encoded_file_map.items()},
+                metadata=res.op_obj.metadata_dict,
+            )
             wb_type = types.TypeRegistry.type_from_dict(res.op_obj.type_dict)
             data = wb_type.load_instance(art, "obj")
             return data
@@ -369,9 +380,14 @@ class TraceNounRef(ref_base.Ref):
                 )
             )
 
-            art = MemTraceFilesArtifact(self._entity,
-                    self._project,
-                    self._name,self._version, {k: v for k, v in res.obj.encoded_file_map.items()}, metadata=res.obj.metadata_dict)
+            art = MemTraceFilesArtifact(
+                self._entity,
+                self._project,
+                self._name,
+                self._version,
+                {k: v for k, v in res.obj.encoded_file_map.items()},
+                metadata=res.obj.metadata_dict,
+            )
             wb_type = types.TypeRegistry.type_from_dict(res.obj.type_dict)
             # mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
             data = wb_type.load_instance(art, "obj")
@@ -489,8 +505,6 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         entity = "test_entity"
         project = "test_project"
 
-
-        
         _orig_ref = _get_ref(obj)
         if isinstance(_orig_ref, TraceNounRef):
             return _orig_ref
@@ -499,7 +513,6 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         art = MemTraceFilesArtifact(entity, project, name)
         ref = art.set("obj", weave_type, obj)
         # ref_base._put_ref(obj, ref)
-
 
         # mapper = mappers_python.map_to_python(weave_type, art)
         # val = mapper.apply(obj)
@@ -614,6 +627,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
         raise NotImplementedError
+
 
 def _get_ref(obj: typing.Any) -> typing.Optional[ref_base.Ref]:
     if isinstance(obj, ref_base.Ref):
