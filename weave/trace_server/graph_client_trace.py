@@ -107,7 +107,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     def uri_obj(self) -> uris.WeaveURI:
         # TODO: This is why wrong, but why do we need it here?
         # because OpDefType.load_instance tries to use it
-        return TraceObjectURI(
+        return TraceNounUri(
             "name",
             "version",
             "entity",
@@ -146,13 +146,17 @@ def refs_to_str(val: typing.Any) -> typing.Any:
 #     return hasher.hexdigest()
 
 
+# URIS are the WORST! Here is what we want:
+# `wandb-trace://[entity]/[project]/call/[ID]`
+# `wandb-trace://[entity]/[project]/op/name:[CONTENT_HASH]`
+# `wandb-trace://[entity]/[project]/obj/name:[CONTENT_HASH]/[PATH]#[EXTRA]`
 @dataclasses.dataclass
-class TraceObjectURI(uris.WeaveURI):
-    SCHEME = "trace-object"
-    name: str
-    version: typing.Optional[str]
-    entity_name: str
-    project_name: str
+class TraceNounUri(uris.WeaveURI):
+    SCHEME = "wandb-trace"
+    entity: str
+    project: str
+    trace_noun: str
+    path: Optional[list[str]] = None
     extra: Optional[list[str]] = None
 
     @classmethod
@@ -166,72 +170,111 @@ class TraceObjectURI(uris.WeaveURI):
         query: dict[str, list[str]],
         fragment: str,
     ):
-        parts = path.strip("/").split("/")
-        parts = [parse.unquote(part) for part in parts]
-        if len(parts) < 3:
-            raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
-        entity_name = parts[0]
-        project_name = parts[1]
-        name = parts[2]
-        version = parts[3]
+        entity = netloc.strip("/")
+        path_parts = path.strip("/").split("/")
 
-        extra: Optional[list[str]] = None
-        if fragment:
-            extra = fragment.split("/")
+        if len(path_parts) < 3:
+            raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
+
+        project = path_parts[0]
+        trace_noun = path_parts[1]
+        compound_version = path_parts[2]
+        path = None
+        extra = None
+        if trace_noun == "call":
+            name = ""
+            version = compound_version
+        elif trace_noun == "op" or trace_noun == "obj":
+            compound_version_parts = compound_version.split(":")
+            if not len(compound_version_parts) == 2:
+                raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
+            name = compound_version_parts[0]
+            version = compound_version_parts[1]
+        else:
+            raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
+        if trace_noun == "obj":
+            path = path_parts[3:]
+            if not path:
+                path = None
+            if fragment:
+                extra = fragment.split("/")
+                if not extra:
+                    extra = None
+        else:
+            if path_parts[3:]:
+                raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
+            if fragment:
+                raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
+        
+        
         return cls(
-            name,
-            version,
-            entity_name,
-            project_name,
-            extra,
+            entity=entity,
+            project=project,
+            trace_noun=trace_noun,
+            name=name,
+            version=version,
+            path=path,
+            extra=extra,
         )
 
     def __str__(self) -> str:
+        compound_version = f"{quote_slashes(self.name)}:{quote_slashes(self.version)}" if self.name else quote_slashes(self.version)
         uri = (
-            f"{self.SCHEME}:///"
-            f"{quote_slashes(self.entity_name)}/"
-            f"{quote_slashes(self.project_name)}/"
-            f"{quote_slashes(self.name)}"
-            f":{quote_slashes(self.version)}"
+            f"{self.SCHEME}://"
+            f"{quote_slashes(self.entity)}/"
+            f"{quote_slashes(self.project)}/"
+            f"{quote_slashes(self.trace_noun)}/"
+            f"{compound_version}"
         )
-        # if self.row_id:
-        #     uri += f"/{quote_slashes(self.row_id)}"
-        # if self.version_hash:
-        #     uri += f"/{quote_slashes(self.version_hash)}"
+        if self.path:
+            uri += f"/{'/'.join([self.path])}"
         if self.extra:
             uri += f"#{'/'.join(self.extra)}"
         return uri
 
-    def to_ref(self) -> "TraceObjectRef":
-        return TraceObjectRef.from_uri(self)
+    def to_ref(self) -> "TraceNounRef":
+        return TraceNounRef.from_uri(self)
 
-    def with_path(self, path: str) -> "TraceObjectURI":
-        return TraceObjectURI(
-            self.name,
-            self.version,
-            self.entity_name,
-            self.project_name,
-            # path,
-            self.extra,
+    def with_path(self, path: str) -> "TraceNounUri":
+        if self.trace_noun != "obj":
+            raise ValueError("Can only add path to obj URI")
+        return TraceNounUri(
+            entity=self.entity,
+            project=self.project,
+            trace_noun=self.trace_noun,
+            name=self.name,
+            version=self.version,
+            path=self.path + path.split("/"),
+            extra=None,
         )
 
 
-class TraceObjectRef(ref_base.Ref):
+class TraceNounRef(ref_base.Ref):
     def __init__(
         self,
-        entity_name: str,
-        project_name: str,
-        object_name: str,
-        version_hash: Optional[str],
-        obj: Optional[Any] = None,
-        type: Optional["types.Type"] = None,
+        entity: str,
+        project: str,
+        trace_noun: str,
+        name: str,
+        version: str,
+        path: Optional[list[str]] = None,
         extra: Optional[list[str]] = None,
+        type: typing.Optional[types.Type] = None,
+        obj: typing.Optional[typing.Any] = None,
     ):
-        self._entity_name = entity_name
-        self._project_name = project_name
-        self._object_name = object_name
-        self._version_hash = version_hash
+        self._entity = entity
+        self._project = project
+        self._trace_noun = trace_noun
+        self._name = name
+        self._version = version
+        self._path = path
         self._extra = extra
+
+        if trace_noun not in ["call", "op", "obj"]:
+            raise ValueError(f"Invalid trace noun: {trace_noun}")
+        if path or extra:
+            if trace_noun != "obj":
+                raise ValueError(f"Path and extra only valid for obj noun")
 
         # Needed because mappers_python checks this
         self.artifact = None
@@ -239,15 +282,16 @@ class TraceObjectRef(ref_base.Ref):
         super().__init__(obj=obj, type=type)
 
     @classmethod
-    def from_uri(cls, uri: uris.WeaveURI) -> "TraceObjectRef":
-        if not isinstance(uri, TraceObjectURI):
+    def from_uri(cls, uri: uris.WeaveURI) -> "TraceNounRef":
+        if not isinstance(uri, TraceNounUri):
             raise ValueError("Expected WandbTableURI")
         return cls(
-            uri.entity_name,
-            uri.project_name,
-            uri.name,
-            uri.version_hash,
-            uri.row_version,
+            entity=uri.entity,
+            project=uri.project,
+            trace_noun=uri.trace_noun,
+            name=uri.name,
+            version=uri.version,
+            path=uri.path,
             extra=uri.extra,
         )
 
@@ -269,14 +313,14 @@ class TraceObjectRef(ref_base.Ref):
     @property
     def uri(self) -> str:
         return str(
-            TraceObjectURI(
-                self._object_name,
-                self._version_hash,
-                self._entity_name,
-                self._project_name,
-                # None,  # netloc ?
-                # row_version=self._row_version,
-                extra=self.extra,
+            TraceNounUri(
+                entity=self._entity,
+                project=self._project,
+                trace_noun=self._trace_noun,
+                name=self._name,
+                version=self._version,
+                path=self._path,
+                extra=self._extra,
             )
         )
 
@@ -305,7 +349,10 @@ class TraceObjectRef(ref_base.Ref):
 
     def with_extra(
         self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
-    ) -> "TraceObjectRef":
+    ) -> "TraceNounRef":
+        if self._trace_noun != "obj":
+            raise ValueError("Can only add extra to obj ref")
+        
         new_extra = self.extra
         if self.extra is None:
             new_extra = []
@@ -313,11 +360,12 @@ class TraceObjectRef(ref_base.Ref):
             new_extra = self.extra.copy()
         new_extra += extra
         return self.__class__(
-            entity_name=self._entity_name,
-            project_name=self._project_name,
-            object_name=self._object_name,
-            version_hash=self._version_hash,
-            obj=obj,
+            entity=self.entity,
+            project=self.project,
+            trace_noun=self.trace_noun,
+            name=self.name,
+            version=self.version,
+            path=self.path,
             extra=new_extra,
         )
 
@@ -373,7 +421,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         # raise NotImplementedError
         # return False
-        return isinstance(ref, TraceObjectRef)
+        return isinstance(ref, TraceNounRef)
 
     def ref_uri(
         self, name: str, version: str, path: str
@@ -385,7 +433,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
     ##### Write API
 
-    # def save_object(self, obj: typing.Any, name: str, branch_name: str) -> TraceObjectRef:
+    # def save_object(self, obj: typing.Any, name: str, branch_name: str) -> TraceNounRef:
     def save_object(self, obj: typing.Any, name: str, branch_name: str) -> ref_base.Ref:
         wb_type = types.type_of_with_refs(obj)
 
@@ -417,7 +465,19 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         # )
         # TODO  we have have already computed type here, should construct
         # ref with it (type_val["_type"])
-        ref = TraceObjectRef("entity", "project", name, id_, obj, None, None)
+        trace_noun = 'obj'
+        if isinstance(obj, OpDef):
+            trace_noun = 'op'
+        ref = TraceNounRef(
+            entity="test_entity",
+            project="test_project",
+            trace_noun=trace_noun,
+            name=name,
+            version=id_,
+            path=None,
+            extra=None,
+            obj=obj,
+            type=wb_type)
         ref_base._put_ref(obj, ref)
         return ref
 

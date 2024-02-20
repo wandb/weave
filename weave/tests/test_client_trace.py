@@ -25,15 +25,20 @@ def trace_client():
         inited_client.reset()
 
 
-def test_simple_op(trace_client: typing.Dict[str, typing.Any]):
+def test_simple_op(trace_client):
     @weave.op()
     def my_op(a: int) -> int:
         return a + 1
 
     assert my_op(5) == 6
+
+    op_ref = weave.obj_ref(my_op)
+    assert trace_client.ref_is_own(op_ref)
+    got_op = weave.storage.get(str(op_ref))
+    
     runs = trace_client.runs()
     assert len(runs) == 1
-    assert runs[0].name.startswith("trace-object:///entity/project/op-my_op")
+    assert runs[0].name.startswith("wandb-trace:///entity/project/call/")
     assert runs[0] == trace_server_interface.CallSchema(
         entity="test_entity",
         project="test_project",
@@ -50,3 +55,11 @@ def test_simple_op(trace_client: typing.Dict[str, typing.Any]):
         outputs={"_result": 6},
         summary=None,
     )
+
+def test_dataset(trace_client):
+    from weave.weaveflow import Dataset
+
+    d = Dataset([{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    ref = weave.publish(d)
+    d2 = weave.storage.get(str(ref))
+    assert d2.rows == d2.rows

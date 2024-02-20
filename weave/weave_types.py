@@ -1092,7 +1092,13 @@ class ObjectType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        if isinstance(obj, pydantic.BaseModel):
+        is_base_model = False
+        # UGG - why is this try-catch?
+        try:
+            is_base_model = isinstance(obj, pydantic.BaseModel)
+        except:
+            pass
+        if is_base_model:
             type_class = cls.typeclass_of_class(obj.__class__)
             attr_types = {}
             for k, field in obj.model_fields.items():
