@@ -16,7 +16,9 @@ def trace_client():
     clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
         "localhost", 8123, False
     )
-    graph_client = graph_client_trace.GraphClientTrace(clickhouse_trace_server)
+    graph_client = graph_client_trace.GraphClientTrace(
+        "test_entity", "test_project", clickhouse_trace_server
+    )
     inited_client = InitializedClient(graph_client)
 
     try:
@@ -43,8 +45,8 @@ def test_simple_op(trace_client):
         == "wandb-trace://test_entity/test_project/op/op-my_op:d974fac56411d5e5b6cf75fad9a53811"
     )
     assert runs[0] == trace_server_interface.CallSchema(
-        entity="test_entity",
-        project="test_project",
+        entity=trace_client.entity,
+        project=trace_client.project,
         id=runs[0].id,
         name=runs[0].name,
         trace_id=runs[0].trace_id,

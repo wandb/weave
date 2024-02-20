@@ -214,8 +214,8 @@ export const useCalls = (
   const [calls, setCalls] = useState<SpanWithFeedback[] | null>(null);
   useEffect(() => {
     fetchAllCalls({
-      "entity": "test_entity",
-      "project": "test_project",
+      "entity": entity,
+      "project": project,
       "filter": {
         "names": filter.opVersionRefs,
         "input_object_version_refs": filter.inputObjectVersionRefs,

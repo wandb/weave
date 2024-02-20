@@ -439,7 +439,11 @@ class TraceNounRef(ref_base.Ref):
 
 @dataclasses.dataclass
 class GraphClientTrace(GraphClient[WeaveRunObj]):
-    def __init__(self, trace_server: tsi.TraceServerInterface):
+    def __init__(
+        self, entity: str, project: str, trace_server: tsi.TraceServerInterface
+    ):
+        self.entity = entity
+        self.project = project
         self.trace_server = trace_server
 
     ##### Read API
@@ -448,8 +452,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
     def runs(self) -> Sequence[Run]:
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity="test_entity",
-                project="test_project",
+                entity=self.entity,
+                project=self.project,
             )
         )
         return res.calls
@@ -502,15 +506,12 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
     # def save_object(self, obj: typing.Any, name: str, branch_name: str) -> TraceNounRef:
     def save_object(self, obj: typing.Any, name: str, branch_name: str) -> ref_base.Ref:
-        entity = "test_entity"
-        project = "test_project"
-
         _orig_ref = _get_ref(obj)
         if isinstance(_orig_ref, TraceNounRef):
             return _orig_ref
         weave_type = types.type_of_with_refs(obj)
         obj = box.box(obj)
-        art = MemTraceFilesArtifact(entity, project, name)
+        art = MemTraceFilesArtifact(self.entity, self.project, name)
         ref = art.set("obj", weave_type, obj)
         # ref_base._put_ref(obj, ref)
 
@@ -526,8 +527,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             else:
                 encoded_path_contents[k] = v
         partial_obj = tsi.PartialObjForCreationSchema(
-            entity=entity,
-            project=project,
+            entity=self.entity,
+            project=self.project,
             name=name,
             type_dict=weave_type.to_dict(),
             # val_dict=val,
@@ -545,8 +546,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         art._version = version_hash
 
         ref = TraceNounRef(
-            entity=entity,
-            project=project,
+            entity=self.entity,
+            project=self.project,
             trace_noun=trace_noun,
             name=name,
             version=version_hash,
@@ -565,6 +566,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         inputs: typing.Dict[str, typing.Any],
         input_refs: Sequence[Ref],
     ) -> WeaveRunObj:
+
         inputs = copy.copy(inputs)
         inputs["_keys"] = list(inputs.keys())
         for i, ref in enumerate(input_refs[:3]):
@@ -579,8 +581,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             parent_id = None
 
         call = tsi.PartialCallForCreationSchema(
-            entity="test_entity",
-            project="test_project",
+            entity=self.entity,
+            project=self.project,
             id=str(uuid.uuid4()),
             name=op_name,
             trace_id=trace_id,
@@ -594,8 +596,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
     def fail_run(self, run: Run, exception: BaseException) -> None:
         self.trace_server.call_update(
             {
-                "entity": "test_entity",
-                "project": "test_project",
+                "entity": self.entity,
+                "project": self.project,
                 "id": run.id,
                 "fields": {
                     "end_time_s": time.time(),
@@ -617,8 +619,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         self.trace_server.call_update(
             tsi.CallUpdateReq.model_validate(
                 {
-                    "entity": "test_entity",
-                    "project": "test_project",
+                    "entity": self.entity,
+                    "project": self.project,
                     "id": run.id,
                     "fields": {"end_time_s": time.time(), "outputs": output},
                 }
