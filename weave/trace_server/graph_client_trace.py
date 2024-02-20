@@ -113,9 +113,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
 
     @property
     def metadata(self):
-        return artifact_fs.ArtifactMetadata(
-            self._metadata, {**self._metadata}
-        )
+        return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
 
 
 def refs_to_str(val: typing.Any) -> typing.Any:
@@ -204,8 +202,7 @@ class TraceNounUri(uris.WeaveURI):
                 raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
             if fragment:
                 raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
-        
-        
+
         return cls(
             entity=entity,
             project=project,
@@ -217,7 +214,11 @@ class TraceNounUri(uris.WeaveURI):
         )
 
     def __str__(self) -> str:
-        compound_version = f"{quote_slashes(self.name)}:{quote_slashes(self.version)}" if self.name else quote_slashes(self.version)
+        compound_version = (
+            f"{quote_slashes(self.name)}:{quote_slashes(self.version)}"
+            if self.name
+            else quote_slashes(self.version)
+        )
         uri = (
             f"{self.SCHEME}://"
             f"{quote_slashes(self.entity)}/"
@@ -273,7 +274,7 @@ class TraceNounRef(ref_base.Ref):
             raise ValueError(f"Invalid trace noun: {trace_noun}")
         if path or extra:
             if trace_noun != "obj":
-                raise ValueError(f"Path and extra only valid for obj noun")
+                raise ValueError("Path and extra only valid for obj noun")
 
         # Needed because mappers_python checks this
         self.artifact = None
@@ -372,7 +373,7 @@ class TraceNounRef(ref_base.Ref):
     ) -> "TraceNounRef":
         if self._trace_noun != "obj":
             raise ValueError("Can only add extra to obj ref")
-        
+
         new_extra = self.extra
         if self.extra is None:
             new_extra = []
@@ -474,20 +475,18 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         if isinstance(obj, OpDef):
             raise NotImplementedError
         else:
-            partial_obj =tsi.PartialObjForCreationSchema(
-                    entity="test_entity",
-                    project="test_project",
-                    name=name,
-                    type_dict=wb_type.to_dict(),
-                    val_dict=val,
-                    encoded_file_map=encoded_path_contents,
-                    metadata_dict=art.metadata.as_dict(),
-                )
+            partial_obj = tsi.PartialObjForCreationSchema(
+                entity="test_entity",
+                project="test_project",
+                name=name,
+                type_dict=wb_type.to_dict(),
+                val_dict=val,
+                encoded_file_map=encoded_path_contents,
+                metadata_dict=art.metadata.as_dict(),
+            )
             version_hash = version_hash_for_object(partial_obj)
             id_ = version_hash
-            self.trace_server.obj_create(tsi.ObjCreateReq(
-                obj=partial_obj)
-            )
+            self.trace_server.obj_create(tsi.ObjCreateReq(obj=partial_obj))
         #     "objects",
         #     [
         #         (
@@ -501,9 +500,9 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         # )
         # TODO  we have have already computed type here, should construct
         # ref with it (type_val["_type"])
-        trace_noun = 'obj'
+        trace_noun = "obj"
         if isinstance(obj, OpDef):
-            trace_noun = 'op'
+            trace_noun = "op"
         ref = TraceNounRef(
             entity="test_entity",
             project="test_project",
@@ -513,7 +512,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             path=None,
             extra=None,
             obj=obj,
-            type=wb_type)
+            type=wb_type,
+        )
         ref_base._put_ref(obj, ref)
         return ref
 

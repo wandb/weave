@@ -6,7 +6,8 @@ from .trace_server_interface import PartialObjForCreationSchema
 
 # This is a quick solution but needs more thought
 
-def version_hash_for_object(object:PartialObjForCreationSchema) -> str:
+
+def version_hash_for_object(object: PartialObjForCreationSchema) -> str:
     type_dict = _order_dict(object.type_dict)
     val_dict = _order_dict(object.val_dict)
 
@@ -26,10 +27,20 @@ def version_hash_for_object(object:PartialObjForCreationSchema) -> str:
 
     return hasher.hexdigest()
 
+
 def _decode_bytes_to_str(dictionary):
-    return {k: _decode_bytes_to_str(v) if isinstance(v, dict) else v.decode() if isinstance(v, bytes) else v
-            for k, v in dictionary.items()}
+    return {
+        k: _decode_bytes_to_str(v)
+        if isinstance(v, dict)
+        else v.decode()
+        if isinstance(v, bytes)
+        else v
+        for k, v in dictionary.items()
+    }
+
 
 def _order_dict(dictionary):
-    return {k: _order_dict(v) if isinstance(v, dict) else v
-            for k, v in sorted(dictionary.items())}
+    return {
+        k: _order_dict(v) if isinstance(v, dict) else v
+        for k, v in sorted(dictionary.items())
+    }

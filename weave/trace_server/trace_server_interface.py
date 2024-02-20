@@ -99,6 +99,7 @@ class PartialObjForCreationSchema(BaseModel):
     encoded_file_map: typing.Optional[typing.Dict[str, bytes]] = None
     metadata_dict: typing.Optional[typing.Dict[str, typing.Any]] = None
 
+
 class CallCreateReq(BaseModel):
     call: PartialCallForCreationSchema
 

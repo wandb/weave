@@ -214,6 +214,7 @@ all_obj_insert_columns = [
     "metadata_dict_dump",
 ]
 
+
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     ch_client: Client
     call_insert_buffer: InMemFlushableBuffer
@@ -313,7 +314,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         calls = [_ch_call_to_call_schema(call) for call in ch_calls]
         return tsi.CallQueryRes(calls=calls)
-    
+
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
 
@@ -328,28 +329,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         raise NotImplementedError()
-    
+
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         ch_obj = _partial_obj_schema_to_ch_obj(req.obj)
         self._insert_obj(ch_obj)
         return tsi.ObjCreateRes()
 
-
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         raise NotImplementedError()
-
 
     def obj_update(self, req: tsi.ObjUpdateReq) -> tsi.ObjUpdateRes:
         raise NotImplementedError()
 
-
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         raise NotImplementedError()
 
-
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         raise NotImplementedError()
-
 
     # Private Methods
     def __del__(self):
@@ -376,7 +372,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 + str(time.time() - start_time)
                 + " seconds."
             )
-
 
     def _flush_obj_insert_buffer(self, buffer: typing.List):
         buffer_len = len(buffer)
@@ -668,8 +663,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             self._flush_call_insert_buffer([row])
 
-
-
     def _insert_obj(self, ch_obj: InsertableCHObjectSchema) -> None:
         parameters = ch_obj.model_dump()
         row = []
@@ -879,11 +872,12 @@ def _process_parameters(
             parameters[key] = value.timestamp()
     return parameters
 
+
 def _partial_obj_schema_to_ch_obj(
     partial_obj: tsi.PartialObjForCreationSchema,
 ) -> InsertableCHObjectSchema:
     version_hash = version_hash_for_object(partial_obj)
-    
+
     return InsertableCHObjectSchema(
         entity=partial_obj.entity,
         project=partial_obj.project,

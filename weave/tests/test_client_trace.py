@@ -35,7 +35,7 @@ def test_simple_op(trace_client):
     op_ref = weave.obj_ref(my_op)
     assert trace_client.ref_is_own(op_ref)
     got_op = weave.storage.get(str(op_ref))
-    
+
     runs = trace_client.runs()
     assert len(runs) == 1
     assert runs[0].name.startswith("wandb-trace:///entity/project/call/")
@@ -55,6 +55,7 @@ def test_simple_op(trace_client):
         outputs={"_result": 6},
         summary=None,
     )
+
 
 def test_dataset(trace_client):
     from weave.weaveflow import Dataset
