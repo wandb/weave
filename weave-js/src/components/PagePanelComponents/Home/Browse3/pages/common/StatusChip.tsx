@@ -41,6 +41,12 @@ const STATUS_INFO: Record<CallStatusType, CallStatusInfo> = {
     color: 'red',
     tooltip: 'This call failed.',
   },
+  UNSET: {
+    icon: 'randomize-reset-reload',
+    label: 'Running',
+    color: 'cactus',
+    tooltip: 'This call has not finished.',
+  },
 };
 
 export const StatusChip = ({value, iconOnly}: StatusChipProps) => {
