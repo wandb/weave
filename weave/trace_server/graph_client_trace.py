@@ -53,7 +53,7 @@ quote_slashes = functools.partial(parse.quote, safe="")
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
 
-    def __init__(self, path_contents=None, metadata=None):
+    def __init__(self, version:str=None, path_contents=None, metadata=None):
         if path_contents is None:
             path_contents = {}
         self.path_contents = path_contents
@@ -61,6 +61,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
             metadata = {}
         self._metadata = metadata
         self.temp_read_dir = None
+        self._version = version
 
     @contextlib.contextmanager
     def new_file(self, path, binary=False):
@@ -78,7 +79,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
 
     @property
     def version(self):
-        raise NotImplementedError
+        return self._version
 
     @contextlib.contextmanager
     def open(self, path, binary=False):
@@ -343,7 +344,7 @@ class TraceNounRef(ref_base.Ref):
                 )
             )
 
-            art = MemTraceFilesArtifact({k: v for k, v in res.obj.encoded_file_map.items()}, metadata=res.obj.metadata_dict)
+            art = MemTraceFilesArtifact(self._version, {k: v for k, v in res.obj.encoded_file_map.items()}, metadata=res.obj.metadata_dict)
             wb_type = types.TypeRegistry.type_from_dict(res.obj.type_dict)
             mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
             return mapper.apply(res.obj.val_dict)
@@ -374,19 +375,19 @@ class TraceNounRef(ref_base.Ref):
         if self._trace_noun != "obj":
             raise ValueError("Can only add extra to obj ref")
 
-        new_extra = self.extra
-        if self.extra is None:
+        new_extra = self._extra
+        if new_extra is None:
             new_extra = []
         else:
-            new_extra = self.extra.copy()
+            new_extra = self._extra.copy()
         new_extra += extra
         return self.__class__(
-            entity=self.entity,
-            project=self.project,
-            trace_noun=self.trace_noun,
-            name=self.name,
-            version=self.version,
-            path=self.path,
+            entity=self._entity,
+            project=self._project,
+            trace_noun=self._trace_noun,
+            name=self._name,
+            version=self._version,
+            path=self._path,
             extra=new_extra,
         )
 

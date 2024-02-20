@@ -641,6 +641,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {limit_part}
         """,
             parameters,
+            column_formats={"encoded_file_map": {"string": "bytes"}},
         )
         # # print(raw_res.result_rows)
         objs = []
@@ -783,11 +784,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def _query(
-        self, query: str, parameters: typing.Dict[str, typing.Any]
+        self, query: str, parameters: typing.Dict[str, typing.Any], column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None
     ) -> QueryResult:
         print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(query, parameters=parameters, use_none=True)
+        res = self.ch_client.query(query, parameters=parameters, column_formats=column_formats, use_none=True)
         # print("Summary: " + json.dumps(res.summary, indent=2))
         return res
 
@@ -859,6 +860,11 @@ def _raw_call_dict_to_ch_call(
 def _raw_obj_dict_to_ch_obj(
     obj: typing.Dict[str, typing.Any]
 ) -> SelectableCHObjSchema:
+    if obj['encoded_file_map']:
+        obj['encoded_file_map'] = {
+            k.decode('utf-8'): v
+            for k, v in obj['encoded_file_map'].items()
+        }
     return SelectableCHObjSchema.model_validate(obj)
 
 
