@@ -139,8 +139,10 @@ class InsertableCHObjSchema(BaseModel):
     name: str
     version_hash: str
 
+    is_op: bool
+
     type_dict_dump: str
-    val_dict_dump: str
+    # val_dict_dump: str
     encoded_file_map: typing.Dict[str, bytes] = {}
     metadata_dict_dump: typing.Optional[str] = None
 
@@ -151,8 +153,10 @@ class SelectableCHObjSchema(BaseModel):
     name: str
     version_hash: str
 
+    is_op: bool
+
     type_dict_dump: str
-    val_dict_dump: str
+    # val_dict_dump: str
     encoded_file_map: typing.Dict[str, bytes] = {}
     metadata_dict_dump: typing.Optional[str] = None
 
@@ -210,8 +214,9 @@ all_obj_columns = [
     "project",
     "name",
     "version_hash",
+    "is_op",
     "type_dict_dump",
-    "val_dict_dump",
+    # "val_dict_dump",
     "encoded_file_map",
     "metadata_dict_dump",
     "created_at",
@@ -223,8 +228,9 @@ required_obj_columns = [
     "project",
     "name",
     "version_hash",
+    "is_op",
     "type_dict_dump",
-    "val_dict_dump",
+    # "val_dict_dump",
     # "encoded_file_map",
     # "metadata_dict_dump",
     "created_at",
@@ -237,8 +243,9 @@ all_obj_insert_columns = [
     "project",
     "name",
     "version_hash",
+    "is_op",
     "type_dict_dump",
-    "val_dict_dump",
+    # "val_dict_dump",
     "encoded_file_map",
     "metadata_dict_dump",
 ]
@@ -345,10 +352,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise NotImplementedError()
+        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj, True)
+        self._insert_obj(ch_obj)
+        return tsi.ObjCreateRes()
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise NotImplementedError()
+        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(self._obj_read(req, True)))
 
     def op_update(self, req: tsi.OpUpdateReq) -> tsi.OpUpdateRes:
         raise NotImplementedError()
@@ -539,13 +548,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
         return _deduplicate_calls(calls)
     
-    def _obj_read(self, req: tsi.ObjReadReq) -> SelectableCHObjSchema:
+    def _obj_read(self, req: tsi.ObjReadReq, only_ops: bool = False) -> SelectableCHObjSchema:
+        conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
+        if only_ops:
+            conditions.append("is_op = 1")
+        else:
+            conditions.append("is_op = 0")
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
             columns=all_obj_columns,
             # columns=req.columns,
-            conditions=["name = {name: String}", "version_hash = {version_hash: String}"],
+            conditions=conditions,
             limit=1,
             parameters={"name": req.name, "version_hash": req.version_hash},
         )
@@ -700,8 +714,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             name String,
             version_hash String,
 
+            is_op UInt8,
+
             type_dict_dump String,
-            val_dict_dump String,
+            # val_dict_dump String,
             encoded_file_map Map(String, String),
             metadata_dict_dump String NULL,
 
@@ -912,10 +928,13 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         # `version_hash`` should always be present
         version_hash=ch_obj.version_hash,
 
+        # `is_op`` should always be present
+        is_op=ch_obj.is_op,
+
         # `type_dict`` should always be present
         type_dict=json.loads(ch_obj.type_dict_dump),
         # `val_dict`` should always be present
-        val_dict=json.loads(ch_obj.val_dict_dump),
+        # val_dict=json.loads(ch_obj.val_dict_dump),
         # `encoded_file_map`` should always be present
         encoded_file_map=ch_obj.encoded_file_map,
         # `metadata_dict`` may be null (represented as `\\N`)
@@ -1050,6 +1069,7 @@ def _process_parameters(
 
 def _partial_obj_schema_to_ch_obj(
     partial_obj: tsi.PartialObjForCreationSchema,
+    is_op: bool = False,
 ) -> InsertableCHObjSchema:
     version_hash = version_hash_for_object(partial_obj)
 
@@ -1058,8 +1078,9 @@ def _partial_obj_schema_to_ch_obj(
         project=partial_obj.project,
         name=partial_obj.name,
         version_hash=version_hash,
+        is_op=is_op,
         type_dict_dump=json.dumps(partial_obj.type_dict),
-        val_dict_dump=json.dumps(partial_obj.val_dict),
+        # val_dict_dump=json.dumps(partial_obj.val_dict),
         encoded_file_map=partial_obj.encoded_file_map or {},
         metadata_dict_dump=json.dumps(partial_obj.metadata_dict),
     )

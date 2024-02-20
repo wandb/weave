@@ -21,9 +21,7 @@ from ..graph_client import GraphClient
 from ..op_def import OpDef
 from ..ref_base import Ref
 from .. import artifact_fs
-from .. import artifact_base
 from .. import artifact_local
-from .. import storage
 from .. import ref_base
 from .. import uris
 from .. import weave_types as types
@@ -32,6 +30,7 @@ from ..run import RunKey, Run
 from ..runs import Run as WeaveRunObj
 from ..run_sql import RunSql
 from .. import storage
+from .. import box
 
 import functools
 from urllib import parse
@@ -43,7 +42,6 @@ from .. import ref_base
 from .. import weave_types as types
 
 
-from .remote_http_trace_server import RemoteHTTPTraceServer
 from .trace_server_interface_util import version_hash_for_object
 from . import trace_server_interface as tsi
 
@@ -53,7 +51,7 @@ quote_slashes = functools.partial(parse.quote, safe="")
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
 
-    def __init__(self, version:str=None, path_contents=None, metadata=None):
+    def __init__(self, entity:str, project: str, name: str, version:str=None, path_contents=None, metadata=None):
         if path_contents is None:
             path_contents = {}
         self.path_contents = path_contents
@@ -61,6 +59,10 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
             metadata = {}
         self._metadata = metadata
         self.temp_read_dir = None
+
+        self._entity = entity
+        self._project = project
+        self._name = name
         self._version = version
 
     @contextlib.contextmanager
@@ -100,17 +102,26 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
 
         if self.temp_read_dir is None:
             self.temp_read_dir = tempfile.mkdtemp()
-        path = os.path.join(self.temp_read_dir, path)
-        with open(path, "wb") as f:
+        write_path = os.path.join(self.temp_read_dir, path)
+        with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
-        return path
+        return write_path
 
     @property
     def uri_obj(self) -> uris.WeaveURI:
-        raise NotImplementedError
         # TODO: This is why wrong, but why do we need it here?
         # because OpDefType.load_instance tries to use it
-        # return TraceNounUri()
+        trace_noun = "obj"
+        # HACK!
+        if "obj.py" in self.path_contents:
+            trace_noun = "op"
+        return TraceNounUri(
+            entity=self._entity,
+            project=self._project,
+            trace_noun=trace_noun,
+            name=self._name,
+            version=self._version,
+        )
 
     @property
     def metadata(self):
@@ -228,7 +239,7 @@ class TraceNounUri(uris.WeaveURI):
             f"{compound_version}"
         )
         if self.path:
-            uri += f"/{'/'.join([self.path])}"
+            uri += f"/{'/'.join(self.path)}"
         if self.extra:
             uri += f"#{'/'.join(self.extra)}"
         return uri
@@ -237,15 +248,14 @@ class TraceNounUri(uris.WeaveURI):
         return TraceNounRef.from_uri(self)
 
     def with_path(self, path: str) -> "TraceNounUri":
-        if self.trace_noun != "obj":
-            raise ValueError("Can only add path to obj URI")
+
         return TraceNounUri(
             entity=self.entity,
             project=self.project,
             trace_noun=self.trace_noun,
             name=self.name,
             version=self.version,
-            path=self.path + path.split("/"),
+            path=(self.path or []) + path.split("/"),
             extra=None,
         )
 
@@ -331,7 +341,22 @@ class TraceNounRef(ref_base.Ref):
         if self._trace_noun == "call":
             raise NotImplementedError
         elif self._trace_noun == "op":
-            raise NotImplementedError
+            res = gc.trace_server.op_read(
+                tsi.OpReadReq(
+                    entity=self._entity,
+                    project=self._project,
+                    name=self._name,
+                    version_hash=self._version,
+                )
+            )
+            art = MemTraceFilesArtifact(
+                                    self._entity,
+                    self._project,
+                    self._name,
+                self._version, {k: v for k, v in res.op_obj.encoded_file_map.items()}, metadata=res.op_obj.metadata_dict)
+            wb_type = types.TypeRegistry.type_from_dict(res.op_obj.type_dict)
+            data = wb_type.load_instance(art, "obj")
+            return data
         elif self._trace_noun == "obj":
             res = gc.trace_server.obj_read(
                 tsi.ObjReadReq(
@@ -339,15 +364,19 @@ class TraceNounRef(ref_base.Ref):
                     project=self._project,
                     name=self._name,
                     version_hash=self._version,
-                    path=self._path,
-                    extra=self._extra,
+                    # path=self._path,
+                    # extra=self._extra,
                 )
             )
 
-            art = MemTraceFilesArtifact(self._version, {k: v for k, v in res.obj.encoded_file_map.items()}, metadata=res.obj.metadata_dict)
+            art = MemTraceFilesArtifact(self._entity,
+                    self._project,
+                    self._name,self._version, {k: v for k, v in res.obj.encoded_file_map.items()}, metadata=res.obj.metadata_dict)
             wb_type = types.TypeRegistry.type_from_dict(res.obj.type_dict)
-            mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
-            return mapper.apply(res.obj.val_dict)
+            # mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
+            data = wb_type.load_instance(art, "obj")
+            return data
+            # return mapper.apply(res.obj.val_dict)
         else:
             raise ValueError(f"Invalid trace noun: {self._trace_noun}")
 
@@ -457,63 +486,61 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
     # def save_object(self, obj: typing.Any, name: str, branch_name: str) -> TraceNounRef:
     def save_object(self, obj: typing.Any, name: str, branch_name: str) -> ref_base.Ref:
-        wb_type = types.type_of_with_refs(obj)
+        entity = "test_entity"
+        project = "test_project"
 
-        art = MemTraceFilesArtifact()
 
-        mapper = mappers_python.map_to_python(wb_type, art)
-        val = mapper.apply(obj)
+        
+        _orig_ref = _get_ref(obj)
+        if isinstance(_orig_ref, TraceNounRef):
+            return _orig_ref
+        weave_type = types.type_of_with_refs(obj)
+        obj = box.box(obj)
+        art = MemTraceFilesArtifact(entity, project, name)
+        ref = art.set("obj", weave_type, obj)
+        # ref_base._put_ref(obj, ref)
+
+
+        # mapper = mappers_python.map_to_python(weave_type, art)
+        # val = mapper.apply(obj)
 
         # type_val = storage.to_python(obj, ref_persister=save_custom_object)
-        # TODO: THIS IS EXTREMELY WRONG - need a deterministic hash!
-        id_ = str(uuid.uuid4())
+        # Should this encoding be handled below the server abstraction?
         encoded_path_contents = {}
         for k, v in art.path_contents.items():
             if isinstance(v, str):
                 encoded_path_contents[k] = v.encode("utf-8")
             else:
                 encoded_path_contents[k] = v
-        if isinstance(obj, OpDef):
-            raise NotImplementedError
-        else:
-            partial_obj = tsi.PartialObjForCreationSchema(
-                entity="test_entity",
-                project="test_project",
-                name=name,
-                type_dict=wb_type.to_dict(),
-                val_dict=val,
-                encoded_file_map=encoded_path_contents,
-                metadata_dict=art.metadata.as_dict(),
-            )
-            version_hash = version_hash_for_object(partial_obj)
-            id_ = version_hash
-            self.trace_server.obj_create(tsi.ObjCreateReq(obj=partial_obj))
-        #     "objects",
-        #     [
-        #         (
-        #             id_,
-        #             json.dumps(wb_type.to_dict()),
-        #             json.dumps(val),
-        #             encoded_path_contents,
-        #             json.dumps(art.metadata),
-        #         )
-        #     ],
-        # )
-        # TODO  we have have already computed type here, should construct
-        # ref with it (type_val["_type"])
-        trace_noun = "obj"
+        partial_obj = tsi.PartialObjForCreationSchema(
+            entity=entity,
+            project=project,
+            name=name,
+            type_dict=weave_type.to_dict(),
+            # val_dict=val,
+            encoded_file_map=encoded_path_contents,
+            metadata_dict=art.metadata.as_dict(),
+        )
+        version_hash = version_hash_for_object(partial_obj)
         if isinstance(obj, OpDef):
             trace_noun = "op"
+            self.trace_server.op_create(tsi.OpCreateReq(op_obj=partial_obj))
+        else:
+            trace_noun = "obj"
+            self.trace_server.obj_create(tsi.ObjCreateReq(obj=partial_obj))
+
+        art._version = version_hash
+
         ref = TraceNounRef(
-            entity="test_entity",
-            project="test_project",
+            entity=entity,
+            project=project,
             trace_noun=trace_noun,
             name=name,
-            version=id_,
+            version=version_hash,
             path=None,
             extra=None,
             obj=obj,
-            type=wb_type,
+            type=weave_type,
         )
         ref_base._put_ref(obj, ref)
         return ref
@@ -587,3 +614,8 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
         raise NotImplementedError
+
+def _get_ref(obj: typing.Any) -> typing.Optional[ref_base.Ref]:
+    if isinstance(obj, ref_base.Ref):
+        return obj
+    return ref_base.get_ref(obj)

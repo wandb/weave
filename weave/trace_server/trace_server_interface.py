@@ -81,7 +81,7 @@ class ObjSchema(BaseModel):
     version_hash: str
 
     type_dict: typing.Dict[str, typing.Any]
-    val_dict: typing.Dict[str, typing.Any]
+    # val_dict: typing.Dict[str, typing.Any]
     encoded_file_map: typing.Dict[str, bytes]
     metadata_dict: typing.Dict[str, typing.Any]
 
@@ -94,10 +94,33 @@ class PartialObjForCreationSchema(BaseModel):
     name: str
 
     type_dict: typing.Dict[str, typing.Any]
-    val_dict: typing.Dict[str, typing.Any]
+    # val_dict: typing.Dict[str, typing.Any]
 
     encoded_file_map: typing.Optional[typing.Dict[str, bytes]] = None
     metadata_dict: typing.Optional[typing.Dict[str, typing.Any]] = None
+
+
+# class OpSchema(BaseModel):
+#     entity: str
+#     project: str
+#     name: str
+#     version_hash: str
+
+#     code: typing.Optional[str] = None
+#     environment_state_identity: typing.Optional[str] = None
+#     # TODO: We might want to also track the inputs and output types here.
+#     # TODO: We should probably track the dependencies of the op here as well.
+
+#     created_at_s: float
+
+
+# class PartialOpForCreationSchema(BaseModel):
+#     entity: str
+#     project: str
+#     name: str
+
+#     code: typing.Optional[str] = None
+#     environment_state_identity: typing.Optional[str] = None
 
 
 class CallCreateReq(BaseModel):
@@ -187,7 +210,7 @@ class CallQueryRes(BaseModel):
 
 
 class OpCreateReq(BaseModel):
-    pass
+    op_obj: PartialObjForCreationSchema
 
 
 class OpCreateRes(BaseModel):
@@ -195,11 +218,14 @@ class OpCreateRes(BaseModel):
 
 
 class OpReadReq(BaseModel):
-    pass
+    entity: str
+    project: str
+    name: str
+    version_hash: str
 
 
 class OpReadRes(BaseModel):
-    pass
+    op_obj: ObjSchema
 
 
 class OpUpdateReq(BaseModel):

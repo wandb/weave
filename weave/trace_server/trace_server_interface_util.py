@@ -1,21 +1,22 @@
 import hashlib
 import json
 import uuid
-from .trace_server_interface import PartialObjForCreationSchema
+from . import trace_server_interface as tsi
 
 
 # This is a quick solution but needs more thought
 
 
-def version_hash_for_object(object: PartialObjForCreationSchema) -> str:
-    type_dict = _order_dict(object.type_dict)
-    val_dict = _order_dict(object.val_dict)
+def version_hash_for_object(obj: tsi.PartialObjForCreationSchema) -> str:
+    type_dict = _order_dict(obj.type_dict)
+    # val_dict = _order_dict(obj.val_dict)
 
     hasher = hashlib.md5()
+    
     hasher.update(json.dumps(type_dict).encode())
-    hasher.update(json.dumps(val_dict).encode())
+    # hasher.update(json.dumps(val_dict).encode())
 
-    files = _order_dict(object.encoded_file_map or {})
+    files = _order_dict(obj.encoded_file_map or {})
     for k, v in files.items():
         hasher.update(k.encode())
         if isinstance(v, str):
@@ -26,6 +27,17 @@ def version_hash_for_object(object: PartialObjForCreationSchema) -> str:
             raise ValueError(f"Unexpected type for file {k}: {type(v)}")
 
     return hasher.hexdigest()
+
+# def version_hash_for_op(op: tsi.PartialOpForCreationSchema) -> str:
+
+#     hasher = hashlib.md5()
+#     hasher.update(op.name.encode())
+#     if op.code:
+#         hasher.update(op.code.encode())
+#     if op.environment_state_identity:
+#         hasher.update(op.environment_state_identity.encode())
+    
+#     return hasher.hexdigest()
 
 
 def _decode_bytes_to_str(dictionary):
