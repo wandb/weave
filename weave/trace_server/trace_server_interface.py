@@ -100,6 +100,27 @@ class PartialObjForCreationSchema(BaseModel):
     metadata_dict: typing.Optional[typing.Dict[str, typing.Any]] = None
 
 
+class TransportableObjSchema(ObjSchema):
+    encoded_file_map_as_length_and_big_int: typing.Dict[str, typing.Tuple[int, int]]
+
+
+class TransportablePartialObjForCreationSchema(PartialObjForCreationSchema):
+    encoded_file_map_as_length_and_big_int: typing.Dict[str, typing.Tuple[int, int]]
+
+
+class TransportableObjCreateReq(BaseModel):
+    obj: TransportablePartialObjForCreationSchema
+
+class TransportableObjReadRes(BaseModel):
+    obj: ObjSchema
+
+class TransportableOpCreateReq(BaseModel):
+    op_obj: TransportablePartialObjForCreationSchema
+
+class TransportableOpReadRes(BaseModel):
+    op_obj: ObjSchema
+
+
 # class OpSchema(BaseModel):
 #     entity: str
 #     project: str

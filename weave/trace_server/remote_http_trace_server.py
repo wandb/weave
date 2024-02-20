@@ -2,8 +2,10 @@ import json
 import typing as t
 import requests
 
+
 from .flushing_buffer import InMemAutoFlushingBuffer
 from . import trace_server_interface as tsi
+from .trace_server_interface_util import prepare_partial_obj_for_creation_schema_for_transport, read_obj_schema_from_transport
 
 MAX_FLUSH_COUNT = 100
 MAX_FLUSH_AGE = 5
@@ -98,12 +100,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def op_create(
         self, req: t.Union[tsi.OpCreateReq, t.Dict[str, t.Any]]
     ) -> tsi.OpCreateRes:
+        if isinstance(req, dict):
+            req = tsi.OpCreateReq.model_validate(req)
+        
+        transport_req = tsi.TransportableOpCreateReq(
+            op_obj=prepare_partial_obj_for_creation_schema_for_transport(req.op_obj),
+        )
+
         return self._generic_request(
-            "/op/create", req, tsi.OpCreateReq, tsi.OpCreateRes
+            "/op/create", transport_req, tsi.TransportableOpCreateReq, tsi.OpCreateRes
         )
 
     def op_read(self, req: t.Union[tsi.OpReadReq, t.Dict[str, t.Any]]) -> tsi.OpReadRes:
-        return self._generic_request("/op/read", req, tsi.OpReadReq, tsi.OpReadRes)
+        transport_res = self._generic_request("/op/read", req, tsi.OpReadReq, tsi.TransportableOpReadRes)
+        return tsi.OpReadRes(op_obj=read_obj_schema_from_transport(transport_res.op_obj))
+
 
     def op_update(
         self, req: t.Union[tsi.OpUpdateReq, t.Dict[str, t.Any]]
@@ -129,14 +140,22 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def obj_create(
         self, req: t.Union[tsi.ObjCreateReq, t.Dict[str, t.Any]]
     ) -> tsi.ObjCreateRes:
+        if isinstance(req, dict):
+            req = tsi.ObjCreateReq.model_validate(req)
+        
+        transport_req = tsi.TransportableObjCreateReq(
+            obj=prepare_partial_obj_for_creation_schema_for_transport(req.obj),
+        )
+
         return self._generic_request(
-            "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
+            "/obj/create", transport_req, tsi.TransportableObjCreateReq, tsi.ObjCreateRes
         )
 
     def obj_read(
         self, req: t.Union[tsi.ObjReadReq, t.Dict[str, t.Any]]
     ) -> tsi.ObjReadRes:
-        return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
+        transport_res = self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.TransportableObjReadRes)
+        return tsi.ObjReadRes(obj_obj=read_obj_schema_from_transport(transport_res.obj))
 
     def obj_update(
         self, req: t.Union[tsi.ObjUpdateReq, t.Dict[str, t.Any]]
