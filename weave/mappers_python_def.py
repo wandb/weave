@@ -46,8 +46,14 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
         result = {"_type": self.type.name}
         for prop_name, prop_serializer in self._property_serializers.items():
             if prop_serializer is not None:
-                v = prop_serializer.apply(getattr(obj, prop_name))
-                result[prop_name] = v
+                obj_val = getattr(obj, prop_name, None)
+                if obj_val is None:
+                    # Shortcut if there is a None here. In boards there are some cases where
+                    # we have incorrect types that are missing optional designation. Fixes
+                    # plotboard.cy.ts
+                    result[prop_name] = None
+                else:
+                    result[prop_name] = prop_serializer.apply(obj_val)
         return result
 
 
@@ -66,12 +72,14 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
             if serializer.type != OpDefType() and k in constructor_sig.parameters:
-                # None haxxx
-                # TODO: remove
                 obj_val = obj.get(k)
-                if obj_val is not None or serializer.type == types.UnknownType():
-                    v = serializer.apply(obj_val)
-                    result[k] = v
+                if obj_val is None:
+                    # Shortcut if there is a None here. In boards there are some cases where
+                    # we have incorrect types that are missing optional designation. Fixes
+                    # plotboard.cy.ts
+                    result[k] = None
+                else:
+                    result[k] = serializer.apply(obj_val)
 
         for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):
@@ -94,6 +102,8 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             # with overridden op methods. The op_methods are unbound on the class,
             # and will bind self upon construction as usual.
             if self.type._relocatable:
+                # Attach fields to the relocated object, so we can
+                # detect and reconstruct later.
                 new_class = type(
                     instance_class.__name__,
                     (instance_class,),

@@ -19,9 +19,9 @@ def make_object_getattribute(
     return object_getattribute
 
 
-def make_object_lookup_path() -> typing.Callable[
-    [typing.Any, typing.List[str]], typing.Any
-]:
+def make_object_lookup_path() -> (
+    typing.Callable[[typing.Any, typing.List[str]], typing.Any]
+):
     def object_lookup_path(self: typing.Any, path: typing.List[str]) -> typing.Any:
         assert len(path) > 1
         edge_type = path[0]

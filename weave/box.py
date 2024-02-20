@@ -100,6 +100,12 @@ class BoxedList(list):
             return res._lookup_path(remaining_path)
         return res
 
+    def __iter__(self):
+        # Needed to make list-comprehensions work with our custom __getitem__,
+        # otherwise, list.__iter__ uses the parent class __getitem__.
+        for i in range(len(self)):
+            yield self[i]
+
     def __getitem__(self, __index: typing.Any) -> typing.Any:
         val = super().__getitem__(__index)
         return ref_util.val_with_relative_ref(

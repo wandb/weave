@@ -67,7 +67,7 @@ const CallLinkOp = styled.div<{fullWidth?: boolean}>`
 `;
 CallLinkOp.displayName = 'S.CallLinkOp';
 
-const CallId = styled.div`
+export const CallId = styled.div`
   padding: 0 4px;
   background-color: ${MOON_150};
   border-radius: 4px;

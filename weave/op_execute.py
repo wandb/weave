@@ -61,7 +61,7 @@ def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
 def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
     mon_span_inputs = {**inputs}
     client = graph_client_context.get_graph_client()
-    if client is not None and context_state.eager_mode() and op_def.location:
+    if client is not None and context_state.eager_mode():
         op_def_ref = storage._get_ref(op_def)
         if not client.ref_is_own(op_def_ref):
             op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
@@ -78,7 +78,8 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
         run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
         try:
             with run_context.current_run(run):
-                res = op_def.resolve_fn(**inputs)
+                res = op_def.raw_resolve_fn(**inputs)
+                res = box.box(res)
         except BaseException as e:
             print("Error running ", op_def.name)
             client.fail_run(run, e)

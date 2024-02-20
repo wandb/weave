@@ -1,25 +1,7 @@
 from pydantic import BaseModel, create_model
 from . import weave_types as types
-import typing
+from . import infer_types
 import enum
-
-
-class JSONType(enum.Enum):
-    STRING = "string"
-    NUMBER = "number"
-    INTEGER = "integer"
-    BOOLEAN = "boolean"
-    OBJECT = "object"
-    ARRAY = "array"
-    NULL = "null"
-
-
-class JSONSchema(typing.TypedDict, total=False):
-    title: str
-    type: JSONType
-    properties: "typing.Optional[typing.Dict[str, JSONSchema]]"
-    required: typing.Optional[typing.List[str]]
-    items: "typing.Optional[typing.Union[JSONSchema, JSONType]]"  # Type of array items
 
 
 def weave_type_to_pydantic(
@@ -38,33 +20,11 @@ def weave_type_to_pydantic(
     return create_model(name, **field_defs)  # type: ignore
 
 
-def json_schema_to_weave_type(json_schema: JSONSchema) -> types.Type:
-    type = JSONType(json_schema["type"])
-    if type == JSONType.INTEGER:
-        return types.Int()
-    elif type == JSONType.NUMBER:
-        return types.Number()
-    elif type == JSONType.STRING:
-        return types.String()
-    elif type == JSONType.NULL:
-        return types.NoneType()
-    elif type == JSONType.BOOLEAN:
-        return types.Boolean()
-    elif type == JSONType.ARRAY:
-        items_type = json_schema["items"]
-        assert items_type is not None, "No items type given for array"
-        if not isinstance(items_type, dict):
-            items_type = {"type": items_type}
-        return types.List(json_schema_to_weave_type(items_type))
-    elif type == JSONType.OBJECT:
-
-        properties = json_schema.get("properties", {}) or {}
-        weave_properties = {
-            key: json_schema_to_weave_type(value) for key, value in properties.items()
-        }
-
-        required_keys: set[str] = set(json_schema.get("required", []) or [])
-        not_required = set(properties.keys()) - required_keys
-
-        return types.TypedDict(weave_properties, not_required_keys=not_required)
-    raise ValueError(f"Could not get weave type for json schema {json_schema}")
+def pydantic_class_to_attr_types(
+    pydantic_class: type[BaseModel],
+) -> dict[str, types.Type]:
+    attr_types = {}
+    for field_name, field in pydantic_class.model_fields.items():
+        if field.annotation:
+            attr_types[field_name] = infer_types.python_type_to_type(field.annotation)
+    return attr_types

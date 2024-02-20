@@ -5,6 +5,11 @@ import time
 import weave
 
 
+from . import context_state as _context_state
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
+
+
 @weave.op(
     render_info={"type": "function"},
     name="demo-slowmult",
@@ -104,3 +109,6 @@ def train(dataset, _run=None):
     _run.print_("starting")
     _run.set_output(AsyncDemoTrainResult(dataset[0]["prompt"]))
     _run.print_("done")
+
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)

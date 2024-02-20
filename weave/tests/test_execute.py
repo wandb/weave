@@ -13,12 +13,34 @@ import pytest
 
 execute_test_count_op_run_count = 0
 
+from .. import context_state as _context_state
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
+
 
 @api.op(input_type={"x": types.Any()}, output_type=types.Number(), hidden=True)
 def execute_test_count_op(x):
     global execute_test_count_op_run_count
     execute_test_count_op_run_count += 1
     return len(x)
+
+
+REFINE_CALLED = 0
+
+
+@weave.op()
+def _test_execute_refining_op_refine(x: int) -> weave.types.Type:
+    global REFINE_CALLED
+    REFINE_CALLED += 1
+    return weave.types.Int()
+
+
+@weave.op(refine_output_type=_test_execute_refining_op_refine)
+def _test_execute_refining_op(x: int) -> typing.Any:
+    return x + 1
+
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_local_file_pure_cached(cereal_csv):
@@ -37,21 +59,6 @@ def test_execute_no_cache():
     nine = weave_internal.make_const_node(types.Number(), 9)
     res = execute.execute_nodes([nine + 3], no_cache=True)
     assert res.unwrap() == [12]
-
-
-REFINE_CALLED = 0
-
-
-@weave.op()
-def _test_execute_refining_op_refine(x: int) -> weave.types.Type:
-    global REFINE_CALLED
-    REFINE_CALLED += 1
-    return weave.types.Int()
-
-
-@weave.op(refine_output_type=_test_execute_refining_op_refine)
-def _test_execute_refining_op(x: int) -> typing.Any:
-    return x + 1
 
 
 @pytest.fixture()
