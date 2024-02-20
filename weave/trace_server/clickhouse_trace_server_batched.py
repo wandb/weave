@@ -12,6 +12,8 @@ from clickhouse_connect.driver.query import QueryResult
 import clickhouse_connect
 from pydantic import BaseModel, model_validator
 
+
+from .trace_server_interface_util import version_hash_for_object
 from . import trace_server_interface as tsi
 from .flushing_buffer import InMemAutoFlushingBuffer, InMemFlushableBuffer
 
@@ -103,6 +105,18 @@ class UpdateableCHCallSchema(BaseModel):
     created_at: typing.Optional[datetime.datetime] = None
 
 
+class InsertableCHObjectSchema(BaseModel):
+    entity: str
+    project: str
+    name: str
+    version_hash: str
+
+    type_dict_dump: str
+    val_dict_dump: str
+    encoded_file_map: typing.Dict[str, bytes] = {}
+    metadata_dict_dump: typing.Optional[str] = None
+
+
 # Very critical that this matches the calls table schema! This should
 # essentially be the DB version of CallSchema with the addition of the
 # created_at and updated_at fields
@@ -175,6 +189,30 @@ required_call_columns = [
     "exception",
 ]
 
+all_obj_columns = [
+    "entity",
+    "project",
+    "name",
+    "version_hash",
+    "type_dict_dump",
+    "val_dict_dump",
+    "encoded_file_map",
+    "metadata_dict_dump",
+    "created_at",
+    "updated_at",
+]
+
+
+all_obj_insert_columns = [
+    "entity",
+    "project",
+    "name",
+    "version_hash",
+    "type_dict_dump",
+    "val_dict_dump",
+    "encoded_file_map",
+    "metadata_dict_dump",
+]
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     ch_client: Client
@@ -183,13 +221,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def __init__(self, host: str, port: int = 8123, should_batch: bool = True):
         super().__init__()
         self.ch_client = clickhouse_connect.get_client(host=host, port=port)
-        self.ch_insert_thread_client = clickhouse_connect.get_client(
+        self.ch_call_insert_thread_client = clickhouse_connect.get_client(
+            host=host, port=port
+        )
+        self.ch_obj_insert_thread_client = clickhouse_connect.get_client(
             host=host, port=port
         )
         self._run_migrations()
         self._print_status()
         self.call_insert_buffer = InMemAutoFlushingBuffer(
             MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_call_insert_buffer
+        )
+        self.obj_insert_buffer = InMemAutoFlushingBuffer(
+            MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_obj_insert_buffer
         )
         self.should_batch = should_batch
 
@@ -269,12 +313,49 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         calls = [_ch_call_to_call_schema(call) for call in ch_calls]
         return tsi.CallQueryRes(calls=calls)
+    
+    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+        raise NotImplementedError()
+
+    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+        raise NotImplementedError()
+
+    def op_update(self, req: tsi.OpUpdateReq) -> tsi.OpUpdateRes:
+        raise NotImplementedError()
+
+    def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
+        raise NotImplementedError()
+
+    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
+        raise NotImplementedError()
+    
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        ch_obj = _partial_obj_schema_to_ch_obj(req.obj)
+        self._insert_obj(ch_obj)
+        return tsi.ObjCreateRes()
+
+
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        raise NotImplementedError()
+
+
+    def obj_update(self, req: tsi.ObjUpdateReq) -> tsi.ObjUpdateRes:
+        raise NotImplementedError()
+
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        raise NotImplementedError()
+
+
+    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+        raise NotImplementedError()
+
 
     # Private Methods
     def __del__(self):
         self.call_insert_buffer.flush()
         self.ch_client.close()
-        self.ch_insert_thread_client.close()
+        self.ch_call_insert_thread_client.close()
 
     def _flush_call_insert_buffer(self, buffer: typing.List):
         buffer_len = len(buffer)
@@ -282,7 +363,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             flush_id = _generate_id()
             start_time = time.time()
             print("(" + flush_id + ") Flushing " + str(buffer_len) + " calls.")
-            self.ch_insert_thread_client.insert(
+            self.ch_call_insert_thread_client.insert(
                 "calls_raw",
                 data=buffer,
                 column_names=all_call_columns,
@@ -291,7 +372,28 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             print(
                 "("
                 + flush_id
-                + ") Complete in "
+                + ") Call flush complete in "
+                + str(time.time() - start_time)
+                + " seconds."
+            )
+
+
+    def _flush_obj_insert_buffer(self, buffer: typing.List):
+        buffer_len = len(buffer)
+        if buffer_len:
+            flush_id = _generate_id()
+            start_time = time.time()
+            print("(" + flush_id + ") Flushing " + str(buffer_len) + " objects.")
+            self.ch_obj_insert_thread_client.insert(
+                "objects",
+                data=buffer,
+                column_names=all_obj_insert_columns,
+                # column_type_names=all_obj_column_type_names_with_defaults_nullable,
+            )
+            print(
+                "("
+                + flush_id
+                + ") Object flush complete in "
                 + str(time.time() - start_time)
                 + " seconds."
             )
@@ -460,17 +562,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objects (
             entity String,
             project String,
-            id String,
-            type String,
-            val String,
-            files Map(String, String),
-            art_meta String,
+            name String,
+            version_hash String,
+
+            type_dict_dump String,
+            val_dict_dump String,
+            encoded_file_map Map(String, String),
+            metadata_dict_dump String NULL,
+
             created_at DateTime64(3) DEFAULT now64(3),
             updated_at DateTime64(3) DEFAULT now64(3)
         )
-        ENGINE = ReplacingMergeTree
-        ORDER BY (entity, project, id)
-        PRIMARY KEY (entity, project, id)
+        ENGINE = MergeTree
+        ORDER BY (entity, project, name, version_hash)
+        PRIMARY KEY (entity, project, name, version_hash)
         """
         )
         self.ch_client.command(
@@ -562,6 +667,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self.call_insert_buffer.insert(row=row)
         else:
             self._flush_call_insert_buffer([row])
+
+
+
+    def _insert_obj(self, ch_obj: InsertableCHObjectSchema) -> None:
+        parameters = ch_obj.model_dump()
+        row = []
+        for key in all_obj_insert_columns:
+            row.append(parameters.get(key, None))
+
+        if self.should_batch:
+            self.obj_insert_buffer.insert(row=row)
+        else:
+            self._flush_obj_insert_buffer([row])
 
 
 def _prepare_nullable_dict_value(
@@ -760,3 +878,19 @@ def _process_parameters(
         if isinstance(value, datetime.datetime):
             parameters[key] = value.timestamp()
     return parameters
+
+def _partial_obj_schema_to_ch_obj(
+    partial_obj: tsi.PartialObjForCreationSchema,
+) -> InsertableCHObjectSchema:
+    version_hash = version_hash_for_object(partial_obj)
+    
+    return InsertableCHObjectSchema(
+        entity=partial_obj.entity,
+        project=partial_obj.project,
+        name=partial_obj.name,
+        version_hash=version_hash,
+        type_dict_dump=json.dumps(partial_obj.type_dict),
+        val_dict_dump=json.dumps(partial_obj.val_dict),
+        encoded_file_map=partial_obj.encoded_file_map or {},
+        metadata_dict_dump=json.dumps(partial_obj.metadata_dict),
+    )

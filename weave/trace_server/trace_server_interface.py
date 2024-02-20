@@ -74,6 +74,31 @@ class PartialCallForCreationSchema(BaseModel):
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
 
 
+class ObjSchema(BaseModel):
+    entity: str
+    project: str
+    name: str
+    version_hash: str
+
+    type_dict: typing.Dict[str, typing.Any]
+    val_dict: typing.Dict[str, typing.Any]
+    encoded_file_map: typing.Dict[str, str]
+    metadata_dict: typing.Dict[str, typing.Any]
+
+    created_at_s: float
+
+
+class PartialObjForCreationSchema(BaseModel):
+    entity: str
+    project: str
+    name: str
+
+    type_dict: typing.Dict[str, typing.Any]
+    val_dict: typing.Dict[str, typing.Any]
+
+    encoded_file_map: typing.Optional[typing.Dict[str, bytes]] = None
+    metadata_dict: typing.Optional[typing.Dict[str, typing.Any]] = None
+
 class CallCreateReq(BaseModel):
     call: PartialCallForCreationSchema
 
@@ -201,7 +226,7 @@ class OpQueryRes(BaseModel):
 
 
 class ObjCreateReq(BaseModel):
-    pass
+    obj: PartialObjForCreationSchema
 
 
 class ObjCreateRes(BaseModel):

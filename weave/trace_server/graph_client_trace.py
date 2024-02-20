@@ -14,6 +14,7 @@ from clickhouse_connect import get_client
 
 from collections.abc import Mapping
 
+
 # from weave.graph_client_sql import MemFilesArtifact
 
 from ..graph_client import GraphClient
@@ -43,12 +44,12 @@ from .. import weave_types as types
 
 
 from .remote_http_trace_server import RemoteHTTPTraceServer
+from .trace_server_interface_util import version_hash_for_object
 from . import trace_server_interface as tsi
 
 quote_slashes = functools.partial(parse.quote, safe="")
 
 
-# # From Tim: This feels really heavy and I need to understand it better
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
 
@@ -77,7 +78,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
 
     @property
     def version(self):
-        return None
+        raise NotImplementedError
 
     @contextlib.contextmanager
     def open(self, path, binary=False):
@@ -91,32 +92,30 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         yield f
         f.close()
 
-    def path(self, name: str) -> str:
-        if name not in self.path_contents:
-            raise FileNotFoundError(name)
+    def path(self, path: str) -> str:
+        if path not in self.path_contents:
+            raise FileNotFoundError(path)
         import tempfile
 
         if self.temp_read_dir is None:
             self.temp_read_dir = tempfile.mkdtemp()
-        path = os.path.join(self.temp_read_dir, name)
+        path = os.path.join(self.temp_read_dir, path)
         with open(path, "wb") as f:
-            f.write(self.path_contents[name])
+            f.write(self.path_contents[path])
         return path
 
     @property
     def uri_obj(self) -> uris.WeaveURI:
+        raise NotImplementedError
         # TODO: This is why wrong, but why do we need it here?
         # because OpDefType.load_instance tries to use it
-        return TraceNounUri(
-            "name",
-            "version",
-            "entity",
-            "project",
-        )
+        # return TraceNounUri()
 
     @property
     def metadata(self):
-        return self._metadata
+        return artifact_fs.ArtifactMetadata(
+            self._metadata, {**self._metadata}
+        )
 
 
 def refs_to_str(val: typing.Any) -> typing.Any:
@@ -325,10 +324,31 @@ class TraceNounRef(ref_base.Ref):
         )
 
     def _get(self) -> Any:
-        raise NotImplementedError
-        # gc = graph_client_context.require_graph_client()
-        # assert isinstance(gc, GraphClientTrace)
-        # assert self._version_hash
+        gc = graph_client_context.require_graph_client()
+        assert isinstance(gc, GraphClientTrace)
+        if self._trace_noun == "call":
+            raise NotImplementedError
+        elif self._trace_noun == "op":
+            raise NotImplementedError
+        elif self._trace_noun == "obj":
+            obj = gc.trace_server.obj_read(
+                tsi.ObjReadReq(
+                    entity=self._entity,
+                    project=self._project,
+                    name=self._name,
+                    version=self._version,
+                    path=self._path,
+                    extra=self._extra,
+                )
+            )
+
+            art = MemTraceFilesArtifact(obj.files, metadata=obj.metadata)
+            wb_type = types.TypeRegistry.type_from_dict(obj.type)
+            mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
+            return mapper.apply(obj.val)
+        else:
+            raise ValueError(f"Invalid trace noun: {self._trace_noun}")
+
         # client = gc.client
         # query_result = client.query(
         #     f"SELECT * FROM objects WHERE id = '{self._version_hash}'",
@@ -440,9 +460,10 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         art = MemTraceFilesArtifact()
 
         mapper = mappers_python.map_to_python(wb_type, art)
-        # val = mapper.apply(obj)
+        val = mapper.apply(obj)
 
         # type_val = storage.to_python(obj, ref_persister=save_custom_object)
+        # TODO: THIS IS EXTREMELY WRONG - need a deterministic hash!
         id_ = str(uuid.uuid4())
         encoded_path_contents = {}
         for k, v in art.path_contents.items():
@@ -450,8 +471,23 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
                 encoded_path_contents[k] = v.encode("utf-8")
             else:
                 encoded_path_contents[k] = v
-        # TODO: Make this work
-        # self.client.insert(
+        if isinstance(obj, OpDef):
+            raise NotImplementedError
+        else:
+            partial_obj =tsi.PartialObjForCreationSchema(
+                    entity="test_entity",
+                    project="test_project",
+                    name=name,
+                    type_dict=wb_type.to_dict(),
+                    val_dict=val,
+                    encoded_file_map=encoded_path_contents,
+                    metadata_dict=art.metadata.as_dict(),
+                )
+            version_hash = version_hash_for_object(partial_obj)
+            id_ = version_hash
+            self.trace_server.obj_create(tsi.ObjCreateReq(
+                obj=partial_obj)
+            )
         #     "objects",
         #     [
         #         (
