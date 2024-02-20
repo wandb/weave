@@ -180,8 +180,8 @@ def init_sql_client() -> _graph_client.GraphClient:
     return _weave_init.init_sql().client
 
 
-def init_trace_client() -> _graph_client.GraphClient:
-    return _weave_init.init_trace_remote().client
+def init_trace_client(project_name: str) -> _graph_client.GraphClient:
+    return _weave_init.init_trace_remote(project_name).client
 
 
 @contextlib.contextmanager
