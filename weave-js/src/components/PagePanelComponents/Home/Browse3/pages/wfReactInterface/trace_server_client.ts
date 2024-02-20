@@ -46,7 +46,7 @@ type TraceCallsQueryReq= {
 
 
 
-export const fetchAllCalls = async (req: TraceCallsQueryReq): Promise<TraceCallQueryRes> => {
+export const callsQuery = async (req: TraceCallsQueryReq): Promise<TraceCallQueryRes> => {
     const url = "http://127.0.0.1:6345/calls/query"
     // eslint-disable-next-line wandb/no-unprefixed-urls
     const response = await fetch(url, {

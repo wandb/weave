@@ -38,8 +38,9 @@ import {
   useRuns,
   useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
-import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
-import { fetchAllCalls, TraceCallSchema } from './trace_server_client';
+import {PROJECT_CALL_STREAM_NAME, TRACE_REF_PREFIX, WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import { callsQuery, TraceCallSchema } from './trace_server_client';
+import { useDeepMemo } from '../../../../../../hookUtils';
 
 export const OP_CATEGORIES = [
   'train',
@@ -74,6 +75,18 @@ export type CallSchema = CallKey & {
   rawFeedback?: any;
 };
 
+const refIsWandbArtifactRef = (refUri: string) => {
+  return refUri.startsWith(WANDB_ARTIFACT_REF_PREFIX);
+}
+
+const refIsWandbTraceRef = (refUri: string) => {
+  return refUri.startsWith(TRACE_REF_PREFIX);
+}
+
+const opNameIsRef = (opName: string) => {
+  return refIsWandbArtifactRef(opName) || refIsWandbTraceRef(opName);
+}
+
 export const spanToCallSchema = (
   entity: string,
   project: string,
@@ -85,10 +98,10 @@ export const spanToCallSchema = (
     callId: span.span_id,
     traceId: span.trace_id,
     parentId: span.parent_id ?? null,
-    spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+    spanName: opNameIsRef(span.name)
       ? refUriToOpVersionKey(span.name).opId
       : span.name,
-    opVersionRef: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+    opVersionRef: opNameIsRef(span.name)
       ? span.name
       : null,
     rawSpan: span,
@@ -97,18 +110,40 @@ export const spanToCallSchema = (
 };
 
 export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
+
   const cachedCall = key ? getCallFromCache(key) : null;
-  const calls = useRuns(
-    {
-      entityName: key?.entity ?? '',
-      projectName: key?.project ?? '',
-      streamName: PROJECT_CALL_STREAM_NAME,
-    },
-    {
-      callIds: [key?.callId ?? ''],
-    },
-    {skip: key == null || cachedCall != null}
-  );
+  const [calls, setCalls] = useState<SpanWithFeedback[] | null>(null);
+  const deepKey = useDeepMemo(key);
+  
+  useEffect(() => {
+    if (!deepKey) {
+      return;
+    }
+    callsQuery({
+      "entity": deepKey.entity,
+      "project": deepKey.project,
+      "filter": {
+        "call_ids": [deepKey.callId]
+      }
+  }).then((data) => {
+      setCalls(data.calls.map(traceCallToSpanWithFeedback));
+    })
+  }, [deepKey]);
+  // return {
+  //   loading: true,
+  //   result: null,
+  // }
+  // const calls = useRuns(
+  //   {
+  //     entityName: key?.entity ?? '',
+  //     projectName: key?.project ?? '',
+  //     streamName: PROJECT_CALL_STREAM_NAME,
+  //   },
+  //   {
+  //     callIds: [key?.callId ?? ''],
+  //   },
+  //   {skip: key == null || cachedCall != null}
+  // );
 
   return useMemo(() => {
     if (key == null) {
@@ -123,11 +158,16 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         result: cachedCall,
       };
     }
-    const callResult = calls.result?.[0] ?? null;
+    
+    let callResult = null;
+    if (calls) {
+      callResult = calls[0] ;
+    }
     const result = callResult
       ? spanToCallSchema(key.entity, key.project, callResult)
       : null;
-    if (calls.loading) {
+    const loading = !cachedCall && calls == null;
+    if (loading) {
       return {
         loading: true,
         result,
@@ -141,7 +181,7 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         result,
       };
     }
-  }, [cachedCall, calls.loading, calls.result, key]);
+  }, [cachedCall, calls, key]);
 };
 
 export type CallFilter = {
@@ -212,41 +252,26 @@ export const useCalls = (
   filter: CallFilter
 ): Loadable<CallSchema[]> => {
   const [calls, setCalls] = useState<SpanWithFeedback[] | null>(null);
+  // TODO: Make a better hook interface for these that correctly deep memos automatically.
+  const deepFilter = useDeepMemo(filter);
   useEffect(() => {
-    fetchAllCalls({
+    callsQuery({
       "entity": entity,
       "project": project,
       "filter": {
-        "names": filter.opVersionRefs,
-        "input_object_version_refs": filter.inputObjectVersionRefs,
-        "output_object_version_refs": filter.outputObjectVersionRefs,
-        "parent_ids": filter.parentIds,
-        "trace_ids": filter.traceId ? [filter.traceId] : undefined,
-        "call_ids": filter.callIds,
-        "trace_roots_only": filter.traceRootsOnly,
+        "names": deepFilter.opVersionRefs,
+        "input_object_version_refs": deepFilter.inputObjectVersionRefs,
+        "output_object_version_refs": deepFilter.outputObjectVersionRefs,
+        "parent_ids": deepFilter.parentIds,
+        "trace_ids": deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        "call_ids": deepFilter.callIds,
+        "trace_roots_only": deepFilter.traceRootsOnly,
       }
   }).then((data) => {
       setCalls(data.calls.map(traceCallToSpanWithFeedback));
     })
-  }, [filter.callIds, filter.inputObjectVersionRefs, filter.opVersionRefs, filter.outputObjectVersionRefs, filter.parentIds, filter.traceId, filter.traceRootsOnly]);
-  // const calls = useRunsWithFeedback(
-  //   {
-  //     entityName: entity,
-  //     projectName: project,
-  //     streamName: PROJECT_CALL_STREAM_NAME,
-  //   },
-  //   {
-  //     opUris: filter.opVersionRefs,
-  //     inputUris: filter.inputObjectVersionRefs,
-  //     outputUris: filter.outputObjectVersionRefs,
-  //     traceId: filter.traceId,
-  //     parentIds: filter.parentIds,
-  //     traceRootsOnly: filter.traceRootsOnly,
-  //     callIds: filter.callIds,
-  //   },
-  //   // TODO: Re-Enable feedback once we actually have it!
-  //   true
-  // );
+  }, [deepFilter, entity, project]);
+
   return useMemo(() => {
     const allResults = (calls ?? []).map(run =>
       spanToCallSchema(entity, project, run)
@@ -295,13 +320,15 @@ type OpVersionKey = {
 
 export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
   const refDict = refStringToRefDict(refUri);
-  if (
-    refDict.filePathParts.length !== 1 ||
-    refDict.refExtraTuples.length !== 0 ||
-    refDict.filePathParts[0] !== 'obj'
-  ) {
-    if (refDict.versionCommitHash !== '*') {
-      throw new Error('Invalid refUri: ' + refUri);
+  if (refIsWandbArtifactRef(refUri)) {
+    if (
+      refDict.filePathParts.length !== 1 ||
+      refDict.refExtraTuples.length !== 0 ||
+      refDict.filePathParts[0] !== 'obj'
+    ) {
+      if (refDict.versionCommitHash !== '*') {
+        throw new Error('Invalid refUri: ' + refUri);
+      }
     }
   }
   return {
@@ -312,7 +339,8 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
   };
 };
 export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
-  return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
+  return `${TRACE_REF_PREFIX}${key.entity}/${key.project}/op/${key.opId}:${key.versionHash}`;
+  // return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
 };
 
 export type OpVersionSchema = OpVersionKey & {
@@ -320,6 +348,7 @@ export type OpVersionSchema = OpVersionKey & {
   versionIndex: number;
   createdAtMs: number;
   category: OpCategory | null;
+  // files: {path: string; content: string};
 };
 
 const artifactVersionNodeToOpVersionDictNode = (
@@ -342,6 +371,12 @@ export const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
+  return {
+    loading: true,
+    result: null,
+  }
+
+
   const cachedOpVersion = key ? getOpVersionFromCache(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
@@ -408,6 +443,7 @@ export const useOpVersionsNode = (
   filter: OpVersionFilter,
   opts?: {skip?: boolean}
 ): Node => {
+  return opArray({})
   const projectNode = opRootProject({
     entityName: constString(entity),
     projectName: constString(project),
@@ -495,6 +531,10 @@ export const useOpVersions = (
   filter: OpVersionFilter,
   opts?: {skip?: boolean}
 ): Loadable<OpVersionSchema[]> => {
+  return {
+    loading: true,
+    result: [],
+  }
   const dataNode = useOpVersionsNode(entity, project, filter);
 
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
@@ -581,9 +621,12 @@ export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
 };
 
 export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
-  return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${
+  return `${TRACE_REF_PREFIX}${key.entity}/${key.project}/obj/${
     key.objectId
   }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
+  // return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${
+  //   key.objectId
+  // }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
 };
 
 export type ObjectVersionSchema = ObjectVersionKey & {
@@ -640,6 +683,10 @@ export const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
+  return {
+    loading: true,
+    result: null,
+  }
   const cachedObjectVersion = key ? getObjectVersionFromCache(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
@@ -709,6 +756,7 @@ export const useRootObjectVersionsNode = (
   filter: ObjectVersionFilter,
   opts?: {skip?: boolean}
 ): Node => {
+  return opArray({})
   const projectNode = opRootProject({
     entityName: constString(entity),
     projectName: constString(project),
@@ -785,6 +833,10 @@ export const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   opts?: {skip?: boolean}
 ): Loadable<ObjectVersionSchema[]> => {
+  return {
+    loading: true,
+    result: [],
+  }
   const dataNode = useRootObjectVersionsNode(entity, project, filter);
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
@@ -857,6 +909,7 @@ type WFNaiveRefDict = {
   project: string;
   artifactName: string;
   versionCommitHash: string;
+  traceNoun?: string
   filePathParts: string[];
   refExtraTuples: Array<{
     edgeType: string;
@@ -865,7 +918,15 @@ type WFNaiveRefDict = {
 };
 
 const refStringToRefDict = (uri: string): WFNaiveRefDict => {
-  const scheme = WANDB_ARTIFACT_REF_PREFIX;
+  if (uri.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
+    return wandbArtifactRefStringToRefDict(uri);
+  } else if (uri.startsWith(TRACE_REF_PREFIX)) {
+    return wandbTraceRefStringToRefDict(uri);
+  } else {
+    throw new Error('Invalid uri: ' + uri);
+  }}
+const wandbArtifactRefStringToRefDict = (uri: string): WFNaiveRefDict => {
+  const scheme = TRACE_REF_PREFIX;
   if (!uri.startsWith(scheme)) {
     throw new Error('Invalid uri: ' + uri);
   }
@@ -896,6 +957,46 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
   return {
     entity,
     project,
+    artifactName,
+    versionCommitHash,
+    filePathParts,
+    refExtraTuples,
+  };
+};
+
+const wandbTraceRefStringToRefDict = (uri: string): WFNaiveRefDict => {
+  const scheme = TRACE_REF_PREFIX;
+  if (!uri.startsWith(scheme)) {
+    throw new Error('Invalid uri: ' + uri);
+  }
+  const uriWithoutScheme = uri.slice(scheme.length);
+  let uriParts = uriWithoutScheme;
+  let refExtraPath = '';
+  const refExtraTuples = [];
+  if (uriWithoutScheme.includes('#')) {
+    [uriParts, refExtraPath] = uriWithoutScheme.split('#');
+    const refExtraParts = refExtraPath.split('/');
+    if (refExtraParts.length % 2 !== 0) {
+      throw new Error('Invalid uri: ' + uri);
+    }
+    for (let i = 0; i < refExtraParts.length; i += 2) {
+      refExtraTuples.push({
+        edgeType: refExtraParts[i],
+        edgeName: refExtraParts[i + 1],
+      });
+    }
+  }
+  const [entity, project, traceNoun, artifactNameAndVersion, filePath] = uriParts.split(
+    '/',
+    5
+  );
+  const [artifactName, versionCommitHash] = artifactNameAndVersion.split(':');
+  const filePathParts = filePath?.split('/') ?? [];
+
+  return {
+    entity,
+    project,
+    traceNoun,
     artifactName,
     versionCommitHash,
     filePathParts,
