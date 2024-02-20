@@ -346,7 +346,6 @@ const MainPeekingLayout: FC = () => {
             zIndex: 1,
             width: `${drawerWidthPct}%`,
             height: '100%',
-            margin: 0,
             boxShadow:
               'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
             borderLeft: `1px solid ${MOON_200}`,
@@ -362,13 +361,10 @@ const MainPeekingLayout: FC = () => {
           style={{
             borderTop: '1px solid #ddd',
             position: 'absolute',
-            top: 0,
-            left: 0,
-            zIndex: 100,
+            inset: '0 auto 0 0',
+            zIndex: 2,
             backgroundColor: '#f4f7f9',
             cursor: 'col-resize',
-            padding: '4px 0 0',
-            bottom: 0,
             width: '5px',
           }}
         />
