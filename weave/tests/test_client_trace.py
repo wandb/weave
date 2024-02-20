@@ -70,14 +70,3 @@ def test_dataset(trace_client):
     d2 = weave.storage.get(str(ref))
     assert d2.rows == d2.rows
 
-
-def test_dumb_test():
-    import weave
-
-    weave.init("test-project-weave")
-
-    @weave.op()
-    def do_it(a):
-        return a + 1
-
-    do_it(1)
