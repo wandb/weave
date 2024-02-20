@@ -2,8 +2,6 @@ import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 
-import {useFlexDirection} from './useFlexDirection';
-
 const setDrawerSize = (
   newSize: number,
   setSize: (value: number) => void,
@@ -20,10 +18,8 @@ const setDrawerSize = (
 };
 
 export const useDrawerResize = () => {
-  const flexDirection = useFlexDirection();
   const windowSize = useWindowSize();
   const defaultSize = 60;
-  const maxHeight = 85;
   const maxWidth = 90;
 
   //  We store the drawer width and height in local storage so that it persists
@@ -31,19 +27,12 @@ export const useDrawerResize = () => {
     'weaveflow-drawer-width-number',
     defaultSize
   );
-  const [height, setHeight] = useLocalStorage(
-    'weaveflow-drawer-height-number',
-    defaultSize
-  );
 
   useEffect(() => {
     if (width > maxWidth) {
       setWidth(defaultSize);
     }
-    if (height > maxHeight) {
-      setHeight(defaultSize);
-    }
-  }, [height, setHeight, setWidth, width]);
+  }, [setWidth, width]);
 
   //  We store this in a ref so that we can access it in the mousemove handler, in a useEffect.
   const [isResizing, setIsResizing] = useState(false);
@@ -77,20 +66,13 @@ export const useDrawerResize = () => {
         return;
       }
       const minWidth = (300 / windowSize.width) * 100;
-      const minHeight = (300 / windowSize.height) * 100;
-
       e.preventDefault();
-      if (flexDirection === 'row') {
-        const newWidth =
-          ((windowSize.width - e.clientX) * 100) / windowSize.width;
-        setDrawerSize(newWidth, setWidth, minWidth, maxWidth);
-      } else if (flexDirection === 'column') {
-        const newHeight =
-          ((windowSize.height - e.clientY) * 100) / windowSize.height;
-        setDrawerSize(newHeight, setHeight, minHeight, maxHeight);
-      }
+
+      const newWidth =
+        ((windowSize.width - e.clientX) * 100) / windowSize.width;
+      setDrawerSize(newWidth, setWidth, minWidth, maxWidth);
     },
-    [flexDirection, windowSize.height, windowSize.width, setHeight, setWidth]
+    [windowSize.width, setWidth]
   );
 
   useEffect(() => {
@@ -106,6 +88,5 @@ export const useDrawerResize = () => {
   return {
     handleMousedown,
     drawerWidthPct: width,
-    drawerHeightPct: height,
   };
 };
