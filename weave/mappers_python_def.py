@@ -45,6 +45,8 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
         # fields.
         result = {"_type": self.type.name}
         for prop_name, prop_serializer in self._property_serializers.items():
+            if prop_name == "_name":
+                prop_name = "name"
             if prop_serializer is not None:
                 obj_val = getattr(obj, prop_name, None)
                 if obj_val is None:
@@ -73,6 +75,10 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         for k, serializer in self._property_serializers.items():
             if serializer.type != OpDefType() and k in constructor_sig.parameters:
                 obj_val = obj.get(k)
+
+                # Commenting out during merge into clickhouse
+                # result[k] = serializer.apply(obj_val)
+
                 if obj_val is None:
                     # Shortcut if there is a None here. In boards there are some cases where
                     # we have incorrect types that are missing optional designation. Fixes
@@ -358,7 +364,7 @@ class DefaultToPy(mappers.Mapper):
 
         ref = None
 
-        if gc and isinstance(obj, op_def.OpDef):
+        if gc and isinstance(obj, op_def.OpDef) and self._path != []:
             # This is a hack to ensure op_defs are always published as
             # top-level objects. This should be achieved by a policy
             # instead. There is a parallel policy in to_weavejs_with_refs

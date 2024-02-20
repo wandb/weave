@@ -1,6 +1,6 @@
-import _ from 'lodash';
+import _, { sum } from 'lodash';
 import LRUCache from 'lru-cache';
-import {useMemo} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 
 import {
   constFunction,
@@ -39,6 +39,7 @@ import {
   useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import { fetchAllCalls, TraceCallSchema } from './trace_server_client';
 
 export const OP_CATEGORIES = [
   'train',
@@ -83,7 +84,7 @@ export const spanToCallSchema = (
     project,
     callId: span.span_id,
     traceId: span.trace_id,
-    parentId: span.parent_id,
+    parentId: span.parent_id ?? null,
     spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
       ? refUriToOpVersionKey(span.name).opId
       : span.name,
@@ -178,31 +179,76 @@ export const callsNode = (
     }
   );
 };
+
+const traceCallToSpanWithFeedback = (call: TraceCallSchema): SpanWithFeedback => {
+  // All these are weird conversions from the new data model to the way the UI expects it
+  const latency_s = call.end_time_s ? (call.end_time_s - call.start_time_s) : 0;
+  const summary =  call.summary ?? {}
+  summary.latency_s = latency_s
+  let status_code: string = call.status_code
+  if (status_code === "OK") 
+    {status_code = "SUCCESS"}
+  const start_time_ms =  call.start_time_s * 1000
+  return {
+    name: call.name,
+    inputs: call.inputs ?? {},
+    output: call.outputs ?? {},
+    status_code: status_code,
+    exception: call.exception,
+    attributes: call.attributes ?? {},
+    summary: summary as any,
+    span_id: call.id,
+    trace_id: call.trace_id,
+    parent_id: call.parent_id,
+    timestamp: start_time_ms,
+    start_time_ms: start_time_ms,
+    end_time_ms: (call.end_time_s ?? 0) * 1000,
+  }
+}
+
 export const useCalls = (
   entity: string,
   project: string,
   filter: CallFilter
 ): Loadable<CallSchema[]> => {
-  const calls = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: PROJECT_CALL_STREAM_NAME,
-    },
-    {
-      opUris: filter.opVersionRefs,
-      inputUris: filter.inputObjectVersionRefs,
-      outputUris: filter.outputObjectVersionRefs,
-      traceId: filter.traceId,
-      parentIds: filter.parentIds,
-      traceRootsOnly: filter.traceRootsOnly,
-      callIds: filter.callIds,
-    },
-    // TODO: Re-Enable feedback once we actually have it!
-    true
-  );
+  const [calls, setCalls] = useState<SpanWithFeedback[] | null>(null);
+  useEffect(() => {
+    fetchAllCalls({
+      "entity": "test_entity",
+      "project": "test_project",
+      "filter": {
+        "names": filter.opVersionRefs,
+        "input_object_version_refs": filter.inputObjectVersionRefs,
+        "output_object_version_refs": filter.outputObjectVersionRefs,
+        "parent_ids": filter.parentIds,
+        "trace_ids": filter.traceId ? [filter.traceId] : undefined,
+        "call_ids": filter.callIds,
+        "trace_roots_only": filter.traceRootsOnly,
+      }
+  }).then((data) => {
+      setCalls(data.calls.map(traceCallToSpanWithFeedback));
+    })
+  }, [filter.callIds, filter.inputObjectVersionRefs, filter.opVersionRefs, filter.outputObjectVersionRefs, filter.parentIds, filter.traceId, filter.traceRootsOnly]);
+  // const calls = useRunsWithFeedback(
+  //   {
+  //     entityName: entity,
+  //     projectName: project,
+  //     streamName: PROJECT_CALL_STREAM_NAME,
+  //   },
+  //   {
+  //     opUris: filter.opVersionRefs,
+  //     inputUris: filter.inputObjectVersionRefs,
+  //     outputUris: filter.outputObjectVersionRefs,
+  //     traceId: filter.traceId,
+  //     parentIds: filter.parentIds,
+  //     traceRootsOnly: filter.traceRootsOnly,
+  //     callIds: filter.callIds,
+  //   },
+  //   // TODO: Re-Enable feedback once we actually have it!
+  //   true
+  // );
   return useMemo(() => {
-    const allResults = (calls.result ?? []).map(run =>
+    const allResults = (calls ?? []).map(run =>
       spanToCallSchema(entity, project, run)
     );
     // Unfortunately, we can't filter by category in the query level yet
@@ -216,7 +262,7 @@ export const useCalls = (
       );
     });
 
-    if (calls.loading) {
+    if (calls == null) {
       return {
         loading: true,
         result,
@@ -237,7 +283,7 @@ export const useCalls = (
         result,
       };
     }
-  }, [calls.result, calls.loading, entity, project, filter.opCategory]);
+  }, [calls, entity, project, filter.opCategory]);
 };
 
 type OpVersionKey = {
