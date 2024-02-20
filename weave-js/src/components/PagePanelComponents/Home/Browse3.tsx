@@ -73,7 +73,6 @@ import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {useCall} from './Browse3/pages/wfReactInterface/interface';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
-import {useFlexDirection} from './useFlexDirection';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -134,9 +133,6 @@ const browse3Paths = (projectRoot: string) => [
   `${projectRoot}/:tab(${tabs})`,
   `${projectRoot}`,
 ];
-
-const SIDEBAR_WIDTH = 56;
-const NAVBAR_HEIGHT = 60;
 
 export const Browse3: FC<{
   hideHeader?: boolean;
@@ -303,12 +299,10 @@ const MainPeekingLayout: FC = () => {
     params.project!
   );
   const targetBase = baseRouter.projectUrl(params.entity!, params.project!);
-  const flexDirection = useFlexDirection();
-  const isFlexRow = flexDirection === 'row';
   const isDrawerOpen = peekLocation != null;
   const windowSize = useWindowSize();
 
-  const {handleMousedown, drawerWidthPct, drawerHeightPct} = useDrawerResize();
+  const {handleMousedown, drawerWidthPct} = useDrawerResize();
   const closePeek = useClosePeek();
 
   useMousetrap('esc', closePeek);
@@ -321,7 +315,7 @@ const MainPeekingLayout: FC = () => {
         height: '100%',
         display: 'flex',
         overflow: 'hidden',
-        flexDirection,
+        flexDirection: 'row',
         alignContent: 'stretch',
       }}>
       <Box
@@ -333,24 +327,16 @@ const MainPeekingLayout: FC = () => {
           transition: !isDrawerOpen
             ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
             : 'none',
-          marginRight:
-            !isDrawerOpen || !isFlexRow
-              ? 0
-              : `${(drawerWidthPct * windowSize.width) / 100}px`,
-          // this is px hack to account for the navbar height
-          marginBottom:
-            !isDrawerOpen || isFlexRow
-              ? 0
-              : `${
-                  (drawerHeightPct * (windowSize.height - NAVBAR_HEIGHT)) / 100
-                }px`,
+          marginRight: !isDrawerOpen
+            ? 0
+            : `${(drawerWidthPct * windowSize.width) / 100}px`,
         }}>
         <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
       </Box>
 
       <Drawer
         variant="persistent"
-        anchor={isFlexRow ? 'right' : 'bottom'}
+        anchor="right"
         open={isDrawerOpen}
         onClose={closePeek}
         PaperProps={{
@@ -358,16 +344,12 @@ const MainPeekingLayout: FC = () => {
             overflow: 'hidden',
             display: 'flex',
             zIndex: 1,
-            width: isFlexRow
-              ? `${drawerWidthPct}%`
-              : `calc(100% - ${SIDEBAR_WIDTH}px)`,
-            height: !isFlexRow ? `${drawerHeightPct}%` : '100%',
-            margin: isFlexRow ? 0 : `0 0 0 ${SIDEBAR_WIDTH + 1}px`,
-            boxShadow: isFlexRow
-              ? 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px'
-              : 'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 3px 0px 6px, rgba(15, 15, 15, 0.06) 9px 0px 24px',
-            borderLeft: isFlexRow ? `1px solid ${MOON_200}` : 'none',
-            borderTop: !isFlexRow ? `1px solid ${MOON_200}` : 'none',
+            width: `${drawerWidthPct}%`,
+            height: '100%',
+            margin: 0,
+            boxShadow:
+              'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+            borderLeft: `1px solid ${MOON_200}`,
             position: 'absolute',
           },
         }}
@@ -384,12 +366,10 @@ const MainPeekingLayout: FC = () => {
             left: 0,
             zIndex: 100,
             backgroundColor: '#f4f7f9',
-            cursor: isFlexRow ? 'col-resize' : 'row-resize',
-            padding: isFlexRow ? '4px 0 0' : '0 4px 0 0',
-            bottom: isFlexRow ? 0 : 'auto',
-            right: isFlexRow ? 'auto' : 0,
-            width: isFlexRow ? '5px' : 'auto',
-            height: isFlexRow ? 'auto' : '5px',
+            cursor: 'col-resize',
+            padding: '4px 0 0',
+            bottom: 0,
+            width: '5px',
           }}
         />
         {peekLocation && (
