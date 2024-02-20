@@ -105,18 +105,6 @@ class UpdateableCHCallSchema(BaseModel):
     created_at: typing.Optional[datetime.datetime] = None
 
 
-class InsertableCHObjectSchema(BaseModel):
-    entity: str
-    project: str
-    name: str
-    version_hash: str
-
-    type_dict_dump: str
-    val_dict_dump: str
-    encoded_file_map: typing.Dict[str, bytes] = {}
-    metadata_dict_dump: typing.Optional[str] = None
-
-
 # Very critical that this matches the calls table schema! This should
 # essentially be the DB version of CallSchema with the addition of the
 # created_at and updated_at fields
@@ -142,6 +130,34 @@ class SelectableCHCallSchema(BaseModel):
 
     updated_at: datetime.datetime
     created_at: datetime.datetime
+
+
+
+class InsertableCHObjSchema(BaseModel):
+    entity: str
+    project: str
+    name: str
+    version_hash: str
+
+    type_dict_dump: str
+    val_dict_dump: str
+    encoded_file_map: typing.Dict[str, bytes] = {}
+    metadata_dict_dump: typing.Optional[str] = None
+
+
+class SelectableCHObjSchema(BaseModel):
+    entity: str
+    project: str
+    name: str
+    version_hash: str
+
+    type_dict_dump: str
+    val_dict_dump: str
+    encoded_file_map: typing.Dict[str, bytes] = {}
+    metadata_dict_dump: typing.Optional[str] = None
+
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
 
 # Listing of all columns to protect against SQL injection
@@ -198,6 +214,19 @@ all_obj_columns = [
     "val_dict_dump",
     "encoded_file_map",
     "metadata_dict_dump",
+    "created_at",
+    "updated_at",
+]
+
+required_obj_columns = [
+    "entity",
+    "project",
+    "name",
+    "version_hash",
+    "type_dict_dump",
+    "val_dict_dump",
+    # "encoded_file_map",
+    # "metadata_dict_dump",
     "created_at",
     "updated_at",
 ]
@@ -336,7 +365,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes()
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        raise NotImplementedError()
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(self._obj_read(req)))
 
     def obj_update(self, req: tsi.ObjUpdateReq) -> tsi.ObjUpdateRes:
         raise NotImplementedError()
@@ -509,6 +538,116 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for row in raw_res.result_rows:
             calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
         return _deduplicate_calls(calls)
+    
+    def _obj_read(self, req: tsi.ObjReadReq) -> SelectableCHObjSchema:
+        ch_objs = self._select_objs_query(
+            req.entity,
+            req.project,
+            columns=all_obj_columns,
+            # columns=req.columns,
+            conditions=["name = {name: String}", "version_hash = {version_hash: String}"],
+            limit=1,
+            parameters={"name": req.name, "version_hash": req.version_hash},
+        )
+
+        # If the call is not found, raise a NotFoundError
+        if not ch_objs:
+            raise NotFoundError(f"Obj with id {req.id} not found")
+
+        return ch_objs[0]
+    
+
+    def _select_objs_query(
+        self,
+        entity: str,
+        project: str,
+        columns: typing.Optional[typing.List[str]] = None,
+        conditions: typing.Optional[typing.List[str]] = None,
+        # order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
+        # offset: typing.Optional[int] = None,
+        limit: typing.Optional[int] = None,
+        parameters: typing.Dict[str, typing.Any] = None,
+    ) -> typing.List[SelectableCHObjSchema]:
+
+        if not parameters:
+            parameters = {}
+
+        parameters["entity_scope"] = entity
+        parameters["project_scope"] = project
+        if columns == None:
+            columns = all_obj_columns
+
+        remaining_columns = set(columns) - set(required_obj_columns)
+        columns = required_obj_columns + list(remaining_columns)
+
+        # # Stop injection
+        assert (
+            set(columns) - set(all_obj_columns) == set()
+        ), f"Invalid columns: {columns}"
+        select_columns_part = ", ".join(columns)
+
+        if not conditions:
+            conditions = []
+
+        conditions.append(
+            "entity = {entity_scope: String} AND project = {project_scope: String}"
+        )
+
+
+        conditions_part = " AND ".join(conditions)
+
+        # order_by_part = ""
+        # if order_by == None:
+        #     order_by = []
+        # order_by = list(order_by) + [("updated_at", "DESC")]
+        # for field, direction in order_by:
+        #     assert field in all_call_columns, f"Invalid order_by field: {field}"
+        #     assert direction in [
+        #         "ASC",
+        #         "DESC",
+        #     ], f"Invalid order_by direction: {direction}"
+        # order_by_part = ", ".join(
+        #     [f"{field} {direction}" for field, direction in order_by]
+        # )
+        # order_by_part = f"ORDER BY {order_by_part}"
+
+        # offset_part = ""
+        # if offset != None:
+        #     offset_part = f"OFFSET {offset}"
+
+        limit_part = ""
+        if limit != None:
+            limit_part = f"LIMIT {limit}"
+
+        # raw_res = self._query(
+        #     f"""
+        #     SELECT {select_columns_part}
+        #     FROM calls_agg
+        #     WHERE entity = {{entity_scope: String}} AND project = {{project_scope: String}}
+        #     GROUP BY entity, project, id
+        #     HAVING {conditions_part}
+        #     {order_by_part}
+        #     {limit_part}
+        #     {offset_part}
+        # """,
+        #     parameters,
+        # )
+
+        raw_res = self._query(
+            f"""
+            SELECT {select_columns_part}
+            FROM objects
+            WHERE {conditions_part}
+            {limit_part}
+        """,
+            parameters,
+        )
+        # # print(raw_res.result_rows)
+        objs = []
+        for row in raw_res.result_rows:
+            objs.append(_raw_obj_dict_to_ch_obj(dict(zip(columns, row))))
+        return objs
+    
 
     def _execute_update(self, req: tsi.CallUpdateReq) -> None:
         # raw_read_res = self._call_read(tsi.CallReadReq(entity=req.entity, project=req.project, id=req.id))
@@ -663,7 +802,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             self._flush_call_insert_buffer([row])
 
-    def _insert_obj(self, ch_obj: InsertableCHObjectSchema) -> None:
+    def _insert_obj(self, ch_obj: InsertableCHObjSchema) -> None:
         parameters = ch_obj.model_dump()
         row = []
         for key in all_obj_insert_columns:
@@ -717,6 +856,11 @@ def _raw_call_dict_to_ch_call(
 ) -> SelectableCHCallSchema:
     return SelectableCHCallSchema.model_validate(call)
 
+def _raw_obj_dict_to_ch_obj(
+    obj: typing.Dict[str, typing.Any]
+) -> SelectableCHObjSchema:
+    return SelectableCHObjSchema.model_validate(obj)
+
 
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
@@ -748,6 +892,31 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         summary=_nullable_dict_dump_to_dict(ch_call.summary),
         # `summary` may be null (represented as `\\N`)
         exception=ch_call.exception,
+    )
+
+
+def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
+    return tsi.ObjSchema(
+        # `entity` should always be present
+        entity=ch_obj.entity,
+        # `project`` should always be present
+        project=ch_obj.project,
+        # `name`` should always be present
+        name=ch_obj.name,
+        # `version_hash`` should always be present
+        version_hash=ch_obj.version_hash,
+
+        # `type_dict`` should always be present
+        type_dict=json.loads(ch_obj.type_dict_dump),
+        # `val_dict`` should always be present
+        val_dict=json.loads(ch_obj.val_dict_dump),
+        # `encoded_file_map`` should always be present
+        encoded_file_map=ch_obj.encoded_file_map,
+        # `metadata_dict`` may be null (represented as `\\N`)
+        metadata_dict=json.loads(ch_obj.metadata_dict_dump) if ch_obj.metadata_dict_dump else None,
+
+        # `created_at`` should always be present
+        created_at_s=_datetime_to_sec_float(ch_obj.created_at),
     )
 
 
@@ -875,10 +1044,10 @@ def _process_parameters(
 
 def _partial_obj_schema_to_ch_obj(
     partial_obj: tsi.PartialObjForCreationSchema,
-) -> InsertableCHObjectSchema:
+) -> InsertableCHObjSchema:
     version_hash = version_hash_for_object(partial_obj)
 
-    return InsertableCHObjectSchema(
+    return InsertableCHObjSchema(
         entity=partial_obj.entity,
         project=partial_obj.project,
         name=partial_obj.name,

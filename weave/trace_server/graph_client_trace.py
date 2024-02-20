@@ -332,21 +332,21 @@ class TraceNounRef(ref_base.Ref):
         elif self._trace_noun == "op":
             raise NotImplementedError
         elif self._trace_noun == "obj":
-            obj = gc.trace_server.obj_read(
+            res = gc.trace_server.obj_read(
                 tsi.ObjReadReq(
                     entity=self._entity,
                     project=self._project,
                     name=self._name,
-                    version=self._version,
+                    version_hash=self._version,
                     path=self._path,
                     extra=self._extra,
                 )
             )
 
-            art = MemTraceFilesArtifact(obj.files, metadata=obj.metadata)
-            wb_type = types.TypeRegistry.type_from_dict(obj.type)
+            art = MemTraceFilesArtifact({k: v for k, v in res.obj.encoded_file_map.items()}, metadata=res.obj.metadata_dict)
+            wb_type = types.TypeRegistry.type_from_dict(res.obj.type_dict)
             mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
-            return mapper.apply(obj.val)
+            return mapper.apply(res.obj.val_dict)
         else:
             raise ValueError(f"Invalid trace noun: {self._trace_noun}")
 

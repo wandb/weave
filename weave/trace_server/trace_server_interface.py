@@ -82,7 +82,7 @@ class ObjSchema(BaseModel):
 
     type_dict: typing.Dict[str, typing.Any]
     val_dict: typing.Dict[str, typing.Any]
-    encoded_file_map: typing.Dict[str, str]
+    encoded_file_map: typing.Dict[str, bytes]
     metadata_dict: typing.Dict[str, typing.Any]
 
     created_at_s: float
@@ -235,11 +235,15 @@ class ObjCreateRes(BaseModel):
 
 
 class ObjReadReq(BaseModel):
-    pass
+    entity: str
+    project: str
+    name: str
+    version_hash: str
+    
 
 
 class ObjReadRes(BaseModel):
-    pass
+    obj: ObjSchema
 
 
 class ObjUpdateReq(BaseModel):
