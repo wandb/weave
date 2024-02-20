@@ -308,12 +308,21 @@ class ObjDeleteRes(BaseModel):
     pass
 
 
+class ObjectVersionFilter(BaseModel):
+    # TODO: This needs to be added to the data model!
+    category: typing.Optional[str] = None
+    objectIds: typing.Optional[typing.List[str]] = None
+    # Ugggg - implementing this is going to be a pain - probably have to do a materialized view
+    latestOnly: typing.Optional[bool] = None
+
 class ObjQueryReq(BaseModel):
-    pass
+    entity: str
+    project: str
+    filter: typing.Optional[ObjectVersionFilter] = None
 
 
 class ObjQueryRes(BaseModel):
-    pass
+    objs: typing.List[ObjSchema]
 
 
 class TraceServerInterface:

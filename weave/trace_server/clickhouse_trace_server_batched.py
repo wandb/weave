@@ -382,7 +382,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        raise NotImplementedError()
+        conditions = []
+        # parameters = {}
+        if req.filter:
+            raise NotImplementedError()
+        conditions.append("is_op == 0")
+
+        ch_objs = self._select_objs_query(
+            req.entity,
+            req.project,
+            # columns=None,
+            conditions=conditions,
+            # order_by=None,
+            # Skipping limit and offset for now so we aren't tempted to use them.
+            # We should have a better way to paginate
+            # offset=req.offset,
+            # limit=req.limit,
+            # parameters=parameters,
+        )
+        objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
+        return tsi.ObjQueryRes(objs=objs)
 
     # Private Methods
     def __del__(self):
@@ -593,19 +612,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         remaining_columns = set(columns) - set(required_obj_columns)
         columns = required_obj_columns + list(remaining_columns)
-
         # # Stop injection
         assert (
             set(columns) - set(all_obj_columns) == set()
         ), f"Invalid columns: {columns}"
         select_columns_part = ", ".join(columns)
+        merged_cols = []
+        for col in columns:
+            if col in ["entity", "project", "name", "version_hash"]:
+                merged_cols.append(f"{col} AS {col}")
+            else:
+                merged_cols.append(f"anyLast({col}) AS {col}")
+        select_columns_part = ", ".join(merged_cols)
+
+
 
         if not conditions:
-            conditions = []
+            conditions = ['1 = 1']
 
-        conditions.append(
-            "entity = {entity_scope: String} AND project = {project_scope: String}"
-        )
+        # conditions.append(
+        #     "entity = {entity_scope: String} AND project = {project_scope: String}"
+        # )
 
         conditions_part = " AND ".join(conditions)
 
@@ -650,7 +677,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             f"""
             SELECT {select_columns_part}
             FROM objects
-            WHERE {conditions_part}
+            WHERE entity = {{entity_scope: String}} AND project = {{project_scope: String}}
+            GROUP BY entity, project, name, version_hash
+            HAVING {conditions_part}
             {limit_part}
         """,
             parameters,
@@ -722,7 +751,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             created_at DateTime64(3) DEFAULT now64(3),
             updated_at DateTime64(3) DEFAULT now64(3)
         )
-        ENGINE = MergeTree
+        ENGINE = ReplacingMergeTree
         ORDER BY (entity, project, name, version_hash)
         PRIMARY KEY (entity, project, name, version_hash)
         """

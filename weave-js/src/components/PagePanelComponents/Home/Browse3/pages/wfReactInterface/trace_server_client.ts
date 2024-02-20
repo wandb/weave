@@ -44,6 +44,35 @@ type TraceCallsQueryReq= {
     // # TODO: Bring other fields from `trace_server_interface.py::TraceCallsQueryReq`
 }
 
+// This should match `trace_server_interface.py::TraceObjSchema` exactly!!
+export type TraceObjSchema = {
+    entity: string;
+    project: string;
+    name: string;
+    version_hash: string;
+
+    type_dict: {[key: string]: any};
+    encoded_file_map_as_length_and_big_int: {[key: string]: [number, number]};
+    metadata_dict: {[key: string]: any};
+
+    created_at_s: number
+}
+
+type Trace_ObjsFilter = {
+
+}
+
+type TraceObjsQueryReq= {
+    entity: string,
+    project: string,
+    filter?: Trace_ObjsFilter
+    // # TODO: Bring other fields from `trace_server_interface.py::TraceCallsQueryReq`
+}
+
+type TraceObjQueryRes = {
+    objs: Array<TraceObjSchema>
+}
+
 
 
 export const callsQuery = async (req: TraceCallsQueryReq): Promise<TraceCallQueryRes> => {
@@ -58,5 +87,22 @@ export const callsQuery = async (req: TraceCallsQueryReq): Promise<TraceCallQuer
     });
     const res = await response.json();
     console.log("Retrieved trace calls: ", res.calls.length)
+    return res;
+}
+
+
+export const objectsQuery = async (req: TraceObjsQueryReq): Promise<TraceObjQueryRes> => {
+    const url = "http://127.0.0.1:6345/objs/query"
+    console.log("Querying trace objs: ", req)
+    // eslint-disable-next-line wandb/no-unprefixed-urls
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+        'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(req),
+    });
+    const res = await response.json();
+    console.log("Retrieved trace objs: ", res.objs.length)
     return res;
 }

@@ -510,6 +510,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         if isinstance(_orig_ref, TraceNounRef):
             return _orig_ref
         weave_type = types.type_of_with_refs(obj)
+        orig_obj = obj
         obj = box.box(obj)
         art = MemTraceFilesArtifact(self.entity, self.project, name)
         ref = art.set("obj", weave_type, obj)
@@ -557,6 +558,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             type=weave_type,
         )
         ref_base._put_ref(obj, ref)
+        ref_base._put_ref(orig_obj, ref)
         return ref
 
     def create_run(

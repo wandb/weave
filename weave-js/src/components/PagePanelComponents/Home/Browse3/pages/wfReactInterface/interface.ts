@@ -31,6 +31,7 @@ import {
   opRootProject,
   opStringEqual,
 } from '../../../../../../core';
+import { useDeepMemo } from '../../../../../../hookUtils';
 import {useNodeValue} from '../../../../../../react';
 import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
 import {
@@ -39,8 +40,7 @@ import {
   useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, TRACE_REF_PREFIX, WANDB_ARTIFACT_REF_PREFIX} from './constants';
-import { callsQuery, TraceCallSchema } from './trace_server_client';
-import { useDeepMemo } from '../../../../../../hookUtils';
+import { callsQuery, objectsQuery, TraceCallSchema, TraceObjSchema } from './trace_server_client';
 
 export const OP_CATEGORIES = [
   'train',
@@ -243,6 +243,22 @@ const traceCallToSpanWithFeedback = (call: TraceCallSchema): SpanWithFeedback =>
     timestamp: start_time_ms,
     start_time_ms: start_time_ms,
     end_time_ms: (call.end_time_s ?? 0) * 1000,
+  }
+}
+
+
+const traceObjToObjectVersionSchema = (obj: TraceObjSchema): ObjectVersionSchema => {
+  return {
+    entity: obj.entity,
+    project: obj.project,
+    objectId: obj.name,
+    versionHash: obj.version_hash,
+    path: 'obj', // Is this correct?
+    // # TODO: how to get this from the DM?
+    versionIndex: 0,
+    typeName: obj.type_dict.type,
+    category: typeNameToCategory(obj.type_dict.type),
+    createdAtMs: obj.created_at_s * 1000,
   }
 }
 
@@ -833,12 +849,23 @@ export const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   opts?: {skip?: boolean}
 ): Loadable<ObjectVersionSchema[]> => {
-  return {
-    loading: true,
-    result: [],
-  }
-  const dataNode = useRootObjectVersionsNode(entity, project, filter);
-  const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
+  // const dataNode = useRootObjectVersionsNode(entity, project, filter);
+  // const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
+
+  const [dataValue, setDataValue] = useState<ObjectVersionSchema[] | null>(null)
+
+  // TODO: Filter out files when not needed!
+
+  useEffect(() => {
+    objectsQuery({
+      "entity": entity,
+      "project": project,
+      // "filter": {}
+  }).then((data) => {
+    setDataValue(data.objs.map(traceObjToObjectVersionSchema));
+    })
+  }, [entity, project]);
+
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -847,30 +874,16 @@ export const useRootObjectVersions = (
         result: [],
       };
     }
-    const result = (dataValue.result ?? [])
-      .map((row: any) => ({
-        entity,
-        project,
-        objectId: row.objectId as string,
-        versionHash: row.versionHash as string,
-        path: 'obj',
-        refExtra: null,
-        versionIndex: row.dataDict.versionIndex as number,
-        typeName: row.dataDict.typeName as string,
-        category: typeNameToCategory(row.dataDict.typeName as string),
-        createdAtMs: row.dataDict.createdAtMs as number,
-      }))
+    const result = (dataValue ?? [])
+      
       .filter((row: any) => {
         return (
           filter.category == null || filter.category.includes(row.category)
         );
       })
-      // TODO: Move this to the weave filters?
-      .filter((row: any) => {
-        return !['OpDef', 'stream_table', 'type'].includes(row.typeName);
-      }) as ObjectVersionSchema[];
+      
 
-    if (dataValue.loading) {
+    if (dataValue == null) {
       return {
         loading: true,
         result,
@@ -894,14 +907,7 @@ export const useRootObjectVersions = (
         result,
       };
     }
-  }, [
-    dataValue.loading,
-    dataValue.result,
-    entity,
-    filter.category,
-    opts?.skip,
-    project,
-  ]);
+  }, [dataValue, entity, filter.category, opts?.skip, project]);
 };
 
 type WFNaiveRefDict = {
