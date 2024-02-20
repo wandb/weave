@@ -45,7 +45,7 @@ const STATUS_INFO: Record<CallStatusType, CallStatusInfo> = {
     icon: 'run',
     label: 'Pending',
     color: 'cactus',
-    tooltip: 'This call is running.',
+    tooltip: 'This call has not finished.',
   },
 };
 

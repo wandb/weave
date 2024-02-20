@@ -229,7 +229,7 @@ def _check_fast_history3_concat_type(
         ):
             sub_result = _check_fast_history3_concat_type(
                 orig_expected_type.property_types[k],
-                fast_path_type.property_types[k],
+                fast_path_type.property_types.get(k, types.NoneType()),
                 depth=depth + 1,
             )
             if sub_result:

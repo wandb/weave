@@ -118,6 +118,7 @@ const callsTableWeaveType: Type = {
       timestamp: 'any',
       start_time_s: 'number',
       end_time_s: 'number',
+      status_code: 'string',
     },
   },
 };

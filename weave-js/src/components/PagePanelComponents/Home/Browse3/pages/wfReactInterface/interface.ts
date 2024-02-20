@@ -92,6 +92,16 @@ export const spanToCallSchema = (
   project: string,
   span: SpanWithFeedback
 ): CallSchema => {
+  // This rawSpan construction fixes issues with crashed runs using the
+  // streamtable graph client (will be fixed in the future)
+  const rawSpan = span as Span;
+  rawSpan.summary = span.summary ?? {
+    latency_s: 0,
+  };
+  rawSpan.summary.latency_s = span.summary?.latency_s ?? 0;
+  rawSpan.status_code = span.status_code ?? 'UNSET';
+  rawSpan.inputs = span.inputs ?? {};
+
   return {
     entity,
     project,
@@ -104,7 +114,7 @@ export const spanToCallSchema = (
     opVersionRef: opNameIsRef(span.name)
       ? span.name
       : null,
-    rawSpan: span,
+    rawSpan,
     rawFeedback: span.feedback,
   };
 };

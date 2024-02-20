@@ -259,3 +259,7 @@ def dd_env() -> str:
 
 def env_is_ci() -> bool:
     return util.parse_boolean_env_var("WEAVE_CI")
+
+
+def disable_weave_pii() -> bool:
+    return os.getenv("DISABLE_WEAVE_PII", "false").strip().lower() == "true"
