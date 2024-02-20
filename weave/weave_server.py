@@ -74,7 +74,7 @@ if engine_trace.datadog_is_enabled():
     # patch all libraries to datadog except logging
     ddtrace.patch_all(logging=False)
 
-    if not os.getenv("DISABLE_WEAVE_PII") == "true":
+    if not environment.disable_weave_pii():
         # patch logging to datadog, if not disabled
         ddtrace.patch(logging=True)
 
