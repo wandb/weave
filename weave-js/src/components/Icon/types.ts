@@ -124,6 +124,7 @@ export const IconNames = {
   PanTool: 'pan-tool',
   PanTool1: 'pan-tool-1',
   Panel: 'panel',
+  ParentBackUp: 'parent-back-up',
   Pause: 'pause',
   Paused: 'paused',
   PencilEdit: 'pencil-edit',
