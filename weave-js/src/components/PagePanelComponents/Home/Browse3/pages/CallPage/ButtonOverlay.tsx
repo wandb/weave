@@ -27,10 +27,7 @@ const ChildWrapper = styled.div`
   user-select: none;
   pointer-events: none;
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  inset: 0;
 `;
 ChildWrapper.displayName = 'S.ChildWrapper';
 
@@ -38,10 +35,7 @@ const Overlay = styled.div`
   z-index: 1; // Unfortunate, but necessary to appear over the MUI data grid header
   position: absolute;
   background-color: ${hexToRGB(WHITE, 0.7)};
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;

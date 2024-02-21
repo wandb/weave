@@ -176,7 +176,7 @@ export const CallDetails: FC<{
                   onClick={onClick}>
                   Go to table
                 </Button>
-              </Box>{' '}
+              </Box>
               <Box
                 sx={{
                   flex: '1 1 auto',
