@@ -153,6 +153,20 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   }, [cachedCall, calls.loading, calls.result, key]);
 };
 
+export const useParentCall = (
+  call: CallSchema | null
+): Loadable<CallSchema | null> => {
+  let parentCall = null;
+  if (call && call.parentId) {
+    parentCall = {
+      entity: call.entity,
+      project: call.project,
+      callId: call.parentId,
+    };
+  }
+  return useCall(parentCall);
+};
+
 export type CallFilter = {
   // Filters are ANDed across the fields and ORed within the fields
   // Commented out means not yet implemented

@@ -4,26 +4,62 @@ import {Typography} from '@mui/material';
 import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
+import styled from 'styled-components';
 
+import {MOON_800} from '../../../../../../common/css/color.styles';
 import {parseRef} from '../../../../../../react';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowRouteContext} from '../../context';
 import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
-import {opNiceName} from '../common/Links';
+import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {CallSchema, useCalls} from '../wfReactInterface/interface';
+import {
+  CallSchema,
+  useCalls,
+  useParentCall,
+} from '../wfReactInterface/interface';
+
+const Heading = styled.div`
+  color: ${MOON_800};
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  padding: 8px 8px 0 8px;
+  gap: 4px;
+`;
+Heading.displayName = 'S.Heading';
+
+export const CallSchemaLink = ({call}: {call: CallSchema}) => {
+  const {entity: entityName, project: projectName, callId, spanName} = call;
+  return (
+    <CallLink
+      entityName={entityName}
+      projectName={projectName}
+      opName={spanName}
+      callId={callId}
+    />
+  );
+};
 
 export const CallDetails: FC<{
   call: CallSchema;
 }> = ({call}) => {
+  const parentCall = useParentCall(call);
   const {inputs, output} = useMemo(
     () => getDisplayInputsAndOutput(call),
     [call]
   );
+
+  let parentInfo = null;
+  if (parentCall.result) {
+    parentInfo = <CallSchemaLink call={parentCall.result} />;
+  }
+
   const childCalls = useCalls(call.entity, call.project, {
     parentIds: [call.callId],
   });
+
   const {singularChildCalls, multipleChildCallOpRefs} = useMemo(
     () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
     [childCalls.loading, childCalls.result]
@@ -40,6 +76,7 @@ export const CallDetails: FC<{
         overflowY: 'auto',
         // padding: 2,
       }}>
+      {parentInfo && <Heading>Called from {parentInfo}</Heading>}
       <Box
         style={{
           width: '100%',
