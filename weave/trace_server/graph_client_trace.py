@@ -31,7 +31,7 @@ from ..runs import Run as WeaveRunObj
 from ..run_sql import RunSql
 from .. import storage
 from .. import box
-
+from .. import urls
 import functools
 from urllib import parse
 from typing import Any, Optional
@@ -436,6 +436,10 @@ class TraceNounRef(ref_base.Ref):
             extra=new_extra,
         )
 
+    @property
+    def ui_url(self) -> str:
+        return urls.object_version_path(self._entity, self._project, self._name, self._version)
+
 
 @dataclasses.dataclass
 class GraphClientTrace(GraphClient[WeaveRunObj]):
@@ -500,7 +504,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         raise NotImplementedError
 
     def run_ui_url(self, run: Run) -> str:
-        return "<UI URL NOT IMPLEMENTED>"
+        return urls.call_path_as_peek(self.entity, self.project, run.id)
 
     ##### Write API
 
