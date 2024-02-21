@@ -13,5 +13,4 @@ if __name__ == "__main__":
         curTime = time.strftime("%x, %X", time.localtime())
         print("Clearing cache " + curTime, flush=True)
         cache.clear_cache()
-        time.sleep(60*60*hour_interval)
-
+        time.sleep(60 * 60 * hour_interval)
