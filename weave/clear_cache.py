@@ -7,7 +7,7 @@ import os
 # Script to run to delete expired caches
 if __name__ == "__main__":
     print("Starting clear cache job", flush=True)
-    hour_interval = int(os.getenv("WEAVE_CACHE_CLEAR_INTERVAL", 2))
+    hour_interval = int(os.getenv("WEAVE_CACHE_CLEAR_INTERVAL", 24))
     print("Clearing expired caches every " + str(hour_interval) + " hours", flush=True)
     while True:
         curTime = time.strftime("%x, %X", time.localtime())
