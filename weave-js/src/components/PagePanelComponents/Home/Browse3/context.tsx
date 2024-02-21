@@ -485,7 +485,8 @@ type RouteType = {
     entityName: string,
     projectName: string,
     traceId: string,
-    callId: string
+    callId: string,
+    tracetree?: boolean
   ) => string;
   callsUIUrl: (
     entityName: string,
@@ -541,6 +542,28 @@ const useSetSearchParam = () => {
   );
 };
 
+// Update multiple query params
+const useSetSearchParams = () => {
+  const location = useLocation();
+  return useCallback(
+    (pairs: Record<string, string | null>) => {
+      const searchParams = new URLSearchParams(location.search);
+      Object.entries(pairs).forEach(([key, value]) => {
+        if (value === null) {
+          searchParams.delete(key);
+        } else {
+          searchParams.set(key, value);
+        }
+      });
+      const newSearch = searchParams.toString();
+      const newUrl = `${location.pathname}?${newSearch}`;
+      return newUrl;
+    },
+    [location]
+  );
+};
+
+const TRACETREE_PARAM = 'tracetree';
 const PEAK_SEARCH_PARAM = 'peekPath';
 export const baseContext = browse3ContextGen(
   (entityName: string, projectName: string) => {
@@ -550,6 +573,7 @@ export const baseContext = browse3ContextGen(
 
 const useMakePeekingRouter = (): RouteType => {
   const setSearchParam = useSetSearchParam();
+  const setSearchParams = useSetSearchParams();
 
   return {
     refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
@@ -613,8 +637,25 @@ const useMakePeekingRouter = (): RouteType => {
         baseContext.opVersionUIUrl(...args)
       );
     },
-    callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callUIUrl(...args));
+    callUIUrl: (
+      entityName: string,
+      projectName: string,
+      traceId: string,
+      callId: string,
+      tracetree?: boolean
+    ) => {
+      const callUrl = baseContext.callUIUrl(
+        entityName,
+        projectName,
+        traceId,
+        callId
+      );
+      const tt = tracetree ?? true;
+      const params = {
+        [PEAK_SEARCH_PARAM]: callUrl,
+        [TRACETREE_PARAM]: tt ? '1' : '0',
+      };
+      return setSearchParams(params);
     },
     callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {
       return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callsUIUrl(...args));

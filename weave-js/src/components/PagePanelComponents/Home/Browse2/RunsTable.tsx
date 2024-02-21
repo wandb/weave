@@ -523,7 +523,6 @@ export const RunsTable: FC<{
         apiRef={apiRef}
         loading={loading}
         rows={tableData}
-        // density="compact"
         initialState={initialState}
         rowHeight={38}
         columns={columns.cols as any}
@@ -531,16 +530,6 @@ export const RunsTable: FC<{
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
         columnGroupingModel={columns.colGroupingModel}
-        // onRowClick={({id}) => {
-        //   history.push(
-        //     peekingRouter.callUIUrl(
-        //       params.entity,
-        //       params.project,
-        //       '',
-        //       id as string
-        //     )
-        //   );
-        // }}
         slots={{
           noRowsOverlay: () => {
             return (
