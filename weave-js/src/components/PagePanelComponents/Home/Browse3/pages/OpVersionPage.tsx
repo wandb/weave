@@ -13,7 +13,6 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
-import {UnderConstruction} from './common/UnderConstruction';
 import {TabUseOp} from './TabUseOp';
 import {
   opVersionKeyToRefUri,
@@ -125,34 +124,6 @@ const OpVersionPageInner: React.FC<{
         {
           label: 'Use',
           content: <TabUseOp name={opNiceName(opId)} uri={uri} />,
-        },
-        {
-          label: 'Execute',
-          content: (
-            <UnderConstruction
-              title="Execute"
-              message={
-                <>
-                  This page will allow you to call this op version with specific
-                  inputs.
-                </>
-              }
-            />
-          ),
-        },
-        {
-          label: 'DAG',
-          content: (
-            <UnderConstruction
-              title="Structure DAG"
-              message={
-                <>
-                  This page will show a "Structure" DAG of Types and Ops
-                  centered at this particular op version.
-                </>
-              }
-            />
-          ),
         },
       ]}
     />

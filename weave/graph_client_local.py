@@ -69,11 +69,14 @@ class GraphClientLocal(GraphClient[WeaveRunObj]):
         raise NotImplementedError
 
     def op_runs(self, op_def: OpDef) -> Sequence[Run]:
+        op_def_ref = ref_base.get_ref(op_def)
+        if op_def_ref is None:
+            raise ValueError(f"Can't get runs for unpublished op: {op_def_ref}")
         runs = storage.objects(types.RunType())
         result: list[WeaveRunObj] = []
         for run_ref in runs:
             run = typing.cast(WeaveRunObj, run_ref.get())
-            if run.op_name == str(op_def.location):
+            if run.op_name == str(op_def_ref):
                 result.append(run)
         return result
 

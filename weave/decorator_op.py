@@ -68,7 +68,8 @@ def op(
 
     # For builtins, enforce that parameter and return types must be declared.
     # For user ops, allow missing types.
-    allow_unknowns = not context_state._loading_built_ins.get()
+    loading_builtins = context_state._loading_built_ins.get()
+    allow_unknowns = not loading_builtins
 
     def wrap(f: Callable[P, R]) -> Callable[P, R]:
         weave_input_type = pyfunc_type_util.determine_input_type(
@@ -113,17 +114,11 @@ def op(
 
             op.weave_fn = op_to_weave_fn(op)
 
+        # We shouldn't bother registering for weaveflow. We could register
+        # only in the case where an op is lazily called. But no need for now.
         op_version = registry_mem.memory_registry.register_op(op)
 
-        # After we register the op, create any derived ops
-
-        # If op.location is set, then its a custom (non-builtin op). We don't
-        # derive custom ops for now, as the derive code doesn't do the right thing.
-        # The op name is the location/uri for custom ops, and the derive code doesn't
-        # fix that up. So we end up double registering ops in WeaveJS which breaks
-        # everything.
-        # TODO: fix so we get mappability for custom (ecosystem) ops!
-        if op.location is None:
+        if loading_builtins:
             derive_op.derive_ops(op)
 
         functools.update_wrapper(op_version, f)

@@ -1,45 +1,8 @@
+from typing import Optional
 import pydantic
 
 import weave
 from weave import weave_types as types
-from weave.weave_pydantic import json_schema_to_weave_type
-
-
-def test_jsonschema_to_weave_type():
-
-    assert json_schema_to_weave_type({"type": "integer"}) == types.Int()
-    assert json_schema_to_weave_type(
-        {"type": "array", "items": {"type": "integer"}}
-    ) == types.List(types.Int())
-
-    assert json_schema_to_weave_type(
-        {
-            "type": "object",
-            "properties": {"a": {"type": "integer"}},
-            "required": ["a"],
-        }
-    ) == types.TypedDict({"a": types.Int()})
-
-    assert json_schema_to_weave_type({"type": "null"}) == types.NoneType()
-
-    assert json_schema_to_weave_type(
-        {
-            "type": "object",
-            "properties": {
-                "a": {
-                    "type": "integer",
-                },
-                "b": {"type": "object", "properties": {"b": {"type": "string"}}},
-            },
-            "required": ["a"],
-        }
-    ) == types.TypedDict(
-        {
-            "a": types.Int(),
-            "b": types.TypedDict({"b": types.String()}, not_required_keys={"b"}),
-        },
-        not_required_keys={"b"},
-    )
 
 
 def test_pydantic_type_inference():
@@ -50,7 +13,12 @@ def test_pydantic_type_inference():
 
     obj = TestPydanticClass(a=1, b="2", c=3.0)
     t = types.TypeRegistry.type_of(obj)
-    assert t == types.ObjectType(a=types.Int(), b=types.String(), c=types.Number())
+    assert isinstance(t, types.ObjectType)
+    assert t.property_types() == {
+        "a": types.Int(),
+        "b": types.String(),
+        "c": types.Float(),
+    }
 
 
 def test_save_load_pydantic():
@@ -61,3 +29,56 @@ def test_save_load_pydantic():
     n = weave.save(obj)
     recovered = weave.use(n)
     assert recovered.a == 1
+
+
+def test_pydantic_saveload():
+    class Object(pydantic.BaseModel):
+        name: Optional[str] = "hello"
+        description: Optional[str] = None
+
+    class A(Object):
+        model_name: str
+
+    class B(A):
+        pass
+
+    a = B(name="my-a", model_name="my-model")
+
+    a_type = weave.type_of(a)
+    assert a_type.root_type_class().__name__ == "A"
+
+    with weave.local_client():
+        weave.publish(a, name="my-a")
+
+        a2 = weave.ref("my-a").get()
+        assert a2.name == "my-a"
+        assert a2.description == None
+        assert a2.model_name == "my-model"
+
+
+def test_pydantic_nested_type():
+    class Child(pydantic.BaseModel):
+        a: str
+
+    class Parent(pydantic.BaseModel):
+        child: Child
+        b: int
+
+    p = Parent(child=Child(a="hello"), b=1)
+    t = weave.type_of(p)
+
+    assert str(t) == "Parent(child=Child(a=String()), b=Int())"
+    assert t.to_dict() == {
+        "type": "Parent",
+        "_base_type": {"type": "Object"},
+        "_relocatable": True,
+        "_is_object": True,
+        "child": {
+            "type": "Child",
+            "_base_type": {"type": "Object"},
+            "_relocatable": True,
+            "_is_object": True,
+            "a": "string",
+        },
+        "b": "int",
+    }

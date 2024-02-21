@@ -13,29 +13,30 @@ from . import test_wb
 from ..ops_domain import run_ops
 from . import fixture_fakewandb as fwb
 
+
 _loading_builtins_token = _context.set_loading_built_ins()
 
 
 @weave.type()
 class _TestPlanObject:
-    _name: str
+    _horse: str
     val: int
 
-    # Because this is named "Test*", doing .name() will tag the result
+    # Because this is named "Test*", doing .horse() will tag the result
     @weave.op()
-    def name(self) -> str:
-        return self._name
+    def horse(self) -> str:
+        return self._horse
+
+
+@weave.type()
+class _TestPlanHasObject:
+    horse: str
+    _obj: _TestPlanObject
 
 
 @weave.op()
 def dummy_no_arg_op() -> typing.List[_TestPlanObject]:
     return [_TestPlanObject("x", 1)]
-
-
-@weave.type()
-class _TestPlanHasObject:
-    name: str
-    _obj: _TestPlanObject
 
 
 # Because this is named "Test*", doing .name() will tag the result
@@ -52,27 +53,27 @@ _context.clear_loading_built_ins(_loading_builtins_token)
 
 def test_traverse_tags():
     obj_node = weave.save(_TestPlanObject("a", 1))
-    obj_from_tag_val_node = get_object_self_tag(obj_node.name() + "hello").val
+    obj_from_tag_val_node = get_object_self_tag(obj_node.horse() + "hello").val
     p = stitch.stitch([obj_from_tag_val_node])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
+    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-horse"
     assert obj_recorder.calls[1].node.from_op.name == "Object-__getattr__"
     assert obj_recorder.calls[1].inputs[1].val == "val"
 
 
 def test_traverse_tags_2level():
     obj_node = weave.save(_TestPlanHasObject("has", _TestPlanObject("a", 1)))
-    name_add_node = obj_node._test_hasobj_obj().name() + "hello"
+    name_add_node = obj_node._test_hasobj_obj().horse() + "hello"
     obj_from_tag_val_node = get_hasobject_self_tag(
         get_object_self_tag(name_add_node)
-    ).name
+    ).horse
     p = stitch.stitch([obj_from_tag_val_node])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 2
     assert obj_recorder.calls[0].node.from_op.name == "op-_test_hasobj_obj"
     assert obj_recorder.calls[1].node.from_op.name == "Object-__getattr__"
-    assert obj_recorder.calls[1].inputs[1].val == "name"
+    assert obj_recorder.calls[1].inputs[1].val == "horse"
 
 
 def test_enter_filter():
@@ -107,22 +108,22 @@ def test_lambda_using_externally_defined_node():
 
 def test_tag_access_in_filter_expr():
     objs_node = weave.save([_TestPlanObject("a", 1), _TestPlanObject("b", 2)])
-    leaf = objs_node.name().filter(lambda obj: get_object_self_tag(obj).val > 2)
+    leaf = objs_node.horse().filter(lambda obj: get_object_self_tag(obj).val > 2)
     p = stitch.stitch([leaf])
     obj_recorder = p.get_result(objs_node)
     calls = obj_recorder.calls
     assert len(calls) == 2
-    assert calls[0].node.from_op.name == "mapped__TestPlanObject-name"
+    assert calls[0].node.from_op.name == "mapped__TestPlanObject-horse"
     assert calls[1].node.from_op.name == "Object-__getattr__"
     assert calls[1].inputs[1].val == "val"
 
 
-def test_travese_dict():
+def test_traverse_dict():
     obj_node = weave.save(_TestPlanObject("a", 1))
-    p = stitch.stitch([weave.ops.dict_(x=obj_node)["x"].name()])
+    p = stitch.stitch([weave.ops.dict_(x=obj_node)["x"].horse()])
     obj_recorder = p.get_result(obj_node)
     assert len(obj_recorder.calls) == 1
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
+    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-horse"
 
 
 def test_travese_groupby_dict():
@@ -142,21 +143,21 @@ def test_zero_arg_ops():
     obj_recorder = p.get_result(node)
     assert obj_recorder.calls == []
 
-    p = stitch.stitch([node.name()])
+    p = stitch.stitch([node.horse()])
     obj_recorder = p.get_result(node)
     assert len(obj_recorder.calls) == 1
-    assert obj_recorder.calls[0].node.from_op.name == "mapped__TestPlanObject-name"
+    assert obj_recorder.calls[0].node.from_op.name == "mapped__TestPlanObject-horse"
 
-    p = stitch.stitch([node.filter(lambda x: x._get_op("name")() != "")])
+    p = stitch.stitch([node.filter(lambda x: x._get_op("horse")() != "")])
     obj_recorder = p.get_result(node)
     assert len(obj_recorder.calls) == 1
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
+    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-horse"
 
-    p = stitch.stitch([node.filter(lambda x: x._get_op("name")() != ""), node.name()])
+    p = stitch.stitch([node.filter(lambda x: x._get_op("horse")() != ""), node.horse()])
     obj_recorder = p.get_result(node)
     assert len(obj_recorder.calls) == 2
-    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-name"
-    assert obj_recorder.calls[1].node.from_op.name == "mapped__TestPlanObject-name"
+    assert obj_recorder.calls[0].node.from_op.name == "_TestPlanObject-horse"
+    assert obj_recorder.calls[1].node.from_op.name == "mapped__TestPlanObject-horse"
 
 
 def test_shared_fn_node():

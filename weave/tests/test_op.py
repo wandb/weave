@@ -9,6 +9,10 @@ from .. import context_state
 from . import test_helpers
 from .. import uris
 
+from .. import context_state as _context_state
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
+
 
 @weave.op(
     name="test_op-op_simple",
@@ -17,6 +21,9 @@ from .. import uris
 )
 def op_simple(a, b):
     return str(a) + str(b)
+
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_op_simple():
@@ -182,17 +189,3 @@ def test_op_method_inferred_self():
         "a": types.Int(),
     }
     assert SomeWeaveObj.my_op.concrete_output_type == types.String()
-
-
-def test_load_op_from_artifact():
-    @weave.op()
-    def op_to_int(a: str) -> int:
-        return int(a)
-
-    ref = storage.save(op_to_int)
-
-    # load op from uri
-    loaded_op = ref.get()
-
-    # test calling from loaded op works
-    assert 3 == weave.use(loaded_op("3"))

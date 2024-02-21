@@ -33,6 +33,7 @@ _context_state.clear_loading_built_ins(_loading_builtins_token)
 
 __version__ = version.VERSION
 
+from .flow import *
 
 # See the comment above pre_init_modules above. This is check to ensure we don't accidentally
 # introduce loading weave.ops or weave.panels when importing weave.

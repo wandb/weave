@@ -1,23 +1,39 @@
-import _ from 'lodash';
 import React, {useMemo} from 'react';
+import styled from 'styled-components';
 
-import {Timestamp} from '../../../../../Timestamp';
-import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {CategoryChip} from '../common/CategoryChip';
-import {SimpleKeyValueTable} from '../common/SimplePageLayout';
+import {CallId, opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
-import {GroupedCalls} from '../ObjectVersionPage';
 import {
   CallSchema,
   refUriToOpVersionKey,
-  useCalls,
   useOpVersion,
 } from '../wfReactInterface/interface';
+
+export const Overview = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+`;
+Overview.displayName = 'S.Overview';
+
+export const CallName = styled.div`
+  font-family: Source Sans Pro;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0px;
+  text-align: left;
+`;
+CallName.displayName = 'S.CallName';
 
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const span = call.rawSpan;
+  const opName = opNiceName(call.spanName);
+  const truncatedId = call.callId.slice(-4);
+
   const opVersionKey = useMemo(() => {
     if (call.opVersionRef) {
       return refUriToOpVersionKey(call.opVersionRef);
@@ -26,63 +42,15 @@ export const CallOverview: React.FC<{
   }, [call.opVersionRef]);
   const callOp = useOpVersion(opVersionKey);
   const opCategory = callOp.result?.category;
-  const childCalls = useCalls(call.entity, call.project, {
-    parentIds: [call.callId],
-  });
-  const safeChildCalls = useMemo(() => {
-    if (childCalls.loading) {
-      return [];
-    }
-    return (childCalls.result ?? []).filter(c => c.opVersionRef != null);
-  }, [childCalls.loading, childCalls.result]);
-  const attributes = _.fromPairs(
-    Object.entries(span.attributes ?? {}).filter(
-      ([k, a]) => !k.startsWith('_') && a != null
-    )
-  );
-  const summary = _.fromPairs(
-    Object.entries(span.summary ?? {}).filter(
-      ([k, a]) => !k.startsWith('_') && k !== 'latency_s' && a != null
-    )
-  );
+
+  const statusCode = call.rawSpan.status_code;
 
   return (
-    <SimpleKeyValueTable
-      data={{
-        Operation:
-          parseRefMaybe(span.name) != null ? (
-            <SmallRef objRef={parseRefMaybe(span.name)!} wfTable="OpVersion" />
-          ) : (
-            span.name
-          ),
-        ...(opCategory
-          ? {
-              Category: <CategoryChip value={opCategory} />,
-            }
-          : {}),
-        Status: <StatusChip value={span.status_code} />,
-        Called: <Timestamp value={span.timestamp / 1000} format="relative" />,
-        ...(span.summary.latency_s != null
-          ? {
-              Latency: span.summary.latency_s.toFixed(3) + 's',
-            }
-          : {}),
-        ...(span.exception ? {Exception: span.exception} : {}),
-        ...((safeChildCalls.length ?? 0) > 0
-          ? {
-              'Child Calls': (
-                <GroupedCalls
-                  calls={safeChildCalls}
-                  partialFilter={{
-                    parentId: call.callId,
-                  }}
-                />
-              ),
-            }
-          : {}),
-        ...(Object.keys(attributes).length > 0 ? {Attributes: attributes} : {}),
-        ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
-      }}
-    />
+    <Overview>
+      <CallName>{opName}</CallName>
+      <CallId>{truncatedId}</CallId>
+      {opCategory && <CategoryChip value={opCategory} />}
+      <StatusChip value={statusCode} iconOnly />
+    </Overview>
   );
 };

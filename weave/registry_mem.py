@@ -52,7 +52,13 @@ class Registry:
             return op
         self.mark_updated()
         # do not save built-in ops today
-        should_save = not location and not op.is_builtin
+
+        # Do not save ops ever. We used to register all ops, and save
+        # non-builtin ops immediately. This causes a lot of unnecessary
+        # writing to the filesystem. Disable for weaveflow, where typically
+        # we don't need registered ops since we eagerly execute.
+        # should_save = not location and not op.is_builtin
+        should_save = False
         if should_save:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=op.name + ":latest")
