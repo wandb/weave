@@ -43,6 +43,9 @@ class InsertableCHCallSchema(BaseModel):
     exception: typing.Optional[str] = None
     created_at: typing.Optional[datetime.datetime] = None
 
+    input_refs: typing.List[str]
+    output_refs: typing.List[str]
+
     @model_validator(mode="after")
     def enforce_db_level_business_rules(self):
         # Running State
@@ -104,6 +107,9 @@ class UpdateableCHCallSchema(BaseModel):
     exception: typing.Optional[str] = None
     created_at: typing.Optional[datetime.datetime] = None
 
+    input_refs: typing.List[str]
+    output_refs: typing.List[str]
+
 
 # Very critical that this matches the calls table schema! This should
 # essentially be the DB version of CallSchema with the addition of the
@@ -130,6 +136,9 @@ class SelectableCHCallSchema(BaseModel):
 
     updated_at: datetime.datetime
     created_at: datetime.datetime
+
+    input_refs: typing.List[str]
+    output_refs: typing.List[str]
 
 
 class InsertableCHObjSchema(BaseModel):
@@ -182,6 +191,8 @@ call_columns: typing.Dict[str, str] = {
     "exception": "Nullable(String)",
     "created_at": "DateTime64(3)",
     "updated_at": "DateTime64(3)",
+    "input_refs": "Array(String)",
+    "output_refs": "Array(String)",
 }
 all_call_columns = list(call_columns.keys())
 
@@ -263,8 +274,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_obj_insert_thread_client = clickhouse_connect.get_client(
             host=host, port=port
         )
-        self._run_migrations()
-        self._print_status()
+        # self._print_status()
         self.call_insert_buffer = InMemAutoFlushingBuffer(
             MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_call_insert_buffer
         )
@@ -310,25 +320,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions = []
         parameters = {}
         if req.filter:
-            if req.filter.names != None:
+            if req.filter.names:
                 conditions.append("name IN {names: Array(String)}")
                 parameters["names"] = req.filter.names
 
-            if req.filter.input_object_version_refs != None:
-                raise NotImplementedError()
+            if req.filter.input_object_version_refs:
+                parameters["input_refs"] = req.filter.input_object_version_refs
+                conditions.append("hasAny(input_refs, {input_refs: Array(String)})")
 
-            if req.filter.output_object_version_refs != None:
-                raise NotImplementedError()
+            if req.filter.output_object_version_refs:
+                parameters["output_refs"] = req.filter.output_object_version_refs
+                conditions.append("hasAny(output_refs, {output_refs: Array(String)})")
 
-            if req.filter.parent_ids != None:
+            if req.filter.parent_ids:
                 conditions.append("parent_id IN {parent_ids: Array(String)}")
                 parameters["parent_ids"] = req.filter.parent_ids
 
-            if req.filter.trace_ids != None:
+            if req.filter.trace_ids:
                 conditions.append("trace_id IN {trace_ids: Array(String)}")
                 parameters["trace_ids"] = req.filter.trace_ids
 
-            if req.filter.call_ids != None:
+            if req.filter.call_ids:
                 conditions.append("id IN {call_ids: Array(String)}")
                 parameters["call_ids"] = req.filter.call_ids
 
@@ -497,22 +509,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for col in columns:
             if col in ["entity", "project", "id"]:
                 merged_cols.append(f"{col} AS {col}")
-            elif col in [
-                "status_code",
-                "start_time",
-                "end_time",
-                "attributes",
-                "inputs",
-                "outputs",
-                "summary",
-                "exception",
-                "updated_at",
-            ]:
-                merged_cols.append(f"anyLast({col}) AS {col}")
-            elif col in ["trace_id", "parent_id", "name", "created_at"]:
-                merged_cols.append(f"anyLast({col}) AS {col}")
             else:
-                raise ValueError(f"Invalid column: {col}")
+                 merged_cols.append(f"anyLast({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
@@ -728,10 +726,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self):
         print("Running migrations")
-        # self.ch_client.command("DROP TABLE IF EXISTS objects")
-        # self.ch_client.command("DROP TABLE IF EXISTS calls")
-        # self.ch_client.command("DROP TABLE IF EXISTS calls_raw")
-        # self.ch_client.command("DROP TABLE IF EXISTS calls_agg")
+        self.ch_client.command("DROP TABLE IF EXISTS objects")
+        self.ch_client.command("DROP TABLE IF EXISTS calls")
+        self.ch_client.command("DROP TABLE IF EXISTS calls_raw")
+        self.ch_client.command("DROP TABLE IF EXISTS calls_agg")
         self.ch_client.command(
             """
         CREATE TABLE IF NOT EXISTS
@@ -776,6 +774,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             exception String NULL,
             created_at DateTime64(3) DEFAULT now64(3),
             updated_at DateTime64(3) DEFAULT now64(3),
+            input_refs Array(String),
+            output_refs Array(String)
         )
         ENGINE = MergeTree
         ORDER BY (entity, project, id)
@@ -800,7 +800,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             summary SimpleAggregateFunction(anyLast, String) NULL,
             exception SimpleAggregateFunction(anyLast, String) NULL,
             created_at SimpleAggregateFunction(any, DateTime64(3)),
-            updated_at SimpleAggregateFunction(anyLast, DateTime64(3))
+            updated_at SimpleAggregateFunction(anyLast, DateTime64(3)),
+            input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
+            output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
         )
         ENGINE = AggregatingMergeTree()
         ORDER BY (entity, project, id)
@@ -820,7 +822,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             anyLastSimpleState(summary) as summary,
             anyLastSimpleState(exception) as exception,
             anySimpleState(created_at) as created_at,
-            anyLastSimpleState(updated_at) as updated_at
+            anyLastSimpleState(updated_at) as updated_at,
+            anyLastSimpleState(input_refs) as input_refs,
+            anyLastSimpleState(output_refs) as output_refs
         FROM calls_raw
         GROUP BY entity, project, id
         """
@@ -837,7 +841,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         res = self.ch_client.query(
             query, parameters=parameters, column_formats=column_formats, use_none=True
         )
-        # print("Summary: " + json.dumps(res.summary, indent=2))
+        print("Summary: " + json.dumps(res.summary, indent=2))
         return res
 
     def _insert_call(self, ch_call: UpdateableCHCallSchema) -> None:
@@ -974,6 +978,23 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     )
 
 
+def extract_refs_from_values(vals: typing.Optional[typing.List[typing.Any]]) -> typing.List[str]:
+    refs = []
+    if vals:
+        for val in vals:
+            if isinstance(val, str) and val.startswith("wandb-trace://"):
+                refs.append(val)
+                # parts = val[len("wandb-trace://") :].split("/")
+                # entity = parts[0]
+                # project = parts[1]
+                # noun = parts[2]
+                # name_and_version = parts[3]
+                # name, version = name_and_version.split(":")
+                # refs.append((entity, project, noun, name, version))
+    print(refs)
+    return refs
+
+
 def _partial_call_schema_to_ch_call(
     partial_call: tsi.PartialCallForCreationSchema,
 ) -> InsertableCHCallSchema:
@@ -1006,6 +1027,13 @@ def _partial_call_schema_to_ch_call(
     if status_code != "UNSET" and not partial_call.end_time_s:
         end_time = datetime.datetime.now()
 
+    input_refs = []
+    output_refs = []
+    if partial_call.inputs:
+        input_refs = extract_refs_from_values(list(partial_call.inputs.values()))
+    if partial_call.outputs:
+        output_refs = extract_refs_from_values(list(partial_call.outputs.values()))
+
     return InsertableCHCallSchema(
         entity=partial_call.entity,
         project=partial_call.project,
@@ -1021,6 +1049,9 @@ def _partial_call_schema_to_ch_call(
         outputs=_prepare_nullable_dict_value(partial_call.outputs),
         summary=_prepare_nullable_dict_value(partial_call.summary),
         exception=partial_call.exception,
+
+        input_refs=input_refs,
+        output_refs=output_refs,
     )
 
 
@@ -1048,6 +1079,13 @@ def _partial_call_schema_to_ch_call_update(
     ):
         end_time = datetime.datetime.now()
 
+    input_refs = []
+    output_refs = []
+    if partial_call.inputs:
+        input_refs = extract_refs_from_values(list(partial_call.inputs.values()))
+    if partial_call.outputs:
+        output_refs = extract_refs_from_values(list(partial_call.outputs.values()))
+
     return UpdateableCHCallSchema(
         entity=partial_call.entity,
         project=partial_call.project,
@@ -1063,6 +1101,9 @@ def _partial_call_schema_to_ch_call_update(
         outputs=_prepare_nullable_dict_value(partial_call.outputs),
         summary=_prepare_nullable_dict_value(partial_call.summary),
         exception=partial_call.exception,
+
+        input_refs=input_refs,
+        output_refs=output_refs,
     )
 
 
