@@ -211,6 +211,7 @@ gql_prop_op(
     types.Boolean(),
 )
 
+
 @op(plugins=wb_gql_op_plugin(lambda inputs, inner: "metadata"), hidden=True)
 def refine_metadata(
     artifactVersion: wdt.ArtifactVersion,
