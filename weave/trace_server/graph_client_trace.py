@@ -42,7 +42,7 @@ from .. import ref_base
 from .. import weave_types as types
 
 
-from .trace_server_interface_util import version_hash_for_object
+from .trace_server_interface_util import generate_id, version_hash_for_object
 from . import trace_server_interface as tsi
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -164,9 +164,10 @@ def refs_to_str(val: typing.Any) -> typing.Any:
 
 
 # URIS are the WORST! Here is what we want:
+# TODO: Move netloc to empty string.
 # `wandb-trace://[entity]/[project]/call/[ID]`
-# `wandb-trace://[entity]/[project]/op/name:[CONTENT_HASH]`
-# `wandb-trace://[entity]/[project]/obj/name:[CONTENT_HASH]/[PATH]#[EXTRA]`
+# `wandb-trace://[entity]/[project]/op/[name]:[CONTENT_HASH]`
+# `wandb-trace://[entity]/[project]/obj/[name]:[CONTENT_HASH]/[PATH]#[EXTRA]`
 @dataclasses.dataclass
 class TraceNounUri(uris.WeaveURI):
     SCHEME = "wandb-trace"
@@ -438,7 +439,9 @@ class TraceNounRef(ref_base.Ref):
 
     @property
     def ui_url(self) -> str:
-        return urls.object_version_path(self._entity, self._project, self._name, self._version)
+        return urls.object_version_path(
+            self._entity, self._project, self._name, self._version
+        )
 
 
 @dataclasses.dataclass
@@ -586,30 +589,35 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             trace_id = str(uuid.uuid4())
             parent_id = None
 
-        call = tsi.PartialCallForCreationSchema(
+        start = tsi.StartedCallSchemaForInsert(
             entity=self.entity,
             project=self.project,
-            id=str(uuid.uuid4()),
+            id=generate_id(),
             name=op_name,
             trace_id=trace_id,
-            start_time_s=time.time(),
+            start_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
             inputs=refs_to_str(inputs),
+            attributes={},
         )
-        self.trace_server.call_create(tsi.CallCreateReq(call=call))
-        return RunSql(call.model_dump())
+        self.trace_server.call_start(tsi.CallStartReq(start=start))
+        return RunSql(start.model_dump())
 
     def fail_run(self, run: Run, exception: BaseException) -> None:
-        self.trace_server.call_update(
-            {
-                "entity": self.entity,
-                "project": self.project,
-                "id": run.id,
-                "fields": {
-                    "end_time_s": time.time(),
-                    "exception": str(exception),
-                },
-            }
+        self.trace_server.call_end(
+            tsi.CallEndReq.model_validate(
+                {
+                    "end": {
+                        "entity": self.entity,
+                        "project": self.project,
+                        "id": run.id,
+                        "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
+                        "outputs": {},
+                        "exception": str(exception),
+                        "summary": {},
+                    },
+                }
+            )
         )
 
     def finish_run(
@@ -622,13 +630,17 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         output = refs_to_str(output)
         if not isinstance(output, dict):
             output = {"_result": output}
-        self.trace_server.call_update(
-            tsi.CallUpdateReq.model_validate(
+        self.trace_server.call_end(
+            tsi.CallEndReq.model_validate(
                 {
-                    "entity": self.entity,
-                    "project": self.project,
-                    "id": run.id,
-                    "fields": {"end_time_s": time.time(), "outputs": output},
+                    "end": {
+                        "entity": self.entity,
+                        "project": self.project,
+                        "id": run.id,
+                        "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
+                        "outputs": output,
+                        "summary": {},
+                    },
                 }
             )
         )

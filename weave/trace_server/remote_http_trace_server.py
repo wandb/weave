@@ -5,7 +5,10 @@ import requests
 
 from .flushing_buffer import InMemAutoFlushingBuffer
 from . import trace_server_interface as tsi
-from .trace_server_interface_util import prepare_partial_obj_for_creation_schema_for_transport, read_obj_schema_from_transport
+from .trace_server_interface_util import (
+    prepare_partial_obj_for_creation_schema_for_transport,
+    read_obj_schema_from_transport,
+)
 
 MAX_FLUSH_COUNT = 100
 MAX_FLUSH_AGE = 5
@@ -48,44 +51,35 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return res_model.parse_obj(r.json())
 
     # Call API
-    def call_create(
-        self, req: t.Union[tsi.CallCreateReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallCreateRes:
+    def call_start(
+        self, req: t.Union[tsi.CallStartReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallStartRes:
         if self.should_batch:
             if isinstance(req, dict):
-                req = tsi.CallCreateReq.model_validate(req)
+                req = tsi.CallStartReq.model_validate(req)
             req = req.model_dump()
-            self.call_buffer.insert({"mode": "insert", "insert": req})
-            return tsi.CallCreateRes()
+            self.call_buffer.insert({"mode": "start", "req": req})
+            return tsi.CallStartRes()
         return self._generic_request(
-            "/call/create", req, tsi.CallCreateReq, tsi.CallCreateRes
+            "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
         )
+
+    def call_end(
+        self, req: t.Union[tsi.CallEndReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallEndRes:
+        if self.should_batch:
+            if isinstance(req, dict):
+                req = tsi.CallEndReq.model_validate(req)
+            req = req.model_dump()
+            self.call_buffer.insert({"mode": "end", "req": req})
+            return tsi.CallEndRes()
+        return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
     def call_read(
         self, req: t.Union[tsi.CallReadReq, t.Dict[str, t.Any]]
     ) -> tsi.CallReadRes:
         return self._generic_request(
             "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
-        )
-
-    def call_update(
-        self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallUpdateRes:
-        if self.should_batch:
-            if isinstance(req, dict):
-                req = tsi.CallUpdateReq.model_validate(req)
-            req = req.model_dump()
-            self.call_buffer.insert({"mode": "update", "update": req})
-            return tsi.CallUpdateRes()
-        return self._generic_request(
-            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
-        )
-
-    def call_delete(
-        self, req: t.Union[tsi.CallDeleteReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallDeleteRes:
-        return self._generic_request(
-            "/call/delete", req, tsi.CallDeleteReq, tsi.CallDeleteRes
         )
 
     def calls_query(
@@ -102,7 +96,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.OpCreateRes:
         if isinstance(req, dict):
             req = tsi.OpCreateReq.model_validate(req)
-        
+
         transport_req = tsi.TransportableOpCreateReq(
             op_obj=prepare_partial_obj_for_creation_schema_for_transport(req.op_obj),
         )
@@ -112,22 +106,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def op_read(self, req: t.Union[tsi.OpReadReq, t.Dict[str, t.Any]]) -> tsi.OpReadRes:
-        transport_res = self._generic_request("/op/read", req, tsi.OpReadReq, tsi.TransportableOpReadRes)
-        return tsi.OpReadRes(op_obj=read_obj_schema_from_transport(transport_res.op_obj))
-
-
-    def op_update(
-        self, req: t.Union[tsi.OpUpdateReq, t.Dict[str, t.Any]]
-    ) -> tsi.OpUpdateRes:
-        return self._generic_request(
-            "/op/update", req, tsi.OpUpdateReq, tsi.OpUpdateRes
+        transport_res = self._generic_request(
+            "/op/read", req, tsi.OpReadReq, tsi.TransportableOpReadRes
         )
-
-    def op_delete(
-        self, req: t.Union[tsi.OpDeleteReq, t.Dict[str, t.Any]]
-    ) -> tsi.OpDeleteRes:
-        return self._generic_request(
-            "/op/delete", req, tsi.OpDeleteReq, tsi.OpDeleteRes
+        return tsi.OpReadRes(
+            op_obj=read_obj_schema_from_transport(transport_res.op_obj)
         )
 
     def ops_query(
@@ -142,34 +125,25 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.ObjCreateRes:
         if isinstance(req, dict):
             req = tsi.ObjCreateReq.model_validate(req)
-        
+
         transport_req = tsi.TransportableObjCreateReq(
             obj=prepare_partial_obj_for_creation_schema_for_transport(req.obj),
         )
 
         return self._generic_request(
-            "/obj/create", transport_req, tsi.TransportableObjCreateReq, tsi.ObjCreateRes
+            "/obj/create",
+            transport_req,
+            tsi.TransportableObjCreateReq,
+            tsi.ObjCreateRes,
         )
 
     def obj_read(
         self, req: t.Union[tsi.ObjReadReq, t.Dict[str, t.Any]]
     ) -> tsi.ObjReadRes:
-        transport_res = self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.TransportableObjReadRes)
+        transport_res = self._generic_request(
+            "/obj/read", req, tsi.ObjReadReq, tsi.TransportableObjReadRes
+        )
         return tsi.ObjReadRes(obj_obj=read_obj_schema_from_transport(transport_res.obj))
-
-    def obj_update(
-        self, req: t.Union[tsi.ObjUpdateReq, t.Dict[str, t.Any]]
-    ) -> tsi.ObjUpdateRes:
-        return self._generic_request(
-            "/obj/update", req, tsi.ObjUpdateReq, tsi.ObjUpdateRes
-        )
-
-    def obj_delete(
-        self, req: t.Union[tsi.ObjDeleteReq, t.Dict[str, t.Any]]
-    ) -> tsi.ObjDeleteRes:
-        return self._generic_request(
-            "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
-        )
 
     def objs_query(
         self, req: t.Union[tsi.ObjQueryReq, t.Dict[str, t.Any]]

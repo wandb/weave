@@ -1,14 +1,8 @@
 # Needs to be kept in sync with core/services/weave-clickhouse/src/api/interface.py
 
+import datetime
 import typing
 from pydantic import BaseModel
-from enum import Enum
-
-
-class StatusCodeEnum(str, Enum):
-    UNSET = "UNSET"
-    OK = "OK"
-    ERROR = "ERROR"
 
 
 class CallSchema(BaseModel):
@@ -20,58 +14,75 @@ class CallSchema(BaseModel):
     # Name of the calling function (op)
     name: str
 
-    # Trace Context Fields
-
     ## Trace ID
     trace_id: str
     ## Parent ID is optional because the call may be a root
     parent_id: typing.Optional[str] = None
 
-    # Status Fields
-
-    ## Status Code -> UNSET, OK, ERROR
-    status_code: StatusCodeEnum
     ## Start time is required
-    start_time_s: float
-    ## End time is optional because the call may not have finished yet
-    end_time_s: typing.Optional[float] = None
-    ## Exception is optional because the call may not have errored
+    start_datetime: datetime.datetime
+    ## Attributes: properties of the call
+    attributes: typing.Dict[str, typing.Any]
+
+    ## Inputs
+    inputs: typing.Dict[str, typing.Any]
+
+    ## End time is required if finished
+    end_datetime: typing.Optional[datetime.datetime] = None
+
+    ## Exception is present if the call failed
     exception: typing.Optional[str] = None
 
-    # Optional fields:
-
-    ## Attributes: properties of the call
-    attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
-
-    ## Inputs and Outputs
-    inputs: typing.Optional[typing.Dict[str, typing.Any]] = None
+    ## Outputs
     outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     ## Summary: a summary of the call
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
 
 
-# YIKES! Why can't this just inherit from CallSchema and override the fields?
-# These should be EXACTLY the same as CallSchema, but with some fields optional
-class PartialCallForCreationSchema(BaseModel):
+# Essentially a partial of StartedCallSchema. Mods:
+# - id is not required (will be generated)
+# - trace_id is not required (will be generated)
+class StartedCallSchemaForInsert(BaseModel):
+    # Identity Fields:
     entity: str
     project: str
-    id: typing.Optional[str] = None
+    id: typing.Optional[str] = None  # Will be generated if not provided
 
-    name: typing.Optional[str] = None
+    # Name of the calling function (op)
+    name: str
 
-    trace_id: typing.Optional[str] = None
+    ## Trace ID
+    trace_id: typing.Optional[str] = None  # Will be generated if not provided
+    ## Parent ID is optional because the call may be a root
     parent_id: typing.Optional[str] = None
 
-    status_code: typing.Optional[StatusCodeEnum] = None
-    start_time_s: typing.Optional[float] = None
-    end_time_s: typing.Optional[float] = None
+    ## Start time is required
+    start_datetime: datetime.datetime
+    ## Attributes: properties of the call
+    attributes: typing.Dict[str, typing.Any]
+
+    ## Inputs
+    inputs: typing.Dict[str, typing.Any]
+
+
+class EndedCallSchemaForInsert(BaseModel):
+    # Identity Fields for lookup
+    entity: str
+    project: str
+    id: str
+
+    ## End time is required
+    end_datetime: datetime.datetime
+
+    ## Exception is present if the call failed
     exception: typing.Optional[str] = None
 
-    attributes: typing.Optional[typing.Dict[str, typing.Any]] = None
-    inputs: typing.Optional[typing.Dict[str, typing.Any]] = None
-    outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
-    summary: typing.Optional[typing.Dict[str, typing.Any]] = None
+    ## Outputs
+    outputs: typing.Dict[str, typing.Any]
+
+    ## Summary: a summary of the call
+    summary: typing.Dict[str, typing.Any]
 
 
 class ObjSchema(BaseModel):
@@ -81,7 +92,6 @@ class ObjSchema(BaseModel):
     version_hash: str
 
     type_dict: typing.Dict[str, typing.Any]
-    # val_dict: typing.Dict[str, typing.Any]
     encoded_file_map: typing.Dict[str, bytes]
     metadata_dict: typing.Dict[str, typing.Any]
 
@@ -111,49 +121,34 @@ class TransportablePartialObjForCreationSchema(PartialObjForCreationSchema):
 class TransportableObjCreateReq(BaseModel):
     obj: TransportablePartialObjForCreationSchema
 
+
 class TransportableObjReadRes(BaseModel):
     obj: ObjSchema
 
+
 class TransportableOpCreateReq(BaseModel):
     op_obj: TransportablePartialObjForCreationSchema
+
 
 class TransportableOpReadRes(BaseModel):
     op_obj: ObjSchema
 
 
-# class OpSchema(BaseModel):
-#     entity: str
-#     project: str
-#     name: str
-#     version_hash: str
-
-#     code: typing.Optional[str] = None
-#     environment_state_identity: typing.Optional[str] = None
-#     # TODO: We might want to also track the inputs and output types here.
-#     # TODO: We should probably track the dependencies of the op here as well.
-
-#     created_at_s: float
+class CallStartReq(BaseModel):
+    start: StartedCallSchemaForInsert
 
 
-# class PartialOpForCreationSchema(BaseModel):
-#     entity: str
-#     project: str
-#     name: str
-
-#     code: typing.Optional[str] = None
-#     environment_state_identity: typing.Optional[str] = None
+class CallStartRes(BaseModel):
+    id: str
+    trace_id: str
 
 
-class CallCreateReq(BaseModel):
-    call: PartialCallForCreationSchema
+class CallEndReq(BaseModel):
+    end: EndedCallSchemaForInsert
 
 
-class CallCreateRes(BaseModel):
+class CallEndRes(BaseModel):
     pass
-    # In a buffered/async world, we can't return anything here.
-    # entity: str
-    # project: str
-    # id: str
 
 
 class CallReadReq(BaseModel):
@@ -167,37 +162,27 @@ class CallReadRes(BaseModel):
     call: CallSchema
 
 
-class _CallUpdateFields(BaseModel):
-    status_code: typing.Optional[StatusCodeEnum] = None
-    end_time_s: typing.Optional[float] = None
-    outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
-    summary: typing.Optional[typing.Dict[str, typing.Any]] = None
-    exception: typing.Optional[str] = None
+# class _CallUpdateFields(BaseModel):
+#     status_code: typing.Optional[StatusCodeEnum] = None
+#     end_time_s: typing.Optional[float] = None
+#     outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
+#     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
+#     exception: typing.Optional[str] = None
 
 
-class CallUpdateReq(BaseModel):
-    entity: str
-    project: str
-    id: str
-    fields: _CallUpdateFields
+# class CallUpdateReq(BaseModel):
+#     entity: str
+#     project: str
+#     id: str
+#     fields: _CallUpdateFields
 
 
-class CallUpdateRes(BaseModel):
-    pass
-    # In a buffered/async world, we can't return anything here.
-    # entity: str
-    # project: str
-    # id: str
-
-
-class CallDeleteReq(BaseModel):
-    entity: str
-    project: str
-    id: str
-
-
-class CallDeleteRes(BaseModel):
-    pass
+# class CallUpdateRes(BaseModel):
+#     pass
+#     # In a buffered/async world, we can't return anything here.
+#     # entity: str
+#     # project: str
+#     # id: str
 
 
 class _CallsFilter(BaseModel):
@@ -249,22 +234,6 @@ class OpReadRes(BaseModel):
     op_obj: ObjSchema
 
 
-class OpUpdateReq(BaseModel):
-    pass
-
-
-class OpUpdateRes(BaseModel):
-    pass
-
-
-class OpDeleteReq(BaseModel):
-    pass
-
-
-class OpDeleteRes(BaseModel):
-    pass
-
-
 class OpQueryReq(BaseModel):
     pass
 
@@ -292,28 +261,13 @@ class ObjReadRes(BaseModel):
     obj: ObjSchema
 
 
-class ObjUpdateReq(BaseModel):
-    pass
-
-
-class ObjUpdateRes(BaseModel):
-    pass
-
-
-class ObjDeleteReq(BaseModel):
-    pass
-
-
-class ObjDeleteRes(BaseModel):
-    pass
-
-
 class ObjectVersionFilter(BaseModel):
     # TODO: This needs to be added to the data model!
     category: typing.Optional[str] = None
     objectIds: typing.Optional[typing.List[str]] = None
     # Ugggg - implementing this is going to be a pain - probably have to do a materialized view
     latestOnly: typing.Optional[bool] = None
+
 
 class ObjQueryReq(BaseModel):
     entity: str
@@ -327,16 +281,13 @@ class ObjQueryRes(BaseModel):
 
 class TraceServerInterface:
     # Call API
-    def call_create(self, req: CallCreateReq) -> CallCreateRes:
+    def call_start(self, req: CallStartReq) -> CallStartRes:
+        ...
+
+    def call_end(self, req: CallEndReq) -> CallEndRes:
         ...
 
     def call_read(self, req: CallReadReq) -> CallReadRes:
-        ...
-
-    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
-        ...
-
-    def call_delete(self, req: CallDeleteReq) -> CallDeleteRes:
         ...
 
     def calls_query(self, req: CallsQueryReq) -> CallQueryRes:
@@ -349,12 +300,6 @@ class TraceServerInterface:
     def op_read(self, req: OpReadReq) -> OpReadRes:
         ...
 
-    def op_update(self, req: OpUpdateReq) -> OpUpdateRes:
-        ...
-
-    def op_delete(self, req: OpDeleteReq) -> OpDeleteRes:
-        ...
-
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
         ...
 
@@ -363,12 +308,6 @@ class TraceServerInterface:
         ...
 
     def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        ...
-
-    def obj_update(self, req: ObjUpdateReq) -> ObjUpdateRes:
-        ...
-
-    def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes:
         ...
 
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:

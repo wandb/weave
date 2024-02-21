@@ -1,5 +1,3 @@
-
-
 import pytest
 
 
@@ -35,6 +33,7 @@ def clickhouse_trace_server(clickhouse_server):
     clickhouse_trace_server._run_migrations()
     yield clickhouse_trace_server
 
+
 @pytest.fixture()
 def trace_client(clickhouse_trace_server):
     graph_client = graph_client_trace.GraphClientTrace(
@@ -66,37 +65,38 @@ def _check_server_health(
     return False
 
 
-
 def _check_server_up(host="localhost", port=18123) -> typing.Tuple[str, int, bool]:
     base_port = 18123
-    base_url = f'http://{host}:{port}/'
+    base_url = f"http://{host}:{port}/"
     endpoint = "/"
 
     def server_healthy(num_retries=1):
-        return _check_server_health(base_url=base_url, endpoint=endpoint, num_retries=num_retries)
+        return _check_server_health(
+            base_url=base_url, endpoint=endpoint, num_retries=num_retries
+        )
 
-    
     if server_healthy():
         return (host, port, True)
 
-    subprocess.Popen([
-        "docker",
-        "run",
-        "-d",
-        "--rm",
-        "-p",
-        f"{base_port}:8123",
-        # "-p19000:9000",
-        "--name",
-        "weave-python-test-clickhouse-server",
-        "--ulimit",
-        "nofile=262144:262144",
-        "clickhouse/clickhouse-server"
-    ])
-    
+    subprocess.Popen(
+        [
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "-p",
+            f"{base_port}:8123",
+            # "-p19000:9000",
+            "--name",
+            "weave-python-test-clickhouse-server",
+            "--ulimit",
+            "nofile=262144:262144",
+            "clickhouse/clickhouse-server",
+        ]
+    )
+
     # wait for the server to start
     if server_healthy(num_retries=30):
         return (host, port, True)
     else:
         return (host, port, False)
-

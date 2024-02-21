@@ -188,6 +188,7 @@ class RefJSONEncoder(json.JSONEncoder):
 
     def default(self, o):
         from .trace_server.graph_client_trace import TraceNounRef
+
         ref_code = None
         if isinstance(o, artifact_fs.FilesystemArtifactRef):
             if o.serialize_as_path_ref:

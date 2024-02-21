@@ -13,7 +13,7 @@ import clickhouse_connect
 from pydantic import BaseModel, model_validator
 
 
-from .trace_server_interface_util import version_hash_for_object
+from .trace_server_interface_util import generate_id, version_hash_for_object
 from . import trace_server_interface as tsi
 from .flushing_buffer import InMemAutoFlushingBuffer, InMemFlushableBuffer
 
@@ -26,89 +26,40 @@ class NotFoundError(Exception):
     pass
 
 
-class InsertableCHCallSchema(BaseModel):
+class CallStartCHInsertable(BaseModel):
     entity: str
     project: str
     id: str
     trace_id: str
     parent_id: typing.Optional[str] = None
     name: str
-    status_code: tsi.StatusCodeEnum
-    start_time: datetime.datetime
-    end_time: typing.Optional[datetime.datetime] = None
-    attributes: typing.Optional[str] = None
-    inputs: typing.Optional[str] = None
-    outputs: typing.Optional[str] = None
-    summary: typing.Optional[str] = None
-    exception: typing.Optional[str] = None
-    created_at: typing.Optional[datetime.datetime] = None
-
+    start_datetime: datetime.datetime
+    attributes_dump: str
+    inputs_dump: str
     input_refs: typing.List[str]
-    output_refs: typing.List[str]
-
-    @model_validator(mode="after")
-    def enforce_db_level_business_rules(self):
-        # Running State
-        if self.status_code == "UNSET":
-            assert (
-                self.end_time is None
-            ), "end_time must be None if status_code is UNSET"
-            assert self.outputs is None, "outputs must be None if status_code is UNSET"
-            assert (
-                self.exception is None
-            ), "exception must be None if status_code is UNSET"
-
-        # Finished State
-        elif self.status_code == "OK":
-            assert self.end_time, "end_time must be set if status_code is OK"
-            # Sometimes the finish update is so fast & the server time is not the same as the client time
-            # So, we need to make sure that the end_time is greater than the start_time
-            # if self.end_time < self.start_time:
-            #     self.end_time = self.start_time
-            assert (
-                self.end_time >= self.start_time
-            ), f"end_time {self.end_time} must be greater than start_time {self.start_time}"
-            assert self.exception is None, "exception must be None if status_code is OK"
-
-        # Error State
-        elif self.status_code == "ERROR":
-            assert self.end_time, "end_time must be set if status_code is ERROR"
-            # Sometimes the finish update is so fast & the server time is not the same as the client time
-            # So, we need to make sure that the end_time is greater than the start_time
-            # if self.end_time < self.start_time:
-            #     self.end_time = self.start_time
-            assert (
-                self.end_time >= self.start_time
-            ), f"end_time {self.end_time} must be greater than start_time {self.start_time}"
-            assert self.exception, "exception must be set if status_code is ERROR"
-            assert self.outputs is None, "outputs must be None if status_code is ERROR"
-
-        # Invalid State
-        else:
-            raise ValueError(f"Invalid status_code: {self.status_code}")
-
-        return self
+    output_refs: typing.List[str] = []  # sadly, this is required
 
 
-class UpdateableCHCallSchema(BaseModel):
+class CallEndCHInsertable(BaseModel):
     entity: str
     project: str
     id: str
-    trace_id: typing.Optional[str] = None
-    parent_id: typing.Optional[str] = None
-    name: typing.Optional[str] = None
-    status_code: typing.Optional[tsi.StatusCodeEnum] = None
-    start_time: typing.Optional[datetime.datetime] = None
-    end_time: typing.Optional[datetime.datetime] = None
-    attributes: typing.Optional[str] = None
-    inputs: typing.Optional[str] = None
-    outputs: typing.Optional[str] = None
-    summary: typing.Optional[str] = None
+    end_datetime: datetime.datetime
     exception: typing.Optional[str] = None
-    created_at: typing.Optional[datetime.datetime] = None
-
-    input_refs: typing.List[str]
+    summary_dump: str
+    outputs_dump: str
+    input_refs: typing.List[str] = []  # sadly, this is required
     output_refs: typing.List[str]
+
+
+CallCHInsertable = typing.Union[CallStartCHInsertable, CallEndCHInsertable]
+
+all_call_columns = list(
+    CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
+)
+
+# Let's just make everything required for now ... can optimize when we implement column selection
+required_call_columns = list(set(all_call_columns) - set([]))
 
 
 # Very critical that this matches the calls table schema! This should
@@ -124,18 +75,15 @@ class SelectableCHCallSchema(BaseModel):
     trace_id: str
     parent_id: typing.Optional[str] = None
 
-    status_code: tsi.StatusCodeEnum
-    start_time: datetime.datetime
-    end_time: typing.Optional[datetime.datetime] = None
+    # status_code: tsi.StatusCodeEnum
+    start_datetime: datetime.datetime
+    end_datetime: typing.Optional[datetime.datetime] = None
     exception: typing.Optional[str] = None
 
-    attributes: typing.Optional[str] = None
-    inputs: typing.Optional[str] = None
-    outputs: typing.Optional[str] = None
-    summary: typing.Optional[str] = None
-
-    updated_at: datetime.datetime
-    created_at: datetime.datetime
+    attributes_dump: str
+    inputs_dump: str
+    outputs_dump: typing.Optional[str] = None
+    summary_dump: typing.Optional[str] = None
 
     input_refs: typing.List[str]
     output_refs: typing.List[str]
@@ -194,7 +142,7 @@ call_columns: typing.Dict[str, str] = {
     "input_refs": "Array(String)",
     "output_refs": "Array(String)",
 }
-all_call_columns = list(call_columns.keys())
+# all_call_columns = list(call_columns.keys())
 
 # Super hack since the insert method is buggy in clickhouse. TODO: make this more maintainable
 cpy = call_columns.copy()
@@ -204,20 +152,20 @@ all_call_column_type_names_with_defaults_nullable = list(cpy.values())
 
 
 # Listing of required columns that are expected to be returned regardless of the caller's columns request
-required_call_columns = [
-    "entity",
-    "project",
-    "id",
-    "created_at",
-    "updated_at",
-    "trace_id",
-    "parent_id",
-    "name",
-    "status_code",
-    "start_time",
-    "end_time",
-    "exception",
-]
+# required_call_columns = [
+#     "entity",
+#     "project",
+#     "id",
+#     "created_at",
+#     "updated_at",
+#     "trace_id",
+#     "parent_id",
+#     "name",
+#     "status_code",
+#     "start_time",
+#     "end_time",
+#     "exception",
+# ]
 
 all_obj_columns = [
     "entity",
@@ -284,37 +232,48 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.should_batch = should_batch
 
     # Creates a new call
-    def call_create(self, req: tsi.CallCreateReq) -> tsi.CallCreateRes:
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        ch_call = _partial_call_schema_to_ch_call(req.call)
+        ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
 
         # Returns the id of the newly created call
-        # Nothing to return in a buffered/async world
-        # return tsi.CallCreateRes(entity=ch_call.entity, project=ch_call.project, id=ch_call.id)
-        return tsi.CallCreateRes()
+        return tsi.CallStartRes(
+            id=ch_call.id,
+            trace_id=ch_call.trace_id,
+        )
+
+    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        # Converts the user-provided call details into a clickhouse schema.
+        # This does validation and conversion of the input data as well
+        # as enforcing business rules and defaults
+        ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
+
+        # Inserts the call into the clickhouse database, verifying that
+        # the call does not already exist
+        self._insert_call(ch_call)
+
+        # Returns the id of the newly created call
+        return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         # Return the marshaled response
         return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
 
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        # Two problems: finish time is going to be delayed, and multiple updates of the
-        # same call will be lost clobbered.
-        self._execute_update(req)
+    # def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+    #     # Two problems: finish time is going to be delayed, and multiple updates of the
+    #     # same call will be lost clobbered.
+    #     self._execute_update(req)
 
-        # Returns the id of the newly created call
-        # Nothing to return in a buffered/async world
-        # return tsi.CallCreateRes(entity=req.entity, project=req.project, id=id)
-        return tsi.CallCreateRes()
-
-    def call_delete(self, req: tsi.CallDeleteReq) -> tsi.CallDeleteRes:
-        raise NotImplementedError()
+    #     # Returns the id of the newly created call
+    #     # Nothing to return in a buffered/async world
+    #     # return tsi.CallStartRes(entity=req.entity, project=req.project, id=id)
+    #     return tsi.CallStartRes()
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallQueryRes:
         conditions = []
@@ -370,12 +329,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(self._obj_read(req, True)))
 
-    def op_update(self, req: tsi.OpUpdateReq) -> tsi.OpUpdateRes:
-        raise NotImplementedError()
-
-    def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
-        raise NotImplementedError()
-
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         raise NotImplementedError()
 
@@ -386,12 +339,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(self._obj_read(req)))
-
-    def obj_update(self, req: tsi.ObjUpdateReq) -> tsi.ObjUpdateRes:
-        raise NotImplementedError()
-
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        raise NotImplementedError()
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conditions = []
@@ -424,14 +371,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _flush_call_insert_buffer(self, buffer: typing.List):
         buffer_len = len(buffer)
         if buffer_len:
-            flush_id = _generate_id()
+            flush_id = generate_id()
             start_time = time.time()
             print("(" + flush_id + ") Flushing " + str(buffer_len) + " calls.")
             self.ch_call_insert_thread_client.insert(
                 "calls_raw",
                 data=buffer,
                 column_names=all_call_columns,
-                column_type_names=all_call_column_type_names_with_defaults_nullable,
+                # column_type_names=all_call_column_type_names_with_defaults_nullable,
             )
             print(
                 "("
@@ -444,7 +391,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _flush_obj_insert_buffer(self, buffer: typing.List):
         buffer_len = len(buffer)
         if buffer_len:
-            flush_id = _generate_id()
+            flush_id = generate_id()
             start_time = time.time()
             print("(" + flush_id + ") Flushing " + str(buffer_len) + " objects.")
             self.ch_obj_insert_thread_client.insert(
@@ -510,7 +457,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if col in ["entity", "project", "id"]:
                 merged_cols.append(f"{col} AS {col}")
             else:
-                 merged_cols.append(f"anyLast({col}) AS {col}")
+                merged_cols.append(f"anyLast({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
@@ -523,19 +470,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions_part = " AND ".join(conditions)
 
         order_by_part = ""
-        if order_by == None:
-            order_by = []
-        order_by = list(order_by) + [("updated_at", "DESC")]
-        for field, direction in order_by:
-            assert field in all_call_columns, f"Invalid order_by field: {field}"
-            assert direction in [
-                "ASC",
-                "DESC",
-            ], f"Invalid order_by direction: {direction}"
-        order_by_part = ", ".join(
-            [f"{field} {direction}" for field, direction in order_by]
-        )
-        order_by_part = f"ORDER BY {order_by_part}"
+        if order_by != None:
+            for field, direction in order_by:
+                assert field in all_call_columns, f"Invalid order_by field: {field}"
+                assert direction in [
+                    "ASC",
+                    "DESC",
+                ], f"Invalid order_by direction: {direction}"
+            order_by_part = ", ".join(
+                [f"{field} {direction}" for field, direction in order_by]
+            )
+            order_by_part = f"ORDER BY {order_by_part}"
 
         offset_part = ""
         if offset != None:
@@ -548,7 +493,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         raw_res = self._query(
             f"""
             SELECT {select_columns_part}
-            FROM calls_agg
+            FROM calls_merged
             WHERE entity = {{entity_scope: String}} AND project = {{project_scope: String}}
             GROUP BY entity, project, id
             HAVING {conditions_part}
@@ -562,7 +507,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls = []
         for row in raw_res.result_rows:
             calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
-        return _deduplicate_calls(calls)
+        return calls
 
     def _obj_read(
         self, req: tsi.ObjReadReq, only_ops: bool = False
@@ -623,53 +568,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 merged_cols.append(f"anyLast({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
-
-
         if not conditions:
-            conditions = ['1 = 1']
-
-        # conditions.append(
-        #     "entity = {entity_scope: String} AND project = {project_scope: String}"
-        # )
+            conditions = ["1 = 1"]
 
         conditions_part = " AND ".join(conditions)
-
-        # order_by_part = ""
-        # if order_by == None:
-        #     order_by = []
-        # order_by = list(order_by) + [("updated_at", "DESC")]
-        # for field, direction in order_by:
-        #     assert field in all_call_columns, f"Invalid order_by field: {field}"
-        #     assert direction in [
-        #         "ASC",
-        #         "DESC",
-        #     ], f"Invalid order_by direction: {direction}"
-        # order_by_part = ", ".join(
-        #     [f"{field} {direction}" for field, direction in order_by]
-        # )
-        # order_by_part = f"ORDER BY {order_by_part}"
-
-        # offset_part = ""
-        # if offset != None:
-        #     offset_part = f"OFFSET {offset}"
 
         limit_part = ""
         if limit != None:
             limit_part = f"LIMIT {limit}"
-
-        # raw_res = self._query(
-        #     f"""
-        #     SELECT {select_columns_part}
-        #     FROM calls_agg
-        #     WHERE entity = {{entity_scope: String}} AND project = {{project_scope: String}}
-        #     GROUP BY entity, project, id
-        #     HAVING {conditions_part}
-        #     {order_by_part}
-        #     {limit_part}
-        #     {offset_part}
-        # """,
-        #     parameters,
-        # )
 
         raw_res = self._query(
             f"""
@@ -689,36 +595,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             objs.append(_raw_obj_dict_to_ch_obj(dict(zip(columns, row))))
         return objs
 
-    def _execute_update(self, req: tsi.CallUpdateReq) -> None:
-        # raw_read_res = self._call_read(tsi.CallReadReq(entity=req.entity, project=req.project, id=req.id))
-        # read_res = _ch_call_to_call_schema(raw_read_res)
-
-        # Builds a new call schema with the updated fields
-        ch_call = _partial_call_schema_to_ch_call_update(
-            tsi.PartialCallForCreationSchema(
-                entity=req.entity,
-                project=req.project,
-                id=req.id,
-                trace_id=None,
-                parent_id=None,
-                name=None,
-                status_code=req.fields.status_code,
-                start_time_s=None,
-                end_time_s=req.fields.end_time_s,
-                attributes=None,
-                inputs=None,
-                outputs=req.fields.outputs,
-                summary=req.fields.summary,
-                exception=req.fields.exception,
-            )
-        )
-
-        self._insert_call(ch_call)
-
-        # Returns the id of the newly created call
-        # Nothing to return in a buffered/async world
-        # return tsi.CallCreateRes(entity=req.entity, project=req.project, id=id)
-
     def _print_status(self):
         tables = self.ch_client.command("SHOW TABLES")
         # tables = self.ch_client.command("SHOW VIEW")
@@ -726,10 +602,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self):
         print("Running migrations")
-        self.ch_client.command("DROP TABLE IF EXISTS objects")
-        self.ch_client.command("DROP TABLE IF EXISTS calls")
-        self.ch_client.command("DROP TABLE IF EXISTS calls_raw")
-        self.ch_client.command("DROP TABLE IF EXISTS calls_agg")
+        res = self.ch_client.command("SHOW TABLES")
+        table_names = res.split("\n")
+        for table_name in table_names:
+            if not table_name.startswith("."):
+                self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
+
         self.ch_client.command(
             """
         CREATE TABLE IF NOT EXISTS
@@ -756,77 +634,88 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         self.ch_client.command(
             """
-        CREATE TABLE IF NOT EXISTS
-        calls_raw (
-            entity String,
-            project String,
-            id String,
-            trace_id String NULL,
-            parent_id String NULL,
-            name String NULL,
-            status_code String NULL,
-            start_time Nullable(DateTime64(3)) ,
-            end_time Nullable(DateTime64(3)) ,
-            attributes String NULL,
-            inputs String NULL,
-            outputs String NULL,
-            summary String NULL,
-            exception String NULL,
-            created_at DateTime64(3) DEFAULT now64(3),
-            updated_at DateTime64(3) DEFAULT now64(3),
-            input_refs Array(String),
-            output_refs Array(String)
-        )
-        ENGINE = MergeTree
-        ORDER BY (entity, project, id)
+            CREATE TABLE IF NOT EXISTS
+            calls_raw (
+                # Identity Fields
+                entity String,
+                project String,
+                id String,
+
+                # Start Fields (All fields except parent_id are required when starting
+                # a call. However, to support a fast "update" we need to allow nulls)
+                trace_id String NULL,
+                parent_id String NULL, # This field is actually nullable
+                name String NULL,
+                start_datetime DateTime64(3) NULL,
+                attributes_dump String NULL,
+                inputs_dump String NULL,
+                input_refs Array(String), # Empty array treated as null
+
+                # End Fields (All fields are required when ending
+                # a call. However, to support a fast "update" we need to allow nulls)
+                end_datetime DateTime64(3) NULL,
+                outputs_dump String NULL,
+                summary_dump String NULL,
+                exception String NULL,
+                output_refs Array(String), # Empty array treated as null
+
+                # Bookkeeping
+                db_row_created_at DateTime64(3) DEFAULT now64(3)
+            )
+            ENGINE = MergeTree
+            ORDER BY (entity, project, id)
         """
         )
         self.ch_client.command(
             """
-        CREATE MATERIALIZED VIEW IF NOT EXISTS
-        calls_agg (
-            entity String,
-            project String,
-            id String,
-            trace_id SimpleAggregateFunction(any, String) NULL,
-            parent_id SimpleAggregateFunction(any, String) NULL,
-            name SimpleAggregateFunction(any, String) NULL,
-            status_code SimpleAggregateFunction(anyLast, String) NULL,
-            start_time SimpleAggregateFunction(anyLast, Nullable(DateTime64(3))),
-            end_time SimpleAggregateFunction(anyLast, Nullable(DateTime64(3))),
-            attributes SimpleAggregateFunction(anyLast, String) NULL,
-            inputs SimpleAggregateFunction(anyLast, String) NULL,
-            outputs SimpleAggregateFunction(anyLast, String) NULL,
-            summary SimpleAggregateFunction(anyLast, String) NULL,
-            exception SimpleAggregateFunction(anyLast, String) NULL,
-            created_at SimpleAggregateFunction(any, DateTime64(3)),
-            updated_at SimpleAggregateFunction(anyLast, DateTime64(3)),
-            input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
-            output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
+            CREATE TABLE calls_merged
+            (
+                entity String,
+                project String,
+                id String,
+                # While these fields are all marked as null, the practical expectation
+                # is that they will be non-null except for parent_id. The problem is that
+                # clickhouse might not aggregate the data immediately, so we need to allow
+                # for nulls in the interim.
+                trace_id SimpleAggregateFunction(any, String) NULL,
+                parent_id SimpleAggregateFunction(any, String) NULL,
+                name SimpleAggregateFunction(any, String) NULL,
+                start_datetime SimpleAggregateFunction(any, DateTime64(3)) NULL,
+                attributes_dump SimpleAggregateFunction(any, String) NULL,
+                inputs_dump SimpleAggregateFunction(any, String) NULL,
+                input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
+                end_datetime SimpleAggregateFunction(any, DateTime64(3)) NULL,
+                outputs_dump SimpleAggregateFunction(any, String) NULL,
+                summary_dump SimpleAggregateFunction(any, String) NULL,
+                exception SimpleAggregateFunction(any, String) NULL,
+                output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
+            )
+            ENGINE = AggregatingMergeTree
+            ORDER BY (entity, project, id)
+        """
         )
-        ENGINE = AggregatingMergeTree()
-        ORDER BY (entity, project, id)
-        AS SELECT
-            entity,
-            project,
-            id,
-            anySimpleState(trace_id) as trace_id,
-            anySimpleState(parent_id) as parent_id,
-            anySimpleState(name) as name,
-            anyLastSimpleState(status_code) as status_code,
-            anyLastSimpleState(start_time) as start_time,
-            anyLastSimpleState(end_time) as end_time,
-            anyLastSimpleState(attributes) as attributes,
-            anyLastSimpleState(inputs) as inputs,
-            anyLastSimpleState(outputs) as outputs,
-            anyLastSimpleState(summary) as summary,
-            anyLastSimpleState(exception) as exception,
-            anySimpleState(created_at) as created_at,
-            anyLastSimpleState(updated_at) as updated_at,
-            anyLastSimpleState(input_refs) as input_refs,
-            anyLastSimpleState(output_refs) as output_refs
-        FROM calls_raw
-        GROUP BY entity, project, id
+        self.ch_client.command(
+            """
+            CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged
+            AS
+            SELECT
+                entity,
+                project,
+                id,
+                anySimpleState(trace_id) as trace_id,
+                anySimpleState(parent_id) as parent_id,
+                anySimpleState(name) as name,
+                anySimpleState(start_datetime) as start_datetime,
+                anySimpleState(attributes_dump) as attributes_dump,
+                anySimpleState(inputs_dump) as inputs_dump,
+                array_concat_aggSimpleState(input_refs) as input_refs,
+                anySimpleState(end_datetime) as end_datetime,
+                anySimpleState(outputs_dump) as outputs_dump,
+                anySimpleState(summary_dump) as summary_dump,
+                anySimpleState(exception) as exception,
+                array_concat_aggSimpleState(output_refs) as output_refs
+            FROM calls_raw
+            GROUP BY entity, project, id
         """
         )
 
@@ -844,7 +733,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         print("Summary: " + json.dumps(res.summary, indent=2))
         return res
 
-    def _insert_call(self, ch_call: UpdateableCHCallSchema) -> None:
+    def _insert_call(self, ch_call: CallCHInsertable) -> None:
         parameters = ch_call.model_dump()
         row = []
         for key in all_call_columns:
@@ -867,19 +756,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_obj_insert_buffer([row])
 
 
-def _prepare_nullable_dict_value(
-    value: typing.Optional[dict] = None,
-) -> typing.Optional[str]:
-    # TODO
-    return json.dumps(value) if value else None
+def _dict_value_to_dump(
+    value: dict,
+) -> str:
+    return json.dumps(value)
 
 
 def _utc_sec_to_datetime(s_time: float) -> datetime.datetime:
     return datetime.datetime.fromtimestamp(s_time, tz=datetime.timezone.utc)
-
-
-def _generate_id() -> str:
-    return str(uuid.uuid4())
 
 
 def _xor(a, b, field_name: str):
@@ -898,21 +782,20 @@ def _nullable_datetime_to_sec_float(
     return _datetime_to_sec_float(val) if val else None
 
 
+def _dict_dump_to_dict(val: str) -> typing.Dict[str, typing.Any]:
+    return json.loads(val)
+
+
 def _nullable_dict_dump_to_dict(
     val: str,
 ) -> typing.Optional[typing.Dict[str, typing.Any]]:
-    return json.loads(val) if val else None
+    return _dict_dump_to_dict(val) if val else None
 
 
 def _raw_call_dict_to_ch_call(
     call: typing.Dict[str, typing.Any]
 ) -> SelectableCHCallSchema:
-    res = SelectableCHCallSchema.model_validate(call)
-    if res.start_time:
-        res.start_time = res.start_time.replace(tzinfo=datetime.timezone.utc)
-    if res.end_time:
-        res.end_time = res.end_time.replace(tzinfo=datetime.timezone.utc)
-    return res
+    return SelectableCHCallSchema.model_validate(call)
 
 
 def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHObjSchema:
@@ -925,33 +808,18 @@ def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHOb
 
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
-        # `entity` should always be present
         entity=ch_call.entity,
-        # `project`` should always be present
         project=ch_call.project,
-        # `id`` should always be present
         id=ch_call.id,
-        # `trace_id` should always be present
         trace_id=ch_call.trace_id,
-        # `parent_id` may be null (represented as `\\N`)
         parent_id=ch_call.parent_id,
-        # `name` should always be present
         name=ch_call.name,
-        # `status_code` should always be present
-        status_code=ch_call.status_code,
-        # `start_time` should always be present
-        start_time_s=_nullable_datetime_to_sec_float(ch_call.start_time),
-        # `end_time` may be null (represented as `\\N`)
-        end_time_s=_nullable_datetime_to_sec_float(ch_call.end_time),
-        # `attributes` may be null (represented as `\\N`)
-        attributes=_nullable_dict_dump_to_dict(ch_call.attributes),
-        # `inputs` may be null (represented as `\\N`)
-        inputs=_nullable_dict_dump_to_dict(ch_call.inputs),
-        # `outputs` may be null (represented as `\\N`)
-        outputs=_nullable_dict_dump_to_dict(ch_call.outputs),
-        # `summary` may be null (represented as `\\N`)
-        summary=_nullable_dict_dump_to_dict(ch_call.summary),
-        # `summary` may be null (represented as `\\N`)
+        start_datetime=ch_call.start_datetime,
+        end_datetime=ch_call.end_datetime,
+        attributes=_dict_dump_to_dict(ch_call.attributes_dump),
+        inputs=_dict_dump_to_dict(ch_call.inputs_dump),
+        outputs=_nullable_dict_dump_to_dict(ch_call.outputs_dump),
+        summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
     )
 
@@ -983,149 +851,52 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     )
 
 
-def extract_refs_from_values(vals: typing.Optional[typing.List[typing.Any]]) -> typing.List[str]:
+def extract_refs_from_values(
+    vals: typing.Optional[typing.List[typing.Any]],
+) -> typing.List[str]:
     refs = []
     if vals:
         for val in vals:
             if isinstance(val, str) and val.startswith("wandb-trace://"):
                 refs.append(val)
-                # parts = val[len("wandb-trace://") :].split("/")
-                # entity = parts[0]
-                # project = parts[1]
-                # noun = parts[2]
-                # name_and_version = parts[3]
-                # name, version = name_and_version.split(":")
-                # refs.append((entity, project, noun, name, version))
     print(refs)
     return refs
 
 
-def _partial_call_schema_to_ch_call(
-    partial_call: tsi.PartialCallForCreationSchema,
-) -> InsertableCHCallSchema:
-    id = partial_call.id or _generate_id()
-    trace_id = partial_call.trace_id or _generate_id()
-    # Default Rules
-    status_code = (
-        partial_call.status_code.value if partial_call.status_code else "UNSET"
-    )
-    start_time = (
-        _utc_sec_to_datetime(partial_call.start_time_s)
-        if partial_call.start_time_s != None
-        else datetime.datetime.now()
-    )
-    end_time = (
-        _utc_sec_to_datetime(partial_call.end_time_s)
-        if partial_call.end_time_s != None
-        else None
-    )
-
-    if status_code == "UNSET":
-        # Case 1: We have an exception, then we are in an error state
-        if partial_call.exception:
-            status_code = "ERROR"
-
-        # Case 2: We have an exception, then we are in an error state
-        elif partial_call.outputs or partial_call.summary:
-            status_code = "OK"
-
-    if status_code != "UNSET" and not partial_call.end_time_s:
-        end_time = datetime.datetime.now()
-
-    input_refs = []
-    output_refs = []
-    if partial_call.inputs:
-        input_refs = extract_refs_from_values(list(partial_call.inputs.values()))
-    if partial_call.outputs:
-        output_refs = extract_refs_from_values(list(partial_call.outputs.values()))
-
-    return InsertableCHCallSchema(
-        entity=partial_call.entity,
-        project=partial_call.project,
-        id=id,
-        trace_id=trace_id,
-        parent_id=partial_call.parent_id,
-        name=partial_call.name,
-        status_code=status_code,
-        start_time=start_time,
-        end_time=end_time,
-        attributes=_prepare_nullable_dict_value(partial_call.attributes),
-        inputs=_prepare_nullable_dict_value(partial_call.inputs),
-        outputs=_prepare_nullable_dict_value(partial_call.outputs),
-        summary=_prepare_nullable_dict_value(partial_call.summary),
-        exception=partial_call.exception,
-
-        input_refs=input_refs,
-        output_refs=output_refs,
+def _start_call_for_insert_to_ch_insertable_start_call(
+    start_call: tsi.StartedCallSchemaForInsert,
+) -> CallStartCHInsertable:
+    # Note: it is technically possible for the user to mess up and provide the
+    # wrong trace id (one that does not match the parent_id)!
+    return CallStartCHInsertable(
+        entity=start_call.entity,
+        project=start_call.project,
+        id=start_call.id or generate_id(),
+        trace_id=start_call.trace_id or generate_id(),
+        parent_id=start_call.parent_id,
+        name=start_call.name,
+        start_datetime=start_call.start_datetime,
+        attributes_dump=_dict_value_to_dump(start_call.attributes),
+        inputs_dump=_dict_value_to_dump(start_call.inputs),
+        input_refs=extract_refs_from_values(list(start_call.inputs.values())),
     )
 
 
-def _partial_call_schema_to_ch_call_update(
-    partial_call: tsi.PartialCallForCreationSchema,
-) -> UpdateableCHCallSchema:
-    status_code = partial_call.status_code.value if partial_call.status_code else None
-    start_time = partial_call.start_time_s
-    end_time = partial_call.end_time_s
-    id = partial_call.id
-    trace_id = partial_call.trace_id
-
-    if status_code == "UNSET" or status_code == None:
-        # Case 1: We have an exception, then we are in an error state
-        if partial_call.exception:
-            status_code = "ERROR"
-
-        # Case 2: We have an exception, then we are in an error state
-        elif partial_call.outputs or partial_call.summary or partial_call.end_time_s:
-            status_code = "OK"
-
-    if (
-        not (status_code == "UNSET" or status_code == None)
-        and not partial_call.end_time_s
-    ):
-        end_time = datetime.datetime.now()
-
-    input_refs = []
-    output_refs = []
-    if partial_call.inputs:
-        input_refs = extract_refs_from_values(list(partial_call.inputs.values()))
-    if partial_call.outputs:
-        output_refs = extract_refs_from_values(list(partial_call.outputs.values()))
-
-    return UpdateableCHCallSchema(
-        entity=partial_call.entity,
-        project=partial_call.project,
-        id=id,
-        trace_id=trace_id,
-        parent_id=partial_call.parent_id,
-        name=partial_call.name,
-        status_code=status_code,
-        start_time=start_time,
-        end_time=end_time,
-        attributes=_prepare_nullable_dict_value(partial_call.attributes),
-        inputs=_prepare_nullable_dict_value(partial_call.inputs),
-        outputs=_prepare_nullable_dict_value(partial_call.outputs),
-        summary=_prepare_nullable_dict_value(partial_call.summary),
-        exception=partial_call.exception,
-
-        input_refs=input_refs,
-        output_refs=output_refs,
+def _end_call_for_insert_to_ch_insertable_end_call(
+    end_call: tsi.EndedCallSchemaForInsert,
+) -> CallEndCHInsertable:
+    # Note: it is technically possible for the user to mess up and provide the
+    # wrong trace id (one that does not match the parent_id)!
+    return CallEndCHInsertable(
+        entity=end_call.entity,
+        project=end_call.project,
+        id=end_call.id,
+        exception=end_call.exception,
+        end_datetime=end_call.end_datetime,
+        summary_dump=_dict_value_to_dump(end_call.summary),
+        outputs_dump=_dict_value_to_dump(end_call.outputs),
+        output_refs=extract_refs_from_values(list(end_call.outputs.values())),
     )
-
-
-def _deduplicate_calls(
-    calls: typing.List[SelectableCHCallSchema],
-) -> typing.List[SelectableCHCallSchema]:
-    latest_calls = {}
-    for call in calls:
-        call_id = f"{call.entity}/{call.project}/{call.id}"
-        if not call.updated_at:
-            raise ValueError(f"Call {call_id} has no updated_at")
-        if (
-            call_id not in latest_calls
-            or latest_calls[call_id].updated_at < call.updated_at
-        ):
-            latest_calls[call_id] = call
-    return list(latest_calls.values())
 
 
 def _process_parameters(

@@ -1,3 +1,4 @@
+import datetime
 import weave
 from ..trace_server import trace_server_interface as tsi
 
@@ -26,14 +27,13 @@ def test_simple_op(trace_client):
         name=runs[0].name,
         trace_id=runs[0].trace_id,
         parent_id=None,
-        status_code=tsi.StatusCodeEnum.OK,
-        start_time_s=float(runs[0].start_time_s),
-        end_time_s=float(runs[0].end_time_s),
+        start_datetime=runs[0].start_datetime,
+        end_datetime=runs[0].end_datetime,
         exception=None,
-        attributes=None,
-        inputs=None,
+        attributes={},
+        inputs={"a": 5, "_keys": ["a"]},
         outputs={"_result": 6},
-        summary=None,
+        summary={},
     )
 
 
@@ -46,32 +46,29 @@ def test_dataset(trace_client):
     assert d2.rows == d2.rows
 
 
-def test_trace_server_call_create(clickhouse_trace_server):
-    req_call = tsi.PartialCallForCreationSchema(
-                entity="test_entity",
-                project="test_project",
-                id="test_id",
-
-                name="test_name",
-
-                trace_id="test_trace_id",
-                parent_id="test_parent_id",
-
-                status_code=tsi.StatusCodeEnum.OK,
-                start_time_s=0.0,
-                end_time_s=1.0,
-                exception=None,
-
-                attributes={"a": 5},
-                inputs={"b": 5},
-                outputs={"c": 5},
-                summary={"d": 5},
-            )
-    clickhouse_trace_server.call_create(
-        tsi.CallCreateReq(
-            call=req_call
-        )
+def test_trace_server_call_start(clickhouse_trace_server):
+    start = tsi.StartedCallSchemaForInsert(
+        entity="test_entity",
+        project="test_project",
+        id="test_id",
+        name="test_name",
+        trace_id="test_trace_id",
+        parent_id="test_parent_id",
+        start_datetime=datetime.datetime.now(tz=datetime.timezone.utc)
+        - datetime.timedelta(seconds=1),
+        attributes={"a": 5},
+        inputs={"b": 5},
     )
+    clickhouse_trace_server.call_start(tsi.CallStartReq(start=start))
+    end = tsi.EndedCallSchemaForInsert(
+        entity="test_entity",
+        project="test_project",
+        id="test_id",
+        end_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"c": 5},
+        outputs={"d": 5},
+    )
+    clickhouse_trace_server.call_end(tsi.CallEndReq(end=end))
 
     res = clickhouse_trace_server.call_read(
         tsi.CallReadReq(
@@ -81,6 +78,22 @@ def test_trace_server_call_create(clickhouse_trace_server):
         )
     )
 
-    assert res.call.model_dump() == req_call.model_dump()
-
-
+    assert res.call.model_dump() == {
+        "entity": "test_entity",
+        "project": "test_project",
+        "id": "test_id",
+        "name": "test_name",
+        "trace_id": "test_trace_id",
+        "parent_id": "test_parent_id",
+        "start_datetime": datetime.datetime.fromisoformat(
+            start.start_datetime.isoformat(timespec="milliseconds")
+        ).replace(tzinfo=None),
+        "end_datetime": datetime.datetime.fromisoformat(
+            end.end_datetime.isoformat(timespec="milliseconds")
+        ).replace(tzinfo=None),
+        "exception": None,
+        "attributes": {"a": 5},
+        "inputs": {"b": 5},
+        "outputs": {"d": 5},
+        "summary": {"c": 5},
+    }
