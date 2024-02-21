@@ -728,10 +728,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self):
         print("Running migrations")
-        self.ch_client.command("DROP TABLE IF EXISTS objects")
-        self.ch_client.command("DROP TABLE IF EXISTS calls")
-        self.ch_client.command("DROP TABLE IF EXISTS calls_raw")
-        self.ch_client.command("DROP TABLE IF EXISTS calls_agg")
+        # self.ch_client.command("DROP TABLE IF EXISTS objects")
+        # self.ch_client.command("DROP TABLE IF EXISTS calls")
+        # self.ch_client.command("DROP TABLE IF EXISTS calls_raw")
+        # self.ch_client.command("DROP TABLE IF EXISTS calls_agg")
         self.ch_client.command(
             """
         CREATE TABLE IF NOT EXISTS

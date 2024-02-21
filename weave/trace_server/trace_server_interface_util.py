@@ -95,7 +95,7 @@ def read_partial_obj_for_creation_schema_from_transport(transported: tsi.Transpo
 def prepare_obj_schema_for_transport(partial: tsi.ObjSchema) -> tsi.TransportableObjSchema:
     partial_dict = partial.model_dump()
     partial_dict["encoded_file_map_as_length_and_big_int"] = prepare_files_map_for_transport(partial.encoded_file_map)
-    partial_dict["encoded_file_map"] = None
+    partial_dict["encoded_file_map"] = {}
     return tsi.TransportableObjSchema.parse_obj(partial_dict)
 
 

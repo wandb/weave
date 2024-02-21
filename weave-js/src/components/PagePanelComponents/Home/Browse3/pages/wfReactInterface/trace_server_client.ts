@@ -1,5 +1,7 @@
 import fetch from 'isomorphic-unfetch';
 
+
+
 type StatusCodeEnum = "OK" | "ERROR" | "UNSET"
 
 // This should match `trace_server_interface.py::CallSchema` exactly!!
@@ -75,34 +77,39 @@ type TraceObjQueryRes = {
 
 
 
-export const callsQuery = async (req: TraceCallsQueryReq): Promise<TraceCallQueryRes> => {
-    const url = "http://127.0.0.1:6345/calls/query"
-    // eslint-disable-next-line wandb/no-unprefixed-urls
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(req),
-    });
-    const res = await response.json();
-    console.log("Retrieved trace calls: ", res.calls.length)
-    return res;
+type TraceObjReadReq = {
+    entity: string,
+    project: string,
+    name: string,
+    version_hash: string
+}
+
+type  TraceObjReadRes = {
+    obj: TraceObjSchema
 }
 
 
-export const objectsQuery = async (req: TraceObjsQueryReq): Promise<TraceObjQueryRes> => {
-    const url = "http://127.0.0.1:6345/objs/query"
-    console.log("Querying trace objs: ", req)
-    // eslint-disable-next-line wandb/no-unprefixed-urls
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(req),
-    });
-    const res = await response.json();
-    console.log("Retrieved trace objs: ", res.objs.length)
-    return res;
+const makeTraceServerEndpointFn = <QT, ST,>(endpoint: string) => {
+    const baseUrl = "http://127.0.0.1:6345"
+    const url = `${baseUrl}${endpoint}`
+    const fn = async (req: QT): Promise<ST> => {
+        // eslint-disable-next-line wandb/no-unprefixed-urls
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(req),
+        });
+        const res = await response.json();
+        return res;
+    }
+    return fn
 }
+
+
+
+export const callsQuery = makeTraceServerEndpointFn<TraceCallsQueryReq, TraceCallQueryRes>("/calls/query")
+export const objectsQuery = makeTraceServerEndpointFn<TraceObjsQueryReq, TraceObjQueryRes>("/objs/query")
+export const objectsRead = makeTraceServerEndpointFn<TraceObjReadReq, TraceObjReadRes>("/obj/read")
+

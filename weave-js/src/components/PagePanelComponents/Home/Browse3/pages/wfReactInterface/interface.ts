@@ -40,7 +40,7 @@ import {
   useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, TRACE_REF_PREFIX, WANDB_ARTIFACT_REF_PREFIX} from './constants';
-import { callsQuery, objectsQuery, TraceCallSchema, TraceObjSchema } from './trace_server_client';
+import { callsQuery, objectsQuery, objectsRead, TraceCallSchema, TraceObjSchema } from './trace_server_client';
 
 export const OP_CATEGORIES = [
   'train',
@@ -709,25 +709,39 @@ export const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
-  return {
-    loading: true,
-    result: null,
-  }
   const cachedObjectVersion = key ? getObjectVersionFromCache(key) : null;
-  const artifactVersionNode = opProjectArtifactVersion({
-    project: opRootProject({
-      entity: constString(key?.entity ?? ''),
-      project: constString(key?.project ?? ''),
-    }),
-    artifactName: constString(key?.objectId ?? ''),
-    artifactVersionAlias: constString(key?.versionHash ?? ''),
-  });
-  const dataNode = artifactVersionNodeToObjectVersionDictNode(
-    artifactVersionNode as any
-  );
-  const dataValue = useNodeValue(dataNode, {
-    skip: key == null || cachedObjectVersion != null,
-  });
+  // const artifactVersionNode = opProjectArtifactVersion({
+  //   project: opRootProject({
+  //     entity: constString(key?.entity ?? ''),
+  //     project: constString(key?.project ?? ''),
+  //   }),
+  //   artifactName: constString(key?.objectId ?? ''),
+  //   artifactVersionAlias: constString(key?.versionHash ?? ''),
+  // });
+  // const dataNode = artifactVersionNodeToObjectVersionDictNode(
+  //   artifactVersionNode as any
+  // );
+  // const dataValue = useNodeValue(dataNode, {
+  //   skip: key == null || cachedObjectVersion != null,
+  // });
+
+  const [dataValue, setDataValue] = useState<ObjectVersionSchema | null>(null)
+  const deepKey = useDeepMemo(key);
+  // TODO: Filter out files when not needed!
+
+  useEffect(() => {
+    if (!deepKey) {
+      return;
+    }
+    objectsRead({
+      "entity": deepKey.entity,
+      "project": deepKey.project,
+      "name": deepKey.objectId,
+      "version_hash": deepKey.versionHash
+  }).then((data) => {
+    setDataValue(traceObjToObjectVersionSchema(data.obj));
+    })
+  }, [deepKey]);
 
   return useMemo(() => {
     if (key == null) {
@@ -742,17 +756,10 @@ export const useObjectVersion = (
         result: cachedObjectVersion,
       };
     }
-    const result =
-      dataValue.result == null || dataValue.result.missing
-        ? null
-        : {
-            ...key,
-            versionIndex: dataValue.result.versionIndex as number,
-            typeName: dataValue.result.typeName as string,
-            category: typeNameToCategory(dataValue.result.typeName as string),
-            createdAtMs: dataValue.result.createdAtMs as number,
-          };
-    if (dataValue.loading) {
+    const loading = dataValue == null;
+    const result = dataValue
+      
+    if (loading) {
       return {
         loading: true,
         result,
@@ -766,7 +773,7 @@ export const useObjectVersion = (
         result,
       };
     }
-  }, [cachedObjectVersion, dataValue.loading, dataValue.result, key]);
+  }, [cachedObjectVersion, dataValue, key]);
 };
 
 type ObjectVersionFilter = {
