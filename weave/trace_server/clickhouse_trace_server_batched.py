@@ -875,7 +875,7 @@ def _prepare_nullable_dict_value(
 
 
 def _utc_sec_to_datetime(s_time: float) -> datetime.datetime:
-    return datetime.datetime.fromtimestamp(s_time)
+    return datetime.datetime.fromtimestamp(s_time, tz=datetime.timezone.utc)
 
 
 def _generate_id() -> str:
@@ -907,7 +907,12 @@ def _nullable_dict_dump_to_dict(
 def _raw_call_dict_to_ch_call(
     call: typing.Dict[str, typing.Any]
 ) -> SelectableCHCallSchema:
-    return SelectableCHCallSchema.model_validate(call)
+    res = SelectableCHCallSchema.model_validate(call)
+    if res.start_time:
+        res.start_time = res.start_time.replace(tzinfo=datetime.timezone.utc)
+    if res.end_time:
+        res.end_time = res.end_time.replace(tzinfo=datetime.timezone.utc)
+    return res
 
 
 def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHObjSchema:
@@ -1006,12 +1011,12 @@ def _partial_call_schema_to_ch_call(
     )
     start_time = (
         _utc_sec_to_datetime(partial_call.start_time_s)
-        if partial_call.start_time_s
+        if partial_call.start_time_s != None
         else datetime.datetime.now()
     )
     end_time = (
         _utc_sec_to_datetime(partial_call.end_time_s)
-        if partial_call.end_time_s
+        if partial_call.end_time_s != None
         else None
     )
 

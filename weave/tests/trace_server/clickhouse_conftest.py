@@ -5,10 +5,17 @@ import pytest
 
 import subprocess
 import time
-from typing import Tuple
+import typing
 import requests
 import urllib
 
+import pytest
+
+from weave.weave_init import InitializedClient
+from ...trace_server import (
+    graph_client_trace,
+    clickhouse_trace_server_batched,
+)
 
 
 @pytest.fixture(scope="session")
@@ -19,6 +26,26 @@ def clickhouse_server():
     yield (host, port)
 
 
+@pytest.fixture(scope="session")
+def clickhouse_trace_server(clickhouse_server):
+    (host, port) = clickhouse_server
+    clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
+        host, port, False
+    )
+    clickhouse_trace_server._run_migrations()
+    yield clickhouse_trace_server
+
+@pytest.fixture()
+def trace_client(clickhouse_trace_server):
+    graph_client = graph_client_trace.GraphClientTrace(
+        "test_entity", "test_project", clickhouse_trace_server
+    )
+    inited_client = InitializedClient(graph_client)
+
+    try:
+        yield graph_client
+    finally:
+        inited_client.reset()
 
 
 def _check_server_health(
@@ -40,7 +67,7 @@ def _check_server_health(
 
 
 
-def _check_server_up(host="localhost", port=18123) -> Tuple[str, int, bool]:
+def _check_server_up(host="localhost", port=18123) -> typing.Tuple[str, int, bool]:
     base_port = 18123
     base_url = f'http://{host}:{port}/'
     endpoint = "/"

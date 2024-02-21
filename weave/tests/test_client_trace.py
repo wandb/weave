@@ -1,33 +1,5 @@
-import typing
-import pytest
-from clickhouse_connect import get_client
-
 import weave
-from weave.weave_init import InitializedClient
-from ..trace_server import (
-    graph_client_trace,
-    clickhouse_trace_server_batched,
-    trace_server_interface,
-)
-
-
-@pytest.fixture()
-def trace_client(clickhouse_server):
-    (host, port) = clickhouse_server
-    clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
-        host, port, False
-    )
-    graph_client = graph_client_trace.GraphClientTrace(
-        "test_entity", "test_project", clickhouse_trace_server
-    )
-    inited_client = InitializedClient(graph_client)
-
-    clickhouse_trace_server._run_migrations()
-
-    try:
-        yield graph_client
-    finally:
-        inited_client.reset()
+from ..trace_server import trace_server_interface as tsi
 
 
 def test_simple_op(trace_client):
@@ -47,14 +19,14 @@ def test_simple_op(trace_client):
         runs[0].name
         == "wandb-trace://test_entity/test_project/op/op-my_op:d974fac56411d5e5b6cf75fad9a53811"
     )
-    assert runs[0] == trace_server_interface.CallSchema(
+    assert runs[0] == tsi.CallSchema(
         entity=trace_client.entity,
         project=trace_client.project,
         id=runs[0].id,
         name=runs[0].name,
         trace_id=runs[0].trace_id,
         parent_id=None,
-        status_code=trace_server_interface.StatusCodeEnum.OK,
+        status_code=tsi.StatusCodeEnum.OK,
         start_time_s=float(runs[0].start_time_s),
         end_time_s=float(runs[0].end_time_s),
         exception=None,
@@ -72,4 +44,43 @@ def test_dataset(trace_client):
     ref = weave.publish(d)
     d2 = weave.storage.get(str(ref))
     assert d2.rows == d2.rows
+
+
+def test_trace_server_call_create(clickhouse_trace_server):
+    req_call = tsi.PartialCallForCreationSchema(
+                entity="test_entity",
+                project="test_project",
+                id="test_id",
+
+                name="test_name",
+
+                trace_id="test_trace_id",
+                parent_id="test_parent_id",
+
+                status_code=tsi.StatusCodeEnum.OK,
+                start_time_s=0.0,
+                end_time_s=1.0,
+                exception=None,
+
+                attributes={"a": 5},
+                inputs={"b": 5},
+                outputs={"c": 5},
+                summary={"d": 5},
+            )
+    clickhouse_trace_server.call_create(
+        tsi.CallCreateReq(
+            call=req_call
+        )
+    )
+
+    res = clickhouse_trace_server.call_read(
+        tsi.CallReadReq(
+            entity="test_entity",
+            project="test_project",
+            id="test_id",
+        )
+    )
+
+    assert res.call.model_dump() == req_call.model_dump()
+
 
