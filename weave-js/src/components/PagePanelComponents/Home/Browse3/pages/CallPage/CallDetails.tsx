@@ -1,5 +1,4 @@
-import {Box, IconButton} from '@material-ui/core';
-import {OpenInNewRounded} from '@mui/icons-material';
+import {Box} from '@material-ui/core';
 import {Typography} from '@mui/material';
 import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
@@ -7,8 +6,7 @@ import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {MOON_800} from '../../../../../../common/css/color.styles';
-import {parseRef} from '../../../../../../react';
-import {SmallRef} from '../../../Browse2/SmallRef';
+import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext} from '../../context';
 import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
@@ -19,6 +17,8 @@ import {
   useCalls,
   useParentCall,
 } from '../wfReactInterface/interface';
+import {ButtonOverlay} from './ButtonOverlay';
+import {OpVersionText} from './OpVersionText';
 
 const Heading = styled.div`
   color: ${MOON_800};
@@ -29,6 +29,17 @@ const Heading = styled.div`
   gap: 4px;
 `;
 Heading.displayName = 'S.Heading';
+
+const MultiCallHeader = styled.div`
+  cursor: pointer;
+  font-family: Source Sans Pro;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 32px;
+  letter-spacing: 0px;
+  text-align: left;
+`;
+MultiCallHeader.displayName = 'S.MultiCallHeader';
 
 export const CallSchemaLink = ({call}: {call: CallSchema}) => {
   const {entity: entityName, project: projectName, callId, spanName} = call;
@@ -116,60 +127,79 @@ export const CallDetails: FC<{
             />
           </Box>
         )}
-        {multipleChildCallOpRefs.map(ref => (
-          <Box
-            key={ref}
-            sx={{
-              flex: '0 0 auto',
-              height: '500px',
-              maxHeight: '95%',
-              p: 2,
-              display: 'flex',
-              flexDirection: 'column',
-            }}>
+        {multipleChildCallOpRefs.map(opVersionRef => {
+          const exampleCall = childCalls.result?.find(
+            c => c.opVersionRef === opVersionRef
+          )!;
+          const multipleChildURL = baseRouter.callsUIUrl(
+            call.entity,
+            call.project,
+            {
+              opVersionRefs: [opVersionRef],
+              parentId: call.callId,
+            }
+          );
+          const onClick = () => {
+            history.push(multipleChildURL);
+          };
+          return (
             <Box
+              key={opVersionRef}
               sx={{
-                display: 'flex',
-                flexDirection: 'row',
                 flex: '0 0 auto',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                height: '50px',
+                height: '500px',
+                maxHeight: '95%',
+                p: 2,
+                display: 'flex',
+                flexDirection: 'column',
               }}>
-              <Typography sx={{display: 'flex', gap: 1}}>
-                Table of <SmallRef objRef={parseRef(ref)} wfTable="OpVersion" />{' '}
-                child calls
-              </Typography>
-              <IconButton
-                onClick={() => {
-                  history.push(
-                    baseRouter.callsUIUrl(call.entity, call.project, {
-                      opVersionRefs: [ref],
-                      parentId: call.callId,
-                    })
-                  );
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  flex: '0 0 auto',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  height: '50px',
                 }}>
-                <OpenInNewRounded />
-              </IconButton>
-            </Box>{' '}
-            <Box
-              sx={{
-                flex: '1 1 auto',
-                overflow: 'hidden',
-              }}>
-              <CallsTable
-                hideControls
-                ioColumnsOnly
-                initialFilter={{
-                  opVersionRefs: [ref],
-                  parentId: call.callId,
-                }}
-                entity={call.entity}
-                project={call.project}
-              />
+                <MultiCallHeader onClick={onClick}>
+                  Child calls of{' '}
+                  <OpVersionText
+                    opVersionRef={opVersionRef}
+                    spanName={exampleCall.spanName}
+                  />
+                </MultiCallHeader>
+                <Button
+                  size="small"
+                  variant="secondary"
+                  icon="share-export"
+                  onClick={onClick}>
+                  Go to table
+                </Button>
+              </Box>{' '}
+              <Box
+                sx={{
+                  flex: '1 1 auto',
+                  overflow: 'hidden',
+                }}>
+                <ButtonOverlay
+                  url={multipleChildURL}
+                  text="Click to view table">
+                  <CallsTable
+                    hideControls
+                    ioColumnsOnly
+                    initialFilter={{
+                      opVersionRefs: [opVersionRef],
+                      parentId: call.callId,
+                    }}
+                    entity={call.entity}
+                    project={call.project}
+                  />
+                </ButtonOverlay>
+              </Box>
             </Box>
-          </Box>
-        ))}
+          );
+        })}
         {childCalls.loading && <CenteredAnimatedLoader />}
         {singularChildCalls.length > 0 && (
           <Box
