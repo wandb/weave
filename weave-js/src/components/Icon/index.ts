@@ -61,6 +61,7 @@ export {
   IconFilterAlt,
   IconFlashBolt,
   IconFolderAlt,
+  IconFolderFill,
   IconFolderProject,
   IconFolderProjectMove,
   IconForumChatBubble,

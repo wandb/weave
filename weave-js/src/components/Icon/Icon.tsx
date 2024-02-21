@@ -61,6 +61,7 @@ import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg
 import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
 import {ReactComponent as ImportFlashBolt} from '../../assets/icons/icon-flash-bolt.svg';
 import {ReactComponent as ImportFolderAlt} from '../../assets/icons/icon-folder-alt.svg';
+import {ReactComponent as ImportFolderFill} from '../../assets/icons/icon-folder-fill.svg';
 import {ReactComponent as ImportFolderProject} from '../../assets/icons/icon-folder-project.svg';
 import {ReactComponent as ImportFolderProjectMove} from '../../assets/icons/icon-folder-project-move.svg';
 import {ReactComponent as ImportForumChatBubble} from '../../assets/icons/icon-forum-chat-bubble.svg';
@@ -414,6 +415,9 @@ export const IconFlashBolt = (props: SVGIconProps) => (
 );
 export const IconFolderAlt = (props: SVGIconProps) => (
   <ImportFolderAlt {...updateIconProps(props)} />
+);
+export const IconFolderFill = (props: SVGIconProps) => (
+  <ImportFolderFill {...updateIconProps(props)} />
 );
 export const IconFolderProject = (props: SVGIconProps) => (
   <ImportFolderProject {...updateIconProps(props)} />
@@ -949,6 +953,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'filter-alt': IconFilterAlt,
   'flash-bolt': IconFlashBolt,
   'folder-alt': IconFolderAlt,
+  'folder-fill': IconFolderFill,
   'folder-project': IconFolderProject,
   'folder-project-move': IconFolderProjectMove,
   'forum-chat-bubble': IconForumChatBubble,
