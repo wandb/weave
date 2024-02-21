@@ -12,14 +12,17 @@ from ..trace_server import (
 
 
 @pytest.fixture()
-def trace_client():
+def trace_client(clickhouse_server):
+    (host, port) = clickhouse_server
     clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
-        "localhost", 8123, False
+        host, port, False
     )
     graph_client = graph_client_trace.GraphClientTrace(
         "test_entity", "test_project", clickhouse_trace_server
     )
     inited_client = InitializedClient(graph_client)
+
+    clickhouse_trace_server._run_migrations()
 
     try:
         yield graph_client

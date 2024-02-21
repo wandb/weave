@@ -24,6 +24,7 @@ import logging
 from flask.testing import FlaskClient
 
 from .tests.wandb_system_tests_conftest import *
+from .tests.trace_server.clickhouse_conftest import clickhouse_server
 
 logs.configure_logger()
 
