@@ -22,7 +22,7 @@ class OpenAIStream:
         self.first_chunk: Optional[ChatCompletionChunk] = None
         self.output_choices: list[dict] = []
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[ChatCompletionChunk]:
         for chunk in self.chunk_iter:
             yield chunk
             if self.first_chunk is None:
@@ -68,14 +68,14 @@ class OpenAIStream:
                         for i in range(
                             tool_call_delta.index
                             + 1
-                            - len(choice["message"]["tool_calls"])
+                            - len(choice["message"]["tool_calls"])  # type: ignore
                         ):
-                            choice["message"]["tool_calls"].append(
+                            choice["message"]["tool_calls"].append(  # type: ignore
                                 {
                                     "function": {"name": None, "arguments": ""},
                                 }
                             )
-                        tool_call = choice["message"]["tool_calls"][
+                        tool_call = choice["message"]["tool_calls"][  # type: ignore
                             tool_call_delta.index
                         ]
                         if tool_call_delta.id is not None:
@@ -92,7 +92,7 @@ class OpenAIStream:
                                     "arguments"
                                 ] += tool_call_delta.function.arguments
 
-    def final_response(self):
+    def final_response(self) -> ChatCompletion:
         if self.first_chunk is None:
             raise ValueError("No chunks received")
         return ChatCompletion(

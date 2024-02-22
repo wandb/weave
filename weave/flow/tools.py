@@ -9,7 +9,7 @@ from openai.types.chat import ChatCompletionMessageToolCall
 from weave.flow.logs import LogEvents
 
 
-def generate_json_schema(func: Callable):
+def generate_json_schema(func: Callable) -> dict:
     """Given a function, generate an OpenAI tool compatible JSON schema.
 
     WIP: This function is very basic and hacky. It will not work in many
@@ -62,15 +62,15 @@ def generate_json_schema(func: Callable):
         if hasattr(type_hints[name], "__members__"):  # Check if it's an Enum
             param_schema["enum"] = [e.value for e in type_hints[name]]
 
-        schema["function"]["parameters"]["properties"][name] = param_schema
+        schema["function"]["parameters"]["properties"][name] = param_schema  # type: ignore
 
         if is_required:
-            schema["function"]["parameters"]["required"].append(name)
+            schema["function"]["parameters"]["required"].append(name)  # type: ignore
 
     return schema
 
 
-def chat_call_tool_params(tools: list[Callable]):
+def chat_call_tool_params(tools: list[Callable]) -> list[ChatCompletionToolParam]:
     chat_tools = [generate_json_schema(tool) for tool in tools]
     return [ChatCompletionToolParam(**tool) for tool in chat_tools]
 
