@@ -33,7 +33,7 @@ export interface FlatSpan {
   attributes: any;
   trace_id: string;
   span_id: string;
-  parent_id: string;
+  parent_id?: string;
 }
 
 export type WBTraceTree = {
