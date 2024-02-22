@@ -19,8 +19,8 @@ from ..trace_server import (
 
 @pytest.fixture(scope="session")
 def clickhouse_server():
-    # host = os.environ.get("TEST_CH_SERVER_HOST", "localhost")
-    (host, port, server_up) = _check_server_up()
+    host = os.environ.get("TEST_CH_SERVER_HOST", "localhost")
+    (host, port, server_up) = _check_server_up(host)
     if not server_up:
         pytest.fail("clickhouse server is not running")
     yield (host, port)
@@ -67,17 +67,9 @@ def _check_server_health(
     return False
 
 
-def _check_server_up(host="0.0.0.0", port=8123) -> typing.Tuple[str, int, bool]:
+def _check_server_up(host="localhost", port=8123) -> typing.Tuple[str, int, bool]:
     base_url = f"http://{host}:{port}/"
     endpoint = "ping"
-
-    print(f"Checking if server is healthy @ various")
-    for scheme in ["http://", "https://"]:
-        for host in ["localhost", "0.0.0.0", "[::1]", "[::]", "weave_clickhouse"]:
-            for port in [8123]:
-                temp_url = f"{scheme}{host}:{port}"
-                print("Checking", temp_url)
-                print(_check_server_health(temp_url, "ping"))
 
     def server_healthy(num_retries=1):
         return _check_server_health(
