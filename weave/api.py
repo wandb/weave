@@ -176,21 +176,8 @@ def local_client() -> typing.Iterator[_graph_client.GraphClient]:
         inited_client.reset()
 
 
-def init_sql_client() -> _graph_client.GraphClient:
-    return _weave_init.init_sql().client
-
-
 def init_trace_client(project_name: str) -> _graph_client.GraphClient:
     return _weave_init.init_trace_remote(project_name).client
-
-
-@contextlib.contextmanager
-def sql_client() -> typing.Iterator[_graph_client.GraphClient]:
-    inited_client = _weave_init.init_sql()
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
 
 
 def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:

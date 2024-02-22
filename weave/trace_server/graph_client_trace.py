@@ -13,8 +13,6 @@ import os
 from typing import Sequence, Sequence
 from clickhouse_connect import get_client
 
-from collections.abc import Mapping
-
 
 # from weave.graph_client_sql import MemFilesArtifact
 
@@ -29,7 +27,6 @@ from .. import weave_types as types
 from .. import mappers_python
 from ..run import RunKey, Run
 from ..runs import Run as WeaveRunObj
-from ..run_sql import RunSql
 from .. import storage
 from .. import box
 from .. import urls
@@ -56,19 +53,23 @@ quote_slashes = functools.partial(parse.quote, safe="")
 
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
+    temp_read_dir: Optional[str]
+    path_contents: typing.Dict[str, typing.Union[str, bytes]]
 
     def __init__(
         self,
         entity: str,
         project: str,
         name: str,
-        version: str = None,
-        path_contents=None,
-        metadata=None,
+        version: str,
+        path_contents: typing.Optional[
+            typing.Mapping[str, typing.Union[str, bytes]]
+        ] = None,
+        metadata: typing.Optional[typing.Dict[str, str]] = None,
     ):
         if path_contents is None:
             path_contents = {}
-        self.path_contents = path_contents
+        self.path_contents = path_contents  # type: ignore
         if metadata is None:
             metadata = {}
         self._metadata = metadata
@@ -80,7 +81,10 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         self._version = version
 
     @contextlib.contextmanager
-    def new_file(self, path, binary=False):
+    def new_file(
+        self, path: str, binary: bool = False
+    ) -> typing.Iterator[typing.Union[io.StringIO, io.BytesIO]]:
+        f: typing.Union[io.StringIO, io.BytesIO]
         if binary:
             f = io.BytesIO()
         else:
@@ -90,20 +94,33 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         f.close()
 
     @property
-    def is_saved(self):
+    def is_saved(self) -> bool:
         return True
 
     @property
-    def version(self):
+    def version(self) -> str:
         return self._version
 
     @contextlib.contextmanager
-    def open(self, path, binary=False):
+    def open(
+        self, path: str, binary: bool = False
+    ) -> typing.Iterator[typing.Union[io.StringIO, io.BytesIO]]:
+        f: typing.Union[io.StringIO, io.BytesIO]
         try:
             if binary:
-                f = io.BytesIO(self.path_contents[path])
+                val = self.path_contents[path]
+                if not isinstance(val, bytes):
+                    raise ValueError(
+                        f"Expected binary file, but got string for path {path}"
+                    )
+                f = io.BytesIO(val)
             else:
-                f = io.StringIO(self.path_contents[path].decode("utf-8"))
+                val = self.path_contents[path]
+                if not isinstance(val, bytes):
+                    raise ValueError(
+                        f"Expected string file, but got binary for path {path}"
+                    )
+                f = io.StringIO(val.decode("utf-8"))
         except KeyError:
             raise FileNotFoundError(path)
         yield f
@@ -118,7 +135,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
             self.temp_read_dir = tempfile.mkdtemp()
         write_path = os.path.join(self.temp_read_dir, path)
         with open(write_path, "wb") as f:
-            f.write(self.path_contents[path])
+            f.write(self.path_contents[path])  # type: ignore
         return write_path
 
     @property
@@ -138,7 +155,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         )
 
     @property
-    def metadata(self):
+    def metadata(self) -> artifact_fs.ArtifactMetadata:
         return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
 
 
@@ -194,7 +211,7 @@ class TraceNounUri(uris.WeaveURI):
         params: str,
         query: dict[str, list[str]],
         fragment: str,
-    ):
+    ) -> "TraceNounUri":
         entity = netloc.strip("/")
         path_parts = path.strip("/").split("/")
 
@@ -204,7 +221,7 @@ class TraceNounUri(uris.WeaveURI):
         project = path_parts[0]
         trace_noun = path_parts[1]
         compound_version = path_parts[2]
-        path = None
+        path_res: typing.Optional[typing.List[str]] = None
         extra = None
         if trace_noun == "call":
             name = ""
@@ -218,9 +235,9 @@ class TraceNounUri(uris.WeaveURI):
         else:
             raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
         if trace_noun == "obj":
-            path = path_parts[3:]
-            if not path:
-                path = None
+            path_res = path_parts[3:]
+            if not path_res:
+                path_res = None
             if fragment:
                 extra = fragment.split("/")
                 if not extra:
@@ -237,7 +254,7 @@ class TraceNounUri(uris.WeaveURI):
             trace_noun=trace_noun,
             name=name,
             version=version,
-            path=path,
+            path=path_res,
             extra=extra,
         )
 
@@ -453,8 +470,25 @@ class TraceNounRef(ref_base.Ref):
         )
 
 
+class CallSchemaRun(Run):
+    entity: str
+    project: str
+    id: str
+    trace_id: str
+
+    def __init__(self, entity: str, project: str, id: str, trace_id: str):
+        self.entity = entity
+        self.project = project
+        self.id = id
+        self.trace_id = trace_id
+
+    @property
+    def ui_url(self) -> str:
+        return urls.call_path_as_peek(self.entity, self.project, self.id)
+
+
 @dataclasses.dataclass
-class GraphClientTrace(GraphClient[WeaveRunObj]):
+class GraphClientTrace(GraphClient[CallSchemaRun]):
     def __init__(
         self, entity: str, project: str, trace_server: tsi.TraceServerInterface
     ):
@@ -528,7 +562,9 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         weave_type = types.type_of_with_refs(obj)
         orig_obj = obj
         obj = box.box(obj)
-        art = MemTraceFilesArtifact(self.entity, self.project, name)
+        art = MemTraceFilesArtifact(
+            self.entity, self.project, name, "_VERSION_PENDING_"
+        )
         ref: ref_base.Ref = art.set("obj", weave_type, obj)
         # ref_base._put_ref(obj, ref)
 
@@ -583,7 +619,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         parent: typing.Optional["RunKey"],
         inputs: typing.Dict[str, typing.Any],
         input_refs: Sequence[Ref],
-    ) -> WeaveRunObj:
+    ) -> CallSchemaRun:
 
         inputs = copy.copy(inputs)
         inputs["_keys"] = list(inputs.keys())
@@ -595,13 +631,15 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             trace_id = parent.trace_id
             parent_id = parent.id
         else:
-            trace_id = str(uuid.uuid4())
+            trace_id = generate_id()
             parent_id = None
+
+        call_id = generate_id()
 
         start = tsi.StartedCallSchemaForInsert(
             entity=self.entity,
             project=self.project,
-            id=generate_id(),
+            id=call_id,
             name=op_name,
             trace_id=trace_id,
             start_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
@@ -610,7 +648,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
             attributes={},
         )
         self.trace_server.call_start(tsi.CallStartReq(start=start))
-        return RunSql(start.model_dump())
+        return CallSchemaRun(start.entity, start.project, call_id, trace_id)
 
     def fail_run(self, run: Run, exception: BaseException) -> None:
         self.trace_server.call_end(
@@ -631,7 +669,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
     def finish_run(
         self,
-        run: WeaveRunObj,
+        run: CallSchemaRun,
         output: typing.Any,
         output_refs: Sequence[Ref],
     ) -> None:
