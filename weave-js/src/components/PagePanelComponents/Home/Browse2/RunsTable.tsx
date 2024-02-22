@@ -22,6 +22,7 @@ import {MOON_250} from '../../../../common/css/color.styles';
 import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
 import {Timestamp} from '../../../Timestamp';
+import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
@@ -518,6 +519,7 @@ export const RunsTable: FC<{
           Columns having many empty values have been hidden.
         </Alert>
       )}
+      <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
       <StyledDataGrid
         columnHeaderHeight={40}
         apiRef={apiRef}
