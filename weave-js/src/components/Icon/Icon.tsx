@@ -125,6 +125,7 @@ import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/ico
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
+import {ReactComponent as ImportParentBackUp} from '../../assets/icons/icon-parent-back-up.svg';
 import {ReactComponent as ImportPause} from '../../assets/icons/icon-pause.svg';
 import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg';
 import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil-edit.svg';
@@ -607,6 +608,9 @@ export const IconPanTool1 = (props: SVGIconProps) => (
 export const IconPanel = (props: SVGIconProps) => (
   <ImportPanel {...updateIconProps(props)} />
 );
+export const IconParentBackUp = (props: SVGIconProps) => (
+  <ImportParentBackUp {...updateIconProps(props)} />
+);
 export const IconPause = (props: SVGIconProps) => (
   <ImportPause {...updateIconProps(props)} />
 );
@@ -1013,6 +1017,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
+  'parent-back-up': IconParentBackUp,
   pause: IconPause,
   paused: IconPaused,
   'pencil-edit': IconPencilEdit,
