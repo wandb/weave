@@ -271,7 +271,9 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
               style={{
                 height: (maxPage + 1) * pageHeight,
                 position: 'relative',
-                transform: `translateY(-${currentPage * pageHeight}px)`,
+                transform: `translateY(-${
+                  currentPage * pageHeight - currentPage * gutterWidth
+                }px)`,
                 transition: 'transform 0.5s',
               }}>
               {renderPanelRefs.map(panelRef => {
