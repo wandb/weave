@@ -115,6 +115,7 @@ class SelectableCHObjSchema(BaseModel):
     name: str
     version_hash: str
     created_datetime: datetime.datetime
+    version_index: int
 
     type_dict_dump: str
     bytes_file_map: typing.Dict[str, bytes]
@@ -816,8 +817,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         b64_file_map=encode_bytes_as_b64(ch_obj.bytes_file_map),
         metadata_dict=_dict_dump_to_dict(ch_obj.metadata_dict_dump),
         created_datetime=ch_obj.created_datetime,
-        # TODO!
-        version_index=-1,
+        version_index=ch_obj.version_index,
     )
 
 

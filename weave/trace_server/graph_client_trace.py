@@ -177,6 +177,7 @@ def refs_to_str(val: typing.Any) -> typing.Any:
 @dataclasses.dataclass
 class TraceNounUri(uris.WeaveURI):
     SCHEME = "wandb-trace"
+    version: str
     entity: str
     project: str
     trace_noun: str
@@ -276,6 +277,8 @@ class TraceNounUri(uris.WeaveURI):
 
 
 class TraceNounRef(ref_base.Ref):
+    version: str
+
     def __init__(
         self,
         entity: str,
@@ -419,7 +422,7 @@ class TraceNounRef(ref_base.Ref):
         # return res
 
     def __repr__(self) -> str:
-        return f"<{self.__class__}({id(self)}) entity_name={self._entity_name} project_name={self._project_name} object_name={self._object_name} version_hash={self._version_hash} row_version={self._row_version} obj={self._obj} type={self._type}>"
+        return f"<{self.__class__}({id(self)}) entity_name={self._entity} project_name={self._project} object_name={self._name} version_hash={self._version} obj={self._obj} type={self._type}>"
 
     def with_extra(
         self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
@@ -431,7 +434,7 @@ class TraceNounRef(ref_base.Ref):
         if new_extra is None:
             new_extra = []
         else:
-            new_extra = self._extra.copy()
+            new_extra = new_extra.copy()
         new_extra += extra
         return self.__class__(
             entity=self._entity,
@@ -526,7 +529,7 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
         orig_obj = obj
         obj = box.box(obj)
         art = MemTraceFilesArtifact(self.entity, self.project, name)
-        ref = art.set("obj", weave_type, obj)
+        ref: ref_base.Ref = art.set("obj", weave_type, obj)
         # ref_base._put_ref(obj, ref)
 
         # mapper = mappers_python.map_to_python(weave_type, art)
