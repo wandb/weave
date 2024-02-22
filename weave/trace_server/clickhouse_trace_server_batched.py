@@ -509,10 +509,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _run_migrations(self) -> None:
         print("Running migrations")
         res = self.ch_client.command("SHOW TABLES")
-        table_names = res.split("\n")
-        for table_name in table_names:
-            if not table_name.startswith("."):
-                self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
+        if isinstance(res, str):
+            table_names = res.split("\n")
+            for table_name in table_names:
+                if not table_name.startswith("."):
+                    self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
 
         self.ch_client.command(
             """
