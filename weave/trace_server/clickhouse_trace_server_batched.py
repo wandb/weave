@@ -13,7 +13,7 @@ import clickhouse_connect
 from pydantic import BaseModel, model_validator
 
 
-from .trace_server_interface_util import generate_id, version_hash_for_object
+from .trace_server_interface_util import decode_b64_to_bytes, encode_bytes_as_b64, generate_id, version_hash_for_object
 from . import trace_server_interface as tsi
 from .flushing_buffer import InMemAutoFlushingBuffer, InMemFlushableBuffer
 
@@ -54,13 +54,6 @@ class CallEndCHInsertable(BaseModel):
 
 CallCHInsertable = typing.Union[CallStartCHInsertable, CallEndCHInsertable]
 
-all_call_columns = list(
-    CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
-)
-
-# Let's just make everything required for now ... can optimize when we implement column selection
-required_call_columns = list(set(all_call_columns) - set([]))
-
 
 # Very critical that this matches the calls table schema! This should
 # essentially be the DB version of CallSchema with the addition of the
@@ -89,18 +82,26 @@ class SelectableCHCallSchema(BaseModel):
     output_refs: typing.List[str]
 
 
-class InsertableCHObjSchema(BaseModel):
+all_call_insert_columns = list(
+    CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
+)
+
+all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
+
+# Let's just make everything required for now ... can optimize when we implement column selection
+required_call_columns = list(set(all_call_select_columns) - set([]))
+
+
+class ObjCHInsertable(BaseModel):
     entity: str
     project: str
     name: str
     version_hash: str
-
-    is_op: bool
+    created_datetime: datetime.datetime
 
     type_dict_dump: str
-    # val_dict_dump: str
-    encoded_file_map: typing.Dict[str, bytes] = {}
-    metadata_dict_dump: typing.Optional[str] = None
+    bytes_file_map: typing.Dict[str, bytes]
+    metadata_dict_dump: str
 
 
 class SelectableCHObjSchema(BaseModel):
@@ -108,106 +109,18 @@ class SelectableCHObjSchema(BaseModel):
     project: str
     name: str
     version_hash: str
-
-    is_op: bool
+    created_datetime: datetime.datetime
 
     type_dict_dump: str
-    # val_dict_dump: str
-    encoded_file_map: typing.Dict[str, bytes] = {}
-    metadata_dict_dump: typing.Optional[str] = None
-
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
+    bytes_file_map: typing.Dict[str, bytes]
+    metadata_dict_dump: str
 
 
-# Listing of all columns to protect against SQL injection
+all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
+all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 
-call_columns: typing.Dict[str, str] = {
-    "entity": "String",
-    "project": "String",
-    "id": "String",
-    "trace_id": "Nullable(String)",
-    "parent_id": "Nullable(String)",
-    "name": "Nullable(String)",
-    "status_code": "Nullable(Enum8('UNSET' = 0, 'OK' = 1, 'ERROR' = 2))",
-    "start_time": "Nullable(DateTime64(3))",
-    "end_time": "Nullable(DateTime64(3))",
-    "attributes": "Nullable(String)",
-    "inputs": "Nullable(String)",
-    "outputs": "Nullable(String)",
-    "summary": "Nullable(String)",
-    "exception": "Nullable(String)",
-    "created_at": "DateTime64(3)",
-    "updated_at": "DateTime64(3)",
-    "input_refs": "Array(String)",
-    "output_refs": "Array(String)",
-}
-# all_call_columns = list(call_columns.keys())
-
-# Super hack since the insert method is buggy in clickhouse. TODO: make this more maintainable
-cpy = call_columns.copy()
-cpy["created_at"] = "Nullable(" + cpy["created_at"] + ")"
-cpy["updated_at"] = "Nullable(" + cpy["updated_at"] + ")"
-all_call_column_type_names_with_defaults_nullable = list(cpy.values())
-
-
-# Listing of required columns that are expected to be returned regardless of the caller's columns request
-# required_call_columns = [
-#     "entity",
-#     "project",
-#     "id",
-#     "created_at",
-#     "updated_at",
-#     "trace_id",
-#     "parent_id",
-#     "name",
-#     "status_code",
-#     "start_time",
-#     "end_time",
-#     "exception",
-# ]
-
-all_obj_columns = [
-    "entity",
-    "project",
-    "name",
-    "version_hash",
-    "is_op",
-    "type_dict_dump",
-    # "val_dict_dump",
-    "encoded_file_map",
-    "metadata_dict_dump",
-    "created_at",
-    "updated_at",
-]
-
-required_obj_columns = [
-    "entity",
-    "project",
-    "name",
-    "version_hash",
-    "is_op",
-    "type_dict_dump",
-    # "val_dict_dump",
-    # "encoded_file_map",
-    # "metadata_dict_dump",
-    "created_at",
-    "updated_at",
-]
-
-
-all_obj_insert_columns = [
-    "entity",
-    "project",
-    "name",
-    "version_hash",
-    "is_op",
-    "type_dict_dump",
-    # "val_dict_dump",
-    "encoded_file_map",
-    "metadata_dict_dump",
-]
-
+# Let's just make everything required for now ... can optimize when we implement column selection
+required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     ch_client: Client
@@ -322,7 +235,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj, True)
+        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
         self._insert_obj(ch_obj)
         return tsi.ObjCreateRes()
 
@@ -335,7 +248,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         ch_obj = _partial_obj_schema_to_ch_obj(req.obj)
         self._insert_obj(ch_obj)
-        return tsi.ObjCreateRes()
+        return tsi.ObjCreateRes(version_hash=ch_obj.version_hash)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(self._obj_read(req)))
@@ -345,7 +258,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # parameters = {}
         if req.filter:
             raise NotImplementedError()
-        conditions.append("is_op == 0")
+        # conditions.append("is_op == 0")
 
         ch_objs = self._select_objs_query(
             req.entity,
@@ -377,7 +290,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self.ch_call_insert_thread_client.insert(
                 "calls_raw",
                 data=buffer,
-                column_names=all_call_columns,
+                column_names=all_call_insert_columns,
                 # column_type_names=all_call_column_type_names_with_defaults_nullable,
             )
             print(
@@ -395,7 +308,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             start_time = time.time()
             print("(" + flush_id + ") Flushing " + str(buffer_len) + " objects.")
             self.ch_obj_insert_thread_client.insert(
-                "objects",
+                "objects_raw",
                 data=buffer,
                 column_names=all_obj_insert_columns,
                 # column_type_names=all_obj_column_type_names_with_defaults_nullable,
@@ -443,14 +356,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters["entity_scope"] = entity
         parameters["project_scope"] = project
         if columns == None:
-            columns = all_call_columns
+            columns = all_call_select_columns
 
         remaining_columns = set(columns) - set(required_call_columns)
         columns = required_call_columns + list(remaining_columns)
 
         # Stop injection
         assert (
-            set(columns) - set(all_call_columns) == set()
+            set(columns) - set(all_call_select_columns) == set()
         ), f"Invalid columns: {columns}"
         merged_cols = []
         for col in columns:
@@ -472,7 +385,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         order_by_part = ""
         if order_by != None:
             for field, direction in order_by:
-                assert field in all_call_columns, f"Invalid order_by field: {field}"
+                assert field in all_call_select_columns, f"Invalid order_by field: {field}"
                 assert direction in [
                     "ASC",
                     "DESC",
@@ -513,14 +426,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.ObjReadReq, only_ops: bool = False
     ) -> SelectableCHObjSchema:
         conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
-        if only_ops:
-            conditions.append("is_op = 1")
-        else:
-            conditions.append("is_op = 0")
+        # if only_ops:
+        #     conditions.append("is_op = 1")
+        # else:
+        #     conditions.append("is_op = 0")
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
-            columns=all_obj_columns,
+            columns=all_obj_select_columns,
             # columns=req.columns,
             conditions=conditions,
             limit=1,
@@ -551,22 +464,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters["entity_scope"] = entity
         parameters["project_scope"] = project
         if columns == None:
-            columns = all_obj_columns
+            columns = all_obj_select_columns
 
-        remaining_columns = set(columns) - set(required_obj_columns)
-        columns = required_obj_columns + list(remaining_columns)
+        remaining_columns = set(columns) - set(required_obj_select_columns)
+        columns = required_obj_select_columns + list(remaining_columns)
         # # Stop injection
         assert (
-            set(columns) - set(all_obj_columns) == set()
+            set(columns) - set(all_obj_select_columns) == set()
         ), f"Invalid columns: {columns}"
         select_columns_part = ", ".join(columns)
-        merged_cols = []
-        for col in columns:
-            if col in ["entity", "project", "name", "version_hash"]:
-                merged_cols.append(f"{col} AS {col}")
-            else:
-                merged_cols.append(f"anyLast({col}) AS {col}")
-        select_columns_part = ", ".join(merged_cols)
+        # merged_cols = []
+        # for col in columns:
+        #     if col in ["entity", "project", "name", "version_hash"]:
+        #         merged_cols.append(f"{col} AS {col}")
+        #     else:
+        #         merged_cols.append(f"anyLast({col}) AS {col}")
+        # select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
             conditions = ["1 = 1"]
@@ -580,14 +493,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         raw_res = self._query(
             f"""
             SELECT {select_columns_part}
-            FROM objects
+            FROM objects_versioned
             WHERE entity = {{entity_scope: String}} AND project = {{project_scope: String}}
-            GROUP BY entity, project, name, version_hash
-            HAVING {conditions_part}
+            AND {conditions_part}
             {limit_part}
         """,
             parameters,
-            column_formats={"encoded_file_map": {"string": "bytes"}},
+            column_formats={"bytes_file_map": {"string": "bytes"}},
         )
         # # print(raw_res.result_rows)
         objs = []
@@ -608,30 +520,94 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not table_name.startswith("."):
                 self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
 
+
+
         self.ch_client.command(
             """
         CREATE TABLE IF NOT EXISTS
-        objects (
+        objects_raw (
             entity String,
             project String,
             name String,
             version_hash String,
-
-            is_op UInt8,
+            created_datetime DateTime64(3),
 
             type_dict_dump String,
-            # val_dict_dump String,
-            encoded_file_map Map(String, String),
-            metadata_dict_dump String NULL,
+            bytes_file_map Map(String, String),
+            metadata_dict_dump String,
 
-            created_at DateTime64(3) DEFAULT now64(3),
-            updated_at DateTime64(3) DEFAULT now64(3)
+            db_row_created_at DateTime64(3) DEFAULT now64(3)
+
         )
-        ENGINE = ReplacingMergeTree
+        ENGINE = MergeTree
         ORDER BY (entity, project, name, version_hash)
-        PRIMARY KEY (entity, project, name, version_hash)
         """
         )
+
+        self.ch_client.command(
+            """
+        CREATE TABLE IF NOT EXISTS
+        objects_deduplicated (
+            entity String,
+            project String,
+            name String,
+            version_hash String,
+            created_datetime SimpleAggregateFunction(min, DateTime64(3)),
+
+            type_dict_dump SimpleAggregateFunction(any, String),
+            bytes_file_map SimpleAggregateFunction(any, Map(String, String)),
+
+            # Note: if we ever want to support updates, this needs to be moved to a more robust handling
+            metadata_dict_dump SimpleAggregateFunction(any, String),
+        )
+        ENGINE = AggregatingMergeTree
+        ORDER BY (entity, project, name, version_hash)
+        """
+        )
+
+
+        self.ch_client.command("""
+        CREATE MATERIALIZED VIEW objects_deduplicated_view TO objects_deduplicated
+        AS
+        SELECT
+            entity,
+            project,
+            name,
+            version_hash,
+            minSimpleState(created_datetime) as created_datetime,
+
+            anySimpleState(type_dict_dump) as type_dict_dump,
+            anySimpleState(bytes_file_map) as bytes_file_map,
+            anySimpleState(metadata_dict_dump) as metadata_dict_dump
+            
+        FROM objects_raw
+        GROUP BY entity, project, name, version_hash
+        """)
+
+
+
+        # The following view is just to workout version indexing and latest keys
+        self.ch_client.command("""
+        CREATE VIEW objects_versioned
+        AS
+        SELECT
+            entity,
+            project,
+            name,
+            version_hash,
+            min(objects_deduplicated.created_datetime) as created_datetime,
+            any(type_dict_dump) as type_dict_dump,
+            any(bytes_file_map) as bytes_file_map,
+            any(metadata_dict_dump) as metadata_dict_dump,
+            row_number() OVER w1 as version_index,
+            1 == count(*) OVER w1 as is_latest
+        FROM objects_deduplicated
+        GROUP BY entity, project, name, version_hash
+        WINDOW
+            w1 AS (PARTITION BY entity, project, name ORDER BY min(objects_deduplicated.created_datetime) ASC Rows BETWEEN CURRENT ROW AND 1 FOLLOWING)
+        """)
+
+
         self.ch_client.command(
             """
             CREATE TABLE IF NOT EXISTS
@@ -736,7 +712,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         parameters = ch_call.model_dump()
         row = []
-        for key in all_call_columns:
+        for key in all_call_insert_columns:
             row.append(parameters.get(key, None))
 
         if self.should_batch:
@@ -744,7 +720,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             self._flush_call_insert_buffer([row])
 
-    def _insert_obj(self, ch_obj: InsertableCHObjSchema) -> None:
+    def _insert_obj(self, ch_obj: ObjCHInsertable) -> None:
         parameters = ch_obj.model_dump()
         row = []
         for key in all_obj_insert_columns:
@@ -799,9 +775,9 @@ def _raw_call_dict_to_ch_call(
 
 
 def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHObjSchema:
-    if obj["encoded_file_map"]:
-        obj["encoded_file_map"] = {
-            k.decode("utf-8"): v for k, v in obj["encoded_file_map"].items()
+    if obj["bytes_file_map"]:
+        obj["bytes_file_map"] ={
+            k.decode("utf-8"): v for k, v in obj["bytes_file_map"].items()
         }
     return SelectableCHObjSchema.model_validate(obj)
 
@@ -826,28 +802,16 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
 
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
-        # `entity` should always be present
         entity=ch_obj.entity,
-        # `project`` should always be present
         project=ch_obj.project,
-        # `name`` should always be present
         name=ch_obj.name,
-        # `version_hash`` should always be present
         version_hash=ch_obj.version_hash,
-        # `is_op`` should always be present
-        is_op=ch_obj.is_op,
-        # `type_dict`` should always be present
-        type_dict=json.loads(ch_obj.type_dict_dump),
-        # `val_dict`` should always be present
-        # val_dict=json.loads(ch_obj.val_dict_dump),
-        # `encoded_file_map`` should always be present
-        encoded_file_map=ch_obj.encoded_file_map,
-        # `metadata_dict`` may be null (represented as `\\N`)
-        metadata_dict=json.loads(ch_obj.metadata_dict_dump)
-        if ch_obj.metadata_dict_dump
-        else None,
-        # `created_at`` should always be present
-        created_at_s=_datetime_to_sec_float(ch_obj.created_at),
+        type_dict=_dict_dump_to_dict(ch_obj.type_dict_dump),
+        b64_file_map=encode_bytes_as_b64(ch_obj.bytes_file_map),
+        metadata_dict=_dict_dump_to_dict(ch_obj.metadata_dict_dump),
+        created_datetime=ch_obj.created_datetime,
+        # TODO!
+        version_index=-1
     )
 
 
@@ -868,11 +832,13 @@ def _start_call_for_insert_to_ch_insertable_start_call(
 ) -> CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
+    call_id = start_call.id or generate_id()
+    trace_id = start_call.trace_id or generate_id()
     return CallStartCHInsertable(
         entity=start_call.entity,
         project=start_call.project,
-        id=start_call.id or generate_id(),
-        trace_id=start_call.trace_id or generate_id(),
+        id=call_id,
+        trace_id=trace_id,
         parent_id=start_call.parent_id,
         name=start_call.name,
         start_datetime=start_call.start_datetime,
@@ -913,20 +879,21 @@ def _process_parameters(
     return parameters
 
 
+
 def _partial_obj_schema_to_ch_obj(
-    partial_obj: tsi.PartialObjForCreationSchema,
-    is_op: bool = False,
-) -> InsertableCHObjSchema:
+    partial_obj: tsi.ObjSchemaForInsert,
+    # is_op: bool = False,
+) -> ObjCHInsertable:
     version_hash = version_hash_for_object(partial_obj)
 
-    return InsertableCHObjSchema(
+    return ObjCHInsertable(
         entity=partial_obj.entity,
         project=partial_obj.project,
         name=partial_obj.name,
         version_hash=version_hash,
-        is_op=is_op,
-        type_dict_dump=json.dumps(partial_obj.type_dict),
-        # val_dict_dump=json.dumps(partial_obj.val_dict),
-        encoded_file_map=partial_obj.encoded_file_map or {},
-        metadata_dict_dump=json.dumps(partial_obj.metadata_dict),
+        # is_op=is_op,
+        type_dict_dump=_dict_value_to_dump(partial_obj.type_dict),
+        bytes_file_map=decode_b64_to_bytes(partial_obj.b64_file_map or {}),
+        metadata_dict_dump=_dict_value_to_dump(partial_obj.metadata_dict),
+        created_datetime=partial_obj.created_datetime,
     )

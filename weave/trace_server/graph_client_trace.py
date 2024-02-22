@@ -1,3 +1,4 @@
+import base64
 import dataclasses
 import hashlib
 import json
@@ -42,7 +43,7 @@ from .. import ref_base
 from .. import weave_types as types
 
 
-from .trace_server_interface_util import generate_id, version_hash_for_object
+from .trace_server_interface_util import  decode_b64_to_bytes, encode_bytes_as_b64, generate_id, version_hash_for_object
 from . import trace_server_interface as tsi
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -386,7 +387,7 @@ class TraceNounRef(ref_base.Ref):
                 self._project,
                 self._name,
                 self._version,
-                {k: v for k, v in res.obj.encoded_file_map.items()},
+                decode_b64_to_bytes(res.obj.b64_file_map),
                 metadata=res.obj.metadata_dict,
             )
             wb_type = types.TypeRegistry.type_from_dict(res.obj.type_dict)
@@ -528,20 +529,15 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
         # type_val = storage.to_python(obj, ref_persister=save_custom_object)
         # Should this encoding be handled below the server abstraction?
-        encoded_path_contents = {}
-        for k, v in art.path_contents.items():
-            if isinstance(v, str):
-                encoded_path_contents[k] = v.encode("utf-8")
-            else:
-                encoded_path_contents[k] = v
-        partial_obj = tsi.PartialObjForCreationSchema(
+        encoded_path_contents = encode_bytes_as_b64({k: (v.encode("utf-8") if isinstance(v, str) else v) for k, v in art.path_contents.items()})
+        partial_obj = tsi.ObjSchemaForInsert(
             entity=self.entity,
             project=self.project,
             name=name,
             type_dict=weave_type.to_dict(),
-            # val_dict=val,
-            encoded_file_map=encoded_path_contents,
+            b64_file_map=encoded_path_contents,
             metadata_dict=art.metadata.as_dict(),
+            created_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
         )
         version_hash = version_hash_for_object(partial_obj)
         if isinstance(obj, OpDef):
