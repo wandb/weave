@@ -471,32 +471,26 @@ class TraceNounRef(ref_base.Ref):
 
 
 class CallSchemaRun(Run):
-    _entity: str
-    _project: str
-    _call_id: str
-    _trace_id: str
-
-    def __init__(self, entity: str, project: str, call_id: str, trace_id: str):
-        self._entity = entity
-        self._project = project
-        self._call_id = call_id
-        self._trace_id = trace_id
+    def __init__(self, call: tsi.CallSchema):
+        self._call = call
 
     @property
     def id(self) -> str:
-        return self._call_id
+        return self._call.id
 
     @property
     def trace_id(self) -> str:
-        return self._trace_id
+        return self._call.trace_id
 
     @property
     def ui_url(self) -> str:
-        return urls.call_path_as_peek(self._entity, self._project, self._call_id)
+        return urls.call_path_as_peek(
+            self._call.entity, self._call.project, self._call.id
+        )
 
 
 def _run_from_call(call: tsi.CallSchema) -> CallSchemaRun:
-    return CallSchemaRun(call.entity, call.project, call.id, call.trace_id)
+    return CallSchemaRun(call)
 
 
 @dataclasses.dataclass
@@ -511,7 +505,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
     ##### Read API
 
     # Implement the required members from the "GraphClient" protocol class
-    def runs(self) -> Sequence[Run]:
+    def runs(self) -> Sequence[CallSchemaRun]:
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
                 entity=self.entity,
@@ -520,7 +514,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         )
         return [_run_from_call(call) for call in res.calls]
 
-    def run(self, run_id: str) -> typing.Optional[Run]:
+    def run(self, run_id: str) -> typing.Optional[CallSchemaRun]:
         res = self.trace_server.call_read(
             tsi.CallReadReq(
                 entity=self.entity,
@@ -536,7 +530,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         # We don't have a good way to do this yet (need to hash the inputs if we want to do it properly)
         raise NotImplementedError()
 
-    def run_children(self, run_id: str) -> Sequence[Run]:
+    def run_children(self, run_id: str) -> Sequence[CallSchemaRun]:
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
                 entity=self.entity,
@@ -546,7 +540,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         )
         return [_run_from_call(call) for call in res.calls]
 
-    def op_runs(self, op_def: OpDef) -> Sequence[Run]:
+    def op_runs(self, op_def: OpDef) -> Sequence[CallSchemaRun]:
         ref = _get_ref(op_def)
         if not isinstance(ref, TraceNounRef):
             raise ValueError("Expected TraceNounRef")
@@ -560,7 +554,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         )
         return [_run_from_call(call) for call in res.calls]
 
-    def ref_input_to(self, ref: Ref) -> Sequence[Run]:
+    def ref_input_to(self, ref: Ref) -> Sequence[CallSchemaRun]:
         if not isinstance(ref, TraceNounRef):
             raise ValueError("Expected TraceNounRef")
         ref_str = str(ref)
@@ -573,7 +567,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         )
         return [_run_from_call(call) for call in res.calls]
 
-    def ref_value_input_to(self, ref: Ref) -> list[Run]:
+    def ref_value_input_to(self, ref: Ref) -> list[CallSchemaRun]:
         if not isinstance(ref, TraceNounRef):
             raise ValueError("Expected TraceNounRef")
         ref_str = str(ref)
@@ -586,7 +580,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         )
         return [_run_from_call(call) for call in res.calls]
 
-    def ref_output_of(self, ref: Ref) -> typing.Optional[Run]:
+    def ref_output_of(self, ref: Ref) -> typing.Optional[CallSchemaRun]:
         if not isinstance(ref, TraceNounRef):
             raise ValueError("Expected TraceNounRef")
         ref_str = str(ref)
@@ -716,9 +710,9 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             attributes={},
         )
         self.trace_server.call_start(tsi.CallStartReq(start=start))
-        return CallSchemaRun(start.entity, start.project, call_id, trace_id)
+        return CallSchemaRun(start)
 
-    def fail_run(self, run: Run, exception: BaseException) -> None:
+    def fail_run(self, run: CallSchemaRun, exception: BaseException) -> None:
         self.trace_server.call_end(
             tsi.CallEndReq.model_validate(
                 {

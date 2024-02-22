@@ -16,19 +16,20 @@ def test_simple_op(trace_client):
 
     runs = trace_client.runs()
     assert len(runs) == 1
+    fetched_call = runs[0]._call
     assert (
-        runs[0].name
+        fetched_call.name
         == "wandb-trace://test_entity/test_project/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
     )
-    assert runs[0] == tsi.CallSchema(
+    assert fetched_call == tsi.CallSchema(
         entity=trace_client.entity,
         project=trace_client.project,
-        id=runs[0].id,
-        name=runs[0].name,
-        trace_id=runs[0].trace_id,
+        id=fetched_call.id,
+        name=fetched_call.name,
+        trace_id=fetched_call.trace_id,
         parent_id=None,
-        start_datetime=runs[0].start_datetime,
-        end_datetime=runs[0].end_datetime,
+        start_datetime=fetched_call.start_datetime,
+        end_datetime=fetched_call.end_datetime,
         exception=None,
         attributes={},
         inputs={"a": 5, "_keys": ["a"]},

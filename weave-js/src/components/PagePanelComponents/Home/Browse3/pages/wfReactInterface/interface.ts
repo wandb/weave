@@ -1,46 +1,56 @@
-import _, { sum } from 'lodash';
+// import _, { sum } from 'lodash';
 import LRUCache from 'lru-cache';
 import {useEffect, useMemo, useState} from 'react';
 
 import {
-  constFunction,
-  constString,
+  // constFunction,
+  // constString,
   Node,
-  opAnd,
+  // opAnd,
   opArray,
-  opArtifactLastMembership,
-  opArtifactMembershipArtifactVersion,
-  opArtifactName,
-  opArtifactTypeArtifacts,
-  opArtifactVersionArtifactSequence,
-  opArtifactVersionCreatedAt,
-  opArtifactVersionHash,
-  opArtifactVersionIsWeaveObject,
-  opArtifactVersionMetadata,
-  opArtifactVersions,
-  opArtifactVersionVersionId,
-  opDict,
-  opFilter,
-  opFlatten,
-  opIsNone,
-  opMap,
-  opPick,
-  opProjectArtifact,
-  opProjectArtifactTypes,
-  opProjectArtifactVersion,
-  opRootProject,
-  opStringEqual,
+  // opArtifactLastMembership,
+  // opArtifactMembershipArtifactVersion,
+  // opArtifactName,
+  // opArtifactTypeArtifacts,
+  // opArtifactVersionArtifactSequence,
+  // opArtifactVersionCreatedAt,
+  // opArtifactVersionHash,
+  // opArtifactVersionIsWeaveObject,
+  // opArtifactVersionMetadata,
+  // opArtifactVersions,
+  // opArtifactVersionVersionId,
+  // opDict,
+  // opFilter,
+  // opFlatten,
+  // opIsNone,
+  // opMap,
+  // opPick,
+  // opProjectArtifact,
+  // opProjectArtifactTypes,
+  // opProjectArtifactVersion,
+  // opRootProject,
+  // opStringEqual,
 } from '../../../../../../core';
-import { useDeepMemo } from '../../../../../../hookUtils';
-import {useNodeValue} from '../../../../../../react';
+import {useDeepMemo} from '../../../../../../hookUtils';
+// import {useNodeValue} from '../../../../../../react';
 import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
 import {
   fnRunsNode,
-  useRuns,
-  useRunsWithFeedback,
+  // useRuns,
+  // useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
-import {PROJECT_CALL_STREAM_NAME, TRACE_REF_PREFIX, WANDB_ARTIFACT_REF_PREFIX} from './constants';
-import { callsQuery, objectsQuery, objectsRead, TraceCallSchema, TraceObjSchema } from './trace_server_client';
+import {
+  PROJECT_CALL_STREAM_NAME,
+  TRACE_REF_PREFIX,
+  WANDB_ARTIFACT_REF_PREFIX,
+} from './constants';
+import {
+  callsQuery,
+  objectsQuery,
+  objectsRead,
+  TraceCallSchema,
+  TraceObjSchema,
+} from './trace_server_client';
 
 export const OP_CATEGORIES = [
   'train',
@@ -77,15 +87,15 @@ export type CallSchema = CallKey & {
 
 const refIsWandbArtifactRef = (refUri: string) => {
   return refUri.startsWith(WANDB_ARTIFACT_REF_PREFIX);
-}
+};
 
 const refIsWandbTraceRef = (refUri: string) => {
   return refUri.startsWith(TRACE_REF_PREFIX);
-}
+};
 
 const opNameIsRef = (opName: string) => {
   return refIsWandbArtifactRef(opName) || refIsWandbTraceRef(opName);
-}
+};
 
 export const spanToCallSchema = (
   entity: string,
@@ -111,33 +121,30 @@ export const spanToCallSchema = (
     spanName: opNameIsRef(span.name)
       ? refUriToOpVersionKey(span.name).opId
       : span.name,
-    opVersionRef: opNameIsRef(span.name)
-      ? span.name
-      : null,
+    opVersionRef: opNameIsRef(span.name) ? span.name : null,
     rawSpan,
     rawFeedback: span.feedback,
   };
 };
 
 export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
-
   const cachedCall = key ? getCallFromCache(key) : null;
   const [calls, setCalls] = useState<SpanWithFeedback[] | null>(null);
   const deepKey = useDeepMemo(key);
-  
+
   useEffect(() => {
     if (!deepKey) {
       return;
     }
     callsQuery({
-      "entity": deepKey.entity,
-      "project": deepKey.project,
-      "filter": {
-        "call_ids": [deepKey.callId]
-      }
-  }).then((data) => {
+      entity: deepKey.entity,
+      project: deepKey.project,
+      filter: {
+        call_ids: [deepKey.callId],
+      },
+    }).then(data => {
       setCalls(data.calls.map(traceCallToSpanWithFeedback));
-    })
+    });
   }, [deepKey]);
   // return {
   //   loading: true,
@@ -168,10 +175,10 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         result: cachedCall,
       };
     }
-    
+
     let callResult = null;
     if (calls) {
-      callResult = calls[0] ;
+      callResult = calls[0];
     }
     const result = callResult
       ? spanToCallSchema(key.entity, key.project, callResult)
@@ -230,15 +237,18 @@ export const callsNode = (
   );
 };
 
-const traceCallToSpanWithFeedback = (call: TraceCallSchema): SpanWithFeedback => {
+const traceCallToSpanWithFeedback = (
+  call: TraceCallSchema
+): SpanWithFeedback => {
   // All these are weird conversions from the new data model to the way the UI expects it
-  const latency_s = call.end_time_s ? (call.end_time_s - call.start_time_s) : 0;
-  const summary =  call.summary ?? {}
-  summary.latency_s = latency_s
-  let status_code: string = call.status_code
-  if (status_code === "OK") 
-    {status_code = "SUCCESS"}
-  const start_time_ms =  call.start_time_s * 1000
+  const latencyS = call.end_time_s ? call.end_time_s - call.start_time_s : 0;
+  const summary = call.summary ?? {};
+  summary.latency_s = latencyS;
+  let status_code: string = call.status_code;
+  if (status_code === 'OK') {
+    status_code = 'SUCCESS';
+  }
+  const startTimeMs = call.start_time_s * 1000;
   return {
     name: call.name,
     inputs: call.inputs ?? {},
@@ -250,14 +260,15 @@ const traceCallToSpanWithFeedback = (call: TraceCallSchema): SpanWithFeedback =>
     span_id: call.id,
     trace_id: call.trace_id,
     parent_id: call.parent_id,
-    timestamp: start_time_ms,
-    start_time_ms,
+    timestamp: startTimeMs,
+    start_time_ms: startTimeMs,
     end_time_ms: (call.end_time_s ?? 0) * 1000,
-  }
-}
+  };
+};
 
-
-const traceObjToObjectVersionSchema = (obj: TraceObjSchema): ObjectVersionSchema => {
+const traceObjToObjectVersionSchema = (
+  obj: TraceObjSchema
+): ObjectVersionSchema => {
   return {
     entity: obj.entity,
     project: obj.project,
@@ -269,8 +280,8 @@ const traceObjToObjectVersionSchema = (obj: TraceObjSchema): ObjectVersionSchema
     typeName: obj.type_dict.type,
     category: typeNameToCategory(obj.type_dict.type),
     createdAtMs: obj.created_at_s * 1000,
-  }
-}
+  };
+};
 
 export const useCalls = (
   entity: string,
@@ -282,20 +293,20 @@ export const useCalls = (
   const deepFilter = useDeepMemo(filter);
   useEffect(() => {
     callsQuery({
-      "entity": entity,
-      "project": project,
-      "filter": {
-        "names": deepFilter.opVersionRefs,
-        "input_object_version_refs": deepFilter.inputObjectVersionRefs,
-        "output_object_version_refs": deepFilter.outputObjectVersionRefs,
-        "parent_ids": deepFilter.parentIds,
-        "trace_ids": deepFilter.traceId ? [deepFilter.traceId] : undefined,
-        "call_ids": deepFilter.callIds,
-        "trace_roots_only": deepFilter.traceRootsOnly,
-      }
-  }).then((data) => {
+      entity,
+      project,
+      filter: {
+        names: deepFilter.opVersionRefs,
+        input_object_version_refs: deepFilter.inputObjectVersionRefs,
+        output_object_version_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+      },
+    }).then(data => {
       setCalls(data.calls.map(traceCallToSpanWithFeedback));
-    })
+    });
   }, [deepFilter, entity, project]);
 
   return useMemo(() => {
@@ -377,21 +388,21 @@ export type OpVersionSchema = OpVersionKey & {
   // files: {path: string; content: string};
 };
 
-const artifactVersionNodeToOpVersionDictNode = (
-  artifactVersionNode: Node<'artifactVersion'>
-) => {
-  const versionIndexNode = opArtifactVersionVersionId({
-    artifactVersion: artifactVersionNode,
-  });
-  const createdAtNode = opArtifactVersionCreatedAt({
-    artifactVersion: artifactVersionNode,
-  });
-  return opDict({
-    missing: opIsNone({val: artifactVersionNode}),
-    versionIndex: versionIndexNode,
-    createdAtMs: createdAtNode,
-  } as any);
-};
+// const artifactVersionNodeToOpVersionDictNode = (
+//   artifactVersionNode: Node<'artifactVersion'>
+// ) => {
+//   const versionIndexNode = opArtifactVersionVersionId({
+//     artifactVersion: artifactVersionNode,
+//   });
+//   const createdAtNode = opArtifactVersionCreatedAt({
+//     artifactVersion: artifactVersionNode,
+//   });
+//   return opDict({
+//     missing: opIsNone({val: artifactVersionNode}),
+//     versionIndex: versionIndexNode,
+//     createdAtMs: createdAtNode,
+//   } as any);
+// };
 
 export const useOpVersion = (
   // Null value skips
@@ -400,60 +411,59 @@ export const useOpVersion = (
   return {
     loading: true,
     result: null,
-  }
+  };
 
-
-  const cachedOpVersion = key ? getOpVersionFromCache(key) : null;
-  const artifactVersionNode = opProjectArtifactVersion({
-    project: opRootProject({
-      entity: constString(key?.entity ?? ''),
-      project: constString(key?.project ?? ''),
-    }),
-    artifactName: constString(key?.opId ?? ''),
-    artifactVersionAlias: constString(key?.versionHash ?? ''),
-  });
-  const dataNode = artifactVersionNodeToOpVersionDictNode(
-    artifactVersionNode as any
-  );
-  const dataValue = useNodeValue(dataNode, {
-    skip: key == null || cachedOpVersion != null,
-  });
-  return useMemo(() => {
-    if (key == null) {
-      return {
-        loading: false,
-        result: null,
-      };
-    } else if (cachedOpVersion != null) {
-      return {
-        loading: false,
-        result: cachedOpVersion,
-      };
-    }
-    const result =
-      dataValue.result == null || dataValue.result.missing
-        ? null
-        : {
-            ...key,
-            versionIndex: dataValue.result.versionIndex as number,
-            category: opNameToCategory(key.opId as string),
-            createdAtMs: dataValue.result.createdAtMs as number,
-          };
-    if (dataValue.loading) {
-      return {
-        loading: true,
-        result,
-      };
-    } else {
-      if (result) {
-        setOpVersionInCache(key, result);
-      }
-      return {
-        loading: false,
-        result,
-      };
-    }
-  }, [cachedOpVersion, dataValue.loading, dataValue.result, key]);
+  // const cachedOpVersion = key ? getOpVersionFromCache(key) : null;
+  // const artifactVersionNode = opProjectArtifactVersion({
+  //   project: opRootProject({
+  //     entity: constString(key?.entity ?? ''),
+  //     project: constString(key?.project ?? ''),
+  //   }),
+  //   artifactName: constString(key?.opId ?? ''),
+  //   artifactVersionAlias: constString(key?.versionHash ?? ''),
+  // });
+  // const dataNode = artifactVersionNodeToOpVersionDictNode(
+  //   artifactVersionNode as any
+  // );
+  // const dataValue = useNodeValue(dataNode, {
+  //   skip: key == null || cachedOpVersion != null,
+  // });
+  // return useMemo(() => {
+  //   if (key == null) {
+  //     return {
+  //       loading: false,
+  //       result: null,
+  //     };
+  //   } else if (cachedOpVersion != null) {
+  //     return {
+  //       loading: false,
+  //       result: cachedOpVersion,
+  //     };
+  //   }
+  //   const result =
+  //     dataValue.result == null || dataValue.result.missing
+  //       ? null
+  //       : {
+  //           ...key,
+  //           versionIndex: dataValue.result.versionIndex as number,
+  //           category: opNameToCategory(key.opId as string),
+  //           createdAtMs: dataValue.result.createdAtMs as number,
+  //         };
+  //   if (dataValue.loading) {
+  //     return {
+  //       loading: true,
+  //       result,
+  //     };
+  //   } else {
+  //     if (result) {
+  //       setOpVersionInCache(key, result);
+  //     }
+  //     return {
+  //       loading: false,
+  //       result,
+  //     };
+  //   }
+  // }, [cachedOpVersion, dataValue.loading, dataValue.result, key]);
 };
 
 type OpVersionFilter = {
@@ -469,86 +479,86 @@ export const useOpVersionsNode = (
   filter: OpVersionFilter,
   opts?: {skip?: boolean}
 ): Node => {
-  return opArray({})
-  const projectNode = opRootProject({
-    entityName: constString(entity),
-    projectName: constString(project),
-  });
-  let artifactsNode = opArray({} as any);
+  return opArray({} as any);
+  // const projectNode = opRootProject({
+  //   entityName: constString(entity),
+  //   projectName: constString(project),
+  // });
+  // let artifactsNode = opArray({} as any);
 
-  if (filter.opIds == null) {
-    artifactsNode = opFlatten({
-      arr: opArtifactTypeArtifacts({
-        artifactType: opProjectArtifactTypes({
-          project: projectNode,
-        }),
-      }) as any,
-    });
-  } else {
-    artifactsNode = opArray(
-      _.fromPairs(
-        filter.opIds.map(opId => {
-          return [
-            opId,
-            opProjectArtifact({
-              project: projectNode,
-              artifactName: constString(opId),
-            }),
-          ];
-        })
-      ) as any
-    );
-  }
+  // if (filter.opIds == null) {
+  //   artifactsNode = opFlatten({
+  //     arr: opArtifactTypeArtifacts({
+  //       artifactType: opProjectArtifactTypes({
+  //         project: projectNode,
+  //       }),
+  //     }) as any,
+  //   });
+  // } else {
+  //   artifactsNode = opArray(
+  //     _.fromPairs(
+  //       filter.opIds.map(opId => {
+  //         return [
+  //           opId,
+  //           opProjectArtifact({
+  //             project: projectNode,
+  //             artifactName: constString(opId),
+  //           }),
+  //         ];
+  //       })
+  //     ) as any
+  //   );
+  // }
 
-  let artifactVersionsNode = opArray({} as any);
-  if (filter.latestOnly) {
-    artifactVersionsNode = opArtifactMembershipArtifactVersion({
-      artifactMembership: opArtifactLastMembership({
-        artifact: artifactsNode,
-      }),
-    }) as any;
-  } else {
-    artifactVersionsNode = opFlatten({
-      arr: opArtifactVersions({
-        artifact: artifactsNode,
-      }) as any,
-    });
-  }
+  // let artifactVersionsNode = opArray({} as any);
+  // if (filter.latestOnly) {
+  //   artifactVersionsNode = opArtifactMembershipArtifactVersion({
+  //     artifactMembership: opArtifactLastMembership({
+  //       artifact: artifactsNode,
+  //     }),
+  //   }) as any;
+  // } else {
+  //   artifactVersionsNode = opFlatten({
+  //     arr: opArtifactVersions({
+  //       artifact: artifactsNode,
+  //     }) as any,
+  //   });
+  // }
 
-  // Filter to only Weave Objects
-  const weaveObjectsNode = opFilter({
-    arr: artifactVersionsNode,
-    filterFn: constFunction({row: 'artifactVersion'}, ({row}) => {
-      return opAnd({
-        lhs: opArtifactVersionIsWeaveObject({artifactVersion: row}),
-        rhs: opStringEqual({
-          lhs: opPick({
-            obj: opArtifactVersionMetadata({
-              artifactVersion: row,
-            }),
-            key: constString('_weave_meta.type_name'),
-          }),
-          rhs: constString('OpDef'),
-        }),
-      });
-    }),
-  });
+  // // Filter to only Weave Objects
+  // const weaveObjectsNode = opFilter({
+  //   arr: artifactVersionsNode,
+  //   filterFn: constFunction({row: 'artifactVersion'}, ({row}) => {
+  //     return opAnd({
+  //       lhs: opArtifactVersionIsWeaveObject({artifactVersion: row}),
+  //       rhs: opStringEqual({
+  //         lhs: opPick({
+  //           obj: opArtifactVersionMetadata({
+  //             artifactVersion: row,
+  //           }),
+  //           key: constString('_weave_meta.type_name'),
+  //         }),
+  //         rhs: constString('OpDef'),
+  //       }),
+  //     });
+  //   }),
+  // });
 
-  // Build Keys
-  const dataNode = opMap({
-    arr: weaveObjectsNode,
-    mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
-      return opDict({
-        opId: opArtifactName({
-          artifact: opArtifactVersionArtifactSequence({artifactVersion: row}),
-        }),
-        versionHash: opArtifactVersionHash({artifactVersion: row}),
-        dataDict: artifactVersionNodeToOpVersionDictNode(row as any),
-      } as any);
-    }),
-  });
+  // // Build Keys
+  // const dataNode = opMap({
+  //   arr: weaveObjectsNode,
+  //   mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
+  //     return opDict({
+  //       opId: opArtifactName({
+  //         artifact: opArtifactVersionArtifactSequence({artifactVersion: row}),
+  //       }),
+  //       versionHash: opArtifactVersionHash({artifactVersion: row}),
+  //       dataDict: artifactVersionNodeToOpVersionDictNode(row as any),
+  //     } as any);
+  //   }),
+  // });
 
-  return dataNode;
+  // return dataNode;
 };
 
 export const useOpVersions = (
@@ -560,67 +570,67 @@ export const useOpVersions = (
   return {
     loading: true,
     result: [],
-  }
-  const dataNode = useOpVersionsNode(entity, project, filter);
+  };
+  // const dataNode = useOpVersionsNode(entity, project, filter);
 
-  const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
+  // const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
-  return useMemo(() => {
-    if (opts?.skip) {
-      return {
-        loading: false,
-        result: [],
-      };
-    }
-    const result = (dataValue.result ?? [])
-      .map((row: any) => ({
-        entity,
-        project,
-        opId: row.opId as string,
-        versionHash: row.versionHash as string,
-        path: 'obj',
-        refExtra: null,
-        versionIndex: row.dataDict.versionIndex as number,
-        typeName: row.dataDict.typeName as string,
-        category: opNameToCategory(row.opId as string),
-        createdAtMs: row.dataDict.createdAtMs as number,
-      }))
-      .filter((row: any) => {
-        return (
-          filter.category == null || filter.category.includes(row.category)
-        );
-      }) as OpVersionSchema[];
+  // return useMemo(() => {
+  //   if (opts?.skip) {
+  //     return {
+  //       loading: false,
+  //       result: [],
+  //     };
+  //   }
+  //   const result = (dataValue.result ?? [])
+  //     .map((row: any) => ({
+  //       entity,
+  //       project,
+  //       opId: row.opId as string,
+  //       versionHash: row.versionHash as string,
+  //       path: 'obj',
+  //       refExtra: null,
+  //       versionIndex: row.dataDict.versionIndex as number,
+  //       typeName: row.dataDict.typeName as string,
+  //       category: opNameToCategory(row.opId as string),
+  //       createdAtMs: row.dataDict.createdAtMs as number,
+  //     }))
+  //     .filter((row: any) => {
+  //       return (
+  //         filter.category == null || filter.category.includes(row.category)
+  //       );
+  //     }) as OpVersionSchema[];
 
-    if (dataValue.loading) {
-      return {
-        loading: true,
-        result,
-      };
-    } else {
-      result.forEach(op => {
-        setOpVersionInCache(
-          {
-            entity,
-            project,
-            opId: op.opId,
-            versionHash: op.versionHash,
-          },
-          op
-        );
-      });
-      return {
-        loading: false,
-        result,
-      };
-    }
-  }, [
-    dataValue.loading,
-    dataValue.result,
-    entity,
-    filter.category,
-    opts?.skip,
-    project,
-  ]);
+  //   if (dataValue.loading) {
+  //     return {
+  //       loading: true,
+  //       result,
+  //     };
+  //   } else {
+  //     result.forEach(op => {
+  //       setOpVersionInCache(
+  //         {
+  //           entity,
+  //           project,
+  //           opId: op.opId,
+  //           versionHash: op.versionHash,
+  //         },
+  //         op
+  //       );
+  //     });
+  //     return {
+  //       loading: false,
+  //       result,
+  //     };
+  //   }
+  // }, [
+  //   dataValue.loading,
+  //   dataValue.result,
+  //   entity,
+  //   filter.category,
+  //   opts?.skip,
+  //   project,
+  // ]);
 };
 
 type ObjectVersionKey = {
@@ -647,9 +657,9 @@ export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
 };
 
 export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
-  return `${TRACE_REF_PREFIX}${key.entity}/${key.project}/obj/${
-    key.objectId
-  }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
+  return `${TRACE_REF_PREFIX}${key.entity}/${key.project}/obj/${key.objectId}:${
+    key.versionHash
+  }/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
   // return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${
   //   key.objectId
   // }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
@@ -681,29 +691,29 @@ const opNameToCategory = (opName: string): OpCategory | null => {
   return null;
 };
 
-const artifactVersionNodeToObjectVersionDictNode = (
-  artifactVersionNode: Node<'artifactVersion'>
-) => {
-  const versionIndexNode = opArtifactVersionVersionId({
-    artifactVersion: artifactVersionNode,
-  });
-  const metadataNode = opArtifactVersionMetadata({
-    artifactVersion: artifactVersionNode,
-  });
-  const typeNameNode = opPick({
-    obj: metadataNode,
-    key: constString('_weave_meta.type_name'),
-  });
-  const createdAtNode = opArtifactVersionCreatedAt({
-    artifactVersion: artifactVersionNode,
-  });
-  return opDict({
-    missing: opIsNone({val: artifactVersionNode}),
-    typeName: typeNameNode,
-    versionIndex: versionIndexNode,
-    createdAtMs: createdAtNode,
-  } as any);
-};
+// const artifactVersionNodeToObjectVersionDictNode = (
+//   artifactVersionNode: Node<'artifactVersion'>
+// ) => {
+//   const versionIndexNode = opArtifactVersionVersionId({
+//     artifactVersion: artifactVersionNode,
+//   });
+//   const metadataNode = opArtifactVersionMetadata({
+//     artifactVersion: artifactVersionNode,
+//   });
+//   const typeNameNode = opPick({
+//     obj: metadataNode,
+//     key: constString('_weave_meta.type_name'),
+//   });
+//   const createdAtNode = opArtifactVersionCreatedAt({
+//     artifactVersion: artifactVersionNode,
+//   });
+//   return opDict({
+//     missing: opIsNone({val: artifactVersionNode}),
+//     typeName: typeNameNode,
+//     versionIndex: versionIndexNode,
+//     createdAtMs: createdAtNode,
+//   } as any);
+// };
 
 export const useObjectVersion = (
   // Null value skips
@@ -725,7 +735,7 @@ export const useObjectVersion = (
   //   skip: key == null || cachedObjectVersion != null,
   // });
 
-  const [dataValue, setDataValue] = useState<ObjectVersionSchema | null>(null)
+  const [dataValue, setDataValue] = useState<ObjectVersionSchema | null>(null);
   const deepKey = useDeepMemo(key);
   // TODO: Filter out files when not needed!
 
@@ -734,13 +744,13 @@ export const useObjectVersion = (
       return;
     }
     objectsRead({
-      "entity": deepKey.entity,
-      "project": deepKey.project,
-      "name": deepKey.objectId,
-      "version_hash": deepKey.versionHash
-  }).then((data) => {
-    setDataValue(traceObjToObjectVersionSchema(data.obj));
-    })
+      entity: deepKey.entity,
+      project: deepKey.project,
+      name: deepKey.objectId,
+      version_hash: deepKey.versionHash,
+    }).then(data => {
+      setDataValue(traceObjToObjectVersionSchema(data.obj));
+    });
   }, [deepKey]);
 
   return useMemo(() => {
@@ -757,8 +767,8 @@ export const useObjectVersion = (
       };
     }
     const loading = dataValue == null;
-    const result = dataValue
-      
+    const result = dataValue;
+
     if (loading) {
       return {
         loading: true,
@@ -789,75 +799,75 @@ export const useRootObjectVersionsNode = (
   filter: ObjectVersionFilter,
   opts?: {skip?: boolean}
 ): Node => {
-  return opArray({})
-  const projectNode = opRootProject({
-    entityName: constString(entity),
-    projectName: constString(project),
-  });
-  let artifactsNode = opArray({} as any);
+  return opArray({} as any);
+  // const projectNode = opRootProject({
+  //   entityName: constString(entity),
+  //   projectName: constString(project),
+  // });
+  // let artifactsNode = opArray({} as any);
 
-  if (filter.objectIds == null) {
-    artifactsNode = opFlatten({
-      arr: opArtifactTypeArtifacts({
-        artifactType: opProjectArtifactTypes({
-          project: projectNode,
-        }),
-      }) as any,
-    });
-  } else {
-    artifactsNode = opArray(
-      _.fromPairs(
-        filter.objectIds.map(objId => {
-          return [
-            objId,
-            opProjectArtifact({
-              project: projectNode,
-              artifactName: constString(objId),
-            }),
-          ];
-        })
-      ) as any
-    );
-  }
+  // if (filter.objectIds == null) {
+  //   artifactsNode = opFlatten({
+  //     arr: opArtifactTypeArtifacts({
+  //       artifactType: opProjectArtifactTypes({
+  //         project: projectNode,
+  //       }),
+  //     }) as any,
+  //   });
+  // } else {
+  //   artifactsNode = opArray(
+  //     _.fromPairs(
+  //       filter.objectIds.map(objId => {
+  //         return [
+  //           objId,
+  //           opProjectArtifact({
+  //             project: projectNode,
+  //             artifactName: constString(objId),
+  //           }),
+  //         ];
+  //       })
+  //     ) as any
+  //   );
+  // }
 
-  let artifactVersionsNode = opArray({} as any);
-  if (filter.latestOnly) {
-    artifactVersionsNode = opArtifactMembershipArtifactVersion({
-      artifactMembership: opArtifactLastMembership({
-        artifact: artifactsNode,
-      }),
-    }) as any;
-  } else {
-    artifactVersionsNode = opFlatten({
-      arr: opArtifactVersions({
-        artifact: artifactsNode,
-      }) as any,
-    });
-  }
+  // let artifactVersionsNode = opArray({} as any);
+  // if (filter.latestOnly) {
+  //   artifactVersionsNode = opArtifactMembershipArtifactVersion({
+  //     artifactMembership: opArtifactLastMembership({
+  //       artifact: artifactsNode,
+  //     }),
+  //   }) as any;
+  // } else {
+  //   artifactVersionsNode = opFlatten({
+  //     arr: opArtifactVersions({
+  //       artifact: artifactsNode,
+  //     }) as any,
+  //   });
+  // }
 
-  // Filter to only Weave Objects
-  const weaveObjectsNode = opFilter({
-    arr: artifactVersionsNode,
-    filterFn: constFunction({row: 'artifactVersion'}, ({row}) => {
-      return opArtifactVersionIsWeaveObject({artifactVersion: row});
-    }),
-  });
+  // // Filter to only Weave Objects
+  // const weaveObjectsNode = opFilter({
+  //   arr: artifactVersionsNode,
+  //   filterFn: constFunction({row: 'artifactVersion'}, ({row}) => {
+  //     return opArtifactVersionIsWeaveObject({artifactVersion: row});
+  //   }),
+  // });
 
-  // Build Keys
-  const dataNode = opMap({
-    arr: weaveObjectsNode,
-    mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
-      return opDict({
-        objectId: opArtifactName({
-          artifact: opArtifactVersionArtifactSequence({artifactVersion: row}),
-        }),
-        versionHash: opArtifactVersionHash({artifactVersion: row}),
-        dataDict: artifactVersionNodeToObjectVersionDictNode(row as any),
-      } as any);
-    }),
-  });
+  // // Build Keys
+  // const dataNode = opMap({
+  //   arr: weaveObjectsNode,
+  //   mapFn: constFunction({row: 'artifactVersion'}, ({row}) => {
+  //     return opDict({
+  //       objectId: opArtifactName({
+  //         artifact: opArtifactVersionArtifactSequence({artifactVersion: row}),
+  //       }),
+  //       versionHash: opArtifactVersionHash({artifactVersion: row}),
+  //       dataDict: artifactVersionNodeToObjectVersionDictNode(row as any),
+  //     } as any);
+  //   }),
+  // });
 
-  return dataNode;
+  // return dataNode;
 };
 
 export const useRootObjectVersions = (
@@ -869,20 +879,21 @@ export const useRootObjectVersions = (
   // const dataNode = useRootObjectVersionsNode(entity, project, filter);
   // const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
-  const [dataValue, setDataValue] = useState<ObjectVersionSchema[] | null>(null)
+  const [dataValue, setDataValue] = useState<ObjectVersionSchema[] | null>(
+    null
+  );
 
   // TODO: Filter out files when not needed!
 
   useEffect(() => {
     objectsQuery({
-      "entity": entity,
-      "project": project,
+      entity,
+      project,
       // "filter": {}
-  }).then((data) => {
-    setDataValue(data.objs.map(traceObjToObjectVersionSchema));
-    })
+    }).then(data => {
+      setDataValue(data.objs.map(traceObjToObjectVersionSchema));
+    });
   }, [entity, project]);
-
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -891,14 +902,9 @@ export const useRootObjectVersions = (
         result: [],
       };
     }
-    const result = (dataValue ?? [])
-      
-      .filter((row: any) => {
-        return (
-          filter.category == null || filter.category.includes(row.category)
-        );
-      })
-      
+    const result = (dataValue ?? []).filter((row: any) => {
+      return filter.category == null || filter.category.includes(row.category);
+    });
 
     if (dataValue == null) {
       return {
@@ -932,7 +938,7 @@ type WFNaiveRefDict = {
   project: string;
   artifactName: string;
   versionCommitHash: string;
-  traceNoun?: string
+  traceNoun?: string;
   filePathParts: string[];
   refExtraTuples: Array<{
     edgeType: string;
@@ -947,7 +953,8 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
     return wandbTraceRefStringToRefDict(uri);
   } else {
     throw new Error('Invalid uri: ' + uri);
-  }}
+  }
+};
 const wandbArtifactRefStringToRefDict = (uri: string): WFNaiveRefDict => {
   const scheme = TRACE_REF_PREFIX;
   if (!uri.startsWith(scheme)) {
@@ -1009,10 +1016,8 @@ const wandbTraceRefStringToRefDict = (uri: string): WFNaiveRefDict => {
       });
     }
   }
-  const [entity, project, traceNoun, artifactNameAndVersion, filePath] = uriParts.split(
-    '/',
-    5
-  );
+  const [entity, project, traceNoun, artifactNameAndVersion, filePath] =
+    uriParts.split('/', 5);
   const [artifactName, versionCommitHash] = artifactNameAndVersion.split(':');
   const filePathParts = filePath?.split('/') ?? [];
 
@@ -1048,22 +1053,22 @@ const setCallInCache = (key: CallKey, value: CallSchema) => {
   callCache.set(callCacheKeyFn(key), value);
 };
 
-const opVersionCache = new LRUCache<string, OpVersionSchema>({
-  max: CACHE_SIZE,
-  updateAgeOnGet: true,
-});
+// const opVersionCache = new LRUCache<string, OpVersionSchema>({
+//   max: CACHE_SIZE,
+//   updateAgeOnGet: true,
+// });
 
-const opVersionCacheKeyFn = (key: OpVersionKey) => {
-  return `op:${key.entity}/${key.project}/${key.opId}/${key.versionHash}`;
-};
+// const opVersionCacheKeyFn = (key: OpVersionKey) => {
+//   return `op:${key.entity}/${key.project}/${key.opId}/${key.versionHash}`;
+// };
 
-const getOpVersionFromCache = (key: OpVersionKey) => {
-  return opVersionCache.get(opVersionCacheKeyFn(key));
-};
+// const getOpVersionFromCache = (key: OpVersionKey) => {
+//   return opVersionCache.get(opVersionCacheKeyFn(key));
+// };
 
-const setOpVersionInCache = (key: OpVersionKey, value: OpVersionSchema) => {
-  opVersionCache.set(opVersionCacheKeyFn(key), value);
-};
+// const setOpVersionInCache = (key: OpVersionKey, value: OpVersionSchema) => {
+//   opVersionCache.set(opVersionCacheKeyFn(key), value);
+// };
 
 const objectVersionCache = new LRUCache<string, ObjectVersionSchema>({
   max: CACHE_SIZE,
