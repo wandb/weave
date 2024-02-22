@@ -159,6 +159,7 @@ def refs_to_str(val: typing.Any) -> typing.Any:
     else:
         return val
 
+
 # `wandb-trace:///[entity]/[project]/call/[ID]`
 # `wandb-trace:///[entity]/[project]/op/[name]:[CONTENT_HASH]`
 # `wandb-trace:///[entity]/[project]/obj/[name]:[CONTENT_HASH]/[PATH]#[EXTRA]`
@@ -366,6 +367,10 @@ class TraceNounRef(ref_base.Ref):
             data = wb_type.load_instance(art, "obj")
             return data
         elif self._trace_noun == "obj":
+            if self._path != ["obj"] or self._extra:
+                raise NotImplementedError(
+                    "Non trivial path not implemented yet", self._path, self._extra
+                )
             res = gc.trace_server.obj_read(
                 tsi.ObjReadReq(
                     entity=self._entity,
@@ -579,7 +584,9 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         art = MemTraceFilesArtifact(
             self.entity, self.project, name, "_VERSION_PENDING_"
         )
-        ref: ref_base.Ref = art.set("obj", weave_type, obj)
+        obj_name = "obj"
+        path: typing.Optional[typing.List[str]] = [obj_name]
+        ref: ref_base.Ref = art.set(obj_name, weave_type, obj)
 
         encoded_path_contents = encode_bytes_as_b64(
             {
@@ -600,6 +607,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         if isinstance(obj, OpDef):
             trace_noun = "op"
             self.trace_server.op_create(tsi.OpCreateReq(op_obj=partial_obj))
+            path = None
         else:
             trace_noun = "obj"
             self.trace_server.obj_create(tsi.ObjCreateReq(obj=partial_obj))
@@ -612,7 +620,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             trace_noun=trace_noun,
             name=name,
             version=version_hash,
-            path=None,
+            path=path,
             extra=None,
             obj=obj,
             type=weave_type,
@@ -635,7 +643,6 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         else:
             trace_id = generate_id()
             parent_id = None
-
 
         start = tsi.StartedCallSchemaForInsert(
             entity=self.entity,

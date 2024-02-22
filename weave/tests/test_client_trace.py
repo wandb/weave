@@ -33,7 +33,7 @@ def test_simple_op(trace_client):
         exception=None,
         attributes={},
         inputs={"a": 5, "_keys": ["a"]},
-        outputs={"_result": 6},
+        outputs={"_result": 6, "_keys": ["_result"]},
         summary={},
     )
 
@@ -93,8 +93,8 @@ def test_trace_server_call_start(clickhouse_trace_server):
             end.end_datetime.isoformat(timespec="milliseconds")
         ).replace(tzinfo=None),
         "exception": None,
-        "attributes": {"a": 5},
-        "inputs": {"b": 5},
-        "outputs": {"d": 5},
-        "summary": {"c": 5},
+        "attributes": {"_keys": ["a"], "a": 5},
+        "inputs": {"_keys": ["b"], "b": 5},
+        "outputs": {"_keys": ["d"], "d": 5},
+        "summary": {"_keys": ["c"], "c": 5},
     }

@@ -774,9 +774,9 @@ def _dict_value_to_dump(
     value: dict,
 ) -> str:
     cpy = value.copy()
-    if "_keys" not in cpy:
+    if cpy:
         keys = list(cpy.keys())
-        cpy['_keys'] = keys
+        cpy["_keys"] = keys
     return json.dumps(cpy)
 
 
