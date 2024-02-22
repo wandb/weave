@@ -1,4 +1,4 @@
-import {styled} from '@mui/material/styles';
+import {styled, Theme} from '@mui/material/styles';
 import {DataGridPro} from '@mui/x-data-grid-pro';
 import {gridClasses} from '@mui/x-data-grid-pro';
 
@@ -19,34 +19,34 @@ const backgroundColorHoveredSelected = Color.fromHex(WHITE)
   .blend(Color.fromHex(OBLIVION, 0.04))
   .toString();
 
-export const StyledDataGrid = styled(DataGridPro)(({theme}) => ({
-  borderRight: 0,
-  borderLeft: 0,
-  borderBottom: 0,
+export const StyledDataGrid = styled(DataGridPro)(
+  ({theme, keepBorders}: {theme?: Theme; keepBorders: boolean}) => ({
+    ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
 
-  '& .MuiDataGrid-columnHeaders': {
-    backgroundColor: MOON_50,
-    color: '#979a9e',
-  },
-
-  '& .MuiDataGrid-pinnedColumnHeaders': {
-    backgroundColor: MOON_50,
-    color: '#979a9e',
-  },
-
-  '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
-    outline: 'none',
-  },
-
-  [`& .${gridClasses.row}`]: {
-    '&.Mui-hovered': {
-      backgroundColor: backgroundColorHovered,
+    '& .MuiDataGrid-columnHeaders': {
+      backgroundColor: MOON_50,
+      color: '#979a9e',
     },
-    '&.Mui-selected': {
-      backgroundColor: backgroundColorSelected,
+
+    '& .MuiDataGrid-pinnedColumnHeaders': {
+      backgroundColor: MOON_50,
+      color: '#979a9e',
+    },
+
+    '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {
+      outline: 'none',
+    },
+
+    [`& .${gridClasses.row}`]: {
       '&.Mui-hovered': {
-        backgroundColor: backgroundColorHoveredSelected,
+        backgroundColor: backgroundColorHovered,
+      },
+      '&.Mui-selected': {
+        backgroundColor: backgroundColorSelected,
+        '&.Mui-hovered': {
+          backgroundColor: backgroundColorHoveredSelected,
+        },
       },
     },
-  },
-}));
+  })
+);
