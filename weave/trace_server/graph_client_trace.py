@@ -471,20 +471,28 @@ class TraceNounRef(ref_base.Ref):
 
 
 class CallSchemaRun(Run):
-    entity: str
-    project: str
-    id: str
-    trace_id: str
+    _entity: str
+    _project: str
+    _call_id: str
+    _trace_id: str
 
-    def __init__(self, entity: str, project: str, id: str, trace_id: str):
-        self.entity = entity
-        self.project = project
-        self.id = id
-        self.trace_id = trace_id
+    def __init__(self, entity: str, project: str, call_id: str, trace_id: str):
+        self._entity = entity
+        self._project = project
+        self._call_id = call_id
+        self._trace_id = trace_id
+
+    @property
+    def id(self) -> str:
+        return self._call_id
+
+    @property
+    def trace_id(self) -> str:
+        return self._trace_id
 
     @property
     def ui_url(self) -> str:
-        return urls.call_path_as_peek(self.entity, self.project, self.id)
+        return urls.call_path_as_peek(self._entity, self._project, self._call_id)
 
 
 @dataclasses.dataclass
