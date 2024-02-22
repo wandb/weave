@@ -41,7 +41,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.BaseModel:
         if isinstance(req, dict):
             req = req_model.parse_obj(req)
-        r = requests.post(self.trace_server_url + url, data=json.dumps(req.dict()))
+        r = requests.post(self.trace_server_url + url, data=req.model_dump())
         r.raise_for_status()
         return res_model.parse_obj(r.json())
 
