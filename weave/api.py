@@ -176,6 +176,10 @@ def local_client() -> typing.Iterator[_graph_client.GraphClient]:
         inited_client.reset()
 
 
+def init_trace_client(project_name: str) -> _graph_client.GraphClient:
+    return _weave_init.init_trace_remote(project_name).client
+
+
 def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
     """Save and version a python object.
 

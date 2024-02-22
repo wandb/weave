@@ -187,12 +187,18 @@ class RefJSONEncoder(json.JSONEncoder):
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
     def default(self, o):
+        from .trace_server.graph_client_trace import TraceRef
+
+        ref_code = None
         if isinstance(o, artifact_fs.FilesystemArtifactRef):
             if o.serialize_as_path_ref:
                 ref_code = f"weave.storage.artifact_path_ref('{o.local_ref_str()}')"
             else:
                 ref_code = f"weave.ref('{str(o)}')"
+        elif isinstance(o, TraceRef):
+            ref_code = f"weave.ref('{str(o)}')"
 
+        if ref_code is not None:
             # This will be a quoted json string in the json.dumps result. We put special
             # tokens in so we can remove the quotes in the final result
             return f"{self.SPECIAL_REF_TOKEN}{ref_code}.get(){self.SPECIAL_REF_TOKEN}"

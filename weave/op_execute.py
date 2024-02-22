@@ -122,7 +122,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
             client.finish_run(run, output, output_refs)
             if not parent_run:
-                print("🍩 View call:", run.ui_url)
+                print("🍩 View trace:", run.ui_url)
             res = _deref_all(output)
 
     else:
