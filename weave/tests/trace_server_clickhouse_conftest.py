@@ -67,10 +67,10 @@ def _check_server_health(
     return False
 
 
-def _check_server_up(host="localhost", port=18123) -> typing.Tuple[str, int, bool]:
+def _check_server_up(host="0.0.0.0", port=18123) -> typing.Tuple[str, int, bool]:
     base_port = 18123
     base_url = f"http://{host}:{port}/"
-    endpoint = "/"
+    endpoint = "/ping"
 
     def server_healthy(num_retries=1):
         return _check_server_health(
@@ -101,4 +101,5 @@ def _check_server_up(host="localhost", port=18123) -> typing.Tuple[str, int, boo
     if server_healthy(num_retries=30):
         return (host, port, True)
     else:
+        print("Failed to start clickhouse server. Exiting." + base_url)
         return (host, port, False)
