@@ -125,6 +125,7 @@ export {
   IconPanel,
   IconPanTool,
   IconPanTool1,
+  IconParentBackUp,
   IconPause,
   IconPaused,
   IconPencilEdit,
