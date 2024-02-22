@@ -20,7 +20,7 @@ const backgroundColorHoveredSelected = Color.fromHex(WHITE)
   .toString();
 
 export const StyledDataGrid = styled(DataGridPro)(
-  ({theme, keepBorders}: {theme?: Theme; keepBorders: boolean}) => ({
+  ({theme, keepBorders}: {theme?: Theme; keepBorders?: boolean}) => ({
     ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
 
     '& .MuiDataGrid-columnHeaders': {
