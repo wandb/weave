@@ -74,10 +74,7 @@ if engine_trace.datadog_is_enabled():
     # patch all libraries to datadog except logging
     ddtrace.patch_all(logging=False)
     
-    if environment.disable_weave_pii():
-        os.environ["DD_LOGS_INJECTION"] = False
-        ddtrace.config.logs_injection = False
-    else: 
+    if not environment.disable_weave_pii():
         ddtrace.patch(logging=True)
 
     custom_dd_patch()
