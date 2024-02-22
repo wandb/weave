@@ -92,6 +92,6 @@ def init_trace_remote(
     # autopatching is only supporte for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this autopatch call can be
     # moved to InitializedClient.__init__
-    # autopatch.autopatch()
+    autopatch.autopatch()
 
     return init_client

@@ -114,11 +114,10 @@ def patch() -> None:
     def _patch() -> None:
         unpatch_fqn = f"{unpatch.__module__}.{unpatch.__qualname__}()"
 
-        if _get_global_monitor() is not None:
-            # info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
-
-            gc = graph_client_context.require_graph_client()
-
+        gc = graph_client_context.require_graph_client()
+        if gc not None:
+            info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
+            
             hooks = ChatCompletions(old_create)
             async_hooks = AsyncChatCompletions(old_async_create)
             openai.resources.chat.completions.Completions.create = (
@@ -127,6 +126,8 @@ def patch() -> None:
             openai.resources.chat.completions.AsyncCompletions.create = (
                 partialmethod_with_self(async_hooks.create)
             )
+        else:
+            error("No graph client found, not patching OpenAI completions")
 
     if version.parse(openai.__version__) < version.parse("1.0.0"):
         error(
@@ -143,10 +144,10 @@ def patch() -> None:
 
 
 def unpatch() -> None:
-    if _get_global_monitor() is not None:
-        info("Unpatching OpenAI completions")
-        openai.resources.chat.completions.Completions.create = old_create
-        openai.resources.chat.completions.AsyncCompletions.create = old_async_create
+    # if _get_global_monitor() is not None:
+    info("Unpatching OpenAI completions")
+    openai.resources.chat.completions.Completions.create = old_create
+    openai.resources.chat.completions.AsyncCompletions.create = old_async_create
 
 
 # TODO: centralize
