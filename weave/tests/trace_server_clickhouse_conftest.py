@@ -19,7 +19,8 @@ from ..trace_server import (
 
 @pytest.fixture(scope="session")
 def clickhouse_server():
-    (host, port, server_up) = _check_server_up()
+    host = os.environ.get("TEST_CH_SERVER_HOST", "localhost")
+    (host, port, server_up) = _check_server_up(host)
     if not server_up:
         pytest.fail("clickhouse server is not running")
     yield (host, port)
