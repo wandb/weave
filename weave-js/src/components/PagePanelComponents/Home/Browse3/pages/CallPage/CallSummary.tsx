@@ -1,25 +1,15 @@
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import React from 'react';
 
 import {Timestamp} from '../../../../../Timestamp';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
-import {GroupedCalls} from '../ObjectVersionPage';
-import {CallSchema, useCalls} from '../wfReactInterface/interface';
+import {CallSchema} from '../wfReactInterface/interface';
 
 export const CallSummary: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
   const span = call.rawSpan;
-  const childCalls = useCalls(call.entity, call.project, {
-    parentIds: [call.callId],
-  });
-  const safeChildCalls = useMemo(() => {
-    if (childCalls.loading) {
-      return [];
-    }
-    return (childCalls.result ?? []).filter(c => c.opVersionRef != null);
-  }, [childCalls.loading, childCalls.result]);
   const attributes = _.fromPairs(
     Object.entries(span.attributes ?? {}).filter(
       ([k, a]) => !k.startsWith('_') && a != null
@@ -51,18 +41,6 @@ export const CallSummary: React.FC<{
               }
             : {}),
           ...(span.exception ? {Exception: span.exception} : {}),
-          ...((safeChildCalls.length ?? 0) > 0
-            ? {
-                'Child Calls': (
-                  <GroupedCalls
-                    calls={safeChildCalls}
-                    partialFilter={{
-                      parentId: call.callId,
-                    }}
-                  />
-                ),
-              }
-            : {}),
           ...(Object.keys(attributes).length > 0
             ? {Attributes: attributes}
             : {}),
