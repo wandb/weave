@@ -803,7 +803,6 @@ def extract_refs_from_values(
         for val in vals:
             if isinstance(val, str) and val.startswith("wandb-trace://"):
                 refs.append(val)
-    print(refs)
     return refs
 
 

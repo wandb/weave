@@ -1,5 +1,6 @@
 import json
 import typing as t
+from pydantic import BaseModel
 import requests
 
 
@@ -9,11 +10,22 @@ from . import trace_server_interface as tsi
 MAX_FLUSH_COUNT = 100
 MAX_FLUSH_AGE = 5
 
+class StartBatchItem(BaseModel):
+    mode: str = "start"
+    req: tsi.CallStartReq
+
+class EndBatchItem(BaseModel):
+    mode: str = "end"
+    req: tsi.CallEndReq
+
+class Batch(BaseModel):
+    batch: t.List[t.Union[StartBatchItem, EndBatchItem]]
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
 
-    def __init__(self, trace_server_url: str, should_batch: bool = True):
+    # My current batching is not safe in notebooks, disable it for now
+    def __init__(self, trace_server_url: str, should_batch: bool = False):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
@@ -22,42 +34,45 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_calls
             )
 
-    def _flush_calls(self, to_flush: t.List) -> None:
-        if len(to_flush) == 0:
+    def _flush_calls(self, batch: t.List) -> None:
+        if len(batch) == 0:
             return
-
+        data = Batch(batch).model_dump_json()
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
-            data=json.dumps({"batch": to_flush}),
+            data=data,
         )
         r.raise_for_status()
 
     def _generic_request(
         self,
         url: str,
-        req: tsi.BaseModel,
-        req_model: t.Type[tsi.BaseModel],
-        res_model: t.Type[tsi.BaseModel],
-    ) -> tsi.BaseModel:
+        req: BaseModel,
+        req_model: t.Type[BaseModel],
+        res_model: t.Type[BaseModel],
+    ) -> BaseModel:
         if isinstance(req, dict):
-            req = req_model.parse_obj(req)
-        r = requests.post(self.trace_server_url + url, data=req.model_dump())
+            req = req_model.model_validate(req)
+        r = requests.post(self.trace_server_url + url, data=req.model_dump_json())
         r.raise_for_status()
-        return res_model.parse_obj(r.json())
+        return res_model.model_validate(r.json())
 
     # Call API
     def call_start(
         self, req: t.Union[tsi.CallStartReq, t.Dict[str, t.Any]]
     ) -> tsi.CallStartRes:
         if self.should_batch:
-            req_as_obj: tsi.CallEndReq
+            req_as_obj: tsi.CallStartReq
             if isinstance(req, dict):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
             else:
                 req_as_obj = req
-            req_as_dict = req_as_obj.model_dump()
-            self.call_buffer.insert({"mode": "start", "req": req_as_dict})
-            return tsi.CallStartRes()
+            if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
+                raise ValueError("CallStartReq must have id and trace_id when batching.")
+            self.call_buffer.insert(StartBatchItem(req=req_as_obj))
+            return tsi.CallStartRes(
+                id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
+            )
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
         )
@@ -71,8 +86,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.CallEndReq.model_validate(req)
             else:
                 req_as_obj = req
-            req_as_dict = req_as_obj.model_dump()
-            self.call_buffer.insert({"mode": "end", "req": req_as_dict})
+            self.call_buffer.insert(EndBatchItem(req=req_as_obj))
             return tsi.CallEndRes()
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
