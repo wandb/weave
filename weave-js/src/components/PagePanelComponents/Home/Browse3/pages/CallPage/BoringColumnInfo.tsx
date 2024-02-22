@@ -77,6 +77,9 @@ export const BoringColumnInfo = ({
         }
 
         const col = columns.find((c: any) => c.field === colName);
+        if (!col) {
+          return null;
+        }
 
         let label = col.field;
         if (!label.includes('.') && col.headerName) {
