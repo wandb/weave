@@ -1,11 +1,3 @@
-# Needs to be kept in sync with core/services/weave-clickhouse/src/api/interface.py
-
-"""
-To Implement:
-* [ ] General Purpose Pagination
-* [ ] General Purpose Column Selection
-* [ ] Category Filtering
-"""
 import abc
 import datetime
 import typing
@@ -139,7 +131,6 @@ class CallReadReq(BaseModel):
     entity: str
     project: str
     id: str
-    columns: typing.Optional[typing.List[str]] = None
 
 
 class CallReadRes(BaseModel):
@@ -147,6 +138,7 @@ class CallReadRes(BaseModel):
 
 
 class _CallsFilter(BaseModel):
+    # op_categories: typing.Optional[typing.List[str]] = None
     op_version_refs: typing.Optional[typing.List[str]] = None
     input_object_version_refs: typing.Optional[typing.List[str]] = None
     output_object_version_refs: typing.Optional[typing.List[str]] = None
@@ -154,22 +146,12 @@ class _CallsFilter(BaseModel):
     trace_ids: typing.Optional[typing.List[str]] = None
     call_ids: typing.Optional[typing.List[str]] = None
     trace_roots_only: typing.Optional[bool] = None
-    # op_category: typing.Optional[typing.List[str]] = None
 
 
 class CallsQueryReq(BaseModel):
     entity: str
     project: str
     filter: typing.Optional[_CallsFilter] = None
-    # columns: typing.Optional[typing.List[str]] = None
-    # order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None
-    # Pagination
-    # Poorman's implementation of pagination ... probably
-    # should make something more sophisticated here since limit/offset
-    # will not work well with high velocity data... need to provide
-    # a way to avoid this (probably an "after" cursor or something like that)
-    # offset: typing.Optional[int] = None
-    # limit: typing.Optional[int] = None
 
 
 class CallQueryRes(BaseModel):
@@ -196,7 +178,7 @@ class OpReadRes(BaseModel):
 
 
 class _OpVersionFilter(BaseModel):
-    # category: typing.Optional[str] = None
+    # op_categories: typing.Optional[typing.List[str]] = None
     op_names: typing.Optional[typing.List[str]] = None
     latest_only: typing.Optional[bool] = None
 
@@ -231,7 +213,7 @@ class ObjReadRes(BaseModel):
 
 
 class _ObjectVersionFilter(BaseModel):
-    # category: typing.Optional[str] = None
+    # object_categories: typing.Optional[typing.List[str]] = None
     object_names: typing.Optional[typing.List[str]] = None
     latest_only: typing.Optional[bool] = None
 

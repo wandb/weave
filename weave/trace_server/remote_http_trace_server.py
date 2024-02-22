@@ -26,7 +26,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if len(to_flush) == 0:
             return
 
-        # print(f"Flushing {len(to_flush)} calls to {self.trace_server_url}")
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=json.dumps({"batch": to_flush}),

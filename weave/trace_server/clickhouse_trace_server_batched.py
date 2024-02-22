@@ -2,15 +2,13 @@
 
 import datetime
 import json
-import queue
 import time
 import typing
-import uuid
 
 from clickhouse_connect.driver.client import Client
 from clickhouse_connect.driver.query import QueryResult
 import clickhouse_connect
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 
 from .trace_server_interface_util import (
@@ -73,7 +71,6 @@ class SelectableCHCallSchema(BaseModel):
     trace_id: str
     parent_id: typing.Optional[str] = None
 
-    # status_code: tsi.StatusCodeEnum
     start_datetime: datetime.datetime
     end_datetime: typing.Optional[datetime.datetime] = None
     exception: typing.Optional[str] = None
@@ -144,7 +141,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.ch_obj_insert_thread_client = clickhouse_connect.get_client(
             host=host, port=port
         )
-        # self._print_status()
         self.call_insert_buffer = InMemAutoFlushingBuffer(
             MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_call_insert_buffer
         )
@@ -187,16 +183,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Return the marshaled response
         return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
 
-    # def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-    #     # Two problems: finish time is going to be delayed, and multiple updates of the
-    #     # same call will be lost clobbered.
-    #     self._execute_update(req)
-
-    #     # Returns the id of the newly created call
-    #     # Nothing to return in a buffered/async world
-    #     # return tsi.CallStartRes(entity=req.entity, project=req.project, id=id)
-    #     return tsi.CallStartRes()
-
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallQueryRes:
         conditions = []
         parameters = {}
@@ -234,13 +220,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_calls = self._select_calls_query(
             req.entity,
             req.project,
-            # columns=req.columns,
             conditions=conditions,
-            # order_by=req.order_by,
-            # Skipping limit and offset for now so we aren't tempted to use them.
-            # We should have a better way to paginate
-            # offset=req.offset,
-            # limit=req.limit,
             parameters=parameters,
         )
         calls = [_ch_call_to_call_schema(call) for call in ch_calls]
@@ -269,13 +249,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
-            # columns=None,
             conditions=conditions,
-            # order_by=None,
-            # Skipping limit and offset for now so we aren't tempted to use them.
-            # We should have a better way to paginate
-            # offset=req.offset,
-            # limit=req.limit,
             parameters=parameters,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
@@ -304,13 +278,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
-            # columns=None,
             conditions=conditions,
-            # order_by=None,
-            # Skipping limit and offset for now so we aren't tempted to use them.
-            # We should have a better way to paginate
-            # offset=req.offset,
-            # limit=req.limit,
             parameters=parameters,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
@@ -332,7 +300,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "calls_raw",
                 data=buffer,
                 column_names=all_call_insert_columns,
-                # column_type_names=all_call_column_type_names_with_defaults_nullable,
             )
             print(
                 "("
@@ -352,7 +319,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "objects_raw",
                 data=buffer,
                 column_names=all_obj_insert_columns,
-                # column_type_names=all_obj_column_type_names_with_defaults_nullable,
             )
             print(
                 "("
@@ -419,10 +385,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not conditions:
             conditions = ["1 = 1"]
 
-        # conditions.append(
-        #     "entity = {entity_scope: String} AND project = {project_scope: String}"
-        # )
-
         conditions_part = " AND ".join(conditions)
 
         order_by_part = ""
@@ -462,7 +424,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """,
             parameters,
         )
-        # print(raw_res.result_rows)
+
         calls = []
         for row in raw_res.result_rows:
             calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
@@ -480,13 +442,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.entity,
             req.project,
             columns=all_obj_select_columns,
-            # columns=req.columns,
             conditions=conditions,
             limit=1,
             parameters={"name": req.name, "version_hash": req.version_hash},
         )
 
-        # If the call is not found, raise a NotFoundError
+        # If the obj is not found, raise a NotFoundError
         if not ch_objs:
             raise NotFoundError(f"Obj with id {req.id} not found")
 
@@ -498,8 +459,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         project: str,
         columns: typing.Optional[typing.List[str]] = None,
         conditions: typing.Optional[typing.List[str]] = None,
-        # order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
-        # offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHObjSchema]:
@@ -542,7 +501,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters,
             column_formats={"bytes_file_map": {"string": "bytes"}},
         )
-        # # print(raw_res.result_rows)
+
         objs = []
         for row in raw_res.result_rows:
             objs.append(_raw_obj_dict_to_ch_obj(dict(zip(columns, row))))

@@ -130,10 +130,8 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
 
     @property
     def uri_obj(self) -> uris.WeaveURI:
-        # TODO: This is why wrong, but why do we need it here?
-        # because OpDefType.load_instance tries to use it
         trace_noun = "obj"
-        # HACK!
+        # Hack! We should have a better way to determine this
         if "obj.py" in self.path_contents:
             trace_noun = "op"
         return TraceNounUri(

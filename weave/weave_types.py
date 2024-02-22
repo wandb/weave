@@ -1095,13 +1095,7 @@ class ObjectType(Type):
 
     @classmethod
     def type_of_instance(cls, obj):
-        is_base_model = False
-        # UGG - why is this try-catch?
-        try:
-            is_base_model = isinstance(obj, pydantic.BaseModel)
-        except:
-            pass
-        if is_base_model:
+        if isinstance(obj, pydantic.BaseModel):
             type_class = cls.typeclass_of_class(obj.__class__)
             attr_types = {}
             for k, field in obj.model_fields.items():
@@ -1207,7 +1201,6 @@ def deserialize_relocatable_object_type(t: dict) -> ObjectType:
             type_attr_types["_name"] = TypeRegistry.type_from_dict(v)
         elif k != "type" and not k.startswith("_"):
             type_attr_types[k] = TypeRegistry.type_from_dict(v)
-
     import textwrap
 
     object_constructor_arg_names = [
