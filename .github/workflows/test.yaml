@@ -109,7 +109,7 @@ jobs:
           - "9015:9015"
         options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
       weave_clickhouse:
-        image: clickhouse/clickhouse-server:master
+        image: clickhouse/clickhouse-server
         ports:
           - "18123:8123"
           - "8083:8083"
