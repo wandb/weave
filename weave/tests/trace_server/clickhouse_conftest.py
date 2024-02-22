@@ -1,3 +1,4 @@
+import os
 import pytest
 
 
@@ -75,25 +76,25 @@ def _check_server_up(host="localhost", port=18123) -> typing.Tuple[str, int, boo
             base_url=base_url, endpoint=endpoint, num_retries=num_retries
         )
 
-    if server_healthy():
-        return (host, port, True)
+    if os.environ.get("CI") != "true":
+        if server_healthy():
+            return (host, port, True)
 
-    subprocess.Popen(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--rm",
-            "-p",
-            f"{base_port}:8123",
-            # "-p19000:9000",
-            "--name",
-            "weave-python-test-clickhouse-server",
-            "--ulimit",
-            "nofile=262144:262144",
-            "clickhouse/clickhouse-server",
-        ]
-    )
+        subprocess.Popen(
+            [
+                "docker",
+                "run",
+                "-d",
+                "--rm",
+                "-p",
+                f"{base_port}:8123",
+                "--name",
+                "weave-python-test-clickhouse-server",
+                "--ulimit",
+                "nofile=262144:262144",
+                "clickhouse/clickhouse-server",
+            ]
+        )
 
     # wait for the server to start
     if server_healthy(num_retries=30):
