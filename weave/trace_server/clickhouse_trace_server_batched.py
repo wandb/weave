@@ -201,12 +201,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions = []
         parameters = {}
         if req.filter:
-            if req.filter.names:
-                for name in req.filter.names:
+            if req.filter.op_version_refs:
+                for name in req.filter.op_version_refs:
                     if "*" in name:
                         raise NotImplementedError("Wildcard not yet supported")
                 conditions.append("name IN {names: Array(String)}")
-                parameters["names"] = req.filter.names
+                parameters["names"] = req.filter.op_version_refs
 
             if req.filter.input_object_version_refs:
                 parameters["input_refs"] = req.filter.input_object_version_refs

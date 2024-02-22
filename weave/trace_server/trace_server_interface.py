@@ -147,7 +147,7 @@ class CallReadRes(BaseModel):
 
 
 class _CallsFilter(BaseModel):
-    names: typing.Optional[typing.List[str]] = None
+    op_version_refs: typing.Optional[typing.List[str]] = None
     input_object_version_refs: typing.Optional[typing.List[str]] = None
     output_object_version_refs: typing.Optional[typing.List[str]] = None
     parent_ids: typing.Optional[typing.List[str]] = None

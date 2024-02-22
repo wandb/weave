@@ -374,7 +374,7 @@ class TraceNounRef(ref_base.Ref):
         gc = graph_client_context.require_graph_client()
         assert isinstance(gc, GraphClientTrace)
         if self._trace_noun == "call":
-            raise NotImplementedError
+            raise ValueError("Cannot get call ref")
         elif self._trace_noun == "op":
             res = gc.trace_server.op_read(
                 tsi.OpReadReq(
@@ -495,6 +495,10 @@ class CallSchemaRun(Run):
         return urls.call_path_as_peek(self._entity, self._project, self._call_id)
 
 
+def _run_from_call(call: tsi.CallSchema) -> CallSchemaRun:
+    return CallSchemaRun(call.entity, call.project, call.id, call.trace_id)
+
+
 @dataclasses.dataclass
 class GraphClientTrace(GraphClient[CallSchemaRun]):
     def __init__(
@@ -514,48 +518,104 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
                 project=self.project,
             )
         )
-        return res.calls
+        return [_run_from_call(call) for call in res.calls]
 
     def run(self, run_id: str) -> typing.Optional[Run]:
-        raise NotImplementedError
+        res = self.trace_server.call_read(
+            tsi.CallReadReq(
+                entity=self.entity,
+                project=self.project,
+                id=run_id,
+            )
+        )
+        return _run_from_call(res.call)
 
     def find_op_run(
         self, op_name: str, inputs: dict[str, typing.Any]
     ) -> typing.Optional[Run]:
-        raise NotImplementedError
+        # We don't have a good way to do this yet (need to hash the inputs if we want to do it properly)
+        raise NotImplementedError()
 
     def run_children(self, run_id: str) -> Sequence[Run]:
-        raise NotImplementedError
+        res = self.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=self.entity,
+                project=self.project,
+                filter=tsi._CallsFilter(parent_ids=[run_id]),
+            )
+        )
+        return [_run_from_call(call) for call in res.calls]
 
     def op_runs(self, op_def: OpDef) -> Sequence[Run]:
-        raise NotImplementedError
+        ref = _get_ref(op_def)
+        if not isinstance(ref, TraceNounRef):
+            raise ValueError("Expected TraceNounRef")
+        ref_str = str(ref)
+        res = self.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=self.entity,
+                project=self.project,
+                filter=tsi._CallsFilter(op_version_refs=[ref_str]),
+            )
+        )
+        return [_run_from_call(call) for call in res.calls]
 
     def ref_input_to(self, ref: Ref) -> Sequence[Run]:
-        raise NotImplementedError
+        if not isinstance(ref, TraceNounRef):
+            raise ValueError("Expected TraceNounRef")
+        ref_str = str(ref)
+        res = self.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=self.entity,
+                project=self.project,
+                filter=tsi._CallsFilter(input_object_version_refs=[ref_str]),
+            )
+        )
+        return [_run_from_call(call) for call in res.calls]
 
     def ref_value_input_to(self, ref: Ref) -> list[Run]:
-        raise NotImplementedError
+        if not isinstance(ref, TraceNounRef):
+            raise ValueError("Expected TraceNounRef")
+        ref_str = str(ref)
+        res = self.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=self.entity,
+                project=self.project,
+                filter=tsi._CallsFilter(input_object_version_refs=[ref_str]),
+            )
+        )
+        return [_run_from_call(call) for call in res.calls]
 
     def ref_output_of(self, ref: Ref) -> typing.Optional[Run]:
-        raise NotImplementedError
+        if not isinstance(ref, TraceNounRef):
+            raise ValueError("Expected TraceNounRef")
+        ref_str = str(ref)
+        res = self.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=self.entity,
+                project=self.project,
+                filter=tsi._CallsFilter(output_object_version_refs=[ref_str]),
+            )
+        )
+        if not res.calls:
+            return None
+        return _run_from_call(res.calls[0])
 
     def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def feedback(self, feedback_id: str) -> typing.Optional[dict[str, typing.Any]]:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     # Helpers
 
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
-        # raise NotImplementedError
-        # return False
         return isinstance(ref, TraceNounRef)
 
     def ref_uri(
         self, name: str, version: str, path: str
     ) -> artifact_local.WeaveLocalArtifactURI:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def run_ui_url(self, run: Run) -> str:
         return urls.call_path_as_peek(self.entity, self.project, run.id)
@@ -701,7 +761,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         )
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
-        raise NotImplementedError
+        raise NotImplementedError()
 
 
 def _get_ref(obj: typing.Any) -> typing.Optional[ref_base.Ref]:
