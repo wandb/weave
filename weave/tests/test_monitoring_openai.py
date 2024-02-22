@@ -286,7 +286,6 @@ def reassembled_chat_completion_message():
                 message=ChatCompletionMessage(
                     content="Why don't scientists trust atoms?\n\nBecause they make up everything!",
                     role="assistant",
-                    function_call=None,
                     tool_calls=None,
                 ),
             )

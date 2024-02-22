@@ -58,6 +58,7 @@ class AsyncChatCompletions:
             # as a child of whatever the parent is, at function call time,
             # not generator start time.
             # TODO: need to fix this to use OpenAIStream instead of reconstruct_completion
+            # like the sync _stream_create below
             async def _stream_create_gen():  # type: ignore
                 chunks = []
                 stream = await self._base_create(*args, **kwargs)
@@ -107,7 +108,11 @@ class ChatCompletions:
                 for chunk in wrapped_stream:
                     yield chunk
                 result = wrapped_stream.final_response()
-                finish_run(result.model_dump(exclude_unset=True))
+                result_with_usage = ChatCompletion(
+                    **result.model_dump(exclude_unset=True),
+                    usage=token_usage(inputs.messages, result.choices),
+                )
+                finish_run(result_with_usage.model_dump(exclude_unset=True))
 
         return _stream_create_gen()  # type: ignore
 
