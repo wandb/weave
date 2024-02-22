@@ -111,7 +111,7 @@ jobs:
       weave_clickhouse:
         image: clickhouse/clickhouse-server
         ports:
-          - "18123:8123"
+          - "8123:18123"
         options: --health-cmd "curl --fail http://localhost:18123/ || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       # - uses: datadog/agent-github-action@v1.3
