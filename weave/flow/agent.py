@@ -15,7 +15,6 @@ from weave.flow.chat_util import OpenAIStream
 
 
 class AgentState(Object):
-    status: str = "running"  # TODO: Enum
     # TODO: want openai types here.
     history: list[Any] = Field(default_factory=list)
 
@@ -23,17 +22,8 @@ class AgentState(Object):
 class Agent(Object):
     model_name: str = "gpt-3.5-turbo"
     temperature: float = 0.7
-
-    # TODO: want Callable, but have an issue with type saving
-    get_input: Any = lambda: input("User input: ")
-    tools: list[Any] = Field(default_factory=list)
-
     system_message: str
-
-    @weave.op()
-    def run(self, state: AgentState):
-        while not state.status == "DONE":
-            state = self.step(state)
+    tools: list[Any] = Field(default_factory=list)
 
     @weave.op()
     def step(self, state: AgentState) -> AgentState:
@@ -91,11 +81,8 @@ class Agent(Object):
             new_messages.extend(
                 perform_tool_calls(self.tools, response_message.tool_calls)
             )
-        else:
-            user_input = self.get_input()
-            LogEvents.user_input_complete(user_input)
-            new_messages.append({"role": "user", "content": user_input})
 
+        # TODO: doesn't really belong here.
         # find distance from end to last system message in state.history
         # if distance > 10, append system message
         for distance in range(len(state.history)):
@@ -104,4 +91,4 @@ class Agent(Object):
         if distance > 10:
             new_messages.append({"role": "system", "content": self.system_message})
 
-        return AgentState(status="RUNNING", history=state.history + new_messages)
+        return AgentState(history=state.history + new_messages)

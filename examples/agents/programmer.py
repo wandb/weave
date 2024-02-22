@@ -100,11 +100,38 @@ def run_command(command: str) -> str:
     Returns:
         The output of the command.
     """
-    return subprocess.check_output(command, shell=True).decode("utf-8")
+    try:
+        completed_process = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            shell=True,
+        )
+        exit_code = completed_process.returncode
+        stdout = completed_process.stdout.strip()
+        stderr = completed_process.stderr.strip()
+    except Exception as e:
+        exit_code = -1
+        stdout = ""
+        stderr = str(e)
+
+    if len(stdout) > LENGTH_LIMIT:
+        stdout = stdout[:LENGTH_LIMIT]
+        stdout += "\n... (truncated)"
+    if len(stderr) > LENGTH_LIMIT:
+        stderr = stderr[:LENGTH_LIMIT]
+        stderr += "\n... (truncated)"
+
+    result = f"Exit code: {exit_code}\n"
+    if stderr:
+        result += f"STDERR\n{stderr}\n"
+    if stdout:
+        result += f"STDOUT\n{stdout}\n"
+    return result
 
 
 if __name__ == "__main__":
-    # weave.init("wf-programmer1")
     console.rule("[bold blue]Programmer")
     console.print(WELCOME)
 
@@ -119,7 +146,7 @@ if __name__ == "__main__":
     initial_prompt = " ".join(sys.argv[1:])
     print("Initial prompt:", initial_prompt)
 
-    initial_state = AgentState(
+    state = AgentState(
         history=[
             {
                 "role": "user",
@@ -128,4 +155,17 @@ if __name__ == "__main__":
         ]
     )
 
-    agent.run(initial_state)
+    while True:
+        state = agent.step(state)
+        last_message = state.history[-1]
+        if last_message["role"] == "assistant" and "tool_calls" not in last_message:
+            user_input = input("User input: ")
+            state = AgentState(
+                history=state.history
+                + [
+                    {
+                        "role": "user",
+                        "content": user_input,
+                    }
+                ]
+            )
