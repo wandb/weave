@@ -10,16 +10,20 @@ from . import trace_server_interface as tsi
 MAX_FLUSH_COUNT = 100
 MAX_FLUSH_AGE = 5
 
+
 class StartBatchItem(BaseModel):
     mode: str = "start"
     req: tsi.CallStartReq
+
 
 class EndBatchItem(BaseModel):
     mode: str = "end"
     req: tsi.CallEndReq
 
+
 class Batch(BaseModel):
     batch: t.List[t.Union[StartBatchItem, EndBatchItem]]
+
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
@@ -68,7 +72,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             else:
                 req_as_obj = req
             if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
-                raise ValueError("CallStartReq must have id and trace_id when batching.")
+                raise ValueError(
+                    "CallStartReq must have id and trace_id when batching."
+                )
             self.call_buffer.insert(StartBatchItem(req=req_as_obj))
             return tsi.CallStartRes(
                 id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
