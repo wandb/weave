@@ -6,7 +6,7 @@ from typing import Callable, get_type_hints
 from openai.types.chat import ChatCompletionToolParam
 from openai.types.chat import ChatCompletionMessageToolCall
 
-from weave.flow.logs import LogEvents
+from weave.flow.console import LogEvents
 
 
 def generate_json_schema(func: Callable) -> dict:

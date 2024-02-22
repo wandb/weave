@@ -5,7 +5,7 @@ import textwrap
 import weave
 from weave.flow import Agent, AgentState, Object
 from weave.flow.chat_util import OpenAIStream
-from weave.flow.logs import LogEvents
+from weave.flow.console import LogEvents
 
 TEACHER_MESSAGE = """Assistant is a teacher.
 The teacher uses a direct technique, without motivational fluff, to drive the student to discover itself.
