@@ -188,9 +188,9 @@ def refs_to_str(val: typing.Any) -> typing.Any:
 
 # URIS are the WORST! Here is what we want:
 # TODO: Move netloc to empty string.
-# `wandb-trace://[entity]/[project]/call/[ID]`
-# `wandb-trace://[entity]/[project]/op/[name]:[CONTENT_HASH]`
-# `wandb-trace://[entity]/[project]/obj/[name]:[CONTENT_HASH]/[PATH]#[EXTRA]`
+# `wandb-trace:///[entity]/[project]/call/[ID]`
+# `wandb-trace:///[entity]/[project]/op/[name]:[CONTENT_HASH]`
+# `wandb-trace:///[entity]/[project]/obj/[name]:[CONTENT_HASH]/[PATH]#[EXTRA]`
 @dataclasses.dataclass
 class TraceNounUri(uris.WeaveURI):
     SCHEME = "wandb-trace"
@@ -212,15 +212,15 @@ class TraceNounUri(uris.WeaveURI):
         query: dict[str, list[str]],
         fragment: str,
     ) -> "TraceNounUri":
-        entity = netloc.strip("/")
         path_parts = path.strip("/").split("/")
 
-        if len(path_parts) < 3:
+        if len(path_parts) < 4:
             raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
 
-        project = path_parts[0]
-        trace_noun = path_parts[1]
-        compound_version = path_parts[2]
+        entity = path_parts[0]
+        project = path_parts[1]
+        trace_noun = path_parts[2]
+        compound_version = path_parts[3]
         path_res: typing.Optional[typing.List[str]] = None
         extra = None
         if trace_noun == "call":
@@ -235,7 +235,7 @@ class TraceNounUri(uris.WeaveURI):
         else:
             raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
         if trace_noun == "obj":
-            path_res = path_parts[3:]
+            path_res = path_parts[4:]
             if not path_res:
                 path_res = None
             if fragment:
@@ -243,7 +243,7 @@ class TraceNounUri(uris.WeaveURI):
                 if not extra:
                     extra = None
         else:
-            if path_parts[3:]:
+            if path_parts[4:]:
                 raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
             if fragment:
                 raise errors.WeaveInvalidURIError(f"Invalid WB Artifact URI: {uri}")
@@ -265,7 +265,7 @@ class TraceNounUri(uris.WeaveURI):
             else quote_slashes(self.version)
         )
         uri = (
-            f"{self.SCHEME}://"
+            f"{self.SCHEME}:///"
             f"{quote_slashes(self.entity)}/"
             f"{quote_slashes(self.project)}/"
             f"{quote_slashes(self.trace_noun)}/"

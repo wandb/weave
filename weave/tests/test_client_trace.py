@@ -19,7 +19,7 @@ def test_simple_op(trace_client):
     fetched_call = runs[0]._call
     assert (
         fetched_call.name
-        == "wandb-trace://test_entity/test_project/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
+        == "wandb-trace:///test_entity/test_project/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
     )
     assert fetched_call == tsi.CallSchema(
         entity=trace_client.entity,
