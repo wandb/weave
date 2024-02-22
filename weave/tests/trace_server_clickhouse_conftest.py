@@ -10,8 +10,8 @@ import urllib
 
 import pytest
 
-from weave.weave_init import InitializedClient
-from ...trace_server import (
+from ..weave_init import InitializedClient
+from ..trace_server import (
     graph_client_trace,
     clickhouse_trace_server_batched,
 )
