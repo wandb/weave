@@ -243,7 +243,7 @@ const traceCallToSpanWithFeedback = (call: TraceCallSchema): SpanWithFeedback =>
     name: call.name,
     inputs: call.inputs ?? {},
     output: call.outputs ?? {},
-    status_code: status_code,
+    status_code,
     exception: call.exception,
     attributes: call.attributes ?? {},
     summary: summary as any,
@@ -251,7 +251,7 @@ const traceCallToSpanWithFeedback = (call: TraceCallSchema): SpanWithFeedback =>
     trace_id: call.trace_id,
     parent_id: call.parent_id,
     timestamp: start_time_ms,
-    start_time_ms: start_time_ms,
+    start_time_ms,
     end_time_ms: (call.end_time_s ?? 0) * 1000,
   }
 }

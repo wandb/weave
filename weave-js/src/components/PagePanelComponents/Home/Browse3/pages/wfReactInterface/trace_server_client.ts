@@ -26,7 +26,7 @@ export type TraceCallSchema = {
     summary?: Record<string, any>;
 }
 type TraceCallQueryRes = {
-    calls: Array<TraceCallSchema>
+    calls: TraceCallSchema[]
 }
 
 type Trace_CallsFilter = {
@@ -72,7 +72,7 @@ type TraceObjsQueryReq= {
 }
 
 type TraceObjQueryRes = {
-    objs: Array<TraceObjSchema>
+    objs: TraceObjSchema[]
 }
 
 
