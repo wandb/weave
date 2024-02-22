@@ -21,7 +21,7 @@ def version_hash_for_object(obj: tsi.ObjSchemaForInsert) -> str:
     # until updates are supported, we need to hash the metadata_dict
     hasher.update(json.dumps(_order_dict(obj.metadata_dict)).encode())
     hasher.update(json.dumps(_order_dict(obj.b64_file_map)).encode())
-    
+
     return hasher.hexdigest()
 
 
@@ -54,11 +54,12 @@ def _order_dict(dictionary):
         for k, v in sorted(dictionary.items())
     }
 
+
 def encode_bytes_as_b64(contents: typing.Dict[str, bytes]) -> typing.Dict[str, str]:
     res = {}
     for k, v in contents.items():
         if isinstance(v, bytes):
-            res[k] = base64.b64encode(v).decode('ascii')
+            res[k] = base64.b64encode(v).decode("ascii")
         else:
             raise ValueError(f"Unexpected type for file {k}: {type(v)}")
     return res
@@ -68,8 +69,7 @@ def decode_b64_to_bytes(contents: typing.Dict[str, str]) -> typing.Dict[str, byt
     res = {}
     for k, v in contents.items():
         if isinstance(v, str):
-            res[k] = base64.b64decode(v.encode('ascii'))
+            res[k] = base64.b64decode(v.encode("ascii"))
         else:
             raise ValueError(f"Unexpected type for file {k}: {type(v)}")
     return res
-

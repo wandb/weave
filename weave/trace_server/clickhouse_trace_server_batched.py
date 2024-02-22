@@ -13,7 +13,12 @@ import clickhouse_connect
 from pydantic import BaseModel, model_validator
 
 
-from .trace_server_interface_util import decode_b64_to_bytes, encode_bytes_as_b64, generate_id, version_hash_for_object
+from .trace_server_interface_util import (
+    decode_b64_to_bytes,
+    encode_bytes_as_b64,
+    generate_id,
+    version_hash_for_object,
+)
 from . import trace_server_interface as tsi
 from .flushing_buffer import InMemAutoFlushingBuffer, InMemFlushableBuffer
 
@@ -121,6 +126,7 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
+
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     ch_client: Client
@@ -385,7 +391,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         order_by_part = ""
         if order_by != None:
             for field, direction in order_by:
-                assert field in all_call_select_columns, f"Invalid order_by field: {field}"
+                assert (
+                    field in all_call_select_columns
+                ), f"Invalid order_by field: {field}"
                 assert direction in [
                     "ASC",
                     "DESC",
@@ -520,8 +528,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not table_name.startswith("."):
                 self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
 
-
-
         self.ch_client.command(
             """
         CREATE TABLE IF NOT EXISTS
@@ -565,8 +571,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """
         )
 
-
-        self.ch_client.command("""
+        self.ch_client.command(
+            """
         CREATE MATERIALIZED VIEW objects_deduplicated_view TO objects_deduplicated
         AS
         SELECT
@@ -582,12 +588,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             
         FROM objects_raw
         GROUP BY entity, project, name, version_hash
-        """)
-
-
+        """
+        )
 
         # The following view is just to workout version indexing and latest keys
-        self.ch_client.command("""
+        self.ch_client.command(
+            """
         CREATE VIEW objects_versioned
         AS
         SELECT
@@ -605,8 +611,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         GROUP BY entity, project, name, version_hash
         WINDOW
             w1 AS (PARTITION BY entity, project, name ORDER BY min(objects_deduplicated.created_datetime) ASC Rows BETWEEN CURRENT ROW AND 1 FOLLOWING)
-        """)
-
+        """
+        )
 
         self.ch_client.command(
             """
@@ -776,7 +782,7 @@ def _raw_call_dict_to_ch_call(
 
 def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHObjSchema:
     if obj["bytes_file_map"]:
-        obj["bytes_file_map"] ={
+        obj["bytes_file_map"] = {
             k.decode("utf-8"): v for k, v in obj["bytes_file_map"].items()
         }
     return SelectableCHObjSchema.model_validate(obj)
@@ -811,7 +817,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         metadata_dict=_dict_dump_to_dict(ch_obj.metadata_dict_dump),
         created_datetime=ch_obj.created_datetime,
         # TODO!
-        version_index=-1
+        version_index=-1,
     )
 
 
@@ -877,7 +883,6 @@ def _process_parameters(
         if isinstance(value, datetime.datetime):
             parameters[key] = value.timestamp()
     return parameters
-
 
 
 def _partial_obj_schema_to_ch_obj(

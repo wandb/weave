@@ -106,7 +106,6 @@ class ObjSchema(BaseModel):
     created_datetime: datetime.datetime
 
 
-
 class ObjSchemaForInsert(BaseModel):
     entity: str
     project: str
@@ -117,7 +116,6 @@ class ObjSchemaForInsert(BaseModel):
     metadata_dict: typing.Dict[str, typing.Any]
 
     created_datetime: datetime.datetime
-
 
 
 class CallStartReq(BaseModel):
@@ -146,6 +144,7 @@ class CallReadReq(BaseModel):
 
 class CallReadRes(BaseModel):
     call: CallSchema
+
 
 class _CallsFilter(BaseModel):
     names: typing.Optional[typing.List[str]] = None
@@ -242,8 +241,10 @@ class ObjQueryReq(BaseModel):
     project: str
     filter: typing.Optional[_ObjectVersionFilter] = None
 
+
 class ObjQueryRes(BaseModel):
     objs: typing.List[ObjSchema]
+
 
 class TraceServerInterface:
     # Call API

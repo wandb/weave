@@ -95,9 +95,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def op_read(self, req: t.Union[tsi.OpReadReq, t.Dict[str, t.Any]]) -> tsi.OpReadRes:
-        return self._generic_request(
-            "/op/read", req, tsi.OpReadReq, tsi.OpReadRes
-        )
+        return self._generic_request("/op/read", req, tsi.OpReadReq, tsi.OpReadRes)
 
     def ops_query(
         self, req: t.Union[tsi.OpQueryReq, t.Dict[str, t.Any]]
@@ -110,18 +108,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: t.Union[tsi.ObjCreateReq, t.Dict[str, t.Any]]
     ) -> tsi.ObjCreateRes:
         return self._generic_request(
-            "/obj/create",
-            req,
-            tsi.ObjCreateReq,
-            tsi.ObjCreateRes
+            "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
         )
 
     def obj_read(
         self, req: t.Union[tsi.ObjReadReq, t.Dict[str, t.Any]]
     ) -> tsi.ObjReadRes:
-        return self._generic_request(
-            "/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes
-        )
+        return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
 
     def objs_query(
         self, req: t.Union[tsi.ObjQueryReq, t.Dict[str, t.Any]]

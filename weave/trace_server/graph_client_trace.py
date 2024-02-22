@@ -43,7 +43,12 @@ from .. import ref_base
 from .. import weave_types as types
 
 
-from .trace_server_interface_util import  decode_b64_to_bytes, encode_bytes_as_b64, generate_id, version_hash_for_object
+from .trace_server_interface_util import (
+    decode_b64_to_bytes,
+    encode_bytes_as_b64,
+    generate_id,
+    version_hash_for_object,
+)
 from . import trace_server_interface as tsi
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -529,7 +534,12 @@ class GraphClientTrace(GraphClient[WeaveRunObj]):
 
         # type_val = storage.to_python(obj, ref_persister=save_custom_object)
         # Should this encoding be handled below the server abstraction?
-        encoded_path_contents = encode_bytes_as_b64({k: (v.encode("utf-8") if isinstance(v, str) else v) for k, v in art.path_contents.items()})
+        encoded_path_contents = encode_bytes_as_b64(
+            {
+                k: (v.encode("utf-8") if isinstance(v, str) else v)
+                for k, v in art.path_contents.items()
+            }
+        )
         partial_obj = tsi.ObjSchemaForInsert(
             entity=self.entity,
             project=self.project,
