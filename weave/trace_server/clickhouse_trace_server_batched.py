@@ -228,9 +228,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_calls = self._select_calls_query(
             req.entity,
             req.project,
-            columns=req.columns,
+            # columns=req.columns,
             conditions=conditions,
-            order_by=req.order_by,
+            # order_by=req.order_by,
             # Skipping limit and offset for now so we aren't tempted to use them.
             # We should have a better way to paginate
             # offset=req.offset,
@@ -243,7 +243,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
         self._insert_obj(ch_obj)
-        return tsi.ObjCreateRes()
+        return tsi.OpCreateRes(version_hash=ch_obj.version_hash)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(self._obj_read(req, True)))

@@ -18,7 +18,7 @@ def test_simple_op(trace_client):
     assert len(runs) == 1
     assert (
         runs[0].name
-        == "wandb-trace://test_entity/test_project/op/op-my_op:d974fac56411d5e5b6cf75fad9a53811"
+        == "wandb-trace://test_entity/test_project/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
     )
     assert runs[0] == tsi.CallSchema(
         entity=trace_client.entity,

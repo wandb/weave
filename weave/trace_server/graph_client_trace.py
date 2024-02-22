@@ -369,7 +369,7 @@ class TraceNounRef(ref_base.Ref):
                 self._project,
                 self._name,
                 self._version,
-                {k: v for k, v in res.op_obj.encoded_file_map.items()},
+                decode_b64_to_bytes(res.op_obj.b64_file_map),
                 metadata=res.op_obj.metadata_dict,
             )
             wb_type = types.TypeRegistry.type_from_dict(res.op_obj.type_dict)
