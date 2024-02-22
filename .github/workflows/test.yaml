@@ -125,7 +125,7 @@ jobs:
           DD_SERVICE: weave-python
           DD_ENV: ci
           # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
-        run: WB_SERVER_HOST=http://wandbservice TEST_CH_SERVER_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 ./tests/test_client_trace.py  --ddtrace --durations=5
+        run: WB_SERVER_HOST=http://wandbservice TEST_CH_SERVER_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 ./tests ./ops_arrow ./ecosystem --ddtrace --durations=5
 
   # nbmake:
   #   name: Run notebooks with nbmake
