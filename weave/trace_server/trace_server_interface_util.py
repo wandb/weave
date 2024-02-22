@@ -7,13 +7,11 @@ import uuid
 from . import trace_server_interface as tsi
 
 
-# This is a quick solution but needs more thought
-
-
 def generate_id() -> str:
     return str(uuid.uuid4())
 
 
+# This is a quick solution but needs more thought
 def version_hash_for_object(obj: tsi.ObjSchemaForInsert) -> str:
     hasher = hashlib.md5()
 
@@ -25,30 +23,7 @@ def version_hash_for_object(obj: tsi.ObjSchemaForInsert) -> str:
     return hasher.hexdigest()
 
 
-# def version_hash_for_op(op: tsi.PartialOpForCreationSchema) -> str:
-
-#     hasher = hashlib.md5()
-#     hasher.update(op.name.encode())
-#     if op.code:
-#         hasher.update(op.code.encode())
-#     if op.environment_state_identity:
-#         hasher.update(op.environment_state_identity.encode())
-
-#     return hasher.hexdigest()
-
-
-def _decode_bytes_to_str(dictionary):
-    return {
-        k: _decode_bytes_to_str(v)
-        if isinstance(v, dict)
-        else v.decode()
-        if isinstance(v, bytes)
-        else v
-        for k, v in dictionary.items()
-    }
-
-
-def _order_dict(dictionary):
+def _order_dict(dictionary: typing.Dict) -> typing.Dict:
     return {
         k: _order_dict(v) if isinstance(v, dict) else v
         for k, v in sorted(dictionary.items())

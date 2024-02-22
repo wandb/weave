@@ -22,7 +22,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_calls
             )
 
-    def _flush_calls(self, to_flush):
+    def _flush_calls(self, to_flush: t.List) -> None:
         if len(to_flush) == 0:
             return
 
@@ -51,10 +51,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: t.Union[tsi.CallStartReq, t.Dict[str, t.Any]]
     ) -> tsi.CallStartRes:
         if self.should_batch:
+            req_as_obj: tsi.CallEndReq
             if isinstance(req, dict):
-                req = tsi.CallStartReq.model_validate(req)
-            req = req.model_dump()
-            self.call_buffer.insert({"mode": "start", "req": req})
+                req_as_obj = tsi.CallStartReq.model_validate(req)
+            else:
+                req_as_obj = req
+            req_as_dict = req_as_obj.model_dump()
+            self.call_buffer.insert({"mode": "start", "req": req_as_dict})
             return tsi.CallStartRes()
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
@@ -64,10 +67,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: t.Union[tsi.CallEndReq, t.Dict[str, t.Any]]
     ) -> tsi.CallEndRes:
         if self.should_batch:
+            req_as_obj: tsi.CallEndReq
             if isinstance(req, dict):
-                req = tsi.CallEndReq.model_validate(req)
-            req = req.model_dump()
-            self.call_buffer.insert({"mode": "end", "req": req})
+                req_as_obj = tsi.CallEndReq.model_validate(req)
+            else:
+                req_as_obj = req
+            req_as_dict = req_as_obj.model_dump()
+            self.call_buffer.insert({"mode": "end", "req": req_as_dict})
             return tsi.CallEndRes()
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 

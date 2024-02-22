@@ -247,7 +247,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpCreateRes(version_hash=ch_obj.version_hash)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(self._obj_read(req, True)))
+        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(self._obj_read(req)))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         raise NotImplementedError()
@@ -261,7 +261,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(self._obj_read(req)))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        conditions = []
+        conditions: typing.List[str] = []
         # parameters = {}
         if req.filter:
             raise NotImplementedError()
@@ -283,12 +283,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     # Private Methods
-    def __del__(self):
+    def __del__(self) -> None:
         self.call_insert_buffer.flush()
         self.ch_client.close()
         self.ch_call_insert_thread_client.close()
 
-    def _flush_call_insert_buffer(self, buffer: typing.List):
+    def _flush_call_insert_buffer(self, buffer: typing.List) -> None:
         buffer_len = len(buffer)
         if buffer_len:
             flush_id = generate_id()
@@ -308,7 +308,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 + " seconds."
             )
 
-    def _flush_obj_insert_buffer(self, buffer: typing.List):
+    def _flush_obj_insert_buffer(self, buffer: typing.List) -> None:
         buffer_len = len(buffer)
         if buffer_len:
             flush_id = generate_id()
@@ -354,16 +354,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
-        parameters: typing.Dict[str, typing.Any] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHCallSchema]:
 
         if not parameters:
             parameters = {}
+        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
 
         parameters["entity_scope"] = entity
         parameters["project_scope"] = project
         if columns == None:
             columns = all_call_select_columns
+        columns = typing.cast(typing.List[str], columns)
 
         remaining_columns = set(columns) - set(required_call_columns)
         columns = required_call_columns + list(remaining_columns)
@@ -391,6 +393,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         order_by_part = ""
         if order_by != None:
+            order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
             for field, direction in order_by:
                 assert (
                     field in all_call_select_columns
@@ -431,14 +434,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
         return calls
 
-    def _obj_read(
-        self, req: tsi.ObjReadReq, only_ops: bool = False
-    ) -> SelectableCHObjSchema:
+    def _obj_read(self, req: tsi.ObjReadReq) -> SelectableCHObjSchema:
         conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
-        # if only_ops:
-        #     conditions.append("is_op = 1")
-        # else:
-        #     conditions.append("is_op = 0")
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
@@ -464,16 +461,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
         # offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
-        parameters: typing.Dict[str, typing.Any] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHObjSchema]:
 
         if not parameters:
             parameters = {}
+        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
 
         parameters["entity_scope"] = entity
         parameters["project_scope"] = project
         if columns == None:
             columns = all_obj_select_columns
+        columns = typing.cast(typing.List[str], columns)
 
         remaining_columns = set(columns) - set(required_obj_select_columns)
         columns = required_obj_select_columns + list(remaining_columns)
@@ -482,13 +481,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             set(columns) - set(all_obj_select_columns) == set()
         ), f"Invalid columns: {columns}"
         select_columns_part = ", ".join(columns)
-        # merged_cols = []
-        # for col in columns:
-        #     if col in ["entity", "project", "name", "version_hash"]:
-        #         merged_cols.append(f"{col} AS {col}")
-        #     else:
-        #         merged_cols.append(f"anyLast({col}) AS {col}")
-        # select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
             conditions = ["1 = 1"]
@@ -516,12 +508,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             objs.append(_raw_obj_dict_to_ch_obj(dict(zip(columns, row))))
         return objs
 
-    def _print_status(self):
-        tables = self.ch_client.command("SHOW TABLES")
-        # tables = self.ch_client.command("SHOW VIEW")
-        print("Current Tables: \n" + tables + "\n")
-
-    def _run_migrations(self):
+    def _run_migrations(self) -> None:
         print("Running migrations")
         res = self.ch_client.command("SHOW TABLES")
         table_names = res.split("\n")
@@ -745,32 +732,12 @@ def _dict_value_to_dump(
     return json.dumps(value)
 
 
-def _utc_sec_to_datetime(s_time: float) -> datetime.datetime:
-    return datetime.datetime.fromtimestamp(s_time, tz=datetime.timezone.utc)
-
-
-def _xor(a, b, field_name: str):
-    if a and b:
-        raise ValueError(f"{field_name} already set to {a}")
-    return a or b
-
-
-def _datetime_to_sec_float(val: datetime.datetime) -> float:
-    return val.timestamp()
-
-
-def _nullable_datetime_to_sec_float(
-    val: typing.Optional[datetime.datetime],
-) -> typing.Optional[float]:
-    return _datetime_to_sec_float(val) if val else None
-
-
 def _dict_dump_to_dict(val: str) -> typing.Dict[str, typing.Any]:
     return json.loads(val)
 
 
 def _nullable_dict_dump_to_dict(
-    val: str,
+    val: typing.Optional[str],
 ) -> typing.Optional[typing.Dict[str, typing.Any]]:
     return _dict_dump_to_dict(val) if val else None
 

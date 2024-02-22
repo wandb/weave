@@ -6,7 +6,7 @@ To Implement:
 * [ ] General Purpose Column Selection
 * [ ] Category Filtering
 """
-
+import abc
 import datetime
 import typing
 from pydantic import BaseModel
@@ -248,34 +248,44 @@ class ObjQueryRes(BaseModel):
 
 class TraceServerInterface:
     # Call API
+    @abc.abstractmethod
     def call_start(self, req: CallStartReq) -> CallStartRes:
         ...
 
+    @abc.abstractmethod
     def call_end(self, req: CallEndReq) -> CallEndRes:
         ...
 
+    @abc.abstractmethod
     def call_read(self, req: CallReadReq) -> CallReadRes:
         ...
 
+    @abc.abstractmethod
     def calls_query(self, req: CallsQueryReq) -> CallQueryRes:
         ...
 
     # Op API
+    @abc.abstractmethod
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
         ...
 
+    @abc.abstractmethod
     def op_read(self, req: OpReadReq) -> OpReadRes:
         ...
 
+    @abc.abstractmethod
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
         ...
 
     # Obj API
+    @abc.abstractmethod
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
         ...
 
+    @abc.abstractmethod
     def obj_read(self, req: ObjReadReq) -> ObjReadRes:
         ...
 
+    @abc.abstractmethod
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
         ...
