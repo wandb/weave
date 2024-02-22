@@ -202,6 +202,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters = {}
         if req.filter:
             if req.filter.names:
+                for name in req.filter.names:
+                    if "*" in name:
+                        raise NotImplementedError("Wildcard not yet supported")
                 conditions.append("name IN {names: Array(String)}")
                 parameters["names"] = req.filter.names
 
@@ -255,9 +258,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         conditions: typing.List[str] = []
-        # parameters = {}
+        parameters: typing.Dict[str, typing.Any] = {}
         if req.filter:
-            raise NotImplementedError()
+            if req.filter.op_names:
+                raise NotImplementedError()
+            if req.filter.latest_only:
+                raise NotImplementedError()
         conditions.append("is_op == 1")
 
         ch_objs = self._select_objs_query(
@@ -270,7 +276,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # We should have a better way to paginate
             # offset=req.offset,
             # limit=req.limit,
-            # parameters=parameters,
+            parameters=parameters,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
@@ -287,9 +293,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conditions: typing.List[str] = []
-        # parameters = {}
+        parameters: typing.Dict[str, typing.Any] = {}
         if req.filter:
-            raise NotImplementedError()
+            if req.filter.object_names:
+                raise NotImplementedError()
+            if req.filter.latest_only:
+                raise NotImplementedError()
         conditions.append("is_op == 0")
 
         ch_objs = self._select_objs_query(
@@ -302,7 +311,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # We should have a better way to paginate
             # offset=req.offset,
             # limit=req.limit,
-            # parameters=parameters,
+            parameters=parameters,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.ObjQueryRes(objs=objs)

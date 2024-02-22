@@ -197,8 +197,8 @@ class OpReadRes(BaseModel):
 
 class _OpVersionFilter(BaseModel):
     # category: typing.Optional[str] = None
-    opIds: typing.Optional[typing.List[str]] = None
-    latestOnly: typing.Optional[bool] = None
+    op_names: typing.Optional[typing.List[str]] = None
+    latest_only: typing.Optional[bool] = None
 
 
 class OpQueryReq(BaseModel):
@@ -232,8 +232,8 @@ class ObjReadRes(BaseModel):
 
 class _ObjectVersionFilter(BaseModel):
     # category: typing.Optional[str] = None
-    objectIds: typing.Optional[typing.List[str]] = None
-    latestOnly: typing.Optional[bool] = None
+    object_names: typing.Optional[typing.List[str]] = None
+    latest_only: typing.Optional[bool] = None
 
 
 class ObjQueryReq(BaseModel):
