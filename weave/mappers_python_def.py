@@ -45,10 +45,6 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
         # fields.
         result = {"_type": self.type.name}
         for prop_name, prop_serializer in self._property_serializers.items():
-            # These lines were somehow carried over from Shawn's pydantic PR I think, but
-            # might be not needed? Leaving here as a reminder to ask him before merging.
-            # if prop_name == "_name":
-            #     prop_name = "name"
             if prop_serializer is not None:
                 obj_val = getattr(obj, prop_name, None)
                 if obj_val is None:
@@ -362,7 +358,7 @@ class DefaultToPy(mappers.Mapper):
 
         ref = None
 
-        if gc and isinstance(obj, op_def.OpDef) and self._path != []:
+        if gc and isinstance(obj, op_def.OpDef):
             # This is a hack to ensure op_defs are always published as
             # top-level objects. This should be achieved by a policy
             # instead. There is a parallel policy in to_weavejs_with_refs

@@ -333,7 +333,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_calls = self._select_calls_query(
             req.entity,
             req.project,
-            columns=req.columns,
             conditions=["id = {id: String}"],
             limit=1,
             parameters={"id": req.id},

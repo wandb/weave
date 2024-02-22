@@ -114,13 +114,6 @@ def op(
 
             op.weave_fn = op_to_weave_fn(op)
 
-        # if not loading_builtins:
-        #     return op
-
-        # op_version = registry_mem.memory_registry.register_op(op)
-
-        # derive_op.derive_ops(op)
-
         # We shouldn't bother registering for weaveflow. We could register
         # only in the case where an op is lazily called. But no need for now.
         op_version = registry_mem.memory_registry.register_op(op)
