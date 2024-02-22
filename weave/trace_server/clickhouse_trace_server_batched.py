@@ -100,6 +100,7 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 class ObjCHInsertable(BaseModel):
     entity: str
     project: str
+    is_op: bool
     name: str
     version_hash: str
     created_datetime: datetime.datetime
@@ -112,6 +113,7 @@ class ObjCHInsertable(BaseModel):
 class SelectableCHObjSchema(BaseModel):
     entity: str
     project: str
+    is_op: bool
     name: str
     version_hash: str
     created_datetime: datetime.datetime
@@ -242,30 +244,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
+        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj, is_op=True)
         self._insert_obj(ch_obj)
         return tsi.OpCreateRes(version_hash=ch_obj.version_hash)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(self._obj_read(req)))
+        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=True)))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         raise NotImplementedError()
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        ch_obj = _partial_obj_schema_to_ch_obj(req.obj)
+        ch_obj = _partial_obj_schema_to_ch_obj(req.obj, is_op=False)
         self._insert_obj(ch_obj)
         return tsi.ObjCreateRes(version_hash=ch_obj.version_hash)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(self._obj_read(req)))
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=False)))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conditions: typing.List[str] = []
         # parameters = {}
         if req.filter:
             raise NotImplementedError()
-        # conditions.append("is_op == 0")
+        conditions.append("is_op == 0")
 
         ch_objs = self._select_objs_query(
             req.entity,
@@ -434,8 +436,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
         return calls
 
-    def _obj_read(self, req: tsi.ObjReadReq) -> SelectableCHObjSchema:
+    def _obj_read(self, req: tsi.ObjReadReq, op_only: bool
+                  ) -> SelectableCHObjSchema:
         conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
+
+        if op_only:
+            conditions.append("is_op == 1")
+        else:
+            conditions.append("is_op == 0")
+
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
@@ -522,6 +531,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objects_raw (
             entity String,
             project String,
+            is_op UInt8,
             name String,
             version_hash String,
             created_datetime DateTime64(3),
@@ -534,7 +544,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         )
         ENGINE = MergeTree
-        ORDER BY (entity, project, name, version_hash)
+        ORDER BY (entity, project, is_op, name, version_hash)
         """
         )
 
@@ -544,6 +554,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objects_deduplicated (
             entity String,
             project String,
+            is_op UInt8,
             name String,
             version_hash String,
             created_datetime SimpleAggregateFunction(min, DateTime64(3)),
@@ -555,7 +566,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             metadata_dict_dump SimpleAggregateFunction(any, String),
         )
         ENGINE = AggregatingMergeTree
-        ORDER BY (entity, project, name, version_hash)
+        ORDER BY (entity, project, is_op, name, version_hash)
         """
         )
 
@@ -566,6 +577,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         SELECT
             entity,
             project,
+            is_op,
             name,
             version_hash,
             minSimpleState(created_datetime) as created_datetime,
@@ -575,7 +587,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             anySimpleState(metadata_dict_dump) as metadata_dict_dump
             
         FROM objects_raw
-        GROUP BY entity, project, name, version_hash
+        GROUP BY entity, project, is_op, name, version_hash
         """
         )
 
@@ -587,6 +599,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         SELECT
             entity,
             project,
+            is_op,
             name,
             version_hash,
             min(objects_deduplicated.created_datetime) as created_datetime,
@@ -596,9 +609,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             row_number() OVER w1 as version_index,
             1 == count(*) OVER w1 as is_latest
         FROM objects_deduplicated
-        GROUP BY entity, project, name, version_hash
+        GROUP BY entity, project, is_op, name, version_hash
         WINDOW
-            w1 AS (PARTITION BY entity, project, name ORDER BY min(objects_deduplicated.created_datetime) ASC Rows BETWEEN CURRENT ROW AND 1 FOLLOWING)
+            w1 AS (PARTITION BY entity, project, is_op, name ORDER BY min(objects_deduplicated.created_datetime) ASC Rows BETWEEN CURRENT ROW AND 1 FOLLOWING)
         """
         )
 
@@ -854,7 +867,7 @@ def _process_parameters(
 
 def _partial_obj_schema_to_ch_obj(
     partial_obj: tsi.ObjSchemaForInsert,
-    # is_op: bool = False,
+    is_op: bool,
 ) -> ObjCHInsertable:
     version_hash = version_hash_for_object(partial_obj)
 
@@ -863,7 +876,7 @@ def _partial_obj_schema_to_ch_obj(
         project=partial_obj.project,
         name=partial_obj.name,
         version_hash=version_hash,
-        # is_op=is_op,
+        is_op=is_op,
         type_dict_dump=_dict_value_to_dump(partial_obj.type_dict),
         bytes_file_map=decode_b64_to_bytes(partial_obj.b64_file_map or {}),
         metadata_dict_dump=_dict_value_to_dump(partial_obj.metadata_dict),
