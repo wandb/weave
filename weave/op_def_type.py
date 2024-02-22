@@ -187,7 +187,7 @@ class RefJSONEncoder(json.JSONEncoder):
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
     def default(self, o):
-        from .trace_server.graph_client_trace import TraceNounRef
+        from .trace_server.graph_client_trace import TraceRef
 
         ref_code = None
         if isinstance(o, artifact_fs.FilesystemArtifactRef):
@@ -195,7 +195,7 @@ class RefJSONEncoder(json.JSONEncoder):
                 ref_code = f"weave.storage.artifact_path_ref('{o.local_ref_str()}')"
             else:
                 ref_code = f"weave.ref('{str(o)}')"
-        elif isinstance(o, TraceNounRef):
+        elif isinstance(o, TraceRef):
             ref_code = f"weave.ref('{str(o)}')"
 
         if ref_code is not None:

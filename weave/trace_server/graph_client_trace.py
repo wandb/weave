@@ -248,8 +248,8 @@ class TraceURI(uris.WeaveURI):
             uri += f"#{'/'.join(self.extra)}"
         return uri
 
-    def to_ref(self) -> "TraceNounRef":
-        return TraceNounRef.from_uri(self)
+    def to_ref(self) -> "TraceRef":
+        return TraceRef.from_uri(self)
 
     def with_path(self, path: str) -> "TraceURI":
 
@@ -264,7 +264,7 @@ class TraceURI(uris.WeaveURI):
         )
 
 
-class TraceNounRef(ref_base.Ref):
+class TraceRef(ref_base.Ref):
     version: str
 
     def __init__(
@@ -299,7 +299,7 @@ class TraceNounRef(ref_base.Ref):
         super().__init__(obj=obj, type=type)
 
     @classmethod
-    def from_uri(cls, uri: uris.WeaveURI) -> "TraceNounRef":
+    def from_uri(cls, uri: uris.WeaveURI) -> "TraceRef":
         if not isinstance(uri, TraceURI):
             raise ValueError("Expected WandbTableURI")
         return cls(
@@ -400,7 +400,7 @@ class TraceNounRef(ref_base.Ref):
 
     def with_extra(
         self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
-    ) -> "TraceNounRef":
+    ) -> "TraceRef":
         if self._trace_noun != "obj":
             raise ValueError("Can only add extra to obj ref")
 
@@ -499,8 +499,8 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
 
     def op_runs(self, op_def: OpDef) -> Sequence[CallSchemaRun]:
         ref = _get_ref(op_def)
-        if not isinstance(ref, TraceNounRef):
-            raise ValueError("Expected TraceNounRef")
+        if not isinstance(ref, TraceRef):
+            raise ValueError("Expected TraceRef")
         ref_str = str(ref)
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
@@ -512,8 +512,8 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         return [_run_from_call(call) for call in res.calls]
 
     def ref_input_to(self, ref: Ref) -> Sequence[CallSchemaRun]:
-        if not isinstance(ref, TraceNounRef):
-            raise ValueError("Expected TraceNounRef")
+        if not isinstance(ref, TraceRef):
+            raise ValueError("Expected TraceRef")
         ref_str = str(ref)
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
@@ -525,8 +525,8 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         return [_run_from_call(call) for call in res.calls]
 
     def ref_value_input_to(self, ref: Ref) -> list[CallSchemaRun]:
-        if not isinstance(ref, TraceNounRef):
-            raise ValueError("Expected TraceNounRef")
+        if not isinstance(ref, TraceRef):
+            raise ValueError("Expected TraceRef")
         ref_str = str(ref)
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
@@ -538,8 +538,8 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         return [_run_from_call(call) for call in res.calls]
 
     def ref_output_of(self, ref: Ref) -> typing.Optional[CallSchemaRun]:
-        if not isinstance(ref, TraceNounRef):
-            raise ValueError("Expected TraceNounRef")
+        if not isinstance(ref, TraceRef):
+            raise ValueError("Expected TraceRef")
         ref_str = str(ref)
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
@@ -561,7 +561,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
     # Helpers
 
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
-        return isinstance(ref, TraceNounRef)
+        return isinstance(ref, TraceRef)
 
     def ref_uri(
         self, name: str, version: str, path: str
@@ -575,7 +575,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
 
     def save_object(self, obj: typing.Any, name: str, branch_name: str) -> ref_base.Ref:
         _orig_ref = _get_ref(obj)
-        if isinstance(_orig_ref, TraceNounRef):
+        if isinstance(_orig_ref, TraceRef):
             return _orig_ref
         weave_type = types.type_of_with_refs(obj)
         orig_obj = obj
@@ -613,7 +613,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
 
         art._version = version_hash
 
-        ref = TraceNounRef(
+        ref = TraceRef(
             entity=self.entity,
             project=self.project,
             trace_noun=trace_noun,
