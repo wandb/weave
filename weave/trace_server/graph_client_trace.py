@@ -31,6 +31,7 @@ from .. import weave_types as types
 
 
 from .trace_server_interface_util import (
+    TRACE_REF_SCHEME,
     decode_b64_to_bytes,
     encode_bytes_as_b64,
     generate_id,
@@ -163,7 +164,7 @@ def refs_to_str(val: typing.Any) -> typing.Any:
 # `wandb-trace:///[entity]/[project]/obj/[name]:[CONTENT_HASH]/[PATH]#[EXTRA]`
 @dataclasses.dataclass
 class TraceURI(uris.WeaveURI):
-    SCHEME = "wandb-trace"
+    SCHEME = TRACE_REF_SCHEME
     version: str
     entity: str
     project: str

@@ -6,6 +6,9 @@ import uuid
 
 from . import trace_server_interface as tsi
 
+TRACE_REF_SCHEME = "wandb-trace"
+ARTIFACT_REF_SCHEME = "wandb-artifact"
+
 
 def generate_id() -> str:
     return str(uuid.uuid4())

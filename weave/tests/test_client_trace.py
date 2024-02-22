@@ -1,5 +1,6 @@
 import datetime
 import weave
+from ..trace_server.trace_server_interface_util import TRACE_REF_SCHEME
 from ..trace_server import trace_server_interface as tsi
 
 
@@ -19,7 +20,7 @@ def test_simple_op(trace_client):
     fetched_call = runs[0]._call
     assert (
         fetched_call.name
-        == "wandb-trace:///test_entity/test_project/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
+        == f"{TRACE_REF_SCHEME}:///test_entity/test_project/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
     )
     assert fetched_call == tsi.CallSchema(
         entity=trace_client.entity,
