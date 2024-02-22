@@ -134,7 +134,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         # Hack! We should have a better way to determine this
         if "obj.py" in self.path_contents:
             trace_noun = "op"
-        return TraceNounUri(
+        return TraceURI(
             entity=self._entity,
             project=self._project,
             trace_noun=trace_noun,
@@ -162,7 +162,7 @@ def refs_to_str(val: typing.Any) -> typing.Any:
 # `wandb-trace:///[entity]/[project]/op/[name]:[CONTENT_HASH]`
 # `wandb-trace:///[entity]/[project]/obj/[name]:[CONTENT_HASH]/[PATH]#[EXTRA]`
 @dataclasses.dataclass
-class TraceNounUri(uris.WeaveURI):
+class TraceURI(uris.WeaveURI):
     SCHEME = "wandb-trace"
     version: str
     entity: str
@@ -181,7 +181,7 @@ class TraceNounUri(uris.WeaveURI):
         params: str,
         query: dict[str, list[str]],
         fragment: str,
-    ) -> "TraceNounUri":
+    ) -> "TraceURI":
         path_parts = path.strip("/").split("/")
 
         if len(path_parts) < 4:
@@ -250,9 +250,9 @@ class TraceNounUri(uris.WeaveURI):
     def to_ref(self) -> "TraceNounRef":
         return TraceNounRef.from_uri(self)
 
-    def with_path(self, path: str) -> "TraceNounUri":
+    def with_path(self, path: str) -> "TraceURI":
 
-        return TraceNounUri(
+        return TraceURI(
             entity=self.entity,
             project=self.project,
             trace_noun=self.trace_noun,
@@ -299,7 +299,7 @@ class TraceNounRef(ref_base.Ref):
 
     @classmethod
     def from_uri(cls, uri: uris.WeaveURI) -> "TraceNounRef":
-        if not isinstance(uri, TraceNounUri):
+        if not isinstance(uri, TraceURI):
             raise ValueError("Expected WandbTableURI")
         return cls(
             entity=uri.entity,
@@ -328,7 +328,7 @@ class TraceNounRef(ref_base.Ref):
     @property
     def uri(self) -> str:
         return str(
-            TraceNounUri(
+            TraceURI(
                 entity=self._entity,
                 project=self._project,
                 trace_noun=self._trace_noun,

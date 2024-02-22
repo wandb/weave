@@ -116,7 +116,7 @@ def patch() -> None:
 
         gc = graph_client_context.require_graph_client()
         if gc:
-            info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
+            # info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
 
             hooks = ChatCompletions(old_create)
             async_hooks = AsyncChatCompletions(old_async_create)
