@@ -67,8 +67,7 @@ def _check_server_health(
     return False
 
 
-def _check_server_up(host="0.0.0.0", port=18123) -> typing.Tuple[str, int, bool]:
-    base_port = 18123
+def _check_server_up(host="0.0.0.0", port=8123) -> typing.Tuple[str, int, bool]:
     base_url = f"http://{host}:{port}/"
     endpoint = "/ping"
 
@@ -88,7 +87,7 @@ def _check_server_up(host="0.0.0.0", port=18123) -> typing.Tuple[str, int, bool]
                 "-d",
                 "--rm",
                 "-p",
-                f"{base_port}:8123",
+                f"{port}:8123",
                 "--name",
                 "weave-python-test-clickhouse-server",
                 "--ulimit",
