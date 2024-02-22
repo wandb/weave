@@ -1178,6 +1178,9 @@ class WFNaiveCall implements WFCall {
     });
   }
   parentCall(): WFCall | null {
+    if (!this.callDict.callSpan.parent_id) {
+      return null;
+    }
     const parentCall = this.state.callsMap.get(
       this.callDict.callSpan.parent_id
     );

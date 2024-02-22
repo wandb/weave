@@ -8,7 +8,7 @@ import React from 'react';
 
 import {Tooltip} from '../../../../../Tooltip';
 
-export const CALL_STATUS = ['SUCCESS', 'DESCENDANT_ERROR', 'ERROR'];
+export const CALL_STATUS = ['SUCCESS', 'DESCENDANT_ERROR', 'ERROR', 'UNSET'];
 export type CallStatusType = (typeof CALL_STATUS)[number];
 
 type StatusChipProps = {
@@ -42,8 +42,8 @@ const STATUS_INFO: Record<CallStatusType, CallStatusInfo> = {
     tooltip: 'This call failed.',
   },
   UNSET: {
-    icon: 'randomize-reset-reload',
-    label: 'Running',
+    icon: 'run',
+    label: 'Pending',
     color: 'cactus',
     tooltip: 'This call has not finished.',
   },
