@@ -253,7 +253,7 @@ def configure_logger() -> None:
                     environment.weave_log_format(LogFormat.PRETTY), logging.INFO
                 ),
             )
-        else:
+        elif not os.environ.get("WEAVE_DISABLE_LOGGING"):
             # This is the default case. Log to a file for this process, but
             # do not write to standard out/error. This is important because
             # when you run Weave in a notebook, it'll create a server, but
