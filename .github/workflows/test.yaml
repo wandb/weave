@@ -112,8 +112,6 @@ jobs:
         image: clickhouse/clickhouse-server
         ports:
           - "18123:8123"
-          - "8083:8083"
-          - "9015:9015"
         options: --health-cmd "curl --fail http://localhost:18123/ || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       # - uses: datadog/agent-github-action@v1.3
