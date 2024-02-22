@@ -64,7 +64,7 @@ export interface Call {
   summary: {latency_s: number; [key: string]: any};
   span_id: string;
   trace_id: string;
-  parent_id?: string;
+  parent_id: string;
   timestamp: number;
   start_time_ms: number;
   end_time_ms: number;
