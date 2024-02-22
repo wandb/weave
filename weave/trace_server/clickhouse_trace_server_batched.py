@@ -773,7 +773,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 def _dict_value_to_dump(
     value: dict,
 ) -> str:
-    return json.dumps(value)
+    cpy = value.copy()
+    if "_keys" not in cpy:
+        keys = list(cpy.keys())
+        cpy['_keys'] = keys
+    return json.dumps(cpy)
 
 
 def _dict_dump_to_dict(val: str) -> typing.Dict[str, typing.Any]:

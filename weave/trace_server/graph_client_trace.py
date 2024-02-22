@@ -1,17 +1,10 @@
-import base64
 import dataclasses
-import hashlib
-import json
-import copy
 import typing
-import uuid
-import time
 import datetime
 import contextlib
 import io
 import os
 from typing import Sequence, Sequence
-from clickhouse_connect import get_client
 
 
 # from weave.graph_client_sql import MemFilesArtifact
@@ -24,10 +17,7 @@ from .. import artifact_local
 from .. import ref_base
 from .. import uris
 from .. import weave_types as types
-from .. import mappers_python
 from ..run import RunKey, Run
-from ..runs import Run as WeaveRunObj
-from .. import storage
 from .. import box
 from .. import urls
 import functools
@@ -169,25 +159,6 @@ def refs_to_str(val: typing.Any) -> typing.Any:
     else:
         return val
 
-
-# def hash_inputs(
-#     inputs: Mapping[str, typing.Any],
-# ) -> str:
-#     hasher = hashlib.md5()
-#     hasher.update(json.dumps(refs_to_str(inputs)).encode())
-#     return hasher.hexdigest()
-
-
-# def make_run_id(op_name: str, inputs: dict[str, typing.Any]) -> str:
-#     input_hash = hash_inputs(inputs)
-#     hasher = hashlib.md5()
-#     hasher.update(op_name.encode())
-#     hasher.update(input_hash.encode())
-#     return hasher.hexdigest()
-
-
-# URIS are the WORST! Here is what we want:
-# TODO: Move netloc to empty string.
 # `wandb-trace:///[entity]/[project]/call/[ID]`
 # `wandb-trace:///[entity]/[project]/op/[name]:[CONTENT_HASH]`
 # `wandb-trace:///[entity]/[project]/obj/[name]:[CONTENT_HASH]/[PATH]#[EXTRA]`
@@ -348,7 +319,6 @@ class TraceNounRef(ref_base.Ref):
     @property
     def type(self) -> "types.Type":
         if self._type is None:
-            # TODO: expensive
             self._type = types.TypeRegistry.type_of(self.obj)
         return self._type
 
@@ -416,27 +386,10 @@ class TraceNounRef(ref_base.Ref):
                 metadata=res.obj.metadata_dict,
             )
             wb_type = types.TypeRegistry.type_from_dict(res.obj.type_dict)
-            # mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
             data = wb_type.load_instance(art, "obj")
             return data
-            # return mapper.apply(res.obj.val_dict)
         else:
             raise ValueError(f"Invalid trace noun: {self._trace_noun}")
-
-        # client = gc.client
-        # query_result = client.query(
-        #     f"SELECT * FROM objects WHERE id = '{self._version_hash}'",
-        #     # Tell clickhouse_connect to return the files map as bytes. But this
-        #     # also returns the keys as bytes...
-        #     column_formats={"files": {"string": "bytes"}},
-        # )
-        # item = query_result.first_item
-        # files = {k.decode("utf-8"): v for k, v in item["files"].items()}
-        # art = MemFilesArtifact(files, metadata=json.loads(item["art_meta"]))
-        # wb_type = types.TypeRegistry.type_from_dict(json.loads(item["type"]))
-        # mapper = mappers_python.map_from_python(wb_type, art)  # type: ignore
-        # res = mapper.apply(json.loads(item["val"]))
-        # return res
 
     def __repr__(self) -> str:
         return f"<{self.__class__}({id(self)}) entity_name={self._entity} project_name={self._project} object_name={self._name} version_hash={self._version} obj={self._obj} type={self._type}>"
@@ -616,7 +569,6 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
 
     ##### Write API
 
-    # def save_object(self, obj: typing.Any, name: str, branch_name: str) -> TraceNounRef:
     def save_object(self, obj: typing.Any, name: str, branch_name: str) -> ref_base.Ref:
         _orig_ref = _get_ref(obj)
         if isinstance(_orig_ref, TraceNounRef):
@@ -628,13 +580,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             self.entity, self.project, name, "_VERSION_PENDING_"
         )
         ref: ref_base.Ref = art.set("obj", weave_type, obj)
-        # ref_base._put_ref(obj, ref)
 
-        # mapper = mappers_python.map_to_python(weave_type, art)
-        # val = mapper.apply(obj)
-
-        # type_val = storage.to_python(obj, ref_persister=save_custom_object)
-        # Should this encoding be handled below the server abstraction?
         encoded_path_contents = encode_bytes_as_b64(
             {
                 k: (v.encode("utf-8") if isinstance(v, str) else v)
@@ -683,12 +629,6 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         input_refs: Sequence[Ref],
     ) -> CallSchemaRun:
 
-        inputs = copy.copy(inputs)
-        inputs["_keys"] = list(inputs.keys())
-        for i, ref in enumerate(input_refs[:3]):
-            inputs["_ref%s" % i] = ref
-            inputs["_ref_digest%s" % i] = ref.digest
-
         if parent:
             trace_id = parent.trace_id
             parent_id = parent.id
@@ -696,12 +636,11 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             trace_id = generate_id()
             parent_id = None
 
-        call_id = generate_id()
 
         start = tsi.StartedCallSchemaForInsert(
             entity=self.entity,
             project=self.project,
-            id=call_id,
+            id=generate_id(),
             name=op_name,
             trace_id=trace_id,
             start_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
@@ -735,7 +674,6 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         output: typing.Any,
         output_refs: Sequence[Ref],
     ) -> None:
-        # TODO process outputs into Refs
         output = refs_to_str(output)
         if not isinstance(output, dict):
             output = {"_result": output}
