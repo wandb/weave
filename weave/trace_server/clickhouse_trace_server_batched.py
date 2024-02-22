@@ -249,10 +249,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpCreateRes(version_hash=ch_obj.version_hash)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=True)))
+        return tsi.OpReadRes(
+            op_obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=True))
+        )
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise NotImplementedError()
+        conditions: typing.List[str] = []
+        # parameters = {}
+        if req.filter:
+            raise NotImplementedError()
+        conditions.append("is_op == 1")
+
+        ch_objs = self._select_objs_query(
+            req.entity,
+            req.project,
+            # columns=None,
+            conditions=conditions,
+            # order_by=None,
+            # Skipping limit and offset for now so we aren't tempted to use them.
+            # We should have a better way to paginate
+            # offset=req.offset,
+            # limit=req.limit,
+            # parameters=parameters,
+        )
+        objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
+        return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         ch_obj = _partial_obj_schema_to_ch_obj(req.obj, is_op=False)
@@ -260,7 +281,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(version_hash=ch_obj.version_hash)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=False)))
+        return tsi.ObjReadRes(
+            obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=False))
+        )
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conditions: typing.List[str] = []
@@ -436,8 +459,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
         return calls
 
-    def _obj_read(self, req: tsi.ObjReadReq, op_only: bool
-                  ) -> SelectableCHObjSchema:
+    def _obj_read(self, req: tsi.ObjReadReq, op_only: bool) -> SelectableCHObjSchema:
         conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
 
         if op_only:
