@@ -3,17 +3,7 @@ import {Autocomplete} from '@mui/material';
 import _ from 'lodash';
 import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 
-import {
-  constBoolean,
-  constFunction,
-  constString,
-  opArray,
-  opJoin,
-  opPick,
-  typedDict,
-} from '../../../../../core';
-import {parseRef, useNodeValue} from '../../../../../react';
-import {Span} from '../../Browse2/callTree';
+import {parseRef} from '../../../../../react';
 import {objectRefDisplayName} from '../../Browse2/SmallRef';
 import {
   getValueAtNestedKey,
@@ -22,9 +12,9 @@ import {
 } from './CallsPage/PivotRunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {
-  callsNode,
   spanToCallSchema,
   useCalls,
+  useSubRunsFromWeaveQuery,
 } from './wfReactInterface/interface';
 
 export const CompareCallsPage: FC<{
@@ -46,7 +36,6 @@ export const CompareCallsPage: FC<{
     props.entity,
     props.project,
     props.callIds,
-    props.secondaryDim,
     selectedOpVersionRef,
     selectedObjectVersionRef
   );
@@ -294,54 +283,4 @@ export const CompareCallsPage: FC<{
       ]}
     />
   );
-};
-
-const useSubRunsFromWeaveQuery = (
-  entity: string,
-  project: string,
-  parentCallIds: string[] | undefined,
-  secondaryDim: string | undefined,
-  selectedOpVersionRef: string | null,
-  selectedObjectVersionRef: string | null
-): {
-  loading: boolean;
-  result: Array<{
-    parent: Span;
-    child: Span;
-  }>;
-} => {
-  const parentRunsNode = selectedObjectVersionRef
-    ? callsNode(entity, project, {
-        callIds: parentCallIds,
-        inputObjectVersionRefs: [selectedObjectVersionRef],
-      })
-    : opArray({} as any);
-  const childRunsNode = selectedOpVersionRef
-    ? callsNode(entity, project, {
-        opVersionRefs: [selectedOpVersionRef],
-      })
-    : opArray({} as any);
-  const joinedRuns = opJoin({
-    arr1: parentRunsNode,
-    arr2: childRunsNode,
-    join1Fn: constFunction({row: typedDict({span_id: 'string'})}, ({row}) => {
-      return opPick({obj: row, key: constString('span_id')});
-    }) as any,
-    join2Fn: constFunction({row: typedDict({parent_id: 'string'})}, ({row}) => {
-      return opPick({obj: row, key: constString('parent_id')});
-    }) as any,
-    alias1: constString('parent'),
-    alias2: constString('child'),
-    leftOuter: constBoolean(true),
-    rightOuter: constBoolean(false),
-  });
-  const nodeValue = useNodeValue(joinedRuns, {
-    skip: !selectedObjectVersionRef || !selectedOpVersionRef,
-  });
-  return useMemo(() => {
-    return {
-      loading: nodeValue.loading,
-      result: nodeValue.result ?? [],
-    };
-  }, [nodeValue.loading, nodeValue.result]);
 };

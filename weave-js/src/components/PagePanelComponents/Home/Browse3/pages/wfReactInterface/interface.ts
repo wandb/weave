@@ -3,6 +3,7 @@ import LRUCache from 'lru-cache';
 import {useEffect, useMemo, useState} from 'react';
 
 import {
+  constBoolean,
   constFunction,
   constString,
   Node,
@@ -23,6 +24,7 @@ import {
   opFilter,
   opFlatten,
   opIsNone,
+  opJoin,
   opMap,
   opPick,
   opProjectArtifact,
@@ -30,6 +32,7 @@ import {
   opProjectArtifactVersion,
   opRootProject,
   opStringEqual,
+  typedDict,
 } from '../../../../../../core';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {useNodeValue} from '../../../../../../react';
@@ -242,7 +245,7 @@ export type CallFilter = {
   opCategory?: OpCategory[];
 };
 
-export const callsNode = (
+const callsNode = (
   entity: string,
   project: string,
   filter: CallFilter
@@ -956,6 +959,60 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
     refExtraTuples,
   };
 };
+
+
+/// Derived Interface - these are not part of the formal interface yet and need to be folded into the trace server directly ///
+
+
+export const useSubRunsFromWeaveQuery = (
+  entity: string,
+  project: string,
+  parentCallIds: string[] | undefined,
+  selectedOpVersionRef: string | null,
+  selectedObjectVersionRef: string | null
+): {
+  loading: boolean;
+  result: Array<{
+    parent: Span;
+    child: Span;
+  }>;
+} => {
+  const parentRunsNode = selectedObjectVersionRef
+    ? callsNode(entity, project, {
+        callIds: parentCallIds,
+        inputObjectVersionRefs: [selectedObjectVersionRef],
+      })
+    : opArray({} as any);
+  const childRunsNode = selectedOpVersionRef
+    ? callsNode(entity, project, {
+        opVersionRefs: [selectedOpVersionRef],
+      })
+    : opArray({} as any);
+  const joinedRuns = opJoin({
+    arr1: parentRunsNode,
+    arr2: childRunsNode,
+    join1Fn: constFunction({row: typedDict({span_id: 'string'})}, ({row}) => {
+      return opPick({obj: row, key: constString('span_id')});
+    }) as any,
+    join2Fn: constFunction({row: typedDict({parent_id: 'string'})}, ({row}) => {
+      return opPick({obj: row, key: constString('parent_id')});
+    }) as any,
+    alias1: constString('parent'),
+    alias2: constString('child'),
+    leftOuter: constBoolean(true),
+    rightOuter: constBoolean(false),
+  });
+  const nodeValue = useNodeValue(joinedRuns, {
+    skip: !selectedObjectVersionRef || !selectedOpVersionRef,
+  });
+  return useMemo(() => {
+    return {
+      loading: nodeValue.loading,
+      result: nodeValue.result ?? [],
+    };
+  }, [nodeValue.loading, nodeValue.result]);
+};
+
 
 //// In Mem Cache Layer ////
 
