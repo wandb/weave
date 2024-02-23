@@ -99,3 +99,18 @@ def test_trace_server_call_start(clickhouse_trace_server):
         "outputs": {"_keys": ["d"], "d": 5},
         "summary": {"_keys": ["c"], "c": 5},
     }
+
+
+def test_call_query_ordering(trace_client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a + 1
+
+    for i in range(10):
+        my_op(i)
+
+    runs = trace_client.runs()
+    assert len(runs) == 10
+
+    # We want to preserve insert order
+    assert [run._call.inputs["a"] for run in runs] == list(range(10))

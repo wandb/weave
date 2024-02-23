@@ -412,21 +412,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         conditions_part = " AND ".join(conditions)
 
-        order_by_part = ""
-        if order_by != None:
-            order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
-            for field, direction in order_by:
-                assert (
-                    field in all_call_select_columns
-                ), f"Invalid order_by field: {field}"
-                assert direction in [
-                    "ASC",
-                    "DESC",
-                ], f"Invalid order_by direction: {direction}"
-            order_by_part = ", ".join(
-                [f"{field} {direction}" for field, direction in order_by]
-            )
-            order_by_part = f"ORDER BY {order_by_part}"
+        order_by_part = "ORDER BY start_datetime ASC"
+        # if order_by != None:
+        #     order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
+        #     for field, direction in order_by:
+        #         assert (
+        #             field in all_call_select_columns
+        #         ), f"Invalid order_by field: {field}"
+        #         assert direction in [
+        #             "ASC",
+        #             "DESC",
+        #         ], f"Invalid order_by direction: {direction}"
+        #     order_by_part = ", ".join(
+        #         [f"{field} {direction}" for field, direction in order_by]
+        #     )
+        #     order_by_part = f"ORDER BY {order_by_part}"
 
         offset_part = ""
         if offset != None:
