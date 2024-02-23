@@ -30,7 +30,6 @@ def clickhouse_server():
 
 @pytest.fixture(scope="session")
 def clickhouse_trace_server(clickhouse_server):
-    (host, port) = clickhouse_server
     clickhouse_trace_server = (
         clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(False)
     )
@@ -39,9 +38,10 @@ def clickhouse_trace_server(clickhouse_server):
 
 
 @pytest.fixture()
-def trace_client(clickhouse_trace_server):
+def trace_client(clickhouse_trace_server, user_by_api_key_in_env):
+    user_by_api_key_in_env
     graph_client = graph_client_trace.GraphClientTrace(
-        "test_entity", "test_project", clickhouse_trace_server
+        user_by_api_key_in_env.username, "test_project", clickhouse_trace_server
     )
     inited_client = InitializedClient(graph_client)
 
