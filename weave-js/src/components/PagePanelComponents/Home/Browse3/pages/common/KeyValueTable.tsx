@@ -5,7 +5,7 @@ import moment from 'moment';
 import React, {useContext, useEffect, useState} from 'react';
 
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {isPrimitive, Primative} from './util';
+import {isPrimitive, Primitive} from './util';
 
 const VALUE_SPACE = 4;
 const ROW_HEIGHT = 26;
@@ -44,11 +44,11 @@ const SimpleTable: React.FC<{
 );
 
 export const SingleValueTable: React.FC<{
-  result: Primative;
+  result: Primitive;
   headerTitle?: string;
 }> = ({headerTitle, result}) => (
   <SimpleTable headerTitle={headerTitle}>
-    <PrimativeRow value={result} />
+    <PrimitiveRow value={result} />
   </SimpleTable>
 );
 
@@ -100,8 +100,8 @@ const valueStyle: React.CSSProperties = {
   borderBottom: `1px solid ${MOON_250}`,
 };
 
-const PrimativeRow: React.FC<{
-  value: Primative;
+const PrimitiveRow: React.FC<{
+  value: Primitive;
 }> = ({value}) => {
   const [open, setOpen] = React.useState(false);
   const cellRef = React.useRef<HTMLTableCellElement>(null);
@@ -127,14 +127,14 @@ const PrimativeRow: React.FC<{
         style={valueStyle}
         colSpan={VALUE_SPACE}
         ref={cellRef}>
-        <PrimativeCell value={value} />
+        <PrimitiveCell value={value} />
       </td>
     </tr>
   );
 };
 
-const PrimativeCell: React.FC<{
-  value: Primative;
+const PrimitiveCell: React.FC<{
+  value: Primitive;
 }> = ({value}) => {
   const valRef = _.isString(value) ? parseRefMaybe(value) : null;
   let useVal: any = value;
@@ -206,7 +206,7 @@ const KeyValueRow: React.FC<{
           {props.rowKey}
         </td>
         <td style={valueStyle} colSpan={VALUE_SPACE} ref={cellRef}>
-          <PrimativeCell value={props.rowValue} />
+          <PrimitiveCell value={props.rowValue} />
         </td>
       </tr>
     );

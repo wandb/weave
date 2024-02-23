@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import React from 'react';
 
-export type Primative =
+export type Primitive =
   | string
   | number
   | boolean

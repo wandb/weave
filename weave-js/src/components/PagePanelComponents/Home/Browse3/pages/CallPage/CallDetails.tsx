@@ -12,7 +12,7 @@ import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {isPrimitive, Primative} from '../common/util';
+import {isPrimitive, Primitive, getDisplayInputsAndOutput} from '../common/util';
 import {
   CallSchema,
   useCalls,
@@ -132,7 +132,7 @@ export const CallDetails: FC<{
                 output
               }
               result={
-                outputIsOnlyResult ? (output._result as Primative) : undefined
+                outputIsOnlyResult ? (output._result as Primitive) : undefined
               }
             />
           </Box>
@@ -239,25 +239,6 @@ export const CallDetails: FC<{
       </Box>
     </Box>
   );
-};
-
-const getDisplayInputsAndOutput = (call: CallSchema) => {
-  const span = call.rawSpan;
-  const inputKeys =
-    span.inputs._keys ??
-    Object.entries(span.inputs)
-      .filter(([k, c]) => c != null && !k.startsWith('_'))
-      .map(([k, c]) => k);
-  const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
-
-  const callOutput = span.output ?? {};
-  const outputKeys =
-    callOutput._keys ??
-    Object.entries(callOutput)
-      .filter(([k, c]) => c != null && (k === '_result' || !k.startsWith('_')))
-      .map(([k, c]) => k);
-  const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
-  return {inputs, output};
 };
 
 const callGrouping = (childCalls: CallSchema[]) => {

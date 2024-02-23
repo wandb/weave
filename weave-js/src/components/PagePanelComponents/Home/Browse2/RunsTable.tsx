@@ -119,21 +119,22 @@ export const RunsTable: FC<{
     [spans]
   );
   const params = useParams<Browse2RootObjectVersionItemParams>();
-  let onlyOneOutputResult = false;
-  if (spans.length > 0) {
-    const spanOutputKeys = _.uniq(
-      spans.map(s =>
-        Object.keys(
-          _.omitBy(
-            flattenObject(s.rawSpan.output!),
-            (v, k) => v == null || (k.startsWith('_') && k !== '_result')
-          )
-        )
+
+  let onlyOneOutputResult = true;
+  let span: CallSchema;
+  for (span in spans) {
+    // get display keys
+    const keys = Object.keys(
+      _.omitBy(
+        flattenObject(span.rawSpan.output!),
+        (v, k) => v == null || (k.startsWith('_') && k !== '_result')
       )
     );
-    onlyOneOutputResult = spanOutputKeys.every(
-      keys => keys.length === 0 || keys[0] === '_result'
-    );
+    // ensure there is only one output _result
+    if (keys.length !== 0 || keys[0] !== '_result') {
+      onlyOneOutputResult = false;
+      break;
+    }
   }
 
   const tableData = useMemo(() => {
