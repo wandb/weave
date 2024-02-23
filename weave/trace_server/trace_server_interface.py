@@ -154,7 +154,7 @@ class CallsQueryReq(BaseModel):
     filter: typing.Optional[_CallsFilter] = None
 
 
-class CallQueryRes(BaseModel):
+class CallsQueryRes(BaseModel):
     calls: typing.List[CallSchema]
 
 
@@ -243,7 +243,7 @@ class TraceServerInterface:
         ...
 
     @abc.abstractmethod
-    def calls_query(self, req: CallsQueryReq) -> CallQueryRes:
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         ...
 
     # Op API

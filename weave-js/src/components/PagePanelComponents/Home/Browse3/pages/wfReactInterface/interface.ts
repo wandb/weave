@@ -270,7 +270,7 @@ export const useCalls = (
   filter: CallFilter
 ): Loadable<CallSchema[]> => {
   const [callRes, setCallRes] =
-    useState<trace_server_client.TraceCallQueryRes | null>(null);
+    useState<trace_server_client.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
   useEffect(() => {
     trace_server_client

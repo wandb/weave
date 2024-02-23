@@ -47,7 +47,7 @@ interface TraceCallsQueryReq {
   filter?: TraceCallsFilter;
 }
 
-export interface TraceCallQueryRes {
+export interface TraceCallsQueryRes {
   calls: TraceCallSchema[];
 }
 
@@ -73,7 +73,7 @@ const makeTraceServerEndpointFn = <QT, ST>(endpoint: string) => {
 
 export const callsQuery = makeTraceServerEndpointFn<
   TraceCallsQueryReq,
-  TraceCallQueryRes
+  TraceCallsQueryRes
 >('/calls/query');
 
 export const callRead = makeTraceServerEndpointFn<

@@ -203,7 +203,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Return the marshaled response
         return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
 
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallQueryRes:
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         conditions = []
         parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
@@ -267,7 +267,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
         )
         calls = [_ch_call_to_call_schema(call) for call in ch_calls]
-        return tsi.CallQueryRes(calls=calls)
+        return tsi.CallsQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj, is_op=True)
@@ -425,6 +425,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for col in columns:
             if col in ["entity", "project", "id"]:
                 merged_cols.append(f"{col} AS {col}")
+            elif col in ["input_refs", "output_refs"]:
+                merged_cols.append(f"array_concat_agg({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
