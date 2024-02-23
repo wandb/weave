@@ -394,7 +394,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if col in ["entity", "project", "id"]:
                 merged_cols.append(f"{col} AS {col}")
             else:
-                merged_cols.append(f"anyLast({col}) AS {col}")
+                merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
@@ -524,12 +524,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self) -> None:
         print("Running migrations")
-        # res = self.ch_client.command("SHOW TABLES")
-        # if isinstance(res, str):
-        #     table_names = res.split("\n")
-        #     for table_name in table_names:
-        #         if not table_name.startswith("."):
-        #             self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
+        res = self.ch_client.command("SHOW TABLES")
+        if isinstance(res, str):
+            table_names = res.split("\n")
+            for table_name in table_names:
+                if not table_name.startswith("."):
+                    self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
 
         self.ch_client.command(
             """
@@ -666,17 +666,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # is that they will be non-null except for parent_id. The problem is that
                 # clickhouse might not aggregate the data immediately, so we need to allow
                 # for nulls in the interim.
-                trace_id SimpleAggregateFunction(any, String) NULL,
-                parent_id SimpleAggregateFunction(any, String) NULL,
-                name SimpleAggregateFunction(any, String) NULL,
-                start_datetime SimpleAggregateFunction(any, DateTime64(3)) NULL,
-                attributes_dump SimpleAggregateFunction(any, String) NULL,
-                inputs_dump SimpleAggregateFunction(any, String) NULL,
+                trace_id SimpleAggregateFunction(any, Nullable(String)),
+                parent_id SimpleAggregateFunction(any, Nullable(String)),
+                name SimpleAggregateFunction(any, Nullable(String)),
+                start_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
+                attributes_dump SimpleAggregateFunction(any, Nullable(String)),
+                inputs_dump SimpleAggregateFunction(any, Nullable(String)),
                 input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
-                end_datetime SimpleAggregateFunction(any, DateTime64(3)) NULL,
-                outputs_dump SimpleAggregateFunction(any, String) NULL,
-                summary_dump SimpleAggregateFunction(any, String) NULL,
-                exception SimpleAggregateFunction(any, String) NULL,
+                end_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
+                outputs_dump SimpleAggregateFunction(any, Nullable(String)),
+                summary_dump SimpleAggregateFunction(any, Nullable(String)),
+                exception SimpleAggregateFunction(any, Nullable(String)),
                 output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
             )
             ENGINE = AggregatingMergeTree
