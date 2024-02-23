@@ -28,8 +28,6 @@ from .. import uris
 from .. import errors
 from .. import ref_base
 from .. import weave_types as types
-from .. import artifact_wandb
-from ..wandb_interface import project_creator
 
 
 from .trace_server_interface_util import (
@@ -461,13 +459,6 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         self.project = project
         self.trace_server = trace_server
 
-        # Maybe this should happen on the first write event? For now, let's just ensure
-        # the project exists when the client is initialized. For production, we can move
-        # this to the service layer which will: a) save a round trip, and b) reduce the amount
-        # of client-side logic to duplicate to TS in the future. We already do auth checks
-        # in the service layer, so this is just a matter of convenience.
-        project_creator.ensure_project_exists(entity, project)
-
     ##### Read API
 
     # Implement the required members from the "GraphClient" protocol class
@@ -572,7 +563,9 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         return isinstance(ref, TraceRef)
 
-    def ref_uri(self, name: str, version: str, path: str) -> uris.WeaveURI:
+    def ref_uri(
+        self, name: str, version: str, path: str
+    ) -> artifact_local.WeaveLocalArtifactURI:
         raise NotImplementedError()
 
     def run_ui_url(self, run: Run) -> str:
@@ -713,37 +706,3 @@ def _get_ref(obj: typing.Any) -> typing.Optional[ref_base.Ref]:
     if isinstance(obj, ref_base.Ref):
         return obj
     return ref_base.get_ref(obj)
-
-
-# This is a modified version of the GraphClientTrace that uses the artifact storage
-# to store the objects and ops
-@dataclasses.dataclass
-class GraphClientTraceWithArtifactStorage(GraphClientTrace):
-    def __init__(
-        self, entity: str, project: str, trace_server: tsi.TraceServerInterface
-    ):
-        super().__init__(entity, project, trace_server)
-
-    def ref_is_own(self, ref: typing.Optional[Ref]) -> bool:
-        return isinstance(ref, artifact_wandb.WandbArtifactRef)
-
-    def ref_uri(
-        self, name: str, version: str, path: str
-    ) -> artifact_wandb.WeaveWBArtifactURI:
-        return artifact_wandb.WeaveWBArtifactURI(
-            name, version, self.entity, self.project, path=path
-        )
-
-    def save_object(
-        self, obj: typing.Any, name: str, branch_name: str
-    ) -> artifact_wandb.WandbArtifactRef:
-        from .. import storage
-
-        res = storage._direct_publish(
-            obj,
-            name=name,
-            wb_entity_name=self.entity,
-            wb_project_name=self.project,
-            branch_name=branch_name,
-        )
-        return res

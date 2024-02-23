@@ -2,16 +2,14 @@
 
 import datetime
 import json
-import os
 import time
 import typing
 
-from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.client import Client
 from clickhouse_connect.driver.query import QueryResult
 import clickhouse_connect
 from pydantic import BaseModel
 
-from weave.trace_server import environment as wf_env
 
 from .trace_server_interface_util import (
     ARTIFACT_REF_SCHEME,
@@ -133,25 +131,18 @@ required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
-    ch_client: CHClient
+    ch_client: Client
     call_insert_buffer: InMemFlushableBuffer
 
-    def __init__(
-        self,
-        host: str,
-        port: int = 8123,
-        user: str = "default",
-        password: str = "",
-        should_batch: bool = True,
-    ):
+    def __init__(self, host: str, port: int = 8123, should_batch: bool = True):
         super().__init__()
-        self._host = host
-        self._port = port
-        self._user = user
-        self._password = password
-        self.ch_client = self._mint_client()
-        self.ch_call_insert_thread_client = self._mint_client()
-        self.ch_obj_insert_thread_client = self._mint_client()
+        self.ch_client = clickhouse_connect.get_client(host=host, port=port)
+        self.ch_call_insert_thread_client = clickhouse_connect.get_client(
+            host=host, port=port
+        )
+        self.ch_obj_insert_thread_client = clickhouse_connect.get_client(
+            host=host, port=port
+        )
         self.call_insert_buffer = InMemAutoFlushingBuffer(
             MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_call_insert_buffer
         )
@@ -159,16 +150,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_obj_insert_buffer
         )
         self.should_batch = should_batch
-
-    @classmethod
-    def from_env(cls, should_batch: bool = True) -> "ClickHouseTraceServer":
-        return cls(
-            wf_env.wf_clickhouse_host(),
-            wf_env.wf_clickhouse_port(),
-            wf_env.wf_clickhouse_user(),
-            wf_env.wf_clickhouse_pass(),
-            should_batch,
-        )
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -306,11 +287,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     # Private Methods
-    def _mint_client(self) -> CHClient:
-        return clickhouse_connect.get_client(
-            host=self._host, port=self._port, user=self._user, password=self._password
-        )
-
     def __del__(self) -> None:
         self.call_insert_buffer.flush()
         self.ch_client.close()
@@ -404,7 +380,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if col in ["entity", "project", "id"]:
                 merged_cols.append(f"{col} AS {col}")
             else:
-                merged_cols.append(f"any({col}) AS {col}")
+                merged_cols.append(f"anyLast({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
@@ -534,12 +510,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self) -> None:
         print("Running migrations")
-        # res = self.ch_client.command("SHOW TABLES")
-        # if isinstance(res, str):
-        #     table_names = res.split("\n")
-        #     for table_name in table_names:
-        #         if not table_name.startswith("."):
-        #             self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
+        res = self.ch_client.command("SHOW TABLES")
+        if isinstance(res, str):
+            table_names = res.split("\n")
+            for table_name in table_names:
+                if not table_name.startswith("."):
+                    self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
 
         self.ch_client.command(
             """
@@ -588,7 +564,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         self.ch_client.command(
             """
-        CREATE MATERIALIZED VIEW IF NOT EXISTS objects_deduplicated_view TO objects_deduplicated
+        CREATE MATERIALIZED VIEW objects_deduplicated_view TO objects_deduplicated
         AS
         SELECT
             entity,
@@ -610,7 +586,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # The following view is just to workout version indexing and latest keys
         self.ch_client.command(
             """
-        CREATE VIEW IF NOT EXISTS objects_versioned
+        CREATE VIEW objects_versioned
         AS
         SELECT
             entity,
@@ -667,7 +643,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         self.ch_client.command(
             """
-            CREATE TABLE IF NOT EXISTS calls_merged
+            CREATE TABLE calls_merged
             (
                 entity String,
                 project String,
@@ -676,17 +652,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # is that they will be non-null except for parent_id. The problem is that
                 # clickhouse might not aggregate the data immediately, so we need to allow
                 # for nulls in the interim.
-                trace_id SimpleAggregateFunction(any, Nullable(String)),
-                parent_id SimpleAggregateFunction(any, Nullable(String)),
-                name SimpleAggregateFunction(any, Nullable(String)),
-                start_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-                attributes_dump SimpleAggregateFunction(any, Nullable(String)),
-                inputs_dump SimpleAggregateFunction(any, Nullable(String)),
+                trace_id SimpleAggregateFunction(any, String) NULL,
+                parent_id SimpleAggregateFunction(any, String) NULL,
+                name SimpleAggregateFunction(any, String) NULL,
+                start_datetime SimpleAggregateFunction(any, DateTime64(3)) NULL,
+                attributes_dump SimpleAggregateFunction(any, String) NULL,
+                inputs_dump SimpleAggregateFunction(any, String) NULL,
                 input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
-                end_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-                outputs_dump SimpleAggregateFunction(any, Nullable(String)),
-                summary_dump SimpleAggregateFunction(any, Nullable(String)),
-                exception SimpleAggregateFunction(any, Nullable(String)),
+                end_datetime SimpleAggregateFunction(any, DateTime64(3)) NULL,
+                outputs_dump SimpleAggregateFunction(any, String) NULL,
+                summary_dump SimpleAggregateFunction(any, String) NULL,
+                exception SimpleAggregateFunction(any, String) NULL,
                 output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
             )
             ENGINE = AggregatingMergeTree
@@ -695,7 +671,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         self.ch_client.command(
             """
-            CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view TO calls_merged
+            CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged
             AS
             SELECT
                 entity,

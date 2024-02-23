@@ -10,8 +10,6 @@ import urllib
 
 import pytest
 
-from weave.trace_server import environment as wf_env
-
 from ..weave_init import InitializedClient
 from ..trace_server import (
     graph_client_trace,
@@ -21,9 +19,8 @@ from ..trace_server import (
 
 @pytest.fixture(scope="session")
 def clickhouse_server():
-    (host, port, server_up) = _check_server_up(
-        wf_env.wf_clickhouse_host(), wf_env.wf_clickhouse_port()
-    )
+    host = os.environ.get("TEST_CH_SERVER_HOST", "localhost")
+    (host, port, server_up) = _check_server_up(host)
     if not server_up:
         pytest.fail("clickhouse server is not running")
     yield (host, port)
@@ -32,8 +29,8 @@ def clickhouse_server():
 @pytest.fixture(scope="session")
 def clickhouse_trace_server(clickhouse_server):
     (host, port) = clickhouse_server
-    clickhouse_trace_server = (
-        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(False)
+    clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
+        host, port, False
     )
     clickhouse_trace_server._run_migrations()
     yield clickhouse_trace_server
@@ -70,7 +67,7 @@ def _check_server_health(
     return False
 
 
-def _check_server_up(host, port) -> typing.Tuple[str, int, bool]:
+def _check_server_up(host="localhost", port=8123) -> typing.Tuple[str, int, bool]:
     base_url = f"http://{host}:{port}/"
     endpoint = "ping"
 
