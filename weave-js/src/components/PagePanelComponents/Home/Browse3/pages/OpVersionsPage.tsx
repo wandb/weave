@@ -18,9 +18,9 @@ import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyOpCategory} from './wfInterface/types';
 import {
-  callsNode,
   opVersionKeyToRefUri,
   OpVersionSchema,
+  useCalls,
   useOpVersions,
   useOpVersionsNode,
 } from './wfReactInterface/interface';
@@ -228,11 +228,17 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
 const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
-  const node = callsNode(obj.entity, obj.project, {
-    opVersionRefs: [refUri],
-  });
-  const countVal = useNodeValue(opCount({arr: node}));
-  const callCount = countVal?.result ?? 0;
+
+  const calls = useCalls(
+    obj.entity,
+    obj.project,
+    {
+      opVersionRefs: [refUri],
+    },
+    100
+  );
+
+  const callCount = calls?.result?.length ?? 0;
 
   if (callCount === 0) {
     return null;
@@ -242,7 +248,8 @@ const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
       neverPeek
       entity={obj.entity}
       project={obj.project}
-      callCount={callCount}
+      callCount={Math.min(99, callCount)}
+      countIsLimited={callCount === 100}
       filter={{
         opVersionRefs: [refUri],
       }}
