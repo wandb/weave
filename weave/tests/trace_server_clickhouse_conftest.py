@@ -10,6 +10,8 @@ import urllib
 
 import pytest
 
+from weave.trace_server import environment as wf_env
+
 from ..weave_init import InitializedClient
 from ..trace_server import (
     graph_client_trace,
@@ -19,27 +21,27 @@ from ..trace_server import (
 
 @pytest.fixture(scope="session")
 def clickhouse_server():
-    host = os.environ.get("TEST_CH_SERVER_HOST", "localhost")
-    (host, port, server_up) = _check_server_up(host)
+    server_up = _check_server_up(
+        wf_env.wf_clickhouse_host(), wf_env.wf_clickhouse_port()
+    )
     if not server_up:
         pytest.fail("clickhouse server is not running")
-    yield (host, port)
 
 
 @pytest.fixture(scope="session")
 def clickhouse_trace_server(clickhouse_server):
-    (host, port) = clickhouse_server
-    clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
-        host, port, False
+    clickhouse_trace_server = (
+        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(False)
     )
     clickhouse_trace_server._run_migrations()
     yield clickhouse_trace_server
 
 
 @pytest.fixture()
-def trace_client(clickhouse_trace_server):
+def trace_client(clickhouse_trace_server, user_by_api_key_in_env):
+    user_by_api_key_in_env
     graph_client = graph_client_trace.GraphClientTrace(
-        "test_entity", "test_project", clickhouse_trace_server
+        user_by_api_key_in_env.username, "test_project", clickhouse_trace_server
     )
     inited_client = InitializedClient(graph_client)
 
@@ -67,7 +69,7 @@ def _check_server_health(
     return False
 
 
-def _check_server_up(host="localhost", port=8123) -> typing.Tuple[str, int, bool]:
+def _check_server_up(host, port) -> bool:
     base_url = f"http://{host}:{port}/"
     endpoint = "ping"
 
@@ -76,10 +78,11 @@ def _check_server_up(host="localhost", port=8123) -> typing.Tuple[str, int, bool
             base_url=base_url, endpoint=endpoint, num_retries=num_retries
         )
 
+    if server_healthy():
+        return True
+
     if os.environ.get("CI") != "true":
         print("CI is not true, not starting clickhouse server")
-        if server_healthy():
-            return (host, port, True)
 
         subprocess.Popen(
             [
@@ -98,7 +101,4 @@ def _check_server_up(host="localhost", port=8123) -> typing.Tuple[str, int, bool
         )
 
     # wait for the server to start
-    if server_healthy(num_retries=30):
-        return (host, port, True)
-    else:
-        return (host, port, False)
+    return server_healthy(num_retries=30)
