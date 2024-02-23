@@ -215,7 +215,7 @@ def ref_str(op):
     return str(weave.obj_ref(op))
 
 
-def test_trace_call_query_query_filter_op_version_refs(trace_client):
+def test_trace_call_query_filter_op_version_refs(trace_client):
     call_spec = simple_line_call_bootstrap()
     call_summaries = call_spec.call_summaries
 
@@ -295,7 +295,7 @@ def get_all_calls_asserting_finished(
     return res
 
 
-def test_trace_call_query_query_filter_input_object_version_refs(trace_client):
+def test_trace_call_query_filter_input_object_version_refs(trace_client):
     call_spec = simple_line_call_bootstrap()
 
     res = get_all_calls_asserting_finished(trace_client, call_spec)
@@ -356,7 +356,7 @@ def test_trace_call_query_query_filter_input_object_version_refs(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_query_filter_output_object_version_refs(trace_client):
+def test_trace_call_query_filter_output_object_version_refs(trace_client):
     call_spec = simple_line_call_bootstrap()
 
     res = get_all_calls_asserting_finished(trace_client, call_spec)
@@ -417,7 +417,7 @@ def test_trace_call_query_query_filter_output_object_version_refs(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_query_filter_parent_ids(trace_client):
+def test_trace_call_query_filter_parent_ids(trace_client):
     call_spec = simple_line_call_bootstrap()
 
     res = get_all_calls_asserting_finished(trace_client, call_spec)
@@ -454,7 +454,7 @@ def test_trace_call_query_query_filter_parent_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_query_filter_trace_ids(trace_client):
+def test_trace_call_query_filter_trace_ids(trace_client):
     call_spec = simple_line_call_bootstrap()
 
     res = get_all_calls_asserting_finished(trace_client, call_spec)
@@ -482,7 +482,7 @@ def test_trace_call_query_query_filter_trace_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_query_filter_call_ids(trace_client):
+def test_trace_call_query_filter_call_ids(trace_client):
     call_spec = simple_line_call_bootstrap()
 
     res = get_all_calls_asserting_finished(trace_client, call_spec)
@@ -510,7 +510,7 @@ def test_trace_call_query_query_filter_call_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_query_filter_trace_roots_only(trace_client):
+def test_trace_call_query_filter_trace_roots_only(trace_client):
     call_spec = simple_line_call_bootstrap()
 
     for trace_roots_only, exp_count in [
@@ -526,6 +526,28 @@ def test_trace_call_query_query_filter_trace_roots_only(trace_client):
                 entity=trace_client.entity,
                 project=trace_client.project,
                 filter=tsi._CallsFilter(trace_roots_only=trace_roots_only),
+            )
+        )
+
+        assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_query_limit(trace_client):
+    call_spec = simple_line_call_bootstrap()
+
+    for limit, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test the True
+        (1, 1),
+        # Test the False
+        (10, 10),
+    ]:
+        inner_res = trace_client.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=trace_client.entity,
+                project=trace_client.project,
+                limit=limit,
             )
         )
 

@@ -152,6 +152,7 @@ class CallsQueryReq(BaseModel):
     entity: str
     project: str
     filter: typing.Optional[_CallsFilter] = None
+    limit: typing.Optional[int] = None
 
 
 class CallsQueryRes(BaseModel):
