@@ -3,7 +3,10 @@ import typing
 
 from pydantic import BaseModel
 import weave
-from ..trace_server.trace_server_interface_util import TRACE_REF_SCHEME
+from ..trace_server.trace_server_interface_util import (
+    TRACE_REF_SCHEME,
+    extract_refs_from_values,
+)
 from ..trace_server import trace_server_interface as tsi
 
 
@@ -131,27 +134,33 @@ class OpCallSpec(BaseModel):
 
 
 def simple_line_call_bootstrap() -> OpCallSpec:
+    @weave.type()
+    class Number:
+        value: int
+
     @weave.op()
-    def adder(a):
-        return a + a
+    def adder(a: Number) -> Number:
+        return Number(a.value + a.value)
 
     adder_v0 = adder
 
     @weave.op()
-    def adder(a, b):
-        return a + b
+    def adder(a: Number, b) -> Number:
+        return Number(a.value + b)
 
     @weave.op()
-    def subtractor(a, b):
-        return a - b
+    def subtractor(a: Number, b) -> Number:
+        return Number(a.value - b)
 
     @weave.op()
-    def multiplier(a, b):
-        return a * b
+    def multiplier(
+        a: Number, b
+    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+        return a.value * b
 
     @weave.op()
-    def liner(m, b, x):
-        return adder(multiplier(m, x), b)
+    def liner(m: Number, b, x) -> Number:
+        return adder(Number(multiplier(m, x)), b)
 
     result: typing.Dict[str, OpCallSummary] = {}
     result["adder_v0"] = OpCallSummary(op=adder_v0)
@@ -164,31 +173,31 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     # Call each op a distinct number of time (allows for easier assertions later)
     num_calls = 1
     for i in range(num_calls):
-        adder_v0(i)
+        adder_v0(Number(i))
     result["adder_v0"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 2
     for i in range(num_calls):
-        adder(i, i)
+        adder(Number(i), i)
     result["adder"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 3
     for i in range(num_calls):
-        subtractor(i, i)
+        subtractor(Number(i), i)
     result["subtractor"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 4
     for i in range(num_calls):
-        multiplier(i, i)
+        multiplier(Number(i), i)
     result["multiplier"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 5
     for i in range(num_calls):
-        liner(i, i, i)
+        liner(Number(i), i, i)
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls
@@ -212,8 +221,9 @@ def test_trace_call_query_query_filter_op_version_refs(trace_client):
     # This is just a string representation of the ref
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
-    adder_ref_str = f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:22eec6273f8becbf7b518205469f4453"
-    assert adder_ref_str == ref_str(call_summaries["adder"].op)
+    assert ref_str(call_summaries["adder"].op).startswith(
+        f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:"
+    )
     wildcard_adder_ref_str = (
         f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:*"
     )
@@ -262,24 +272,254 @@ def test_trace_call_query_query_filter_op_version_refs(trace_client):
         assert len(res.calls) == exp_count
 
 
+def has_any(list_a: typing.List[str], list_b: typing.List[str]) -> bool:
+    return any([a in list_b for a in list_a])
+
+
+def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
+    return list(set(list_a))
+
+
 def test_trace_call_query_query_filter_input_object_version_refs(trace_client):
-    raise NotImplementedError()
+    call_spec = simple_line_call_bootstrap()
+
+    # get all calls
+    res = trace_client.trace_server.calls_query(
+        tsi.CallsQueryReq(
+            entity=trace_client.entity,
+            project=trace_client.project,
+        )
+    )
+
+    input_object_version_refs = unique_vals(
+        [
+            ref
+            for call in res.calls
+            for ref in extract_refs_from_values(call.inputs.values())
+        ]
+    )
+    assert len(input_object_version_refs) > 3
+
+    for input_object_version_refs, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test the empty list case
+        ([], call_spec.total_calls),
+        # Test single
+        (
+            input_object_version_refs[:1],
+            len(
+                [
+                    call
+                    for call in res.calls
+                    if has_any(
+                        extract_refs_from_values(call.inputs.values()),
+                        input_object_version_refs[:1],
+                    )
+                ]
+            ),
+        ),
+        # Test multiple
+        (
+            input_object_version_refs[:3],
+            len(
+                [
+                    call
+                    for call in res.calls
+                    if has_any(
+                        extract_refs_from_values(call.inputs.values()),
+                        input_object_version_refs[:3],
+                    )
+                ]
+            ),
+        ),
+    ]:
+        res = trace_client.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=trace_client.entity,
+                project=trace_client.project,
+                filter=tsi._CallsFilter(
+                    input_object_version_refs=input_object_version_refs
+                ),
+            )
+        )
+
+        assert len(res.calls) == exp_count
 
 
 def test_trace_call_query_query_filter_output_object_version_refs(trace_client):
-    raise NotImplementedError()
+    call_spec = simple_line_call_bootstrap()
+
+    # get all calls
+    res = trace_client.trace_server.calls_query(
+        tsi.CallsQueryReq(
+            entity=trace_client.entity,
+            project=trace_client.project,
+        )
+    )
+
+    output_object_version_refs = unique_vals(
+        [
+            ref
+            for call in res.calls
+            for ref in extract_refs_from_values(call.outputs.values())
+        ]
+    )
+    assert len(output_object_version_refs) > 3
+
+    for output_object_version_refs, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test the empty list case
+        ([], call_spec.total_calls),
+        # Test single
+        (
+            output_object_version_refs[:1],
+            len(
+                [
+                    call
+                    for call in res.calls
+                    if has_any(
+                        extract_refs_from_values(call.outputs.values()),
+                        output_object_version_refs[:1],
+                    )
+                ]
+            ),
+        ),
+        # Test multiple
+        (
+            output_object_version_refs[:3],
+            len(
+                [
+                    call
+                    for call in res.calls
+                    if has_any(
+                        extract_refs_from_values(call.outputs.values()),
+                        output_object_version_refs[:3],
+                    )
+                ]
+            ),
+        ),
+    ]:
+        res = trace_client.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=trace_client.entity,
+                project=trace_client.project,
+                filter=tsi._CallsFilter(
+                    output_object_version_refs=output_object_version_refs
+                ),
+            )
+        )
+
+        assert len(res.calls) == exp_count
 
 
 def test_trace_call_query_query_filter_parent_ids(trace_client):
-    raise NotImplementedError()
+    call_spec = simple_line_call_bootstrap()
+
+    # get all calls
+    res = trace_client.trace_server.calls_query(
+        tsi.CallsQueryReq(
+            entity=trace_client.entity,
+            project=trace_client.project,
+        )
+    )
+    parent_ids = unique_vals(
+        [call.parent_id for call in res.calls if call.parent_id is not None]
+    )
+    assert len(parent_ids) > 3
+
+    for parent_ids, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test the empty list case
+        ([], call_spec.total_calls),
+        # Test single
+        (
+            parent_ids[:1],
+            len([call for call in res.calls if call.parent_id in parent_ids[:1]]),
+        ),
+        # Test multiple
+        (
+            parent_ids[:3],
+            len([call for call in res.calls if call.parent_id in parent_ids[:3]]),
+        ),
+    ]:
+        res = trace_client.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=trace_client.entity,
+                project=trace_client.project,
+                filter=tsi._CallsFilter(parent_ids=parent_ids),
+            )
+        )
+
+        assert len(res.calls) == exp_count
 
 
 def test_trace_call_query_query_filter_trace_ids(trace_client):
-    raise NotImplementedError()
+    call_spec = simple_line_call_bootstrap()
+
+    # get all calls
+    res = trace_client.trace_server.calls_query(
+        tsi.CallsQueryReq(
+            entity=trace_client.entity,
+            project=trace_client.project,
+        )
+    )
+    trace_ids = [call.trace_id for call in res.calls]
+
+    for trace_ids, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test the empty list case
+        ([], call_spec.total_calls),
+        # Test single
+        ([trace_ids[0]], 1),
+        # Test multiple
+        (trace_ids[:3], 3),
+    ]:
+        res = trace_client.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=trace_client.entity,
+                project=trace_client.project,
+                filter=tsi._CallsFilter(trace_ids=trace_ids),
+            )
+        )
+
+        assert len(res.calls) == exp_count
 
 
 def test_trace_call_query_query_filter_call_ids(trace_client):
-    raise NotImplementedError()
+    call_spec = simple_line_call_bootstrap()
+
+    # get all calls
+    res = trace_client.trace_server.calls_query(
+        tsi.CallsQueryReq(
+            entity=trace_client.entity,
+            project=trace_client.project,
+        )
+    )
+    call_ids = [call.id for call in res.calls]
+
+    for call_ids, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test the empty list case
+        ([], call_spec.total_calls),
+        # Test single
+        ([call_ids[0]], 1),
+        # Test multiple
+        (call_ids[:3], 3),
+    ]:
+        res = trace_client.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                entity=trace_client.entity,
+                project=trace_client.project,
+                filter=tsi._CallsFilter(call_ids=call_ids),
+            )
+        )
+
+        assert len(res.calls) == exp_count
 
 
 def test_trace_call_query_query_filter_trace_roots_only(trace_client):
@@ -288,9 +528,9 @@ def test_trace_call_query_query_filter_trace_roots_only(trace_client):
     for trace_roots_only, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
-        # Test the empty list case
+        # Test the True
         (True, call_spec.root_calls),
-        # Base case of most recent version of adder
+        # Test the False
         (False, call_spec.total_calls),
     ]:
         res = trace_client.trace_server.calls_query(

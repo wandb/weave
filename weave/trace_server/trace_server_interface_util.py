@@ -51,3 +51,19 @@ def decode_b64_to_bytes(contents: typing.Dict[str, str]) -> typing.Dict[str, byt
         else:
             raise ValueError(f"Unexpected type for file {k}: {type(v)}")
     return res
+
+
+valid_schemes = [TRACE_REF_SCHEME, ARTIFACT_REF_SCHEME]
+
+
+def extract_refs_from_values(
+    vals: typing.Optional[typing.List[typing.Any]],
+) -> typing.List[str]:
+    refs = []
+    if vals:
+        for val in vals:
+            if isinstance(val, str) and any(
+                val.startswith(scheme + "://") for scheme in valid_schemes
+            ):
+                refs.append(val)
+    return refs
