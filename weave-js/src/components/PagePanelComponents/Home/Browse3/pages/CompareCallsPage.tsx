@@ -21,7 +21,11 @@ import {
   WFHighLevelPivotSpec,
 } from './CallsPage/PivotRunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {callsNode, spanToCallSchema} from './wfReactInterface/interface';
+import {
+  callsNode,
+  spanToCallSchema,
+  useCalls,
+} from './wfReactInterface/interface';
 
 export const CompareCallsPage: FC<{
   entity: string;
@@ -53,25 +57,31 @@ export const CompareCallsPage: FC<{
     });
   }, [props.entity, props.project, subRuns]);
 
-  const parentCallChildCallsNode = callsNode(props.entity, props.project, {
-    parentIds: props.callIds ?? [],
-  });
-  const parentCallsValue = useNodeValue(parentCallChildCallsNode, {
-    skip: !props.callIds,
-  });
+  const parentCallsValue = useCalls(
+    props.entity,
+    props.project,
+    {
+      callIds: props.callIds ?? [],
+    },
+    undefined,
+    {
+      skip: !props.callIds,
+    }
+  );
 
   const objectVersionOptions = useMemo(() => {
     if (
       props.secondaryDim == null ||
       parentCallsValue.loading ||
+      parentCallsValue.result == null ||
       parentCallsValue.result.length === 0
     ) {
       return {};
     }
     return Object.fromEntries(
       _.uniq(
-        parentCallsValue.result.map((parent: Span) =>
-          getValueAtNestedKey(parent, props.secondaryDim!)
+        parentCallsValue.result.map(parent =>
+          getValueAtNestedKey(parent.rawSpan, props.secondaryDim!)
         )
       )
         .filter(item => item != null)
@@ -99,11 +109,15 @@ export const CompareCallsPage: FC<{
   }, [initialSelectedObjectVersionRef, selectedObjectVersionRef]);
 
   const subOpVersionOptions = useMemo(() => {
-    if (parentCallsValue.loading || parentCallsValue.result.length === 0) {
+    if (
+      parentCallsValue.loading ||
+      parentCallsValue.result == null ||
+      parentCallsValue.result.length === 0
+    ) {
       return {};
     }
     const uniqueOpRefs = _.uniq(
-      parentCallsValue.result.map((r: any) => r.name) as string[]
+      parentCallsValue.result.map(r => r.rawSpan.name) as string[]
     );
     return Object.fromEntries(
       uniqueOpRefs.map(opRef => {

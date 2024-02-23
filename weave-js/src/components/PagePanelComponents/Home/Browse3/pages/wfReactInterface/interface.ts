@@ -268,12 +268,16 @@ export const useCalls = (
   entity: string,
   project: string,
   filter: CallFilter,
-  limit?: number
+  limit?: number,
+  opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   const [callRes, setCallRes] =
     useState<trace_server_client.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
   useEffect(() => {
+    if (opts?.skip) {
+      return;
+    }
     trace_server_client
       .callsQuery({
         entity,
@@ -292,15 +296,21 @@ export const useCalls = (
       .then(res => {
         setCallRes(res);
       });
-  }, [entity, project, deepFilter, limit]);
+  }, [entity, project, deepFilter, limit, opts?.skip]);
 
   return useMemo(() => {
+    if (opts?.skip) {
+      return {
+        loading: false,
+        result: [],
+      };
+    }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
     const result = allResults.filter((row: any) => {
       return (
-        filter.opCategory == null ||
+        deepFilter.opCategory == null ||
         (row.opVersionRef &&
-          filter.opCategory.includes(
+          deepFilter.opCategory.includes(
             opVersionRefOpCategory(row.opVersionRef) as OpCategory
           ))
       );
@@ -327,7 +337,7 @@ export const useCalls = (
         result,
       };
     }
-  }, [callRes, filter.opCategory, entity, project]);
+  }, [callRes, deepFilter.opCategory, entity, project, opts?.skip]);
 };
 
 type OpVersionKey = {
