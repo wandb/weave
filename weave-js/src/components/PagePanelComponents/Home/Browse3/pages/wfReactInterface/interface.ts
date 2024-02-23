@@ -960,9 +960,7 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
   };
 };
 
-
 /// Derived Interface - these are not part of the formal interface yet and need to be folded into the trace server directly ///
-
 
 export const useSubRunsFromWeaveQuery = (
   entity: string,
@@ -1012,7 +1010,6 @@ export const useSubRunsFromWeaveQuery = (
     };
   }, [nodeValue.loading, nodeValue.result]);
 };
-
 
 //// In Mem Cache Layer ////
 

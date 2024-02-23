@@ -177,11 +177,6 @@ export const CallsTable: FC<{
     return _.sortBy(OP_CATEGORIES, _.identity);
   }, []);
   const traceRootOptions = [true, false];
-  const {onMakeBoard, isGenerating} = useMakeBoardForCalls(
-    props.entity,
-    props.project,
-    lowLevelFilter
-  );
 
   const userEnabledPivot = effectiveFilter.isPivot ?? false;
   const setUserEnabledPivot = useCallback(
@@ -262,19 +257,6 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <>
-          <IconButton
-            style={{display: 'none', width: '37px', height: '37px'}}
-            size="small"
-            onClick={() => {
-              onMakeBoard();
-            }}>
-            {isGenerating ? (
-              <CircularProgress size={25} />
-            ) : (
-              <DashboardCustomize />
-            )}
-          </IconButton>
-
           <IconButton
             style={{width: '37px', height: '37px'}}
             size="small"
@@ -436,29 +418,6 @@ export const CallsTable: FC<{
       )}
     </FilterLayoutTemplate>
   );
-};
-
-const useMakeBoardForCalls = (
-  entityName: string,
-  projectName: string,
-  lowLevelFilter: CallFilter
-) => {
-  // TODO: Make a generator on the python side that is more robust.
-  // 1. Make feedback a join in weave
-  // 2. Control the column selection like we do in the current table
-  // 3. Map column processing to weave (example timestamps)
-  // 4. Handle references more cleanly
-  // 5. Probably control ordering.
-
-  const runsNode = fnRunsNode(
-    {
-      entityName,
-      projectName,
-      streamName: 'stream',
-    },
-    lowLevelFilter
-  );
-  return useMakeNewBoard(runsNode);
 };
 
 const shouldForceNonTraceRootsOnly = (filter: WFHighLevelCallFilter) => {
