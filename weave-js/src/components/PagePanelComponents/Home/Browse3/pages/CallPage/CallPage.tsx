@@ -22,8 +22,12 @@ import React, {
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
+import {MOON_500} from '../../../../../../common/css/color.styles';
 import {parseRef} from '../../../../../../react';
 import {Button} from '../../../../../Button';
+import {ErrorBoundary} from '../../../../../ErrorBoundary';
+import {IconParentBackUp} from '../../../../../Icon';
+import {Tooltip} from '../../../../../Tooltip';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {Call} from '../../../Browse2/callTree';
 import {SmallRef} from '../../../Browse2/SmallRef';
@@ -234,6 +238,15 @@ const CallTraceTree = styled.div`
 `;
 CallTraceTree.displayName = 'S.CallTraceTree';
 
+const CallOrCountRow = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+`;
+CallOrCountRow.displayName = 'S.CallOrCountRow';
+
 const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
   call,
   treeOnly,
@@ -323,6 +336,9 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
   // call. Effectively this looks like expanding the clicked call.
   const onRowClick: DataGridProProps['onRowClick'] = useCallback(
     params => {
+      if (!params.row.call) {
+        return;
+      }
       setSuppressScroll(true);
       const rowCall = params.row.call as CallSchema;
       history.push(
@@ -350,6 +366,10 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
   const callClass = `.callId-${call.callId}`;
   const getRowClassName: DataGridProProps['getRowClassName'] = useCallback(
     params => {
+      if (!params.row.call) {
+        // Special case for the sibling count row
+        return '';
+      }
       const rowCall = params.row.call as CallSchema;
       return `callId-${rowCall.callId}`;
     },
@@ -423,23 +443,25 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
         <Button icon="close" variant="ghost" onClick={onCloseTraceTree} />
       </CallTraceHeader>
       <CallTraceTree>
-        <DataGridPro
-          apiRef={apiRef}
-          rowHeight={38}
-          columnHeaderHeight={treeOnly ? 0 : 56}
-          treeData
-          loading={treeLoading || animationBuffer}
-          onRowClick={onRowClick}
-          rows={treeLoading || animationBuffer ? [] : rows}
-          columns={treeOnly ? [] : columns}
-          getTreeDataPath={getTreeDataPath}
-          groupingColDef={groupingColDef}
-          isGroupExpandedByDefault={isGroupExpandedByDefault}
-          getRowClassName={getRowClassName}
-          hideFooter
-          rowSelection={false}
-          sx={sx}
-        />
+        <ErrorBoundary>
+          <DataGridPro
+            apiRef={apiRef}
+            rowHeight={38}
+            columnHeaderHeight={treeOnly ? 0 : 56}
+            treeData
+            loading={treeLoading || animationBuffer}
+            onRowClick={onRowClick}
+            rows={treeLoading || animationBuffer ? [] : rows}
+            columns={treeOnly ? [] : columns}
+            getTreeDataPath={getTreeDataPath}
+            groupingColDef={groupingColDef}
+            isGroupExpandedByDefault={isGroupExpandedByDefault}
+            getRowClassName={getRowClassName}
+            hideFooter
+            rowSelection={false}
+            sx={sx}
+          />
+        </ErrorBoundary>
       </CallTraceTree>
     </CallTrace>
   );
@@ -451,8 +473,8 @@ const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
 
 // MUI Box doesn't support cursor
 // https://github.com/mui/material-ui/issues/19983
-const CursorBox = styled(Box)`
-  cursor: pointer;
+const CursorBox = styled(Box)<{$isClickable: boolean}>`
+  cursor: ${p => (p.$isClickable ? 'pointer' : 'default')};
 `;
 CursorBox.displayName = 'S.CursorBox';
 
@@ -465,6 +487,7 @@ const CustomGridTreeDataGroupingCell: FC<
   GridRenderCellParams & {onClick?: (event: MouseEvent) => void}
 > = props => {
   const {id, field, rowNode, row} = props;
+  const {isParentRow} = row;
   const call = row.call as CallSchema;
   const apiRef = useGridApiContext();
   const handleClick: ButtonProps['onClick'] = event => {
@@ -482,6 +505,7 @@ const CustomGridTreeDataGroupingCell: FC<
     event.stopPropagation();
   };
 
+  const hasCountRow = apiRef.current.getRowNode('HIDDEN_SIBLING_COUNT') != null;
   const isLastChild = useMemo(() => {
     if (rowNode.parent == null) {
       return false;
@@ -498,9 +522,21 @@ const CustomGridTreeDataGroupingCell: FC<
     }
     const lastChildId = childrenIds[childrenIds.length - 1];
     return rowNode.id === lastChildId;
-  }, [apiRef, rowNode.id, rowNode.parent]);
-  return (
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiRef, rowNode.id, rowNode.parent, hasCountRow]);
+
+  const tooltip = isParentRow
+    ? 'This is the parent of the currently viewed call. Click to view.'
+    : undefined;
+  const rowTypeIndicator = isParentRow ? (
+    <IconParentBackUp color={MOON_500} width={18} height={18} />
+  ) : null;
+
+  const isHiddenCount = id === 'HIDDEN_SIBLING_COUNT';
+
+  const box = (
     <CursorBox
+      $isClickable={!isHiddenCount}
       sx={{
         height: '100%',
         display: 'flex',
@@ -583,23 +619,34 @@ const CustomGridTreeDataGroupingCell: FC<
           </Box>
         )}
       </Box>
-      <Box
-        sx={{
-          mr: 1,
-        }}>
-        <StatusChip value={row.status} iconOnly />
-      </Box>
-      <Box
-        sx={{
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          flex: '1 1 auto',
-        }}>
-        {opNiceName(call.spanName)}
-      </Box>
+      <CallOrCountRow>
+        {isHiddenCount ? (
+          <Box>{row.count.toLocaleString()} hidden calls</Box>
+        ) : (
+          <>
+            <Box
+              sx={{
+                mr: 1,
+              }}>
+              <StatusChip value={row.status} iconOnly />
+            </Box>
+            <Box
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: '1 1 auto',
+              }}>
+              {opNiceName(call.spanName)}
+            </Box>
+          </>
+        )}
+        {rowTypeIndicator && <Box>{rowTypeIndicator}</Box>}
+      </CallOrCountRow>
     </CursorBox>
   );
+
+  return tooltip ? <Tooltip content={tooltip} trigger={box} /> : box;
 };
 
 const BasicInputOutputRenderer: FC<{
@@ -673,43 +720,56 @@ const BasicInputOutputRenderer: FC<{
 
 /**
  * Returns the flattened trace tree for a given call. Specifically,
- * it will find the trace root for a call, then find all the ancestors
- * of the root. The flattened order is depth-first, so that when listed
- * in a table, the children of each call will be listed immediately
- * after the parent call. The structure of the returned rows conforms to
- * `GridValidRowModel`, but is specifically:
+ * it will find the trace root for a call, then find all the descendants
+ * of the root, filtering by selected call. The flattened order is depth-first,
+ * so that when listed in a table, the children of each call will be listed
+ * immediately after the parent call. The structure of the returned rows conforms
+ * to `GridValidRowModel`, but is specifically:
  * {
  *  id: string;
  *  call: WFCall;
  *  status: CallStatusType;
  *  hierarchy: string[];
+ *  isTraceRootCall: boolean;
+ *  isParentRow?: boolean;
  * }
  * where `hierarchy` is the list of call IDs from the root to the current.
+ * isTraceRootCall indicates whether the row is the root call for the trace.
+ * isParentRow indicates whether the row indicates the parent of the selected call.
  *
  * Furthermore, the `expandKeys` set contains the call IDs of all the calls
  * from the root to the current call, so that the tree can be expanded to
  * show the current call.
  */
-type Row = {
+type CallRow = {
   id: string;
   call: CallSchema;
   status: CallStatusType;
   hierarchy: string[];
+  isTraceRootCall: boolean;
+  isParentRow?: boolean;
 };
+type CountRow = {
+  id: 'HIDDEN_SIBLING_COUNT';
+  count: number;
+  hierarchy: string[];
+};
+type Row = CallRow | CountRow;
 const useCallFlattenedTraceTree = (call: CallSchema) => {
   const traceCalls = useCalls(call.entity, call.project, {
     traceId: call.traceId,
   });
-  const traceCallMap = useMemo(() => {
-    return _.fromPairs(
-      (traceCalls.result ?? []).map(c => {
-        return [c.callId, c];
-      })
-    );
-  }, [traceCalls]);
+  const traceCallsResult = useMemo(
+    () => traceCalls.result ?? [],
+    [traceCalls.result]
+  );
+  const traceCallMap = useMemo(
+    () => _.keyBy(traceCallsResult, 'callId'),
+    [traceCallsResult]
+  );
   const childCallLookup = useMemo(() => {
     const lookup: Record<string, string[]> = {};
-    for (const c of traceCalls.result ?? []) {
+    for (const c of traceCallsResult) {
       if (c.parentId) {
         if (!lookup[c.parentId]) {
           lookup[c.parentId] = [];
@@ -718,7 +778,7 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
       }
     }
     return lookup;
-  }, [traceCalls]);
+  }, [traceCallsResult]);
   return useMemo(() => {
     const rows: Row[] = [];
     const expandKeys = new Set<string>();
@@ -734,11 +794,29 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
         : null;
     }
 
+    // Add a parent row
+    const parentCall = call.parentId ? traceCallMap[call.parentId] : null;
+    if (parentCall) {
+      rows.push({
+        id: parentCall.callId,
+        call: parentCall,
+        status: parentCall.rawSpan.status_code,
+        hierarchy: [parentCall.callId],
+        isTraceRootCall: parentCall.callId === lastCall.callId,
+        isParentRow: true,
+      });
+    }
+
     // Descend to the leaves
     const queue: Array<{
       targetCall: CallSchema;
       parentHierarchy: string[];
-    }> = [{targetCall: lastCall, parentHierarchy: []}];
+    }> = [
+      {
+        targetCall: call,
+        parentHierarchy: call.parentId ? [call.parentId] : [],
+      },
+    ];
     while (queue.length > 0) {
       const {targetCall, parentHierarchy} = queue.shift()!;
       const newHierarchy = [...parentHierarchy, targetCall.callId];
@@ -747,6 +825,7 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
         call: targetCall,
         status: targetCall.rawSpan.status_code,
         hierarchy: newHierarchy,
+        isTraceRootCall: targetCall.callId === lastCall.callId,
       });
       const childIds = childCallLookup[targetCall.callId] ?? [];
       childIds.forEach(c => {
@@ -758,22 +837,51 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
       });
     }
 
-    // Update status indicators to reflect status of descendants.
-    const rowMap: Record<string, Row> = {};
-    for (const row of rows) {
-      rowMap[row.id] = row;
+    if (parentCall) {
+      const siblingCount = childCallLookup[parentCall.callId]?.length - 1 ?? 0;
+      if (siblingCount) {
+        rows.push({
+          id: 'HIDDEN_SIBLING_COUNT',
+          count: siblingCount,
+          hierarchy: [call.parentId!, 'HIDDEN_SIBLING_COUNT'],
+        });
+      }
     }
-    for (const row of rows) {
-      if (row.status === 'ERROR') {
-        for (const p of row.hierarchy) {
-          const parent = rowMap[p];
-          if (parent.status === 'SUCCESS') {
-            parent.status = 'DESCENDANT_ERROR';
-          }
+
+    // Update status indicators to reflect status of descendants.
+    const errorCalls = traceCallsResult.filter(
+      c => c.rawSpan.status_code === 'ERROR'
+    );
+    if (errorCalls.length) {
+      const ancestors = new Set<string>();
+      for (const errorCall of errorCalls) {
+        let ancestorCall = errorCall.parentId
+          ? traceCallMap[errorCall.parentId]
+          : null;
+        while (ancestorCall != null && !ancestors.has(ancestorCall.callId)) {
+          ancestors.add(ancestorCall.callId);
+          ancestorCall = ancestorCall.parentId
+            ? traceCallMap[ancestorCall.parentId]
+            : null;
+        }
+      }
+      for (const row of rows) {
+        if (
+          'status' in row &&
+          row.status === 'SUCCESS' &&
+          ancestors.has(row.id)
+        ) {
+          row.status = 'DESCENDANT_ERROR';
         }
       }
     }
 
     return {rows, expandKeys, loading: traceCalls.loading};
-  }, [call, childCallLookup, traceCallMap, traceCalls.loading]);
+  }, [
+    call,
+    childCallLookup,
+    traceCallMap,
+    traceCallsResult,
+    traceCalls.loading,
+  ]);
 };

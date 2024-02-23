@@ -62,27 +62,28 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
     mon_span_inputs = {**inputs}
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode():
-        op_def_ref = storage._get_ref(op_def)
-        if not client.ref_is_own(op_def_ref):
-            op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-        mon_span_inputs, refs = auto_publish(inputs)
-
-        # Memoization disabled for now.
-        # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
-        # if found_run:
-        #     return found_run.output
-
         parent_run = run_context.get_current_run()
-        # if not parent_run:
-        #     print("Running ", op_def.name)
-        run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
         try:
+            op_def_ref = storage._get_ref(op_def)
+            if not client.ref_is_own(op_def_ref):
+                op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
+            mon_span_inputs, refs = auto_publish(inputs)
+
+            # Memoization disabled for now.
+            # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
+            # if found_run:
+            #     return found_run.output
+
+            # if not parent_run:
+            #     print("Running ", op_def.name)
+            run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
             with run_context.current_run(run):
                 res = op_def.raw_resolve_fn(**inputs)
                 res = box.box(res)
         except BaseException as e:
-            print("Error running ", op_def.name)
             client.fail_run(run, e)
+            if not parent_run:
+                print("🍩 View call:", run.ui_url)
             raise
         if isinstance(res, box.BoxedNone):
             res = None
@@ -109,8 +110,10 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
                     if not parent_run:
                         print("🍩 View call:", run.ui_url)
                     return _deref_all(output)
-                except Exception as e:
+                except BaseException as e:
                     client.fail_run(run, e)
+                    if not parent_run:
+                        print("🍩 View call:", run.ui_url)
                     raise
 
             return _run_async()
