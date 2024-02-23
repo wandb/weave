@@ -121,12 +121,11 @@ export const RunsTable: FC<{
   const params = useParams<Browse2RootObjectVersionItemParams>();
 
   let onlyOneOutputResult = true;
-  let span: CallSchema;
-  for (span in spans) {
+  for (let i = 0; i < spans.length; i++) {
     // get display keys
     const keys = Object.keys(
       _.omitBy(
-        flattenObject(span.rawSpan.output!),
+        flattenObject(spans[i].rawSpan.output!),
         (v, k) => v == null || (k.startsWith('_') && k !== '_result')
       )
     );
