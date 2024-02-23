@@ -119,13 +119,18 @@ def test_graph_call_ordering(trace_client):
     assert [run._call.inputs["a"] for run in runs] == list(range(10))
 
 
-
 class OpCallSummary(BaseModel):
     op: typing.Callable
     num_calls: int = 0
 
 
-def simple_line_call_bootstrap() -> typing.Dict[str, OpCallSummary]:
+class OpCallSpec(BaseModel):
+    call_summaries: typing.Dict[str, OpCallSummary]
+    total_calls: int
+    root_calls: int
+
+
+def simple_line_call_bootstrap() -> OpCallSpec:
     @weave.op()
     def adder(a):
         return a + a
@@ -154,27 +159,32 @@ def simple_line_call_bootstrap() -> typing.Dict[str, OpCallSummary]:
     result["subtractor"] = OpCallSummary(op=subtractor)
     result["multiplier"] = OpCallSummary(op=multiplier)
     result["liner"] = OpCallSummary(op=liner)
+    root_calls = 0
 
     # Call each op a distinct number of time (allows for easier assertions later)
     num_calls = 1
     for i in range(num_calls):
         adder_v0(i)
     result["adder_v0"].num_calls += num_calls
+    root_calls += num_calls
 
     num_calls = 2
     for i in range(num_calls):
         adder(i, i)
     result["adder"].num_calls += num_calls
+    root_calls += num_calls
 
     num_calls = 3
     for i in range(num_calls):
         subtractor(i, i)
     result["subtractor"].num_calls += num_calls
+    root_calls += num_calls
 
     num_calls = 4
     for i in range(num_calls):
         multiplier(i, i)
     result["multiplier"].num_calls += num_calls
+    root_calls += num_calls
 
     num_calls = 5
     for i in range(num_calls):
@@ -182,8 +192,13 @@ def simple_line_call_bootstrap() -> typing.Dict[str, OpCallSummary]:
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls
+    root_calls += num_calls
 
-    return result
+    total_calls = sum([op_call.num_calls for op_call in result.values()])
+
+    return OpCallSpec(
+        call_summaries=result, total_calls=total_calls, root_calls=root_calls
+    )
 
 
 def ref_str(op):
@@ -192,43 +207,48 @@ def ref_str(op):
 
 def test_trace_call_query_query_filter_op_version_refs(trace_client):
     call_spec = simple_line_call_bootstrap()
+    call_summaries = call_spec.call_summaries
 
     # This is just a string representation of the ref
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
     adder_ref_str = f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:22eec6273f8becbf7b518205469f4453"
-    assert adder_ref_str == ref_str(call_spec["adder"].op)
+    assert adder_ref_str == ref_str(call_summaries["adder"].op)
     wildcard_adder_ref_str = (
         f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:*"
     )
 
-    total_calls = sum([op_call.num_calls for op_call in call_spec.values()])
-
     for op_version_refs, exp_count in [
         # Test the None case
-        (None, total_calls),
+        (None, call_spec.total_calls),
         # Test the empty list case
-        ([], total_calls),
+        ([], call_spec.total_calls),
         # Base case of most recent version of adder
-        ([ref_str(call_spec["adder"].op)], call_spec["adder"].num_calls),
+        ([ref_str(call_summaries["adder"].op)], call_summaries["adder"].num_calls),
         # Base case of non-recent version of adder
-        ([ref_str(call_spec["adder_v0"].op)], call_spec["adder_v0"].num_calls),
+        (
+            [ref_str(call_summaries["adder_v0"].op)],
+            call_summaries["adder_v0"].num_calls,
+        ),
         # more than one op
         (
-            [ref_str(call_spec["adder"].op), ref_str(call_spec["subtractor"].op)],
-            call_spec["adder"].num_calls + call_spec["subtractor"].num_calls,
+            [
+                ref_str(call_summaries["adder"].op),
+                ref_str(call_summaries["subtractor"].op),
+            ],
+            call_summaries["adder"].num_calls + call_summaries["subtractor"].num_calls,
         ),
         # Test the wildcard case
         (
             [wildcard_adder_ref_str],
-            call_spec["adder"].num_calls + call_spec["adder_v0"].num_calls,
+            call_summaries["adder"].num_calls + call_summaries["adder_v0"].num_calls,
         ),
         # Test the wildcard case and specific case
         (
-            [wildcard_adder_ref_str, ref_str(call_spec["subtractor"].op)],
-            call_spec["adder"].num_calls
-            + call_spec["adder_v0"].num_calls
-            + call_spec["subtractor"].num_calls,
+            [wildcard_adder_ref_str, ref_str(call_summaries["subtractor"].op)],
+            call_summaries["adder"].num_calls
+            + call_summaries["adder_v0"].num_calls
+            + call_summaries["subtractor"].num_calls,
         ),
     ]:
         res = trace_client.trace_server.calls_query(
@@ -267,17 +287,17 @@ def test_trace_call_query_query_filter_trace_roots_only(trace_client):
 
     for trace_roots_only, exp_count in [
         # Test the None case
-        (None, num_calls),
+        (None, call_spec.total_calls),
         # Test the empty list case
-        (True, num_calls),
+        (True, call_spec.root_calls),
         # Base case of most recent version of adder
-        (False, num_calls),
+        (False, call_spec.total_calls),
     ]:
         res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
                 entity=trace_client.entity,
                 project=trace_client.project,
-                filter=tsi._CallsFilter(op_version_refs=op_version_refs),
+                filter=tsi._CallsFilter(trace_roots_only=trace_roots_only),
             )
         )
 
