@@ -9,7 +9,7 @@ import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext} from '../../context';
 import {CallsTable} from '../CallsPage/CallsPage';
-import {KeyValueTable} from '../common/KeyValueTable';
+import {KeyValueTable, SingleValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {isPrimitive, Primitive} from '../common/util';
@@ -125,16 +125,20 @@ export const CallDetails: FC<{
               flex: '0 0 auto',
               p: 2,
             }}>
-            <KeyValueTable
-              headerTitle="Output"
-              data={
-                // TODO: Consider bringing back openai chat input/output
-                output
-              }
-              result={
-                outputIsOnlyResult ? (output._result as Primitive) : undefined
-              }
-            />
+            {outputIsOnlyResult ? (
+              <SingleValueTable
+                headerTitle="Output"
+                result={output._result as Primitive}
+              />
+            ) : (
+              <KeyValueTable
+                headerTitle="Output"
+                data={
+                  // TODO: Consider bringing back openai chat input/output
+                  output
+                }
+              />
+            )}
           </Box>
         )}
         {multipleChildCallOpRefs.map(opVersionRef => {

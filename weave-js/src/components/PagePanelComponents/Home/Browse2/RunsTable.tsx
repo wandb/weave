@@ -121,16 +121,16 @@ export const RunsTable: FC<{
   const params = useParams<Browse2RootObjectVersionItemParams>();
 
   let onlyOneOutputResult = true;
-  for (let i = 0; i < spans.length; i++) {
+  for (const s of spans) {
     // get display keys
     const keys = Object.keys(
       _.omitBy(
-        flattenObject(spans[i].rawSpan.output!),
+        flattenObject(s.rawSpan.output!),
         (v, k) => v == null || (k.startsWith('_') && k !== '_result')
       )
     );
     // ensure there is only one output _result
-    if (keys.length !== 0 || keys[0] !== '_result') {
+    if (keys.length > 1 || (keys[0] && keys[0] !== '_result')) {
       onlyOneOutputResult = false;
       break;
     }
