@@ -45,6 +45,7 @@ interface TraceCallsQueryReq {
   entity: string;
   project: string;
   filter?: TraceCallsFilter;
+  limit?: number;
 }
 
 export interface TraceCallsQueryRes {

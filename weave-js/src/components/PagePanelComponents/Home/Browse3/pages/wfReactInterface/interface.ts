@@ -267,7 +267,8 @@ export const callsNode = (
 export const useCalls = (
   entity: string,
   project: string,
-  filter: CallFilter
+  filter: CallFilter,
+  limit?: number
 ): Loadable<CallSchema[]> => {
   const [callRes, setCallRes] =
     useState<trace_server_client.TraceCallsQueryRes | null>(null);
@@ -286,11 +287,12 @@ export const useCalls = (
           call_ids: deepFilter.callIds,
           trace_roots_only: deepFilter.traceRootsOnly,
         },
+        limit,
       })
       .then(res => {
         setCallRes(res);
       });
-  }, [entity, project, deepFilter]);
+  }, [entity, project, deepFilter, limit]);
 
   return useMemo(() => {
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
