@@ -4,6 +4,7 @@ import {useMemo} from 'react';
 import {
   constBoolean,
   constFunction,
+  constNumber,
   constString,
   Node,
   opAnd,
@@ -24,6 +25,7 @@ import {
   opFlatten,
   opIsNone,
   opJoin,
+  opLimit,
   opMap,
   opPick,
   opProjectArtifact,
@@ -37,7 +39,6 @@ import {useNodeValue} from '../../../../../../react';
 import {
   fnRunsNode,
   useRuns,
-  useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
 import {
   getCallFromCache,
@@ -128,7 +129,7 @@ const useCalls = (
   if (opts?.skip || limit) {
     throw new Error('Not implemented');
   }
-  const calls = useRunsWithFeedback(
+  let callsNode = fnRunsNode(
     {
       entityName: entity,
       projectName: project,
@@ -142,14 +143,18 @@ const useCalls = (
       parentIds: filter.parentIds,
       traceRootsOnly: filter.traceRootsOnly,
       callIds: filter.callIds,
-    },
-    // TODO: Re-Enable feedback once we actually have it!
-    true
+    }
   );
+  if (limit) {
+    callsNode = opLimit({arr: callsNode, limit: constNumber(limit)});
+  }
+  const calls = useNodeValue(callsNode, {skip: opts?.skip});
+
   return useMemo(() => {
+    const callsResult: RawSpanFromStreamTableEra[] = calls.result ?? [];
     // This `uniqBy` fixes gorilla duplication bug.
     const allResults = _.uniqBy(
-      (calls.result ?? []).map(run => spanToCallSchema(entity, project, run)),
+      callsResult.map(run => spanToCallSchema(entity, project, run)),
       'callId'
     );
     // Unfortunately, we can't filter by category in the query level yet
@@ -251,10 +256,10 @@ const useOpVersions = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<OpVersionSchema[]> => {
+  let dataNode = useOpVersionsNode(entity, project, filter);
   if (limit) {
-    throw new Error('Not implemented');
+    dataNode = opLimit({arr: dataNode, limit: constNumber(limit)})
   }
-  const dataNode = useOpVersionsNode(entity, project, filter);
 
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
@@ -383,10 +388,10 @@ const useRootObjectVersions = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<ObjectVersionSchema[]> => {
+  let dataNode = useRootObjectVersionsNode(entity, project, filter);
   if (limit) {
-    throw new Error('Not implemented');
+    dataNode = opLimit({arr: dataNode, limit: constNumber(limit)})
   }
-  const dataNode = useRootObjectVersionsNode(entity, project, filter);
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 
   return useMemo(() => {
