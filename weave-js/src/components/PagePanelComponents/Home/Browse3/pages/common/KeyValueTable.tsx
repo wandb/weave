@@ -5,7 +5,7 @@ import moment from 'moment';
 import React, {useContext, useEffect, useState} from 'react';
 
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {isPrimitive} from './util';
+import {isPrimitive, Primative} from './util';
 
 const VALUE_SPACE = 4;
 const ROW_HEIGHT = 26;
@@ -15,8 +15,8 @@ const MAX_HEIGHT_MULT = 5;
 export const KeyValueTable: React.FC<{
   data: {[key: string]: any};
   headerTitle?: string;
-  result?: string;
-}> = props => {
+  result?: Primative;
+}> = ({data, headerTitle, result}) => {
   return (
     <Box
       sx={{
@@ -29,22 +29,22 @@ export const KeyValueTable: React.FC<{
           borderCollapse: 'collapse',
           tableLayout: 'fixed',
         }}>
-        {props.headerTitle && (
+        {headerTitle && (
           <thead>
             <tr
               style={{
                 borderBottom: `1px solid ${MOON_250}`,
                 backgroundColor: '#FAFAFA',
               }}>
-              <th colSpan={VALUE_SPACE + 1}>{props.headerTitle}</th>
+              <th colSpan={VALUE_SPACE + 1}>{headerTitle}</th>
             </tr>
           </thead>
         )}
         <tbody>
-          {props.result ? (
-            <RowForString value={props.result} />
+          {result ? (
+            <PrimativeRow value={result} />
           ) : (
-            <KeyValueRowForObject objValue={props.data} />
+            <KeyValueRowForObject objValue={data} />
           )}
         </tbody>
       </table>
@@ -118,8 +118,8 @@ const StringCell: React.FC<{
   );
 };
 
-const RowForString: React.FC<{
-  value: string;
+const PrimativeRow: React.FC<{
+  value: Primative;
 }> = ({value}) => {
   const [open, setOpen] = React.useState(false);
   const cellRef = React.useRef<HTMLTableCellElement>(null);
@@ -145,10 +145,28 @@ const RowForString: React.FC<{
         style={valueStyle}
         colSpan={VALUE_SPACE}
         ref={cellRef}>
-        <StringCell value={value} />
+        <PrimativeCell value={value} />
       </td>
     </tr>
   );
+};
+
+const PrimativeCell: React.FC<{
+  value: Primative;
+}> = ({value}) => {
+  const valRef = _.isString(value) ? parseRefMaybe(value) : null;
+  let useVal: any = value;
+  if (valRef) {
+    useVal = <SmallRef objRef={valRef} />;
+  } else if (_.isString(value)) {
+    //   useVal = <SimplePopoverText text={props.rowValue} />;
+    useVal = <StringCell value={useVal} />;
+  } else if (_.isBoolean(value)) {
+    useVal = (value as boolean).toString();
+  } else if (_.isDate(value)) {
+    useVal = moment(value as Date).format('YYYY-MM-DD HH:mm:ss');
+  }
+  return useVal;
 };
 
 const KeyValueRow: React.FC<{
@@ -170,20 +188,6 @@ const KeyValueRow: React.FC<{
   }, []);
 
   if (isPrimitive(props.rowValue)) {
-    const valRef = _.isString(props.rowValue)
-      ? parseRefMaybe(props.rowValue)
-      : null;
-    let useVal: any = props.rowValue;
-    if (valRef) {
-      useVal = <SmallRef objRef={valRef} />;
-    } else if (_.isString(props.rowValue)) {
-      //   useVal = <SimplePopoverText text={props.rowValue} />;
-      useVal = <StringCell value={useVal} />;
-    } else if (_.isBoolean(props.rowValue)) {
-      useVal = (props.rowValue as boolean).toString();
-    } else if (_.isDate(props.rowValue)) {
-      useVal = moment(props.rowValue as Date).format('YYYY-MM-DD HH:mm:ss');
-    }
     return (
       <tr>
         <td
@@ -199,7 +203,7 @@ const KeyValueRow: React.FC<{
           {props.rowKey}
         </td>
         <td style={valueStyle} colSpan={VALUE_SPACE} ref={cellRef}>
-          {useVal}
+          <PrimativeCell value={props.rowValue} />
         </td>
       </tr>
     );

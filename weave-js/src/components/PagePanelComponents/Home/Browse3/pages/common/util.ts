@@ -1,6 +1,14 @@
 import _ from 'lodash';
 import React from 'react';
 
+export type Primative =
+  | string
+  | number
+  | boolean
+  | Date
+  | null
+  | React.ReactElement;
+
 export const isPrimitive = (val: any) => {
   return (
     React.isValidElement(val) ||

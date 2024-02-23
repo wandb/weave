@@ -180,6 +180,7 @@ export const RunsTable: FC<{
               (v, k) => v == null || (k.startsWith('_') && k !== '_result')
             ),
             (v, k) => {
+              // If there is only one output _result, we don't need to nest it
               if (onlyOneOutputResult && k === '_result') {
                 return 'output';
               }
@@ -387,7 +388,18 @@ export const RunsTable: FC<{
       colGroupingModel.push(inputGroup);
 
       // All output keys as we don't have the order key yet.
-      if (!onlyOneOutputResult) {
+      if (onlyOneOutputResult) {
+        // If there is only one output _result, we don't need to do all the work on outputs
+        cols.push({
+          flex: 1,
+          minWidth: 150,
+          field: 'output',
+          headerName: 'output',
+          renderCell: cellParams => {
+            return renderCell((cellParams.row as any).output);
+          },
+        });
+      } else {
         let outputKeys: {[key: string]: true} = {};
         spans.forEach(span => {
           for (const [k, v] of Object.entries(
@@ -425,16 +437,6 @@ export const RunsTable: FC<{
             },
           });
         }
-      } else {
-        cols.push({
-          flex: 1,
-          minWidth: 150,
-          field: 'output',
-          headerName: 'output',
-          renderCell: cellParams => {
-            return renderCell((cellParams.row as any).output);
-          },
-        });
       }
 
       let feedbackKeys: {[key: string]: true} = {};

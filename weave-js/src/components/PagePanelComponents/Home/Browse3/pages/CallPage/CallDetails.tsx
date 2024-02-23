@@ -12,6 +12,7 @@ import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
+import {isPrimitive, Primative} from '../common/util';
 import {
   CallSchema,
   useCalls,
@@ -82,23 +83,7 @@ export const CallDetails: FC<{
   const outputIsOnlyResult =
     outputKeys.length === 1 &&
     outputKeys[0] === '_result' &&
-    typeof output._result === 'string';
-  const outputTable = (
-    <Box
-      sx={{
-        flex: '0 0 auto',
-        p: 2,
-      }}>
-      <KeyValueTable
-        headerTitle="Output"
-        data={
-          // TODO: Consider bringing back openai chat input/output
-          output
-        }
-        result={outputIsOnlyResult ? (output._result as string) : undefined}
-      />
-    </Box>
-  );
+    isPrimitive(output._result);
 
   return (
     <Box
@@ -134,7 +119,24 @@ export const CallDetails: FC<{
             />
           </Box>
         )}
-        {Object.keys(output).length > 0 && outputTable}
+        {Object.keys(output).length > 0 && (
+          <Box
+            sx={{
+              flex: '0 0 auto',
+              p: 2,
+            }}>
+            <KeyValueTable
+              headerTitle="Output"
+              data={
+                // TODO: Consider bringing back openai chat input/output
+                output
+              }
+              result={
+                outputIsOnlyResult ? (output._result as Primative) : undefined
+              }
+            />
+          </Box>
+        )}
         {multipleChildCallOpRefs.map(opVersionRef => {
           const exampleCall = childCalls.result?.find(
             c => c.opVersionRef === opVersionRef
