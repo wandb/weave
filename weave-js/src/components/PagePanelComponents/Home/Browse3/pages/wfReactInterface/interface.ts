@@ -1,6 +1,6 @@
-import _ from 'lodash';
+import _, { sum } from 'lodash';
 import LRUCache from 'lru-cache';
-import {useMemo} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 
 import {
   constFunction,
@@ -31,6 +31,7 @@ import {
   opRootProject,
   opStringEqual,
 } from '../../../../../../core';
+import { useDeepMemo } from '../../../../../../hookUtils';
 import {useNodeValue} from '../../../../../../react';
 import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
 import {
@@ -39,6 +40,7 @@ import {
   useRunsWithFeedback,
 } from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import * as trace_server_client from './trace_server_client';
 
 export const OP_CATEGORIES = [
   'train',
@@ -73,6 +75,67 @@ export type CallSchema = CallKey & {
   rawFeedback?: any;
 };
 
+const convertISOToDate = (iso: string) => {
+  return new Date(iso);
+}
+
+const traceCallToLegacySpan = (
+  traceCall: trace_server_client.TraceCallSchema
+): Span => {
+  const startDate = convertISOToDate(traceCall.start_datetime);
+  const endDate = traceCall.end_datetime
+    ? convertISOToDate(traceCall.end_datetime)
+    : null;
+  let statusCode = 'UNSET';
+  if (traceCall.exception) {
+    statusCode = 'ERROR';
+  } else if (traceCall.end_datetime) {
+    statusCode = 'SUCCESS';
+  }
+  let latencyS = 0;
+  if (startDate && endDate) {
+    latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
+  }
+  const summary=  {
+    latency_s: latencyS,
+    ...(traceCall.summary ?? {})
+  };
+  return  {
+    name: traceCall.name,
+    inputs: traceCall.inputs,
+    output: traceCall.outputs,
+    status_code: statusCode,
+    exception: traceCall.exception,
+    attributes: traceCall.attributes,
+    summary: summary,
+    span_id: traceCall.id,
+    trace_id: traceCall.trace_id,
+    parent_id: traceCall.parent_id,
+    timestamp: startDate.getTime(),
+    start_time_ms: startDate.getTime(),
+    end_time_ms: endDate?.getTime()
+  }
+}
+
+const traceCallToUICallSchema = (
+  traceCall: trace_server_client.TraceCallSchema
+): CallSchema => {
+  return {
+    entity: traceCall.entity,
+    project: traceCall.project,
+    callId: traceCall.id,
+    traceId: traceCall.trace_id,
+    parentId: traceCall.parent_id ?? null,
+    spanName: traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+    ? refUriToOpVersionKey(traceCall.name).opId
+    : traceCall.name,
+    opVersionRef: traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? traceCall.name
+      : null,
+    rawSpan: traceCallToLegacySpan(traceCall),
+    rawFeedback: {},}
+};
+
 export const spanToCallSchema = (
   entity: string,
   project: string,
@@ -93,7 +156,7 @@ export const spanToCallSchema = (
     project,
     callId: span.span_id,
     traceId: span.trace_id,
-    parentId: span.parent_id,
+    parentId: span.parent_id ?? null,
     spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
       ? refUriToOpVersionKey(span.name).opId
       : span.name,
@@ -107,17 +170,19 @@ export const spanToCallSchema = (
 
 export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? getCallFromCache(key) : null;
-  const calls = useRuns(
-    {
-      entityName: key?.entity ?? '',
-      projectName: key?.project ?? '',
-      streamName: PROJECT_CALL_STREAM_NAME,
-    },
-    {
-      callIds: [key?.callId ?? ''],
-    },
-    {skip: key == null || cachedCall != null}
-  );
+  const [callRes, setCallRes] = useState<trace_server_client.TraceCallReadRes | null>(null);
+  const deepKey = useDeepMemo(key);
+  useEffect(() => {
+    if (deepKey) {
+      trace_server_client.callRead({
+        entity: deepKey.entity,
+        project: deepKey.project,
+        id: deepKey.callId,
+      }).then(res => {
+        setCallRes(res);
+      });
+    }
+  }, [deepKey]);
 
   return useMemo(() => {
     if (key == null) {
@@ -132,11 +197,10 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         result: cachedCall,
       };
     }
-    const callResult = calls.result?.[0] ?? null;
-    const result = callResult
-      ? spanToCallSchema(key.entity, key.project, callResult)
+    const result = callRes
+      ? traceCallToUICallSchema(callRes.call)
       : null;
-    if (calls.loading) {
+    if (callRes == null) {
       return {
         loading: true,
         result,
@@ -150,7 +214,7 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         result,
       };
     }
-  }, [cachedCall, calls.loading, calls.result, key]);
+  }, [cachedCall, callRes, key]);
 };
 
 export const useParentCall = (
@@ -207,31 +271,28 @@ export const useCalls = (
   project: string,
   filter: CallFilter
 ): Loadable<CallSchema[]> => {
-  const calls = useRunsWithFeedback(
-    {
-      entityName: entity,
-      projectName: project,
-      streamName: PROJECT_CALL_STREAM_NAME,
-    },
-    {
-      opUris: filter.opVersionRefs,
-      inputUris: filter.inputObjectVersionRefs,
-      outputUris: filter.outputObjectVersionRefs,
-      traceId: filter.traceId,
-      parentIds: filter.parentIds,
-      traceRootsOnly: filter.traceRootsOnly,
-      callIds: filter.callIds,
-    },
-    // TODO: Re-Enable feedback once we actually have it!
-    true
-  );
+  const [callRes, setCallRes] = useState<trace_server_client.TraceCallQueryRes | null>(null);
+  const deepFilter = useDeepMemo(filter);
+  useEffect(() => {
+    trace_server_client.callsQuery({
+      entity: entity,
+      project: project,
+      filter: {
+        op_version_refs: deepFilter.opVersionRefs,
+        input_object_version_refs: deepFilter.inputObjectVersionRefs,
+        output_object_version_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+      },
+    }).then(res => {
+      setCallRes(res);
+    });
+  }, [entity, project, deepFilter]);
+
   return useMemo(() => {
-    // This `uniqBy` fixes gorilla duplication bug.
-    const allResults = _.uniqBy(
-      (calls.result ?? []).map(run => spanToCallSchema(entity, project, run)),
-      'callId'
-    );
-    // Unfortunately, we can't filter by category in the query level yet
+    const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
     const result = allResults.filter((row: any) => {
       return (
         filter.opCategory == null ||
@@ -242,7 +303,7 @@ export const useCalls = (
       );
     });
 
-    if (calls.loading) {
+    if ( callRes == null) {
       return {
         loading: true,
         result,
@@ -263,7 +324,7 @@ export const useCalls = (
         result,
       };
     }
-  }, [calls.result, calls.loading, entity, project, filter.opCategory]);
+  }, [callRes, filter.opCategory, entity, project]);
 };
 
 type OpVersionKey = {

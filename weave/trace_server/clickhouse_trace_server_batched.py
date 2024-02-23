@@ -2,6 +2,7 @@
 
 import datetime
 import json
+import os
 import time
 import typing
 
@@ -134,15 +135,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ch_client: Client
     call_insert_buffer: InMemFlushableBuffer
 
-    def __init__(self, host: str, port: int = 8123, should_batch: bool = True):
+    def __init__(self, host: str, port: int = 8123, user="default", password="", should_batch: bool = True):
         super().__init__()
-        self.ch_client = clickhouse_connect.get_client(host=host, port=port)
-        self.ch_call_insert_thread_client = clickhouse_connect.get_client(
-            host=host, port=port
-        )
-        self.ch_obj_insert_thread_client = clickhouse_connect.get_client(
-            host=host, port=port
-        )
+        self._host = host
+        self._port = port
+        self._user = user
+        self._password = password
+        self.ch_client = self._mint_client()
+        self.ch_call_insert_thread_client = self._mint_client()
+        self.ch_obj_insert_thread_client = self._mint_client()
         self.call_insert_buffer = InMemAutoFlushingBuffer(
             MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_call_insert_buffer
         )
@@ -150,6 +151,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_obj_insert_buffer
         )
         self.should_batch = should_batch
+
+    @classmethod
+    def from_env(cls, should_batch = True) -> "ClickHouseTraceServer":
+        host = os.environ.get("WF_CLICKHOUSE_HOST", "localhost")
+        port = int(os.environ.get("WF_CLICKHOUSE_PORT", 8123))
+        user = os.environ.get("WF_CLICKHOUSE_USER", "default")
+        password = os.environ.get("WF_CLICKHOUSE_PASS", "")
+        return cls(host, port, user, password, should_batch)
+
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -287,6 +297,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     # Private Methods
+    def _mint_client(self) -> str:
+        return  clickhouse_connect.get_client(host=self._host, port=self._port, user=self._user, password=self._password)
+
+
     def __del__(self) -> None:
         self.call_insert_buffer.flush()
         self.ch_client.close()
@@ -510,12 +524,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self) -> None:
         print("Running migrations")
-        res = self.ch_client.command("SHOW TABLES")
-        if isinstance(res, str):
-            table_names = res.split("\n")
-            for table_name in table_names:
-                if not table_name.startswith("."):
-                    self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
+        # res = self.ch_client.command("SHOW TABLES")
+        # if isinstance(res, str):
+        #     table_names = res.split("\n")
+        #     for table_name in table_names:
+        #         if not table_name.startswith("."):
+        #             self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
 
         self.ch_client.command(
             """
@@ -564,7 +578,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         self.ch_client.command(
             """
-        CREATE MATERIALIZED VIEW objects_deduplicated_view TO objects_deduplicated
+        CREATE MATERIALIZED VIEW IF NOT EXISTS objects_deduplicated_view TO objects_deduplicated
         AS
         SELECT
             entity,
@@ -586,7 +600,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # The following view is just to workout version indexing and latest keys
         self.ch_client.command(
             """
-        CREATE VIEW objects_versioned
+        CREATE VIEW IF NOT EXISTS objects_versioned
         AS
         SELECT
             entity,
@@ -643,7 +657,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         self.ch_client.command(
             """
-            CREATE TABLE calls_merged
+            CREATE TABLE IF NOT EXISTS calls_merged
             (
                 entity String,
                 project String,
@@ -671,7 +685,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         self.ch_client.command(
             """
-            CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged
+            CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view TO calls_merged
             AS
             SELECT
                 entity,

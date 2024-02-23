@@ -29,9 +29,10 @@ def clickhouse_server():
 @pytest.fixture(scope="session")
 def clickhouse_trace_server(clickhouse_server):
     (host, port) = clickhouse_server
-    clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
-        host, port, False
-    )
+    # clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
+    #     host, port, "default", "", False
+    # )
+    clickhouse_trace_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(False)
     clickhouse_trace_server._run_migrations()
     yield clickhouse_trace_server
 
