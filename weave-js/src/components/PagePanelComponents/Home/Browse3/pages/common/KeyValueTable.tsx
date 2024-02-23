@@ -12,45 +12,54 @@ const ROW_HEIGHT = 26;
 const PADDING_GAP = 16;
 const MAX_HEIGHT_MULT = 5;
 
+const SimpleTable: React.FC<{
+  headerTitle?: string;
+  children: React.ReactNode;
+}> = ({headerTitle, children}) => (
+  <Box
+    sx={{
+      border: `1px solid ${MOON_250}`,
+      borderRadius: '4px',
+    }}>
+    <table
+      style={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        tableLayout: 'fixed',
+      }}>
+      {headerTitle && (
+        <thead>
+          <tr
+            style={{
+              borderBottom: `1px solid ${MOON_250}`,
+              backgroundColor: '#FAFAFA',
+            }}>
+            <th colSpan={VALUE_SPACE + 1}>{headerTitle}</th>
+          </tr>
+        </thead>
+      )}
+      <tbody>{children}</tbody>
+    </table>
+  </Box>
+);
+
+export const SingleValueTable: React.FC<{
+  result: Primative;
+  headerTitle?: string;
+}> = ({headerTitle, result}) => (
+  <SimpleTable headerTitle={headerTitle}>
+    <PrimativeRow value={result} />
+  </SimpleTable>
+);
+
 export const KeyValueTable: React.FC<{
   data: {[key: string]: any};
   headerTitle?: string;
-  result?: Primative;
-}> = ({data, headerTitle, result}) => {
-  return (
-    <Box
-      sx={{
-        border: `1px solid ${MOON_250}`,
-        borderRadius: '4px',
-      }}>
-      <table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          tableLayout: 'fixed',
-        }}>
-        {headerTitle && (
-          <thead>
-            <tr
-              style={{
-                borderBottom: `1px solid ${MOON_250}`,
-                backgroundColor: '#FAFAFA',
-              }}>
-              <th colSpan={VALUE_SPACE + 1}>{headerTitle}</th>
-            </tr>
-          </thead>
-        )}
-        <tbody>
-          {result ? (
-            <PrimativeRow value={result} />
-          ) : (
-            <KeyValueRowForObject objValue={data} />
-          )}
-        </tbody>
-      </table>
-    </Box>
-  );
-};
+}> = ({data, headerTitle}) => (
+  <SimpleTable headerTitle={headerTitle}>
+    <KeyValueRowForObject objValue={data} />
+  </SimpleTable>
+);
 
 const baseKeyStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
@@ -89,33 +98,6 @@ const valueStyle: React.CSSProperties = {
   paddingLeft: '8px',
   verticalAlign: 'top',
   borderBottom: `1px solid ${MOON_250}`,
-};
-
-const StringCell: React.FC<{
-  value: string;
-}> = ({value}) => {
-  return (
-    <Box
-      sx={{
-        // maxHeight: !open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        width: '100%',
-      }}>
-      <pre
-        style={{
-          width: '100%',
-          // See https://developer.mozilla.org/en-US/docs/Web/CSS/white-space
-          // We want to break on spaces, but also on newlines and preserve them
-          whiteSpace: 'break-spaces',
-          fontSize: '16px',
-          margin: '0',
-          fontFamily: 'Source Sans Pro',
-        }}>
-        {value}
-      </pre>
-    </Box>
-  );
 };
 
 const PrimativeRow: React.FC<{
@@ -160,7 +142,28 @@ const PrimativeCell: React.FC<{
     useVal = <SmallRef objRef={valRef} />;
   } else if (_.isString(value)) {
     //   useVal = <SimplePopoverText text={props.rowValue} />;
-    useVal = <StringCell value={useVal} />;
+    useVal = (
+      <Box
+        sx={{
+          // maxHeight: !open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          width: '100%',
+        }}>
+        <pre
+          style={{
+            width: '100%',
+            // See https://developer.mozilla.org/en-US/docs/Web/CSS/white-space
+            // We want to break on spaces, but also on newlines and preserve them
+            whiteSpace: 'break-spaces',
+            fontSize: '16px',
+            margin: '0',
+            fontFamily: 'Source Sans Pro',
+          }}>
+          {useVal}
+        </pre>
+      </Box>
+    );
   } else if (_.isBoolean(value)) {
     useVal = (value as boolean).toString();
   } else if (_.isDate(value)) {
