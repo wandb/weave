@@ -1,5 +1,4 @@
 import fetch from 'isomorphic-unfetch';
-import { key } from 'vega';
 
 export type KeyedDictType = {
     [key: string]: any;
