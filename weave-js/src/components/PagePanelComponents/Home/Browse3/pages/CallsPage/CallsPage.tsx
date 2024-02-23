@@ -20,20 +20,16 @@ import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {truncateID, useInitializingFilter} from '../util';
 import {HackyOpCategory} from '../wfInterface/types';
+import {OP_CATEGORIES} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
+import {CallFilter, OpVersionSchema} from '../wfReactInterface/interface';
 import {
-  CallFilter,
   objectVersionNiceString,
-  OP_CATEGORIES,
   opVersionKeyToRefUri,
   opVersionRefOpName,
-  OpVersionSchema,
   refUriToObjectVersionKey,
   refUriToOpVersionKey,
-  useCall,
-  useCalls,
-  useObjectVersion,
-  useOpVersions,
-} from '../wfReactInterface/interface';
+} from '../wfReactInterface/utilities';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
@@ -108,6 +104,7 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
+  const {useCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
@@ -450,6 +447,7 @@ const useOpVersionOptions = (
   project: string,
   effectiveFilter: WFHighLevelCallFilter
 ) => {
+  const {useOpVersions} = useWFHooks();
   // Get all the "latest" versions
   const latestVersions = useOpVersions(entity, project, {
     latestOnly: true,
@@ -464,6 +462,7 @@ const useOpVersionOptions = (
     {
       opIds: [currentOpId ?? ''],
     },
+    undefined,
     {
       skip: !currentOpId,
     }
@@ -511,6 +510,7 @@ const useOpVersionOptions = (
 const useConsumesObjectVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
+  const {useObjectVersion} = useWFHooks();
   // We don't populate this one because it is expensive
   const currentRef = effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
   const objectVersion = useObjectVersion(
@@ -529,6 +529,7 @@ const useConsumesObjectVersionOptions = (
 const useProducesObjectVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
+  const {useObjectVersion} = useWFHooks();
   // We don't populate this one because it is expensive
   const currentRef = effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
   const objectVersion = useObjectVersion(
@@ -549,6 +550,7 @@ const useParentIdOptions = (
   project: string,
   effectiveFilter: WFHighLevelCallFilter
 ) => {
+  const {useCall} = useWFHooks();
   const parentCall = useCall(
     effectiveFilter.parentId
       ? {

@@ -7,8 +7,6 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {opCount} from '../../../../../core';
-import {useNodeValue} from '../../../../../react';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {CategoryChip} from './common/CategoryChip';
@@ -17,13 +15,9 @@ import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyOpCategory} from './wfInterface/types';
-import {
-  opVersionKeyToRefUri,
-  OpVersionSchema,
-  useCalls,
-  useOpVersions,
-  useOpVersionsNode,
-} from './wfReactInterface/interface';
+import {useWFHooks} from './wfReactInterface/context';
+import {OpVersionSchema} from './wfReactInterface/interface';
+import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 
 export type WFHighLevelOpVersionFilter = {
   opCategory?: HackyOpCategory | null;
@@ -81,6 +75,7 @@ export const FilterableOpVersionsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
+  const {useOpVersions} = useWFHooks();
   const effectiveFilter = useMemo(() => {
     return {...props.initialFilter, ...props.frozenFilter};
   }, [props.initialFilter, props.frozenFilter]);
@@ -206,11 +201,18 @@ export const FilterableOpVersionsTable: React.FC<{
 };
 
 const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
+  const {useOpVersions} = useWFHooks();
   const obj = props.obj;
-  const opVersionsNode = useOpVersionsNode(obj.entity, obj.project, {
-    opIds: [obj.opId],
-  });
-  const countValue = useNodeValue(opCount({arr: opVersionsNode}));
+  const ops = useOpVersions(
+    obj.entity,
+    obj.project,
+    {
+      opIds: [obj.opId],
+    },
+    100
+  );
+  const versionCount = ops?.result?.length ?? 0;
+
   return (
     <OpVersionsLink
       entity={obj.entity}
@@ -218,7 +220,8 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
       filter={{
         opName: obj.opId,
       }}
-      versionCount={countValue.result ?? 0}
+      versionCount={Math.min(versionCount, 99)}
+      countIsLimited={versionCount === 100}
       neverPeek
       variant="secondary"
     />
@@ -226,6 +229,8 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
 };
 
 const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
+  const {useCalls} = useWFHooks();
+
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
 
@@ -248,7 +253,7 @@ const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
       neverPeek
       entity={obj.entity}
       project={obj.project}
-      callCount={Math.min(99, callCount)}
+      callCount={Math.min(callCount, 99)}
       countIsLimited={callCount === 100}
       filter={{
         opVersionRefs: [refUri],

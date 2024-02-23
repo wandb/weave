@@ -37,6 +37,10 @@ import {
 import * as _ from 'lodash';
 
 import {WILDCARD_ARTIFACT_VERSION_AND_PATH} from '../Browse3/pages/wfReactInterface/constants';
+import {
+  RawSpanFromStreamTableEra,
+  RawSpanFromStreamTableEraWithFeedback,
+} from '../Browse3/pages/wfReactInterface/interface';
 
 export interface StreamId {
   entityName: string;
@@ -54,24 +58,9 @@ export interface CallFilter {
   callIds?: string[];
 }
 
-export interface Call {
-  name: string;
-  inputs: {_keys?: string[]; [key: string]: any};
-  output: undefined | {_keys?: string[]; [key: string]: any};
-  status_code: string; // TODO enum
-  exception?: string;
-  attributes: {[key: string]: any};
-  summary: {latency_s: number; [key: string]: any};
-  span_id: string;
-  trace_id: string;
-  parent_id?: string;
-  timestamp: number;
-  start_time_ms: number;
-  end_time_ms?: number;
-}
-
+export type Call = RawSpanFromStreamTableEra;
 export type Span = Call;
-export type SpanWithFeedback = Span & {feedback?: any};
+export type SpanWithFeedback = RawSpanFromStreamTableEraWithFeedback;
 
 export interface TraceSpan {
   traceId: string;

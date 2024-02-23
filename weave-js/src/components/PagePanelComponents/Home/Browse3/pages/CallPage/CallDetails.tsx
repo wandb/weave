@@ -12,11 +12,8 @@ import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {
-  CallSchema,
-  useCalls,
-  useParentCall,
-} from '../wfReactInterface/interface';
+import {useWFHooks} from '../wfReactInterface/context';
+import {CallSchema, Loadable} from '../wfReactInterface/interface';
 import {ButtonOverlay} from './ButtonOverlay';
 import {OpVersionText} from './OpVersionText';
 
@@ -53,9 +50,26 @@ export const CallSchemaLink = ({call}: {call: CallSchema}) => {
   );
 };
 
+const useParentCall = (
+  call: CallSchema | null
+): Loadable<CallSchema | null> => {
+  const {useCall} = useWFHooks();
+  let parentCall = null;
+  if (call && call.parentId) {
+    parentCall = {
+      entity: call.entity,
+      project: call.project,
+      callId: call.parentId,
+    };
+  }
+  return useCall(parentCall);
+};
+
 export const CallDetails: FC<{
   call: CallSchema;
 }> = ({call}) => {
+  const {useCalls} = useWFHooks();
+
   const parentCall = useParentCall(call);
   const {inputs, output} = useMemo(
     () => getDisplayInputsAndOutput(call),

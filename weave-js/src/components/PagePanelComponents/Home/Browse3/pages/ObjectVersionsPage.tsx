@@ -7,8 +7,6 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {opCount} from '../../../../../core';
-import {useNodeValue} from '../../../../../react';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
@@ -19,12 +17,9 @@ import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyTypeCategory} from './wfInterface/types';
-import {
-  objectVersionKeyToRefUri,
-  ObjectVersionSchema,
-  useRootObjectVersions,
-  useRootObjectVersionsNode,
-} from './wfReactInterface/interface';
+import {useWFHooks} from './wfReactInterface/context';
+import {ObjectVersionSchema} from './wfReactInterface/interface';
+import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
 
 export const ObjectVersionsPage: React.FC<{
   entity: string;
@@ -82,6 +77,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
+  const {useRootObjectVersions} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
 
   const effectiveFilter = useMemo(() => {
@@ -227,15 +223,18 @@ const ObjectVersionsTable: React.FC<{
 };
 
 const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
+  const {useRootObjectVersions} = useWFHooks();
+
   const obj = props.obj;
-  const objectVersionsNode = useRootObjectVersionsNode(
+  const objectVersionsNode = useRootObjectVersions(
     obj.entity,
     obj.project,
     {
       objectIds: [obj.objectId],
-    }
+    },
+    100
   );
-  const countValue = useNodeValue(opCount({arr: objectVersionsNode}));
+  const countValue = objectVersionsNode.result?.length ?? 0;
   return (
     <ObjectVersionsLink
       entity={obj.entity}
@@ -243,7 +242,8 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
       filter={{
         objectName: obj.objectId,
       }}
-      versionCount={countValue.result ?? 0}
+      versionCount={Math.min(countValue, 99)}
+      countIsLimited={countValue === 100}
       neverPeek
       variant="secondary"
     />

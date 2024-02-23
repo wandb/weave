@@ -11,11 +11,8 @@ import {
   WFHighLevelPivotSpec,
 } from './CallsPage/PivotRunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {
-  spanToCallSchema,
-  useCalls,
-  useSubRunsFromWeaveQuery,
-} from './wfReactInterface/interface';
+import {useWFHooks} from './wfReactInterface/context';
+import {spanToCallSchema} from './wfReactInterface/utilities';
 
 export const CompareCallsPage: FC<{
   entity: string;
@@ -24,6 +21,10 @@ export const CompareCallsPage: FC<{
   primaryDim?: string;
   secondaryDim?: string;
 }> = props => {
+  const {
+    useCalls,
+    derived: {useChildCallsForCompare},
+  } = useWFHooks();
   const [selectedOpVersionRef, setSelectedOpVersionRef] = useState<
     string | null
   >(null);
@@ -32,16 +33,16 @@ export const CompareCallsPage: FC<{
     string | null
   >(null);
 
-  const {loading, result: subRuns} = useSubRunsFromWeaveQuery(
+  const {loading, result: subRuns} = useChildCallsForCompare(
     props.entity,
     props.project,
-    props.callIds,
+    props.callIds ?? [],
     selectedOpVersionRef,
     selectedObjectVersionRef
   );
 
   const childRunsFilteredToOpVersion = useMemo(() => {
-    return subRuns.map(subRun => {
+    return (subRuns ?? []).map(subRun => {
       return spanToCallSchema(props.entity, props.project, subRun.child);
     });
   }, [props.entity, props.project, subRuns]);

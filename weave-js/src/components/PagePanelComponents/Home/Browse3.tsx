@@ -70,7 +70,10 @@ import {TypesPage} from './Browse3/pages/TypesPage';
 import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
 import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
-import {useCall} from './Browse3/pages/wfReactInterface/interface';
+import {
+  useWFHooks,
+  WFDataModelAutoProvider,
+} from './Browse3/pages/wfReactInterface/context';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -308,115 +311,119 @@ const MainPeekingLayout: FC = () => {
   useMousetrap('esc', closePeek);
 
   return (
-    <Box
-      sx={{
-        flex: '1 1 auto',
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        overflow: 'hidden',
-        flexDirection: 'row',
-        alignContent: 'stretch',
-      }}>
+    <WFDataModelAutoProvider
+      entityName={params.entity!}
+      projectName={params.project!}>
       <Box
         sx={{
-          flex: '1 1 40%',
-          overflow: 'hidden',
+          flex: '1 1 auto',
+          width: '100%',
+          height: '100%',
           display: 'flex',
-          // This transition is from the mui drawer component, to keep the main content animation in similar
-          transition: !isDrawerOpen
-            ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
-            : 'none',
-          marginRight: !isDrawerOpen
-            ? 0
-            : `${(drawerWidthPct * windowSize.width) / 100}px`,
+          overflow: 'hidden',
+          flexDirection: 'row',
+          alignContent: 'stretch',
         }}>
-        <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
-      </Box>
-
-      <Drawer
-        variant="persistent"
-        anchor="right"
-        open={isDrawerOpen}
-        onClose={closePeek}
-        PaperProps={{
-          style: {
+        <Box
+          sx={{
+            flex: '1 1 40%',
             overflow: 'hidden',
             display: 'flex',
-            zIndex: 1,
-            width: `${drawerWidthPct}%`,
-            height: '100%',
-            boxShadow:
-              'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
-            borderLeft: `1px solid ${MOON_200}`,
-            position: 'absolute',
-          },
-        }}
-        ModalProps={{
-          keepMounted: true, // Better open performance on mobile.
-        }}>
-        <div
-          id="dragger"
-          onMouseDown={handleMousedown}
-          style={{
-            borderTop: '1px solid #ddd',
-            position: 'absolute',
-            inset: '0 auto 0 0',
-            zIndex: 2,
-            backgroundColor: '#f4f7f9',
-            cursor: 'col-resize',
-            width: '5px',
+            // This transition is from the mui drawer component, to keep the main content animation in similar
+            transition: !isDrawerOpen
+              ? 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
+              : 'none',
+            marginRight: !isDrawerOpen
+              ? 0
+              : `${(drawerWidthPct * windowSize.width) / 100}px`,
+          }}>
+          <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
+        </Box>
+
+        <Drawer
+          variant="persistent"
+          anchor="right"
+          open={isDrawerOpen}
+          onClose={closePeek}
+          PaperProps={{
+            style: {
+              overflow: 'hidden',
+              display: 'flex',
+              zIndex: 1,
+              width: `${drawerWidthPct}%`,
+              height: '100%',
+              boxShadow:
+                'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
+              borderLeft: `1px solid ${MOON_200}`,
+              position: 'absolute',
+            },
           }}
-        />
-        {peekLocation && (
-          <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
-            <SimplePageLayoutContext.Provider
-              value={{
-                headerSuffix: (
-                  <Box
-                    sx={{
-                      height: '47px',
-                      flex: '0 0 auto',
-                    }}>
-                    <Button
-                      tooltip="Open full page for this object"
-                      icon="full-screen-mode-expand"
-                      variant="ghost"
-                      className="ml-4"
-                      onClick={() => {
-                        const pathname = query.peekPath!.replace(
-                          generalBase,
-                          targetBase
-                        );
-                        const preservedQuery = _.pick(query, ['tracetree']);
-                        const search = new URLSearchParams(
-                          preservedQuery
-                        ).toString();
-                        history.push({
-                          pathname,
-                          search,
-                        });
-                      }}
-                    />
-                    <Button
-                      tooltip="Close drawer"
-                      icon="close"
-                      variant="ghost"
-                      className="ml-4"
-                      onClick={closePeek}
-                    />
-                  </Box>
-                ),
-              }}>
-              <Browse3ProjectRoot
-                customLocation={peekLocation}
-                projectRoot={generalProjectRoot}
-              />
-            </SimplePageLayoutContext.Provider>
-          </WeaveflowPeekContext.Provider>
-        )}
-      </Drawer>
-    </Box>
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}>
+          <div
+            id="dragger"
+            onMouseDown={handleMousedown}
+            style={{
+              borderTop: '1px solid #ddd',
+              position: 'absolute',
+              inset: '0 auto 0 0',
+              zIndex: 2,
+              backgroundColor: '#f4f7f9',
+              cursor: 'col-resize',
+              width: '5px',
+            }}
+          />
+          {peekLocation && (
+            <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
+              <SimplePageLayoutContext.Provider
+                value={{
+                  headerSuffix: (
+                    <Box
+                      sx={{
+                        height: '47px',
+                        flex: '0 0 auto',
+                      }}>
+                      <Button
+                        tooltip="Open full page for this object"
+                        icon="full-screen-mode-expand"
+                        variant="ghost"
+                        className="ml-4"
+                        onClick={() => {
+                          const pathname = query.peekPath!.replace(
+                            generalBase,
+                            targetBase
+                          );
+                          const preservedQuery = _.pick(query, ['tracetree']);
+                          const search = new URLSearchParams(
+                            preservedQuery
+                          ).toString();
+                          history.push({
+                            pathname,
+                            search,
+                          });
+                        }}
+                      />
+                      <Button
+                        tooltip="Close drawer"
+                        icon="close"
+                        variant="ghost"
+                        className="ml-4"
+                        onClick={closePeek}
+                      />
+                    </Box>
+                  ),
+                }}>
+                <Browse3ProjectRoot
+                  customLocation={peekLocation}
+                  projectRoot={generalProjectRoot}
+                />
+              </SimplePageLayoutContext.Provider>
+            </WeaveflowPeekContext.Provider>
+          )}
+        </Drawer>
+      </Box>
+    </WFDataModelAutoProvider>
   );
 };
 
@@ -648,6 +655,7 @@ const useCallPeekRedirect = () => {
   const params = useParams<Browse3TabItemParams>();
   const {baseRouter} = useWeaveflowRouteContext();
   const history = useHistory();
+  const {useCall} = useWFHooks();
   const {result: call} = useCall({
     entity: params.entity,
     project: params.project,

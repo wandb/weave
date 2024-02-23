@@ -303,6 +303,7 @@ export const ObjectVersionsLink: React.FC<{
   entity: string;
   project: string;
   versionCount: number;
+  countIsLimited?: boolean;
   filter?: WFHighLevelObjectVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
@@ -317,7 +318,9 @@ export const ObjectVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
+      {props.versionCount}
+      {props.countIsLimited ? '+' : ''} version
+      {props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
@@ -326,6 +329,7 @@ export const OpVersionsLink: React.FC<{
   entity: string;
   project: string;
   versionCount: number;
+  countIsLimited?: boolean;
   filter?: WFHighLevelOpVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
@@ -336,7 +340,9 @@ export const OpVersionsLink: React.FC<{
     <Link
       $variant={props.variant}
       to={router.opVersionsUIUrl(props.entity, props.project, props.filter)}>
-      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
+      {props.versionCount}
+      {props.countIsLimited ? '+' : ''} version
+      {props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
