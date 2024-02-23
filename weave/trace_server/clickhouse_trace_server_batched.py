@@ -206,14 +206,37 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallQueryRes:
         conditions = []
-        parameters = {}
+        parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
             if req.filter.op_version_refs:
+                # We will build up (0 or 1) + N conditions for the op_version_refs
+                # If there are any non-wildcarded names, then we at least have an IN condition
+                # If there are any wildcarded names, then we have a LIKE condition for each
+
+                or_conditions: typing.List[str] = []
+
+                non_wildcarded_names: typing.List[str] = []
+                wildcarded_names: typing.List[str] = []
                 for name in req.filter.op_version_refs:
-                    if "*" in name:
-                        raise NotImplementedError("Wildcard not yet supported")
-                conditions.append("name IN {names: Array(String)}")
-                parameters["names"] = req.filter.op_version_refs
+                    if name.endswith(":*"):
+                        wildcarded_names.append(name)
+                    else:
+                        non_wildcarded_names.append(name)
+
+                if non_wildcarded_names:
+                    or_conditions.append(
+                        "name IN {non_wildcarded_names: Array(String)}"
+                    )
+                    parameters["non_wildcarded_names"] = non_wildcarded_names
+
+                for name_ndx, name in enumerate(wildcarded_names):
+                    param_name = "wildcarded_name_" + str(name_ndx)
+                    or_conditions.append("name LIKE {" + param_name + ": String}")
+                    like_name = name[:-1] + "%"
+                    parameters[param_name] = like_name
+
+                if or_conditions:
+                    conditions.append("(" + " OR ".join(or_conditions) + ")")
 
             if req.filter.input_object_version_refs:
                 parameters["input_refs"] = req.filter.input_object_version_refs

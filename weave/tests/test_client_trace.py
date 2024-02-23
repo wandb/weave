@@ -115,6 +115,7 @@ def test_graph_call_ordering(trace_client):
     # We want to preserve insert order
     assert [run._call.inputs["a"] for run in runs] == list(range(10))
 
+
 # def bootstrap_simple_ops_and_types():
 #     @weave.type()
 #     class Number:
@@ -124,30 +125,30 @@ def test_graph_call_ordering(trace_client):
 #     def adder(a: Number, b: int) -> Number:
 #         raise NotImplementedError("FAKE BUG")
 #         return Number(a.value + b)
-    
+
 #     buggy_adder = adder
-    
+
 #     @weave.op()
 #     def adder(a: Number, b: int) -> Number:
 #         raise NotImplementedError("FAKE BUG")
 #         return Number(a.value + b)
-    
+
 #     @weave.op()
 #     def multer(l: Number, r: int) -> Number:
 #         return Number(l.value * r)
-    
+
 #     @weave.op()
 #     def liner(m: Number, b: int, x: int) -> Number:
 #         return adder(multer(m, x), b)
-    
+
 #     def make_line(m, b, x, x_name):
 #         x = Number(x)
 #         weave.publish('x', x)
 #         m = Number(m)
 #         weave.publish(x_name, x)
-        
+
 #         return liner(m, b, x)
-    
+
 #     return make_line, {
 #         "Number": Number,
 #         "adder": adder,
@@ -157,7 +158,7 @@ def test_graph_call_ordering(trace_client):
 
 # def bootstrap_calls(num_calls=10):
 #     make_line, ops = bootstrap_simple_ops_and_types()
-    
+
 #     for i in range(num_calls):
 #         make_line(i, i, i, f"x{i}")
 
@@ -167,92 +168,97 @@ def test_trace_call_query_query_filter_op_version_refs(trace_client):
     def adder(a, b):
         # Intentional bug
         return a + a
-    
+
     buggy_adder = adder
-    
+
     @weave.op()
     def adder(a, b):
         return a + b
-    
+
     @weave.op()
     def subtractor(a, b):
         return a - b
-    
+
+    @weave.op()
+    def multiplier(a, b):
+        return a * b
+
     for a in range(3):
         for b in range(3):
             # only do the buggy one if a == b (allows for easier counting in assertions)
             if a == b:
-                buggy_adder(a, b) # total of 3 calls 
-            adder(a, b) # total of 9 calls
+                buggy_adder(a, b)  # total of 3 calls
+            adder(a, b)  # total of 9 calls
             if a != b:
-                subtractor(a, b) # total of 6 calls
+                subtractor(a, b)  # total of 6 calls
+            if a != b:
+                multiplier(a, b)  # total of 6 calls
     num_bugs = 3
     num_adds = 9
     num_subs = 6
-    num_calls = num_bugs + num_adds + num_subs
+    num_muls = 6
+    num_calls = num_bugs + num_adds + num_subs + num_muls
 
     trace_interface = trace_client.trace_server
 
-    # Test the None case
-    res = trace_interface.calls_query(tsi.CallsQueryReq({
-        "entity": trace_client.entity,
-        "project": trace_client.project,
-        "filter": tsi._CallsFilter({
-            "op_version_refs": None
-        })
-    }))
+    def ref_str(op):
+        return str(weave.obj_ref(op))
 
-    assert len(res.calls) == num_calls
+    # This is just a string representation of the ref
+    # this only reason we are doing this assertion is to make sure the
+    # manually constructed wildcard string is correct
+    adder_ref_str = f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:22eec6273f8becbf7b518205469f4453"
+    assert adder_ref_str == ref_str(adder)
+    wildcard_adder_ref_str = (
+        f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:*"
+    )
 
-    # Test the empty list case
-    res = trace_interface.calls_query(tsi.CallsQueryReq({
-        "entity": trace_client.entity,
-        "project": trace_client.project,
-        "filter": tsi._CallsFilter({
-            "op_version_refs": []
-        })
-    }))
+    for op_version_refs, exp_count in [
+        # Test the None case
+        (None, num_calls),
+        # Test the empty list case
+        ([], num_calls),
+        # Base case of most recent version of adder
+        ([ref_str(adder)], num_adds),
+        # Base case of non-recent version of adder
+        ([ref_str(buggy_adder)], num_bugs),
+        # more than one op
+        ([ref_str(adder), ref_str(subtractor)], num_adds + num_subs),
+        # Test the wildcard case
+        ([wildcard_adder_ref_str], num_bugs + num_adds),
+        # Test the wildcard case and specific case
+        ([wildcard_adder_ref_str, ref_str(subtractor)], num_bugs + num_adds + num_subs),
+    ]:
+        res = trace_interface.calls_query(
+            tsi.CallsQueryReq(
+                entity=trace_client.entity,
+                project=trace_client.project,
+                filter=tsi._CallsFilter(op_version_refs=op_version_refs),
+            )
+        )
 
-    assert len(res.calls) == num_calls
-    
-    # Test the single op case
-    adder_op_version_ref = weave.obj_ref(adder)
-    res = trace_interface.calls_query(tsi.CallsQueryReq({
-        "entity": trace_client.entity,
-        "project": trace_client.project,
-        "filter": tsi._CallsFilter({
-            "op_version_refs": [adder_op_version_ref]
-        })
-    }))
-
-    assert len(res.calls) == num_adds
-
-    # Test the wildcard case
-    res = trace_interface.calls_query(tsi.CallsQueryReq({
-        "entity": trace_client.entity,
-        "project": trace_client.project,
-        "filter": tsi._CallsFilter({
-            "op_version_refs": ["*"] # todo, construct a wildcard ref
-        })
-    }))
-    assert len(res.calls) == num_adds + num_bugs
+        assert len(res.calls) == exp_count
 
 
 def test_trace_call_query_query_filter_input_object_version_refs(trace_client):
     raise NotImplementedError()
 
+
 def test_trace_call_query_query_filter_output_object_version_refs(trace_client):
     raise NotImplementedError()
+
 
 def test_trace_call_query_query_filter_parent_ids(trace_client):
     raise NotImplementedError()
 
+
 def test_trace_call_query_query_filter_trace_ids(trace_client):
     raise NotImplementedError()
+
 
 def test_trace_call_query_query_filter_call_ids(trace_client):
     raise NotImplementedError()
 
+
 def test_trace_call_query_query_filter_trace_roots_only(trace_client):
     raise NotImplementedError()
-
