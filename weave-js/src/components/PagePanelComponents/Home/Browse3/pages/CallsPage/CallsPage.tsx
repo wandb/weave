@@ -1,9 +1,8 @@
-import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
+import {PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
   Chip,
-  CircularProgress,
   FormControl,
   IconButton,
   ListItem,
@@ -14,10 +13,8 @@ import {
 import _ from 'lodash';
 import React, {FC, useCallback, useMemo} from 'react';
 
-import {fnRunsNode} from '../../../Browse2/callTreeHooks';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
-import {useMakeNewBoard} from '../common/hooks';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
