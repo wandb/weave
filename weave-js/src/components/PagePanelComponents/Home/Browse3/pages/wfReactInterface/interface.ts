@@ -1,4 +1,4 @@
-import _, { sum } from 'lodash';
+import _ from 'lodash';
 import LRUCache from 'lru-cache';
 import {useEffect, useMemo, useState} from 'react';
 
@@ -31,14 +31,10 @@ import {
   opRootProject,
   opStringEqual,
 } from '../../../../../../core';
-import { useDeepMemo } from '../../../../../../hookUtils';
+import {useDeepMemo} from '../../../../../../hookUtils';
 import {useNodeValue} from '../../../../../../react';
 import {Span, SpanWithFeedback} from '../../../Browse2/callTree';
-import {
-  fnRunsNode,
-  useRuns,
-  useRunsWithFeedback,
-} from '../../../Browse2/callTreeHooks';
+import {fnRunsNode} from '../../../Browse2/callTreeHooks';
 import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 import * as trace_server_client from './trace_server_client';
 
@@ -77,7 +73,7 @@ export type CallSchema = CallKey & {
 
 const convertISOToDate = (iso: string) => {
   return new Date(iso);
-}
+};
 
 const traceCallToLegacySpan = (
   traceCall: trace_server_client.TraceCallSchema
@@ -96,26 +92,26 @@ const traceCallToLegacySpan = (
   if (startDate && endDate) {
     latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
   }
-  const summary=  {
+  const summary = {
     latency_s: latencyS,
-    ...(traceCall.summary ?? {})
+    ...(traceCall.summary ?? {}),
   };
-  return  {
+  return {
     name: traceCall.name,
     inputs: traceCall.inputs,
     output: traceCall.outputs,
     status_code: statusCode,
     exception: traceCall.exception,
     attributes: traceCall.attributes,
-    summary: summary,
+    summary,
     span_id: traceCall.id,
     trace_id: traceCall.trace_id,
     parent_id: traceCall.parent_id,
     timestamp: startDate.getTime(),
     start_time_ms: startDate.getTime(),
-    end_time_ms: endDate?.getTime()
-  }
-}
+    end_time_ms: endDate?.getTime(),
+  };
+};
 
 const traceCallToUICallSchema = (
   traceCall: trace_server_client.TraceCallSchema
@@ -127,13 +123,14 @@ const traceCallToUICallSchema = (
     traceId: traceCall.trace_id,
     parentId: traceCall.parent_id ?? null,
     spanName: traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
-    ? refUriToOpVersionKey(traceCall.name).opId
-    : traceCall.name,
+      ? refUriToOpVersionKey(traceCall.name).opId
+      : traceCall.name,
     opVersionRef: traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
       ? traceCall.name
       : null,
     rawSpan: traceCallToLegacySpan(traceCall),
-    rawFeedback: {},}
+    rawFeedback: {},
+  };
 };
 
 export const spanToCallSchema = (
@@ -170,17 +167,20 @@ export const spanToCallSchema = (
 
 export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? getCallFromCache(key) : null;
-  const [callRes, setCallRes] = useState<trace_server_client.TraceCallReadRes | null>(null);
+  const [callRes, setCallRes] =
+    useState<trace_server_client.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
-      trace_server_client.callRead({
-        entity: deepKey.entity,
-        project: deepKey.project,
-        id: deepKey.callId,
-      }).then(res => {
-        setCallRes(res);
-      });
+      trace_server_client
+        .callRead({
+          entity: deepKey.entity,
+          project: deepKey.project,
+          id: deepKey.callId,
+        })
+        .then(res => {
+          setCallRes(res);
+        });
     }
   }, [deepKey]);
 
@@ -197,9 +197,7 @@ export const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         result: cachedCall,
       };
     }
-    const result = callRes
-      ? traceCallToUICallSchema(callRes.call)
-      : null;
+    const result = callRes ? traceCallToUICallSchema(callRes.call) : null;
     if (callRes == null) {
       return {
         loading: true,
@@ -271,24 +269,27 @@ export const useCalls = (
   project: string,
   filter: CallFilter
 ): Loadable<CallSchema[]> => {
-  const [callRes, setCallRes] = useState<trace_server_client.TraceCallQueryRes | null>(null);
+  const [callRes, setCallRes] =
+    useState<trace_server_client.TraceCallQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
   useEffect(() => {
-    trace_server_client.callsQuery({
-      entity: entity,
-      project: project,
-      filter: {
-        op_version_refs: deepFilter.opVersionRefs,
-        input_object_version_refs: deepFilter.inputObjectVersionRefs,
-        output_object_version_refs: deepFilter.outputObjectVersionRefs,
-        parent_ids: deepFilter.parentIds,
-        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter.callIds,
-        trace_roots_only: deepFilter.traceRootsOnly,
-      },
-    }).then(res => {
-      setCallRes(res);
-    });
+    trace_server_client
+      .callsQuery({
+        entity,
+        project,
+        filter: {
+          op_version_refs: deepFilter.opVersionRefs,
+          input_object_version_refs: deepFilter.inputObjectVersionRefs,
+          output_object_version_refs: deepFilter.outputObjectVersionRefs,
+          parent_ids: deepFilter.parentIds,
+          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+          call_ids: deepFilter.callIds,
+          trace_roots_only: deepFilter.traceRootsOnly,
+        },
+      })
+      .then(res => {
+        setCallRes(res);
+      });
   }, [entity, project, deepFilter]);
 
   return useMemo(() => {
@@ -303,7 +304,7 @@ export const useCalls = (
       );
     });
 
-    if ( callRes == null) {
+    if (callRes == null) {
       return {
         loading: true,
         result,
