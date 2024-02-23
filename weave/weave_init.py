@@ -71,12 +71,12 @@ def init_local() -> InitializedClient:
     return InitializedClient(client)
 
 
-def init_trace_remote(
-    project_name: str
-) -> InitializedClient:
+def init_trace_remote(project_name: str) -> InitializedClient:
     entity_name, project_name = get_entity_project_from_project_name(project_name)
 
-    trace_server_url: str = os.environ.get("WF_TRACE_SERVER_URL", "http://127.0.0.1:6345")
+    trace_server_url: str = os.environ.get(
+        "WF_TRACE_SERVER_URL", "http://127.0.0.1:6345"
+    )
     client = graph_client_trace.GraphClientTraceWithArtifactStorage(
         entity_name,
         project_name,

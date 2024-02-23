@@ -6,11 +6,12 @@ import os
 import time
 import typing
 
-from clickhouse_connect.driver.client import Client
+from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 import clickhouse_connect
 from pydantic import BaseModel
 
+from weave.trace_server import environment as wf_env
 
 from .trace_server_interface_util import (
     ARTIFACT_REF_SCHEME,
@@ -132,10 +133,17 @@ required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
-    ch_client: Client
+    ch_client: CHClient
     call_insert_buffer: InMemFlushableBuffer
 
-    def __init__(self, host: str, port: int = 8123, user="default", password="", should_batch: bool = True):
+    def __init__(
+        self,
+        host: str,
+        port: int = 8123,
+        user: str = "default",
+        password: str = "",
+        should_batch: bool = True,
+    ):
         super().__init__()
         self._host = host
         self._port = port
@@ -153,13 +161,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self.should_batch = should_batch
 
     @classmethod
-    def from_env(cls, should_batch = True) -> "ClickHouseTraceServer":
-        host = os.environ.get("WF_CLICKHOUSE_HOST", "localhost")
-        port = int(os.environ.get("WF_CLICKHOUSE_PORT", 8123))
-        user = os.environ.get("WF_CLICKHOUSE_USER", "default")
-        password = os.environ.get("WF_CLICKHOUSE_PASS", "")
-        return cls(host, port, user, password, should_batch)
-
+    def from_env(cls, should_batch: bool = True) -> "ClickHouseTraceServer":
+        return cls(
+            wf_env.wf_clickhouse_host(),
+            wf_env.wf_clickhouse_port(),
+            wf_env.wf_clickhouse_user(),
+            wf_env.wf_clickhouse_pass(),
+            should_batch,
+        )
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -297,9 +306,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     # Private Methods
-    def _mint_client(self) -> str:
-        return  clickhouse_connect.get_client(host=self._host, port=self._port, user=self._user, password=self._password)
-
+    def _mint_client(self) -> CHClient:
+        return clickhouse_connect.get_client(
+            host=self._host, port=self._port, user=self._user, password=self._password
+        )
 
     def __del__(self) -> None:
         self.call_insert_buffer.flush()
@@ -524,12 +534,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self) -> None:
         print("Running migrations")
-        res = self.ch_client.command("SHOW TABLES")
-        if isinstance(res, str):
-            table_names = res.split("\n")
-            for table_name in table_names:
-                if not table_name.startswith("."):
-                    self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
+        # res = self.ch_client.command("SHOW TABLES")
+        # if isinstance(res, str):
+        #     table_names = res.split("\n")
+        #     for table_name in table_names:
+        #         if not table_name.startswith("."):
+        #             self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
 
         self.ch_client.command(
             """

@@ -572,9 +572,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
     def ref_is_own(self, ref: typing.Optional[ref_base.Ref]) -> bool:
         return isinstance(ref, TraceRef)
 
-    def ref_uri(
-        self, name: str, version: str, path: str
-    ) -> uris.WeaveURI:
+    def ref_uri(self, name: str, version: str, path: str) -> uris.WeaveURI:
         raise NotImplementedError()
 
     def run_ui_url(self, run: Run) -> str:
@@ -725,7 +723,7 @@ class GraphClientTraceWithArtifactStorage(GraphClientTrace):
         self, entity: str, project: str, trace_server: tsi.TraceServerInterface
     ):
         super().__init__(entity, project, trace_server)
-            
+
     def ref_is_own(self, ref: typing.Optional[Ref]) -> bool:
         return isinstance(ref, artifact_wandb.WandbArtifactRef)
 
