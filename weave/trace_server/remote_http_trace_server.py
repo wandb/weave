@@ -3,6 +3,8 @@ import typing as t
 from pydantic import BaseModel
 import requests
 
+from weave.trace_server import environment as wf_env
+
 
 from .flushing_buffer import InMemAutoFlushingBuffer
 from . import trace_server_interface as tsi
@@ -37,6 +39,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_buffer = InMemAutoFlushingBuffer(
                 MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_calls
             )
+
+    @classmethod
+    def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
+        return cls(wf_env.wf_trace_server_url())
 
     def _flush_calls(self, batch: t.List) -> None:
         if len(batch) == 0:
