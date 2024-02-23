@@ -18,6 +18,7 @@ import {
   useParentCall,
 } from '../wfReactInterface/interface';
 import {ButtonOverlay} from './ButtonOverlay';
+import {CollapsibleSection} from './CollapsibleSection';
 import {OpVersionText} from './OpVersionText';
 
 const Heading = styled.div`
@@ -101,30 +102,34 @@ export const CallDetails: FC<{
           <Box
             sx={{
               flex: '0 0 auto',
-              p: 2,
+              px: 2,
+              pb: 2,
             }}>
-            <KeyValueTable
-              headerTitle="Inputs"
-              data={
-                // TODO: Consider bringing back openai chat input/output
-                inputs
-              }
-            />
+            <CollapsibleSection headerTitle="Inputs">
+              <KeyValueTable
+                data={
+                  // TODO: Consider bringing back openai chat input/output
+                  inputs
+                }
+              />
+            </CollapsibleSection>
           </Box>
         )}
         {Object.keys(output).length > 0 && (
           <Box
             sx={{
               flex: '0 0 auto',
-              p: 2,
+              px: 2,
+              pb: 2,
             }}>
-            <KeyValueTable
-              headerTitle="Output"
-              data={
-                // TODO: Consider bringing back openai chat input/output
-                output
-              }
-            />
+            <CollapsibleSection headerTitle="Output">
+              <KeyValueTable
+                data={
+                  // TODO: Consider bringing back openai chat input/output
+                  output
+                }
+              />
+            </CollapsibleSection>
           </Box>
         )}
         {multipleChildCallOpRefs.map(opVersionRef => {
