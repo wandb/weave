@@ -78,6 +78,28 @@ export const CallDetails: FC<{
   const {baseRouter} = useWeaveflowRouteContext();
   const history = useHistory();
 
+  const outputKeys = Object.keys(output);
+  const outputIsOnlyResult =
+    outputKeys.length === 1 &&
+    outputKeys[0] === '_result' &&
+    typeof output._result === 'string';
+  const outputTable = (
+    <Box
+      sx={{
+        flex: '0 0 auto',
+        p: 2,
+      }}>
+      <KeyValueTable
+        headerTitle="Output"
+        data={
+          // TODO: Consider bringing back openai chat input/output
+          output
+        }
+        result={outputIsOnlyResult ? (output._result as string) : undefined}
+      />
+    </Box>
+  );
+
   return (
     <Box
       style={{
@@ -112,21 +134,7 @@ export const CallDetails: FC<{
             />
           </Box>
         )}
-        {Object.keys(output).length > 0 && (
-          <Box
-            sx={{
-              flex: '0 0 auto',
-              p: 2,
-            }}>
-            <KeyValueTable
-              headerTitle="Output"
-              data={
-                // TODO: Consider bringing back openai chat input/output
-                output
-              }
-            />
-          </Box>
-        )}
+        {Object.keys(output).length > 0 && outputTable}
         {multipleChildCallOpRefs.map(opVersionRef => {
           const exampleCall = childCalls.result?.find(
             c => c.opVersionRef === opVersionRef

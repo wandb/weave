@@ -119,6 +119,23 @@ export const RunsTable: FC<{
     [spans]
   );
   const params = useParams<Browse2RootObjectVersionItemParams>();
+  let onlyOneOutputResult = false;
+  if (spans.length > 0) {
+    const spanOutputKeys = _.uniq(
+      spans.map(s =>
+        Object.keys(
+          _.omitBy(
+            flattenObject(s.rawSpan.output!),
+            (v, k) => v == null || (k.startsWith('_') && k !== '_result')
+          )
+        )
+      )
+    );
+    onlyOneOutputResult = spanOutputKeys.every(
+      keys => keys.length === 0 || keys[0] === '_result'
+    );
+  }
+
   const tableData = useMemo(() => {
     return spans.map((call: CallSchema) => {
       const argOrder = call.rawSpan.inputs._input_order;
@@ -163,6 +180,9 @@ export const RunsTable: FC<{
               (v, k) => v == null || (k.startsWith('_') && k !== '_result')
             ),
             (v, k) => {
+              if (onlyOneOutputResult && k === '_result') {
+                return 'output';
+              }
               return 'output.' + k;
             }
           ),
@@ -181,7 +201,7 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [spans, loading]);
+  }, [spans, loading, onlyOneOutputResult]);
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
@@ -367,40 +387,52 @@ export const RunsTable: FC<{
       colGroupingModel.push(inputGroup);
 
       // All output keys as we don't have the order key yet.
-      let outputKeys: {[key: string]: true} = {};
-      spans.forEach(span => {
-        for (const [k, v] of Object.entries(
-          flattenObject(span.rawSpan.output ?? {})
-        )) {
-          if (v != null && (!k.startsWith('_') || k === '_result')) {
-            outputKeys[k] = true;
+      if (!onlyOneOutputResult) {
+        let outputKeys: {[key: string]: true} = {};
+        spans.forEach(span => {
+          for (const [k, v] of Object.entries(
+            flattenObject(span.rawSpan.output ?? {})
+          )) {
+            if (v != null && (!k.startsWith('_') || k === '_result')) {
+              outputKeys[k] = true;
+            }
           }
-        }
-      });
-      // sort shallowest keys first
-      outputKeys = _.fromPairs(
-        Object.entries(outputKeys).sort((a, b) => {
-          const aDepth = a[0].split('.').length;
-          const bDepth = b[0].split('.').length;
-          return aDepth - bDepth;
-        })
-      );
+        });
+        // sort shallowest keys first
+        outputKeys = _.fromPairs(
+          Object.entries(outputKeys).sort((a, b) => {
+            const aDepth = a[0].split('.').length;
+            const bDepth = b[0].split('.').length;
+            return aDepth - bDepth;
+          })
+        );
 
-      const outputOrder = Object.keys(outputKeys);
-      const outputGrouping = buildTree(outputOrder, 'output');
-      colGroupingModel.push(outputGrouping);
-      for (const key of outputOrder) {
+        const outputOrder = Object.keys(outputKeys);
+        const outputGrouping = buildTree(outputOrder, 'output');
+        colGroupingModel.push(outputGrouping);
+        for (const key of outputOrder) {
+          cols.push({
+            flex: 1,
+            minWidth: 150,
+            field: 'output.' + key,
+            headerName: key.split('.').slice(-1)[0],
+            renderCell: cellParams => {
+              const k = 'output.' + key;
+              if (k in cellParams.row) {
+                return renderCell((cellParams.row as any)[k]);
+              }
+              return <NotApplicable />;
+            },
+          });
+        }
+      } else {
         cols.push({
           flex: 1,
           minWidth: 150,
-          field: 'output.' + key,
-          headerName: key.split('.').slice(-1)[0],
+          field: 'output',
+          headerName: 'output',
           renderCell: cellParams => {
-            const k = 'output.' + key;
-            if (k in cellParams.row) {
-              return renderCell((cellParams.row as any)[k]);
-            }
-            return <NotApplicable />;
+            return renderCell((cellParams.row as any).output);
           },
         });
       }
@@ -461,6 +493,7 @@ export const RunsTable: FC<{
     params.project,
     isSingleOpVersion,
     tableStats,
+    onlyOneOutputResult,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();

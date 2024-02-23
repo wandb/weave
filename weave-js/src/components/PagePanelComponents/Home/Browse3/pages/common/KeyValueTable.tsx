@@ -15,6 +15,7 @@ const MAX_HEIGHT_MULT = 5;
 export const KeyValueTable: React.FC<{
   data: {[key: string]: any};
   headerTitle?: string;
+  result?: string;
 }> = props => {
   return (
     <Box
@@ -40,7 +41,11 @@ export const KeyValueTable: React.FC<{
           </thead>
         )}
         <tbody>
-          <KeyValueRowForObject objValue={props.data} />
+          {props.result ? (
+            <RowForString value={props.result} />
+          ) : (
+            <KeyValueRowForObject objValue={props.data} />
+          )}
         </tbody>
       </table>
     </Box>
@@ -86,6 +91,66 @@ const valueStyle: React.CSSProperties = {
   borderBottom: `1px solid ${MOON_250}`,
 };
 
+const StringCell: React.FC<{
+  value: string;
+}> = ({value}) => {
+  return (
+    <Box
+      sx={{
+        // maxHeight: !open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        width: '100%',
+      }}>
+      <pre
+        style={{
+          width: '100%',
+          // See https://developer.mozilla.org/en-US/docs/Web/CSS/white-space
+          // We want to break on spaces, but also on newlines and preserve them
+          whiteSpace: 'break-spaces',
+          fontSize: '16px',
+          margin: '0',
+          fontFamily: 'Source Sans Pro',
+        }}>
+        {value}
+      </pre>
+    </Box>
+  );
+};
+
+const RowForString: React.FC<{
+  value: string;
+}> = ({value}) => {
+  const [open, setOpen] = React.useState(false);
+  const cellRef = React.useRef<HTMLTableCellElement>(null);
+  const [canExpand, setCanExpand] = useState(false);
+
+  useEffect(() => {
+    if (
+      cellRef.current &&
+      cellRef.current.clientHeight >= ROW_HEIGHT * MAX_HEIGHT_MULT - 5
+    ) {
+      setCanExpand(true);
+    }
+  }, []);
+
+  return (
+    <tr>
+      <td
+        onClick={() => {
+          if (open || canExpand) {
+            setOpen(!open);
+          }
+        }}
+        style={valueStyle}
+        colSpan={VALUE_SPACE}
+        ref={cellRef}>
+        <StringCell value={value} />
+      </td>
+    </tr>
+  );
+};
+
 const KeyValueRow: React.FC<{
   rowKey: string;
   rowValue: any;
@@ -113,28 +178,7 @@ const KeyValueRow: React.FC<{
       useVal = <SmallRef objRef={valRef} />;
     } else if (_.isString(props.rowValue)) {
       //   useVal = <SimplePopoverText text={props.rowValue} />;
-      useVal = (
-        <Box
-          sx={{
-            // maxHeight: !open ? `${ROW_HEIGHT * MAX_HEIGHT_MULT}px` : '50vh',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            width: '100%',
-          }}>
-          <pre
-            style={{
-              width: '100%',
-              // See https://developer.mozilla.org/en-US/docs/Web/CSS/white-space
-              // We want to break on spaces, but also on newlines and preserve them
-              whiteSpace: 'break-spaces',
-              fontSize: '16px',
-              margin: '0',
-              fontFamily: 'Source Sans Pro',
-            }}>
-            {useVal}
-          </pre>
-        </Box>
-      );
+      useVal = <StringCell value={useVal} />;
     } else if (_.isBoolean(props.rowValue)) {
       useVal = (props.rowValue as boolean).toString();
     } else if (_.isDate(props.rowValue)) {
