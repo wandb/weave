@@ -31,7 +31,7 @@ export type CallSchema = CallKey & {
   parentId: string | null;
   // See note above `RawSpanFromStreamTableEra` regarding the `rawSpan` field.
   // We should wean off of this and move the needed properties to `CallSchema`.
-  rawSpan: RawSpanFromStreamTableEra; 
+  rawSpan: RawSpanFromStreamTableEra;
   rawFeedback?: any;
 };
 
@@ -134,7 +134,7 @@ export type WFDataModelHooks = {
   };
 };
 
-/** 
+/**
  * `RawSpanFromStreamTableEra` and `RawSpanFromStreamTableEraWithFeedback` are
  * sort of relics from the past. The fact that they are exported is a smell of
  * some leaky abstraction. They were originally defined in callTree.ts and
@@ -151,7 +151,7 @@ export type WFDataModelHooks = {
  * data format to the `CallSchema` format. This would allow us to remove the
  * `RawSpanFromStreamTableEra` and `RawSpanFromStreamTableEraWithFeedback`.
  * (hence the more specific name `RawSpanFromStreamTableEra`).
-*/
+ */
 export interface RawSpanFromStreamTableEra {
   name: string;
   inputs: {_keys?: string[]; [key: string]: any};

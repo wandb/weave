@@ -45,7 +45,7 @@ import {
   setObjectVersionInCache,
   setOpVersionInCache,
 } from './cache';
-import {PROJECT_CALL_STREAM_NAME} from './constants';
+import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
 import {
   CallFilter,
   CallKey,
@@ -59,12 +59,13 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  RawSpanFromStreamTableEraWithFeedback,
   WFDataModelHooks,
 } from './interface';
 import {
   opNameToCategory,
   opVersionRefOpCategory,
-  spanToCallSchema,
+  refUriToOpVersionKey,
   typeNameToCategory,
 } from './utilities';
 
@@ -493,7 +494,9 @@ const useChildCallsForCompare = (
   return useMemo(() => {
     return {
       loading: nodeValue.loading,
-      result: (nodeValue.result ?? []).map((row: any) => spanToCallSchema(entity, project, row.child)),
+      result: (nodeValue.result ?? []).map((row: any) =>
+        spanToCallSchema(entity, project, row.child)
+      ),
     };
   }, [entity, nodeValue.loading, nodeValue.result, project]);
 };
@@ -724,6 +727,39 @@ const useOpVersionsNode = (
   });
 
   return dataNode;
+};
+
+// Converters //
+const spanToCallSchema = (
+  entity: string,
+  project: string,
+  span: RawSpanFromStreamTableEraWithFeedback
+): CallSchema => {
+  // This rawSpan construction fixes issues with crashed runs using the
+  // streamtable graph client (will be fixed in the future)
+  const rawSpan = span;
+  rawSpan.summary = span.summary ?? {
+    latency_s: 0,
+  };
+  rawSpan.summary.latency_s = span.summary?.latency_s ?? 0;
+  rawSpan.status_code = span.status_code ?? 'UNSET';
+  rawSpan.inputs = span.inputs ?? {};
+
+  return {
+    entity,
+    project,
+    callId: span.span_id,
+    traceId: span.trace_id,
+    parentId: span.parent_id ?? null,
+    spanName: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? refUriToOpVersionKey(span.name).opId
+      : span.name,
+    opVersionRef: span.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+      ? span.name
+      : null,
+    rawSpan,
+    rawFeedback: span.feedback,
+  };
 };
 
 export const cgDataModelInterface: WFDataModelHooks = {

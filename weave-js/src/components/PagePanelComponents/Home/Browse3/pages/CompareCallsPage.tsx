@@ -12,7 +12,6 @@ import {
 } from './CallsPage/PivotRunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useWFHooks} from './wfReactInterface/context';
-import {spanToCallSchema} from './wfReactInterface/utilities';
 
 export const CompareCallsPage: FC<{
   entity: string;
@@ -173,7 +172,7 @@ export const CompareCallsPage: FC<{
     return (
       <PivotRunsView
         loading={loading}
-        runs={childRunsFilteredToOpVersion}
+        runs={childRunsFilteredToOpVersion ?? []}
         entity={props.entity}
         project={props.project}
         colDimAtLeafMode

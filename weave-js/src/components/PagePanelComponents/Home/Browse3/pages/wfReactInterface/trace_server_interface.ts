@@ -245,7 +245,7 @@ const useChildCallsForCompare = (
       parentCallsById[call.callId] = call;
     }
 
-    return {loading: false, result: (childCalls.result ?? [])};
+    return {loading: false, result: childCalls.result ?? []};
   }, [
     childCalls.loading,
     childCalls.result,
