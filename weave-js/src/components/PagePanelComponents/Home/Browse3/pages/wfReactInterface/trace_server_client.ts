@@ -66,7 +66,6 @@ const makeTraceServerEndpointFn = <QT, ST>(endpoint: string) => {
       body: JSON.stringify(req),
     });
     const res = await response.json();
-    console.log(res);
     return res;
   };
   return fn;

@@ -19,6 +19,7 @@ from .trace_server_interface_util import (
     encode_bytes_as_b64,
     generate_id,
     version_hash_for_object,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
 from .flushing_buffer import InMemAutoFlushingBuffer, InMemFlushableBuffer
@@ -217,7 +218,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 non_wildcarded_names: typing.List[str] = []
                 wildcarded_names: typing.List[str] = []
                 for name in req.filter.op_version_refs:
-                    if name.endswith(":*"):
+                    if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
                         wildcarded_names.append(name)
                     else:
                         non_wildcarded_names.append(name)
@@ -231,7 +232,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 for name_ndx, name in enumerate(wildcarded_names):
                     param_name = "wildcarded_name_" + str(name_ndx)
                     or_conditions.append("name LIKE {" + param_name + ": String}")
-                    like_name = name[:-1] + "%"
+                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
                     parameters[param_name] = like_name
 
                 if or_conditions:
