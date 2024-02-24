@@ -1,15 +1,19 @@
+/**
+ * This file contains the utilities that relate to working with the
+ * wfReactInterface. Importantly, these should never make direct calls down to
+ * the data providers - they should always go through the interface exposed via
+ * the context.
+ */
+
+import {OP_CATEGORIES, WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import {useWFHooks} from './context';
 import {
-  OBJECT_CATEGORIES,
-  OP_CATEGORIES,
-  WANDB_ARTIFACT_REF_PREFIX,
-} from './constants';
-import {
-  ObjectCategory,
   ObjectVersionKey,
   ObjectVersionSchema,
   OpCategory,
   OpVersionKey,
 } from './interface';
+import {CallSchema, Loadable} from './interface';
 
 type RefUri = string;
 
@@ -54,24 +58,6 @@ export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
   return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${
     key.objectId
   }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
-};
-
-export const typeNameToCategory = (typeName: string): ObjectCategory | null => {
-  for (const category of OBJECT_CATEGORIES) {
-    if (typeName.toLocaleLowerCase().includes(category)) {
-      return category as ObjectCategory;
-    }
-  }
-  return null;
-};
-
-export const opNameToCategory = (opName: string): OpCategory | null => {
-  for (const category of OP_CATEGORIES) {
-    if (opName.toLocaleLowerCase().includes(category)) {
-      return category as OpCategory;
-    }
-  }
-  return null;
 };
 
 type WFNaiveRefDict = {
@@ -129,11 +115,25 @@ export const opVersionRefOpName = (opVersionRef: string) => {
   return refUriToOpVersionKey(opVersionRef).opId;
 };
 
-// This one is a huge hack b/c it is based on the name. Once this
-// is added to the data model, we will need to make a query
-// wherever this is used!
+// This one is a huge hack b/c it is based on the name. Once this is added to
+// the data model, we will need to make a query wherever this is used! Action:
+// Remove all uses of this function other than the use in the compute graph
+// interface (for which the datamodel is unlikely to every capture this
+// information). opCategory should be moved to the CallSchema and/or the
+// OpVersionSchema. If it is inferred, then that should be hidden from the
+// caller. The fact that this is imported in the RunsTable is a smell of leaking
+// abstraction.
 export const opVersionRefOpCategory = (opVersionRef: string) => {
   return opNameToCategory(opVersionRefOpName(opVersionRef));
+};
+
+export const opNameToCategory = (opName: string): OpCategory | null => {
+  for (const category of OP_CATEGORIES) {
+    if (opName.toLocaleLowerCase().includes(category)) {
+      return category as OpCategory;
+    }
+  }
+  return null;
 };
 
 export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
@@ -149,4 +149,21 @@ export const objectVersionNiceString = (ov: ObjectVersionSchema) => {
     result += `#${ov.refExtra}`;
   }
   return result;
+};
+
+/// Hooks ///
+
+export const useParentCall = (
+  call: CallSchema | null
+): Loadable<CallSchema | null> => {
+  const {useCall} = useWFHooks();
+  let parentCall = null;
+  if (call && call.parentId) {
+    parentCall = {
+      entity: call.entity,
+      project: call.project,
+      callId: call.parentId,
+    };
+  }
+  return useCall(parentCall);
 };

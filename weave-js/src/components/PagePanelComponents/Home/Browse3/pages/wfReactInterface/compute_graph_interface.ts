@@ -45,12 +45,17 @@ import {
   setObjectVersionInCache,
   setOpVersionInCache,
 } from './cache';
-import {PROJECT_CALL_STREAM_NAME, WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import {
+  OBJECT_CATEGORIES,
+  PROJECT_CALL_STREAM_NAME,
+  WANDB_ARTIFACT_REF_PREFIX,
+} from './constants';
 import {
   CallFilter,
   CallKey,
   CallSchema,
   Loadable,
+  ObjectCategory,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -66,7 +71,6 @@ import {
   opNameToCategory,
   opVersionRefOpCategory,
   refUriToOpVersionKey,
-  typeNameToCategory,
 } from './utilities';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
@@ -760,6 +764,16 @@ const spanToCallSchema = (
     rawSpan,
     rawFeedback: span.feedback,
   };
+};
+
+// Helpers //
+const typeNameToCategory = (typeName: string): ObjectCategory | null => {
+  for (const category of OBJECT_CATEGORIES) {
+    if (typeName.toLocaleLowerCase().includes(category)) {
+      return category as ObjectCategory;
+    }
+  }
+  return null;
 };
 
 export const cgDataModelInterface: WFDataModelHooks = {

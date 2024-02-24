@@ -13,8 +13,8 @@ import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {useWFHooks} from '../wfReactInterface/context';
-import {useParentCall} from '../wfReactInterface/external_utilities';
 import {CallSchema} from '../wfReactInterface/interface';
+import {useParentCall} from '../wfReactInterface/utilities';
 import {ButtonOverlay} from './ButtonOverlay';
 import {OpVersionText} from './OpVersionText';
 
