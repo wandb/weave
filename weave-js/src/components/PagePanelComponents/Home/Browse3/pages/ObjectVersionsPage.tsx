@@ -226,6 +226,11 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
   const {useRootObjectVersions} = useWFHooks();
 
   const obj = props.obj;
+  // Here, we really just want to know the count - and it should be calculated
+  // by the server, not by the client. This is a performance optimization. In
+  // the meantime we will just fetch the first 100 versions and display 99+ if
+  // there are at least 100. Someone can come back and add `count` to the 3
+  // query APIs which will make this faster.
   const objectVersionsNode = useRootObjectVersions(
     obj.entity,
     obj.project,
