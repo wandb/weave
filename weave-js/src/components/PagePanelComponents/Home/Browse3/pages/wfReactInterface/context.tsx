@@ -1,9 +1,22 @@
+/**
+ * This file is responsible for providing the `WFDataModelHooks` context, which
+ * is the primary interface for reading data from the weaveflow data model. The
+ * primary exported symbols are:
+ *  - useWFHooks: used by react components to get access to the weaveflow data
+ *    model.
+ *  - WFDataModelAutoProvider: automatically detects the engine that backs the
+ *    project and configures the context accordingly.
+ *  - useIsWeaveflowEnabled: used by the top-level application to determine if
+ *    the project has weaveflow data.
+ */
+
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
 import {cgWFDataModelHooks} from './compute_graph_interface';
 import {WFDataModelHooksInterface} from './interface';
 import {tsWFDataModelHooks} from './trace_server_interface';
 
+//  Set this to `true` once the trace server supports objects
 const TRACE_SERVER_SUPPORTS_OBJECTS = false;
 
 const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
