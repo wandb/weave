@@ -1,4 +1,10 @@
-//// In Mem Cache Layer ////
+/**
+ * In-memory LRU cache for Calls/Ops/ObjectVersions. This is a fairly simple
+ * cache that lives just for the duration of the process page view. Our usage
+ * pattern is very often a some query (returning many results), followed by a
+ * read of a specific result. Using this caching mechanic, we can avoid
+ * re-fetching the same data multiple times in a single page view.
+ */
 
 import LRUCache from 'lru-cache';
 
