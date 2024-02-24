@@ -51,7 +51,7 @@ export const CompareCallsPage: FC<{
     props.entity,
     props.project,
     {
-      callIds: props.callIds ?? [],
+      parentIds: props.callIds ?? [],
     },
     undefined,
     {
