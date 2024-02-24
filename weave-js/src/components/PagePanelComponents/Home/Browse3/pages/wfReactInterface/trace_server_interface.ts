@@ -199,7 +199,7 @@ const useChildCallsForCompare = (
     entity,
     project,
     {
-      parentIds: parentCallIds,
+      callIds: parentCallIds,
       inputObjectVersionRefs: selectedObjectVersionRef
         ? [selectedObjectVersionRef]
         : [],
@@ -240,12 +240,7 @@ const useChildCallsForCompare = (
     });
 
     return {loading: false, result: res};
-  }, [
-    childCalls.loading,
-    childCalls.result,
-    parentCalls.loading,
-    parentCalls.result,
-  ]);
+  }, [childCalls.loading, childCalls.result, parentCalls.loading, parentCalls.result]);
 
   return result;
 };
