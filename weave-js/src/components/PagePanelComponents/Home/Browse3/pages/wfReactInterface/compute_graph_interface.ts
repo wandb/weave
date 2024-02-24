@@ -460,7 +460,7 @@ const useChildCallsForCompare = (
   selectedObjectVersionRef: string | null
 ): {
   loading: boolean;
-  result: RawSpanFromStreamTableEra[];
+  result: CallSchema[];
 } => {
   const parentRunsNode = selectedObjectVersionRef
     ? callsNode(entity, project, {
@@ -493,9 +493,9 @@ const useChildCallsForCompare = (
   return useMemo(() => {
     return {
       loading: nodeValue.loading,
-      result: (nodeValue.result ?? []).map((row: any) => row.child),
+      result: (nodeValue.result ?? []).map((row: any) => spanToCallSchema(entity, project, row.child)),
     };
-  }, [nodeValue.loading, nodeValue.result]);
+  }, [entity, nodeValue.loading, nodeValue.result, project]);
 };
 
 // Helpers //

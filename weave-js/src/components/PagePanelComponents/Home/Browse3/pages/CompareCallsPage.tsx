@@ -33,19 +33,14 @@ export const CompareCallsPage: FC<{
     string | null
   >(null);
 
-  const {loading, result: subRuns} = useChildCallsForCompare(
-    props.entity,
-    props.project,
-    props.callIds ?? [],
-    selectedOpVersionRef,
-    selectedObjectVersionRef
-  );
-
-  const childRunsFilteredToOpVersion = useMemo(() => {
-    return (subRuns ?? []).map(subRun => {
-      return spanToCallSchema(props.entity, props.project, subRun);
-    });
-  }, [props.entity, props.project, subRuns]);
+  const {loading, result: childRunsFilteredToOpVersion} =
+    useChildCallsForCompare(
+      props.entity,
+      props.project,
+      props.callIds ?? [],
+      selectedOpVersionRef,
+      selectedObjectVersionRef
+    );
 
   const parentCallsValue = useCalls(
     props.entity,

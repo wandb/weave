@@ -202,7 +202,7 @@ const useChildCallsForCompare = (
   selectedObjectVersionRef: string | null
 ): {
   loading: boolean;
-  result: RawSpanFromStreamTableEra[];
+  result: CallSchema[];
 } => {
   // This should be moved to the trace server soon. Doing in memory join for
   // feature completeness now.
@@ -245,11 +245,7 @@ const useChildCallsForCompare = (
       parentCallsById[call.callId] = call;
     }
 
-    const res = (childCalls.result ?? []).map(childCall => {
-      return childCall.rawSpan;
-    });
-
-    return {loading: false, result: res};
+    return {loading: false, result: (childCalls.result ?? [])};
   }, [
     childCalls.loading,
     childCalls.result,

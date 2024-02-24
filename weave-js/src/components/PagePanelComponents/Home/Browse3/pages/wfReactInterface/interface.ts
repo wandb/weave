@@ -130,7 +130,7 @@ export type WFDataModelHooks = {
       parentCallIds: string[],
       selectedOpVersionRef: string | null,
       selectedObjectVersionRef: string | null
-    ) => Loadable<RawSpanFromStreamTableEra[]>;
+    ) => Loadable<CallSchema[]>;
   };
 };
 
