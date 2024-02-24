@@ -123,9 +123,6 @@ const useCalls = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
-  if (opts?.skip || limit) {
-    throw new Error('Not implemented');
-  }
   let runsNode = fnRunsNode(
     {
       entityName: entity,
