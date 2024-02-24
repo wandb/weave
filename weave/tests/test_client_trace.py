@@ -55,7 +55,7 @@ def test_dataset(trace_client):
     assert d2.rows == d2.rows
 
 
-def test_trace_server_call_start(clickhouse_trace_server):
+def test_trace_server_call_start_and_end(clickhouse_trace_server):
     start = tsi.StartedCallSchemaForInsert(
         entity="test_entity",
         project="test_project",
@@ -69,6 +69,33 @@ def test_trace_server_call_start(clickhouse_trace_server):
         inputs={"b": 5},
     )
     clickhouse_trace_server.call_start(tsi.CallStartReq(start=start))
+
+    res = clickhouse_trace_server.call_read(
+        tsi.CallReadReq(
+            entity="test_entity",
+            project="test_project",
+            id="test_id",
+        )
+    )
+
+    assert res.call.model_dump() == {
+        "entity": "test_entity",
+        "project": "test_project",
+        "id": "test_id",
+        "name": "test_name",
+        "trace_id": "test_trace_id",
+        "parent_id": "test_parent_id",
+        "start_datetime": datetime.datetime.fromisoformat(
+            start.start_datetime.isoformat(timespec="milliseconds")
+        ),
+        "end_datetime": None,
+        "exception": None,
+        "attributes": {"_keys": ["a"], "a": 5},
+        "inputs": {"_keys": ["b"], "b": 5},
+        "outputs": None,
+        "summary": None,
+    }
+
     end = tsi.EndedCallSchemaForInsert(
         entity="test_entity",
         project="test_project",
@@ -96,10 +123,10 @@ def test_trace_server_call_start(clickhouse_trace_server):
         "parent_id": "test_parent_id",
         "start_datetime": datetime.datetime.fromisoformat(
             start.start_datetime.isoformat(timespec="milliseconds")
-        ).replace(tzinfo=None),
+        ),
         "end_datetime": datetime.datetime.fromisoformat(
             end.end_datetime.isoformat(timespec="milliseconds")
-        ).replace(tzinfo=None),
+        ),
         "exception": None,
         "attributes": {"_keys": ["a"], "a": 5},
         "inputs": {"_keys": ["b"], "b": 5},
@@ -226,7 +253,7 @@ def test_trace_call_query_filter_op_version_refs(trace_client):
         f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:"
     )
     wildcard_adder_ref_str = (
-        f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:*"
+        f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:*/obj"
     )
 
     for op_version_refs, exp_count in [
