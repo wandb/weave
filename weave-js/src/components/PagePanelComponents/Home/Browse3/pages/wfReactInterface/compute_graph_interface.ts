@@ -36,10 +36,7 @@ import {
   typedDict,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
-import {
-  fnRunsNode,
-  useRuns,
-} from '../../../Browse2/callTreeHooks';
+import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
 import {
   getCallFromCache,
   getObjectVersionFromCache,
@@ -129,7 +126,7 @@ const useCalls = (
   if (opts?.skip || limit) {
     throw new Error('Not implemented');
   }
-  let callsNode = fnRunsNode(
+  let runsNode = fnRunsNode(
     {
       entityName: entity,
       projectName: project,
@@ -146,9 +143,9 @@ const useCalls = (
     }
   );
   if (limit) {
-    callsNode = opLimit({arr: callsNode, limit: constNumber(limit)});
+    runsNode = opLimit({arr: runsNode, limit: constNumber(limit)});
   }
-  const calls = useNodeValue(callsNode, {skip: opts?.skip});
+  const calls = useNodeValue(runsNode, {skip: opts?.skip});
 
   return useMemo(() => {
     const callsResult: RawSpanFromStreamTableEra[] = calls.result ?? [];
@@ -258,7 +255,7 @@ const useOpVersions = (
 ): Loadable<OpVersionSchema[]> => {
   let dataNode = useOpVersionsNode(entity, project, filter);
   if (limit) {
-    dataNode = opLimit({arr: dataNode, limit: constNumber(limit)})
+    dataNode = opLimit({arr: dataNode, limit: constNumber(limit)});
   }
 
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
@@ -390,7 +387,7 @@ const useRootObjectVersions = (
 ): Loadable<ObjectVersionSchema[]> => {
   let dataNode = useRootObjectVersionsNode(entity, project, filter);
   if (limit) {
-    dataNode = opLimit({arr: dataNode, limit: constNumber(limit)})
+    dataNode = opLimit({arr: dataNode, limit: constNumber(limit)});
   }
   const dataValue = useNodeValue(dataNode, {skip: opts?.skip});
 

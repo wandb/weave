@@ -193,7 +193,61 @@ const useChildCallsForCompare = (
     child: RawSpanFromStreamTableEra;
   }>;
 } => {
-  throw new Error('Not implemented');
+  // This should be moved to the trace server soon. Doing in memory join for
+  // feature completeness now.
+  const parentCalls = useCalls(
+    entity,
+    project,
+    {
+      parentIds: parentCallIds,
+      inputObjectVersionRefs: selectedObjectVersionRef
+        ? [selectedObjectVersionRef]
+        : [],
+    },
+    undefined,
+    {skip: selectedObjectVersionRef == null}
+  );
+
+  const subParentCallIds = useMemo(() => {
+    return (parentCalls.result ?? []).map(call => call.callId);
+  }, [parentCalls.result]);
+
+  const childCalls = useCalls(
+    entity,
+    project,
+    {
+      parentIds: subParentCallIds,
+      opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
+    },
+    undefined,
+    {skip: selectedOpVersionRef == null}
+  );
+
+  const result = useMemo(() => {
+    const loading = parentCalls.loading || childCalls.loading;
+    if (loading) {
+      return {loading, result: []};
+    }
+
+    const parentCallsById: {[key: string]: CallSchema} = {};
+    for (const call of parentCalls.result ?? []) {
+      parentCallsById[call.callId] = call;
+    }
+
+    const res = (childCalls.result ?? []).map(childCall => {
+      const parentCall = parentCallsById[childCall.parentId ?? ''];
+      return {parent: parentCall.rawSpan, child: childCall.rawSpan};
+    });
+
+    return {loading: false, result: res};
+  }, [
+    childCalls.loading,
+    childCalls.result,
+    parentCalls.loading,
+    parentCalls.result,
+  ]);
+
+  return result;
 };
 
 /// Converters ///
