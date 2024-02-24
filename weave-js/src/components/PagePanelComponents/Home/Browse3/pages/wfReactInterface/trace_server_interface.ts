@@ -114,14 +114,14 @@ const useCalls = (
         limit,
       })
       .then(res => {
-        setCallRes(res);
         loadingRef.current = false;
+        setCallRes(res);
       })
       .catch(e => {
         // Temp fix before more robust error handling
+        loadingRef.current = false;
         console.error(e);
         setCallRes({calls: []});
-        loadingRef.current = false;
       });
   }, [entity, project, deepFilter, limit, opts?.skip]);
 
@@ -213,6 +213,8 @@ const useChildCallsForCompare = (
 } => {
   // This should be moved to the trace server soon. Doing in memory join for
   // feature completeness now.
+  const skipParent = parentCallIds == null || parentCallIds.length === 0 || selectedObjectVersionRef == null;
+
   const parentCalls = useCalls(
     entity,
     project,
@@ -223,12 +225,14 @@ const useChildCallsForCompare = (
         : [],
     },
     undefined,
-    {skip: selectedObjectVersionRef == null}
+    {skip: skipParent}
   );
 
   const subParentCallIds = useMemo(() => {
     return (parentCalls.result ?? []).map(call => call.callId);
   }, [parentCalls.result]);
+
+  const skipChild = subParentCallIds.length === 0 || selectedOpVersionRef == null;
 
   const childCalls = useCalls(
     entity,
@@ -238,7 +242,7 @@ const useChildCallsForCompare = (
       opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
     },
     undefined,
-    {skip: selectedOpVersionRef == null}
+    {skip: skipChild}
   );
 
   const result = useMemo(() => {
@@ -246,19 +250,12 @@ const useChildCallsForCompare = (
     if (loading) {
       return {loading, result: []};
     }
-
-    const parentCallsById: {[key: string]: CallSchema} = {};
-    for (const call of parentCalls.result ?? []) {
-      parentCallsById[call.callId] = call;
+    if (skipChild || skipParent) {
+      return {loading: false, result: []};
     }
 
     return {loading: false, result: childCalls.result ?? []};
-  }, [
-    childCalls.loading,
-    childCalls.result,
-    parentCalls.loading,
-    parentCalls.result,
-  ]);
+  }, [childCalls.loading, childCalls.result, parentCalls.loading, skipChild, skipParent]);
 
   return result;
 };
