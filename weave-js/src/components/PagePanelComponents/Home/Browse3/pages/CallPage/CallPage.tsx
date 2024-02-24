@@ -51,6 +51,7 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
+import {CursorBox} from './CursorBox';
 
 // % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
@@ -469,13 +470,6 @@ const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
 const INSET_SPACING = 54;
 const TREE_COLOR = '#aaaeb2';
 const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
-
-// MUI Box doesn't support cursor
-// https://github.com/mui/material-ui/issues/19983
-const CursorBox = styled(Box)<{$isClickable: boolean}>`
-  cursor: ${p => (p.$isClickable ? 'pointer' : 'default')};
-`;
-CursorBox.displayName = 'S.CursorBox';
 
 /**
  * Utility component to render the grouping cell for the trace tree.

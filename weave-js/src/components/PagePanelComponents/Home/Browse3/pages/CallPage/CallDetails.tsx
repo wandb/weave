@@ -16,6 +16,7 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {useParentCall} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ButtonOverlay} from './ButtonOverlay';
+import {ObjectViewerSection} from './ObjectViewerSection';
 import {OpVersionText} from './OpVersionText';
 
 const Heading = styled.div`
@@ -103,13 +104,7 @@ export const CallDetails: FC<{
               flex: '0 0 auto',
               p: 2,
             }}>
-            <KeyValueTable
-              headerTitle="Inputs"
-              data={
-                // TODO: Consider bringing back openai chat input/output
-                inputs
-              }
-            />
+            <ObjectViewerSection title="Inputs" data={inputs} />
           </Box>
         )}
         {Object.keys(output).length > 0 && (
@@ -118,13 +113,7 @@ export const CallDetails: FC<{
               flex: '0 0 auto',
               p: 2,
             }}>
-            <KeyValueTable
-              headerTitle="Output"
-              data={
-                // TODO: Consider bringing back openai chat input/output
-                output
-              }
-            />
+            <ObjectViewerSection title="Outputs" data={output} />
           </Box>
         )}
         {multipleChildCallOpRefs.map(opVersionRef => {
