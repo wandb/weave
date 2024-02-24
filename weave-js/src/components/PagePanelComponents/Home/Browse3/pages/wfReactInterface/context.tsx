@@ -1,12 +1,14 @@
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
-import {cgDataModelInterface} from './compute_graph_interface';
-import {WFDataModelHooks} from './interface';
-import {tsDataModelInterface} from './trace_server_interface';
+import {cgWFDataModelHooks} from './compute_graph_interface';
+import {WFDataModelHooksInterface} from './interface';
+import {tsWFDataModelHooks} from './trace_server_interface';
 
 const TRACE_SERVER_SUPPORTS_OBJECTS = false;
 
-const WFDataModelHooksContext = createContext<WFDataModelHooks | null>(null);
+const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
+  null
+);
 
 export const useWFHooks = () => {
   const ctx = useContext(WFDataModelHooksContext);
@@ -18,7 +20,7 @@ export const useWFHooks = () => {
 
 const WFDataModelFromComputeGraphProvider: FC = ({children}) => {
   return (
-    <WFDataModelHooksContext.Provider value={cgDataModelInterface}>
+    <WFDataModelHooksContext.Provider value={cgWFDataModelHooks}>
       {children}
     </WFDataModelHooksContext.Provider>
   );
@@ -26,24 +28,24 @@ const WFDataModelFromComputeGraphProvider: FC = ({children}) => {
 
 const WFDataModelFromTraceServerProvider: FC = ({children}) => {
   return (
-    <WFDataModelHooksContext.Provider value={tsDataModelInterface}>
+    <WFDataModelHooksContext.Provider value={tsWFDataModelHooks}>
       {children}
     </WFDataModelHooksContext.Provider>
   );
 };
 
 const WFDataModelFromTraceServerCallsOnlyProvider: FC = ({children}) => {
-  const mixedContext: WFDataModelHooks = useMemo(() => {
+  const mixedContext: WFDataModelHooksInterface = useMemo(() => {
     return {
-      useCall: tsDataModelInterface.useCall,
-      useCalls: tsDataModelInterface.useCalls,
-      useOpVersion: cgDataModelInterface.useOpVersion,
-      useOpVersions: cgDataModelInterface.useOpVersions,
-      useObjectVersion: cgDataModelInterface.useObjectVersion,
-      useRootObjectVersions: cgDataModelInterface.useRootObjectVersions,
+      useCall: tsWFDataModelHooks.useCall,
+      useCalls: tsWFDataModelHooks.useCalls,
+      useOpVersion: cgWFDataModelHooks.useOpVersion,
+      useOpVersions: cgWFDataModelHooks.useOpVersions,
+      useObjectVersion: cgWFDataModelHooks.useObjectVersion,
+      useRootObjectVersions: cgWFDataModelHooks.useRootObjectVersions,
       derived: {
         useChildCallsForCompare:
-          tsDataModelInterface.derived.useChildCallsForCompare,
+          tsWFDataModelHooks.derived.useChildCallsForCompare,
       },
     };
   }, []);
@@ -91,12 +93,12 @@ export const WFDataModelAutoProvider: FC<{
 };
 
 const useProjectHasCGData = (entity: string, project: string) => {
-  const calls = cgDataModelInterface.useCalls(entity, project, {}, 1);
+  const calls = cgWFDataModelHooks.useCalls(entity, project, {}, 1);
   return (calls.result ?? []).length > 0;
 };
 
 const useProjectHasTSData = (entity: string, project: string) => {
-  const calls = tsDataModelInterface.useCalls(entity, project, {}, 1);
+  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1);
   return (calls.result ?? []).length > 0;
 };
 

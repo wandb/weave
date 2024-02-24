@@ -1,3 +1,9 @@
+/**
+ * This file defines `cgWFDataModelHooks` which conforms to the the
+ * `WFDataModelHooksInterface`, providing access to the Weaveflow data model
+ * backed by the "Compute Graph" (StreamTable) engine.
+ */
+
 import _ from 'lodash';
 import {useMemo} from 'react';
 
@@ -65,7 +71,7 @@ import {
   OpVersionSchema,
   RawSpanFromStreamTableEra,
   RawSpanFromStreamTableEraWithFeedback,
-  WFDataModelHooks,
+  WFDataModelHooksInterface,
 } from './interface';
 import {
   opNameToCategory,
@@ -776,7 +782,7 @@ const typeNameToCategory = (typeName: string): ObjectCategory | null => {
   return null;
 };
 
-export const cgDataModelInterface: WFDataModelHooks = {
+export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
   useOpVersion,

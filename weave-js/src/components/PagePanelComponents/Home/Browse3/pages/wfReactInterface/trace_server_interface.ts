@@ -1,3 +1,9 @@
+/**
+ * This file defines `tsWFDataModelHooks` which conforms to the the
+ * `WFDataModelHooksInterface`, providing access to the Weaveflow data model
+ * backed by the "Trace Server" engine.
+ */
+
 import {useEffect, useMemo, useRef, useState} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -16,6 +22,7 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  WFDataModelHooksInterface,
 } from './interface';
 import * as trace_server_client from './trace_server_client';
 import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
@@ -324,7 +331,7 @@ const convertISOToDate = (iso: string) => {
 
 // Export //
 
-export const tsDataModelInterface = {
+export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
   useOpVersion,

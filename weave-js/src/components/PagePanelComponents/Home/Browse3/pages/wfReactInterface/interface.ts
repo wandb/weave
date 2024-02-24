@@ -93,7 +93,7 @@ export type ObjectVersionFilter = {
   latestOnly?: boolean;
 };
 
-export type WFDataModelHooks = {
+export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
