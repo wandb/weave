@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {getCallFromCache, setCallInCache} from './cache';
@@ -21,12 +21,15 @@ import * as trace_server_client from './trace_server_client';
 import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
+  const loadingRef = useRef(false);
   const cachedCall = key ? getCallFromCache(key) : null;
   const [callRes, setCallRes] =
     useState<trace_server_client.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
+      setCallRes(null);
+      loadingRef.current = true;
       trace_server_client
         .callRead({
           entity: deepKey.entity,
@@ -34,6 +37,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
           id: deepKey.callId,
         })
         .then(res => {
+      loadingRef.current = false;
           setCallRes(res);
         });
     }
@@ -53,10 +57,10 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
       };
     }
     const result = callRes ? traceCallToUICallSchema(callRes.call) : null;
-    if (callRes == null) {
+    if (callRes == null || loadingRef.current) {
       return {
         loading: true,
-        result,
+        result: null,
       };
     } else {
       if (result) {
@@ -77,6 +81,7 @@ const useCalls = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
+  const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<trace_server_client.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
@@ -84,6 +89,8 @@ const useCalls = (
     if (opts?.skip) {
       return;
     }
+      setCallRes(null);
+      loadingRef.current = true;
     trace_server_client
       .callsQuery({
         entity,
@@ -101,6 +108,12 @@ const useCalls = (
       })
       .then(res => {
         setCallRes(res);
+        loadingRef.current = false;
+      }).catch((e) => {
+        // Temp fix before more robust error handling
+        console.error(e);
+        setCallRes({calls: []});
+        loadingRef.current = false;
       });
   }, [entity, project, deepFilter, limit, opts?.skip]);
 
@@ -122,10 +135,10 @@ const useCalls = (
       );
     });
 
-    if (callRes == null) {
+    if (callRes == null || loadingRef.current) {
       return {
         loading: true,
-        result,
+        result: [],
       };
     } else {
       allResults.forEach(call => {
@@ -240,7 +253,12 @@ const useChildCallsForCompare = (
     });
 
     return {loading: false, result: res};
-  }, [childCalls.loading, childCalls.result, parentCalls.loading, parentCalls.result]);
+  }, [
+    childCalls.loading,
+    childCalls.result,
+    parentCalls.loading,
+    parentCalls.result,
+  ]);
 
   return result;
 };
