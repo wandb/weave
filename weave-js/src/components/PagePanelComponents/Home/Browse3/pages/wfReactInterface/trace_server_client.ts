@@ -1,3 +1,17 @@
+/**
+ * This file defines the connection between the web client and the trace server.
+ * The intention is that the implementation is a 1-1 mapping to the trace
+ * server's API. This file should not contain any business logic. If possible,
+ * we could generate this from `trace_server.py`. Which in effect is a perfect
+ * mapping of `weave/trace_server/trace_server_interface.py` as a web service. 
+ *
+ * These types MUST be kept in sync with the types defined in
+ * `weave/trace_server/trace_server_interface.py`. Please modify with care.
+ *
+ * TODO: Currently, we only implement Call Read and Call Query - there are
+ * several other endpoints that we should implement.
+ */
+
 import fetch from 'isomorphic-unfetch';
 
 export type KeyedDictType = {
