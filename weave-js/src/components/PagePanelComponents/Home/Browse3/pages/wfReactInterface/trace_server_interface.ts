@@ -213,7 +213,10 @@ const useChildCallsForCompare = (
 } => {
   // This should be moved to the trace server soon. Doing in memory join for
   // feature completeness now.
-  const skipParent = parentCallIds == null || parentCallIds.length === 0 || selectedObjectVersionRef == null;
+  const skipParent =
+    parentCallIds == null ||
+    parentCallIds.length === 0 ||
+    selectedObjectVersionRef == null;
 
   const parentCalls = useCalls(
     entity,
@@ -232,7 +235,8 @@ const useChildCallsForCompare = (
     return (parentCalls.result ?? []).map(call => call.callId);
   }, [parentCalls.result]);
 
-  const skipChild = subParentCallIds.length === 0 || selectedOpVersionRef == null;
+  const skipChild =
+    subParentCallIds.length === 0 || selectedOpVersionRef == null;
 
   const childCalls = useCalls(
     entity,
@@ -255,7 +259,13 @@ const useChildCallsForCompare = (
     }
 
     return {loading: false, result: childCalls.result ?? []};
-  }, [childCalls.loading, childCalls.result, parentCalls.loading, skipChild, skipParent]);
+  }, [
+    childCalls.loading,
+    childCalls.result,
+    parentCalls.loading,
+    skipChild,
+    skipParent,
+  ]);
 
   return result;
 };

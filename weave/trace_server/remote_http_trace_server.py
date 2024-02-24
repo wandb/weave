@@ -50,7 +50,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         data = Batch(batch).model_dump_json()
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
-            data=data.encode('utf-8'),
+            data=data.encode("utf-8"),
         )
         r.raise_for_status()
 
@@ -63,7 +63,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> BaseModel:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
-        r = requests.post(self.trace_server_url + url, data=req.model_dump_json().encode('utf-8'))
+        r = requests.post(
+            self.trace_server_url + url, data=req.model_dump_json().encode("utf-8")
+        )
         r.raise_for_status()
         return res_model.model_validate(r.json())
 
