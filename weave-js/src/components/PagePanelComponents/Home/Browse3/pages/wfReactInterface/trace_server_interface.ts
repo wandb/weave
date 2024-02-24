@@ -37,7 +37,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
           id: deepKey.callId,
         })
         .then(res => {
-      loadingRef.current = false;
+          loadingRef.current = false;
           setCallRes(res);
         });
     }
@@ -89,8 +89,8 @@ const useCalls = (
     if (opts?.skip) {
       return;
     }
-      setCallRes(null);
-      loadingRef.current = true;
+    setCallRes(null);
+    loadingRef.current = true;
     trace_server_client
       .callsQuery({
         entity,
@@ -109,7 +109,8 @@ const useCalls = (
       .then(res => {
         setCallRes(res);
         loadingRef.current = false;
-      }).catch((e) => {
+      })
+      .catch(e => {
         // Temp fix before more robust error handling
         console.error(e);
         setCallRes({calls: []});
