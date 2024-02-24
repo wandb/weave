@@ -43,7 +43,7 @@ export const CompareCallsPage: FC<{
 
   const childRunsFilteredToOpVersion = useMemo(() => {
     return (subRuns ?? []).map(subRun => {
-      return spanToCallSchema(props.entity, props.project, subRun.child);
+      return spanToCallSchema(props.entity, props.project, subRun);
     });
   }, [props.entity, props.project, subRuns]);
 
