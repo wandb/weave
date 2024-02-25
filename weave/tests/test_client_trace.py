@@ -84,7 +84,7 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     )
     # TODO: Figure out why this is failing in CI
     if os.environ.get("CI"):
-        exp_start_datetime = exp_start_datetime.replace(tzinfo=datetime.timezone.utc)
+        exp_start_datetime = exp_start_datetime.replace(tzinfo=None)
 
     assert res.call.model_dump() == {
         "entity": "test_entity",
@@ -125,7 +125,7 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     )
     # TODO: Figure out why this is failing in CI
     if os.environ.get("CI"):
-        exp_end_datetime = exp_end_datetime.replace(tzinfo=datetime.timezone.utc)
+        exp_end_datetime = exp_end_datetime.replace(tzinfo=None)
 
     assert res.call.model_dump() == {
         "entity": "test_entity",
