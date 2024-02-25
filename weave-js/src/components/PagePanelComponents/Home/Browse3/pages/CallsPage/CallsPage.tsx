@@ -1,9 +1,8 @@
-import {DashboardCustomize, PivotTableChart} from '@mui/icons-material';
+import {PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
   Chip,
-  CircularProgress,
   FormControl,
   IconButton,
   ListItem,
@@ -14,29 +13,23 @@ import {
 import _ from 'lodash';
 import React, {FC, useCallback, useMemo} from 'react';
 
-import {fnRunsNode} from '../../../Browse2/callTreeHooks';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
-import {useMakeNewBoard} from '../common/hooks';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {truncateID, useInitializingFilter} from '../util';
 import {HackyOpCategory} from '../wfInterface/types';
+import {OP_CATEGORIES} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
+import {CallFilter, OpVersionSchema} from '../wfReactInterface/interface';
 import {
-  CallFilter,
   objectVersionNiceString,
-  OP_CATEGORIES,
   opVersionKeyToRefUri,
   opVersionRefOpName,
-  OpVersionSchema,
   refUriToObjectVersionKey,
   refUriToOpVersionKey,
-  useCall,
-  useCalls,
-  useObjectVersion,
-  useOpVersions,
-} from '../wfReactInterface/interface';
+} from '../wfReactInterface/utilities';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
@@ -111,6 +104,7 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
+  const {useCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
@@ -177,11 +171,6 @@ export const CallsTable: FC<{
     return _.sortBy(OP_CATEGORIES, _.identity);
   }, []);
   const traceRootOptions = [true, false];
-  const {onMakeBoard, isGenerating} = useMakeBoardForCalls(
-    props.entity,
-    props.project,
-    lowLevelFilter
-  );
 
   const userEnabledPivot = effectiveFilter.isPivot ?? false;
   const setUserEnabledPivot = useCallback(
@@ -262,19 +251,6 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <>
-          <IconButton
-            style={{display: 'none', width: '37px', height: '37px'}}
-            size="small"
-            onClick={() => {
-              onMakeBoard();
-            }}>
-            {isGenerating ? (
-              <CircularProgress size={25} />
-            ) : (
-              <DashboardCustomize />
-            )}
-          </IconButton>
-
           <IconButton
             style={{width: '37px', height: '37px'}}
             size="small"
@@ -438,29 +414,6 @@ export const CallsTable: FC<{
   );
 };
 
-const useMakeBoardForCalls = (
-  entityName: string,
-  projectName: string,
-  lowLevelFilter: CallFilter
-) => {
-  // TODO: Make a generator on the python side that is more robust.
-  // 1. Make feedback a join in weave
-  // 2. Control the column selection like we do in the current table
-  // 3. Map column processing to weave (example timestamps)
-  // 4. Handle references more cleanly
-  // 5. Probably control ordering.
-
-  const runsNode = fnRunsNode(
-    {
-      entityName,
-      projectName,
-      streamName: 'stream',
-    },
-    lowLevelFilter
-  );
-  return useMakeNewBoard(runsNode);
-};
-
 const shouldForceNonTraceRootsOnly = (filter: WFHighLevelCallFilter) => {
   return (
     (filter.inputObjectVersionRefs?.length ?? 0) > 0 ||
@@ -494,6 +447,7 @@ const useOpVersionOptions = (
   project: string,
   effectiveFilter: WFHighLevelCallFilter
 ) => {
+  const {useOpVersions} = useWFHooks();
   // Get all the "latest" versions
   const latestVersions = useOpVersions(entity, project, {
     latestOnly: true,
@@ -508,6 +462,7 @@ const useOpVersionOptions = (
     {
       opIds: [currentOpId ?? ''],
     },
+    undefined,
     {
       skip: !currentOpId,
     }
@@ -555,6 +510,7 @@ const useOpVersionOptions = (
 const useConsumesObjectVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
+  const {useObjectVersion} = useWFHooks();
   // We don't populate this one because it is expensive
   const currentRef = effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
   const objectVersion = useObjectVersion(
@@ -573,6 +529,7 @@ const useConsumesObjectVersionOptions = (
 const useProducesObjectVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
+  const {useObjectVersion} = useWFHooks();
   // We don't populate this one because it is expensive
   const currentRef = effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
   const objectVersion = useObjectVersion(
@@ -593,6 +550,7 @@ const useParentIdOptions = (
   project: string,
   effectiveFilter: WFHighLevelCallFilter
 ) => {
+  const {useCall} = useWFHooks();
   const parentCall = useCall(
     effectiveFilter.parentId
       ? {

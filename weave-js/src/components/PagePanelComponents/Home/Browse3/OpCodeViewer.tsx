@@ -6,10 +6,8 @@ import {Button} from '../../../Button';
 import {Browse2OpDefCode} from '../Browse2/Browse2OpDefCode';
 import {useWeaveflowCurrentRouteContext} from './context';
 import {OpCodeViewerDiff} from './OpCodeViewerDiff';
-import {
-  opVersionKeyToRefUri,
-  OpVersionSchema,
-} from './pages/wfReactInterface/interface';
+import {OpVersionSchema} from './pages/wfReactInterface/interface';
+import {opVersionKeyToRefUri} from './pages/wfReactInterface/utilities';
 import {SelectOpVersion} from './SelectOpVersion';
 
 type OpCodeViewerProps = {

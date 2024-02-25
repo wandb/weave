@@ -14,12 +14,12 @@ from pydantic import BaseModel
 from weave.trace_server import environment as wf_env
 
 from .trace_server_interface_util import (
-    ARTIFACT_REF_SCHEME,
-    TRACE_REF_SCHEME,
+    extract_refs_from_values,
     decode_b64_to_bytes,
     encode_bytes_as_b64,
     generate_id,
     version_hash_for_object,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
 from .flushing_buffer import InMemAutoFlushingBuffer, InMemFlushableBuffer
@@ -204,16 +204,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Return the marshaled response
         return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
 
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallQueryRes:
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         conditions = []
-        parameters = {}
+        parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
             if req.filter.op_version_refs:
+                # We will build up (0 or 1) + N conditions for the op_version_refs
+                # If there are any non-wildcarded names, then we at least have an IN condition
+                # If there are any wildcarded names, then we have a LIKE condition for each
+
+                or_conditions: typing.List[str] = []
+
+                non_wildcarded_names: typing.List[str] = []
+                wildcarded_names: typing.List[str] = []
                 for name in req.filter.op_version_refs:
-                    if "*" in name:
-                        raise NotImplementedError("Wildcard not yet supported")
-                conditions.append("name IN {names: Array(String)}")
-                parameters["names"] = req.filter.op_version_refs
+                    if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                        wildcarded_names.append(name)
+                    else:
+                        non_wildcarded_names.append(name)
+
+                if non_wildcarded_names:
+                    or_conditions.append(
+                        "name IN {non_wildcarded_names: Array(String)}"
+                    )
+                    parameters["non_wildcarded_names"] = non_wildcarded_names
+
+                for name_ndx, name in enumerate(wildcarded_names):
+                    param_name = "wildcarded_name_" + str(name_ndx)
+                    or_conditions.append("name LIKE {" + param_name + ": String}")
+                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
+                    parameters[param_name] = like_name
+
+                if or_conditions:
+                    conditions.append("(" + " OR ".join(or_conditions) + ")")
 
             if req.filter.input_object_version_refs:
                 parameters["input_refs"] = req.filter.input_object_version_refs
@@ -243,9 +266,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.project,
             conditions=conditions,
             parameters=parameters,
+            limit=req.limit,
         )
         calls = [_ch_call_to_call_schema(call) for call in ch_calls]
-        return tsi.CallQueryRes(calls=calls)
+        return tsi.CallsQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj, is_op=True)
@@ -403,6 +427,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for col in columns:
             if col in ["entity", "project", "id"]:
                 merged_cols.append(f"{col} AS {col}")
+            elif col in ["input_refs", "output_refs"]:
+                merged_cols.append(f"array_concat_agg({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
@@ -412,21 +438,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         conditions_part = " AND ".join(conditions)
 
-        order_by_part = ""
-        if order_by != None:
-            order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
-            for field, direction in order_by:
-                assert (
-                    field in all_call_select_columns
-                ), f"Invalid order_by field: {field}"
-                assert direction in [
-                    "ASC",
-                    "DESC",
-                ], f"Invalid order_by direction: {direction}"
-            order_by_part = ", ".join(
-                [f"{field} {direction}" for field, direction in order_by]
-            )
-            order_by_part = f"ORDER BY {order_by_part}"
+        order_by_part = "ORDER BY start_datetime ASC"
+        # if order_by != None:
+        #     order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
+        #     for field, direction in order_by:
+        #         assert (
+        #             field in all_call_select_columns
+        #         ), f"Invalid order_by field: {field}"
+        #         assert direction in [
+        #             "ASC",
+        #             "DESC",
+        #         ], f"Invalid order_by direction: {direction}"
+        #     order_by_part = ", ".join(
+        #         [f"{field} {direction}" for field, direction in order_by]
+        #     )
+        #     order_by_part = f"ORDER BY {order_by_part}"
 
         offset_part = ""
         if offset != None:
@@ -819,22 +845,6 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         created_datetime=ch_obj.created_datetime,
         version_index=ch_obj.version_index,
     )
-
-
-valid_schemes = [TRACE_REF_SCHEME, ARTIFACT_REF_SCHEME]
-
-
-def extract_refs_from_values(
-    vals: typing.Optional[typing.List[typing.Any]],
-) -> typing.List[str]:
-    refs = []
-    if vals:
-        for val in vals:
-            if isinstance(val, str) and any(
-                val.startswith(scheme + "://") for scheme in valid_schemes
-            ):
-                refs.append(val)
-    return refs
 
 
 def _start_call_for_insert_to_ch_insertable_start_call(

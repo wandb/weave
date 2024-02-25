@@ -13,6 +13,7 @@ import pytest
 from weave.trace_server import environment as wf_env
 
 from ..weave_init import InitializedClient
+import uuid
 from ..trace_server import (
     graph_client_trace,
     clickhouse_trace_server_batched,
@@ -39,9 +40,11 @@ def clickhouse_trace_server(clickhouse_server):
 
 @pytest.fixture()
 def trace_client(clickhouse_trace_server, user_by_api_key_in_env):
-    user_by_api_key_in_env
+    # Generate a random project name to avoid conflicts between tests
+    # using the same shared backend server
+    random_project_name = str(uuid.uuid4())
     graph_client = graph_client_trace.GraphClientTrace(
-        user_by_api_key_in_env.username, "test_project", clickhouse_trace_server
+        user_by_api_key_in_env.username, random_project_name, clickhouse_trace_server
     )
     inited_client = InitializedClient(graph_client)
 

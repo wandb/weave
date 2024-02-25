@@ -50,7 +50,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         data = Batch(batch).model_dump_json()
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
-            data=data,
+            data=data.encode("utf-8"),
         )
         r.raise_for_status()
 
@@ -63,7 +63,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> BaseModel:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
-        r = requests.post(self.trace_server_url + url, data=req.model_dump_json())
+        r = requests.post(
+            self.trace_server_url + url, data=req.model_dump_json().encode("utf-8")
+        )
         r.raise_for_status()
         return res_model.model_validate(r.json())
 
@@ -111,9 +113,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def calls_query(
         self, req: t.Union[tsi.CallsQueryReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallQueryRes:
+    ) -> tsi.CallsQueryRes:
         return self._generic_request(
-            "/calls/query", req, tsi.CallsQueryReq, tsi.CallQueryRes
+            "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
         )
 
     # Op API

@@ -25,16 +25,12 @@ import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
+import {useWFHooks} from './wfReactInterface/context';
+import {CallSchema, ObjectVersionSchema} from './wfReactInterface/interface';
 import {
-  CallSchema,
   objectVersionKeyToRefUri,
-  ObjectVersionSchema,
   refUriToOpVersionKey,
-  useCalls,
-  useObjectVersion,
-  useOpVersion,
-  useRootObjectVersions,
-} from './wfReactInterface/interface';
+} from './wfReactInterface/utilities';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;
@@ -44,6 +40,8 @@ export const ObjectVersionPage: React.FC<{
   filePath: string;
   refExtra?: string;
 }> = props => {
+  const {useObjectVersion} = useWFHooks();
+
   const objectVersion = useObjectVersion({
     entity: props.entity,
     project: props.project,
@@ -64,6 +62,7 @@ export const ObjectVersionPage: React.FC<{
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
+  const {useRootObjectVersions, useCalls} = useWFHooks();
   const objectVersionHash = objectVersion.versionHash;
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -410,6 +409,7 @@ const OpVersionCallsLink: React.FC<{
   };
   partialFilter?: WFHighLevelCallFilter;
 }> = ({val, partialFilter}) => {
+  const {useOpVersion} = useWFHooks();
   const opVersion = useOpVersion(refUriToOpVersionKey(val.opVersionRef));
   if (opVersion.loading) {
     return null;

@@ -46,7 +46,8 @@ import {
 } from '../common/SimplePageLayout';
 import {CallStatusType, StatusChip} from '../common/StatusChip';
 import {truncateID} from '../util';
-import {CallSchema, useCall, useCalls} from '../wfReactInterface/interface';
+import {useWFHooks} from '../wfReactInterface/context';
+import {CallSchema} from '../wfReactInterface/interface';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
@@ -62,6 +63,8 @@ export const CallPage: FC<{
   project: string;
   callId: string;
 }> = props => {
+  const {useCall} = useWFHooks();
+
   const call = useCall({
     entity: props.entity,
     project: props.project,
@@ -756,6 +759,7 @@ type CountRow = {
 };
 type Row = CallRow | CountRow;
 const useCallFlattenedTraceTree = (call: CallSchema) => {
+  const {useCalls} = useWFHooks();
   const traceCalls = useCalls(call.entity, call.project, {
     traceId: call.traceId,
   });

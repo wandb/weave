@@ -12,11 +12,9 @@ import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {
-  CallSchema,
-  useCalls,
-  useParentCall,
-} from '../wfReactInterface/interface';
+import {useWFHooks} from '../wfReactInterface/context';
+import {CallSchema} from '../wfReactInterface/interface';
+import {useParentCall} from '../wfReactInterface/utilities';
 import {ButtonOverlay} from './ButtonOverlay';
 import {OpVersionText} from './OpVersionText';
 
@@ -56,6 +54,8 @@ export const CallSchemaLink = ({call}: {call: CallSchema}) => {
 export const CallDetails: FC<{
   call: CallSchema;
 }> = ({call}) => {
+  const {useCalls} = useWFHooks();
+
   const parentCall = useParentCall(call);
   const {inputs, output} = useMemo(
     () => getDisplayInputsAndOutput(call),
