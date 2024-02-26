@@ -9,7 +9,8 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {getCallFromCache, setCallInCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
-import * as trace_server_client from './traceServerClient';
+import * as traceServerClient from './traceServerClient';
+import { useTraceServerClientContext } from './traceServerClientContext';
 import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
@@ -28,17 +29,17 @@ import {
 } from './wfDataModelHooksInterface';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
+  const tsClient = useTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedCall = key ? getCallFromCache(key) : null;
   const [callRes, setCallRes] =
-    useState<trace_server_client.TraceCallReadRes | null>(null);
+    useState<traceServerClient.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
       setCallRes(null);
       loadingRef.current = true;
-      trace_server_client
-        .callRead({
+      tsClient.callRead({
           entity: deepKey.entity,
           project: deepKey.project,
           id: deepKey.callId,
@@ -48,7 +49,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
           setCallRes(res);
         });
     }
-  }, [deepKey]);
+  }, [deepKey, tsClient]);
 
   return useMemo(() => {
     if (key == null) {
@@ -88,9 +89,10 @@ const useCalls = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
+  const tsClient = useTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
-    useState<trace_server_client.TraceCallsQueryRes | null>(null);
+    useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
   useEffect(() => {
     if (opts?.skip) {
@@ -98,7 +100,7 @@ const useCalls = (
     }
     setCallRes(null);
     loadingRef.current = true;
-    trace_server_client
+    tsClient
       .callsQuery({
         entity,
         project,
@@ -123,7 +125,7 @@ const useCalls = (
         console.error(e);
         setCallRes({calls: []});
       });
-  }, [entity, project, deepFilter, limit, opts?.skip]);
+  }, [entity, project, deepFilter, limit, opts?.skip, tsClient]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -273,7 +275,7 @@ const useChildCallsForCompare = (
 /// Converters ///
 
 const traceCallToLegacySpan = (
-  traceCall: trace_server_client.TraceCallSchema
+  traceCall: traceServerClient.TraceCallSchema
 ): RawSpanFromStreamTableEra => {
   const startDate = convertISOToDate(traceCall.start_datetime);
   const endDate = traceCall.end_datetime
@@ -311,7 +313,7 @@ const traceCallToLegacySpan = (
 };
 
 const traceCallToUICallSchema = (
-  traceCall: trace_server_client.TraceCallSchema
+  traceCall: traceServerClient.TraceCallSchema
 ): CallSchema => {
   return {
     entity: traceCall.entity,

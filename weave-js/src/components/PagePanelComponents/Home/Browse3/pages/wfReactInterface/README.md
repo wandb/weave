@@ -16,7 +16,7 @@ The React application calls high-level hooks such as `useCalls` which then make 
 ```mermaid
 flowchart TD
     WeaveflowReactComponents --> context.ts::WFDataModelHooksContext
-    context.ts::WFDataModelHooksContext --> tsDataModelHooks::tsWFDataModelHooks --> trace_server_client.ts --> W&BTraceServer --> ClickHouse
+    context.ts::WFDataModelHooksContext --> tsDataModelHooks::tsWFDataModelHooks --> traceServerClient.ts --> W&BTraceServer --> ClickHouse
     context.ts::WFDataModelHooksContext --> cgDataModelHooks::cgWFDataModelHooks --> W&BWeaveServer --> StreamTableStorage
 ```
 
@@ -38,7 +38,7 @@ flowchart TD
     context.ts --> cgDataModelHooks.ts
 
 
-    tsDataModelHooks.ts --> trace_server_client.ts
+    tsDataModelHooks.ts --> traceServerClient.ts
     tsDataModelHooks.ts --> utilities.ts
     tsDataModelHooks.ts --> interface.ts
     tsDataModelHooks.ts --> constants.ts

@@ -66,12 +66,7 @@ export interface TraceCallsQueryRes {
   calls: TraceCallSchema[];
 }
 
-export interface TraceServerClientInterface {
-  callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes>;
-  callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes>;
-}
-
-export class TraceServerClient implements TraceServerClientInterface {
+export class TraceServerClient {
   private baseUrl: string;
 
   constructor(baseUrl: string) {
