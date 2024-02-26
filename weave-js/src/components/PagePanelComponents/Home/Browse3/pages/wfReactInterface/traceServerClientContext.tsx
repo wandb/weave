@@ -17,7 +17,7 @@ export const useTraceServerClientContext = () => {
   return ctx;
 };
 
-export const TraceServerClientContextProvider: FC<{
+const TraceServerClientContextProvider: FC<{
   baseUrl: string;
 }> = ({baseUrl, children}) => {
   const client = useMemo(() => {
@@ -27,5 +27,19 @@ export const TraceServerClientContextProvider: FC<{
     <TraceServerClientContext.Provider value={client}>
       {children}
     </TraceServerClientContext.Provider>
+  );
+};
+
+export const OptionalTraceServerClientFromWindowConfigProvider: FC = ({
+  children,
+}) => {
+  const traceBackendBaseUrl = window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL;
+  if (traceBackendBaseUrl == null) {
+    return <>{children}</>;
+  }
+  return (
+    <TraceServerClientContextProvider baseUrl={traceBackendBaseUrl}>
+      {children}
+    </TraceServerClientContextProvider>
   );
 };

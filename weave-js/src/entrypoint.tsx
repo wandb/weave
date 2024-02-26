@@ -17,6 +17,7 @@ import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
 import {Browse2} from './components/PagePanelComponents/Home/Browse2';
 import {Browse3} from './components/PagePanelComponents/Home/Browse3';
+import {OptionalTraceServerClientFromWindowConfigProvider} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
@@ -142,15 +143,17 @@ const BrowseWrapper: FC = props => (
   <React.Suspense fallback="loading">
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
-        <StateInspector name="WeaveApp">
-          <PanelRootContextProvider>
-            <WeaveViewerContextProvider>
-              <PanelInteractContextProvider>
-                {props.children}
-              </PanelInteractContextProvider>
-            </WeaveViewerContextProvider>
-          </PanelRootContextProvider>
-        </StateInspector>
+        <OptionalTraceServerClientFromWindowConfigProvider>
+          <StateInspector name="WeaveApp">
+            <PanelRootContextProvider>
+              <WeaveViewerContextProvider>
+                <PanelInteractContextProvider>
+                  {props.children}
+                </PanelInteractContextProvider>
+              </WeaveViewerContextProvider>
+            </PanelRootContextProvider>
+          </StateInspector>
+        </OptionalTraceServerClientFromWindowConfigProvider>
       </NotebookComputeGraphContextProvider>
     </ErrorBoundary>
   </React.Suspense>
