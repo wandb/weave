@@ -60,6 +60,7 @@ Like `Dataset`s, Weave automatically captures when they are used and update the 
 :::
 
 ```python
+import json
 from weave.weaveflow import Model
 import weave
 
