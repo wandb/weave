@@ -10,7 +10,11 @@
 
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
+import {useWeaveContext} from '../../../../../../context';
+import {BasicClient} from '../../../../../../core';
 import {cgWFDataModelHooks} from './cgDataModelHooks';
+import {placeholderWFDataModelHooks} from './placeholderDataModelHooks';
+import {useHasTraceServerClientContext} from './traceServerClientContext';
 import {tsWFDataModelHooks} from './tsDataModelHooks';
 import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
@@ -40,6 +44,14 @@ const WFDataModelFromComputeGraphProvider: FC = ({children}) => {
 const WFDataModelFromTraceServerProvider: FC = ({children}) => {
   return (
     <WFDataModelHooksContext.Provider value={tsWFDataModelHooks}>
+      {children}
+    </WFDataModelHooksContext.Provider>
+  );
+};
+
+const WFDataModelPlaceholderProvider: FC = ({children}) => {
+  return (
+    <WFDataModelHooksContext.Provider value={placeholderWFDataModelHooks}>
       {children}
     </WFDataModelHooksContext.Provider>
   );
@@ -95,28 +107,46 @@ export const WFDataModelAutoProvider: FC<{
     );
   }
 
-  // Default to CG
+  // Default to empty placeholder to not crash the app
   return (
-    <WFDataModelFromComputeGraphProvider>
-      {children}
-    </WFDataModelFromComputeGraphProvider>
+    <WFDataModelPlaceholderProvider>{children}</WFDataModelPlaceholderProvider>
   );
 };
 
-export const useProjectHasCGData = (
-  entity: string,
-  project: string,
-  opts?: {skip: boolean}
-) => {
-  const calls = cgWFDataModelHooks.useCalls(entity, project, {}, 1, opts);
+/**
+ * Returns true if the client can connect to compute graph execution engine and
+ * the project has data in the compute graph.
+ */
+const useProjectHasCGData = (entity: string, project: string) => {
+  const client = useWeaveContext();
+  const connectedToCGServer = useMemo(
+    () => client instanceof BasicClient && client.isRemoteServerClient(),
+    [client]
+  );
+  const calls = cgWFDataModelHooks.useCalls(entity, project, {}, 1, {
+    skip: !connectedToCGServer,
+  });
   return (calls.result ?? []).length > 0;
 };
 
-export const useProjectHasTSData = (
-  entity: string,
-  project: string,
-  opts?: {skip: boolean}
-) => {
-  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, opts);
+/**
+ * Returns true if the client can connect to trace server and the project has
+ * data in the trace server.
+ */
+const useProjectHasTSData = (entity: string, project: string) => {
+  const skip = !!useHasTraceServerClientContext();
+  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
+    skip: skip,
+  });
   return (calls.result ?? []).length > 0;
+};
+
+/**
+ * Returns true if the project has data in either the compute graph or the trace
+ * server.
+ */
+export const useProjectHasTraceData = (entity: string, project: string) => {
+  const hasCG = useProjectHasCGData(entity, project);
+  const hasTS = useProjectHasTSData(entity, project);
+  return hasCG || hasTS;
 };
