@@ -201,7 +201,8 @@ export const CallDetails: FC<{
           );
         })}
         {childCalls.loading && <CenteredAnimatedLoader />}
-        {singularChildCalls.length > 0 && (
+        {/* Disabling display of singular children while we decide if we want them here. */}
+        {false && singularChildCalls.length > 0 && (
           <Box
             sx={{
               flex: '0 0 auto',
