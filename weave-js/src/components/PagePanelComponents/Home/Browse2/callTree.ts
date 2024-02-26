@@ -113,22 +113,24 @@ const callsTableWeaveType: Type = {
 };
 
 export const callsTableNode = (streamId: StreamId) => {
-  // Going straight to the opRunHistory call saves about 1 second per request in lookup time
-  // const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
-  // const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
-  //   stream_table: opGet({
-  //     uri: constString(predsRefStr),
-  //   }),
-  // }) as Node;
-  const streamTableRowsNode = opRunHistory3({
-    run: opProjectRun({
-      project: opRootProject({
-        entityName: constString(streamId.entityName),
-        projectName: constString(streamId.projectName),
-      }),
-      runName: constString(streamId.streamName),
+  const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
+  const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
+    stream_table: opGet({
+      uri: constString(predsRefStr),
     }),
-  });
+  }) as Node;
+  // Going straight to the opRunHistory call saves about 1 second per request in
+  // lookup time, but does not have the correct types, resulting in backend
+  // errors or missing data until compaction.
+  // const streamTableRowsNode = opRunHistory3({
+  //   run: opProjectRun({
+  //     project: opRootProject({
+  //       entityName: constString(streamId.entityName),
+  //       projectName: constString(streamId.projectName),
+  //     }),
+  //     runName: constString(streamId.streamName),
+  //   }),
+  // });
   streamTableRowsNode.type = callsTableWeaveType;
   return streamTableRowsNode;
 };
