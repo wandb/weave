@@ -10,9 +10,9 @@
 
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
-import {cgWFDataModelHooks} from './compute_graph_interface';
-import {WFDataModelHooksInterface} from './interface';
-import {tsWFDataModelHooks} from './trace_server_interface';
+import {cgWFDataModelHooks} from './cgDataModelHooks';
+import {tsWFDataModelHooks} from './tsDataModelHooks';
+import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
 //  Set this to `true` once the trace server supports objects
 const TRACE_SERVER_SUPPORTS_OBJECTS = false;
@@ -112,7 +112,11 @@ export const useProjectHasCGData = (
   return (calls.result ?? []).length > 0;
 };
 
-export const useProjectHasTSData = (entity: string, project: string) => {
-  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1);
+export const useProjectHasTSData = (
+  entity: string,
+  project: string,
+  opts?: {skip: boolean}
+) => {
+  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, opts);
   return (calls.result ?? []).length > 0;
 };

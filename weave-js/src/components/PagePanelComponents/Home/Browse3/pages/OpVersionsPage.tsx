@@ -16,8 +16,8 @@ import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyOpCategory} from './wfInterface/types';
 import {useWFHooks} from './wfReactInterface/context';
-import {OpVersionSchema} from './wfReactInterface/interface';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
+import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
 
 export type WFHighLevelOpVersionFilter = {
   opCategory?: HackyOpCategory | null;

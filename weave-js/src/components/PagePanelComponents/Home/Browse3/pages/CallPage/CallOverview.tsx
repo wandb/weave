@@ -5,8 +5,8 @@ import {CategoryChip} from '../common/CategoryChip';
 import {CallId, opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
-import {CallSchema} from '../wfReactInterface/interface';
 import {refUriToOpVersionKey} from '../wfReactInterface/utilities';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const Overview = styled.div`
   display: flex;

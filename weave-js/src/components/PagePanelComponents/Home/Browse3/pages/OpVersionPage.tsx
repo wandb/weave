@@ -15,8 +15,8 @@ import {
 } from './common/SimplePageLayout';
 import {TabUseOp} from './TabUseOp';
 import {useWFHooks} from './wfReactInterface/context';
-import {OpVersionSchema} from './wfReactInterface/interface';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
+import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
 
 export const OpVersionPage: React.FC<{
   entity: string;

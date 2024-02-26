@@ -12,8 +12,8 @@ import {
   ObjectVersionSchema,
   OpCategory,
   OpVersionKey,
-} from './interface';
-import {CallSchema, Loadable} from './interface';
+} from './wfDataModelHooksInterface';
+import {CallSchema, Loadable} from './wfDataModelHooksInterface';
 
 type RefUri = string;
 

@@ -27,11 +27,11 @@ import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
-import {CallSchema} from '../Browse3/pages/wfReactInterface/interface';
 import {
   opVersionRefOpCategory,
   opVersionRefOpName,
 } from '../Browse3/pages/wfReactInterface/utilities';
+import {CallSchema} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';

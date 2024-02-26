@@ -47,7 +47,7 @@ import {
 import {CallStatusType, StatusChip} from '../common/StatusChip';
 import {truncateID} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
-import {CallSchema} from '../wfReactInterface/interface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';

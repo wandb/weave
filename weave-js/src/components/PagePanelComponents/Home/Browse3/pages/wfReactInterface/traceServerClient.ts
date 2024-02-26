@@ -66,11 +66,21 @@ export interface TraceCallsQueryRes {
   calls: TraceCallSchema[];
 }
 
-const makeTraceServerEndpointFn = <QT, ST>(endpoint: string) => {
-  // TODO: make this configurable
-  const baseUrl = 'http://127.0.0.1:6345';
-  const url = `${baseUrl}${endpoint}`;
-  const fn = async (req: QT): Promise<ST> => {
+export interface TraceServerClientInterface {
+  callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes>;
+  callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes>;
+}
+
+export class TraceServerClient implements TraceServerClientInterface {
+  private baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+
+  private makeRequest = async <QT, ST>(endpoint: string, req: QT): Promise<ST> => {
+    const url = `${this.baseUrl}${endpoint}`;
+
     // eslint-disable-next-line wandb/no-unprefixed-urls
     const response = await fetch(url, {
       method: 'POST',
@@ -81,16 +91,14 @@ const makeTraceServerEndpointFn = <QT, ST>(endpoint: string) => {
     });
     const res = await response.json();
     return res;
+
   };
-  return fn;
-};
 
-export const callsQuery = makeTraceServerEndpointFn<
-  TraceCallsQueryReq,
-  TraceCallsQueryRes
->('/calls/query');
+  callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> = (req) => {
+    return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>('/calls/query', req);
+  }
+  callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = (req) => {
+    return this.makeRequest<TraceCallReadReq, TraceCallReadRes>('/call/read', req);
+  }
+}
 
-export const callRead = makeTraceServerEndpointFn<
-  TraceCallReadReq,
-  TraceCallReadRes
->('/call/read');

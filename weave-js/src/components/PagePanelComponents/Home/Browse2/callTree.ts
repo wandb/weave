@@ -40,7 +40,7 @@ import {WILDCARD_ARTIFACT_VERSION_AND_PATH} from '../Browse3/pages/wfReactInterf
 import {
   RawSpanFromStreamTableEra,
   RawSpanFromStreamTableEraWithFeedback,
-} from '../Browse3/pages/wfReactInterface/interface';
+} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 
 export interface StreamId {
   entityName: string;

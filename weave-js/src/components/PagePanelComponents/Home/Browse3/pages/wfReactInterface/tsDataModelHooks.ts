@@ -9,6 +9,8 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {getCallFromCache, setCallInCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import * as trace_server_client from './traceServerClient';
+import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -23,9 +25,7 @@ import {
   OpVersionSchema,
   RawSpanFromStreamTableEra,
   WFDataModelHooksInterface,
-} from './interface';
-import * as trace_server_client from './trace_server_client';
-import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
+} from './wfDataModelHooksInterface';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const loadingRef = useRef(false);
