@@ -10,7 +10,7 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {getCallFromCache, setCallInCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
-import { useTraceServerClientContext } from './traceServerClientContext';
+import {useTraceServerClientContext} from './traceServerClientContext';
 import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
@@ -39,7 +39,8 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
     if (deepKey) {
       setCallRes(null);
       loadingRef.current = true;
-      tsClient.callRead({
+      tsClient
+        .callRead({
           entity: deepKey.entity,
           project: deepKey.project,
           id: deepKey.callId,

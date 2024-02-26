@@ -73,7 +73,10 @@ export class TraceServerClient {
     this.baseUrl = baseUrl;
   }
 
-  private makeRequest = async <QT, ST>(endpoint: string, req: QT): Promise<ST> => {
+  private makeRequest = async <QT, ST>(
+    endpoint: string,
+    req: QT
+  ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
 
     // eslint-disable-next-line wandb/no-unprefixed-urls
@@ -86,14 +89,19 @@ export class TraceServerClient {
     });
     const res = await response.json();
     return res;
-
   };
 
-  callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> = (req) => {
-    return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>('/calls/query', req);
-  }
-  callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = (req) => {
-    return this.makeRequest<TraceCallReadReq, TraceCallReadRes>('/call/read', req);
-  }
+  callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
+    req => {
+      return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
+        '/calls/query',
+        req
+      );
+    };
+  callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = req => {
+    return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
+      '/call/read',
+      req
+    );
+  };
 }
-

@@ -136,7 +136,7 @@ const useProjectHasCGData = (entity: string, project: string) => {
 const useProjectHasTSData = (entity: string, project: string) => {
   const skip = !!useHasTraceServerClientContext();
   const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
-    skip: skip,
+    skip,
   });
   return (calls.result ?? []).length > 0;
 };
