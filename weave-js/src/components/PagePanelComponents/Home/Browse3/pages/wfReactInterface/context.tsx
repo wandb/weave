@@ -6,8 +6,6 @@
  *    model.
  *  - WFDataModelAutoProvider: automatically detects the engine that backs the
  *    project and configures the context accordingly.
- *  - useIsWeaveflowEnabled: used by the top-level application to determine if
- *    the project has weaveflow data.
  */
 
 import React, {createContext, FC, useContext, useMemo} from 'react';
@@ -105,21 +103,16 @@ export const WFDataModelAutoProvider: FC<{
   );
 };
 
-const useProjectHasCGData = (entity: string, project: string) => {
-  const calls = cgWFDataModelHooks.useCalls(entity, project, {}, 1);
+export const useProjectHasCGData = (
+  entity: string,
+  project: string,
+  opts?: {skip: boolean}
+) => {
+  const calls = cgWFDataModelHooks.useCalls(entity, project, {}, 1, opts);
   return (calls.result ?? []).length > 0;
 };
 
-const useProjectHasTSData = (entity: string, project: string) => {
+export const useProjectHasTSData = (entity: string, project: string) => {
   const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1);
   return (calls.result ?? []).length > 0;
-};
-
-export const useIsWeaveflowEnabled = (
-  entityName: string,
-  projectName: string
-) => {
-  const hasCGData = useProjectHasCGData(entityName, projectName);
-  const hasTSData = useProjectHasTSData(entityName, projectName);
-  return hasCGData || hasTSData;
 };
