@@ -58,6 +58,10 @@ const backendWeaveViewerUrl = () => {
   return WEAVE_BACKEND_HOST + '/wb_viewer';
 };
 
+export const backendTraceBaseUrl = () => {
+  return window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL;
+}
+
 
 export const coreAppUrl = (path: string = '') => {
   const origin = window.WEAVE_CONFIG.WANDB_BASE_URL

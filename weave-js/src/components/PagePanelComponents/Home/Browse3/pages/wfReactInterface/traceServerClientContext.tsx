@@ -25,54 +25,21 @@ export const useGetTraceServerClientContext = () => {
   }, [ctx]);
 };
 
-const TraceServerClientContextProvider: FC<{
+export const OptionalTraceServerClientContextProvider: FC<{
   baseUrl: string;
 }> = ({baseUrl, children}) => {
   const client = useMemo(() => {
+    if (baseUrl === '') {
+      return null;
+    }
     return new TraceServerClient(baseUrl);
   }, [baseUrl]);
+  if (!client) {
+    return <>{children}</>;
+  }
   return (
     <TraceServerClientContext.Provider value={client}>
       {children}
     </TraceServerClientContext.Provider>
   );
-};
-
-export const OptionalTraceServerClientFromWindowConfigProvider: FC = ({
-  children,
-}) => {
-  // This is pretty hacky. Essentially if we are mounted in the core app, then we will have
-  // a trace backend url provided by the window.CONFIG. This is populated by the core app frontend
-  // build process. However, if we are in a self-hosted weave environment, then the entrypoint will
-  // load up the env variables dynamically fom the weave server and populate the window.WEAVE_CONFIG.
-  //
-  // Our primary use case is the app running in the core app, so we will use the window.CONFIG if it is
-  // available. If it is not, then we will use the window.WEAVE_CONFIG.
-  const traceBackendBaseUrlProvidedByWandbServer = (window as any).CONFIG
-    ?.TRACE_BACKEND_BASE_URL;
-  const traceBackendBaseUrlProvidedByWeaveServer = (window as any).WEAVE_CONFIG
-    ?.TRACE_BACKEND_BASE_URL;
-
-  if (
-    traceBackendBaseUrlProvidedByWandbServer != null &&
-    traceBackendBaseUrlProvidedByWandbServer !== ''
-  ) {
-    return (
-      <TraceServerClientContextProvider
-        baseUrl={traceBackendBaseUrlProvidedByWandbServer}>
-        {children}
-      </TraceServerClientContextProvider>
-    );
-  } else if (
-    traceBackendBaseUrlProvidedByWeaveServer != null &&
-    traceBackendBaseUrlProvidedByWeaveServer !== ''
-  ) {
-    return (
-      <TraceServerClientContextProvider
-        baseUrl={traceBackendBaseUrlProvidedByWeaveServer}>
-        {children}
-      </TraceServerClientContextProvider>
-    );
-  }
-  return <>{children}</>;
 };
