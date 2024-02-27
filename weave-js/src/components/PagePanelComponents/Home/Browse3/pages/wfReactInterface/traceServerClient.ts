@@ -96,6 +96,7 @@ export class TraceServerClient {
     // eslint-disable-next-line wandb/no-unprefixed-urls
     const response = await fetch(url, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },

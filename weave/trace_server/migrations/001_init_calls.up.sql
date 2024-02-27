@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS calls_raw (
+CREATE TABLE calls_raw (
     # Identity Fields
     entity String,
     project String,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS calls_raw (
     db_row_created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = MergeTree
 ORDER BY (entity, project, id);
-CREATE TABLE IF NOT EXISTS calls_merged (
+CREATE TABLE calls_merged (
     entity String,
     project String,
     id String,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS calls_merged (
     output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
 ) ENGINE = AggregatingMergeTree
 ORDER BY (entity, project, id);
-CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view TO calls_merged AS
+CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS
 SELECT entity,
     project,
     id,

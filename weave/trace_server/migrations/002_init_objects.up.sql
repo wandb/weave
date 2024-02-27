@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS objects_raw (
+CREATE TABLE objects_raw (
     entity String,
     project String,
     is_op UInt8,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS objects_raw (
     db_row_created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = MergeTree
 ORDER BY (entity, project, is_op, name, version_hash);
-CREATE TABLE IF NOT EXISTS objects_deduplicated (
+CREATE TABLE objects_deduplicated (
     entity String,
     project String,
     is_op UInt8,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS objects_deduplicated (
     metadata_dict_dump SimpleAggregateFunction(any, String),
 ) ENGINE = AggregatingMergeTree
 ORDER BY (entity, project, is_op, name, version_hash);
-CREATE MATERIALIZED VIEW IF NOT EXISTS objects_deduplicated_view TO objects_deduplicated AS
+CREATE MATERIALIZED VIEW objects_deduplicated_view TO objects_deduplicated AS
 SELECT entity,
     project,
     is_op,
@@ -40,7 +40,7 @@ GROUP BY entity,
     is_op,
     name,
     version_hash;
-CREATE VIEW IF NOT EXISTS objects_versioned AS
+CREATE VIEW objects_versioned AS
 SELECT entity,
     project,
     is_op,

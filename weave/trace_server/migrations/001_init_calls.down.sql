@@ -1,3 +1,3 @@
-DROP TABLE IF EXISTS calls_raw;
-DROP TABLE IF EXISTS calls_merged;
-DROP TABLE IF EXISTS calls_merged_view;
+DROP TABLE calls_raw;
+DROP TABLE calls_merged;
+DROP TABLE calls_merged_view;

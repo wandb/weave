@@ -19,7 +19,7 @@ class ClickHouseTraceServerMigrator:
     def apply_migrations(
         self, target_db: str, target_version: typing.Optional[int] = None
     ) -> None:
-        status = self._get_migration_status("default")
+        status = self._get_migration_status(target_db)
         print(f"""`{target_db}` migration status: {status}""")
         if status["partially_applied_version"]:
             print(

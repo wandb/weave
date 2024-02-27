@@ -142,6 +142,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         port: int = 8123,
         user: str = "default",
         password: str = "",
+        database: str = "default",
         should_batch: bool = True,
     ):
         super().__init__()
@@ -149,6 +150,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._port = port
         self._user = user
         self._password = password
+        self._database = database
         self.ch_client = self._mint_client()
         self.ch_call_insert_thread_client = self._mint_client()
         self.ch_obj_insert_thread_client = self._mint_client()
@@ -167,6 +169,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             wf_env.wf_clickhouse_port(),
             wf_env.wf_clickhouse_user(),
             wf_env.wf_clickhouse_pass(),
+            wf_env.wf_clickhouse_database(),
             should_batch,
         )
 
@@ -332,7 +335,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # Private Methods
     def _mint_client(self) -> CHClient:
         return clickhouse_connect.get_client(
-            host=self._host, port=self._port, user=self._user, password=self._password
+            host=self._host,
+            port=self._port,
+            user=self._user,
+            password=self._password,
+            database=self._database,
         )
 
     def __del__(self) -> None:
@@ -560,8 +567,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self) -> None:
         print("Running migrations")
-        migrator = wf_migrator.ClickHouseTraceServerMigrator(self.ch_client)
-        migrator.apply_migrations("default")
+        migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
+        migrator.apply_migrations(self._database)
 
     def _query(
         self,
