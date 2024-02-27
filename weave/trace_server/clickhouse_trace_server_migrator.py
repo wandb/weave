@@ -4,7 +4,8 @@ import os
 
 from clickhouse_connect.driver.client import Client as CHClient
 
-class ClickHouseTraceServerMigrator():
+
+class ClickHouseTraceServerMigrator:
     ch_client: CHClient
 
     def __init__(
@@ -15,14 +16,20 @@ class ClickHouseTraceServerMigrator():
         self.ch_client = ch_client
         self._initialize_migration_db()
 
-    def apply_migrations(self, target_db: str, target_version: typing.Optional[int] = None):
-        status = self._get_migration_status('default')
+    def apply_migrations(
+        self, target_db: str, target_version: typing.Optional[int] = None
+    ) -> None:
+        status = self._get_migration_status("default")
         print(f"""`{target_db}` migration status: {status}""")
-        if status['partially_applied_version']:
-            print(f"Unable to apply migrations to `{target_db}`. Found partially applied migration version {status['partially_applied_version']}. Please fix the database manually and try again.")
+        if status["partially_applied_version"]:
+            print(
+                f"Unable to apply migrations to `{target_db}`. Found partially applied migration version {status['partially_applied_version']}. Please fix the database manually and try again."
+            )
             return
         migration_map = self._get_migrations()
-        migrations_to_apply = self._determine_migrations_to_apply(status['curr_version'], migration_map, target_version)
+        migrations_to_apply = self._determine_migrations_to_apply(
+            status["curr_version"], migration_map, target_version
+        )
         if len(migrations_to_apply) == 0:
             print(f"No migrations to apply to `{target_db}`")
             return
@@ -30,11 +37,14 @@ class ClickHouseTraceServerMigrator():
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
 
-    def _initialize_migration_db(self):
-        self.ch_client.command("""
+    def _initialize_migration_db(self) -> None:
+        self.ch_client.command(
+            """
             CREATE DATABASE IF NOT EXISTS db_management
-        """)
-        self.ch_client.command("""
+        """
+        )
+        self.ch_client.command(
+            """
             CREATE TABLE IF NOT EXISTS db_management.migrations
             (
                 db_name String,
@@ -43,7 +53,8 @@ class ClickHouseTraceServerMigrator():
             ) 
             ENGINE = MergeTree() 
             ORDER BY (db_name)
-        """)
+        """
+        )
 
     def _get_migration_status(self, db_name: str) -> typing.Dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -53,17 +64,23 @@ class ClickHouseTraceServerMigrator():
         """
         res = self.ch_client.query_df(query)
         if res is None or len(res) == 0:
-            self.ch_client.insert("db_management.migrations", data=[[db_name, 0, None]], column_names=column_names)
+            self.ch_client.insert(
+                "db_management.migrations",
+                data=[[db_name, 0, None]],
+                column_names=column_names,
+            )
         res = self.ch_client.query_df(query)
         if res is None or len(res) == 0:
             raise Exception("Migration table not found")
 
         return res.iloc[0].to_dict()
-    
-    def _get_migrations(self) -> typing.List[str]:
+
+    def _get_migrations(
+        self,
+    ) -> typing.Dict[int, typing.Dict[str, typing.Optional[str]]]:
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_files = os.listdir(migration_dir)
-        migration_map = {}
+        migration_map: typing.Dict[int, typing.Dict[str, typing.Optional[str]]] = {}
         max_version = 0
         for file in migration_files:
             if not file.endswith(".up.sql") and not file.endswith(".down.sql"):
@@ -74,12 +91,12 @@ class ClickHouseTraceServerMigrator():
             version = int(file_name_parts[0], 10)
             if version < 1:
                 raise Exception(f"Invalid migration file: {file}")
-            
+
             is_up = file.endswith(".up.sql")
 
             if version not in migration_map:
                 migration_map[version] = {"up": None, "down": None}
-            
+
             if is_up:
                 if migration_map[version]["up"] is not None:
                     raise Exception(f"Duplicate migration file for version {version}")
@@ -88,16 +105,18 @@ class ClickHouseTraceServerMigrator():
                 if migration_map[version]["down"] is not None:
                     raise Exception(f"Duplicate migration file for version {version}")
                 migration_map[version]["down"] = file
-            
+
             if version > max_version:
                 max_version = version
 
         if len(migration_map) == 0:
             raise Exception("No migrations found")
-        
+
         if max_version != len(migration_map):
-            raise Exception(f"Invalid migration versioning. Expected {max_version} migrations but found {len(migration_map)}")
-        
+            raise Exception(
+                f"Invalid migration versioning. Expected {max_version} migrations but found {len(migration_map)}"
+            )
+
         for version in range(1, max_version + 1):
             if version not in migration_map:
                 raise Exception(f"Missing migration file for version {version}")
@@ -105,38 +124,62 @@ class ClickHouseTraceServerMigrator():
                 raise Exception(f"Missing up migration file for version {version}")
             if migration_map[version]["down"] is None:
                 raise Exception(f"Missing down migration file for version {version}")
-        
+
         return migration_map
-    
-    def _determine_migrations_to_apply(self, current_version: int, migration_map: typing.Dict, target_version: typing.Optional[int] = None) -> typing.List[typing.Tuple[int, str]]:
+
+    def _determine_migrations_to_apply(
+        self,
+        current_version: int,
+        migration_map: typing.Dict,
+        target_version: typing.Optional[int] = None,
+    ) -> typing.List[typing.Tuple[int, str]]:
         if target_version is None:
             target_version = len(migration_map)
         if target_version < 0 or target_version > len(migration_map):
             raise Exception(f"Invalid target version: {target_version}")
-        if target_version == current_version:
-            return []
+
         if target_version > current_version:
-            return [(i, f"{migration_map[i]['up']}") for i in range(current_version + 1, target_version + 1)]
+            res = []
+            for i in range(current_version + 1, target_version + 1):
+                if migration_map[i]["up"] is None:
+                    raise Exception(f"Missing up migration file for version {i}")
+                res.append((i, f"{migration_map[i]['up']}"))
+            return res
         if target_version < current_version:
-            return [(i-1, f"{migration_map[i]['down']}") for i in range(current_version, target_version, -1)]
-        
-    def _apply_migration(self, target_db: str, target_version:int, migration_file: str):
+            res = []
+            for i in range(current_version, target_version, -1):
+                if migration_map[i]["down"] is None:
+                    raise Exception(f"Missing down migration file for version {i}")
+                res.append((i, f"{migration_map[i]['down']}"))
+            return res
+
+        return []
+
+    def _apply_migration(
+        self, target_db: str, target_version: int, migration_file: str
+    ) -> None:
         print(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)
         with open(migration_file_path, "r") as f:
             migration_sql = f.read()
-        self.ch_client.command(f"""
+        self.ch_client.command(
+            f"""
             ALTER TABLE db_management.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'
-        """)
+        """
+        )
         migration_sub_commands = migration_sql.split(";")
         for command in migration_sub_commands:
             command = command.strip()
             if len(command) == 0:
                 continue
+            curr_db = self.ch_client.database
+            self.ch_client.database = target_db
             self.ch_client.command(command)
-        self.ch_client.command(f"""
+            self.ch_client.database = curr_db
+        self.ch_client.command(
+            f"""
             ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'
-        """)
+        """
+        )
         print(f"Migration {migration_file} applied to `{target_db}`")
-
