@@ -34,6 +34,9 @@ class ClickHouseTraceServerMigrator:
             print(f"No migrations to apply to `{target_db}`")
             return
         print(f"Migrations to apply: {migrations_to_apply}")
+        if status["curr_version"] == 0:
+            print(f"Creating database `{target_db}`")
+            self.ch_client.command(f"CREATE DATABASE {target_db}")
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
 
