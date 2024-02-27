@@ -118,9 +118,9 @@ export const WFDataModelAutoProvider: FC<{
  * the project has data in the compute graph.
  */
 const useProjectHasCGData = (entity: string, project: string) => {
-  const client = useWeaveContext();
+  const {client} = useWeaveContext();
   const connectedToCGServer = useMemo(
-    () => client instanceof BasicClient && client.isRemoteServerClient(),
+    () => client.isWeavePythonBackend(),
     [client]
   );
   const calls = cgWFDataModelHooks.useCalls(entity, project, {}, 1, {

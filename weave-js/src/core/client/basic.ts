@@ -223,7 +223,7 @@ export class BasicClient implements Client {
     return Promise.resolve();
   }
 
-  public isRemoteServerClient(): boolean {
+  public isWeavePythonBackend(): boolean {
     return this.isRemoteServer;
   }
 

@@ -56,4 +56,7 @@ export class EngineClient implements Client {
   public debugMeta(): {id: string} & {[prop: string]: any} {
     return {id: 'EngineClient', opStore: this.opStore.debugMeta()};
   }
+  public isWeavePythonBackend(): boolean {
+    return false;
+  }
 }
