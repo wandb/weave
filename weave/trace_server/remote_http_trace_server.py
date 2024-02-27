@@ -64,7 +64,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = requests.post(
-            self.trace_server_url + url, json=json.loads(req.model_dump_json().encode("utf-8")),
+            self.trace_server_url + url,
+            json=json.loads(req.model_dump_json().encode("utf-8")),
         )
         r.raise_for_status()
         return res_model.model_validate(r.json())
