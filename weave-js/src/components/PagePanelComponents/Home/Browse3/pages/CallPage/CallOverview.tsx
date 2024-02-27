@@ -18,9 +18,9 @@ Overview.displayName = 'S.Overview';
 
 export const CallName = styled.div`
   font-family: Source Sans Pro;
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 32px;
   letter-spacing: 0px;
   text-align: left;
 `;
