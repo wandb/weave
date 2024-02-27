@@ -18,8 +18,8 @@ import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyTypeCategory} from './wfInterface/types';
 import {useWFHooks} from './wfReactInterface/context';
-import {ObjectVersionSchema} from './wfReactInterface/interface';
 import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
+import {ObjectVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
 
 export const ObjectVersionsPage: React.FC<{
   entity: string;

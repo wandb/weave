@@ -26,11 +26,14 @@ import {TabUseDataset} from './TabUseDataset';
 import {TabUseModel} from './TabUseModel';
 import {TabUseObject} from './TabUseObject';
 import {useWFHooks} from './wfReactInterface/context';
-import {CallSchema, ObjectVersionSchema} from './wfReactInterface/interface';
 import {
   objectVersionKeyToRefUri,
   refUriToOpVersionKey,
 } from './wfReactInterface/utilities';
+import {
+  CallSchema,
+  ObjectVersionSchema,
+} from './wfReactInterface/wfDataModelHooksInterface';
 
 export const ObjectVersionPage: React.FC<{
   entity: string;

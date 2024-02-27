@@ -32,7 +32,7 @@ import {
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {renderCell} from '../util';
-import {CallSchema} from '../wfReactInterface/interface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;

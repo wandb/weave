@@ -22,7 +22,6 @@ import {truncateID, useInitializingFilter} from '../util';
 import {HackyOpCategory} from '../wfInterface/types';
 import {OP_CATEGORIES} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
-import {CallFilter, OpVersionSchema} from '../wfReactInterface/interface';
 import {
   objectVersionNiceString,
   opVersionKeyToRefUri,
@@ -30,6 +29,10 @@ import {
   refUriToObjectVersionKey,
   refUriToOpVersionKey,
 } from '../wfReactInterface/utilities';
+import {
+  CallFilter,
+  OpVersionSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {

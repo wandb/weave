@@ -4,7 +4,7 @@ import React from 'react';
 import {Timestamp} from '../../../../../Timestamp';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
-import {CallSchema} from '../wfReactInterface/interface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const CallSummary: React.FC<{
   call: CallSchema;

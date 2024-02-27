@@ -16,8 +16,8 @@ The React application calls high-level hooks such as `useCalls` which then make 
 ```mermaid
 flowchart TD
     WeaveflowReactComponents --> context.ts::WFDataModelHooksContext
-    context.ts::WFDataModelHooksContext --> trace_server_interface::tsWFDataModelHooks --> trace_server_client.ts --> W&BTraceServer --> ClickHouse
-    context.ts::WFDataModelHooksContext --> compute_graph_interface::cgWFDataModelHooks --> W&BWeaveServer --> StreamTableStorage
+    context.ts::WFDataModelHooksContext --> tsDataModelHooks::tsWFDataModelHooks --> traceServerClient.ts --> W&BTraceServer --> ClickHouse
+    context.ts::WFDataModelHooksContext --> cgDataModelHooks::cgWFDataModelHooks --> W&BWeaveServer --> StreamTableStorage
 ```
 
 The dependencies are laid out like:
@@ -26,23 +26,23 @@ The dependencies are laid out like:
 flowchart TD
     cache.ts --> interface.ts
 
-    compute_graph_interface.ts --> utilities.ts
-    compute_graph_interface.ts --> interface.ts
-    compute_graph_interface.ts --> constants.ts
-    compute_graph_interface.ts --> cache.ts
+    cgDataModelHooks.ts --> utilities.ts
+    cgDataModelHooks.ts --> interface.ts
+    cgDataModelHooks.ts --> constants.ts
+    cgDataModelHooks.ts --> cache.ts
 
     interface.ts --> constants.ts
 
     context.ts --> interface.ts
-    context.ts --> trace_server_interface.ts
-    context.ts --> compute_graph_interface.ts
+    context.ts --> tsDataModelHooks.ts
+    context.ts --> cgDataModelHooks.ts
 
 
-    trace_server_interface.ts --> trace_server_client.ts
-    trace_server_interface.ts --> utilities.ts
-    trace_server_interface.ts --> interface.ts
-    trace_server_interface.ts --> constants.ts
-    trace_server_interface.ts --> cache.ts
+    tsDataModelHooks.ts --> traceServerClient.ts
+    tsDataModelHooks.ts --> utilities.ts
+    tsDataModelHooks.ts --> interface.ts
+    tsDataModelHooks.ts --> constants.ts
+    tsDataModelHooks.ts --> cache.ts
 
     utilities.ts --> constants.ts
     utilities.ts --> interface.ts

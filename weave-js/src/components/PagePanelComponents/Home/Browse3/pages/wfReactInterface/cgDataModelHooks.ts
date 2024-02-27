@@ -57,6 +57,11 @@ import {
   WANDB_ARTIFACT_REF_PREFIX,
 } from './constants';
 import {
+  opNameToCategory,
+  opVersionRefOpCategory,
+  refUriToOpVersionKey,
+} from './utilities';
+import {
   CallFilter,
   CallKey,
   CallSchema,
@@ -72,12 +77,7 @@ import {
   RawSpanFromStreamTableEra,
   RawSpanFromStreamTableEraWithFeedback,
   WFDataModelHooksInterface,
-} from './interface';
-import {
-  opNameToCategory,
-  opVersionRefOpCategory,
-  refUriToOpVersionKey,
-} from './utilities';
+} from './wfDataModelHooksInterface';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? getCallFromCache(key) : null;

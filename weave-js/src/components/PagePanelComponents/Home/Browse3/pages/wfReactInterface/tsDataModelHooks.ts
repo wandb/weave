@@ -9,6 +9,9 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {getCallFromCache, setCallInCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import * as traceServerClient from './traceServerClient';
+import {useGetTraceServerClientContext} from './traceServerClientContext';
+import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -23,21 +26,20 @@ import {
   OpVersionSchema,
   RawSpanFromStreamTableEra,
   WFDataModelHooksInterface,
-} from './interface';
-import * as trace_server_client from './trace_server_client';
-import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
+} from './wfDataModelHooksInterface';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
+  const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedCall = key ? getCallFromCache(key) : null;
   const [callRes, setCallRes] =
-    useState<trace_server_client.TraceCallReadRes | null>(null);
+    useState<traceServerClient.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
   useEffect(() => {
     if (deepKey) {
       setCallRes(null);
       loadingRef.current = true;
-      trace_server_client
+      getTsClient()
         .callRead({
           entity: deepKey.entity,
           project: deepKey.project,
@@ -48,7 +50,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
           setCallRes(res);
         });
     }
-  }, [deepKey]);
+  }, [deepKey, getTsClient]);
 
   return useMemo(() => {
     if (key == null) {
@@ -88,9 +90,10 @@ const useCalls = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
+  const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
-    useState<trace_server_client.TraceCallsQueryRes | null>(null);
+    useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
   useEffect(() => {
     if (opts?.skip) {
@@ -98,7 +101,7 @@ const useCalls = (
     }
     setCallRes(null);
     loadingRef.current = true;
-    trace_server_client
+    getTsClient()
       .callsQuery({
         entity,
         project,
@@ -123,7 +126,7 @@ const useCalls = (
         console.error(e);
         setCallRes({calls: []});
       });
-  }, [entity, project, deepFilter, limit, opts?.skip]);
+  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -273,7 +276,7 @@ const useChildCallsForCompare = (
 /// Converters ///
 
 const traceCallToLegacySpan = (
-  traceCall: trace_server_client.TraceCallSchema
+  traceCall: traceServerClient.TraceCallSchema
 ): RawSpanFromStreamTableEra => {
   const startDate = convertISOToDate(traceCall.start_datetime);
   const endDate = traceCall.end_datetime
@@ -311,7 +314,7 @@ const traceCallToLegacySpan = (
 };
 
 const traceCallToUICallSchema = (
-  traceCall: trace_server_client.TraceCallSchema
+  traceCall: traceServerClient.TraceCallSchema
 ): CallSchema => {
   return {
     entity: traceCall.entity,

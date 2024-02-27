@@ -6,15 +6,14 @@
  *    model.
  *  - WFDataModelAutoProvider: automatically detects the engine that backs the
  *    project and configures the context accordingly.
- *  - useIsWeaveflowEnabled: used by the top-level application to determine if
- *    the project has weaveflow data.
  */
 
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
-import {cgWFDataModelHooks} from './compute_graph_interface';
-import {WFDataModelHooksInterface} from './interface';
-import {tsWFDataModelHooks} from './trace_server_interface';
+import {cgWFDataModelHooks} from './cgDataModelHooks';
+import {useHasTraceServerClientContext} from './traceServerClientContext';
+import {tsWFDataModelHooks} from './tsDataModelHooks';
+import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
 //  Set this to `true` once the trace server supports objects
 const TRACE_SERVER_SUPPORTS_OBJECTS = false;
@@ -73,16 +72,9 @@ export const WFDataModelAutoProvider: FC<{
   entityName: string;
   projectName: string;
 }> = ({entityName, projectName, children}) => {
-  const hasCGData = useProjectHasCGData(entityName, projectName);
-  const hasTSData = useProjectHasTSData(entityName, projectName);
+  const hasTSData = useProjectHasTraceServerCalls(entityName, projectName);
 
-  if (hasCGData) {
-    return (
-      <WFDataModelFromComputeGraphProvider>
-        {children}
-      </WFDataModelFromComputeGraphProvider>
-    );
-  } else if (hasTSData) {
+  if (hasTSData) {
     if (TRACE_SERVER_SUPPORTS_OBJECTS) {
       return (
         <WFDataModelFromTraceServerProvider>
@@ -96,8 +88,6 @@ export const WFDataModelAutoProvider: FC<{
       </WFDataModelFromTraceServerCallsOnlyProvider>
     );
   }
-
-  // Default to CG
   return (
     <WFDataModelFromComputeGraphProvider>
       {children}
@@ -105,21 +95,18 @@ export const WFDataModelAutoProvider: FC<{
   );
 };
 
-const useProjectHasCGData = (entity: string, project: string) => {
-  const calls = cgWFDataModelHooks.useCalls(entity, project, {}, 1);
-  return (calls.result ?? []).length > 0;
-};
-
-const useProjectHasTSData = (entity: string, project: string) => {
-  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1);
-  return (calls.result ?? []).length > 0;
-};
-
-export const useIsWeaveflowEnabled = (
-  entityName: string,
-  projectName: string
+/**
+ * Returns true if the client can connect to trace server and the project has
+ * data in the trace server.
+ */
+export const useProjectHasTraceServerCalls = (
+  entity: string,
+  project: string
 ) => {
-  const hasCGData = useProjectHasCGData(entityName, projectName);
-  const hasTSData = useProjectHasTSData(entityName, projectName);
-  return hasCGData || hasTSData;
+  const hasTraceServer = useHasTraceServerClientContext();
+  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
+    skip: !hasTraceServer,
+  });
+
+  return (calls.result ?? []).length > 0;
 };

@@ -15,7 +15,7 @@ import {
   ObjectVersionSchema,
   OpVersionKey,
   OpVersionSchema,
-} from './interface';
+} from './wfDataModelHooksInterface';
 
 const CACHE_SIZE = 5 * 2 ** 20; // 5MB
 
