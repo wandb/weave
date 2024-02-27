@@ -10,7 +10,7 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {getCallFromCache, setCallInCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
-import {useTraceServerClientContext} from './traceServerClientContext';
+import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
@@ -29,7 +29,7 @@ import {
 } from './wfDataModelHooksInterface';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
-  const tsClient = useTraceServerClientContext();
+  const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const cachedCall = key ? getCallFromCache(key) : null;
   const [callRes, setCallRes] =
@@ -39,7 +39,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
     if (deepKey) {
       setCallRes(null);
       loadingRef.current = true;
-      tsClient
+      getTsClient()
         .callRead({
           entity: deepKey.entity,
           project: deepKey.project,
@@ -50,7 +50,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
           setCallRes(res);
         });
     }
-  }, [deepKey, tsClient]);
+  }, [deepKey, getTsClient]);
 
   return useMemo(() => {
     if (key == null) {
@@ -90,7 +90,7 @@ const useCalls = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
-  const tsClient = useTraceServerClientContext();
+  const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
@@ -101,7 +101,7 @@ const useCalls = (
     }
     setCallRes(null);
     loadingRef.current = true;
-    tsClient
+    getTsClient()
       .callsQuery({
         entity,
         project,
@@ -126,7 +126,7 @@ const useCalls = (
         console.error(e);
         setCallRes({calls: []});
       });
-  }, [entity, project, deepFilter, limit, opts?.skip, tsClient]);
+  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
 
   return useMemo(() => {
     if (opts?.skip) {

@@ -124,6 +124,9 @@ def weave_onprem() -> bool:
 def weave_backend_host() -> str:
     return os.getenv("WEAVE_BACKEND_HOST", "/__weave")
 
+def trace_backend_base_url() -> str:
+    return os.getenv("TRACE_BACKEND_BASE_URL", '')
+
 
 def analytics_disabled() -> bool:
     if os.getenv("WEAVE_DISABLE_ANALYTICS") == "true":
