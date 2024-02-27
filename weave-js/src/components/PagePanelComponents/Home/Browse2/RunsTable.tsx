@@ -122,11 +122,19 @@ export const RunsTable: FC<{
   const tableData = useMemo(() => {
     return spans.map((call: CallSchema) => {
       const argOrder = call.rawSpan.inputs._input_order;
-      let args = _.fromPairs(
-        Object.entries(call.rawSpan.inputs).filter(
-          ([k, c]) => c != null && !k.startsWith('_')
-        )
-      );
+      let args: Record<string, any> = {};
+      if (call.rawSpan.inputs._keys) {
+        for (const key of call.rawSpan.inputs._keys) {
+          args[key] = call.rawSpan.inputs[key];
+        }
+      } else {
+        args = _.fromPairs(
+          Object.entries(call.rawSpan.inputs).filter(
+            ([k, c]) => c != null && !k.startsWith('_')
+          )
+        );
+      }
+
       if (argOrder) {
         args = _.fromPairs(argOrder.map((k: string) => [k, args[k]]));
       }
@@ -338,6 +346,7 @@ export const RunsTable: FC<{
       const inputOrder = !isSingleOpVersion
         ? getInputColumns(tableStats)
         : row0.rawSpan.inputs._arg_order ??
+          row0.rawSpan.inputs._keys ??
           Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
             k => !k.startsWith('_')
           );
