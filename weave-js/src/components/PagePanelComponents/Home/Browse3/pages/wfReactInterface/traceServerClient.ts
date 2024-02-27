@@ -73,6 +73,20 @@ export class TraceServerClient {
     this.baseUrl = baseUrl;
   }
 
+  callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
+    req => {
+      return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
+        '/calls/query',
+        req
+      );
+    };
+  callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = req => {
+    return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
+      '/call/read',
+      req
+    );
+  };
+
   private makeRequest = async <QT, ST>(
     endpoint: string,
     req: QT
@@ -89,19 +103,5 @@ export class TraceServerClient {
     });
     const res = await response.json();
     return res;
-  };
-
-  callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
-    req => {
-      return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
-        '/calls/query',
-        req
-      );
-    };
-  callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = req => {
-    return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
-      '/call/read',
-      req
-    );
   };
 }

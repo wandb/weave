@@ -5,7 +5,7 @@ declare global {
       ANALYTICS_DISABLED: boolean;
       WEAVE_BACKEND_HOST: string;
       ONPREM: boolean;
-      TRACE_BACKEND_BASE_URL: string,
+      TRACE_BACKEND_BASE_URL: string;
       WANDB_BASE_URL: string;
       DD_ENV: string;
       ENV_IS_CI: boolean;
@@ -60,8 +60,7 @@ const backendWeaveViewerUrl = () => {
 
 export const backendTraceBaseUrl = () => {
   return window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL;
-}
-
+};
 
 export const coreAppUrl = (path: string = '') => {
   const origin = window.WEAVE_CONFIG.WANDB_BASE_URL
@@ -90,7 +89,7 @@ const DEFAULT_CONFIG: Config = {
   ANALYTICS_DISABLED: window.WEAVE_CONFIG.ANALYTICS_DISABLED,
   WANDB_BASE_URL: window.WEAVE_CONFIG.WANDB_BASE_URL,
   ENV_IS_CI: window.WEAVE_CONFIG.ENV_IS_CI,
-  TRACE_BACKEND_BASE_URL: window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL
+  TRACE_BACKEND_BASE_URL: window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL,
 } as const;
 
 let config = {...DEFAULT_CONFIG};
