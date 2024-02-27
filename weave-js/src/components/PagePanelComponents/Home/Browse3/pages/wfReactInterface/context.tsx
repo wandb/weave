@@ -11,7 +11,6 @@
 import React, {createContext, FC, useContext, useMemo} from 'react';
 
 import {useWeaveContext} from '../../../../../../context';
-import {BasicClient} from '../../../../../../core';
 import {cgWFDataModelHooks} from './cgDataModelHooks';
 import {placeholderWFDataModelHooks} from './placeholderDataModelHooks';
 import {useHasTraceServerClientContext} from './traceServerClientContext';
