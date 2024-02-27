@@ -180,9 +180,6 @@ const CallPageInnerVertical: FC<{
   call: CallSchema;
   setVerticalLayout: (vertical: boolean) => void;
 }> = ({call, setVerticalLayout}) => {
-  const {callId} = call;
-  const spanName = opNiceName(call.spanName);
-  const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   const history = useHistory();
   const showTraceTree = queryGetBoolean(history, 'tracetree', true);
@@ -191,7 +188,6 @@ const CallPageInnerVertical: FC<{
   };
   return (
     <SimplePageLayoutWithHeader
-      title={title}
       headerExtra={
         <Box
           sx={{
