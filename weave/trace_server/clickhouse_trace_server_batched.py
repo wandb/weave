@@ -334,13 +334,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     # Private Methods
     def _mint_client(self) -> CHClient:
-        return clickhouse_connect.get_client(
+        client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
             user=self._user,
             password=self._password,
-            database=self._database,
         )
+        # Safely create the database if it does not exist
+        client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
+        client.database = self._database
+        return client
 
     def __del__(self) -> None:
         self.call_insert_buffer.flush()
