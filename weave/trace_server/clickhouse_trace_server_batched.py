@@ -2,7 +2,6 @@
 
 import datetime
 import json
-import os
 import time
 import typing
 
@@ -11,7 +10,8 @@ from clickhouse_connect.driver.query import QueryResult
 import clickhouse_connect
 from pydantic import BaseModel
 
-from weave.trace_server import environment as wf_env
+from . import environment as wf_env
+from . import clickhouse_trace_server_migrator as wf_migrator
 
 from .trace_server_interface_util import (
     extract_refs_from_values,
@@ -560,189 +560,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self) -> None:
         print("Running migrations")
-        res = self.ch_client.command("SHOW TABLES")
-        if isinstance(res, str):
-            table_names = res.split("\n")
-            for table_name in table_names:
-                if not table_name.startswith("."):
-                    self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
-
-        self.ch_client.command(
-            """
-        CREATE TABLE IF NOT EXISTS
-        objects_raw (
-            entity String,
-            project String,
-            is_op UInt8,
-            name String,
-            version_hash String,
-            created_datetime DateTime64(3),
-
-            type_dict_dump String,
-            bytes_file_map Map(String, String),
-            metadata_dict_dump String,
-
-            db_row_created_at DateTime64(3) DEFAULT now64(3)
-
-        )
-        ENGINE = MergeTree
-        ORDER BY (entity, project, is_op, name, version_hash)
-        """
-        )
-
-        self.ch_client.command(
-            """
-        CREATE TABLE IF NOT EXISTS
-        objects_deduplicated (
-            entity String,
-            project String,
-            is_op UInt8,
-            name String,
-            version_hash String,
-            created_datetime SimpleAggregateFunction(min, DateTime64(3)),
-
-            type_dict_dump SimpleAggregateFunction(any, String),
-            bytes_file_map SimpleAggregateFunction(any, Map(String, String)),
-
-            # Note: if we ever want to support updates, this needs to be moved to a more robust handling
-            metadata_dict_dump SimpleAggregateFunction(any, String),
-        )
-        ENGINE = AggregatingMergeTree
-        ORDER BY (entity, project, is_op, name, version_hash)
-        """
-        )
-
-        self.ch_client.command(
-            """
-        CREATE MATERIALIZED VIEW IF NOT EXISTS objects_deduplicated_view TO objects_deduplicated
-        AS
-        SELECT
-            entity,
-            project,
-            is_op,
-            name,
-            version_hash,
-            minSimpleState(created_datetime) as created_datetime,
-
-            anySimpleState(type_dict_dump) as type_dict_dump,
-            anySimpleState(bytes_file_map) as bytes_file_map,
-            anySimpleState(metadata_dict_dump) as metadata_dict_dump
-            
-        FROM objects_raw
-        GROUP BY entity, project, is_op, name, version_hash
-        """
-        )
-
-        # The following view is just to workout version indexing and latest keys
-        self.ch_client.command(
-            """
-        CREATE VIEW IF NOT EXISTS objects_versioned
-        AS
-        SELECT
-            entity,
-            project,
-            is_op,
-            name,
-            version_hash,
-            min(objects_deduplicated.created_datetime) as created_datetime,
-            any(type_dict_dump) as type_dict_dump,
-            any(bytes_file_map) as bytes_file_map,
-            any(metadata_dict_dump) as metadata_dict_dump,
-            row_number() OVER w1 as version_index,
-            1 == count(*) OVER w1 as is_latest
-        FROM objects_deduplicated
-        GROUP BY entity, project, is_op, name, version_hash
-        WINDOW
-            w1 AS (PARTITION BY entity, project, is_op, name ORDER BY min(objects_deduplicated.created_datetime) ASC Rows BETWEEN CURRENT ROW AND 1 FOLLOWING)
-        """
-        )
-
-        self.ch_client.command(
-            """
-            CREATE TABLE IF NOT EXISTS
-            calls_raw (
-                # Identity Fields
-                entity String,
-                project String,
-                id String,
-
-                # Start Fields (All fields except parent_id are required when starting
-                # a call. However, to support a fast "update" we need to allow nulls)
-                trace_id String NULL,
-                parent_id String NULL, # This field is actually nullable
-                name String NULL,
-                start_datetime DateTime64(3) NULL,
-                attributes_dump String NULL,
-                inputs_dump String NULL,
-                input_refs Array(String), # Empty array treated as null
-
-                # End Fields (All fields are required when ending
-                # a call. However, to support a fast "update" we need to allow nulls)
-                end_datetime DateTime64(3) NULL,
-                outputs_dump String NULL,
-                summary_dump String NULL,
-                exception String NULL,
-                output_refs Array(String), # Empty array treated as null
-
-                # Bookkeeping
-                db_row_created_at DateTime64(3) DEFAULT now64(3)
-            )
-            ENGINE = MergeTree
-            ORDER BY (entity, project, id)
-        """
-        )
-        self.ch_client.command(
-            """
-            CREATE TABLE IF NOT EXISTS calls_merged
-            (
-                entity String,
-                project String,
-                id String,
-                # While these fields are all marked as null, the practical expectation
-                # is that they will be non-null except for parent_id. The problem is that
-                # clickhouse might not aggregate the data immediately, so we need to allow
-                # for nulls in the interim.
-                trace_id SimpleAggregateFunction(any, Nullable(String)),
-                parent_id SimpleAggregateFunction(any, Nullable(String)),
-                name SimpleAggregateFunction(any, Nullable(String)),
-                start_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-                attributes_dump SimpleAggregateFunction(any, Nullable(String)),
-                inputs_dump SimpleAggregateFunction(any, Nullable(String)),
-                input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
-                end_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-                outputs_dump SimpleAggregateFunction(any, Nullable(String)),
-                summary_dump SimpleAggregateFunction(any, Nullable(String)),
-                exception SimpleAggregateFunction(any, Nullable(String)),
-                output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
-            )
-            ENGINE = AggregatingMergeTree
-            ORDER BY (entity, project, id)
-        """
-        )
-        self.ch_client.command(
-            """
-            CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view TO calls_merged
-            AS
-            SELECT
-                entity,
-                project,
-                id,
-                anySimpleState(trace_id) as trace_id,
-                anySimpleState(parent_id) as parent_id,
-                anySimpleState(name) as name,
-                anySimpleState(start_datetime) as start_datetime,
-                anySimpleState(attributes_dump) as attributes_dump,
-                anySimpleState(inputs_dump) as inputs_dump,
-                array_concat_aggSimpleState(input_refs) as input_refs,
-                anySimpleState(end_datetime) as end_datetime,
-                anySimpleState(outputs_dump) as outputs_dump,
-                anySimpleState(summary_dump) as summary_dump,
-                anySimpleState(exception) as exception,
-                array_concat_aggSimpleState(output_refs) as output_refs
-            FROM calls_raw
-            GROUP BY entity, project, id
-        """
-        )
+        migrator = wf_migrator.ClickHouseTraceServerMigrator(self.ch_client)
+        migrator.apply_migrations("default")
 
     def _query(
         self,
