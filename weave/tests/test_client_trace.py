@@ -82,9 +82,6 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     exp_start_datetime = datetime.datetime.fromisoformat(
         start.start_datetime.isoformat(timespec="milliseconds")
     )
-    # TODO: Figure out why this is failing in CI
-    if os.environ.get("CI"):
-        exp_start_datetime = exp_start_datetime.replace(tzinfo=None)
 
     assert res.call.model_dump() == {
         "entity": "test_entity",
@@ -123,9 +120,6 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     exp_end_datetime = datetime.datetime.fromisoformat(
         end.end_datetime.isoformat(timespec="milliseconds")
     )
-    # TODO: Figure out why this is failing in CI
-    if os.environ.get("CI"):
-        exp_end_datetime = exp_end_datetime.replace(tzinfo=None)
 
     assert res.call.model_dump() == {
         "entity": "test_entity",
