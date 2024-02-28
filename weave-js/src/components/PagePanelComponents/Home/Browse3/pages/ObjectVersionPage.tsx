@@ -144,7 +144,6 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            Ref: <span>{refUri}</span>,
             ...((producingCalls.result?.length ?? 0) > 0
               ? {
                   [maybePluralizeWord(
