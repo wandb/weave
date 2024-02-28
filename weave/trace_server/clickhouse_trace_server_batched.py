@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+from contextlib import contextmanager
 import datetime
 import json
 import time
@@ -138,12 +139,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def __init__(
         self,
+        *,
         host: str,
         port: int = 8123,
         user: str = "default",
         password: str = "",
         database: str = "default",
-        should_batch: bool = True,
+        use_async_insert: bool = False,
     ):
         super().__init__()
         self._host = host
@@ -152,26 +154,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._password = password
         self._database = database
         self.ch_client = self._mint_client()
-        self.ch_call_insert_thread_client = self._mint_client()
-        self.ch_obj_insert_thread_client = self._mint_client()
-        self.call_insert_buffer = InMemAutoFlushingBuffer(
-            MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_call_insert_buffer
-        )
-        self.obj_insert_buffer = InMemAutoFlushingBuffer(
-            MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_obj_insert_buffer
-        )
-        self.should_batch = should_batch
+        self._flush_immediately = True
+        self._call_batch: typing.List[typing.List[typing.Any]] = []
+        self._use_async_insert = use_async_insert
 
     @classmethod
-    def from_env(cls, should_batch: bool = True) -> "ClickHouseTraceServer":
+    def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
         return cls(
-            wf_env.wf_clickhouse_host(),
-            wf_env.wf_clickhouse_port(),
-            wf_env.wf_clickhouse_user(),
-            wf_env.wf_clickhouse_pass(),
-            wf_env.wf_clickhouse_database(),
-            should_batch,
+            host=wf_env.wf_clickhouse_host(),
+            port=wf_env.wf_clickhouse_port(),
+            user=wf_env.wf_clickhouse_user(),
+            password=wf_env.wf_clickhouse_pass(),
+            database=wf_env.wf_clickhouse_database(),
+            use_async_insert=use_async_insert,
         )
+
+    @contextmanager
+    def call_batch(self) -> typing.Iterator[None]:
+        # Not thread safe - do not use across threads
+        self._flush_immediately = False
+        try:
+            yield
+            self._flush_calls()
+        finally:
+            self._call_batch = []
+            self._flush_immediately = True
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -346,46 +353,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return client
 
     def __del__(self) -> None:
-        self.call_insert_buffer.flush()
         self.ch_client.close()
-        self.ch_call_insert_thread_client.close()
 
-    def _flush_call_insert_buffer(self, buffer: typing.List) -> None:
-        buffer_len = len(buffer)
-        if buffer_len:
-            flush_id = generate_id()
-            start_time = time.time()
-            print("(" + flush_id + ") Flushing " + str(buffer_len) + " calls.")
-            self.ch_call_insert_thread_client.insert(
+    def _insert_call_batch(self, batch: typing.List) -> None:
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                settings["wait_for_async_insert"] = 0
+            self.ch_client.insert(
                 "calls_raw",
-                data=buffer,
+                data=batch,
                 column_names=all_call_insert_columns,
-            )
-            print(
-                "("
-                + flush_id
-                + ") Call flush complete in "
-                + str(time.time() - start_time)
-                + " seconds."
+                settings=settings,
             )
 
-    def _flush_obj_insert_buffer(self, buffer: typing.List) -> None:
-        buffer_len = len(buffer)
-        if buffer_len:
-            flush_id = generate_id()
-            start_time = time.time()
-            print("(" + flush_id + ") Flushing " + str(buffer_len) + " objects.")
-            self.ch_obj_insert_thread_client.insert(
+    def _insert_obj_batch(self, batch: typing.List) -> None:
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                settings["wait_for_async_insert"] = 0
+            self.ch_client.insert(
                 "objects_raw",
-                data=buffer,
+                data=batch,
                 column_names=all_obj_insert_columns,
-            )
-            print(
-                "("
-                + flush_id
-                + ") Object flush complete in "
-                + str(time.time() - start_time)
-                + " seconds."
+                settings=settings,
             )
 
     def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
@@ -592,11 +585,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         row = []
         for key in all_call_insert_columns:
             row.append(parameters.get(key, None))
+        self._call_batch.append(row)
+        if self._flush_immediately:
+            self._flush_calls()
 
-        if self.should_batch:
-            self.call_insert_buffer.insert(row=row)
-        else:
-            self._flush_call_insert_buffer([row])
+    def _flush_calls(self) -> None:
+        self._insert_call_batch(self._call_batch)
+        self._call_batch = []
 
     def _insert_obj(self, ch_obj: ObjCHInsertable) -> None:
         parameters = ch_obj.model_dump()
@@ -604,10 +599,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for key in all_obj_insert_columns:
             row.append(parameters.get(key, None))
 
-        if self.should_batch:
-            self.obj_insert_buffer.insert(row=row)
-        else:
-            self._flush_obj_insert_buffer([row])
+        self._insert_obj_batch([row])
 
 
 def _dict_value_to_dump(

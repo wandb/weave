@@ -32,7 +32,9 @@ def clickhouse_server():
 @pytest.fixture(scope="session")
 def clickhouse_trace_server(clickhouse_server):
     clickhouse_trace_server = (
-        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(False)
+        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
+            use_async_insert=False
+        )
     )
     clickhouse_trace_server._run_migrations()
     yield clickhouse_trace_server
