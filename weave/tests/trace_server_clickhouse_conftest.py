@@ -4,7 +4,6 @@ import pytest
 
 import subprocess
 import time
-import typing
 import requests
 import urllib
 

@@ -3,7 +3,6 @@
 from contextlib import contextmanager
 import datetime
 import json
-import time
 import typing
 
 from clickhouse_connect.driver.client import Client as CHClient
@@ -23,7 +22,6 @@ from .trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
-from .flushing_buffer import InMemAutoFlushingBuffer, InMemFlushableBuffer
 
 
 MAX_FLUSH_COUNT = 10000
@@ -135,7 +133,6 @@ required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     ch_client: CHClient
-    call_insert_buffer: InMemFlushableBuffer
 
     def __init__(
         self,
