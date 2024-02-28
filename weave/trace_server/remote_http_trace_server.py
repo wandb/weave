@@ -1,4 +1,3 @@
-import json
 import typing as t
 from pydantic import BaseModel
 import requests
@@ -39,10 +38,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_buffer = InMemAutoFlushingBuffer(
                 MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_calls
             )
+        self._auth: t.Optional[t.Tuple[str, str]] = None
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
         return cls(wf_env.wf_trace_server_url())
+
+    def set_auth(self, auth: t.Tuple[str, str]) -> None:
+        self._auth = auth
 
     def _flush_calls(self, batch: t.List) -> None:
         if len(batch) == 0:
@@ -51,6 +54,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=data.encode("utf-8"),
+            auth=self._auth,
         )
         r.raise_for_status()
 
@@ -64,7 +68,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if isinstance(req, dict):
             req = req_model.model_validate(req)
         r = requests.post(
-            self.trace_server_url + url, data=req.model_dump_json().encode("utf-8")
+            self.trace_server_url + url,
+            data=req.model_dump_json().encode("utf-8"),
+            auth=self._auth,
         )
         r.raise_for_status()
         return res_model.model_validate(r.json())

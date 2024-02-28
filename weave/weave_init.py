@@ -72,13 +72,19 @@ def init_local() -> InitializedClient:
 
 
 def init_trace_remote(project_name: str) -> InitializedClient:
+    from . import wandb_api
+
     entity_name, project_name = get_entity_project_from_project_name(project_name)
 
+    remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env()
+    wandb_context = wandb_api.get_wandb_api_context()
+    if wandb_context is not None and wandb_context.api_key is not None:
+        remote_server.set_auth(("api", wandb_context.api_key))
+
     client = graph_client_trace.GraphClientTraceWithArtifactStorage(
-        entity_name,
-        project_name,
-        remote_http_trace_server.RemoteHTTPTraceServer.from_env(),
+        entity_name, project_name, remote_server
     )
+
     init_client = InitializedClient(client)
 
     # autopatching is only supporte for the wandb client, because OpenAI calls are not
