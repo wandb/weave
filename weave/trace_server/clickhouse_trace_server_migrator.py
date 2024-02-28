@@ -62,18 +62,20 @@ class ClickHouseTraceServerMigrator:
         query = f"""
             SELECT {select_columns} FROM db_management.migrations WHERE db_name = '{db_name}'
         """
-        res = self.ch_client.query_df(query)
-        if res is None or len(res) == 0:
+        res = self.ch_client.query(query)
+        result_rows = res.result_rows
+        if res is None or len(result_rows) == 0:
             self.ch_client.insert(
                 "db_management.migrations",
                 data=[[db_name, 0, None]],
                 column_names=column_names,
             )
-        res = self.ch_client.query_df(query)
-        if res is None or len(res) == 0:
+        res = self.ch_client.query(query)
+        result_rows = res.result_rows
+        if res is None or len(result_rows) == 0:
             raise Exception("Migration table not found")
 
-        return res.iloc[0].to_dict()
+        return dict(zip(column_names, result_rows[0]))
 
     def _get_migrations(
         self,
