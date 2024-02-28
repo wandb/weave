@@ -5,6 +5,7 @@ declare global {
       ANALYTICS_DISABLED: boolean;
       WEAVE_BACKEND_HOST: string;
       ONPREM: boolean;
+      TRACE_BACKEND_BASE_URL: string;
       WANDB_BASE_URL: string;
       DD_ENV: string;
       ENV_IS_CI: boolean;
@@ -19,6 +20,7 @@ if (!window.WEAVE_CONFIG) {
     ANALYTICS_DISABLED: false,
     ONPREM: false,
     WEAVE_BACKEND_HOST: '/__weave',
+    TRACE_BACKEND_BASE_URL: '',
     WANDB_BASE_URL: 'https://api.wandb.ai',
     DD_ENV: '',
     ENV_IS_CI: false,
@@ -31,6 +33,7 @@ interface Config {
   ONPREM: boolean;
   PREFIX: string;
   WANDB_BASE_URL: string;
+  TRACE_BACKEND_BASE_URL: string;
   ENV_IS_CI: boolean;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
@@ -53,6 +56,10 @@ const backendWeaveOpsUrl = () => {
 
 const backendWeaveViewerUrl = () => {
   return WEAVE_BACKEND_HOST + '/wb_viewer';
+};
+
+export const backendTraceBaseUrl = () => {
+  return window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL;
 };
 
 export const coreAppUrl = (path: string = '') => {
@@ -82,6 +89,7 @@ const DEFAULT_CONFIG: Config = {
   ANALYTICS_DISABLED: window.WEAVE_CONFIG.ANALYTICS_DISABLED,
   WANDB_BASE_URL: window.WEAVE_CONFIG.WANDB_BASE_URL,
   ENV_IS_CI: window.WEAVE_CONFIG.ENV_IS_CI,
+  TRACE_BACKEND_BASE_URL: window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL,
 } as const;
 
 let config = {...DEFAULT_CONFIG};

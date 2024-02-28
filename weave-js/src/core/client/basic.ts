@@ -223,6 +223,10 @@ export class BasicClient implements Client {
     return Promise.resolve();
   }
 
+  public isWeavePythonBackend(): boolean {
+    return this.isRemoteServer;
+  }
+
   private scheduleRequest() {
     if (this.nextRequestTimer != null) {
       clearTimeout(this.nextRequestTimer);

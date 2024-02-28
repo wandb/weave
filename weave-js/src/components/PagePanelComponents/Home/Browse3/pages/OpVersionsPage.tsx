@@ -7,8 +7,6 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {opCount} from '../../../../../core';
-import {useNodeValue} from '../../../../../react';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {CategoryChip} from './common/CategoryChip';
@@ -17,13 +15,9 @@ import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyOpCategory} from './wfInterface/types';
-import {
-  callsNode,
-  opVersionKeyToRefUri,
-  OpVersionSchema,
-  useOpVersions,
-  useOpVersionsNode,
-} from './wfReactInterface/interface';
+import {useWFHooks} from './wfReactInterface/context';
+import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
+import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
 
 export type WFHighLevelOpVersionFilter = {
   opCategory?: HackyOpCategory | null;
@@ -81,6 +75,7 @@ export const FilterableOpVersionsTable: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
+  const {useOpVersions} = useWFHooks();
   const effectiveFilter = useMemo(() => {
     return {...props.initialFilter, ...props.frozenFilter};
   }, [props.initialFilter, props.frozenFilter]);
@@ -206,11 +201,23 @@ export const FilterableOpVersionsTable: React.FC<{
 };
 
 const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
+  const {useOpVersions} = useWFHooks();
   const obj = props.obj;
-  const opVersionsNode = useOpVersionsNode(obj.entity, obj.project, {
-    opIds: [obj.opId],
-  });
-  const countValue = useNodeValue(opCount({arr: opVersionsNode}));
+  // Here, we really just want to know the count - and it should be calculated
+  // by the server, not by the client. This is a performance optimization. In
+  // the meantime we will just fetch the first 100 versions and display 99+ if
+  // there are at least 100. Someone can come back and add `count` to the 3
+  // query APIs which will make this faster.
+  const ops = useOpVersions(
+    obj.entity,
+    obj.project,
+    {
+      opIds: [obj.opId],
+    },
+    100
+  );
+  const versionCount = ops?.result?.length ?? 0;
+
   return (
     <OpVersionsLink
       entity={obj.entity}
@@ -218,7 +225,8 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
       filter={{
         opName: obj.opId,
       }}
-      versionCount={countValue.result ?? 0}
+      versionCount={Math.min(versionCount, 99)}
+      countIsLimited={versionCount === 100}
       neverPeek
       variant="secondary"
     />
@@ -226,13 +234,26 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
 };
 
 const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
+  const {useCalls} = useWFHooks();
+
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
-  const node = callsNode(obj.entity, obj.project, {
-    opVersionRefs: [refUri],
-  });
-  const countVal = useNodeValue(opCount({arr: node}));
-  const callCount = countVal?.result ?? 0;
+
+  // Here, we really just want to know the count - and it should be calculated
+  // by the server, not by the client. This is a performance optimization. In
+  // the meantime we will just fetch the first 100 versions and display 99+ if
+  // there are at least 100. Someone can come back and add `count` to the 3
+  // query APIs which will make this faster.
+  const calls = useCalls(
+    obj.entity,
+    obj.project,
+    {
+      opVersionRefs: [refUri],
+    },
+    100
+  );
+
+  const callCount = calls?.result?.length ?? 0;
 
   if (callCount === 0) {
     return null;
@@ -242,7 +263,8 @@ const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
       neverPeek
       entity={obj.entity}
       project={obj.project}
-      callCount={callCount}
+      callCount={Math.min(callCount, 99)}
+      countIsLimited={callCount === 100}
       filter={{
         opVersionRefs: [refUri],
       }}

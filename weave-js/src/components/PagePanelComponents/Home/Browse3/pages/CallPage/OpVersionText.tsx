@@ -5,15 +5,14 @@
 import React from 'react';
 
 import {opNiceName} from '../common/Links';
-import {
-  refUriToOpVersionKey,
-  useOpVersion,
-} from '../wfReactInterface/interface';
+import {useWFHooks} from '../wfReactInterface/context';
+import {refUriToOpVersionKey} from '../wfReactInterface/utilities';
 
 const useOpVersionText = (
   opVersionRef: string | null,
   spanName: string
 ): string => {
+  const {useOpVersion} = useWFHooks();
   const opVersion = useOpVersion(
     opVersionRef ? refUriToOpVersionKey(opVersionRef) : null
   );

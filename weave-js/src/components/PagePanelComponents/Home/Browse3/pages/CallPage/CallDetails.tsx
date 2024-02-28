@@ -12,12 +12,11 @@ import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
-import {
-  CallSchema,
-  useCalls,
-  useParentCall,
-} from '../wfReactInterface/interface';
+import {useWFHooks} from '../wfReactInterface/context';
+import {useParentCall} from '../wfReactInterface/utilities';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ButtonOverlay} from './ButtonOverlay';
+import {ObjectViewerSection} from './ObjectViewerSection';
 import {OpVersionText} from './OpVersionText';
 
 const Heading = styled.div`
@@ -56,6 +55,8 @@ export const CallSchemaLink = ({call}: {call: CallSchema}) => {
 export const CallDetails: FC<{
   call: CallSchema;
 }> = ({call}) => {
+  const {useCalls} = useWFHooks();
+
   const parentCall = useParentCall(call);
   const {inputs, output} = useMemo(
     () => getDisplayInputsAndOutput(call),
@@ -103,13 +104,7 @@ export const CallDetails: FC<{
               flex: '0 0 auto',
               p: 2,
             }}>
-            <KeyValueTable
-              headerTitle="Inputs"
-              data={
-                // TODO: Consider bringing back openai chat input/output
-                inputs
-              }
-            />
+            <ObjectViewerSection title="Inputs" data={inputs} />
           </Box>
         )}
         {Object.keys(output).length > 0 && (
@@ -118,13 +113,7 @@ export const CallDetails: FC<{
               flex: '0 0 auto',
               p: 2,
             }}>
-            <KeyValueTable
-              headerTitle="Output"
-              data={
-                // TODO: Consider bringing back openai chat input/output
-                output
-              }
-            />
+            <ObjectViewerSection title="Outputs" data={output} />
           </Box>
         )}
         {multipleChildCallOpRefs.map(opVersionRef => {
@@ -201,7 +190,8 @@ export const CallDetails: FC<{
           );
         })}
         {childCalls.loading && <CenteredAnimatedLoader />}
-        {singularChildCalls.length > 0 && (
+        {/* Disabling display of singular children while we decide if we want them here. */}
+        {false && singularChildCalls.length > 0 && (
           <Box
             sx={{
               flex: '0 0 auto',

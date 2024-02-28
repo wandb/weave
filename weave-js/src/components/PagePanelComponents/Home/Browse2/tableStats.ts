@@ -136,16 +136,31 @@ export const getInputColumns = (tableStats: TableStats): string[] => {
 export const getBoringColumns = (tableStats: TableStats): string[] => {
   const columns = Object.keys(tableStats.column);
   const boring: string[] = [];
+  if (tableStats.rowCount < 2) {
+    // Would be confusing to have "common" values when there is only one row.
+    return [];
+  }
+  const allNull = new Set<string>();
   for (const col of columns) {
     if (col.startsWith('output.')) {
       // For now, output is always interesting
       continue;
     }
-    const {valueCounts} = tableStats.column[col];
+    const {typeCounts, valueCounts} = tableStats.column[col];
     const values = Object.values(valueCounts);
     if (values.length === 1 && values[0] === tableStats.rowCount) {
       boring.push(col);
+      if (typeCounts.null === tableStats.rowCount) {
+        allNull.add(col);
+      }
     }
   }
+
+  // Special case - leave status in the table if it is the only boring column
+  // we would show.
+  if (boring.every(col => col === 'status_code' || allNull.has(col))) {
+    return [];
+  }
+
   return boring;
 };

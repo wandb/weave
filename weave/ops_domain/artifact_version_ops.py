@@ -201,6 +201,13 @@ gql_prop_op(
     "artifactVersion-fileCount",
     wdt.ArtifactVersionType,
     "fileCount",
+    types.Int(),
+)
+
+gql_prop_op(
+    "artifactVersion-isGenerated",
+    wdt.ArtifactVersionType,
+    "isGenerated",
     types.Boolean(),
 )
 

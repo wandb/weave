@@ -4,11 +4,9 @@ import styled from 'styled-components';
 import {CategoryChip} from '../common/CategoryChip';
 import {CallId, opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
-import {
-  CallSchema,
-  refUriToOpVersionKey,
-  useOpVersion,
-} from '../wfReactInterface/interface';
+import {useWFHooks} from '../wfReactInterface/context';
+import {refUriToOpVersionKey} from '../wfReactInterface/utilities';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const Overview = styled.div`
   display: flex;
@@ -20,9 +18,9 @@ Overview.displayName = 'S.Overview';
 
 export const CallName = styled.div`
   font-family: Source Sans Pro;
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 32px;
   letter-spacing: 0px;
   text-align: left;
 `;
@@ -31,6 +29,8 @@ CallName.displayName = 'S.CallName';
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
+  const {useOpVersion} = useWFHooks();
+
   const opName = opNiceName(call.spanName);
   const truncatedId = call.callId.slice(-4);
 

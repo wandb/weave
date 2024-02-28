@@ -21,10 +21,10 @@ import {
   opNumberMult,
   opOr,
   opPick,
-  opProjectRun,
+  // opProjectRun,
   opRefToUri,
-  opRootProject,
-  opRunHistory3,
+  // opRootProject,
+  // opRunHistory3,
   opStringEndsWith,
   opStringEqual,
   opStringStartsWith,
@@ -37,6 +37,10 @@ import {
 import * as _ from 'lodash';
 
 import {WILDCARD_ARTIFACT_VERSION_AND_PATH} from '../Browse3/pages/wfReactInterface/constants';
+import {
+  RawSpanFromStreamTableEra,
+  RawSpanFromStreamTableEraWithFeedback,
+} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 
 export interface StreamId {
   entityName: string;
@@ -54,24 +58,9 @@ export interface CallFilter {
   callIds?: string[];
 }
 
-export interface Call {
-  name: string;
-  inputs: {_keys?: string[]; [key: string]: any};
-  output: undefined | {_keys?: string[]; [key: string]: any};
-  status_code: string; // TODO enum
-  exception?: string;
-  attributes: {[key: string]: any};
-  summary: {latency_s: number; [key: string]: any};
-  span_id: string;
-  trace_id: string;
-  parent_id: string;
-  timestamp: number;
-  start_time_ms: number;
-  end_time_ms: number;
-}
-
+export type Call = RawSpanFromStreamTableEra;
 export type Span = Call;
-export type SpanWithFeedback = Span & {feedback?: any};
+export type SpanWithFeedback = RawSpanFromStreamTableEraWithFeedback;
 
 export interface TraceSpan {
   traceId: string;
@@ -124,22 +113,24 @@ const callsTableWeaveType: Type = {
 };
 
 export const callsTableNode = (streamId: StreamId) => {
-  // Going straight to the opRunHistory call saves about 1 second per request in lookup time
-  // const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
-  // const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
-  //   stream_table: opGet({
-  //     uri: constString(predsRefStr),
-  //   }),
-  // }) as Node;
-  const streamTableRowsNode = opRunHistory3({
-    run: opProjectRun({
-      project: opRootProject({
-        entityName: constString(streamId.entityName),
-        projectName: constString(streamId.projectName),
-      }),
-      runName: constString(streamId.streamName),
+  const predsRefStr = `wandb-artifact:///${streamId.entityName}/${streamId.projectName}/${streamId.streamName}:latest/obj`;
+  const streamTableRowsNode = callOpVeryUnsafe('stream_table-rows', {
+    stream_table: opGet({
+      uri: constString(predsRefStr),
     }),
-  });
+  }) as Node;
+  // Going straight to the opRunHistory call saves about 1 second per request in
+  // lookup time, but does not have the correct types, resulting in backend
+  // errors or missing data until compaction.
+  // const streamTableRowsNode = opRunHistory3({
+  //   run: opProjectRun({
+  //     project: opRootProject({
+  //       entityName: constString(streamId.entityName),
+  //       projectName: constString(streamId.projectName),
+  //     }),
+  //     runName: constString(streamId.streamName),
+  //   }),
+  // });
   streamTableRowsNode.type = callsTableWeaveType;
   return streamTableRowsNode;
 };

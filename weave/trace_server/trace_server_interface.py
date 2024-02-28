@@ -152,9 +152,10 @@ class CallsQueryReq(BaseModel):
     entity: str
     project: str
     filter: typing.Optional[_CallsFilter] = None
+    limit: typing.Optional[int] = None
 
 
-class CallQueryRes(BaseModel):
+class CallsQueryRes(BaseModel):
     calls: typing.List[CallSchema]
 
 
@@ -243,7 +244,7 @@ class TraceServerInterface:
         ...
 
     @abc.abstractmethod
-    def calls_query(self, req: CallsQueryReq) -> CallQueryRes:
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         ...
 
     # Op API

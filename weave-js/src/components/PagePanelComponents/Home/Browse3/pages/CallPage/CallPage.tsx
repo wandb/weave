@@ -46,10 +46,12 @@ import {
 } from '../common/SimplePageLayout';
 import {CallStatusType, StatusChip} from '../common/StatusChip';
 import {truncateID} from '../util';
-import {CallSchema, useCall, useCalls} from '../wfReactInterface/interface';
+import {useWFHooks} from '../wfReactInterface/context';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
+import {CursorBox} from './CursorBox';
 
 // % of screen to give the trace view in horizontal mode
 const TRACE_PCT = 40;
@@ -62,6 +64,8 @@ export const CallPage: FC<{
   project: string;
   callId: string;
 }> = props => {
+  const {useCall} = useWFHooks();
+
   const call = useCall({
     entity: props.entity,
     project: props.project,
@@ -177,9 +181,6 @@ const CallPageInnerVertical: FC<{
   call: CallSchema;
   setVerticalLayout: (vertical: boolean) => void;
 }> = ({call, setVerticalLayout}) => {
-  const {callId} = call;
-  const spanName = opNiceName(call.spanName);
-  const title = `${spanName} (${truncateID(callId)})`;
   const callTabs = useCallTabs(call);
   const history = useHistory();
   const showTraceTree = queryGetBoolean(history, 'tracetree', true);
@@ -188,7 +189,6 @@ const CallPageInnerVertical: FC<{
   };
   return (
     <SimplePageLayoutWithHeader
-      title={title}
       headerExtra={
         <Box
           sx={{
@@ -471,13 +471,6 @@ const INSET_SPACING = 54;
 const TREE_COLOR = '#aaaeb2';
 const BORDER_STYLE = `1px solid ${TREE_COLOR}`;
 
-// MUI Box doesn't support cursor
-// https://github.com/mui/material-ui/issues/19983
-const CursorBox = styled(Box)<{$isClickable: boolean}>`
-  cursor: ${p => (p.$isClickable ? 'pointer' : 'default')};
-`;
-CursorBox.displayName = 'S.CursorBox';
-
 /**
  * Utility component to render the grouping cell for the trace tree.
  * Most of the work here is to rendering the tree structure (i.e. the
@@ -756,6 +749,7 @@ type CountRow = {
 };
 type Row = CallRow | CountRow;
 const useCallFlattenedTraceTree = (call: CallSchema) => {
+  const {useCalls} = useWFHooks();
   const traceCalls = useCalls(call.entity, call.project, {
     traceId: call.traceId,
   });

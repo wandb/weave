@@ -17,10 +17,11 @@ import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
 import {Browse2} from './components/PagePanelComponents/Home/Browse2';
 import {Browse3} from './components/PagePanelComponents/Home/Browse3';
+import {OptionalTraceServerClientContextProvider} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
-import getConfig from './config';
+import getConfig, {backendTraceBaseUrl} from './config';
 import {
   useIsAuthenticated,
   WeaveViewerContextProvider,
@@ -142,15 +143,18 @@ const BrowseWrapper: FC = props => (
   <React.Suspense fallback="loading">
     <ErrorBoundary>
       <NotebookComputeGraphContextProvider>
-        <StateInspector name="WeaveApp">
-          <PanelRootContextProvider>
-            <WeaveViewerContextProvider>
-              <PanelInteractContextProvider>
-                {props.children}
-              </PanelInteractContextProvider>
-            </WeaveViewerContextProvider>
-          </PanelRootContextProvider>
-        </StateInspector>
+        <OptionalTraceServerClientContextProvider
+          baseUrl={backendTraceBaseUrl()}>
+          <StateInspector name="WeaveApp">
+            <PanelRootContextProvider>
+              <WeaveViewerContextProvider>
+                <PanelInteractContextProvider>
+                  {props.children}
+                </PanelInteractContextProvider>
+              </WeaveViewerContextProvider>
+            </PanelRootContextProvider>
+          </StateInspector>
+        </OptionalTraceServerClientContextProvider>
       </NotebookComputeGraphContextProvider>
     </ErrorBoundary>
   </React.Suspense>

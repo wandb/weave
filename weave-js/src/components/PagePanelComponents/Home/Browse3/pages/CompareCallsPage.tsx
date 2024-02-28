@@ -3,17 +3,7 @@ import {Autocomplete} from '@mui/material';
 import _ from 'lodash';
 import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 
-import {
-  constBoolean,
-  constFunction,
-  constString,
-  opArray,
-  opJoin,
-  opPick,
-  typedDict,
-} from '../../../../../core';
-import {parseRef, useNodeValue} from '../../../../../react';
-import {Span} from '../../Browse2/callTree';
+import {parseRef} from '../../../../../react';
 import {objectRefDisplayName} from '../../Browse2/SmallRef';
 import {
   getValueAtNestedKey,
@@ -21,7 +11,7 @@ import {
   WFHighLevelPivotSpec,
 } from './CallsPage/PivotRunsTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {callsNode, spanToCallSchema} from './wfReactInterface/interface';
+import {useWFHooks} from './wfReactInterface/context';
 
 export const CompareCallsPage: FC<{
   entity: string;
@@ -30,6 +20,10 @@ export const CompareCallsPage: FC<{
   primaryDim?: string;
   secondaryDim?: string;
 }> = props => {
+  const {
+    useCalls,
+    derived: {useChildCallsForCompare},
+  } = useWFHooks();
   const [selectedOpVersionRef, setSelectedOpVersionRef] = useState<
     string | null
   >(null);
@@ -38,40 +32,40 @@ export const CompareCallsPage: FC<{
     string | null
   >(null);
 
-  const {loading, result: subRuns} = useSubRunsFromWeaveQuery(
+  const {loading, result: childRunsFilteredToOpVersion} =
+    useChildCallsForCompare(
+      props.entity,
+      props.project,
+      props.callIds ?? [],
+      selectedOpVersionRef,
+      selectedObjectVersionRef
+    );
+
+  const parentCallsValue = useCalls(
     props.entity,
     props.project,
-    props.callIds,
-    props.secondaryDim,
-    selectedOpVersionRef,
-    selectedObjectVersionRef
+    {
+      parentIds: props.callIds ?? [],
+    },
+    undefined,
+    {
+      skip: !props.callIds,
+    }
   );
-
-  const childRunsFilteredToOpVersion = useMemo(() => {
-    return subRuns.map(subRun => {
-      return spanToCallSchema(props.entity, props.project, subRun.child);
-    });
-  }, [props.entity, props.project, subRuns]);
-
-  const parentCallChildCallsNode = callsNode(props.entity, props.project, {
-    parentIds: props.callIds ?? [],
-  });
-  const parentCallsValue = useNodeValue(parentCallChildCallsNode, {
-    skip: !props.callIds,
-  });
 
   const objectVersionOptions = useMemo(() => {
     if (
       props.secondaryDim == null ||
       parentCallsValue.loading ||
+      parentCallsValue.result == null ||
       parentCallsValue.result.length === 0
     ) {
       return {};
     }
     return Object.fromEntries(
       _.uniq(
-        parentCallsValue.result.map((parent: Span) =>
-          getValueAtNestedKey(parent, props.secondaryDim!)
+        parentCallsValue.result.map(parent =>
+          getValueAtNestedKey(parent.rawSpan, props.secondaryDim!)
         )
       )
         .filter(item => item != null)
@@ -99,11 +93,15 @@ export const CompareCallsPage: FC<{
   }, [initialSelectedObjectVersionRef, selectedObjectVersionRef]);
 
   const subOpVersionOptions = useMemo(() => {
-    if (parentCallsValue.loading || parentCallsValue.result.length === 0) {
+    if (
+      parentCallsValue.loading ||
+      parentCallsValue.result == null ||
+      parentCallsValue.result.length === 0
+    ) {
       return {};
     }
     const uniqueOpRefs = _.uniq(
-      parentCallsValue.result.map((r: any) => r.name) as string[]
+      parentCallsValue.result.map(r => r.rawSpan.name) as string[]
     );
     return Object.fromEntries(
       uniqueOpRefs.map(opRef => {
@@ -174,7 +172,7 @@ export const CompareCallsPage: FC<{
     return (
       <PivotRunsView
         loading={loading}
-        runs={childRunsFilteredToOpVersion}
+        runs={childRunsFilteredToOpVersion ?? []}
         entity={props.entity}
         project={props.project}
         colDimAtLeafMode
@@ -280,54 +278,4 @@ export const CompareCallsPage: FC<{
       ]}
     />
   );
-};
-
-const useSubRunsFromWeaveQuery = (
-  entity: string,
-  project: string,
-  parentCallIds: string[] | undefined,
-  secondaryDim: string | undefined,
-  selectedOpVersionRef: string | null,
-  selectedObjectVersionRef: string | null
-): {
-  loading: boolean;
-  result: Array<{
-    parent: Span;
-    child: Span;
-  }>;
-} => {
-  const parentRunsNode = selectedObjectVersionRef
-    ? callsNode(entity, project, {
-        callIds: parentCallIds,
-        inputObjectVersionRefs: [selectedObjectVersionRef],
-      })
-    : opArray({} as any);
-  const childRunsNode = selectedOpVersionRef
-    ? callsNode(entity, project, {
-        opVersionRefs: [selectedOpVersionRef],
-      })
-    : opArray({} as any);
-  const joinedRuns = opJoin({
-    arr1: parentRunsNode,
-    arr2: childRunsNode,
-    join1Fn: constFunction({row: typedDict({span_id: 'string'})}, ({row}) => {
-      return opPick({obj: row, key: constString('span_id')});
-    }) as any,
-    join2Fn: constFunction({row: typedDict({parent_id: 'string'})}, ({row}) => {
-      return opPick({obj: row, key: constString('parent_id')});
-    }) as any,
-    alias1: constString('parent'),
-    alias2: constString('child'),
-    leftOuter: constBoolean(true),
-    rightOuter: constBoolean(false),
-  });
-  const nodeValue = useNodeValue(joinedRuns, {
-    skip: !selectedObjectVersionRef || !selectedOpVersionRef,
-  });
-  return useMemo(() => {
-    return {
-      loading: nodeValue.loading,
-      result: nodeValue.result ?? [],
-    };
-  }, [nodeValue.loading, nodeValue.result]);
 };

@@ -6,3 +6,11 @@ export const LIST_INDEX_EDGE_TYPE = 'ndx';
 export const OBJECT_ATTRIBUTE_EDGE_TYPE = 'atr';
 export const TABLE_ROW_EDGE_TYPE = 'row';
 export const TABLE_COLUMN_EDGE_TYPE = 'col';
+export const OP_CATEGORIES = [
+  'train',
+  'predict',
+  'score',
+  'evaluate',
+  'tune',
+] as const;
+export const OBJECT_CATEGORIES = ['model', 'dataset'] as const;

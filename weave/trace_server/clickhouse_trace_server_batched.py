@@ -1,9 +1,8 @@
 # Clickhouse Trace Server
 
+from contextlib import contextmanager
 import datetime
 import json
-import os
-import time
 import typing
 
 from clickhouse_connect.driver.client import Client as CHClient
@@ -11,18 +10,18 @@ from clickhouse_connect.driver.query import QueryResult
 import clickhouse_connect
 from pydantic import BaseModel
 
-from weave.trace_server import environment as wf_env
+from . import environment as wf_env
+from . import clickhouse_trace_server_migrator as wf_migrator
 
 from .trace_server_interface_util import (
-    ARTIFACT_REF_SCHEME,
-    TRACE_REF_SCHEME,
+    extract_refs_from_values,
     decode_b64_to_bytes,
     encode_bytes_as_b64,
     generate_id,
     version_hash_for_object,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
-from .flushing_buffer import InMemAutoFlushingBuffer, InMemFlushableBuffer
 
 
 MAX_FLUSH_COUNT = 10000
@@ -134,41 +133,49 @@ required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     ch_client: CHClient
-    call_insert_buffer: InMemFlushableBuffer
 
     def __init__(
         self,
+        *,
         host: str,
         port: int = 8123,
         user: str = "default",
         password: str = "",
-        should_batch: bool = True,
+        database: str = "default",
+        use_async_insert: bool = False,
     ):
         super().__init__()
         self._host = host
         self._port = port
         self._user = user
         self._password = password
+        self._database = database
         self.ch_client = self._mint_client()
-        self.ch_call_insert_thread_client = self._mint_client()
-        self.ch_obj_insert_thread_client = self._mint_client()
-        self.call_insert_buffer = InMemAutoFlushingBuffer(
-            MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_call_insert_buffer
-        )
-        self.obj_insert_buffer = InMemAutoFlushingBuffer(
-            MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_obj_insert_buffer
-        )
-        self.should_batch = should_batch
+        self._flush_immediately = True
+        self._call_batch: typing.List[typing.List[typing.Any]] = []
+        self._use_async_insert = use_async_insert
 
     @classmethod
-    def from_env(cls, should_batch: bool = True) -> "ClickHouseTraceServer":
+    def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
         return cls(
-            wf_env.wf_clickhouse_host(),
-            wf_env.wf_clickhouse_port(),
-            wf_env.wf_clickhouse_user(),
-            wf_env.wf_clickhouse_pass(),
-            should_batch,
+            host=wf_env.wf_clickhouse_host(),
+            port=wf_env.wf_clickhouse_port(),
+            user=wf_env.wf_clickhouse_user(),
+            password=wf_env.wf_clickhouse_pass(),
+            database=wf_env.wf_clickhouse_database(),
+            use_async_insert=use_async_insert,
         )
+
+    @contextmanager
+    def call_batch(self) -> typing.Iterator[None]:
+        # Not thread safe - do not use across threads
+        self._flush_immediately = False
+        try:
+            yield
+            self._flush_calls()
+        finally:
+            self._call_batch = []
+            self._flush_immediately = True
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -204,16 +211,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Return the marshaled response
         return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
 
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallQueryRes:
+    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         conditions = []
-        parameters = {}
+        parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
             if req.filter.op_version_refs:
+                # We will build up (0 or 1) + N conditions for the op_version_refs
+                # If there are any non-wildcarded names, then we at least have an IN condition
+                # If there are any wildcarded names, then we have a LIKE condition for each
+
+                or_conditions: typing.List[str] = []
+
+                non_wildcarded_names: typing.List[str] = []
+                wildcarded_names: typing.List[str] = []
                 for name in req.filter.op_version_refs:
-                    if "*" in name:
-                        raise NotImplementedError("Wildcard not yet supported")
-                conditions.append("name IN {names: Array(String)}")
-                parameters["names"] = req.filter.op_version_refs
+                    if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                        wildcarded_names.append(name)
+                    else:
+                        non_wildcarded_names.append(name)
+
+                if non_wildcarded_names:
+                    or_conditions.append(
+                        "name IN {non_wildcarded_names: Array(String)}"
+                    )
+                    parameters["non_wildcarded_names"] = non_wildcarded_names
+
+                for name_ndx, name in enumerate(wildcarded_names):
+                    param_name = "wildcarded_name_" + str(name_ndx)
+                    or_conditions.append("name LIKE {" + param_name + ": String}")
+                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
+                    parameters[param_name] = like_name
+
+                if or_conditions:
+                    conditions.append("(" + " OR ".join(or_conditions) + ")")
 
             if req.filter.input_object_version_refs:
                 parameters["input_refs"] = req.filter.input_object_version_refs
@@ -243,9 +273,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.project,
             conditions=conditions,
             parameters=parameters,
+            limit=req.limit,
         )
         calls = [_ch_call_to_call_schema(call) for call in ch_calls]
-        return tsi.CallQueryRes(calls=calls)
+        return tsi.CallsQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj, is_op=True)
@@ -307,51 +338,44 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     # Private Methods
     def _mint_client(self) -> CHClient:
-        return clickhouse_connect.get_client(
-            host=self._host, port=self._port, user=self._user, password=self._password
+        client = clickhouse_connect.get_client(
+            host=self._host,
+            port=self._port,
+            user=self._user,
+            password=self._password,
         )
+        # Safely create the database if it does not exist
+        client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
+        client.database = self._database
+        return client
 
     def __del__(self) -> None:
-        self.call_insert_buffer.flush()
         self.ch_client.close()
-        self.ch_call_insert_thread_client.close()
 
-    def _flush_call_insert_buffer(self, buffer: typing.List) -> None:
-        buffer_len = len(buffer)
-        if buffer_len:
-            flush_id = generate_id()
-            start_time = time.time()
-            print("(" + flush_id + ") Flushing " + str(buffer_len) + " calls.")
-            self.ch_call_insert_thread_client.insert(
+    def _insert_call_batch(self, batch: typing.List) -> None:
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                settings["wait_for_async_insert"] = 0
+            self.ch_client.insert(
                 "calls_raw",
-                data=buffer,
+                data=batch,
                 column_names=all_call_insert_columns,
-            )
-            print(
-                "("
-                + flush_id
-                + ") Call flush complete in "
-                + str(time.time() - start_time)
-                + " seconds."
+                settings=settings,
             )
 
-    def _flush_obj_insert_buffer(self, buffer: typing.List) -> None:
-        buffer_len = len(buffer)
-        if buffer_len:
-            flush_id = generate_id()
-            start_time = time.time()
-            print("(" + flush_id + ") Flushing " + str(buffer_len) + " objects.")
-            self.ch_obj_insert_thread_client.insert(
+    def _insert_obj_batch(self, batch: typing.List) -> None:
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                settings["wait_for_async_insert"] = 0
+            self.ch_client.insert(
                 "objects_raw",
-                data=buffer,
+                data=batch,
                 column_names=all_obj_insert_columns,
-            )
-            print(
-                "("
-                + flush_id
-                + ") Object flush complete in "
-                + str(time.time() - start_time)
-                + " seconds."
+                settings=settings,
             )
 
     def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
@@ -403,6 +427,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for col in columns:
             if col in ["entity", "project", "id"]:
                 merged_cols.append(f"{col} AS {col}")
+            elif col in ["input_refs", "output_refs"]:
+                merged_cols.append(f"array_concat_agg({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
@@ -412,21 +438,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         conditions_part = " AND ".join(conditions)
 
-        order_by_part = ""
-        if order_by != None:
-            order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
-            for field, direction in order_by:
-                assert (
-                    field in all_call_select_columns
-                ), f"Invalid order_by field: {field}"
-                assert direction in [
-                    "ASC",
-                    "DESC",
-                ], f"Invalid order_by direction: {direction}"
-            order_by_part = ", ".join(
-                [f"{field} {direction}" for field, direction in order_by]
-            )
-            order_by_part = f"ORDER BY {order_by_part}"
+        order_by_part = "ORDER BY start_datetime ASC"
+        # if order_by != None:
+        #     order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
+        #     for field, direction in order_by:
+        #         assert (
+        #             field in all_call_select_columns
+        #         ), f"Invalid order_by field: {field}"
+        #         assert direction in [
+        #             "ASC",
+        #             "DESC",
+        #         ], f"Invalid order_by direction: {direction}"
+        #     order_by_part = ", ".join(
+        #         [f"{field} {direction}" for field, direction in order_by]
+        #     )
+        #     order_by_part = f"ORDER BY {order_by_part}"
 
         offset_part = ""
         if offset != None:
@@ -534,189 +560,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self) -> None:
         print("Running migrations")
-        res = self.ch_client.command("SHOW TABLES")
-        if isinstance(res, str):
-            table_names = res.split("\n")
-            for table_name in table_names:
-                if not table_name.startswith("."):
-                    self.ch_client.command("DROP TABLE IF EXISTS " + table_name)
-
-        self.ch_client.command(
-            """
-        CREATE TABLE IF NOT EXISTS
-        objects_raw (
-            entity String,
-            project String,
-            is_op UInt8,
-            name String,
-            version_hash String,
-            created_datetime DateTime64(3),
-
-            type_dict_dump String,
-            bytes_file_map Map(String, String),
-            metadata_dict_dump String,
-
-            db_row_created_at DateTime64(3) DEFAULT now64(3)
-
-        )
-        ENGINE = MergeTree
-        ORDER BY (entity, project, is_op, name, version_hash)
-        """
-        )
-
-        self.ch_client.command(
-            """
-        CREATE TABLE IF NOT EXISTS
-        objects_deduplicated (
-            entity String,
-            project String,
-            is_op UInt8,
-            name String,
-            version_hash String,
-            created_datetime SimpleAggregateFunction(min, DateTime64(3)),
-
-            type_dict_dump SimpleAggregateFunction(any, String),
-            bytes_file_map SimpleAggregateFunction(any, Map(String, String)),
-
-            # Note: if we ever want to support updates, this needs to be moved to a more robust handling
-            metadata_dict_dump SimpleAggregateFunction(any, String),
-        )
-        ENGINE = AggregatingMergeTree
-        ORDER BY (entity, project, is_op, name, version_hash)
-        """
-        )
-
-        self.ch_client.command(
-            """
-        CREATE MATERIALIZED VIEW IF NOT EXISTS objects_deduplicated_view TO objects_deduplicated
-        AS
-        SELECT
-            entity,
-            project,
-            is_op,
-            name,
-            version_hash,
-            minSimpleState(created_datetime) as created_datetime,
-
-            anySimpleState(type_dict_dump) as type_dict_dump,
-            anySimpleState(bytes_file_map) as bytes_file_map,
-            anySimpleState(metadata_dict_dump) as metadata_dict_dump
-            
-        FROM objects_raw
-        GROUP BY entity, project, is_op, name, version_hash
-        """
-        )
-
-        # The following view is just to workout version indexing and latest keys
-        self.ch_client.command(
-            """
-        CREATE VIEW IF NOT EXISTS objects_versioned
-        AS
-        SELECT
-            entity,
-            project,
-            is_op,
-            name,
-            version_hash,
-            min(objects_deduplicated.created_datetime) as created_datetime,
-            any(type_dict_dump) as type_dict_dump,
-            any(bytes_file_map) as bytes_file_map,
-            any(metadata_dict_dump) as metadata_dict_dump,
-            row_number() OVER w1 as version_index,
-            1 == count(*) OVER w1 as is_latest
-        FROM objects_deduplicated
-        GROUP BY entity, project, is_op, name, version_hash
-        WINDOW
-            w1 AS (PARTITION BY entity, project, is_op, name ORDER BY min(objects_deduplicated.created_datetime) ASC Rows BETWEEN CURRENT ROW AND 1 FOLLOWING)
-        """
-        )
-
-        self.ch_client.command(
-            """
-            CREATE TABLE IF NOT EXISTS
-            calls_raw (
-                # Identity Fields
-                entity String,
-                project String,
-                id String,
-
-                # Start Fields (All fields except parent_id are required when starting
-                # a call. However, to support a fast "update" we need to allow nulls)
-                trace_id String NULL,
-                parent_id String NULL, # This field is actually nullable
-                name String NULL,
-                start_datetime DateTime64(3) NULL,
-                attributes_dump String NULL,
-                inputs_dump String NULL,
-                input_refs Array(String), # Empty array treated as null
-
-                # End Fields (All fields are required when ending
-                # a call. However, to support a fast "update" we need to allow nulls)
-                end_datetime DateTime64(3) NULL,
-                outputs_dump String NULL,
-                summary_dump String NULL,
-                exception String NULL,
-                output_refs Array(String), # Empty array treated as null
-
-                # Bookkeeping
-                db_row_created_at DateTime64(3) DEFAULT now64(3)
-            )
-            ENGINE = MergeTree
-            ORDER BY (entity, project, id)
-        """
-        )
-        self.ch_client.command(
-            """
-            CREATE TABLE IF NOT EXISTS calls_merged
-            (
-                entity String,
-                project String,
-                id String,
-                # While these fields are all marked as null, the practical expectation
-                # is that they will be non-null except for parent_id. The problem is that
-                # clickhouse might not aggregate the data immediately, so we need to allow
-                # for nulls in the interim.
-                trace_id SimpleAggregateFunction(any, Nullable(String)),
-                parent_id SimpleAggregateFunction(any, Nullable(String)),
-                name SimpleAggregateFunction(any, Nullable(String)),
-                start_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-                attributes_dump SimpleAggregateFunction(any, Nullable(String)),
-                inputs_dump SimpleAggregateFunction(any, Nullable(String)),
-                input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
-                end_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-                outputs_dump SimpleAggregateFunction(any, Nullable(String)),
-                summary_dump SimpleAggregateFunction(any, Nullable(String)),
-                exception SimpleAggregateFunction(any, Nullable(String)),
-                output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
-            )
-            ENGINE = AggregatingMergeTree
-            ORDER BY (entity, project, id)
-        """
-        )
-        self.ch_client.command(
-            """
-            CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view TO calls_merged
-            AS
-            SELECT
-                entity,
-                project,
-                id,
-                anySimpleState(trace_id) as trace_id,
-                anySimpleState(parent_id) as parent_id,
-                anySimpleState(name) as name,
-                anySimpleState(start_datetime) as start_datetime,
-                anySimpleState(attributes_dump) as attributes_dump,
-                anySimpleState(inputs_dump) as inputs_dump,
-                array_concat_aggSimpleState(input_refs) as input_refs,
-                anySimpleState(end_datetime) as end_datetime,
-                anySimpleState(outputs_dump) as outputs_dump,
-                anySimpleState(summary_dump) as summary_dump,
-                anySimpleState(exception) as exception,
-                array_concat_aggSimpleState(output_refs) as output_refs
-            FROM calls_raw
-            GROUP BY entity, project, id
-        """
-        )
+        migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
+        migrator.apply_migrations(self._database)
 
     def _query(
         self,
@@ -737,11 +582,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         row = []
         for key in all_call_insert_columns:
             row.append(parameters.get(key, None))
+        self._call_batch.append(row)
+        if self._flush_immediately:
+            self._flush_calls()
 
-        if self.should_batch:
-            self.call_insert_buffer.insert(row=row)
-        else:
-            self._flush_call_insert_buffer([row])
+    def _flush_calls(self) -> None:
+        self._insert_call_batch(self._call_batch)
+        self._call_batch = []
 
     def _insert_obj(self, ch_obj: ObjCHInsertable) -> None:
         parameters = ch_obj.model_dump()
@@ -749,10 +596,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for key in all_obj_insert_columns:
             row.append(parameters.get(key, None))
 
-        if self.should_batch:
-            self.obj_insert_buffer.insert(row=row)
-        else:
-            self._flush_obj_insert_buffer([row])
+        self._insert_obj_batch([row])
 
 
 def _dict_value_to_dump(
@@ -819,22 +663,6 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         created_datetime=ch_obj.created_datetime,
         version_index=ch_obj.version_index,
     )
-
-
-valid_schemes = [TRACE_REF_SCHEME, ARTIFACT_REF_SCHEME]
-
-
-def extract_refs_from_values(
-    vals: typing.Optional[typing.List[typing.Any]],
-) -> typing.List[str]:
-    refs = []
-    if vals:
-        for val in vals:
-            if isinstance(val, str) and any(
-                val.startswith(scheme + "://") for scheme in valid_schemes
-            ):
-                refs.append(val)
-    return refs
 
 
 def _start_call_for_insert_to_ch_insertable_start_call(

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {ReactNode} from 'react';
 import styled from 'styled-components';
 
 import {
@@ -8,6 +8,7 @@ import {
 } from '../../../../../../common/css/color.styles';
 import {Tooltip} from '../../../../../Tooltip';
 import {getBoringColumns, TableStats} from '../../../Browse2/tableStats';
+import {BoringStringValue} from './BoringStringValue';
 
 type BoringColumnInfoProps = {
   tableStats: TableStats;
@@ -15,8 +16,8 @@ type BoringColumnInfoProps = {
 };
 
 const Boring = styled.div`
+  overflow: auto;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px;
@@ -46,9 +47,6 @@ const BoringLabel = styled.div`
 BoringLabel.displayName = 'S.BoringLabel';
 
 const BoringValue = styled.div`
-  height: 32px;
-  display: flex;
-  align-items: center;
   background-color: ${MOON_100};
   padding: 4px 8px;
   border-radius: 0 8px 8px 0;
@@ -86,16 +84,27 @@ export const BoringColumnInfo = ({
           label = col.headerName;
         }
 
-        let value = boringValue;
+        let value: ReactNode = boringValue;
+        let height: number | undefined = 32;
         if (col.renderCell) {
           const cellParams = {value, row: {[col.field]: value}};
           value = col.renderCell(cellParams);
+          if (typeof value === 'string') {
+            value = (
+              <BoringStringValue
+                value={value}
+                maxWidthCollapsed={300}
+                maxWidthExpanded={600}
+              />
+            );
+            height = undefined;
+          }
         }
 
         return (
           <BoringPair key={colName}>
             <BoringLabel>{label}</BoringLabel>
-            <BoringValue>{value}</BoringValue>
+            <BoringValue style={{height}}>{value}</BoringValue>
           </BoringPair>
         );
       })}
