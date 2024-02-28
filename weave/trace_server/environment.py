@@ -21,6 +21,11 @@ def wf_clickhouse_pass() -> str:
     return os.environ.get("WF_CLICKHOUSE_PASS", "")
 
 
+def wf_clickhouse_database() -> str:
+    """The password of the clickhouse server."""
+    return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
+
+
 def wf_trace_server_url() -> str:
     """The url of the web server exposing the trace interface endpoints"""
     return os.environ.get("WF_TRACE_SERVER_URL", "http://127.0.0.1:6345")
