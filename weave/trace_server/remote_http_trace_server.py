@@ -42,7 +42,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
-        return cls(wf_env.wf_trace_server_url())
+        return cls(wf_env.wf_trace_server_url(), should_batch)
 
     def set_auth(self, auth: t.Tuple[str, str]) -> None:
         self._auth = auth
@@ -50,7 +50,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def _flush_calls(self, batch: t.List) -> None:
         if len(batch) == 0:
             return
-        data = Batch(batch).model_dump_json()
+        data = Batch(batch=batch).model_dump_json()
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=data.encode("utf-8"),
