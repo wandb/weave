@@ -4,7 +4,7 @@ import {useParams} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from './context';
 import {useURLSearchParamsDict} from './pages/util';
-import {refDictToRefString} from './pages/wfInterface/naive';
+// import {refDictToRefString} from './pages/wfInterface/naive';
 import {Sidebar, SidebarItem} from './Sidebar';
 
 export const SideNav = () => {
@@ -76,24 +76,32 @@ export const SideNav = () => {
   const items: SidebarItem[][] = [
     [
       {
-        id: 'evaluation',
-        name: 'Evaluations',
-        iconName: IconNames.TypeNumber,
+        id: 'calls',
+        name: 'Traces',
+        iconName: IconNames.LayoutTabs,
         path: baseRouter.callsUIUrl(entity, project, {
-          opCategory: 'evaluate',
-          opVersionRefs: [
-            refDictToRefString({
-              entity: currentEntity,
-              project: currentProject,
-              artifactName: 'Evaluation-evaluate',
-              versionCommitHash: '*',
-              filePathParts: ['obj'],
-              refExtraTuples: [],
-            }),
-          ],
-          isPivot: true,
+          traceRootsOnly: true,
         }),
       },
+      // {
+      //   id: 'evaluation',
+      //   name: 'Evaluations',
+      //   iconName: IconNames.TypeNumber,
+      //   path: baseRouter.callsUIUrl(entity, project, {
+      //     opCategory: 'evaluate',
+      //     opVersionRefs: [
+      //       refDictToRefString({
+      //         entity: currentEntity,
+      //         project: currentProject,
+      //         artifactName: 'Evaluation-evaluate',
+      //         versionCommitHash: '*',
+      //         filePathParts: ['obj'],
+      //         refExtraTuples: [],
+      //       }),
+      //     ],
+      //     isPivot: true,
+      //   }),
+      // },
       {
         id: 'models',
         name: 'Models',
@@ -117,14 +125,6 @@ export const SideNav = () => {
         name: 'Operations',
         iconName: IconNames.JobProgramCode,
         path: baseRouter.opVersionsUIUrl(entity, project, {}),
-      },
-      {
-        id: 'calls',
-        name: 'Traces',
-        iconName: IconNames.RunningRepeat,
-        path: baseRouter.callsUIUrl(entity, project, {
-          traceRootsOnly: true,
-        }),
       },
       {
         id: 'objects',
