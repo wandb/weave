@@ -60,6 +60,7 @@ export const IconNames = {
   FilterAlt: 'filter-alt',
   FlashBolt: 'flash-bolt',
   FolderAlt: 'folder-alt',
+  FolderFill: 'folder-fill',
   FolderProject: 'folder-project',
   FolderProjectMove: 'folder-project-move',
   ForumChatBubble: 'forum-chat-bubble',
