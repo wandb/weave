@@ -18,7 +18,7 @@ type CopyableTextProps = {
   onClick?(): void;
 };
 
-export const Wrapper = styled.div`
+const Wrapper = styled.div`
   background-color: ${MOON_100};
   display: flex;
   align-items: center;
@@ -30,7 +30,14 @@ export const Wrapper = styled.div`
 `;
 Wrapper.displayName = 'S.Wrapper';
 
-export const Text = styled.code`
+const IconCell = styled.div`
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+`;
+IconCell.displayName = 'S.IconCell';
+
+const Text = styled.code`
   font-size: 0.7em;
 `;
 Text.displayName = 'S.Text';
@@ -58,12 +65,14 @@ export const CopyableText = ({
         copy();
         onClick?.();
       }}>
-      <Icon
-        name={icon ?? 'copy'}
-        width={16}
-        height={16}
-        style={{marginRight: 8}}
-      />
+      <IconCell>
+        <Icon
+          name={icon ?? 'copy'}
+          width={16}
+          height={16}
+          style={{marginRight: 8}}
+        />
+      </IconCell>
       <Text>{text}</Text>
     </Wrapper>
   );
