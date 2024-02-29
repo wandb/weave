@@ -32,8 +32,10 @@ type ColumnStats = {
   valueCount: number;
   // TODO: Would make code more complex but could only store counts for types seen
   typeCounts: Record<ValueType, number>;
+
+  valueCounts: Record<any, number>;
 };
-type TableStats = {
+export type TableStats = {
   rowCount: number;
   column: Record<string, ColumnStats>;
 };
@@ -45,12 +47,7 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   };
 
   // Determine set of possible columns and value types
-  const colPatterns: RegExp[] = [
-    /status_code/,
-    /opCategory/,
-    /input\.*/,
-    /output\.*/,
-  ];
+  const colPatterns: RegExp[] = [/opCategory/, /input\.*/, /output\.*/];
   for (const row of table) {
     stats.rowCount++;
     for (const colName of Object.keys(row)) {
@@ -67,6 +64,7 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
                 number: 0,
                 other: 0,
               },
+              valueCounts: {},
             };
           }
           const colStats = stats.column[colName];
@@ -74,6 +72,10 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
           const value = row[colName];
           const valueType = determineType(value);
           colStats.typeCounts[valueType] += 1;
+          if (!(value in colStats.valueCounts)) {
+            colStats.valueCounts[value] = 0;
+          }
+          colStats.valueCounts[value] += 1;
         }
       }
     }
@@ -87,6 +89,7 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
 
 export const useColumnVisibility = (tableStats: TableStats) => {
   const [forceShowAll, setForceShowAll] = useState(false);
+  const boringColumns = getBoringColumns(tableStats);
 
   const model: GridColumnVisibilityModel = {};
   for (const colName in tableStats.column) {
@@ -95,6 +98,8 @@ export const useColumnVisibility = (tableStats: TableStats) => {
       // but that seemed less confusing than a "Show all" not actually
       // showing all?
       model[colName] = true;
+    } else if (boringColumns.includes(colName)) {
+      model[colName] = false;
     } else {
       const colStats = tableStats.column[colName];
       if (colStats.typeCounts.null === tableStats.rowCount) {
@@ -119,4 +124,32 @@ export const getInputColumns = (tableStats: TableStats): string[] => {
   return Object.keys(tableStats.column)
     .filter(colName => colName.startsWith('input.'))
     .map(colName => colName.substring(6));
+};
+
+// Get a list of "boring" columns.
+// Boring columns are those that have the same value for every row.
+export const getBoringColumns = (tableStats: TableStats): string[] => {
+  const columns = Object.keys(tableStats.column);
+  const boring: string[] = [];
+  if (tableStats.rowCount < 2) {
+    // Would be confusing to have "common" values when there is only one row.
+    return [];
+  }
+  const allNull = new Set<string>();
+  for (const col of columns) {
+    if (col.startsWith('output.')) {
+      // For now, output is always interesting
+      continue;
+    }
+    const {typeCounts, valueCounts} = tableStats.column[col];
+    const values = Object.values(valueCounts);
+    if (values.length === 1 && values[0] === tableStats.rowCount) {
+      boring.push(col);
+      if (typeCounts.null === tableStats.rowCount) {
+        allNull.add(col);
+      }
+    }
+  }
+
+  return boring;
 };

@@ -14,13 +14,9 @@ import {
   SimplePageLayoutWithHeader,
 } from './common/SimplePageLayout';
 import {TabUseOp} from './TabUseOp';
-import {
-  opVersionKeyToRefUri,
-  OpVersionSchema,
-  useCalls,
-  useOpVersion,
-  useOpVersions,
-} from './wfReactInterface/interface';
+import {useWFHooks} from './wfReactInterface/context';
+import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
+import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
 
 export const OpVersionPage: React.FC<{
   entity: string;
@@ -28,6 +24,8 @@ export const OpVersionPage: React.FC<{
   opName: string;
   version: string;
 }> = props => {
+  const {useOpVersion} = useWFHooks();
+
   const opVersion = useOpVersion({
     entity: props.entity,
     project: props.project,
@@ -45,6 +43,7 @@ export const OpVersionPage: React.FC<{
 const OpVersionPageInner: React.FC<{
   opVersion: OpVersionSchema;
 }> = ({opVersion}) => {
+  const {useOpVersions, useCalls} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
   const {entity, project, opId, versionIndex, category} = opVersion;
 

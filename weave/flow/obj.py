@@ -37,7 +37,12 @@ class Object(pydantic.BaseModel, metaclass=ObjectMeta):
     description: Optional[str] = None
 
     # Allow OpDef attributes
-    model_config = ConfigDict(ignored_types=(OpDef,), arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        ignored_types=(OpDef,),
+        arbitrary_types_allowed=True,
+        protected_namespaces=(),
+        extra="forbid",
+    )
 
     def __getattribute__(self, name: str) -> Any:
         attribute = super().__getattribute__(name)

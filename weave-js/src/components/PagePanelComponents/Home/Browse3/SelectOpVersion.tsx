@@ -5,10 +5,8 @@ import styled from 'styled-components';
 
 import {Pill} from '../../../Tag';
 import {Timestamp} from '../../../Timestamp';
-import {
-  opVersionKeyToRefUri,
-  OpVersionSchema,
-} from './pages/wfReactInterface/interface';
+import {opVersionKeyToRefUri} from './pages/wfReactInterface/utilities';
+import {OpVersionSchema} from './pages/wfReactInterface/wfDataModelHooksInterface';
 
 const Option = styled.li`
   display: flex;

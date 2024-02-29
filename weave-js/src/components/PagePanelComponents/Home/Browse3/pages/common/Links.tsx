@@ -248,16 +248,19 @@ export const CallLink: React.FC<{
   callId: string;
   variant?: LinkVariant;
   fullWidth?: boolean;
+  tracetree?: boolean;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   const opName = opNiceName(props.opName);
   const truncatedId = props.callId.slice(-4);
+  const tracetree = props.tracetree ?? opName !== 'Evaluation-evaluate';
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,
     '',
-    props.callId
+    props.callId,
+    tracetree
   );
   const onClick = () => {
     history.push(to);
@@ -279,6 +282,7 @@ export const CallsLink: React.FC<{
   entity: string;
   project: string;
   callCount: number;
+  countIsLimited?: boolean;
   filter?: WFHighLevelCallFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
@@ -289,7 +293,8 @@ export const CallsLink: React.FC<{
     <Link
       $variant={props.variant}
       to={router.callsUIUrl(props.entity, props.project, props.filter)}>
-      {props.callCount} calls
+      {props.callCount}
+      {props.countIsLimited ? '+' : ''} calls
     </Link>
   );
 };
@@ -298,6 +303,7 @@ export const ObjectVersionsLink: React.FC<{
   entity: string;
   project: string;
   versionCount: number;
+  countIsLimited?: boolean;
   filter?: WFHighLevelObjectVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
@@ -312,7 +318,9 @@ export const ObjectVersionsLink: React.FC<{
         props.project,
         props.filter
       )}>
-      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
+      {props.versionCount}
+      {props.countIsLimited ? '+' : ''} version
+      {props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };
@@ -321,6 +329,7 @@ export const OpVersionsLink: React.FC<{
   entity: string;
   project: string;
   versionCount: number;
+  countIsLimited?: boolean;
   filter?: WFHighLevelOpVersionFilter;
   neverPeek?: boolean;
   variant?: LinkVariant;
@@ -331,7 +340,9 @@ export const OpVersionsLink: React.FC<{
     <Link
       $variant={props.variant}
       to={router.opVersionsUIUrl(props.entity, props.project, props.filter)}>
-      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
+      {props.versionCount}
+      {props.countIsLimited ? '+' : ''} version
+      {props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };

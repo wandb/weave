@@ -18,3 +18,4 @@ numpy<1.24  # shap uses np.bool which is removed in 1.24
 Faker==19.6.2  # used for synthetic data generation
 pytest-dotenv
 supervisor>=4.2.5
+clickhouse_connect==0.7.0

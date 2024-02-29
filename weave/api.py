@@ -150,7 +150,10 @@ def init(project_name: str) -> _graph_client.GraphClient:
     Returns:
         A Weave client.
     """
-    return _weave_init.init_wandb(project_name).client
+    # This is the stream-table backend. Disabling it in favor of the new
+    # trace-server backend.
+    # return _weave_init.init_wandb(project_name).client
+    return _weave_init.init_trace_remote(project_name).client
 
 
 @contextlib.contextmanager
@@ -174,6 +177,10 @@ def local_client() -> typing.Iterator[_graph_client.GraphClient]:
         yield inited_client.client
     finally:
         inited_client.reset()
+
+
+def init_trace_client(project_name: str) -> _graph_client.GraphClient:
+    return _weave_init.init_trace_remote(project_name).client
 
 
 def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:

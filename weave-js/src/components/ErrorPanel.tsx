@@ -6,7 +6,7 @@ import {Icon} from './Icon';
 import {Tooltip} from './Tooltip';
 
 const DEFAULT_TITLE = 'Something went wrong.';
-const DEFAULT_SUBTITLE = 'Please check the panel configuration for errors.';
+const DEFAULT_SUBTITLE = 'An unexpected error occurred.';
 const DEFAULT_SUBTITLE2 = 'Thank you for your patience while Weave is in beta.';
 
 type ErrorPanelProps = {

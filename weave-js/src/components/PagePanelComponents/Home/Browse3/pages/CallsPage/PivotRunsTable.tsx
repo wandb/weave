@@ -32,7 +32,7 @@ import {
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {renderCell} from '../util';
-import {CallSchema} from '../wfReactInterface/interface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export type WFHighLevelPivotSpec = {
   rowDim: string | null;
@@ -330,7 +330,8 @@ export const PivotRunsTable: FC<
 
         const outputOrder = Object.keys(outputKeys);
         outputOrder.sort();
-        const outputGrouping = buildTree(outputOrder, col);
+        const dotSafeCol = col.replace(/\./g, '_dot_');
+        const outputGrouping = buildTree(outputOrder, dotSafeCol);
         outputGrouping.renderHeaderGroup = params => {
           return renderCell(col);
         };
@@ -339,7 +340,7 @@ export const PivotRunsTable: FC<
           cols.push({
             flex: 1,
             minWidth: 100,
-            field: col + '.' + key,
+            field: dotSafeCol + '.' + key,
             headerName: key.split('.').slice(-1)[0],
             renderCell: cellParams => {
               const row: PivotDataRowType = cellParams.row;

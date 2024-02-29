@@ -28,6 +28,23 @@ def update_combined_choice(
     return combined_choice
 
 
+def token_usage(
+    input_messages: List[ChatCompletionMessage], response_choices: list[Choice]
+) -> CompletionUsage:
+    prompt_tokens = num_tokens_from_messages(input_messages)
+    completion_tokens = 0
+    for choice in response_choices:
+        message = choice.message
+        completion_tokens += num_tokens_from_messages([message])
+
+    total_tokens = prompt_tokens + completion_tokens
+    return CompletionUsage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
+    )
+
+
 def reconstruct_completion(
     input_messages: List[ChatCompletionMessage],
     output_chunks: List[ChatCompletionChunk],
@@ -68,18 +85,7 @@ def reconstruct_completion(
     # Assume all chunks belong to the same completion
     first_chunk = output_chunks[0]
 
-    prompt_tokens = num_tokens_from_messages(input_messages)
-    completion_tokens = 0
-    for choice in combined_choices:
-        message = choice.message
-        completion_tokens += num_tokens_from_messages([message])
-
-    total_tokens = prompt_tokens + completion_tokens
-    usage = CompletionUsage(
-        prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-        total_tokens=total_tokens,
-    )
+    usage = token_usage(input_messages, combined_choices)
 
     return ChatCompletion(
         id=first_chunk.id,

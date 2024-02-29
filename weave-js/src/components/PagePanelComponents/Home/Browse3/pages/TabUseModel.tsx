@@ -2,6 +2,7 @@ import {Alert, Box} from '@mui/material';
 import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
+import {parseRef} from '../../../../../react';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
 
@@ -13,6 +14,10 @@ type TabUseModelProps = {
 
 export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
   const pythonName = isValidVarName(name) ? name : 'model';
+  const ref = parseRef(uri);
+  const isParentObject = !ref.artifactRefExtra;
+  const label = isParentObject ? 'model version' : 'object';
+
   return (
     <Box m={2}>
       <Alert severity="info" variant="outlined">
@@ -26,32 +31,36 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
       </Alert>
 
       <Box mt={2}>
-        The ref for this model version is:
+        The ref for this {label} is:
         <CopyableText text={uri} />
       </Box>
       <Box mt={2}>
-        Use the following code to retrieve this model version:
+        Use the following code to retrieve this {label}:
         <CopyableText
           text={`${pythonName} = weave.ref("<ref_uri>").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
         />
       </Box>
-      <Box mt={2}>
-        To <DocLink path="guides/tools/serve" text="serve this model" /> locally
-        with a Swagger UI:
-        <CopyableText
-          text="weave serve <ref_uri>"
-          copyText={`weave serve ${uri}`}
-        />
-      </Box>
-      <Box mt={2}>
-        To <DocLink path="guides/tools/deploy" text="deploy this model" /> to
-        the cloud run:
-        <CopyableText
-          text={`weave deploy gcp --project "${projectName}" <ref_uri>`}
-          copyText={`weave deploy gcp --project "${projectName}" ${uri}`}
-        />
-      </Box>
+      {isParentObject && (
+        <>
+          <Box mt={2}>
+            To <DocLink path="guides/tools/serve" text="serve this model" />{' '}
+            locally with a Swagger UI:
+            <CopyableText
+              text="weave serve <ref_uri>"
+              copyText={`weave serve ${uri}`}
+            />
+          </Box>
+          <Box mt={2}>
+            To <DocLink path="guides/tools/deploy" text="deploy this model" />{' '}
+            to the cloud run:
+            <CopyableText
+              text={`weave deploy gcp --project "${projectName}" <ref_uri>`}
+              copyText={`weave deploy gcp --project "${projectName}" ${uri}`}
+            />
+          </Box>
+        </>
+      )}
     </Box>
   );
 };

@@ -57,6 +57,8 @@ class AsyncChatCompletions:
             # code until next() is called. But we want to create the run
             # as a child of whatever the parent is, at function call time,
             # not generator start time.
+            # TODO: need to fix this to use OpenAIStream instead of reconstruct_completion
+            # like the sync _stream_create below
             async def _stream_create_gen():  # type: ignore
                 chunks = []
                 stream = await self._base_create(*args, **kwargs)
@@ -99,13 +101,18 @@ class ChatCompletions:
         ) as finish_run:
 
             def _stream_create_gen():  # type: ignore
-                chunks = []
                 stream = self._base_create(*args, **kwargs)
-                for chunk in stream:
-                    chunks.append(chunk)
+                from weave.flow.chat_util import OpenAIStream
+
+                wrapped_stream = OpenAIStream(stream)
+                for chunk in wrapped_stream:
                     yield chunk
-                result = reconstruct_completion(inputs.messages, chunks)  # type: ignore
-                finish_run(result.model_dump(exclude_unset=True))
+                result = wrapped_stream.final_response()
+                result_with_usage = ChatCompletion(
+                    **result.model_dump(exclude_unset=True),
+                    usage=token_usage(inputs.messages, result.choices),
+                )
+                finish_run(result_with_usage.model_dump(exclude_unset=True))
 
         return _stream_create_gen()  # type: ignore
 
@@ -114,10 +121,9 @@ def patch() -> None:
     def _patch() -> None:
         unpatch_fqn = f"{unpatch.__module__}.{unpatch.__qualname__}()"
 
-        if _get_global_monitor() is not None:
+        gc = graph_client_context.require_graph_client()
+        if gc:
             # info(f"Patching OpenAI completions.  To unpatch, call {unpatch_fqn}")
-
-            gc = graph_client_context.require_graph_client()
 
             hooks = ChatCompletions(old_create)
             async_hooks = AsyncChatCompletions(old_async_create)
@@ -127,6 +133,8 @@ def patch() -> None:
             openai.resources.chat.completions.AsyncCompletions.create = (
                 partialmethod_with_self(async_hooks.create)
             )
+        else:
+            error("No graph client found, not patching OpenAI completions")
 
     if version.parse(openai.__version__) < version.parse("1.0.0"):
         error(
@@ -143,10 +151,10 @@ def patch() -> None:
 
 
 def unpatch() -> None:
-    if _get_global_monitor() is not None:
-        info("Unpatching OpenAI completions")
-        openai.resources.chat.completions.Completions.create = old_create
-        openai.resources.chat.completions.AsyncCompletions.create = old_async_create
+    # if _get_global_monitor() is not None:
+    info("Unpatching OpenAI completions")
+    openai.resources.chat.completions.Completions.create = old_create
+    openai.resources.chat.completions.AsyncCompletions.create = old_async_create
 
 
 # TODO: centralize

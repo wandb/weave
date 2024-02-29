@@ -12,11 +12,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import {
-  DataGridPro as DataGrid,
-  GridColDef,
-  useGridApiRef,
-} from '@mui/x-data-grid-pro';
+import {GridColDef, useGridApiRef} from '@mui/x-data-grid-pro';
 import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
@@ -61,13 +57,17 @@ import React, {
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {useWeaveflowCurrentRouteContext} from '../Browse3/context';
+import {
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../Browse3/context';
 import {Link} from '../Browse3/pages/common/Links';
 import {
   DICT_KEY_EDGE_TYPE,
   LIST_INDEX_EDGE_TYPE,
   OBJECT_ATTRIBUTE_EDGE_TYPE,
 } from '../Browse3/pages/wfReactInterface/constants';
+import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {
   mutationPublishArtifact,
@@ -647,11 +647,13 @@ export const WeaveEditorObject: FC<{
 
 const typeToDataGridColumnSpec = (
   type: Type,
+  isPeeking?: boolean,
   disableEdits?: boolean
 ): GridColDef[] => {
   //   const cols: GridColDef[] = [];
   //   const colGrouping: GridColumnGroup[] = [];
   if (isAssignableTo(type, {type: 'typedDict', propertyTypes: {}})) {
+    const maxWidth = window.innerWidth * (isPeeking ? 0.5 : 0.75);
     const propertyTypes = typedDictPropertyTypes(type);
     return Object.entries(propertyTypes).flatMap(([key, valueType]) => {
       const valTypeCols = typeToDataGridColumnSpec(valueType);
@@ -671,6 +673,7 @@ const typeToDataGridColumnSpec = (
         ) {
           return [
             {
+              maxWidth,
               type: 'string',
               editable: false,
               field: key,
@@ -689,6 +692,7 @@ const typeToDataGridColumnSpec = (
         }
         return [
           {
+            maxWidth,
             type: colType,
             editable: editable && !disableEdits,
             field: key,
@@ -698,6 +702,7 @@ const typeToDataGridColumnSpec = (
       }
       return valTypeCols.map(col => ({
         ...col,
+        maxWidth,
         field: `${key}.${col.field}`,
         headerName: `${key}.${col.field}`,
       }));
@@ -714,6 +719,7 @@ export const WeaveEditorTable: FC<{
   disableEdits?: boolean;
 }> = ({node, path, disableEdits}) => {
   const apiRef = useGridApiRef();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
   const addEdit = useWeaveEditorContextAddEdit();
   const makeLinkPath = useObjectVersionLinkPathForPath();
   const objectType = listObjectType(node.type);
@@ -816,9 +822,9 @@ export const WeaveEditorTable: FC<{
           </Link>
         ),
       },
-      ...typeToDataGridColumnSpec(objectType, disableEdits),
+      ...typeToDataGridColumnSpec(objectType, isPeeking, disableEdits),
     ];
-  }, [disableEdits, makeLinkPath, objectType, path]);
+  }, [disableEdits, makeLinkPath, objectType, path, isPeeking]);
   return (
     <>
       {isTruncated && (
@@ -831,7 +837,8 @@ export const WeaveEditorTable: FC<{
           height: 460,
           width: '100%',
         }}>
-        <DataGrid
+        <StyledDataGrid
+          keepBorders
           apiRef={apiRef}
           density="compact"
           experimentalFeatures={{columnGrouping: true}}
