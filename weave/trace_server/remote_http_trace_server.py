@@ -5,11 +5,8 @@ import requests
 from weave.trace_server import environment as wf_env
 
 
-from .flushing_buffer import InMemAutoFlushingBuffer
+from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
-
-MAX_FLUSH_COUNT = 100
-MAX_FLUSH_AGE = 5
 
 
 class StartBatchItem(BaseModel):
@@ -35,9 +32,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
         if self.should_batch:
-            self.call_buffer = InMemAutoFlushingBuffer(
-                MAX_FLUSH_COUNT, MAX_FLUSH_AGE, self._flush_calls
-            )
+            self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: t.Optional[t.Tuple[str, str]] = None
 
     @classmethod
@@ -89,7 +84,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
-            self.call_buffer.insert(StartBatchItem(req=req_as_obj))
+            self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
             return tsi.CallStartRes(
                 id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
             )
@@ -106,7 +101,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.CallEndReq.model_validate(req)
             else:
                 req_as_obj = req
-            self.call_buffer.insert(EndBatchItem(req=req_as_obj))
+            self.call_processor.enqueue([EndBatchItem(req=req_as_obj)])
             return tsi.CallEndRes()
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
