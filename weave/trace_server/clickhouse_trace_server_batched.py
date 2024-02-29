@@ -613,6 +613,25 @@ def _dict_dump_to_dict(val: str) -> typing.Dict[str, typing.Any]:
     return json.loads(val)
 
 
+def _ensure_datetimes_have_tz(
+    dt: typing.Optional[datetime.datetime] = None,
+) -> typing.Optional[datetime.datetime]:
+    # https://github.com/ClickHouse/clickhouse-connect/issues/210
+    # Clickhouse does not support timezone-aware datetimes. You can specify the
+    # desired timezone at query time. However according to the issue above,
+    # clickhouse will produce a timezone-naive datetime when the preferred
+    # timezone is UTC. This is a problem because it does not match the ISO8601
+    # standard as datetimes are to be interpreted locally unless specified
+    # otherwise. This function ensures that the datetime has a timezone, and if
+    # it does not, it adds the UTC timezone to correctly convey that the
+    # datetime is in UTC for the caller.
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
+
+
 def _nullable_dict_dump_to_dict(
     val: typing.Optional[str],
 ) -> typing.Optional[typing.Dict[str, typing.Any]]:
@@ -641,8 +660,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
         name=ch_call.name,
-        start_datetime=ch_call.start_datetime,
-        end_datetime=ch_call.end_datetime,
+        start_datetime=_ensure_datetimes_have_tz(ch_call.start_datetime),
+        end_datetime=_ensure_datetimes_have_tz(ch_call.end_datetime),
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         outputs=_nullable_dict_dump_to_dict(ch_call.outputs_dump),
@@ -660,7 +679,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         type_dict=_dict_dump_to_dict(ch_obj.type_dict_dump),
         b64_file_map=encode_bytes_as_b64(ch_obj.bytes_file_map),
         metadata_dict=_dict_dump_to_dict(ch_obj.metadata_dict_dump),
-        created_datetime=ch_obj.created_datetime,
+        created_datetime=_ensure_datetimes_have_tz(ch_obj.created_datetime),
         version_index=ch_obj.version_index,
     )
 
