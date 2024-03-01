@@ -20,6 +20,7 @@ import {hexToRGB, MOON_300} from '../../../../common/css/globals.styles';
 import {Icon, IconName, IconNames} from '../../../Icon';
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {Link} from '../Browse3/pages/common/Links';
+import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -41,8 +42,15 @@ type WFDBTableType =
   | 'Object'
   | 'ObjectVersion';
 
-export const objectRefDisplayName = (objRef: ObjectRef) => {
-  let label = `${objRef.artifactName}:${objRef.artifactVersion.slice(0, 6)}`;
+export const objectRefDisplayName = (
+  objRef: ObjectRef,
+  versionIndex?: number
+) => {
+  const versionStr =
+    versionIndex != null
+      ? `v${versionIndex}`
+      : objRef.artifactVersion.slice(0, 6);
+  let label = `${objRef.artifactName}:${versionStr}`;
   if (objRef.artifactPath !== 'obj') {
     label += '/' + objRef.artifactPath;
   }
@@ -57,10 +65,27 @@ export const objectRefDisplayName = (objRef: ObjectRef) => {
   }
   return {label};
 };
+
 export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   objRef,
   wfTable,
 }) => {
+  const {useObjectVersion} = useWFHooks();
+
+  const objVersionKey =
+    'entityName' in objRef
+      ? {
+          entity: objRef.entityName,
+          project: objRef.projectName,
+          objectId: objRef.artifactName,
+          versionHash: objRef.artifactVersion,
+          path: objRef.artifactPath,
+          refExtra: objRef.artifactRefExtra,
+        }
+      : null;
+  const objectVersion = useObjectVersion(objVersionKey);
+  const versionIndex = objectVersion.result?.versionIndex;
+
   const {peekingRouter} = useWeaveflowRouteContext();
   const refTypeNode = useMemo(() => {
     const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
@@ -70,7 +95,7 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   const refTypeQuery = useNodeValue(refTypeNode);
   const refType: Type = refTypeQuery.result ?? 'unknown';
   const rootType = getRootType(refType);
-  const {label} = objectRefDisplayName(objRef);
+  const {label} = objectRefDisplayName(objRef, versionIndex);
 
   const rootTypeName = getTypeName(rootType);
   let icon: IconName = IconNames.CubeContainer;
