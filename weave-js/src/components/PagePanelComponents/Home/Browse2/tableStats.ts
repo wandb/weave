@@ -47,12 +47,7 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   };
 
   // Determine set of possible columns and value types
-  const colPatterns: RegExp[] = [
-    /status_code/,
-    /opCategory/,
-    /input\.*/,
-    /output\.*/,
-  ];
+  const colPatterns: RegExp[] = [/opCategory/, /input\.*/, /output\.*/];
   for (const row of table) {
     stats.rowCount++;
     for (const colName of Object.keys(row)) {
@@ -154,12 +149,6 @@ export const getBoringColumns = (tableStats: TableStats): string[] => {
         allNull.add(col);
       }
     }
-  }
-
-  // Special case - leave status in the table if it is the only boring column
-  // we would show.
-  if (boring.every(col => col === 'status_code' || allNull.has(col))) {
-    return [];
   }
 
   return boring;
