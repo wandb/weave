@@ -443,9 +443,11 @@ class CallSchemaRun(Run):
 
     @property
     def ui_url(self) -> str:
-        return urls.call_path_as_peek(
-            self._call.entity, self._call.project, self._call.id
-        )
+        project_parts = self._call.project_id.split("/")
+        if len(project_parts) != 2:
+            raise ValueError(f"Invalid project_id: {self._call.project_id}")
+        entity, project = project_parts
+        return urls.call_path_as_peek(entity, project, self._call.id)
 
 
 def _run_from_call(call: tsi.CallSchema) -> CallSchemaRun:
