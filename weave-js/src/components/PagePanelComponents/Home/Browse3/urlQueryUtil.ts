@@ -5,6 +5,25 @@
  */
 import {History} from 'history';
 
+export function queryGetString(
+  history: History,
+  key: string,
+  defaultValue?: string
+): string | null {
+  const {search} = history.location;
+  const params = new URLSearchParams(search);
+  return params.get(key) ?? defaultValue ?? null;
+}
+
+export function querySetString(history: History, key: string, value: string) {
+  const {search} = history.location;
+  const params = new URLSearchParams(search);
+  params.set(key, value);
+  history.replace({
+    search: params.toString(),
+  });
+}
+
 export function queryGetBoolean(
   history: History,
   key: string,

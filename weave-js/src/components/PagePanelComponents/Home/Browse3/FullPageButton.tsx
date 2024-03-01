@@ -19,8 +19,11 @@ export const FullPageButton = ({
   }
   const [pathname, search] = query.peekPath.split('?');
   const params = new URLSearchParams(search);
-  if ('tracetree' in query) {
-    params.set('tracetree', query.tracetree);
+  const preserveKeys = ['tracetree', 'path'];
+  for (const key of preserveKeys) {
+    if (key in query) {
+      params.set(key, query[key]);
+    }
   }
   const paramsStr = params.toString();
   let to = pathname.replace(generalBase, targetBase);

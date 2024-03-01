@@ -244,6 +244,7 @@ export const CallLink: React.FC<{
   callId: string;
   variant?: LinkVariant;
   fullWidth?: boolean;
+  preservePath?: boolean;
   tracetree?: boolean;
 }> = props => {
   const history = useHistory();
@@ -251,11 +252,13 @@ export const CallLink: React.FC<{
   const opName = opNiceName(props.opName);
   const truncatedId = props.callId.slice(-4);
   const tracetree = props.tracetree ?? opName !== 'Evaluation-evaluate';
+  const path = props.preservePath ? undefined : null;
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,
     '',
     props.callId,
+    path,
     tracetree
   );
   const onClick = () => {

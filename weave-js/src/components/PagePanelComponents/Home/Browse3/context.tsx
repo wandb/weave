@@ -344,9 +344,14 @@ const browse3ContextGen = (
       entityName: string,
       projectName: string,
       traceId: string,
-      callId: string
+      callId: string,
+      path?: string | null
     ) => {
-      return `${projectRoot(entityName, projectName)}/calls/${callId}`;
+      let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
+      if (path) {
+        url += `?path=${encodeURIComponent(path)}`;
+      }
+      return url;
     },
     callsUIUrl: (
       entityName: string,
@@ -486,6 +491,7 @@ type RouteType = {
     projectName: string,
     traceId: string,
     callId: string,
+    path?: string | null,
     tracetree?: boolean
   ) => string;
   callsUIUrl: (
@@ -565,6 +571,8 @@ const useSetSearchParams = () => {
 
 const TRACETREE_PARAM = 'tracetree';
 const PEAK_SEARCH_PARAM = 'peekPath';
+const PATH_PARAM = 'path';
+
 export const baseContext = browse3ContextGen(
   (entityName: string, projectName: string) => {
     return `/${entityName}/${projectName}`;
@@ -642,19 +650,24 @@ const useMakePeekingRouter = (): RouteType => {
       projectName: string,
       traceId: string,
       callId: string,
+      path?: string | null,
       tracetree?: boolean
     ) => {
       const callUrl = baseContext.callUIUrl(
         entityName,
         projectName,
         traceId,
-        callId
+        callId,
+        path
       );
       const tt = tracetree ?? true;
-      const params = {
+      const params: Record<string, string | null> = {
         [PEAK_SEARCH_PARAM]: callUrl,
         [TRACETREE_PARAM]: tt ? '1' : '0',
       };
+      if (path !== undefined) {
+        params[PATH_PARAM] = path;
+      }
       return setSearchParams(params);
     },
     callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {

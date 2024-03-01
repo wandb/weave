@@ -13,7 +13,6 @@ import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {useWFHooks} from '../wfReactInterface/context';
-import {useParentCall} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ButtonOverlay} from './ButtonOverlay';
 import {ObjectViewerSection} from './ObjectViewerSection';
@@ -57,16 +56,10 @@ export const CallDetails: FC<{
 }> = ({call}) => {
   const {useCalls} = useWFHooks();
 
-  const parentCall = useParentCall(call);
   const {inputs, output} = useMemo(
     () => getDisplayInputsAndOutput(call),
     [call]
   );
-
-  let parentInfo = null;
-  if (parentCall.result) {
-    parentInfo = <CallSchemaLink call={parentCall.result} />;
-  }
 
   const childCalls = useCalls(call.entity, call.project, {
     parentIds: [call.callId],
@@ -88,7 +81,6 @@ export const CallDetails: FC<{
         overflowY: 'auto',
         // padding: 2,
       }}>
-      {parentInfo && <Heading>Called from {parentInfo}</Heading>}
       <Box
         style={{
           width: '100%',
