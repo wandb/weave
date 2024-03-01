@@ -1,12 +1,10 @@
-import urllib
-import json
 from wandb import util as wb_util
 
 from . import environment
 from . import context_state
 
 BROWSE3_PATH = "browse3"
-WORKSPACE_SLUG = "weaveflow"
+WORKSPACE_SLUG = "weave"
 
 
 def remote_project_root_url(entity_name: str, project_name: str) -> str:
