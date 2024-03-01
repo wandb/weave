@@ -665,8 +665,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             tsi.CallEndReq.model_validate(
                 {
                     "end": {
-                        "entity": self.entity,
-                        "project": self.project,
+                        "project_id": self.project_id(),
                         "id": run.id,
                         "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
                         "outputs": {},
@@ -690,8 +689,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             tsi.CallEndReq.model_validate(
                 {
                     "end": {
-                        "entity": self.entity,
-                        "project": self.project,
+                        "project_id": self.project_id(),
                         "id": run.id,
                         "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
                         "outputs": output,
