@@ -5,9 +5,7 @@ from pydantic import BaseModel
 
 
 class CallSchema(BaseModel):
-    # Identity Fields:
-    entity: str
-    project: str
+    project_id: str
     id: str
 
     # Name of the calling function (op)
@@ -43,9 +41,7 @@ class CallSchema(BaseModel):
 # - id is not required (will be generated)
 # - trace_id is not required (will be generated)
 class StartedCallSchemaForInsert(BaseModel):
-    # Identity Fields:
-    entity: str
-    project: str
+    project_id: str
     id: typing.Optional[str] = None  # Will be generated if not provided
 
     # Name of the calling function (op)
@@ -66,9 +62,7 @@ class StartedCallSchemaForInsert(BaseModel):
 
 
 class EndedCallSchemaForInsert(BaseModel):
-    # Identity Fields for lookup
-    entity: str
-    project: str
+    project_id: str
     id: str
 
     ## End time is required
@@ -128,8 +122,7 @@ class CallEndRes(BaseModel):
 
 
 class CallReadReq(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     id: str
 
 
@@ -149,8 +142,7 @@ class _CallsFilter(BaseModel):
 
 
 class CallsQueryReq(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     filter: typing.Optional[_CallsFilter] = None
     limit: typing.Optional[int] = None
 
