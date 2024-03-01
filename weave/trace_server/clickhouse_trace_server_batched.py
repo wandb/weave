@@ -418,7 +418,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ), f"Invalid columns: {columns}"
         merged_cols = []
         for col in columns:
-            if col in ["entity", "project", "id"]:
+            if col in ["project_id", "id"]:
                 merged_cols.append(f"{col} AS {col}")
             elif col in ["input_refs", "output_refs"]:
                 merged_cols.append(f"array_concat_agg({col}) AS {col}")
