@@ -21,12 +21,14 @@ import {useParams} from 'react-router-dom';
 import {MOON_250} from '../../../../common/css/color.styles';
 import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
+import {parseRef} from '../../../../react';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
+import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {
   opVersionRefOpCategory,
   opVersionRefOpName,
@@ -96,6 +98,30 @@ export function buildTree(
   return root;
 }
 
+type OpVersionIndexTextProps = {
+  opVersionRef: string;
+};
+
+const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
+  const {useObjectVersion} = useWFHooks();
+  const ref = parseRef(opVersionRef);
+  const objVersionKey =
+    'entityName' in ref
+      ? {
+          entity: ref.entityName,
+          project: ref.projectName,
+          objectId: ref.artifactName,
+          versionHash: ref.artifactVersion,
+          path: ref.artifactPath,
+          refExtra: ref.artifactRefExtra,
+        }
+      : null;
+  const objVersion = useObjectVersion(objVersionKey);
+  return objVersion.result ? (
+    <span>v{objVersion.result.versionIndex}</span>
+  ) : null;
+};
+
 export const RunsTable: FC<{
   loading: boolean;
   spans: CallSchema[];
@@ -105,6 +131,9 @@ export const RunsTable: FC<{
   const showIO = true;
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
+  }, [spans]);
+  const isSingleOp = useMemo(() => {
+    return _.uniq(spans.map(span => span.spanName)).length === 1;
   }, [spans]);
 
   const apiRef = useGridApiRef();
@@ -247,6 +276,23 @@ export const RunsTable: FC<{
           );
         },
       },
+      ...(isSingleOp && !isSingleOpVersion
+        ? [
+            {
+              field: 'opVersionIndex',
+              headerName: 'Op Version',
+              type: 'number',
+              align: 'right' as const,
+              disableColumnMenu: true,
+              sortable: false,
+              filterable: false,
+              resizable: false,
+              renderCell: (cellParams: any) => (
+                <OpVersionIndexText opVersionRef={cellParams.row.opVersion} />
+              ),
+            },
+          ]
+        : []),
       {
         field: 'status_code',
         headerName: 'Status',
@@ -468,6 +514,7 @@ export const RunsTable: FC<{
     spans,
     params.entity,
     params.project,
+    isSingleOp,
     isSingleOpVersion,
     tableStats,
   ]);
