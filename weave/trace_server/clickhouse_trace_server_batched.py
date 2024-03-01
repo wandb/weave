@@ -266,8 +266,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conditions.append("parent_id IS NULL")
 
         ch_calls = self._select_calls_query(
-            req.entity,
-            req.project,
+            req.project_id,
             conditions=conditions,
             parameters=parameters,
             limit=req.limit,
@@ -378,8 +377,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
         # Generate and run the query to get the call from the database
         ch_calls = self._select_calls_query(
-            req.entity,
-            req.project,
+            req.project_id,
             conditions=["id = {id: String}"],
             limit=1,
             parameters={"id": req.id},
