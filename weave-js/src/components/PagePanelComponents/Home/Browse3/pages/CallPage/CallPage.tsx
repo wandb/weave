@@ -168,7 +168,7 @@ const CallPageInnerVertical: FC<{
       }
       isSidebarOpen={showTraceTree}
       headerContent={<CallOverview call={call} />}
-      leftSidebar={<CallTraceView call={call} treeOnly />}
+      leftSidebar={<CallTraceView call={call} />}
       tabs={callTabs}
     />
   );

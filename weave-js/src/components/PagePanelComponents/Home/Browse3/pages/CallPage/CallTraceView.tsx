@@ -1,36 +1,21 @@
-import {Box} from '@material-ui/core';
 import {
   DataGridPro,
   DataGridProProps,
-  GridColDef,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {
-  FC,
-  ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {parseRef} from '../../../../../../react';
 import {Button} from '../../../../../Button';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {Call} from '../../../Browse2/callTree';
-import {SmallRef} from '../../../Browse2/SmallRef';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {querySetBoolean} from '../../urlQueryUtil';
 import {CallStatusType} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
-
-// Whether to show complex inputs/outputs in the table
-const SHOW_COMPLEX_IO = true;
 
 const CallTrace = styled.div`
   display: flex;
@@ -59,10 +44,7 @@ const CallTraceHeaderTitle = styled.div`
 `;
 CallTraceHeaderTitle.displayName = 'S.CallTraceHeaderTitle';
 
-export const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
-  call,
-  treeOnly,
-}) => {
+export const CallTraceView: FC<{call: CallSchema}> = ({call}) => {
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
@@ -75,38 +57,6 @@ export const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
   useEffect(() => {
     setExpandKeys(curr => new Set([...curr, ...forcedExpandKeys]));
   }, [forcedExpandKeys]);
-
-  const columns: GridColDef[] = [
-    // probably want to add more details like the following in the future.
-    // {field: 'opName', headerName: 'Op Name'},
-    // {field: 'opVersion', headerName: 'Op Version'},
-    // {field: 'opCategory', headerName: 'Op Category'},
-    // {field: 'callDuration', headerName: 'Duration'},
-
-    // Somewhat experimental field designed to show the primitive inputs
-    // Feel free to remove this if it's not useful.
-    {
-      field: 'inputs',
-      headerName: 'Inputs',
-      flex: 1,
-      renderCell: ({row}) => {
-        const rowCall = row.call as CallSchema;
-        return <BasicInputOutputRenderer ioData={rowCall.rawSpan.inputs} />;
-      },
-    },
-
-    // Somewhat experimental field designed to show the primitive outputs
-    // Feel free to remove this if it's not useful.
-    {
-      field: 'outputs',
-      flex: 1,
-      headerName: 'Output',
-      renderCell: ({row}) => {
-        const rowCall = row.call as CallSchema;
-        return <BasicInputOutputRenderer ioData={rowCall.rawSpan.output} />;
-      },
-    },
-  ];
 
   // Informs DataGridPro where to lookup the hierarchy of a given row.
   const getTreeDataPath: DataGridProProps['getTreeDataPath'] = useCallback(
@@ -199,13 +149,13 @@ export const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
         },
       },
       '& .MuiDataGrid-columnHeaders': {
-        borderBottom: treeOnly ? 'none' : undefined,
+        borderBottom: 'none',
       },
       [callClass]: {
         backgroundColor: '#a9edf252',
       },
     }),
-    [callClass, treeOnly]
+    [callClass]
   );
 
   // Scroll selected call into view
@@ -259,12 +209,12 @@ export const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
           <DataGridPro
             apiRef={apiRef}
             rowHeight={38}
-            columnHeaderHeight={treeOnly ? 0 : 56}
+            columnHeaderHeight={0}
             treeData
             loading={treeLoading || animationBuffer}
             onRowClick={onRowClick}
             rows={treeLoading || animationBuffer ? [] : rows}
-            columns={treeOnly ? [] : columns}
+            columns={[]}
             getTreeDataPath={getTreeDataPath}
             groupingColDef={groupingColDef}
             isGroupExpandedByDefault={isGroupExpandedByDefault}
@@ -276,75 +226,6 @@ export const CallTraceView: FC<{call: CallSchema; treeOnly?: boolean}> = ({
         </ErrorBoundary>
       </CallTraceTree>
     </CallTrace>
-  );
-};
-
-const BasicInputOutputRenderer: FC<{
-  ioData: Call['inputs'] | Call['output'];
-}> = ({ioData}) => {
-  return (
-    <Box
-      sx={{
-        height: '100%',
-        width: '100%',
-        overflow: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-      {ioData?._keys?.map((k, i) => {
-        const v = ioData![k];
-        let value: ReactNode = '';
-
-        if (typeof v === 'string' && v.startsWith('wandb-artifact:///')) {
-          value = <SmallRef objRef={parseRef(v)} />;
-          if (!SHOW_COMPLEX_IO) {
-            return null;
-          }
-        } else if (_.isArray(v)) {
-          if (v.length === 1 && typeof v[0] === 'string') {
-            value = v[0];
-          } else {
-            value = `List of ${v.length} items`;
-            if (!SHOW_COMPLEX_IO) {
-              return null;
-            }
-          }
-        } else if (_.isObject(v)) {
-          value = `Object with ${Object.keys(v).length} entries`;
-          if (!SHOW_COMPLEX_IO) {
-            return null;
-          }
-        } else {
-          value = v + '';
-        }
-
-        return (
-          <Box
-            key={i}
-            gridGap={4}
-            sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              height: '38px',
-              flex: '0 0 auto',
-            }}>
-            {k !== '_result' && (
-              <>
-                <Box
-                  sx={{
-                    fontWeight: 'bold',
-                  }}>
-                  {k}
-                </Box>
-                <span>:</span>
-              </>
-            )}
-            <Box>{value}</Box>
-          </Box>
-        );
-      })}
-    </Box>
   );
 };
 
