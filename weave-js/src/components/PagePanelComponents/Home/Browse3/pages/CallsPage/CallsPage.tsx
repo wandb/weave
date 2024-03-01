@@ -498,7 +498,7 @@ const useOpVersionOptions = (
       ov => {
         const ref = opVersionKeyToRefUri(ov);
         result.push({
-          title: ov.opId + ':v' + ov.versionIndex,
+          title: opNiceName(ov.opId) + ':v' + ov.versionIndex,
           ref,
           group: `Versions of ${opNiceName(currentOpId!)}`,
           objectVersion: ov,
