@@ -7,6 +7,7 @@ import weave
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     extract_refs_from_values,
+    generate_id,
 )
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.graph_client_trace import GraphClientTrace
@@ -56,9 +57,10 @@ def test_dataset(trace_client):
 
 
 def test_trace_server_call_start_and_end(clickhouse_trace_server):
+    call_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
         project_id="test_entity/test_project",
-        id="test_id",
+        id=call_id,
         name="test_name",
         trace_id="test_trace_id",
         parent_id="test_parent_id",
@@ -72,7 +74,7 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     res = clickhouse_trace_server.call_read(
         tsi.CallReadReq(
             project_id="test_entity/test_project",
-            id="test_id",
+            id=call_id,
         )
     )
 
@@ -82,7 +84,7 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
 
     assert res.call.model_dump() == {
         "project_id": "test_entity/test_project",
-        "id": "test_id",
+        "id": call_id,
         "name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
@@ -97,7 +99,7 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
 
     end = tsi.EndedCallSchemaForInsert(
         project_id="test_entity/test_project",
-        id="test_id",
+        id=call_id,
         end_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
         outputs={"d": 5},
@@ -107,7 +109,7 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     res = clickhouse_trace_server.call_read(
         tsi.CallReadReq(
             project_id="test_entity/test_project",
-            id="test_id",
+            id=call_id,
         )
     )
 
@@ -116,9 +118,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     )
 
     assert res.call.model_dump() == {
-        "entity": "test_entity",
-        "project": "test_project",
-        "id": "test_id",
+        "project_id": "test_entity/test_project",
+        "id": call_id,
         "name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
