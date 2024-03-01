@@ -206,6 +206,7 @@ import {ReactComponent as ImportTypeStringQuote} from '../../assets/icons/icon-t
 import {ReactComponent as ImportUndeterminateVisibility} from '../../assets/icons/icon-undeterminate-visibility.svg';
 import {ReactComponent as ImportUndo} from '../../assets/icons/icon-undo.svg';
 import {ReactComponent as ImportUnlockedUnconstrained} from '../../assets/icons/icon-unlocked-unconstrained.svg';
+import {ReactComponent as ImportUserAuthor} from '../../assets/icons/icon-user-author.svg';
 import {ReactComponent as ImportUserProfilePersonal} from '../../assets/icons/icon-user-profile-personal.svg';
 import {ReactComponent as ImportUsersTeam} from '../../assets/icons/icon-users-team.svg';
 import {ReactComponent as ImportVersionsLayers} from '../../assets/icons/icon-versions-layers.svg';
@@ -852,6 +853,9 @@ export const IconUndo = (props: SVGIconProps) => (
 export const IconUnlockedUnconstrained = (props: SVGIconProps) => (
   <ImportUnlockedUnconstrained {...updateIconProps(props)} />
 );
+export const IconUserAuthor = (props: SVGIconProps) => (
+  <ImportUserAuthor {...updateIconProps(props)} />
+);
 export const IconUserProfilePersonal = (props: SVGIconProps) => (
   <ImportUserProfilePersonal {...updateIconProps(props)} />
 );
@@ -1102,6 +1106,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'undeterminate-visibility': IconUndeterminateVisibility,
   undo: IconUndo,
   'unlocked-unconstrained': IconUnlockedUnconstrained,
+  'user-author': IconUserAuthor,
   'user-profile-personal': IconUserProfilePersonal,
   'users-team': IconUsersTeam,
   'versions-layers': IconVersionsLayers,

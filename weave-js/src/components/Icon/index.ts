@@ -206,6 +206,7 @@ export {
   IconUndeterminateVisibility,
   IconUndo,
   IconUnlockedUnconstrained,
+  IconUserAuthor,
   IconUserProfilePersonal,
   IconUsersTeam,
   IconVersionsLayers,

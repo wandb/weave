@@ -205,6 +205,7 @@ export const IconNames = {
   UndeterminateVisibility: 'undeterminate-visibility',
   Undo: 'undo',
   UnlockedUnconstrained: 'unlocked-unconstrained',
+  UserAuthor: 'user-author',
   UserProfilePersonal: 'user-profile-personal',
   UsersTeam: 'users-team',
   VersionsLayers: 'versions-layers',
