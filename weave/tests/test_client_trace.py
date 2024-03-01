@@ -81,8 +81,7 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     )
 
     assert res.call.model_dump() == {
-        "entity": "test_entity",
-        "project": "test_project",
+        "project_id": "test_entity/test_project",
         "id": "test_id",
         "name": "test_name",
         "trace_id": "test_trace_id",
