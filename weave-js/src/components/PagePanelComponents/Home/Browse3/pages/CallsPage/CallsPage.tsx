@@ -303,7 +303,7 @@ export const CallsTable: FC<{
                   isPivoting ||
                   Object.keys(props.frozenFilter ?? {}).includes('opVersions')
                 }
-                value={effectiveFilter.opVersionRefs?.[0] ?? null}
+                value={opVersion ? opVersionRef : null}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
