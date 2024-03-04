@@ -1,6 +1,7 @@
 import {Alert, Box} from '@mui/material';
 import React from 'react';
 
+import {isValidVarName} from '../../../../../core/util/var';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
 
@@ -10,6 +11,8 @@ type TabUseOpProps = {
 };
 
 export const TabUseOp = ({name, uri}: TabUseOpProps) => {
+  const pythonName = isValidVarName(name) ? name : 'op';
+
   return (
     <Box m={2}>
       <Alert severity="info" variant="outlined">
@@ -28,8 +31,8 @@ export const TabUseOp = ({name, uri}: TabUseOpProps) => {
       <Box mt={2}>
         Use the following code to retrieve this operation version:
         <CopyableText
-          text={`${name} = weave.ref(<ref_url>).get()`}
-          copyText={`${name} = weave.ref("${uri}").get()`}
+          text={`${pythonName} = weave.ref(<ref_url>).get()`}
+          copyText={`${pythonName} = weave.ref("${uri}").get()`}
         />
       </Box>
     </Box>
