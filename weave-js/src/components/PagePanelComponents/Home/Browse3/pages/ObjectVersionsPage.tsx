@@ -143,8 +143,6 @@ const ObjectVersionsTable: React.FC<{
             objectName={obj.objectId}
             version={obj.versionHash}
             versionIndex={obj.versionIndex}
-            filePath={obj.path}
-            refExtra={obj.refExtra}
           />
         );
       },

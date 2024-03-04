@@ -48,6 +48,7 @@ import {
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
 } from './Browse3/context';
+import {FullPageButton} from './Browse3/FullPageButton';
 import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
@@ -290,7 +291,6 @@ const Browse3Mounted: FC<{
 };
 
 const MainPeekingLayout: FC = () => {
-  const history = useHistory();
   const {baseRouter} = useWeaveflowRouteContext();
   const params = useParams<Browse3Params>();
   const baseRouterProjectRoot = baseRouter.projectUrl(':entity', ':project');
@@ -384,25 +384,10 @@ const MainPeekingLayout: FC = () => {
                         height: '47px',
                         flex: '0 0 auto',
                       }}>
-                      <Button
-                        tooltip="Open full page for this object"
-                        icon="full-screen-mode-expand"
-                        variant="ghost"
-                        className="ml-4"
-                        onClick={() => {
-                          const pathname = query.peekPath!.replace(
-                            generalBase,
-                            targetBase
-                          );
-                          const preservedQuery = _.pick(query, ['tracetree']);
-                          const search = new URLSearchParams(
-                            preservedQuery
-                          ).toString();
-                          history.push({
-                            pathname,
-                            search,
-                          });
-                        }}
+                      <FullPageButton
+                        query={query}
+                        generalBase={generalBase}
+                        targetBase={targetBase}
                       />
                       <Button
                         tooltip="Close drawer"
