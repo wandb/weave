@@ -19,9 +19,8 @@ export type KeyedDictType = {
   _keys?: string[];
 };
 
-export interface TraceCallSchema {
-  entity: string;
-  project: string;
+export type TraceCallSchema = {
+  project_id: string;
   id: string;
   name: string;
   trace_id: string;
@@ -33,17 +32,16 @@ export interface TraceCallSchema {
   exception?: string;
   outputs?: KeyedDictType;
   summary?: KeyedDictType;
-}
+};
 
-interface TraceCallReadReq {
-  entity: string;
-  project: string;
+type TraceCallReadReq = {
+  project_id: string;
   id: string;
-}
+};
 
-export interface TraceCallReadRes {
+export type TraceCallReadRes = {
   call: TraceCallSchema;
-}
+};
 
 interface TraceCallsFilter {
   op_version_refs?: string[];
@@ -55,16 +53,15 @@ interface TraceCallsFilter {
   trace_roots_only?: boolean;
 }
 
-interface TraceCallsQueryReq {
-  entity: string;
-  project: string;
+type TraceCallsQueryReq = {
+  project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
-}
+};
 
-export interface TraceCallsQueryRes {
+export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
-}
+};
 
 export class TraceServerClient {
   private baseUrl: string;

@@ -1,7 +1,5 @@
 CREATE TABLE calls_raw (
-    # Identity Fields
-    entity String,
-    project String,
+    project_id String,
     id String,
     # Start Fields (All fields except parent_id are required when starting
     # a call. However, to support a fast "update" we need to allow nulls)
@@ -25,10 +23,9 @@ CREATE TABLE calls_raw (
     # Bookkeeping
     db_row_created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = MergeTree
-ORDER BY (entity, project, id);
+ORDER BY (project_id, id);
 CREATE TABLE calls_merged (
-    entity String,
-    project String,
+    project_id String,
     id String,
     # While these fields are all marked as null, the practical expectation
     # is that they will be non-null except for parent_id. The problem is that
@@ -47,10 +44,9 @@ CREATE TABLE calls_merged (
     exception SimpleAggregateFunction(any, Nullable(String)),
     output_refs SimpleAggregateFunction(array_concat_agg, Array(String))
 ) ENGINE = AggregatingMergeTree
-ORDER BY (entity, project, id);
+ORDER BY (project_id, id);
 CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS
-SELECT entity,
-    project,
+SELECT project_id,
     id,
     anySimpleState(trace_id) as trace_id,
     anySimpleState(parent_id) as parent_id,
@@ -65,6 +61,5 @@ SELECT entity,
     anySimpleState(exception) as exception,
     array_concat_aggSimpleState(output_refs) as output_refs
 FROM calls_raw
-GROUP BY entity,
-    project,
+GROUP BY project_id,
     id

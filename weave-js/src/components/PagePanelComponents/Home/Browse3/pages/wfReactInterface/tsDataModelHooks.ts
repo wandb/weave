@@ -28,6 +28,14 @@ import {
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
+const projectIdFromParts = ({
+  entity,
+  project,
+}: {
+  entity: string;
+  project: string;
+}) => `${entity}/${project}`;
+
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -41,8 +49,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
       loadingRef.current = true;
       getTsClient()
         .callRead({
-          entity: deepKey.entity,
-          project: deepKey.project,
+          project_id: projectIdFromParts(deepKey),
           id: deepKey.callId,
         })
         .then(res => {
@@ -103,8 +110,7 @@ const useCalls = (
     loadingRef.current = true;
     getTsClient()
       .callsQuery({
-        entity,
-        project,
+        project_id: projectIdFromParts({entity, project}),
         filter: {
           op_version_refs: deepFilter.opVersionRefs,
           input_object_version_refs: deepFilter.inputObjectVersionRefs,
@@ -313,12 +319,18 @@ const traceCallToLegacySpan = (
   };
 };
 
+const projectIdToParts = (projectId: string) => {
+  const [entity, project] = projectId.split('/');
+  return {entity, project};
+};
+
 const traceCallToUICallSchema = (
   traceCall: traceServerClient.TraceCallSchema
 ): CallSchema => {
+  const {entity, project} = projectIdToParts(traceCall.project_id);
   return {
-    entity: traceCall.entity,
-    project: traceCall.project,
+    entity,
+    project,
     callId: traceCall.id,
     traceId: traceCall.trace_id,
     parentId: traceCall.parent_id ?? null,

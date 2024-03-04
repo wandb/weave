@@ -7,6 +7,7 @@ import weave
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     extract_refs_from_values,
+    generate_id,
 )
 from ..trace_server import trace_server_interface as tsi
 from ..trace_server.graph_client_trace import GraphClientTrace
@@ -31,8 +32,7 @@ def test_simple_op(trace_client):
         == f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
     )
     assert fetched_call == tsi.CallSchema(
-        entity=trace_client.entity,
-        project=trace_client.project,
+        project_id=f"{trace_client.entity}/{trace_client.project}",
         id=fetched_call.id,
         name=fetched_call.name,
         trace_id=fetched_call.trace_id,
@@ -57,10 +57,10 @@ def test_dataset(trace_client):
 
 
 def test_trace_server_call_start_and_end(clickhouse_trace_server):
+    call_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
-        entity="test_entity",
-        project="test_project",
-        id="test_id",
+        project_id="test_entity/test_project",
+        id=call_id,
         name="test_name",
         trace_id="test_trace_id",
         parent_id="test_parent_id",
@@ -73,9 +73,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
 
     res = clickhouse_trace_server.call_read(
         tsi.CallReadReq(
-            entity="test_entity",
-            project="test_project",
-            id="test_id",
+            project_id="test_entity/test_project",
+            id=call_id,
         )
     )
 
@@ -84,9 +83,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     )
 
     assert res.call.model_dump() == {
-        "entity": "test_entity",
-        "project": "test_project",
-        "id": "test_id",
+        "project_id": "test_entity/test_project",
+        "id": call_id,
         "name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
@@ -100,9 +98,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     }
 
     end = tsi.EndedCallSchemaForInsert(
-        entity="test_entity",
-        project="test_project",
-        id="test_id",
+        project_id="test_entity/test_project",
+        id=call_id,
         end_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
         outputs={"d": 5},
@@ -111,9 +108,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
 
     res = clickhouse_trace_server.call_read(
         tsi.CallReadReq(
-            entity="test_entity",
-            project="test_project",
-            id="test_id",
+            project_id="test_entity/test_project",
+            id=call_id,
         )
     )
 
@@ -122,9 +118,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     )
 
     assert res.call.model_dump() == {
-        "entity": "test_entity",
-        "project": "test_project",
-        "id": "test_id",
+        "project_id": "test_entity/test_project",
+        "id": call_id,
         "name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
@@ -294,8 +289,7 @@ def test_trace_call_query_filter_op_version_refs(trace_client):
     ]:
         res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=trace_client.entity,
-                project=trace_client.project,
+                project_id=trace_client.project_id(),
                 filter=tsi._CallsFilter(op_version_refs=op_version_refs),
             )
         )
@@ -316,8 +310,7 @@ def get_all_calls_asserting_finished(
 ) -> tsi.CallsQueryRes:
     res = trace_client.trace_server.calls_query(
         tsi.CallsQueryReq(
-            entity=trace_client.entity,
-            project=trace_client.project,
+            project_id=trace_client.project_id(),
         )
     )
     assert len(res.calls) == call_spec.total_calls
@@ -375,8 +368,7 @@ def test_trace_call_query_filter_input_object_version_refs(trace_client):
     ]:
         inner_res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=trace_client.entity,
-                project=trace_client.project,
+                project_id=trace_client.project_id(),
                 filter=tsi._CallsFilter(
                     input_object_version_refs=input_object_version_refs
                 ),
@@ -436,8 +428,7 @@ def test_trace_call_query_filter_output_object_version_refs(trace_client):
     ]:
         inner_res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=trace_client.entity,
-                project=trace_client.project,
+                project_id=trace_client.project_id(),
                 filter=tsi._CallsFilter(
                     output_object_version_refs=output_object_version_refs
                 ),
@@ -475,8 +466,7 @@ def test_trace_call_query_filter_parent_ids(trace_client):
     ]:
         inner_res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=trace_client.entity,
-                project=trace_client.project,
+                project_id=trace_client.project_id(),
                 filter=tsi._CallsFilter(parent_ids=parent_ids),
             )
         )
@@ -503,8 +493,7 @@ def test_trace_call_query_filter_trace_ids(trace_client):
     ]:
         inner_res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=trace_client.entity,
-                project=trace_client.project,
+                project_id=trace_client.project_id(),
                 filter=tsi._CallsFilter(trace_ids=trace_ids),
             )
         )
@@ -531,8 +520,7 @@ def test_trace_call_query_filter_call_ids(trace_client):
     ]:
         inner_res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=trace_client.entity,
-                project=trace_client.project,
+                project_id=trace_client.project_id(),
                 filter=tsi._CallsFilter(call_ids=call_ids),
             )
         )
@@ -553,8 +541,7 @@ def test_trace_call_query_filter_trace_roots_only(trace_client):
     ]:
         inner_res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=trace_client.entity,
-                project=trace_client.project,
+                project_id=trace_client.project_id(),
                 filter=tsi._CallsFilter(trace_roots_only=trace_roots_only),
             )
         )
@@ -575,8 +562,7 @@ def test_trace_call_query_limit(trace_client):
     ]:
         inner_res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=trace_client.entity,
-                project=trace_client.project,
+                project_id=trace_client.project_id(),
                 limit=limit,
             )
         )

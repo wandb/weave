@@ -33,8 +33,7 @@ class NotFoundError(Exception):
 
 
 class CallStartCHInsertable(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     id: str
     trace_id: str
     parent_id: typing.Optional[str] = None
@@ -47,8 +46,7 @@ class CallStartCHInsertable(BaseModel):
 
 
 class CallEndCHInsertable(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     id: str
     end_datetime: datetime.datetime
     exception: typing.Optional[str] = None
@@ -65,8 +63,7 @@ CallCHInsertable = typing.Union[CallStartCHInsertable, CallEndCHInsertable]
 # essentially be the DB version of CallSchema with the addition of the
 # created_at and updated_at fields
 class SelectableCHCallSchema(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     id: str
 
     name: str
@@ -269,8 +266,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conditions.append("parent_id IS NULL")
 
         ch_calls = self._select_calls_query(
-            req.entity,
-            req.project,
+            req.project_id,
             conditions=conditions,
             parameters=parameters,
             limit=req.limit,
@@ -381,8 +377,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
         # Generate and run the query to get the call from the database
         ch_calls = self._select_calls_query(
-            req.entity,
-            req.project,
+            req.project_id,
             conditions=["id = {id: String}"],
             limit=1,
             parameters={"id": req.id},
@@ -396,8 +391,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _select_calls_query(
         self,
-        entity: str,
-        project: str,
+        project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
         conditions: typing.Optional[typing.List[str]] = None,
         order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
@@ -410,8 +404,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters = {}
         parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
 
-        parameters["entity_scope"] = entity
-        parameters["project_scope"] = project
+        parameters["project_id"] = project_id
         if columns == None:
             columns = all_call_select_columns
         columns = typing.cast(typing.List[str], columns)
@@ -425,7 +418,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ), f"Invalid columns: {columns}"
         merged_cols = []
         for col in columns:
-            if col in ["entity", "project", "id"]:
+            if col in ["project_id", "id"]:
                 merged_cols.append(f"{col} AS {col}")
             elif col in ["input_refs", "output_refs"]:
                 merged_cols.append(f"array_concat_agg({col}) AS {col}")
@@ -466,8 +459,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             f"""
             SELECT {select_columns_part}
             FROM calls_merged
-            WHERE entity = {{entity_scope: String}} AND project = {{project_scope: String}}
-            GROUP BY entity, project, id
+            WHERE project_id = {{project_id: String}}
+            GROUP BY project_id, id
             HAVING {conditions_part}
             {order_by_part}
             {limit_part}
@@ -654,8 +647,7 @@ def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHOb
 
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
-        entity=ch_call.entity,
-        project=ch_call.project,
+        project_id=ch_call.project_id,
         id=ch_call.id,
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
@@ -692,8 +684,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
     return CallStartCHInsertable(
-        entity=start_call.entity,
-        project=start_call.project,
+        project_id=start_call.project_id,
         id=call_id,
         trace_id=trace_id,
         parent_id=start_call.parent_id,
@@ -711,8 +702,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
     return CallEndCHInsertable(
-        entity=end_call.entity,
-        project=end_call.project,
+        project_id=end_call.project_id,
         id=end_call.id,
         exception=end_call.exception,
         end_datetime=end_call.end_datetime,

@@ -443,9 +443,11 @@ class CallSchemaRun(Run):
 
     @property
     def ui_url(self) -> str:
-        return urls.call_path_as_peek(
-            self._call.entity, self._call.project, self._call.id
-        )
+        project_parts = self._call.project_id.split("/")
+        if len(project_parts) != 2:
+            raise ValueError(f"Invalid project_id: {self._call.project_id}")
+        entity, project = project_parts
+        return urls.call_path_as_peek(entity, project, self._call.id)
 
 
 def _run_from_call(call: tsi.CallSchema) -> CallSchemaRun:
@@ -468,14 +470,16 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         # in the service layer, so this is just a matter of convenience.
         project_creator.ensure_project_exists(entity, project)
 
+    def project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
+
     ##### Read API
 
     # Implement the required members from the "GraphClient" protocol class
     def runs(self) -> Sequence[CallSchemaRun]:
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self.project_id(),
             )
         )
         return [_run_from_call(call) for call in res.calls]
@@ -483,7 +487,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
     def run(self, run_id: str) -> typing.Optional[CallSchemaRun]:
         res = self.trace_server.call_read(
             tsi.CallReadReq(
-                entity=self.entity,
+                project_id=self.project_id(),
                 project=self.project,
                 id=run_id,
             )
@@ -499,8 +503,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
     def run_children(self, run_id: str) -> Sequence[CallSchemaRun]:
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self.project_id(),
                 filter=tsi._CallsFilter(parent_ids=[run_id]),
             )
         )
@@ -513,8 +516,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         ref_str = str(ref)
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self.project_id(),
                 filter=tsi._CallsFilter(op_version_refs=[ref_str]),
             )
         )
@@ -526,8 +528,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         ref_str = str(ref)
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self.project_id(),
                 filter=tsi._CallsFilter(input_object_version_refs=[ref_str]),
             )
         )
@@ -539,8 +540,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         ref_str = str(ref)
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self.project_id(),
                 filter=tsi._CallsFilter(input_object_version_refs=[ref_str]),
             )
         )
@@ -552,8 +552,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
         ref_str = str(ref)
         res = self.trace_server.calls_query(
             tsi.CallsQueryReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self.project_id(),
                 filter=tsi._CallsFilter(output_object_version_refs=[ref_str]),
             )
         )
@@ -651,8 +650,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             parent_id = None
 
         start = tsi.StartedCallSchemaForInsert(
-            entity=self.entity,
-            project=self.project,
+            project_id=self.project_id(),
             id=generate_id(),
             name=op_name,
             trace_id=trace_id,
@@ -669,8 +667,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             tsi.CallEndReq.model_validate(
                 {
                     "end": {
-                        "entity": self.entity,
-                        "project": self.project,
+                        "project_id": self.project_id(),
                         "id": run.id,
                         "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
                         "outputs": {},
@@ -694,8 +691,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             tsi.CallEndReq.model_validate(
                 {
                     "end": {
-                        "entity": self.entity,
-                        "project": self.project,
+                        "project_id": self.project_id(),
                         "id": run.id,
                         "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
                         "outputs": output,
