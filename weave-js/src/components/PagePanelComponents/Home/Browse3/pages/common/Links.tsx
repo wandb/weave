@@ -159,7 +159,7 @@ export const ObjectVersionLink: React.FC<{
   objectName: string;
   version: string;
   versionIndex: number;
-  filePath: string;
+  filePath?: string;
   refExtra?: string;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -167,19 +167,15 @@ export const ObjectVersionLink: React.FC<{
   //   ? props.version
   //   : props.objectName + ': ' + truncateID(props.version);
   const text = objectVersionText(props.objectName, props.versionIndex);
-  return (
-    <Link
-      to={peekingRouter.objectVersionUIUrl(
-        props.entityName,
-        props.projectName,
-        props.objectName,
-        props.version,
-        props.filePath,
-        props.refExtra
-      )}>
-      {text}
-    </Link>
+  const to = peekingRouter.objectVersionUIUrl(
+    props.entityName,
+    props.projectName,
+    props.objectName,
+    props.version,
+    props.filePath,
+    props.refExtra
   );
+  return <Link to={to}>{text}</Link>;
 };
 
 export const OpLink: React.FC<{
