@@ -61,6 +61,7 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../Browse3/context';
+import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
 import {Link} from '../Browse3/pages/common/Links';
 import {
   DICT_KEY_EDGE_TYPE,
@@ -79,6 +80,9 @@ import {parseRefMaybe, SmallRef} from './SmallRef';
 import {useRefPageUrl} from './url';
 
 const displaysAsSingleRow = (valueType: Type) => {
+  if (valueType === 'none') {
+    return true;
+  }
   if (isAssignableTo(valueType, maybe({type: 'list', objectType: 'any'}))) {
     return false;
   }
@@ -374,6 +378,9 @@ const WeaveEditorField: FC<{
   disableEdits?: boolean;
 }> = ({node, path, disableEdits}) => {
   const weave = useWeaveContext();
+  if (node.type === 'none') {
+    return <ValueViewPrimitive>null</ValueViewPrimitive>;
+  }
   if (isAssignableTo(node.type, maybe('boolean'))) {
     return <WeaveEditorBoolean node={node} path={path} disableEdits />;
   }

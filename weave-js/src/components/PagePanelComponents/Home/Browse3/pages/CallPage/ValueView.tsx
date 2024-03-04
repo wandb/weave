@@ -1,11 +1,10 @@
 import React from 'react';
-import styled from 'styled-components';
 
-import {MOON_150} from '../../../../../../common/css/color.styles';
 import {parseRef} from '../../../../../../react';
 import {SmallRef} from '../../../Browse2/SmallRef';
 import {WANDB_ARTIFACT_REF_PREFIX} from '../wfReactInterface/constants';
 import {ValueViewNumber} from './ValueViewNumber';
+import {ValueViewPrimitive} from './ValueViewPrimitive';
 import {ValueViewString} from './ValueViewString';
 
 type ValueData = Record<string, any>;
@@ -14,18 +13,6 @@ type ValueViewProps = {
   data: ValueData;
   isExpanded: boolean;
 };
-
-export const Primitive = styled.div`
-  display: inline-block;
-  padding: 0 4px;
-  background-color: ${MOON_150};
-  border-radius: 4px;
-  font-weight: 600;
-  font-family: monospace;
-  font-size: 10px;
-  line-height: 20px;
-`;
-Primitive.displayName = 'S.Primitive';
 
 export const isRef = (value: any): boolean => {
   return (
@@ -45,7 +32,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     return null;
   }
   if (data.value === null) {
-    return <Primitive>null</Primitive>;
+    return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
   if (isRef(data.value)) {
     return <SmallRef objRef={parseRef(data.value)} />;
@@ -60,7 +47,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
 
   if (data.valueType === 'boolean') {
-    return <Primitive>{data.value.toString()}</Primitive>;
+    return <ValueViewPrimitive>{data.value.toString()}</ValueViewPrimitive>;
   }
 
   return <div>{data.value.toString()}</div>;
