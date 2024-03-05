@@ -20,6 +20,12 @@ class ValRef(Ref):
     val_id: uuid.UUID
 
 
+@dataclasses.dataclass
+class ObjectRef(Ref):
+    name: str
+    val_id: uuid.UUID
+
+
 class RefEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, TableRef):
@@ -29,6 +35,10 @@ class RefEncoder(json.JSONEncoder):
         elif isinstance(o, uuid.UUID):
             return {"_type": "UUID", "uuid": o.hex}
         return json.JSONEncoder.default(self, o)
+
+
+def json_dumps(val):
+    return json.dumps(val, cls=RefEncoder)
 
 
 def ref_decoder(d):
@@ -42,16 +52,34 @@ def ref_decoder(d):
     return d
 
 
-class CHClient:
+def json_loads(d):
+    return json.loads(d, object_hook=ref_decoder)
+
+
+class ObjectServer:
     def __init__(self):
         self.client = clickhouse_connect.get_client()
 
     def drop_tables(self):
+        self.client.command("DROP TABLE IF EXISTS objects")
         self.client.command("DROP TABLE IF EXISTS values")
         self.client.command("DROP TABLE IF EXISTS tables")
         self.client.command("DROP TABLE IF EXISTS table_transactions")
 
     def create_tables(self):
+        self.client.command(
+            """
+            CREATE TABLE IF NOT EXISTS objects
+            (
+                id UUID,
+                name String,
+                branch String,
+                created_at DateTime64 DEFAULT now64(),
+                val String
+            ) 
+            ENGINE = MergeTree() 
+            ORDER BY (name, branch, created_at)"""
+        )
         self.client.command(
             """
             CREATE TABLE IF NOT EXISTS values
@@ -190,7 +218,7 @@ class CHClient:
         val = lists_to_tables(val)
 
         # encode val
-        encoded_val = json.dumps(val, cls=RefEncoder)
+        encoded_val = json_dumps(val)
 
         value_id = uuid.uuid4()
         self.client.insert(
@@ -207,12 +235,7 @@ class CHClient:
             """,
             parameters={"value_id": val_ref.val_id},
         )
-        val = json.loads(query_result.result_rows[0][0], object_hook=ref_decoder)
-        if isinstance(val, Ref):
-            return self.get(val)
-        elif isinstance(val, dict):
-            val = {k: self.get(v) if isinstance(v, Ref) else v for k, v in val.items()}
-        return val
+        return json_loads(query_result.result_rows[0][0])
 
     def get(self, val_ref: Ref):
         if isinstance(val_ref, TableRef):
@@ -221,6 +244,47 @@ class CHClient:
             return self.get_val(val_ref)
         else:
             raise ValueError(f"Unknown ref type: {val_ref}")
+
+    def new_object(self, val, name: str, branch: str) -> ObjectRef:
+        val_ref = self.new_val(val)
+        self.client.insert(
+            "objects",
+            data=[(uuid.uuid4(), name, branch, json_dumps(val_ref))],
+            column_names=("id", "name", "branch", "val"),
+        )
+        return ObjectRef(name, val_ref.val_id)
+
+    def resolve_object(self, name: str, branch: str) -> Optional[ValRef]:
+        query_result = self.client.query(
+            """
+            SELECT val from objects WHERE name = %(name)s AND branch = %(branch)s
+            """,
+            parameters={"name": name, "branch": branch},
+        )
+        result = query_result.result_rows
+        if not result:
+            return None
+        return json_loads(result[0][0])
+
+
+class ObjectClient:
+    def __init__(self):
+        self.server = ObjectServer()
+
+    def save(self, val, name: str, branch: str = "latest") -> ObjectRef:
+        return self.server.new_object(val, name, branch)
+
+    def get(self, ref: ObjectRef):
+        val = self.server.get_val(ValRef(ref.val_id))
+
+        def resolve_refs(val):
+            if isinstance(val, dict):
+                return {k: resolve_refs(v) for k, v in val.items()}
+            elif isinstance(val, Ref):
+                return self.server.get(val)
+            return val
+
+        return resolve_refs(val)
 
 
 # OK so I need
