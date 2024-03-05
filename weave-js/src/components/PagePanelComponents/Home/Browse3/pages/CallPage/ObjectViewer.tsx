@@ -46,15 +46,26 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       opGet({uri: constString(ref)} as any)
     );
     const refQueries = refValueNodes.map(node => client.query(node));
-    Promise.all(refQueries).then(values => {
+    Promise.allSettled(refQueries).then(values => {
       const refValues: RefValues = {};
       for (const [r, v] of _.zip(refs, values)) {
-        if (!r) {
+        if (!r || !v) {
           // Shouldn't be possible
           continue;
         }
-        v._ref = r;
-        refValues[r] = v;
+        let val = r;
+        if (v.status === 'rejected') {
+          console.error('Error resolving ref', r);
+        } else {
+          val = v.value;
+          if (typeof val === 'object' && val !== null) {
+            val = {
+              ...v.value,
+              _ref: r,
+            };
+          }
+        }
+        refValues[r] = val;
       }
       const resolved = mapObject(data, context => {
         if (isRef(context.value)) {
