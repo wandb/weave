@@ -5,8 +5,8 @@ import styled from 'styled-components';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {ObjectViewer} from './ObjectViewer';
-import {getValueType} from './traverse';
-import {ValueView} from './ValueView';
+import {getValueType, traverse} from './traverse';
+import {isRef, ValueView} from './ValueView';
 
 type Data = Record<string, any>;
 
@@ -33,12 +33,43 @@ const Title = styled.div`
 `;
 Title.displayName = 'S.Title';
 
+// We'll automatically expand objects if they are "simple" enough.
+// This is a heuristic for what that means.
+const isSimpleData = (data: Data): boolean => {
+  let isSimple = true;
+  traverse(data, context => {
+    if (context.depth > 3) {
+      isSimple = false;
+      return false;
+    }
+    if (isRef(context.value)) {
+      isSimple = false;
+      return false;
+    }
+    if (context.valueType === 'array' && context.value.length > 10) {
+      isSimple = false;
+      return false;
+    }
+    if (
+      context.valueType === 'object' &&
+      Object.keys(context.value).length > 10
+    ) {
+      isSimple = false;
+      return false;
+    }
+    return undefined;
+  });
+  return isSimple;
+};
+
 export const ObjectViewerSection = ({
   title,
   data,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
-  const [mode, setMode] = useState('collapsed');
+  const [mode, setMode] = useState(
+    isSimpleData(data) ? 'expanded' : 'collapsed'
+  );
 
   const isOneValue = '_result' in data;
 
