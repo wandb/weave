@@ -1,9 +1,10 @@
-from typing import Optional
+from typing import Optional, Any
 import clickhouse_connect
 import uuid
 import json
 import dataclasses
-import time
+
+from weave import box
 
 
 class Ref:
@@ -21,19 +22,27 @@ class ValRef(Ref):
 
 
 @dataclasses.dataclass
-class ObjectRef(Ref):
+class ObjectRef:
     name: str
     val_id: uuid.UUID
+    extra: list[str] = dataclasses.field(default_factory=list)
+
+    def with_key(self, key) -> "ObjectRef":
+        return ObjectRef(self.name, self.val_id, self.extra + ["key", key])
+
+    def with_attr(self, attr) -> "ObjectRef":
+        return ObjectRef(self.name, self.val_id, self.extra + ["attr", attr])
+
+    def with_id(self, index) -> "ObjectRef":
+        return ObjectRef(self.name, self.val_id, self.extra + ["id", index])
 
 
 class RefEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, TableRef):
-            return {"_type": "TableRef", "table_id": o.table_id}
-        elif isinstance(o, ValRef):
-            return {"_type": "ValRef", "val_id": o.val_id}
-        elif isinstance(o, uuid.UUID):
+        if isinstance(o, uuid.UUID):
             return {"_type": "UUID", "uuid": o.hex}
+        elif dataclasses.is_dataclass(o):
+            return {"_type": o.__class__.__name__, **dataclasses.asdict(o)}
         return json.JSONEncoder.default(self, o)
 
 
@@ -41,14 +50,25 @@ def json_dumps(val):
     return json.dumps(val, cls=RefEncoder)
 
 
+class ObjectRecord:
+    def __init__(self, attrs):
+        for k, v in attrs.items():
+            setattr(self, k, v)
+
+    def __repr__(self):
+        return f"ObjectRecord({self.__dict__})"
+
+
 def ref_decoder(d):
     if "_type" in d:
-        if d["_type"] == "TableRef":
+        if d["_type"] == "UUID":
+            return uuid.UUID(d["uuid"])
+        elif d["_type"] == "TableRef":
             return TableRef(d["table_id"])
         elif d["_type"] == "ValRef":
             return ValRef(d["val_id"])
-        elif d["_type"] == "UUID":
-            return uuid.UUID(d["uuid"])
+        else:
+            return ObjectRecord(d)
     return d
 
 
@@ -61,6 +81,7 @@ class ObjectServer:
         self.client = clickhouse_connect.get_client()
 
     def drop_tables(self):
+        # TODO: branches
         self.client.command("DROP TABLE IF EXISTS objects")
         self.client.command("DROP TABLE IF EXISTS values")
         self.client.command("DROP TABLE IF EXISTS tables")
@@ -267,6 +288,70 @@ class ObjectServer:
         return json_loads(result[0][0])
 
 
+class TraceObject:
+    def __init__(self, val, ref, server):
+        self.val = val
+        self.ref = ref
+        self.server = server
+
+    def __getattribute__(self, __name: str) -> Any:
+        return make_trace_val(
+            getattr(self.val, __name), self.ref.with_attr(__name), self.server
+        )
+
+    def __repr__(self):
+        return f"TraceObject({self.ref})"
+
+
+class TraceTable:
+    def __init__(self, val, ref, server):
+        self.val = val
+        self.ref = ref
+        self.server = server
+
+    def __getitem__(self, i):
+        return make_trace_val(self.val[i], self.ref.with_id(i), self.server)
+
+
+class TraceDict:
+    def __init__(self, val, ref, server):
+        self.val = val
+        self.ref = ref
+        self.server = server
+
+    def __getitem__(self, key):
+        return make_trace_val(self.val[key], self.ref.with_key(key), self.server)
+
+    def keys(self):
+        return self.val.keys()
+
+    def values(self):
+        return self.val.values()
+
+    def items(self):
+        return self.val.items()
+
+    def __iter__(self):
+        return iter(self.val)
+
+    def __repr__(self):
+        return f"TraceDict({self.val})"
+
+
+def make_trace_val(val: Any, ref: ObjectRef, server: ObjectServer):
+    if isinstance(val, Ref):
+        val = server.get(val)
+    if isinstance(val, ObjectRecord):
+        return TraceObject(val, ref, server)
+    elif isinstance(val, list):
+        return TraceTable(val, ref, server)
+    elif isinstance(val, dict):
+        return TraceDict(val, ref, server)
+    box_val = box.box(val)
+    setattr(box_val, "ref", ref)
+    return box_val
+
+
 class ObjectClient:
     def __init__(self):
         self.server = ObjectServer()
@@ -277,17 +362,13 @@ class ObjectClient:
     def get(self, ref: ObjectRef):
         val = self.server.get_val(ValRef(ref.val_id))
 
-        def resolve_refs(val):
-            if isinstance(val, dict):
-                return {k: resolve_refs(v) for k, v in val.items()}
-            elif isinstance(val, Ref):
-                return self.server.get(val)
-            return val
-
-        return resolve_refs(val)
+        return make_trace_val(val, ref, self.server)
 
 
-# OK so I need
-#   - append and set mutations
+# TODO
+#   - mutations (append, set, remove)
 #   - files
-#   - hook it into the client somehow
+#   - client queries / filters / client objects
+#   - joins / resolve many
+#   - find all calls on a given dataset row
+#   - table ID refs instead of index
