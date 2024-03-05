@@ -128,7 +128,6 @@ export const RunsTable: FC<{
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
 }> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
-  const showIO = true;
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
   }, [spans]);
@@ -371,128 +370,126 @@ export const RunsTable: FC<{
       })
     );
 
-    if (showIO) {
-      const attributesOrder = Object.keys(attributesKeys);
-      const attributesGrouping = buildTree(attributesOrder, 'attributes');
-      colGroupingModel.push(attributesGrouping);
-      for (const key of attributesOrder) {
-        if (!key.startsWith('_')) {
-          cols.push({
-            flex: 1,
-            minWidth: 150,
-            field: 'attributes.' + key,
-            headerName: key.split('.').slice(-1)[0],
-            renderCell: cellParams => {
-              return renderCell((cellParams.row as any)['attributes.' + key]);
-            },
-          });
-        }
-      }
-
-      const inputOrder = !isSingleOpVersion
-        ? getInputColumns(tableStats)
-        : row0.rawSpan.inputs._arg_order ??
-          row0.rawSpan.inputs._keys ??
-          Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
-            k => !k.startsWith('_')
-          );
-      const inputGroup: Exclude<
-        ComponentProps<typeof DataGrid>['columnGroupingModel'],
-        undefined
-      >[number] = {
-        groupId: 'inputs',
-        children: [],
-      };
-      for (const key of inputOrder) {
+    const attributesOrder = Object.keys(attributesKeys);
+    const attributesGrouping = buildTree(attributesOrder, 'attributes');
+    colGroupingModel.push(attributesGrouping);
+    for (const key of attributesOrder) {
+      if (!key.startsWith('_')) {
         cols.push({
           flex: 1,
           minWidth: 150,
-          field: 'input.' + key,
-          headerName: key,
-          renderCell: cellParams => {
-            const k = 'input.' + key;
-            if (k in cellParams.row) {
-              return renderCell((cellParams.row as any)[k]);
-            }
-            return <NotApplicable />;
-          },
-        });
-        inputGroup.children.push({field: 'input.' + key});
-      }
-      colGroupingModel.push(inputGroup);
-
-      // All output keys as we don't have the order key yet.
-      let outputKeys: {[key: string]: true} = {};
-      spans.forEach(span => {
-        for (const [k, v] of Object.entries(
-          flattenObject(span.rawSpan.output ?? {})
-        )) {
-          if (v != null && (!k.startsWith('_') || k === '_result')) {
-            outputKeys[k] = true;
-          }
-        }
-      });
-      // sort shallowest keys first
-      outputKeys = _.fromPairs(
-        Object.entries(outputKeys).sort((a, b) => {
-          const aDepth = a[0].split('.').length;
-          const bDepth = b[0].split('.').length;
-          return aDepth - bDepth;
-        })
-      );
-
-      const outputOrder = Object.keys(outputKeys);
-      const outputGrouping = buildTree(outputOrder, 'output');
-      colGroupingModel.push(outputGrouping);
-      for (const key of outputOrder) {
-        cols.push({
-          flex: 1,
-          minWidth: 150,
-          field: 'output.' + key,
+          field: 'attributes.' + key,
           headerName: key.split('.').slice(-1)[0],
           renderCell: cellParams => {
-            const k = 'output.' + key;
-            if (k in cellParams.row) {
-              return renderCell((cellParams.row as any)[k]);
-            }
-            return <NotApplicable />;
+            return renderCell((cellParams.row as any)['attributes.' + key]);
           },
         });
       }
+    }
 
-      let feedbackKeys: {[key: string]: true} = {};
-      spans.forEach(span => {
-        for (const [k, v] of Object.entries(
-          flattenObject(span.rawFeedback ?? {})
-        )) {
-          if (v != null && k !== '_keys') {
-            feedbackKeys[k] = true;
+    const inputOrder = !isSingleOpVersion
+      ? getInputColumns(tableStats)
+      : row0.rawSpan.inputs._arg_order ??
+        row0.rawSpan.inputs._keys ??
+        Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
+          k => !k.startsWith('_')
+        );
+    const inputGroup: Exclude<
+      ComponentProps<typeof DataGrid>['columnGroupingModel'],
+      undefined
+    >[number] = {
+      groupId: 'inputs',
+      children: [],
+    };
+    for (const key of inputOrder) {
+      cols.push({
+        flex: 1,
+        minWidth: 150,
+        field: 'input.' + key,
+        headerName: key,
+        renderCell: cellParams => {
+          const k = 'input.' + key;
+          if (k in cellParams.row) {
+            return renderCell((cellParams.row as any)[k]);
           }
-        }
+          return <NotApplicable />;
+        },
       });
-      // sort shallowest keys first
-      feedbackKeys = _.fromPairs(
-        Object.entries(feedbackKeys).sort((a, b) => {
-          const aDepth = a[0].split('.').length;
-          const bDepth = b[0].split('.').length;
-          return aDepth - bDepth;
-        })
-      );
+      inputGroup.children.push({field: 'input.' + key});
+    }
+    colGroupingModel.push(inputGroup);
 
-      const feedbackOrder = Object.keys(feedbackKeys);
-      const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
-      colGroupingModel.push(feedbackGrouping);
-      for (const key of feedbackOrder) {
-        cols.push({
-          flex: 1,
-          minWidth: 150,
-          field: 'feedback.' + key,
-          headerName: key.split('.').slice(-1)[0],
-          renderCell: cellParams => {
-            return renderCell((cellParams.row as any)['feedback.' + key]);
-          },
-        });
+    // All output keys as we don't have the order key yet.
+    let outputKeys: {[key: string]: true} = {};
+    spans.forEach(span => {
+      for (const [k, v] of Object.entries(
+        flattenObject(span.rawSpan.output ?? {})
+      )) {
+        if (v != null && (!k.startsWith('_') || k === '_result')) {
+          outputKeys[k] = true;
+        }
       }
+    });
+    // sort shallowest keys first
+    outputKeys = _.fromPairs(
+      Object.entries(outputKeys).sort((a, b) => {
+        const aDepth = a[0].split('.').length;
+        const bDepth = b[0].split('.').length;
+        return aDepth - bDepth;
+      })
+    );
+
+    const outputOrder = Object.keys(outputKeys);
+    const outputGrouping = buildTree(outputOrder, 'output');
+    colGroupingModel.push(outputGrouping);
+    for (const key of outputOrder) {
+      cols.push({
+        flex: 1,
+        minWidth: 150,
+        field: 'output.' + key,
+        headerName: key.split('.').slice(-1)[0],
+        renderCell: cellParams => {
+          const k = 'output.' + key;
+          if (k in cellParams.row) {
+            return renderCell((cellParams.row as any)[k]);
+          }
+          return <NotApplicable />;
+        },
+      });
+    }
+
+    let feedbackKeys: {[key: string]: true} = {};
+    spans.forEach(span => {
+      for (const [k, v] of Object.entries(
+        flattenObject(span.rawFeedback ?? {})
+      )) {
+        if (v != null && k !== '_keys') {
+          feedbackKeys[k] = true;
+        }
+      }
+    });
+    // sort shallowest keys first
+    feedbackKeys = _.fromPairs(
+      Object.entries(feedbackKeys).sort((a, b) => {
+        const aDepth = a[0].split('.').length;
+        const bDepth = b[0].split('.').length;
+        return aDepth - bDepth;
+      })
+    );
+
+    const feedbackOrder = Object.keys(feedbackKeys);
+    const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
+    colGroupingModel.push(feedbackGrouping);
+    for (const key of feedbackOrder) {
+      cols.push({
+        flex: 1,
+        minWidth: 150,
+        field: 'feedback.' + key,
+        headerName: key.split('.').slice(-1)[0],
+        renderCell: cellParams => {
+          return renderCell((cellParams.row as any)['feedback.' + key]);
+        },
+      });
     }
 
     cols.push({
@@ -510,7 +507,6 @@ export const RunsTable: FC<{
     return {cols, colGroupingModel};
   }, [
     ioColumnsOnly,
-    showIO,
     spans,
     params.entity,
     params.project,
