@@ -64,8 +64,8 @@ def test_object(server):
 
 
 def test_save_load(client):
-    ref = client.save({"a": [1, 2, 3]}, "my-obj")
-    val = client.get(ref)
+    saved_val = client.save({"a": [1, 2, 3]}, "my-obj")
+    val = client.get(saved_val.ref)
     assert val["a"][0] == 1
     assert val["a"][1] == 2
     assert val["a"][2] == 3
