@@ -295,7 +295,7 @@ class TraceObject:
         self.server = server
 
     def __getattribute__(self, __name: str) -> Any:
-        return make_trace_val(
+        return access_sub_val(
             getattr(self.val, __name), self.ref.with_attr(__name), self.server
         )
 
@@ -310,7 +310,7 @@ class TraceTable:
         self.server = server
 
     def __getitem__(self, i):
-        return make_trace_val(self.val[i], self.ref.with_id(i), self.server)
+        return access_sub_val(self.val[i], self.ref.with_id(i), self.server)
 
 
 class TraceDict:
@@ -320,7 +320,7 @@ class TraceDict:
         self.server = server
 
     def __getitem__(self, key):
-        return make_trace_val(self.val[key], self.ref.with_key(key), self.server)
+        return access_sub_val(self.val[key], self.ref.with_key(key), self.server)
 
     def keys(self):
         return self.val.keys()
@@ -338,17 +338,18 @@ class TraceDict:
         return f"TraceDict({self.val})"
 
 
-def make_trace_val(val: Any, ref: ObjectRef, server: ObjectServer):
+def access_sub_val(val: Any, new_ref: ObjectRef, server: ObjectServer):
+    # Derefence val and create the appropriate wrapper object
     if isinstance(val, Ref):
         val = server.get(val)
     if isinstance(val, ObjectRecord):
-        return TraceObject(val, ref, server)
+        return TraceObject(val, new_ref, server)
     elif isinstance(val, list):
-        return TraceTable(val, ref, server)
+        return TraceTable(val, new_ref, server)
     elif isinstance(val, dict):
-        return TraceDict(val, ref, server)
+        return TraceDict(val, new_ref, server)
     box_val = box.box(val)
-    setattr(box_val, "ref", ref)
+    setattr(box_val, "ref", new_ref)
     return box_val
 
 
@@ -362,7 +363,7 @@ class ObjectClient:
     def get(self, ref: ObjectRef):
         val = self.server.get_val(ValRef(ref.val_id))
 
-        return make_trace_val(val, ref, self.server)
+        return access_sub_val(val, ref, self.server)
 
 
 # TODO
