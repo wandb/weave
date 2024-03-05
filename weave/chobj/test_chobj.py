@@ -77,6 +77,36 @@ def test_dataset(client):
         rows: list[Any]
 
     ref = client.save(Dataset([1, 2, 3]), "my-dataset")
+    new_table_rows = []
+    for row in ref.rows:
+        new_table_rows.append({"a_ref": row, "b": row + 42})
+    ref2 = client.save(new_table_rows, "my-dataset2")
+
+    # if we access a_ref values, we actually get values, but we
+    # can also get correct references.
+    # TODO: shit this is wrong... those should be the underlying
+    # refs I think?
+
+    row0 = ref2[0]
+    ref0_aref = row0["a_ref"]
+    assert ref0_aref == 1
+    assert chobj.get_ref(ref0_aref) == chobj.ObjectRef(
+        "my-dataset2", ref2.ref.val_id, ["id", 0, "key", "a_ref"]
+    )
+
+    row1 = ref2[1]
+    ref1_aref = row1["a_ref"]
+    assert ref1_aref == 2
+    assert chobj.get_ref(ref1_aref) == chobj.ObjectRef(
+        "my-dataset2", ref2.ref.val_id, ["id", 1, "key", "a_ref"]
+    )
+
+    row2 = ref2[2]
+    ref2_aref = row2["a_ref"]
+    assert ref2_aref == 3
+    assert chobj.get_ref(ref2_aref) == chobj.ObjectRef(
+        "my-dataset2", ref2.ref.val_id, ["id", 2, "key", "a_ref"]
+    )
 
 
 # def test_publish_big_list(server):
