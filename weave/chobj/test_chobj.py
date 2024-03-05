@@ -18,31 +18,31 @@ def client():
 
 
 def test_table_create(server):
-    table_ref = server.new_table([1, 2, 3])
-    assert list(server.get_table(table_ref)) == [1, 2, 3]
+    table_ref = server._new_table([1, 2, 3])
+    assert list(server._get_table(table_ref)) == [1, 2, 3]
 
 
 def test_table_append(server):
-    table_ref = server.new_table([1, 2, 3])
-    new_table_ref, item_id = server.table_append(table_ref, 4)
-    assert list(server.get_table(new_table_ref)) == [1, 2, 3, 4]
+    table_ref = server._new_table([1, 2, 3])
+    new_table_ref, item_id = server._table_append(table_ref, 4)
+    assert list(server._get_table(new_table_ref)) == [1, 2, 3, 4]
 
 
 def test_table_remove(server):
-    table_ref0 = server.new_table([1])
-    table_ref1, item_id2 = server.table_append(table_ref0, 2)
-    table_ref2, item_id3 = server.table_append(table_ref1, 3)
-    table_ref3 = server.table_remove(table_ref2, item_id2)
-    assert list(server.get_table(table_ref3)) == [1, 3]
+    table_ref0 = server._new_table([1])
+    table_ref1, item_id2 = server._table_append(table_ref0, 2)
+    table_ref2, item_id3 = server._table_append(table_ref1, 3)
+    table_ref3 = server._table_remove(table_ref2, item_id2)
+    assert list(server._get_table(table_ref3)) == [1, 3]
 
 
 def new_val_single(server):
-    obj_id = server.new_val(42)
+    obj_id = server._new_val(42)
     assert server.get(obj_id) == 42
 
 
 def test_new_val_with_list(server):
-    ref = server.new_val({"a": [1, 2, 3]})
+    ref = server._new_val({"a": [1, 2, 3]})
     server_val = server.get(ref)
     table_ref = server_val["a"]
     assert isinstance(table_ref, chobj.TableRef)
@@ -58,9 +58,9 @@ def test_new_val_with_list(server):
 
 def test_object(server):
     obj_ref = server.new_object({"a": 43}, "my-obj", "latest")
-    val_ref = server.resolve_object("my-obj", "latest")
+    val_ref = server._resolve_object("my-obj", "latest")
     assert obj_ref.val_id == val_ref.val_id
-    assert server.resolve_object("my-obj", "latest2") is None
+    assert server._resolve_object("my-obj", "latest2") is None
 
 
 def test_save_load(client):
@@ -107,6 +107,14 @@ def test_dataset(client):
     assert chobj.get_ref(ref2_aref) == chobj.ObjectRef(
         "my-dataset2", ref2.ref.val_id, ["id", 2, "key", "a_ref"]
     )
+
+
+def test_calls(client):
+    @dataclasses.dataclass
+    class Call:
+        inputs: dict
+        op: chobj.ObjectRef
+        output: Any
 
 
 # def test_publish_big_list(server):

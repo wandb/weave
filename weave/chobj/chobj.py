@@ -140,7 +140,7 @@ class ObjectServer:
             ORDER BY (id, tx_order)"""
         )
 
-    def new_table(self, initial_table: list):
+    def _new_table(self, initial_table: list):
         tx_id = uuid.uuid4().hex
         tx_items = [
             (tx_id, uuid.uuid4().hex, i, json_dumps(v))
@@ -159,7 +159,7 @@ class ObjectServer:
         )
         return TableRef(table_id)
 
-    def get_table(self, table_ref: TableRef):
+    def _get_table(self, table_ref: TableRef):
         query_result = self.client.query(
             """
             WITH RankedItems AS (
@@ -209,7 +209,7 @@ class ObjectServer:
         )
         return TableRef(new_table_id)
 
-    def table_append(self, table_ref: TableRef, value):
+    def _table_append(self, table_ref: TableRef, value):
         tx_id = uuid.uuid4()
         item_id = uuid.uuid4()
         tx_items = [(tx_id, item_id, 0, json.dumps(value))]
@@ -221,7 +221,7 @@ class ObjectServer:
         new_table_ref = self._add_table_transaction(table_ref, tx_id)
         return new_table_ref, item_id
 
-    def table_remove(self, table_row_ref: TableRef, item_id: uuid.UUID):
+    def _table_remove(self, table_row_ref: TableRef, item_id: uuid.UUID):
         tx_id = uuid.uuid4()
         tx_items = [(tx_id, item_id, 0, None)]
         self.client.insert(
@@ -231,13 +231,13 @@ class ObjectServer:
         )
         return self._add_table_transaction(TableRef(table_row_ref.table_id), tx_id)
 
-    def new_val(self, val):
+    def _new_val(self, val):
         # map val (this could do more than lists_to_tables)
         def lists_to_tables(val):
             if isinstance(val, dict):
                 return {k: lists_to_tables(v) for k, v in val.items()}
             elif isinstance(val, list):
-                return self.new_table(val)
+                return self._new_table(val)
             return val
 
         val = lists_to_tables(val)
@@ -264,11 +264,11 @@ class ObjectServer:
 
     def get(self, val_ref: Ref):
         if isinstance(val_ref, TableRef):
-            return list(self.get_table(val_ref))
+            return list(self._get_table(val_ref))
         elif isinstance(val_ref, ValRef):
             return self.get_val(val_ref)
         elif isinstance(val_ref, ObjectRef):
-            obj = self.resolve_object(val_ref.name, "latest")
+            obj = self._resolve_object(val_ref.name, "latest")
             if isinstance(obj, Ref):
                 obj = self.get(obj)
             # This is where extra resolution happens?
@@ -286,7 +286,7 @@ class ObjectServer:
             raise ValueError(f"Unknown ref type: {val_ref}")
 
     def new_object(self, val, name: str, branch: str) -> ObjectRef:
-        val_ref = self.new_val(val)
+        val_ref = self._new_val(val)
         self.client.insert(
             "objects",
             data=[(uuid.uuid4(), name, branch, json_dumps(val_ref))],
@@ -294,7 +294,7 @@ class ObjectServer:
         )
         return ObjectRef(name, val_ref.val_id)
 
-    def resolve_object(self, name: str, branch: str) -> Optional[ValRef]:
+    def _resolve_object(self, name: str, branch: str) -> Optional[ValRef]:
         query_result = self.client.query(
             """
             SELECT val from objects WHERE name = %(name)s AND branch = %(branch)s
