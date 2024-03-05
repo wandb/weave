@@ -229,6 +229,24 @@ export const CallTraceView: FC<{call: CallSchema}> = ({call}) => {
   );
 };
 
+const RE_TRAILING_INT = /\d+$/;
+
+// Sorting evaluation calls by dataset row.
+// Because of async they may have been processed in a different order.
+const getCallSortExampleRow = (call: CallSchema): number => {
+  const {example} = call.rawSpan.inputs;
+  if (example) {
+    const match = example.match(RE_TRAILING_INT);
+    if (match) {
+      return parseInt(match[0], 10);
+    }
+  }
+  return Number.POSITIVE_INFINITY;
+};
+const getCallSortStartTime = (call: CallSchema): number => {
+  return call.rawSpan.start_time_ms;
+};
+
 /**
  * Returns the flattened trace tree for a given call. Specifically,
  * it will find the trace root for a call, then find all the descendants
@@ -340,13 +358,13 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
         isTraceRootCall: targetCall.callId === lastCall.callId,
       });
       const childIds = childCallLookup[targetCall.callId] ?? [];
-      childIds.forEach(c => {
-        const childCall = traceCallMap[c];
-        if (!childCall) {
-          return;
-        }
-        queue.push({targetCall: childCall, parentHierarchy: newHierarchy});
-      });
+      const childCalls = _.sortBy(
+        childIds.map(c => traceCallMap[c]).filter(c => c),
+        [getCallSortExampleRow, getCallSortStartTime]
+      );
+      childCalls.forEach(c =>
+        queue.push({targetCall: c, parentHierarchy: newHierarchy})
+      );
     }
 
     if (parentCall) {
