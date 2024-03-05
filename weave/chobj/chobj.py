@@ -22,7 +22,7 @@ class ValRef(Ref):
 
 
 @dataclasses.dataclass
-class ObjectRef:
+class ObjectRef(Ref):
     name: str
     val_id: uuid.UUID
     extra: list[str] = dataclasses.field(default_factory=list)
@@ -43,6 +43,8 @@ class RefEncoder(json.JSONEncoder):
             return {"_type": "UUID", "uuid": o.hex}
         elif dataclasses.is_dataclass(o):
             return {"_type": o.__class__.__name__, **dataclasses.asdict(o)}
+        elif isinstance(o, ObjectRecord):
+            return o.__dict__
         return json.JSONEncoder.default(self, o)
 
 
@@ -67,6 +69,8 @@ def ref_decoder(d):
             return TableRef(d["table_id"])
         elif d["_type"] == "ValRef":
             return ValRef(d["val_id"])
+        elif d["_type"] == "ObjectRef":
+            return ObjectRef(d["name"], d["val_id"], d["extra"])
         else:
             return ObjectRecord(d)
     return d
@@ -139,7 +143,7 @@ class ObjectServer:
     def new_table(self, initial_table: list):
         tx_id = uuid.uuid4().hex
         tx_items = [
-            (tx_id, uuid.uuid4().hex, i, json.dumps(v))
+            (tx_id, uuid.uuid4().hex, i, json_dumps(v))
             for i, v in enumerate(initial_table)
         ]
         self.client.insert(
@@ -184,7 +188,7 @@ class ObjectServer:
             },
         )
         for row in query_result.result_rows:
-            yield json.loads(row[0])
+            yield json_loads(row[0])
 
     def _add_table_transaction(self, table_ref: TableRef, tx_id: uuid.UUID):
         # TODO: this can be one command instead of two
@@ -263,6 +267,21 @@ class ObjectServer:
             return list(self.get_table(val_ref))
         elif isinstance(val_ref, ValRef):
             return self.get_val(val_ref)
+        elif isinstance(val_ref, ObjectRef):
+            obj = self.resolve_object(val_ref.name, "latest")
+            if isinstance(obj, Ref):
+                obj = self.get(obj)
+            # This is where extra resolution happens?
+            for extra_index in range(0, len(val_ref.extra), 2):
+                if val_ref.extra[extra_index] == "key":
+                    obj = obj[val_ref.extra[extra_index + 1]]
+                elif val_ref.extra[extra_index] == "attr":
+                    obj = getattr(obj, val_ref.extra[extra_index + 1])
+                elif val_ref.extra[extra_index] == "id":
+                    obj = obj[val_ref.extra[extra_index + 1]]
+                else:
+                    raise ValueError(f"Unknown ref type: {val_ref}")
+            return obj
         else:
             raise ValueError(f"Unknown ref type: {val_ref}")
 
@@ -295,8 +314,14 @@ class TraceObject:
         self.server = server
 
     def __getattribute__(self, __name: str) -> Any:
-        return access_sub_val(
-            getattr(self.val, __name), self.ref.with_attr(__name), self.server
+        try:
+            return object.__getattribute__(self, __name)
+        except AttributeError:
+            pass
+        return make_trace_obj(
+            object.__getattribute__(self.val, __name),
+            self.ref.with_attr(__name),
+            self.server,
         )
 
     def __repr__(self):
@@ -310,7 +335,7 @@ class TraceTable:
         self.server = server
 
     def __getitem__(self, i):
-        return access_sub_val(self.val[i], self.ref.with_id(i), self.server)
+        return make_trace_obj(self.val[i], self.ref.with_id(i), self.server)
 
 
 class TraceDict:
@@ -320,7 +345,7 @@ class TraceDict:
         self.server = server
 
     def __getitem__(self, key):
-        return access_sub_val(self.val[key], self.ref.with_key(key), self.server)
+        return make_trace_obj(self.val[key], self.ref.with_key(key), self.server)
 
     def keys(self):
         return self.val.keys()
@@ -338,7 +363,7 @@ class TraceDict:
         return f"TraceDict({self.val})"
 
 
-def access_sub_val(val: Any, new_ref: ObjectRef, server: ObjectServer):
+def make_trace_obj(val: Any, new_ref: ObjectRef, server: ObjectServer):
     # Derefence val and create the appropriate wrapper object
     if isinstance(val, Ref):
         val = server.get(val)
@@ -353,17 +378,41 @@ def access_sub_val(val: Any, new_ref: ObjectRef, server: ObjectServer):
     return box_val
 
 
+def get_ref(obj: Any) -> Optional[ObjectRef]:
+    return getattr(obj, "ref", None)
+
+
+def map_to_refs(obj: Any) -> Any:
+    if dataclasses.is_dataclass(obj):
+        return ObjectRecord(
+            {
+                "_type": obj.__class__.__name__,
+                **{k: map_to_refs(v) for k, v in dataclasses.asdict(obj).items()},
+            },
+        )
+    elif isinstance(obj, list):
+        return [map_to_refs(v) for v in obj]
+    elif isinstance(obj, dict):
+        return {k: map_to_refs(v) for k, v in obj.items()}
+    ref = get_ref(obj)
+    if ref:
+        return ref
+    return obj
+
+
 class ObjectClient:
     def __init__(self):
         self.server = ObjectServer()
 
-    def save(self, val, name: str, branch: str = "latest") -> ObjectRef:
-        return self.server.new_object(val, name, branch)
+    def save(self, val, name: str, branch: str = "latest") -> Any:
+        val = map_to_refs(val)
+        ref = self.server.new_object(val, name, branch)
+        return self.get(ref)
 
     def get(self, ref: ObjectRef):
         val = self.server.get_val(ValRef(ref.val_id))
 
-        return access_sub_val(val, ref, self.server)
+        return make_trace_obj(val, ref, self.server)
 
 
 # TODO
