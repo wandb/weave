@@ -15,7 +15,7 @@ const Editor = React.lazy(async () => {
 
 type CodeEditorProps = {
   value: string;
-  language: string;
+  language?: string;
   readOnly?: boolean;
   onChange?: (value: string) => void;
   maxHeight?: number;
