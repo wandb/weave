@@ -662,9 +662,9 @@ class TraceTable(Tracable):
                 yield make_trace_obj(
                     item[1], self.ref.with_id(i), self.server, self.root
                 )
+                i += 1
             if len(page_data) < page_size:
                 break
-            i += 1
             page_index += 1
 
     def append(self, val):
