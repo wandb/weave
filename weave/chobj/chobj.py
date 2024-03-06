@@ -1,5 +1,6 @@
 from typing import Optional, Any
 import clickhouse_connect
+import copy
 import uuid
 import json
 import dataclasses
@@ -60,6 +61,16 @@ class ObjectRecord:
     def __repr__(self):
         return f"ObjectRecord({self.__dict__})"
 
+    def __eq__(self, other):
+        if other.__class__.__name__ != getattr(self, "_type"):
+            return False
+        for k, v in self.__dict__.items():
+            if k == "_type" or k == "id":
+                continue
+            if getattr(other, k) != v:
+                return False
+        return True
+
 
 def ref_decoder(d):
     if "_type" in d:
@@ -78,6 +89,15 @@ def ref_decoder(d):
 
 def json_loads(d):
     return json.loads(d, object_hook=ref_decoder)
+
+
+def make_value_filter(filter):
+    query_parts = []
+    for key, value in filter.items():
+        # Assume all values are to be treated as strings for simplicity. Adjust the casting as necessary.
+        query_part = f"JSONExtractString(val, '{key}') = '{value}'"
+        query_parts.append(query_part)
+    return " AND ".join(query_parts)
 
 
 class ObjectServer:
@@ -269,6 +289,20 @@ class ObjectServer:
         )
         return json_loads(query_result.result_rows[0][0])
 
+    def query_vals(self, filter):
+        predicate = make_value_filter(filter)
+        query_result = self.client.query(
+            f"""
+            SELECT val FROM (
+                SELECT *,
+                    ROW_NUMBER() OVER(PARTITION BY id ORDER BY created_at DESC) AS rn
+                FROM values
+            ) WHERE rn = 1 AND {predicate} ORDER BY created_at ASC
+            """,
+        )
+        for row in query_result.result_rows:
+            yield json_loads(row[0])
+
     def get(self, val_ref: Ref):
         if isinstance(val_ref, TableRef):
             return list(self._get_table(val_ref))
@@ -415,6 +449,7 @@ class Call:
     op_name: str
     inputs: dict
     id: Optional[uuid.UUID] = None
+    parent_id: Optional[uuid.UUID] = None
     output: Any = None
 
 
@@ -431,6 +466,11 @@ class ObjectClient:
         val = self.server.get_val(ValRef(ref.val_id))
 
         return make_trace_obj(val, ref, self.server)
+
+    def calls(self, filter: dict):
+        filt = copy.copy(filter)
+        filt["_type"] = "Call"
+        return self.server.query_vals(filt)
 
     def call(self, call_id: uuid.UUID) -> Optional[Call]:
         return self.server.get_val(ValRef(call_id))
@@ -454,5 +494,6 @@ class ObjectClient:
 #   - table ID refs instead of index
 #   - dedupe, content ID
 #   - efficient walking of all relationships
+#   - pull out _type to top-level of value
 
 # Biggest question, can the val table be stored as a table?
