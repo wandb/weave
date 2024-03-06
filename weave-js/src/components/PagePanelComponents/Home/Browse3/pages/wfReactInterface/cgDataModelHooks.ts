@@ -769,6 +769,8 @@ const spanToCallSchema = (
       : null,
     rawSpan,
     rawFeedback: span.feedback,
+    userId: null,
+    runId: null,
   };
 };
 

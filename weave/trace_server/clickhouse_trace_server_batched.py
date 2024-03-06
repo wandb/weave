@@ -44,6 +44,9 @@ class CallStartCHInsertable(BaseModel):
     input_refs: typing.List[str]
     output_refs: typing.List[str] = []  # sadly, this is required
 
+    wb_user_id: typing.Optional[str] = None
+    wb_run_id: typing.Optional[str] = None
+
 
 class CallEndCHInsertable(BaseModel):
     project_id: str
@@ -82,6 +85,9 @@ class SelectableCHCallSchema(BaseModel):
 
     input_refs: typing.List[str]
     output_refs: typing.List[str]
+
+    wb_user_id: typing.Optional[str] = None
+    wb_run_id: typing.Optional[str] = None
 
 
 all_call_insert_columns = list(
@@ -264,6 +270,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if req.filter.trace_roots_only:
                 conditions.append("parent_id IS NULL")
+
+            if req.filter.wb_user_ids:
+                conditions.append("wb_user_id IN {wb_user_ids: Array(String)}")
+                parameters["wb_user_ids"] = req.filter.wb_user_ids
+
+            if req.filter.wb_run_ids:
+                conditions.append("wb_run_id IN {wb_run_ids: Array(String)}")
+                parameters["wb_run_ids"] = req.filter.wb_run_ids
 
         ch_calls = self._select_calls_query(
             req.project_id,
@@ -659,6 +673,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         outputs=_nullable_dict_dump_to_dict(ch_call.outputs_dump),
         summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
+        wb_run_id=ch_call.wb_run_id,
+        wb_user_id=ch_call.wb_user_id,
     )
 
 
@@ -693,6 +709,8 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(list(start_call.inputs.values())),
+        wb_run_id=start_call.wb_run_id,
+        wb_user_id=start_call.wb_user_id,
     )
 
 

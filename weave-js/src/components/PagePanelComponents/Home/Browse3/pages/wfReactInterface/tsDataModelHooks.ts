@@ -119,6 +119,8 @@ const useCalls = (
           trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
           call_ids: deepFilter.callIds,
           trace_roots_only: deepFilter.traceRootsOnly,
+          wb_run_ids: deepFilter.runIds,
+          wb_user_ids: deepFilter.userIds,
         },
         limit,
       })
@@ -342,6 +344,8 @@ const traceCallToUICallSchema = (
       : null,
     rawSpan: traceCallToLegacySpan(traceCall),
     rawFeedback: {},
+    userId: traceCall.wb_user_id ?? null,
+    runId: traceCall.wb_run_id ?? null,
   };
 };
 

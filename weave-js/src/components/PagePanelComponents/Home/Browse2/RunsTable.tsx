@@ -292,6 +292,30 @@ export const RunsTable: FC<{
             },
           ]
         : []),
+      // {
+      //   field: 'user_id',
+      //   headerName: 'User',
+      //   disableColumnMenu: true,
+      //   renderCell: cellParams => {
+      //     return (
+      //       <div style={{margin: 'auto'}}>
+      //         {cellParams.row.call.userId ?? <NotApplicable />}
+      //       </div>
+      //     );
+      //   },
+      // },
+      // {
+      //   field: 'run_id',
+      //   headerName: 'Run',
+      //   disableColumnMenu: true,
+      //   renderCell: cellParams => {
+      //     return (
+      //       <div style={{margin: 'auto'}}>
+      //         {cellParams.row.call.runId ?? <NotApplicable />}
+      //       </div>
+      //     );
+      //   },
+      // },
       {
         field: 'status_code',
         headerName: 'Status',

@@ -36,6 +36,10 @@ class CallSchema(BaseModel):
     ## Summary: a summary of the call
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
 
+    # WB Metadata
+    wb_user_id: typing.Optional[str] = None
+    wb_run_id: typing.Optional[str] = None
+
 
 # Essentially a partial of StartedCallSchema. Mods:
 # - id is not required (will be generated)
@@ -59,6 +63,10 @@ class StartedCallSchemaForInsert(BaseModel):
 
     ## Inputs
     inputs: typing.Dict[str, typing.Any]
+
+    # WB Metadata
+    wb_user_id: typing.Optional[str] = None
+    wb_run_id: typing.Optional[str] = None
 
 
 class EndedCallSchemaForInsert(BaseModel):
@@ -139,6 +147,8 @@ class _CallsFilter(BaseModel):
     trace_ids: typing.Optional[typing.List[str]] = None
     call_ids: typing.Optional[typing.List[str]] = None
     trace_roots_only: typing.Optional[bool] = None
+    wb_user_ids: typing.Optional[typing.List[str]] = None
+    wb_run_ids: typing.Optional[typing.List[str]] = None
 
 
 class CallsQueryReq(BaseModel):
