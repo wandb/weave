@@ -1,5 +1,6 @@
 from typing import Any
 import pytest
+import uuid
 import chobj
 import dataclasses
 
@@ -124,6 +125,30 @@ def test_calls_query(client, server):
     assert len(result) == 2
     assert result[0] == chobj.Call("x", {"a": 5, "b": 10})
     assert result[1] == chobj.Call("x", {"a": 6, "b": 11})
+
+
+def test_dataset_calls(client, server):
+    @dataclasses.dataclass
+    class Dataset:
+        rows: list[Any]
+
+    ref = client.save(
+        Dataset([{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
+        "my-dataset",
+    )
+    for row in ref.rows:
+        client.create_call("x", {"a": row["doc"]})
+
+    calls = list(client.calls({"op_name": "x"}))
+    assert calls[0].inputs["a"] == "xx"
+    assert calls[1].inputs["a"] == "yy"
+
+
+def test_encode():
+    call = chobj.Call("x", {"a": chobj.ObjectRef("my-dataset", uuid.uuid4()), "b": 10})
+    encoded = chobj.json_dumps(call)
+    call2 = chobj.json_loads(encoded)
+    assert call == call2
 
 
 # def test_publish_big_list(server):
