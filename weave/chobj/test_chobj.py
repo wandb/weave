@@ -186,6 +186,19 @@ def test_mutations(client):
     assert new_ds_rows[2] == {"doc": "zz", "label": "e"}
 
 
+def test_stable_dataset_row_refs(client):
+    dataset = client.save(
+        chobj.Dataset(
+            [
+                {"doc": "xx", "label": "c"},
+                {"doc": "yy", "label": "d", "somelist": [{"a": 3, "b": 14}]},
+            ]
+        ),
+        "my-dataset",
+    )
+    call = client.create_call("x", {"a": dataset.rows[0]["doc"]})
+
+
 # def test_publish_big_list(server):
 #     import time
 
