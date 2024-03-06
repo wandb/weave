@@ -143,12 +143,38 @@ def test_encode():
     assert call == call2
 
 
-# def test_mutations(client):
-#     dataset = client.save(
-#         chobj.Dataset([{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
-#         "my-dataset",
-#     )
-#     dataset.rows.append({"doc": "zz", "label": "e"})
+def test_mutations(client):
+    dataset = client.save(
+        chobj.Dataset(
+            [
+                {"doc": "xx", "label": "c"},
+                {"doc": "yy", "label": "d", "somelist": [{"a": 3, "b": 14}]},
+            ]
+        ),
+        "my-dataset",
+    )
+    dataset.rows.append({"doc": "zz", "label": "e"})
+    dataset.rows[1]["doc"] = "jjj"
+    dataset.rows[1]["somelist"][0]["a"] = 12
+    dataset.cows = "moo"
+    assert dataset.mutations == [
+        chobj.Mutation(
+            path=["attr", "rows"],
+            operation="append",
+            args=({"doc": "zz", "label": "e"},),
+        ),
+        chobj.Mutation(
+            path=["attr", "rows", "id", 1], operation="setitem", args=("doc", "jjj")
+        ),
+        chobj.Mutation(
+            path=["attr", "rows", "id", 1, "key", "somelist", "id", 0],
+            operation="setitem",
+            args=("a", 12),
+        ),
+        chobj.Mutation(path=[], operation="setattr", args=("cows", "moo")),
+    ]
+    new_ref = dataset.save()
+    breakpoint()
 
 
 # def test_publish_big_list(server):
