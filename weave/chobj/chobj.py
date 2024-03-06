@@ -198,7 +198,7 @@ class ObjectServer:
         )
         return TableRef(table_id)
 
-    def _get_table(
+    def _table_query(
         self,
         table_ref: TableRef,
         filter: Optional[dict] = None,
@@ -334,29 +334,6 @@ class ObjectServer:
         )
         return [json_loads(r[0]) for r in query_result.result_rows]
 
-    def get(self, val_ref: Ref):
-        if isinstance(val_ref, TableRef):
-            return list(self._get_table(val_ref))
-        elif isinstance(val_ref, ValRef):
-            return self.get_val(val_ref)
-        elif isinstance(val_ref, ObjectRef):
-            obj = self._resolve_object(val_ref.name, "latest")
-            if isinstance(obj, Ref):
-                obj = self.get(obj)
-            # This is where extra resolution happens?
-            for extra_index in range(0, len(val_ref.extra), 2):
-                if val_ref.extra[extra_index] == "key":
-                    obj = obj[val_ref.extra[extra_index + 1]]
-                elif val_ref.extra[extra_index] == "attr":
-                    obj = getattr(obj, val_ref.extra[extra_index + 1])
-                elif val_ref.extra[extra_index] == "id":
-                    obj = obj[val_ref.extra[extra_index + 1]]
-                else:
-                    raise ValueError(f"Unknown ref type: {val_ref}")
-            return obj
-        else:
-            raise ValueError(f"Unknown ref type: {val_ref}")
-
     def new_object(self, val, name: str, branch: str) -> ObjectRef:
         val_ref = self._new_val(val)
         self.client.insert(
@@ -407,10 +384,36 @@ class TraceObject:
 
 
 class TraceTable:
+    def __init__(self, table_ref, ref, server, filter):
+        self.table_ref = table_ref
+        self.filter = filter
+        self.ref = ref
+        self.server: ObjectServer = server
+
+    def __iter__(self):
+        page_index = 0
+        page_size = 1
+        i = 0
+        while True:
+            page_data = self.server._table_query(
+                self.table_ref,
+                self.filter,
+                offset=page_index * page_size,
+                limit=page_size,
+            )
+            for item in page_data:
+                yield make_trace_obj(item, self.ref.with_id(i), self.server)
+            if len(page_data) < page_size:
+                break
+            i += 1
+            page_index += 1
+
+
+class TraceList:
     def __init__(self, val, ref, server):
         self.val = val
         self.ref = ref
-        self.server = server
+        self.server: ObjectServer = server
 
     def __getitem__(self, i):
         return make_trace_obj(self.val[i], self.ref.with_id(i), self.server)
@@ -449,12 +452,29 @@ class TraceDict:
 
 def make_trace_obj(val: Any, new_ref: Ref, server: ObjectServer):
     # Derefence val and create the appropriate wrapper object
-    if isinstance(val, Ref):
-        val = server.get(val)
+    if isinstance(val, TableRef):
+        return TraceTable(val, new_ref, server, {})
+    if isinstance(val, ObjectRef):
+        obj = server._resolve_object(val.name, "latest")
+        if isinstance(obj, ValRef):
+            obj = server.get_val(obj)
+        elif isinstance(obj, Ref):
+            raise ValueError(f"Unexpected type: {obj}")
+        # This is where extra resolution happens?
+        for extra_index in range(0, len(val.extra), 2):
+            if val.extra[extra_index] == "key":
+                obj = obj[val.extra[extra_index + 1]]
+            elif val.extra[extra_index] == "attr":
+                obj = getattr(obj, val.extra[extra_index + 1])
+            elif val.extra[extra_index] == "id":
+                obj = obj[val.extra[extra_index + 1]]
+            else:
+                raise ValueError(f"Unknown ref type: {val}")
+        val = obj
     if isinstance(val, ObjectRecord):
         return TraceObject(val, new_ref, server)
     elif isinstance(val, list):
-        return TraceTable(val, new_ref, server)
+        return TraceList(val, new_ref, server)
     elif isinstance(val, dict):
         return TraceDict(val, new_ref, server)
     box_val = box.box(val)
@@ -493,6 +513,25 @@ class Call:
     output: Any = None
 
 
+class ValueIter:
+    def __init__(self, server, filter):
+        self.server = server
+        self.filter = filter
+
+    def __iter__(self):
+        page_index = 0
+        page_size = 1
+        while True:
+            page_data = self.server.query_vals(
+                self.filter, offset=page_index * page_size, limit=page_size
+            )
+            for call in page_data:
+                yield make_trace_obj(call, ValRef(call.id), self.server)
+            if len(page_data) < page_size:
+                break
+            page_index += 1
+
+
 class ObjectClient:
     def __init__(self):
         self.server = ObjectServer()
@@ -510,8 +549,7 @@ class ObjectClient:
     def calls(self, filter: dict):
         filt = copy.copy(filter)
         filt["_type"] = "Call"
-        for call in self.server.query_vals(filt):
-            yield make_trace_obj(call, ValRef(call.id), self.server)
+        return ValueIter(self.server, filt)
 
     def call(self, call_id: uuid.UUID) -> Optional[Call]:
         return self.server.get_val(ValRef(call_id))
@@ -529,6 +567,7 @@ class ObjectClient:
 
 
 # TODO
+#   - refactor paging stuff to ensure its shared
 #   - batch ref resolution in call query / dataset join path
 #   - ensure true client/server wire interface
 #   - mutations (append, set, remove)
@@ -537,10 +576,9 @@ class ObjectClient:
 #   - table ID refs instead of index
 #   - dedupe, content ID
 #   - efficient walking of all relationships
-#   - pull out _type to top-level of value
+#   - pull out _type to top-level of value and index
 #   - don't encode UUID
 #   - call outputs as refs
-#   - client paging
 #   - merge extra stuff in refs
 #   - filter non-string
 #   - filter table when not dicts
