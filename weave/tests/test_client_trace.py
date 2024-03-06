@@ -3,6 +3,7 @@ import os
 import typing
 
 from pydantic import BaseModel
+import wandb
 import weave
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
@@ -157,6 +158,7 @@ class OpCallSpec(BaseModel):
     call_summaries: typing.Dict[str, OpCallSummary]
     total_calls: int
     root_calls: int
+    run_calls: int
 
 
 def simple_line_call_bootstrap() -> OpCallSpec:
@@ -222,17 +224,21 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     root_calls += num_calls
 
     num_calls = 5
+    run_calls = 0
+    run = wandb.init()
     for i in range(num_calls):
         liner(Number(i), i, i)
+    run.finish()
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls
+    run_calls += num_calls * 3
     root_calls += num_calls
 
     total_calls = sum([op_call.num_calls for op_call in result.values()])
 
     return OpCallSpec(
-        call_summaries=result, total_calls=total_calls, root_calls=root_calls
+        call_summaries=result, total_calls=total_calls, root_calls=root_calls, run_calls=run_calls
     )
 
 
@@ -543,6 +549,30 @@ def test_trace_call_query_filter_trace_roots_only(trace_client):
             tsi.CallsQueryReq(
                 project_id=trace_client.project_id(),
                 filter=tsi._CallsFilter(trace_roots_only=trace_roots_only),
+            )
+        )
+
+        assert len(inner_res.calls) == exp_count
+
+def test_trace_call_query_filter_wb_run_ids(trace_client):
+    call_spec = simple_line_call_bootstrap()
+
+    res = get_all_calls_asserting_finished(trace_client, call_spec)
+
+    wb_run_ids = list(set([call.wb_run_id for call in res.calls]) - set([None]))
+
+    for wb_run_ids, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test the empty list case
+        ([], call_spec.total_calls),
+        # Test List (of 1)
+        (wb_run_ids, call_spec.run_calls),
+    ]:
+        inner_res = trace_client.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=trace_client.project_id(),
+                filter=tsi._CallsFilter(wb_run_ids=wb_run_ids),
             )
         )
 
