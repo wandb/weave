@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Generator
 import pytest
 import uuid
 import chobj
@@ -6,7 +6,7 @@ import dataclasses
 
 
 @pytest.fixture
-def server():
+def server() -> Generator[chobj.ObjectServer, None, None]:
     server = chobj.ObjectServer()
     server.drop_tables()
     server.create_tables()
@@ -14,51 +14,45 @@ def server():
 
 
 @pytest.fixture
-def client():
+def client() -> Generator[chobj.ObjectClient, None, None]:
     yield chobj.ObjectClient()
 
 
 def test_table_create(server):
-    table_ref = server._new_table([1, 2, 3])
-    assert list(server._table_query(table_ref)) == [1, 2, 3]
-    assert list(server._table_query(table_ref, offset=1)) == [2, 3]
-    assert list(server._table_query(table_ref, offset=1, limit=1)) == [2]
+    table_ref = server.new_table([1, 2, 3])
+    assert list(server.table_query(table_ref)) == [1, 2, 3]
+    assert list(server.table_query(table_ref, offset=1)) == [2, 3]
+    assert list(server.table_query(table_ref, offset=1, limit=1)) == [2]
     # TODO: This doesn't work
     # assert list(server._table_query(table_ref, filter={"": 2})) == [2]
 
 
 def test_table_append(server):
-    table_ref = server._new_table([1, 2, 3])
-    new_table_ref, item_id = server._table_append(table_ref, 4)
-    assert list(server._table_query(new_table_ref)) == [1, 2, 3, 4]
+    table_ref = server.new_table([1, 2, 3])
+    new_table_ref, item_id = server.table_append(table_ref, 4)
+    assert list(server.table_query(new_table_ref)) == [1, 2, 3, 4]
 
 
 def test_table_remove(server):
-    table_ref0 = server._new_table([1])
-    table_ref1, item_id2 = server._table_append(table_ref0, 2)
-    table_ref2, item_id3 = server._table_append(table_ref1, 3)
-    table_ref3 = server._table_remove(table_ref2, item_id2)
-    assert list(server._table_query(table_ref3)) == [1, 3]
+    table_ref0 = server.new_table([1])
+    table_ref1, item_id2 = server.table_append(table_ref0, 2)
+    table_ref2, item_id3 = server.table_append(table_ref1, 3)
+    table_ref3 = server.table_remove(table_ref2, item_id2)
+    assert list(server.table_query(table_ref3)) == [1, 3]
 
 
 def new_val_single(server):
-    obj_id = server._new_val(42)
+    obj_id = server.new_val(42)
     assert server.get(obj_id) == 42
 
 
 def test_new_val_with_list(server):
-    ref = server._new_val({"a": [1, 2, 3]})
+    ref = server.new_val({"a": [1, 2, 3]})
     server_val = server.get_val(ref)
     table_ref = server_val["a"]
     assert isinstance(table_ref, chobj.TableRef)
-    table_val = server._table_query(table_ref)
+    table_val = server.table_query(table_ref)
     assert list(table_val) == [1, 2, 3]
-
-
-# def test_nested_list_append(server):
-#     ref = server.new_val({"a": [1, 2, 3]})
-#     ref = ref.with_path("a")
-#     ref = server.table_append(ref, [5, 6, 7])
 
 
 def test_object(server):
