@@ -107,7 +107,7 @@ def json_loads(d):
     return json.loads(d, object_hook=ref_decoder)
 
 
-def make_value_filter(filter):
+def make_value_filter(filter: dict):
     query_parts = []
     for key, value in filter.items():
         # Assume all values are to be treated as strings for simplicity. Adjust the casting as necessary.
@@ -198,9 +198,16 @@ class ObjectServer:
         )
         return TableRef(table_id)
 
-    def _get_table(self, table_ref: TableRef):
+    def _get_table(
+        self,
+        table_ref: TableRef,
+        filter: Optional[dict] = None,
+        offset: Optional[int] = 0,
+        limit: Optional[int] = 100,
+    ):
+        predicate = make_value_filter(filter) if filter else "1 = 1"
         query_result = self.client.query(
-            """
+            f"""
             WITH RankedItems AS (
                 SELECT
                     id,
@@ -220,14 +227,19 @@ class ObjectServer:
             SELECT
             val
             FROM RankedItems
-            WHERE item_record_index = 1 AND val IS NOT NULL
+            WHERE item_record_index = 1 AND val IS NOT NULL AND {predicate}
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
             parameters={
                 "table_id": table_ref.table_id,
+                "offset": offset,
+                "limit": limit,
             },
         )
-        for row in query_result.result_rows:
-            yield json_loads(row[0])
+        # TODO: we shouldn't json load here, this can be put on the wire
+        # as encoded json, and then decoded on the read side (split server into
+        # client/server pair)
+        return [json_loads(r[0]) for r in query_result.result_rows]
 
     def _add_table_transaction(self, table_ref: TableRef, tx_id: uuid.UUID):
         # TODO: this can be one command instead of two
@@ -305,7 +317,9 @@ class ObjectServer:
         )
         return json_loads(query_result.result_rows[0][0])
 
-    def query_vals(self, filter):
+    def query_vals(
+        self, filter: dict, offset: Optional[int] = 0, limit: Optional[int] = 100
+    ):
         predicate = make_value_filter(filter)
         query_result = self.client.query(
             f"""
@@ -314,10 +328,11 @@ class ObjectServer:
                     ROW_NUMBER() OVER(PARTITION BY id ORDER BY created_at DESC) AS rn
                 FROM values
             ) WHERE rn = 1 AND {predicate} ORDER BY created_at ASC
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
+            parameters={"limit": limit, "offset": offset},
         )
-        for row in query_result.result_rows:
-            yield json_loads(row[0])
+        return [json_loads(r[0]) for r in query_result.result_rows]
 
     def get(self, val_ref: Ref):
         if isinstance(val_ref, TableRef):
@@ -527,5 +542,7 @@ class ObjectClient:
 #   - call outputs as refs
 #   - client paging
 #   - merge extra stuff in refs
+#   - filter non-string
+#   - filter table when not dicts
 
 # Biggest question, can the val table be stored as a table?

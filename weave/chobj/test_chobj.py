@@ -21,6 +21,10 @@ def client():
 def test_table_create(server):
     table_ref = server._new_table([1, 2, 3])
     assert list(server._get_table(table_ref)) == [1, 2, 3]
+    assert list(server._get_table(table_ref, offset=1)) == [2, 3]
+    assert list(server._get_table(table_ref, offset=1, limit=1)) == [2]
+    # TODO: This doesn't work
+    # assert list(server._get_table(table_ref, filter={"": 2})) == [2]
 
 
 def test_table_append(server):
