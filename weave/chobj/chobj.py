@@ -387,6 +387,9 @@ class TraceObject:
     def __repr__(self):
         return f"TraceObject({self.val})"
 
+    def __eq__(self, other):
+        return self.val == other
+
 
 class TraceTable:
     def __init__(self, val, ref, server):
@@ -396,6 +399,9 @@ class TraceTable:
 
     def __getitem__(self, i):
         return make_trace_obj(self.val[i], self.ref.with_id(i), self.server)
+
+    def __eq__(self, other):
+        return self.val == other
 
 
 class TraceDict:
@@ -421,6 +427,9 @@ class TraceDict:
 
     def __repr__(self):
         return f"TraceDict({self.val})"
+
+    def __eq__(self, other):
+        return self.val == other
 
 
 def make_trace_obj(val: Any, new_ref: Ref, server: ObjectServer):
