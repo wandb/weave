@@ -32,6 +32,8 @@ export type TraceCallSchema = {
   exception?: string;
   outputs?: KeyedDictType;
   summary?: KeyedDictType;
+  wb_run_id?: string;
+  wb_user_id?: string;
 };
 
 type TraceCallReadReq = {
@@ -51,6 +53,8 @@ interface TraceCallsFilter {
   trace_ids?: string[];
   call_ids?: string[];
   trace_roots_only?: boolean;
+  wb_run_ids?: string[];
+  wb_user_ids?: string[];
 }
 
 type TraceCallsQueryReq = {

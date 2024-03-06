@@ -33,6 +33,8 @@ export type CallSchema = CallKey & {
   // We should wean off of this and move the needed properties to `CallSchema`.
   rawSpan: RawSpanFromStreamTableEra;
   rawFeedback?: any;
+  userId: string | null;
+  runId: string | null;
 };
 
 export type CallFilter = {
@@ -46,6 +48,8 @@ export type CallFilter = {
   callIds?: string[];
   traceRootsOnly?: boolean;
   opCategory?: OpCategory[];
+  runIds?: string[];
+  userIds?: string[];
 };
 
 export type OpVersionKey = {

@@ -293,6 +293,40 @@ export const RunsTable: FC<{
           ]
         : []),
       {
+        field: 'user_id',
+        headerName: 'User',
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
+        // width: 70,
+        // minWidth: 70,
+        // maxWidth: 70,
+        renderCell: cellParams => {
+          return (
+            <div style={{margin: 'auto'}}>
+              {cellParams.row.call.userId ?? <NotApplicable />}
+            </div>
+          );
+        },
+      },
+      {
+        field: 'run_id',
+        headerName: 'Run',
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
+        // width: 70,
+        // minWidth: 70,
+        // maxWidth: 70,
+        renderCell: cellParams => {
+          return (
+            <div style={{margin: 'auto'}}>
+              {cellParams.row.call.runId ?? <NotApplicable />}
+            </div>
+          );
+        },
+      },
+      {
         field: 'status_code',
         headerName: 'Status',
         sortable: false,
