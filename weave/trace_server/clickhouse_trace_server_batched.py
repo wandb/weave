@@ -89,6 +89,7 @@ class SelectableCHCallSchema(BaseModel):
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
 
+
 all_call_insert_columns = list(
     CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
 )
@@ -269,11 +270,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if req.filter.trace_roots_only:
                 conditions.append("parent_id IS NULL")
-            
+
             if req.filter.wb_user_ids:
                 conditions.append("wb_user_id IN {wb_user_ids: Array(String)}")
                 parameters["wb_user_ids"] = req.filter.wb_user_ids
-            
+
             if req.filter.wb_run_ids:
                 conditions.append("wb_run_id IN {wb_run_ids: Array(String)}")
                 parameters["wb_run_ids"] = req.filter.wb_run_ids

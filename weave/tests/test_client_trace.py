@@ -238,7 +238,10 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     total_calls = sum([op_call.num_calls for op_call in result.values()])
 
     return OpCallSpec(
-        call_summaries=result, total_calls=total_calls, root_calls=root_calls, run_calls=run_calls
+        call_summaries=result,
+        total_calls=total_calls,
+        root_calls=root_calls,
+        run_calls=run_calls,
     )
 
 
@@ -553,6 +556,7 @@ def test_trace_call_query_filter_trace_roots_only(trace_client):
         )
 
         assert len(inner_res.calls) == exp_count
+
 
 def test_trace_call_query_filter_wb_run_ids(trace_client):
     call_spec = simple_line_call_bootstrap()

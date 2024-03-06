@@ -170,7 +170,6 @@ const useCalls = (
           call
         );
       });
-      console.log(result)
       return {
         loading: false,
         result,

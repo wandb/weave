@@ -658,7 +658,7 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             parent_id=parent_id,
             inputs=refs_to_str(inputs),
             attributes={},
-            wb_run_id=current_wb_run_id
+            wb_run_id=current_wb_run_id,
         )
         self.trace_server.call_start(tsi.CallStartReq(start=start))
         return CallSchemaRun(start)
@@ -745,11 +745,14 @@ class GraphClientTraceWithArtifactStorage(GraphClientTrace):
         )
         return res
 
+
 def safe_current_wb_run_id() -> Optional[str]:
     try:
         import wandb
-        if wandb.run == None:
+
+        wandb_run = wandb.run
+        if wandb_run is None:
             return None
-        return f"{wandb.run.entity}/{wandb.run.project}/{wandb.run.id}"
+        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
     except ImportError:
         return None
