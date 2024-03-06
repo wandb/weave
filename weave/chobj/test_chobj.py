@@ -20,17 +20,17 @@ def client():
 
 def test_table_create(server):
     table_ref = server._new_table([1, 2, 3])
-    assert list(server._get_table(table_ref)) == [1, 2, 3]
-    assert list(server._get_table(table_ref, offset=1)) == [2, 3]
-    assert list(server._get_table(table_ref, offset=1, limit=1)) == [2]
+    assert list(server._table_query(table_ref)) == [1, 2, 3]
+    assert list(server._table_query(table_ref, offset=1)) == [2, 3]
+    assert list(server._table_query(table_ref, offset=1, limit=1)) == [2]
     # TODO: This doesn't work
-    # assert list(server._get_table(table_ref, filter={"": 2})) == [2]
+    # assert list(server._table_query(table_ref, filter={"": 2})) == [2]
 
 
 def test_table_append(server):
     table_ref = server._new_table([1, 2, 3])
     new_table_ref, item_id = server._table_append(table_ref, 4)
-    assert list(server._get_table(new_table_ref)) == [1, 2, 3, 4]
+    assert list(server._table_query(new_table_ref)) == [1, 2, 3, 4]
 
 
 def test_table_remove(server):
@@ -38,7 +38,7 @@ def test_table_remove(server):
     table_ref1, item_id2 = server._table_append(table_ref0, 2)
     table_ref2, item_id3 = server._table_append(table_ref1, 3)
     table_ref3 = server._table_remove(table_ref2, item_id2)
-    assert list(server._get_table(table_ref3)) == [1, 3]
+    assert list(server._table_query(table_ref3)) == [1, 3]
 
 
 def new_val_single(server):
@@ -48,10 +48,10 @@ def new_val_single(server):
 
 def test_new_val_with_list(server):
     ref = server._new_val({"a": [1, 2, 3]})
-    server_val = server.get(ref)
+    server_val = server.get_val(ref)
     table_ref = server_val["a"]
     assert isinstance(table_ref, chobj.TableRef)
-    table_val = server.get(table_ref)
+    table_val = server._table_query(table_ref)
     assert list(table_val) == [1, 2, 3]
 
 
@@ -71,12 +71,13 @@ def test_object(server):
 def test_save_load(client):
     saved_val = client.save({"a": [1, 2, 3]}, "my-obj")
     val = client.get(saved_val.ref)
-    assert val["a"][0] == 1
-    assert val["a"][1] == 2
-    assert val["a"][2] == 3
+    val_table = list(val["a"])
+    assert val_table[0] == 1
+    assert val_table[1] == 2
+    assert val_table[2] == 3
 
 
-def test_dataset(client):
+def test_dataset_refs(client):
     @dataclasses.dataclass
     class Dataset:
         rows: list[Any]
@@ -86,27 +87,28 @@ def test_dataset(client):
     for row in ref.rows:
         new_table_rows.append({"a_ref": row, "b": row + 42})
     ref2 = client.save(new_table_rows, "my-dataset2")
+    ref2_list = list(ref2)
 
     # if we access a_ref values, we actually get values, but we
     # can also get correct references.
     # TODO: shit this is wrong... those should be the underlying
     # refs I think?
 
-    row0 = ref2[0]
+    row0 = ref2_list[0]
     ref0_aref = row0["a_ref"]
     assert ref0_aref == 1
     assert chobj.get_ref(ref0_aref) == chobj.ObjectRef(
         "my-dataset2", ref2.ref.val_id, ["id", 0, "key", "a_ref"]
     )
 
-    row1 = ref2[1]
+    row1 = ref2_list[1]
     ref1_aref = row1["a_ref"]
     assert ref1_aref == 2
     assert chobj.get_ref(ref1_aref) == chobj.ObjectRef(
         "my-dataset2", ref2.ref.val_id, ["id", 1, "key", "a_ref"]
     )
 
-    row2 = ref2[2]
+    row2 = ref2_list[2]
     ref2_aref = row2["a_ref"]
     assert ref2_aref == 3
     assert chobj.get_ref(ref2_aref) == chobj.ObjectRef(
