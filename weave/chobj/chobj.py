@@ -12,6 +12,33 @@ class Ref:
     pass
 
 
+from rich import print
+
+
+def log_ch_commands():
+    from clickhouse_connect.driver import httpclient
+    from clickhouse_connect.driver import client
+
+    orig_command = httpclient.HttpClient.command
+
+    def logging_command(*args, **kwargs):
+        print("CH Command", args, kwargs)
+        return orig_command(*args, **kwargs)
+
+    httpclient.HttpClient.command = logging_command
+
+    orig_query = client.Client.query
+
+    def logging_query(*args, **kwargs):
+        print("CH Query", args, kwargs)
+        return orig_query(*args, **kwargs)
+
+    client.Client.query = logging_query
+
+
+# log_ch_commands()
+
+
 @dataclasses.dataclass
 class TableRef(Ref):
     table_id: uuid.UUID
@@ -624,7 +651,7 @@ class TraceTable(Tracable):
 
     def __iter__(self):
         page_index = 0
-        page_size = 1
+        page_size = 10
         i = 0
         while True:
             page_data = self.server.table_query(
@@ -785,7 +812,7 @@ class ValueIter:
 
     def __iter__(self):
         page_index = 0
-        page_size = 1
+        page_size = 10
         while True:
             page_data = self.server.query_vals(
                 self.filter, offset=page_index * page_size, limit=page_size
