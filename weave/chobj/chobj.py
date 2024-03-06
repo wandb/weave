@@ -362,12 +362,61 @@ class ObjectServer:
             return None
         return json_loads(result[0][0])
 
+    def mutate(self, ref: ObjectRef, mutations: list["Mutation"]):
+        from rich import print
 
-class TraceObject:
-    def __init__(self, val, ref, server):
+        print(ref, mutations)
+        val = self.get_val(ValRef(ref.val_id))
+        for mutation in mutations:
+            if mutation.path:
+                # only handle root for the moment.
+                continue
+            if mutation.operation == "setattr":
+                setattr(val, mutation.args[0], mutation.args[1])
+        return self.new_object(val, ref.name, "latest")
+
+
+@dataclasses.dataclass
+class Mutation:
+    path: list[str]
+    operation: str
+    args: tuple[Any]
+
+
+class Tracable:
+    mutated_value: Any = None
+    ref: Ref
+    list_mutations: Optional[list] = None
+    mutations: Optional[list[Mutation]] = None
+    root: "Tracable"
+    server: ObjectServer
+
+    def add_mutation(self, path, operation, *args):
+        if self.mutations is None:
+            self.mutations = []
+        self.mutations.append(Mutation(path, operation, args))
+
+    def save(self):
+        if not isinstance(self.ref, ObjectRef):
+            raise ValueError("Can only save from object refs")
+        if self.root is not self:
+            raise ValueError("Can only save from root object")
+        if self.mutations is None:
+            raise ValueError("No mutations to save")
+
+        mutations = self.mutations
+        self.mutations = None
+        return self.server.mutate(self.ref, mutations)
+
+
+class TraceObject(Tracable):
+    def __init__(self, val, ref, server, root):
         self.val = val
         self.ref = ref
         self.server = server
+        self.root = root
+        if self.root is None:
+            self.root = self
 
     def __getattribute__(self, __name: str) -> Any:
         try:
@@ -378,7 +427,17 @@ class TraceObject:
             object.__getattribute__(self.val, __name),
             self.ref.with_attr(__name),
             self.server,
+            self.root,
         )
+
+    def __setattr__(self, __name: str, __value: Any) -> None:
+        if __name in ["val", "ref", "server", "root", "mutations"]:
+            return object.__setattr__(self, __name, __value)
+        else:
+            object.__getattribute__(self, "root").add_mutation(
+                self.ref.extra, "setattr", __name, __value
+            )
+            return object.__setattr__(self.val, __name, __value)
 
     def __repr__(self):
         return f"TraceObject({self.val})"
@@ -387,18 +446,21 @@ class TraceObject:
         return self.val == other
 
 
-class TraceTable:
-    def __init__(self, table_ref, ref, server, filter):
+class TraceTable(Tracable):
+    def __init__(self, table_ref, ref, server, filter, root):
         self.table_ref = table_ref
         self.filter = filter
         self.ref = ref
         self.server: ObjectServer = server
+        self.root = root
+        if self.root is None:
+            self.root = self
 
     def __getitem__(self, i):
         page_data = self.server.table_query(
             self.table_ref, self.filter, offset=i, limit=1
         )
-        return make_trace_obj(page_data[0], self.ref.with_id(i), self.server)
+        return make_trace_obj(page_data[0], self.ref.with_id(i), self.server, self.root)
 
     def __iter__(self):
         page_index = 0
@@ -412,34 +474,49 @@ class TraceTable:
                 limit=page_size,
             )
             for item in page_data:
-                yield make_trace_obj(item, self.ref.with_id(i), self.server)
+                yield make_trace_obj(item, self.ref.with_id(i), self.server, self.root)
             if len(page_data) < page_size:
                 break
             i += 1
             page_index += 1
 
+    def append(self, val):
+        self.root.add_mutation(self.ref.extra, "append", val)
 
-class TraceList:
-    def __init__(self, val, ref, server):
+
+class TraceList(Tracable):
+    def __init__(self, val, ref, server, root):
         self.val = val
         self.ref = ref
         self.server: ObjectServer = server
+        self.root = root
+        if self.root is None:
+            self.root = self
 
     def __getitem__(self, i):
-        return make_trace_obj(self.val[i], self.ref.with_id(i), self.server)
+        return make_trace_obj(self.val[i], self.ref.with_id(i), self.server, self.root)
 
     def __eq__(self, other):
         return self.val == other
 
 
-class TraceDict:
-    def __init__(self, val, ref, server):
+class TraceDict(Tracable):
+    def __init__(self, val, ref, server, root):
         self.val = val
         self.ref = ref
         self.server = server
+        self.root = root
+        if self.root is None:
+            self.root = self
 
     def __getitem__(self, key):
-        return make_trace_obj(self.val[key], self.ref.with_key(key), self.server)
+        return make_trace_obj(
+            self.val[key], self.ref.with_key(key), self.server, self.root
+        )
+
+    def __setitem__(self, key, value):
+        self.val[key] = value
+        self.root.add_mutation(self.ref.extra, "setitem", key, value)
 
     def keys(self):
         return self.val.keys()
@@ -460,7 +537,9 @@ class TraceDict:
         return self.val == other
 
 
-def make_trace_obj(val: Any, new_ref: Ref, server: ObjectServer):
+def make_trace_obj(
+    val: Any, new_ref: Ref, server: ObjectServer, root: Optional[Tracable]
+):
     # Derefence val and create the appropriate wrapper object
     extra: list[str] = []
     if isinstance(val, ObjectRef):
@@ -470,7 +549,7 @@ def make_trace_obj(val: Any, new_ref: Ref, server: ObjectServer):
     if isinstance(val, ValRef):
         val = server.get_val(val)
     elif isinstance(val, TableRef):
-        val = TraceTable(val, new_ref, server, {})
+        val = TraceTable(val, new_ref, server, {}, root)
 
     if extra:
         # This is where extra resolution happens?
@@ -488,14 +567,14 @@ def make_trace_obj(val: Any, new_ref: Ref, server: ObjectServer):
             if isinstance(val, ValRef):
                 val = server.get_val(val)
             elif isinstance(val, TableRef):
-                val = TraceTable(val, new_ref, server, {})
+                val = TraceTable(val, new_ref, server, {}, root)
 
     if isinstance(val, ObjectRecord):
-        return TraceObject(val, new_ref, server)
+        return TraceObject(val, new_ref, server, root)
     elif isinstance(val, list):
-        return TraceList(val, new_ref, server)
+        return TraceList(val, new_ref, server, root)
     elif isinstance(val, dict):
-        return TraceDict(val, new_ref, server)
+        return TraceDict(val, new_ref, server, root)
     box_val = box.box(val)
     setattr(box_val, "ref", new_ref)
     return box_val
@@ -550,7 +629,7 @@ class ValueIter:
                 self.filter, offset=page_index * page_size, limit=page_size
             )
             for call in page_data:
-                yield make_trace_obj(call, ValRef(call.id), self.server)
+                yield make_trace_obj(call, ValRef(call.id), self.server, None)
             if len(page_data) < page_size:
                 break
             page_index += 1
@@ -568,7 +647,7 @@ class ObjectClient:
     def get(self, ref: ObjectRef):
         val = self.server.get_val(ValRef(ref.val_id))
 
-        return make_trace_obj(val, ref, self.server)
+        return make_trace_obj(val, ref, self.server, None)
 
     def calls(self, filter: dict):
         filt = copy.copy(filter)
@@ -606,5 +685,6 @@ class ObjectClient:
 #   - merge extra stuff in refs
 #   - filter non-string
 #   - filter table when not dicts
+#   - naming: Value / Object / Record etc.
 
 # Biggest question, can the val table be stored as a table?
