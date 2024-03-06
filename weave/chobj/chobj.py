@@ -179,7 +179,7 @@ class ObjectServer:
             ORDER BY (id, tx_order)"""
         )
 
-    def _new_table(self, initial_table: list):
+    def new_table(self, initial_table: list):
         tx_id = uuid.uuid4().hex
         tx_items = [
             (tx_id, uuid.uuid4().hex, i, json_dumps(v))
@@ -198,7 +198,7 @@ class ObjectServer:
         )
         return TableRef(table_id)
 
-    def _table_query(
+    def table_query(
         self,
         table_ref: TableRef,
         filter: Optional[dict] = None,
@@ -260,7 +260,7 @@ class ObjectServer:
         )
         return TableRef(new_table_id)
 
-    def _table_append(self, table_ref: TableRef, value):
+    def table_append(self, table_ref: TableRef, value):
         tx_id = uuid.uuid4()
         item_id = uuid.uuid4()
         tx_items = [(tx_id, item_id, 0, json.dumps(value))]
@@ -272,7 +272,7 @@ class ObjectServer:
         new_table_ref = self._add_table_transaction(table_ref, tx_id)
         return new_table_ref, item_id
 
-    def _table_remove(self, table_row_ref: TableRef, item_id: uuid.UUID):
+    def table_remove(self, table_row_ref: TableRef, item_id: uuid.UUID):
         tx_id = uuid.uuid4()
         tx_items = [(tx_id, item_id, 0, None)]
         self.client.insert(
@@ -282,13 +282,13 @@ class ObjectServer:
         )
         return self._add_table_transaction(TableRef(table_row_ref.table_id), tx_id)
 
-    def _new_val(self, val, value_id: Optional[uuid.UUID] = None):
+    def new_val(self, val, value_id: Optional[uuid.UUID] = None):
         # map val (this could do more than lists_to_tables)
         def lists_to_tables(val):
             if isinstance(val, dict):
                 return {k: lists_to_tables(v) for k, v in val.items()}
             elif isinstance(val, list):
-                return self._new_table(val)
+                return self.new_table(val)
             return val
 
         val = lists_to_tables(val)
@@ -335,7 +335,7 @@ class ObjectServer:
         return [json_loads(r[0]) for r in query_result.result_rows]
 
     def new_object(self, val, name: str, branch: str) -> ObjectRef:
-        val_ref = self._new_val(val)
+        val_ref = self.new_val(val)
         self.client.insert(
             "objects",
             data=[(uuid.uuid4(), name, branch, json_dumps(val_ref))],
@@ -395,7 +395,7 @@ class TraceTable:
         page_size = 1
         i = 0
         while True:
-            page_data = self.server._table_query(
+            page_data = self.server.table_query(
                 self.table_ref,
                 self.filter,
                 offset=page_index * page_size,
@@ -557,13 +557,13 @@ class ObjectClient:
     def create_call(self, op_name: str, inputs: dict):
         inputs = map_to_refs(inputs)
         call = Call(op_name, inputs)
-        val_ref = self.server._new_val(call)
+        val_ref = self.server.new_val(call)
         call.id = val_ref.val_id
         return call
 
     def finish_call(self, call: Call, output: Any):
         call.output = output
-        self.server._new_val(call, value_id=call.id)
+        self.server.new_val(call, value_id=call.id)
 
 
 # TODO
