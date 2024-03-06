@@ -287,12 +287,9 @@ class ObjectServer:
         def lists_to_tables(val):
             if isinstance(val, dict):
                 return {k: lists_to_tables(v) for k, v in val.items()}
-            elif dataclasses.is_dataclass(val):
-                val.__class__(
-                    **{
-                        k: lists_to_tables(v)
-                        for k, v in dataclasses_asdict_one_level(val).items()
-                    }
+            elif isinstance(val, ObjectRecord):
+                return ObjectRecord(
+                    {k: lists_to_tables(v) for k, v in val.__dict__.items()}
                 )
             elif isinstance(val, list):
                 return self.new_table(val)
@@ -397,6 +394,12 @@ class TraceTable:
         self.ref = ref
         self.server: ObjectServer = server
 
+    def __getitem__(self, i):
+        page_data = self.server.table_query(
+            self.table_ref, self.filter, offset=i, limit=1
+        )
+        return make_trace_obj(page_data[0], self.ref.with_id(i), self.server)
+
     def __iter__(self):
         page_index = 0
         page_size = 1
@@ -459,25 +462,34 @@ class TraceDict:
 
 def make_trace_obj(val: Any, new_ref: Ref, server: ObjectServer):
     # Derefence val and create the appropriate wrapper object
-    if isinstance(val, TableRef):
-        return TraceTable(val, new_ref, server, {})
+    extra: list[str] = []
     if isinstance(val, ObjectRef):
-        obj = server._resolve_object(val.name, "latest")
-        if isinstance(obj, ValRef):
-            obj = server.get_val(obj)
-        elif isinstance(obj, Ref):
-            raise ValueError(f"Unexpected type: {obj}")
+        extra = val.extra
+        val = server._resolve_object(val.name, "latest")
+
+    if isinstance(val, ValRef):
+        val = server.get_val(val)
+    elif isinstance(val, TableRef):
+        val = TraceTable(val, new_ref, server, {})
+
+    if extra:
         # This is where extra resolution happens?
-        for extra_index in range(0, len(val.extra), 2):
-            if val.extra[extra_index] == "key":
-                obj = obj[val.extra[extra_index + 1]]
-            elif val.extra[extra_index] == "attr":
-                obj = getattr(obj, val.extra[extra_index + 1])
-            elif val.extra[extra_index] == "id":
-                obj = obj[val.extra[extra_index + 1]]
+        for extra_index in range(0, len(extra), 2):
+            if extra[extra_index] == "key":
+                val = val[extra[extra_index + 1]]
+            elif extra[extra_index] == "attr":
+                val = getattr(val, extra[extra_index + 1])
+            elif extra[extra_index] == "id":
+                val = val[extra[extra_index + 1]]
             else:
                 raise ValueError(f"Unknown ref type: {val}")
-        val = obj
+
+            # need to deref if we encounter these
+            if isinstance(val, ValRef):
+                val = server.get_val(val)
+            elif isinstance(val, TableRef):
+                val = TraceTable(val, new_ref, server, {})
+
     if isinstance(val, ObjectRecord):
         return TraceObject(val, new_ref, server)
     elif isinstance(val, list):
