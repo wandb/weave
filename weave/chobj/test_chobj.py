@@ -109,12 +109,13 @@ def test_dataset(client):
     )
 
 
-def test_calls(client):
-    @dataclasses.dataclass
-    class Call:
-        inputs: dict
-        op: chobj.ObjectRef
-        output: Any
+def test_calls(client, server):
+    call = client.create_call("x", {"a": 5, "b": 10})
+    client.finish_call(call, "hello")
+    result = client.call(call.id)
+    assert result.op_name == "x"
+    assert result.inputs == {"a": 5, "b": 10}
+    assert result.output == "hello"
 
 
 # def test_publish_big_list(server):

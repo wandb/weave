@@ -111,11 +111,12 @@ class ObjectServer:
             CREATE TABLE IF NOT EXISTS values
             (
                 id UUID,
+                created_at DateTime64 DEFAULT now64(),
                 # TODO: should be type, val
                 val String
             ) 
             ENGINE = MergeTree() 
-            ORDER BY (id)"""
+            ORDER BY (id, created_at)"""
         )
         self.client.command(
             """
@@ -233,7 +234,7 @@ class ObjectServer:
         )
         return self._add_table_transaction(TableRef(table_row_ref.table_id), tx_id)
 
-    def _new_val(self, val):
+    def _new_val(self, val, value_id: Optional[uuid.UUID] = None):
         # map val (this could do more than lists_to_tables)
         def lists_to_tables(val):
             if isinstance(val, dict):
@@ -247,7 +248,8 @@ class ObjectServer:
         # encode val
         encoded_val = json_dumps(val)
 
-        value_id = uuid.uuid4()
+        if value_id is None:
+            value_id = uuid.uuid4()
         self.client.insert(
             "values",
             data=[(value_id, encoded_val)],
@@ -258,7 +260,10 @@ class ObjectServer:
     def get_val(self, val_ref: ValRef):
         query_result = self.client.query(
             """
-            SELECT val from values WHERE id = %(value_id)s
+            SELECT val from values
+            WHERE id = %(value_id)s
+            ORDER BY created_at DESC
+            LIMIT 1
             """,
             parameters={"value_id": val_ref.val_id},
         )
@@ -405,6 +410,14 @@ def map_to_refs(obj: Any) -> Any:
     return obj
 
 
+@dataclasses.dataclass
+class Call:
+    op_name: str
+    inputs: dict
+    id: Optional[uuid.UUID] = None
+    output: Any = None
+
+
 class ObjectClient:
     def __init__(self):
         self.server = ObjectServer()
@@ -419,14 +432,27 @@ class ObjectClient:
 
         return make_trace_obj(val, ref, self.server)
 
+    def call(self, call_id: uuid.UUID) -> Optional[Call]:
+        return self.server.get_val(ValRef(call_id))
+
+    def create_call(self, op_name: str, inputs: dict):
+        call = Call(op_name, inputs)
+        val_ref = self.server._new_val(call)
+        call.id = val_ref.val_id
+        return call
+
+    def finish_call(self, call: Call, output: Any):
+        call.output = output
+        self.server._new_val(call, value_id=call.id)
+
 
 # TODO
 #   - mutations (append, set, remove)
 #   - files
 #   - client queries / filters / client objects
 #   - joins / resolve many
-#   - find all calls on a given dataset row
 #   - table ID refs instead of index
 #   - dedupe, content ID
+#   - efficient walking of all relationships
 
 # Biggest question, can the val table be stored as a table?
