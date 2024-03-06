@@ -100,6 +100,7 @@ class ObjectServer:
                 name String,
                 branch String,
                 created_at DateTime64 DEFAULT now64(),
+                # TODO: should be a ref always
                 val String
             ) 
             ENGINE = MergeTree() 
@@ -110,6 +111,7 @@ class ObjectServer:
             CREATE TABLE IF NOT EXISTS values
             (
                 id UUID,
+                # TODO: should be type, val
                 val String
             ) 
             ENGINE = MergeTree() 
@@ -422,3 +424,6 @@ class ObjectClient:
 #   - joins / resolve many
 #   - find all calls on a given dataset row
 #   - table ID refs instead of index
+#   - dedupe, content ID
+
+# Biggest question, can the val table be stored as a table?
