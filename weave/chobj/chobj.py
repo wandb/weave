@@ -4,15 +4,13 @@ import copy
 import uuid
 import json
 import dataclasses
+from rich import print
 
 from weave import box
 
 
 class Ref:
     pass
-
-
-from rich import print
 
 
 def log_ch_commands():
