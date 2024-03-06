@@ -96,6 +96,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
         "inputs": {"_keys": ["b"], "b": 5},
         "outputs": None,
         "summary": None,
+        "wb_user_id": None,
+        "wb_run_id": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -131,6 +133,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
         "inputs": {"_keys": ["b"], "b": 5},
         "outputs": {"_keys": ["d"], "d": 5},
         "summary": {"_keys": ["c"], "c": 5},
+        "wb_user_id": None,
+        "wb_run_id": None,
     }
 
 
