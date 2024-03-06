@@ -287,6 +287,13 @@ class ObjectServer:
         def lists_to_tables(val):
             if isinstance(val, dict):
                 return {k: lists_to_tables(v) for k, v in val.items()}
+            elif dataclasses.is_dataclass(val):
+                val.__class__(
+                    **{
+                        k: lists_to_tables(v)
+                        for k, v in dataclasses_asdict_one_level(val).items()
+                    }
+                )
             elif isinstance(val, list):
                 return self.new_table(val)
             return val
@@ -505,6 +512,11 @@ def map_to_refs(obj: Any) -> Any:
 
 
 @dataclasses.dataclass
+class Dataset:
+    rows: list[Any]
+
+
+@dataclasses.dataclass
 class Call:
     op_name: str
     inputs: dict
@@ -567,10 +579,10 @@ class ObjectClient:
 
 
 # TODO
-#   - refactor paging stuff to ensure its shared
+#   - mutations (append, set, remove)
+#   - calls on dataset rows are stable
 #   - batch ref resolution in call query / dataset join path
 #   - ensure true client/server wire interface
-#   - mutations (append, set, remove)
 #   - files
 #   - client queries / filters / client objects
 #   - table ID refs instead of index

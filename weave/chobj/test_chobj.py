@@ -72,11 +72,7 @@ def test_save_load(client):
 
 
 def test_dataset_refs(client):
-    @dataclasses.dataclass
-    class Dataset:
-        rows: list[Any]
-
-    ref = client.save(Dataset([1, 2, 3]), "my-dataset")
+    ref = client.save(chobj.Dataset([1, 2, 3]), "my-dataset")
     new_table_rows = []
     for row in ref.rows:
         new_table_rows.append({"a_ref": row, "b": row + 42})
@@ -128,12 +124,8 @@ def test_calls_query(client, server):
 
 
 def test_dataset_calls(client, server):
-    @dataclasses.dataclass
-    class Dataset:
-        rows: list[Any]
-
     ref = client.save(
-        Dataset([{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
+        chobj.Dataset([{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
         "my-dataset",
     )
     for row in ref.rows:
@@ -149,6 +141,14 @@ def test_encode():
     encoded = chobj.json_dumps(call)
     call2 = chobj.json_loads(encoded)
     assert call == call2
+
+
+# def test_mutations(client):
+#     dataset = client.save(
+#         chobj.Dataset([{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
+#         "my-dataset",
+#     )
+#     dataset.rows.append({"doc": "zz", "label": "e"})
 
 
 # def test_publish_big_list(server):
