@@ -225,7 +225,7 @@ class ObjectServer:
                 ORDER BY item_record_time_order ASC
             )
             SELECT
-            val
+            item_id, val
             FROM RankedItems
             WHERE item_record_index = 1 AND val IS NOT NULL AND {predicate}
             LIMIT %(limit)s OFFSET %(offset)s
@@ -239,7 +239,7 @@ class ObjectServer:
         # TODO: we shouldn't json load here, this can be put on the wire
         # as encoded json, and then decoded on the read side (split server into
         # client/server pair)
-        return [json_loads(r[0]) for r in query_result.result_rows]
+        return [(r[0], json_loads(r[1])) for r in query_result.result_rows]
 
     def _add_table_transaction(self, table_ref: TableRef, tx_id: uuid.UUID):
         # TODO: this can be one command instead of two
@@ -362,18 +362,176 @@ class ObjectServer:
             return None
         return json_loads(result[0][0])
 
-    def mutate(self, ref: ObjectRef, mutations: list["Mutation"]):
-        from rich import print
+    def _apply_mutation(self, root, mutation: "Mutation"):
+        val = root
+        for i in range(0, len(mutation.path), 2):
+            op, arg = mutation.path[i], mutation.path[i + 1]
+            if isinstance(val, TableRef):
+                if op == "id":
+                    table_path = tuple(mutation.path[:i])
+                    return None, (
+                        table_path,
+                        Mutation(
+                            [op, arg, *mutation.path[i + 2 :]],
+                            mutation.operation,
+                            mutation.args,
+                        ),
+                    )
+                else:
+                    raise ValueError(f"Unknown table op: {op}")
+            if op == "attr":
+                val = getattr(val, arg)
+            elif op == "key":
+                val = val[arg]
+            elif op == "id":
+                val = val[arg]
+        if mutation.operation == "setattr":
+            setattr(val, mutation.args[0], mutation.args[1])
+        elif mutation.operation == "append":
+            if isinstance(val, TableRef):
+                return None, (
+                    tuple(mutation.path),
+                    Mutation(
+                        [],
+                        mutation.operation,
+                        mutation.args,
+                    ),
+                )
+            else:
+                val.append(mutation.args[0])
+        elif mutation.operation == "setitem":
+            val[mutation.args[0]] = mutation.args[1]
+        return val, None
 
-        print(ref, mutations)
-        val = self.get_val(ValRef(ref.val_id))
+    def _table_mutate(self, table_ref: TableRef, mutations: list["Mutation"]):
+        table_items = self.table_query(table_ref, limit=10000)
+        if len(table_items) >= 100000:
+            raise ValueError(
+                "mutation not yet implemented for tables with >= 100000 items"
+            )
+
+        tx_id = uuid.uuid4()
+        tx_append_items = []
+        updated_row_ids = set()
         for mutation in mutations:
-            if mutation.path:
-                # only handle root for the moment.
-                continue
-            if mutation.operation == "setattr":
-                setattr(val, mutation.args[0], mutation.args[1])
-        return self.new_object(val, ref.name, "latest")
+            if not mutation.path:
+                if mutation.operation == "append":
+                    item_id = uuid.uuid4()
+                    tx_append_items.append(
+                        (
+                            tx_id,
+                            item_id,
+                            len(tx_append_items),
+                            json.dumps(mutation.args[0]),
+                        )
+                    )
+                else:
+                    raise ValueError(
+                        f"Mutation operation not yet supported on table root: {mutation.operation}"
+                    )
+            else:
+                op, arg = mutation.path[0], mutation.path[1]
+                if op != "id":
+                    raise ValueError(
+                        f"Mutation path incorrect for table: {mutation.path}"
+                    )
+                row_id = arg
+                updated_row_ids.add(row_id)
+                row = table_items[row_id][1]
+                val = row
+                for i in range(2, len(mutation.path), 2):
+                    op, arg = mutation.path[i], mutation.path[i + 1]
+                    if op == "key":
+                        val = val[arg]
+                    elif op == "id":
+                        val = val[arg]
+                    else:
+                        raise ValueError(f"Unknown op: {op}")
+                if mutation.operation == "setitem":
+                    val[mutation.args[0]] = mutation.args[1]
+                elif mutation.operation == "append":
+                    val.append(mutation.args[0])
+                else:
+                    raise ValueError(
+                        f"Mutation operation not yet supported: {mutation.operation}"
+                    )
+        tx_items = []
+        for row_id in updated_row_ids:
+            tx_items.append(
+                (
+                    tx_id,
+                    table_items[row_id][0],
+                    len(tx_items),
+                    json.dumps(table_items[row_id][1]),
+                )
+            )
+        for tx_append_item in tx_append_items:
+            tx_items.append(
+                (
+                    tx_id,
+                    tx_append_item[1],
+                    len(tx_items),
+                    tx_append_item[3],
+                )
+            )
+
+        self.client.insert(
+            "table_transactions",
+            data=tx_items,
+            column_names=("id", "item_id", "tx_order", "val"),
+        )
+        return self._add_table_transaction(table_ref, tx_id)
+
+    def mutate(self, ref: ObjectRef, mutations: list["Mutation"]):
+        root = self.get_val(ValRef(ref.val_id))
+        table_mutations = {}
+        for mutation in mutations:
+            new_val, table_mutation = self._apply_mutation(root, mutation)
+            if new_val is not None:
+                root = new_val
+            else:
+                table_mutations.setdefault(table_mutation[0], []).append(
+                    table_mutation[1]
+                )
+
+        for table_path, mutations in table_mutations.items():
+            table_ref_parent = root
+            for i in range(0, len(table_path[:-2]), 2):
+                op, arg = table_path[i], table_path[i + 1]
+                table_ref_parent = apply_path_step(table_ref_parent, op, arg)
+            table_ref = apply_path_step(
+                table_ref_parent, table_path[-2], table_path[-1]
+            )
+            if not isinstance(table_ref, TableRef):
+                raise ValueError("Expected table ref")
+            new_table_ref = self._table_mutate(table_ref, mutations)
+            # TODO: put table ref back into root
+            set_path_step(
+                table_ref_parent, table_path[-2], table_path[-1], new_table_ref
+            )
+
+        return self.new_object(root, ref.name, "latest")
+
+
+def apply_path_step(val, op, arg):
+    if op == "attr":
+        return getattr(val, arg)
+    elif op == "key":
+        return val[arg]
+    elif op == "id":
+        return val[arg]
+    raise ValueError(f"Unknown op: {op}")
+
+
+def set_path_step(val, op, arg, new_val):
+    if op == "attr":
+        setattr(val, arg, new_val)
+    elif op == "key":
+        val[arg] = new_val
+    elif op == "id":
+        val[arg] = new_val
+    else:
+        raise ValueError(f"Unknown op: {op}")
 
 
 @dataclasses.dataclass
@@ -460,7 +618,9 @@ class TraceTable(Tracable):
         page_data = self.server.table_query(
             self.table_ref, self.filter, offset=i, limit=1
         )
-        return make_trace_obj(page_data[0], self.ref.with_id(i), self.server, self.root)
+        return make_trace_obj(
+            page_data[0][1], self.ref.with_id(i), self.server, self.root
+        )
 
     def __iter__(self):
         page_index = 0
@@ -474,7 +634,9 @@ class TraceTable(Tracable):
                 limit=page_size,
             )
             for item in page_data:
-                yield make_trace_obj(item, self.ref.with_id(i), self.server, self.root)
+                yield make_trace_obj(
+                    item[1], self.ref.with_id(i), self.server, self.root
+                )
             if len(page_data) < page_size:
                 break
             i += 1
@@ -670,21 +832,28 @@ class ObjectClient:
 
 
 # TODO
-#   - mutations (append, set, remove)
+#
+# must prove
+#   - [x] mutations (append, set, remove)
 #   - calls on dataset rows are stable
 #   - batch ref resolution in call query / dataset join path
-#   - ensure true client/server wire interface
 #   - files
-#   - client queries / filters / client objects
+#   - ensure true client/server wire interface
 #   - table ID refs instead of index
 #   - dedupe, content ID
 #   - efficient walking of all relationships
+#   - call outputs as refs
+#   - performance tests
+#
+# perf related
 #   - pull out _type to top-level of value and index
 #   - don't encode UUID
-#   - call outputs as refs
+# code quality
+#   - clean up mutation stuff
 #   - merge extra stuff in refs
+#   - naming: Value / Object / Record etc.
+# bugs
 #   - filter non-string
 #   - filter table when not dicts
-#   - naming: Value / Object / Record etc.
 
 # Biggest question, can the val table be stored as a table?
