@@ -20,9 +20,9 @@ def client() -> Generator[chobj.ObjectClient, None, None]:
 
 def test_table_create(server):
     table_ref = server.new_table([1, 2, 3])
-    assert list(server.table_query(table_ref)) == [1, 2, 3]
-    assert list(server.table_query(table_ref, offset=1)) == [2, 3]
-    assert list(server.table_query(table_ref, offset=1, limit=1)) == [2]
+    assert list(r[1] for r in server.table_query(table_ref)) == [1, 2, 3]
+    assert list(r[1] for r in server.table_query(table_ref, offset=1)) == [2, 3]
+    assert list(r[1] for r in server.table_query(table_ref, offset=1, limit=1)) == [2]
     # TODO: This doesn't work
     # assert list(server._table_query(table_ref, filter={"": 2})) == [2]
 
@@ -30,7 +30,7 @@ def test_table_create(server):
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])
     new_table_ref, item_id = server.table_append(table_ref, 4)
-    assert list(server.table_query(new_table_ref)) == [1, 2, 3, 4]
+    assert list(r[1] for r in server.table_query(new_table_ref)) == [1, 2, 3, 4]
 
 
 def test_table_remove(server):
@@ -38,7 +38,7 @@ def test_table_remove(server):
     table_ref1, item_id2 = server.table_append(table_ref0, 2)
     table_ref2, item_id3 = server.table_append(table_ref1, 3)
     table_ref3 = server.table_remove(table_ref2, item_id2)
-    assert list(server.table_query(table_ref3)) == [1, 3]
+    assert list(r[1] for r in server.table_query(table_ref3)) == [1, 3]
 
 
 def new_val_single(server):
@@ -52,7 +52,7 @@ def test_new_val_with_list(server):
     table_ref = server_val["a"]
     assert isinstance(table_ref, chobj.TableRef)
     table_val = server.table_query(table_ref)
-    assert list(table_val) == [1, 2, 3]
+    assert list(r[1] for r in table_val) == [1, 2, 3]
 
 
 def test_object(server):
@@ -174,7 +174,16 @@ def test_mutations(client):
         chobj.Mutation(path=[], operation="setattr", args=("cows", "moo")),
     ]
     new_ref = dataset.save()
-    breakpoint()
+    new_ds = client.get(new_ref)
+    assert new_ds.cows == "moo"
+    new_ds_rows = list(new_ds.rows)
+    assert new_ds_rows[0] == {"doc": "xx", "label": "c"}
+    assert new_ds_rows[1] == {
+        "doc": "jjj",
+        "label": "d",
+        "somelist": [{"a": 12, "b": 14}],
+    }
+    assert new_ds_rows[2] == {"doc": "zz", "label": "e"}
 
 
 # def test_publish_big_list(server):
