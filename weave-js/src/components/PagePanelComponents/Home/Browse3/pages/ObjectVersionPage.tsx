@@ -227,7 +227,11 @@ const ObjectVersionPageInner: React.FC<{
           label: 'Use',
           content:
             objectTypeCategory === 'dataset' ? (
-              <TabUseDataset name={objectName} uri={refUri} />
+              <TabUseDataset
+                name={objectName}
+                uri={refUri}
+                versionIndex={objectVersionIndex}
+              />
             ) : objectTypeCategory === 'model' ? (
               <TabUseModel
                 name={objectName}
