@@ -9,11 +9,16 @@ import {DocLink} from './common/Links';
 type TabUseDatasetProps = {
   name: string;
   uri: string;
+  versionIndex: number;
 };
 
 const ROW_PATH_PREFIX = 'atr/rows/ndx/';
 
-export const TabUseDataset = ({name, uri}: TabUseDatasetProps) => {
+export const TabUseDataset = ({
+  name,
+  uri,
+  versionIndex,
+}: TabUseDatasetProps) => {
   const ref = parseRef(uri);
   const isParentObject = !ref.artifactRefExtra;
   const isRow = ref.artifactRefExtra?.startsWith(ROW_PATH_PREFIX) ?? false;
@@ -22,6 +27,14 @@ export const TabUseDataset = ({name, uri}: TabUseDatasetProps) => {
   if (isRow) {
     pythonName +=
       '_row' + ref.artifactRefExtra?.substring(ROW_PATH_PREFIX.length);
+  }
+
+  // TODO: Row references are not yet supported, you get:
+  //       ValueError: '/' not currently supported in short-form URI
+  let long = '';
+  if (!isRow && 'projectName' in ref) {
+    long = `weave.init('${ref.projectName}')
+${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
   }
 
   return (
@@ -46,6 +59,12 @@ export const TabUseDataset = ({name, uri}: TabUseDatasetProps) => {
           text={`${pythonName} = weave.ref("<ref_uri>").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
         />
+        {long && (
+          <>
+            or
+            <CopyableText text={long} />
+          </>
+        )}
       </Box>
     </Box>
   );

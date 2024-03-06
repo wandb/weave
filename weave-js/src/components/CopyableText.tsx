@@ -39,6 +39,7 @@ IconCell.displayName = 'S.IconCell';
 
 const Text = styled.code`
   font-size: 0.7em;
+  white-space: pre-line;
 `;
 Text.displayName = 'S.Text';
 
