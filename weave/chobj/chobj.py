@@ -20,6 +20,16 @@ class TableRef(Ref):
 @dataclasses.dataclass
 class ValRef(Ref):
     val_id: uuid.UUID
+    extra: list[str] = dataclasses.field(default_factory=list)
+
+    def with_key(self, key) -> "ValRef":
+        return ValRef(self.val_id, self.extra + ["key", key])
+
+    def with_attr(self, attr) -> "ValRef":
+        return ValRef(self.val_id, self.extra + ["attr", attr])
+
+    def with_id(self, index) -> "ValRef":
+        return ValRef(self.val_id, self.extra + ["id", index])
 
 
 @dataclasses.dataclass
@@ -38,12 +48,18 @@ class ObjectRef(Ref):
         return ObjectRef(self.name, self.val_id, self.extra + ["id", index])
 
 
+def dataclasses_asdict_one_level(obj):
+    # dataclasses.asdict is recursive. We don't want that when json encoding
+    return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
+
+
 class RefEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, uuid.UUID):
             return {"_type": "UUID", "uuid": o.hex}
         elif dataclasses.is_dataclass(o):
-            return {"_type": o.__class__.__name__, **dataclasses.asdict(o)}
+            data = dataclasses_asdict_one_level(o)
+            return {"_type": o.__class__.__name__, **data}
         elif isinstance(o, ObjectRecord):
             return o.__dict__
         return json.JSONEncoder.default(self, o)
@@ -369,7 +385,7 @@ class TraceObject:
         )
 
     def __repr__(self):
-        return f"TraceObject({self.ref})"
+        return f"TraceObject({self.val})"
 
 
 class TraceTable:
@@ -407,7 +423,7 @@ class TraceDict:
         return f"TraceDict({self.val})"
 
 
-def make_trace_obj(val: Any, new_ref: ObjectRef, server: ObjectServer):
+def make_trace_obj(val: Any, new_ref: Ref, server: ObjectServer):
     # Derefence val and create the appropriate wrapper object
     if isinstance(val, Ref):
         val = server.get(val)
@@ -470,12 +486,14 @@ class ObjectClient:
     def calls(self, filter: dict):
         filt = copy.copy(filter)
         filt["_type"] = "Call"
-        return self.server.query_vals(filt)
+        for call in self.server.query_vals(filt):
+            yield make_trace_obj(call, ValRef(call.id), self.server)
 
     def call(self, call_id: uuid.UUID) -> Optional[Call]:
         return self.server.get_val(ValRef(call_id))
 
     def create_call(self, op_name: str, inputs: dict):
+        inputs = map_to_refs(inputs)
         call = Call(op_name, inputs)
         val_ref = self.server._new_val(call)
         call.id = val_ref.val_id
@@ -487,13 +505,18 @@ class ObjectClient:
 
 
 # TODO
+#   - batch ref resolution in call query / dataset join path
+#   - ensure true client/server wire interface
 #   - mutations (append, set, remove)
 #   - files
 #   - client queries / filters / client objects
-#   - joins / resolve many
 #   - table ID refs instead of index
 #   - dedupe, content ID
 #   - efficient walking of all relationships
 #   - pull out _type to top-level of value
+#   - don't encode UUID
+#   - call outputs as refs
+#   - client paging
+#   - merge extra stuff in refs
 
 # Biggest question, can the val table be stored as a table?
