@@ -299,7 +299,10 @@ class ObjectServer:
     def _resolve_object(self, name: str, branch: str) -> Optional[ValRef]:
         query_result = self.client.query(
             """
-            SELECT val from objects WHERE name = %(name)s AND branch = %(branch)s
+            SELECT val from objects
+            WHERE name = %(name)s AND branch = %(branch)s
+            ORDER BY created_at DESC
+            LIMIT 1
             """,
             parameters={"name": name, "branch": branch},
         )
