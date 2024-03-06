@@ -109,13 +109,21 @@ def test_dataset(client):
     )
 
 
-def test_calls(client, server):
+def test_call_create(client, server):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.call(call.id)
-    assert result.op_name == "x"
-    assert result.inputs == {"a": 5, "b": 10}
-    assert result.output == "hello"
+    assert result == chobj.Call("x", {"a": 5, "b": 10}, output="hello")
+
+
+def test_calls_query(client, server):
+    client.create_call("x", {"a": 5, "b": 10})
+    client.create_call("x", {"a": 6, "b": 11})
+    client.create_call("y", {"a": 5, "b": 10})
+    result = list(client.calls({"op_name": "x"}))
+    assert len(result) == 2
+    assert result[0] == chobj.Call("x", {"a": 5, "b": 10})
+    assert result[1] == chobj.Call("x", {"a": 6, "b": 11})
 
 
 # def test_publish_big_list(server):
