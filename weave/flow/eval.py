@@ -30,6 +30,8 @@ class Evaluation(Object):
                 pass
             elif callable(scorer) and not isinstance(scorer, op_def.OpDef):
                 scorer = weave.op()(scorer)
+            elif isinstance(scorer, op_def.OpDef):
+                pass
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
             scorers.append(scorer)
