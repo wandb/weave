@@ -41,11 +41,20 @@ def log_ch_commands():
 class TableRef(Ref):
     table_id: uuid.UUID
 
+    def uri(self) -> str:
+        return f"table:///{self.table_id}"
+
 
 @dataclasses.dataclass
 class ValRef(Ref):
     val_id: uuid.UUID
     extra: list[str] = dataclasses.field(default_factory=list)
+
+    def uri(self) -> str:
+        u = f"val:///{self.val_id}"
+        if self.extra:
+            u += "/" + "/".join(self.extra)
+        return u
 
     def with_key(self, key) -> "ValRef":
         return ValRef(self.val_id, self.extra + ["key", key])
@@ -62,6 +71,12 @@ class ObjectRef(Ref):
     name: str
     val_id: uuid.UUID
     extra: list[str] = dataclasses.field(default_factory=list)
+
+    def uri(self) -> str:
+        u = f"object:///{self.name}/{self.val_id}"
+        if self.extra:
+            u += "/" + "/".join(self.extra)
+        return u
 
     def with_key(self, key) -> "ObjectRef":
         return ObjectRef(self.name, self.val_id, self.extra + ["key", key])
@@ -92,6 +107,32 @@ class RefEncoder(json.JSONEncoder):
 
 def json_dumps(val):
     return json.dumps(val, cls=RefEncoder)
+
+
+def refs(val):
+    result_refs = []
+
+    def find_refs(inner_val):
+        if isinstance(inner_val, Ref):
+            result_refs.append(inner_val)
+        else:
+            check_val = None
+            if isinstance(inner_val, dict):
+                check_val = inner_val.values()
+            elif isinstance(inner_val, list):
+                check_val = inner_val
+            elif isinstance(inner_val, ObjectRecord):
+                check_val = inner_val.__dict__.values()
+            elif dataclasses.is_dataclass(inner_val):
+                check_val = dataclasses_asdict_one_level(inner_val).values()
+            if check_val:
+                for val in check_val:
+                    find_refs(val)
+
+    find_refs(val)
+
+    # TODO: ref.uri() instead of str()
+    return [str(r) for r in result_refs]
 
 
 class ObjectRecord:
@@ -173,6 +214,7 @@ class ObjectServer:
             (
                 id UUID,
                 created_at DateTime64 DEFAULT now64(),
+                refs Array(String),
                 # TODO: should be type, val
                 val String
             ) 
@@ -198,6 +240,7 @@ class ObjectServer:
                 item_id UUID,
                 created_at DateTime64 DEFAULT now64(),
                 tx_order UInt32,
+                refs Array(String),
                 val Nullable(String)
             ) 
             ENGINE = MergeTree() 
@@ -207,13 +250,13 @@ class ObjectServer:
     def new_table(self, initial_table: list):
         tx_id = uuid.uuid4().hex
         tx_items = [
-            (tx_id, uuid.uuid4().hex, i, json_dumps(v))
+            (tx_id, uuid.uuid4().hex, i, refs(v), json_dumps(v))
             for i, v in enumerate(initial_table)
         ]
         self.client.insert(
             "table_transactions",
             data=tx_items,
-            column_names=("id", "item_id", "tx_order", "val"),
+            column_names=("id", "item_id", "tx_order", "refs", "val"),
         )
         table_id = uuid.uuid4()
         self.client.insert(
@@ -329,8 +372,8 @@ class ObjectServer:
             value_id = uuid.uuid4()
         self.client.insert(
             "values",
-            data=[(value_id, encoded_val)],
-            column_names=("id", "val"),
+            data=[(value_id, refs(val), encoded_val)],
+            column_names=("id", "refs", "val"),
         )
         return ValRef(val_id=value_id)
 
