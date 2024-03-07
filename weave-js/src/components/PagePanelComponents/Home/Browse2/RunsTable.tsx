@@ -37,6 +37,7 @@ import {CallSchema} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInte
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
+import {CustomGroupedColumnHeader} from './CustomGroupedColumnHeader';
 import {
   computeTableStats,
   getInputColumns,
@@ -426,15 +427,17 @@ export const RunsTable: FC<{
       children: [],
     };
     for (const key of inputOrder) {
+      const field = 'input.' + key;
       cols.push({
         flex: 1,
         minWidth: 150,
-        field: 'input.' + key,
-        headerName: key,
+        field,
+        renderHeader: headerParams => {
+          return <CustomGroupedColumnHeader field={headerParams.field} />;
+        },
         renderCell: cellParams => {
-          const k = 'input.' + key;
-          if (k in cellParams.row) {
-            return renderCell((cellParams.row as any)[k]);
+          if (field in cellParams.row) {
+            return renderCell((cellParams.row as any)[field]);
           }
           return <NotApplicable />;
         },
@@ -467,15 +470,17 @@ export const RunsTable: FC<{
     const outputGrouping = buildTree(outputOrder, 'output');
     colGroupingModel.push(outputGrouping);
     for (const key of outputOrder) {
+      const field = 'output.' + key;
       cols.push({
         flex: 1,
         minWidth: 150,
-        field: 'output.' + key,
-        headerName: key.split('.').slice(-1)[0],
+        field,
+        renderHeader: headerParams => {
+          return <CustomGroupedColumnHeader field={headerParams.field} />;
+        },
         renderCell: cellParams => {
-          const k = 'output.' + key;
-          if (k in cellParams.row) {
-            return renderCell((cellParams.row as any)[k]);
+          if (field in cellParams.row) {
+            return renderCell((cellParams.row as any)[field]);
           }
           return <NotApplicable />;
         },
