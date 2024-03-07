@@ -15,6 +15,10 @@ if typing.TYPE_CHECKING:
     from .op_def import OpDef
 
 
+def print_run_link(run):
+    print(f"🍩 {run.ui_url}")
+
+
 def _deref_all(obj: typing.Any):
     if isinstance(obj, dict):
         return {k: _deref_all(v) for k, v in obj.items()}
@@ -47,7 +51,10 @@ def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
 
     client = graph_client_context.require_graph_client()
     if not ref:
-        ref = client.save_object(obj, f"{obj.__class__.__name__}", "latest")
+        name = getattr(obj, "name", None)
+        if name == None:
+            name = f"{obj.__class__.__name__}"
+        ref = client.save_object(obj, name, "latest")
 
     output_refs.append(ref)
     return ref
@@ -83,7 +90,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
         except BaseException as e:
             client.fail_run(run, e)
             if not parent_run:
-                print("🍩 View call:", run.ui_url)
+                print_run_link(run)
             raise
         if isinstance(res, box.BoxedNone):
             res = None
@@ -108,12 +115,12 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
                     # output = box.box(output)
                     client.finish_run(run, output, output_refs)
                     if not parent_run:
-                        print("🍩 View call:", run.ui_url)
+                        print_run_link(run)
                     return _deref_all(output)
                 except BaseException as e:
                     client.fail_run(run, e)
                     if not parent_run:
-                        print("🍩 View call:", run.ui_url)
+                        print_run_link(run)
                     raise
 
             return _run_async()
@@ -125,7 +132,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
             client.finish_run(run, output, output_refs)
             if not parent_run:
-                print("🍩 View trace:", run.ui_url)
+                print_run_link(run)
             res = _deref_all(output)
 
     else:

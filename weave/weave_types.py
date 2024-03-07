@@ -78,8 +78,11 @@ def instance_class_to_potential_type(cls):
         return exact_type_classes
     result = []
     for instance_class, type_classes in mapping.items():
-        if issubclass(cls, instance_class):
-            result += [tc.typeclass_of_class(cls) for tc in type_classes]
+        try:
+            if issubclass(cls, instance_class):
+                result += [tc.typeclass_of_class(cls) for tc in type_classes]
+        except TypeError:
+            return [UnknownType()]
     return result
 
 

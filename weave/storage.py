@@ -38,6 +38,8 @@ def split_path_dotfile(path, dotfile_name):
 
 
 def _get_name(wb_type: types.Type, obj: typing.Any) -> str:
+    if getattr(obj, "name", None) != None:
+        return obj.name
     return wb_type.name
     # This tries to figure out which variable references obj.
     # But it is slow when there are a lot of references. If we want to do

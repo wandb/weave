@@ -44,13 +44,7 @@ class Object(pydantic.BaseModel, metaclass=ObjectMeta):
         extra="forbid",
     )
 
-    def __getattribute__(self, name: str) -> Any:
-        attribute = super().__getattribute__(name)
-        if name not in super().__getattribute__("model_fields"):
-            return attribute
-        return ref_util.val_with_relative_ref(
-            self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
-        )
+    __str__ = pydantic.BaseModel.__repr__
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
@@ -77,3 +71,17 @@ class Object(pydantic.BaseModel, metaclass=ObjectMeta):
             return new_obj
         # otherwise perform standard pydantic validation
         return handler(v)
+
+
+# We don't define this directly in the class definition so that VSCode
+# doesn't try to navigate to it instead of the target attribute
+def _object_getattribute(self, name: str) -> Any:
+    attribute = object.__getattribute__(self, name)
+    if name not in object.__getattribute__(self, "model_fields"):
+        return attribute
+    return ref_util.val_with_relative_ref(
+        self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
+    )
+
+
+Object.__getattribute__ = _object_getattribute

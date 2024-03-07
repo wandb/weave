@@ -434,6 +434,10 @@ class CallSchemaRun(Run):
         self._call = call
 
     @property
+    def op_name(self):
+        return self._call.name
+
+    @property
     def id(self) -> str:
         return self._call.id
 
