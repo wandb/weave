@@ -20,7 +20,7 @@ console = Console()
 
 class Evaluation(Object):
     dataset: Union[Dataset, list]
-    scores: Optional[list[Union[Callable, Scorer]]] = None
+    scores: Optional[list[Union[Callable, op_def.OpDef, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
 
     def model_post_init(self, __context) -> None:
