@@ -9,7 +9,6 @@ import numpy as np
 import weave
 from weave import op_def
 from weave.flow import Object, Dataset, Model
-from weave.flow import tui
 from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
 from weave.weaveflow import util
 
