@@ -70,20 +70,20 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode():
         parent_run = run_context.get_current_run()
+        op_def_ref = storage._get_ref(op_def)
+        if not client.ref_is_own(op_def_ref):
+            op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
+        mon_span_inputs, refs = auto_publish(inputs)
+
+        # Memoization disabled for now.
+        # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
+        # if found_run:
+        #     return found_run.output
+
+        # if not parent_run:
+        #     print("Running ", op_def.name)
+        run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
         try:
-            op_def_ref = storage._get_ref(op_def)
-            if not client.ref_is_own(op_def_ref):
-                op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-            mon_span_inputs, refs = auto_publish(inputs)
-
-            # Memoization disabled for now.
-            # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
-            # if found_run:
-            #     return found_run.output
-
-            # if not parent_run:
-            #     print("Running ", op_def.name)
-            run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
             with run_context.current_run(run):
                 res = op_def.raw_resolve_fn(**inputs)
                 res = box.box(res)
