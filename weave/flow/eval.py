@@ -28,8 +28,7 @@ def async_call(
         is_async = inspect.iscoroutinefunction(func)
     if is_async:
         return func(*args, **kwargs)  # type: ignore
-    else:
-        return asyncio.to_thread(func, *args, **kwargs)
+    return asyncio.to_thread(func, *args, **kwargs)
 
 
 class Evaluation(Object):
