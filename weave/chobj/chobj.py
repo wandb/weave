@@ -904,6 +904,7 @@ class ObjectClient:
 # must prove
 #   - [x] mutations (append, set, remove)
 #   - calls on dataset rows are stable
+#   - custom objects
 #   - batch ref resolution in call query / dataset join path
 #   - files
 #   - ensure true client/server wire interface
