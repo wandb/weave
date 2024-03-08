@@ -54,6 +54,8 @@ def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
         name = getattr(obj, "name", None)
         if name == None:
             name = f"{obj.__class__.__name__}"
+        if not isinstance(name, str):
+            raise ValueError(f"Object's name attribute is not a string: {name}")
         ref = client.save_object(obj, name, "latest")
 
     output_refs.append(ref)

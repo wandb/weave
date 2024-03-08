@@ -2,6 +2,7 @@ import asyncio
 import pytest
 import weave
 from weave import ref_base
+from weave.flow.scorer import MulticlassF1Score
 from weave import Dataset, Model, Evaluation
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
@@ -213,4 +214,30 @@ def test_score_with_custom_summarize():
         assert result == {
             "prediction": {"mean": 9.5},
             "MyScorer": {"awesome": 3},
+        }
+
+
+def test_multiclass_f1_score():
+    with weave.local_client():
+        evaluation = Evaluation(
+            dataset=[
+                {"target": {"a": False, "b": True}, "pred": {"a": True, "b": False}}
+            ],
+            scores=[MulticlassF1Score(class_names=["a", "b"])],
+        )
+
+        @weave.op()
+        def return_pred(pred):
+            return pred
+
+        result = asyncio.run(evaluation.evaluate(return_pred))
+        assert result == {
+            "prediction": {
+                "a": {"true_count": 1, "true_fraction": 1.0},
+                "b": {"true_count": 0, "true_fraction": 0.0},
+            },
+            "MulticlassF1Score": {
+                "a": {"f1": 0, "precision": 0.0, "recall": 0},
+                "b": {"f1": 0, "precision": 0, "recall": 0.0},
+            },
         }

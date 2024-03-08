@@ -18,12 +18,26 @@ from rich import print
 console = Console()
 
 
+def async_call(
+    func: typing.Union[Callable, op_def.OpDef], *args, **kwargs
+) -> typing.Coroutine:
+    is_async = False
+    if isinstance(func, op_def.OpDef):
+        is_async = inspect.iscoroutinefunction(func.raw_resolve_fn)
+    else:
+        is_async = inspect.iscoroutinefunction(func)
+    if is_async:
+        return func(*args, **kwargs)  # type: ignore
+    else:
+        return asyncio.to_thread(func, *args, **kwargs)
+
+
 class Evaluation(Object):
     dataset: Union[Dataset, list]
     scores: Optional[list[Union[Callable, op_def.OpDef, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context: Any) -> None:
         scorers = []
         for scorer in self.scores or []:
             if isinstance(scorer, Scorer):
@@ -41,7 +55,7 @@ class Evaluation(Object):
             self.dataset = Dataset(rows=self.dataset)
 
         if self.name == None and self.dataset.name != None:
-            self.name = self.dataset.name + "-evaluation"
+            self.name = self.dataset.name + "-evaluation"  # type: ignore
 
     @weave.op()
     async def predict_and_score(
@@ -50,7 +64,7 @@ class Evaluation(Object):
         if self.preprocess_model_input == None:
             model_input = example
         else:
-            model_input = self.preprocess_model_input(example)
+            model_input = self.preprocess_model_input(example)  # type: ignore
 
         if isinstance(model, Model):
             model_predict = model.get_infer_method()
@@ -71,7 +85,7 @@ class Evaluation(Object):
                 )
 
         try:
-            prediction = await model_predict(**model_predict_args)
+            prediction = await async_call(model_predict, **model_predict_args)
         except Exception as e:
             print("Prediction failed")
             traceback.print_exc()
@@ -94,9 +108,7 @@ class Evaluation(Object):
                     )
             score_args["prediction"] = prediction
 
-            result = score_fn(**score_args)
-            if inspect.iscoroutine(result):
-                result = await result
+            result = await async_call(score_fn, **score_args)
             scores[scorer_name] = result
 
         return {
@@ -134,7 +146,8 @@ class Evaluation(Object):
 
         n_complete = 0
         # with console.status("Evaluating...") as status:
-        _rows = self.dataset.rows
+        dataset = typing.cast(Dataset, self.dataset)
+        _rows = dataset.rows
         async for example, eval_row in util.async_foreach(_rows, eval_example, 30):
             n_complete += 1
             # prediction_errors += int(eval_row["prediction_error"])

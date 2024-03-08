@@ -61,7 +61,7 @@ def main():
     raw_labels = json.load(open(os.path.join("example_data", "labels.json")))
     for example_id, label in raw_labels.items():
         doc = open(os.path.join("example_data", example_id + ".txt")).read()
-        dataset_rows.append({"id": example_id, "doc": doc, "label": label})
+        dataset_rows.append({"id": example_id, "doc": doc, "target": label})
     dataset = weave.Dataset(name="example-dataset", rows=dataset_rows)
 
     # eval = weave.Evaluation(dataset=dataset, scores=[MulticlassF1Score])
@@ -73,7 +73,8 @@ def main():
     # print(asyncio.run(model.predict("The name is John and he has 5 shares.")))
 
     eval = weave.Evaluation(
-        dataset=dataset, scores=[MulticlassF1Score(class_names=["name", "shares"])]
+        dataset=dataset,
+        scores=[MulticlassF1Score(class_names=["name", "shares"])],
     )
     asyncio.run(eval.evaluate(model))
 
