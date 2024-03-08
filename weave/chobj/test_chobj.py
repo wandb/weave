@@ -202,6 +202,9 @@ def test_stable_dataset_row_refs(client, server):
     dataset2 = client.get(dataset2_ref)
     call = client.create_call("x", {"a": dataset2.rows[0]["doc"]})
     client.finish_call(call, "call2")
+    x = client.calls({"ref": chobj.get_ref(dataset.rows[0]["doc"])})
+
+    assert len(list(x)) == 2
 
 
 # def test_publish_big_list(server):

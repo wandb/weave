@@ -36,6 +36,9 @@ def log_ch_commands():
 class Ref:
     extra: list[str]
 
+    def uri(self) -> str:
+        raise NotImplementedError
+
     def with_key(self, key: str) -> "Ref":
         raise NotImplementedError
 
@@ -154,8 +157,7 @@ def refs(val):
 
     find_refs(val)
 
-    # TODO: ref.uri() instead of str()
-    return [str(r) for r in result_refs]
+    return [r.uri() for r in result_refs]
 
 
 class ObjectRecord:
@@ -195,7 +197,6 @@ def ref_decoder(d):
 
 
 def json_loads(d):
-    print("D", d)
     return json.loads(d, object_hook=ref_decoder)
 
 
@@ -214,9 +215,9 @@ def make_value_filter(filter: ValueFilter):
             query_parts.append(query_part)
     if "type" in filter:
         query_parts.append(f"type = '{filter['type']}'")
-    elif "ref" in filter:
+    if "ref" in filter:
         ref = filter["ref"]
-        query_parts.append(f"{ref} IN refs")
+        query_parts.append(f"has(refs, '{ref.uri()}')")
     return " AND ".join(query_parts)
 
 
@@ -276,6 +277,7 @@ class ObjectServer:
             (
                 id UUID,
                 item_id UUID,
+                item_version UUID,
                 type String,
                 created_at DateTime64 DEFAULT now64(),
                 tx_order UInt32,
@@ -519,7 +521,7 @@ class ObjectServer:
 
         tx_id = uuid.uuid4()
         tx_append_items = []
-        updated_row_ids = set()
+        updated_item_ids = set()
         for mutation in mutations:
             if not mutation.path:
                 if mutation.operation == "append":
@@ -543,9 +545,9 @@ class ObjectServer:
                     raise ValueError(
                         f"Mutation path incorrect for table: {mutation.path}"
                     )
-                row_id = int(arg)
-                updated_row_ids.add(row_id)
-                row = table_items[row_id][1]
+                item_id = int(arg)
+                updated_item_ids.add(item_id)
+                row = table_items[item_id][1]
                 val = row
                 for i in range(2, len(mutation.path), 2):
                     op, arg = mutation.path[i], mutation.path[i + 1]
@@ -564,14 +566,14 @@ class ObjectServer:
                         f"Mutation operation not yet supported: {mutation.operation}"
                     )
         tx_items = []
-        for row_id in updated_row_ids:
+        for item_id in updated_item_ids:
             tx_items.append(
                 (
                     tx_id,
-                    table_items[row_id][0],
+                    table_items[item_id][0],
                     len(tx_items),
-                    get_type(table_items[row_id][1]),
-                    json.dumps(table_items[row_id][1]),
+                    get_type(table_items[item_id][1]),
+                    json.dumps(table_items[item_id][1]),
                 )
             )
         for tx_append_item in tx_append_items:
@@ -953,6 +955,7 @@ class ObjectClient:
         return make_trace_obj(val, ref, self.server, None)
 
     def calls(self, filter: ValueFilter):
+        print("FILT", filter)
         filt = copy.copy(filter)
         filt["type"] = "Call"
         return ValueIter(self.server, filt)
@@ -971,9 +974,6 @@ class ObjectClient:
         call.output = output
         self.server.new_val(call, value_id=call.id)
 
-
-# TODO
-# Pull out value type to top-level
 
 # TODO
 #
