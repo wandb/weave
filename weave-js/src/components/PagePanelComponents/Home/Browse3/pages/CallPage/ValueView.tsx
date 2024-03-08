@@ -2,7 +2,7 @@ import React from 'react';
 
 import {parseRef} from '../../../../../../react';
 import {SmallRef} from '../../../Browse2/SmallRef';
-import {WANDB_ARTIFACT_REF_PREFIX} from '../wfReactInterface/constants';
+import {isRef} from '../common/util';
 import {ValueViewNumber} from './ValueViewNumber';
 import {ValueViewPrimitive} from './ValueViewPrimitive';
 import {ValueViewString} from './ValueViewString';
@@ -12,12 +12,6 @@ type ValueData = Record<string, any>;
 type ValueViewProps = {
   data: ValueData;
   isExpanded: boolean;
-};
-
-export const isRef = (value: any): boolean => {
-  return (
-    typeof value === 'string' && value.startsWith(WANDB_ARTIFACT_REF_PREFIX)
-  );
 };
 
 export const ValueView = ({data, isExpanded}: ValueViewProps) => {

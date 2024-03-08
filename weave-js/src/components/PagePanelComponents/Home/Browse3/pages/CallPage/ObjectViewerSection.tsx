@@ -4,9 +4,10 @@ import styled from 'styled-components';
 
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
+import {isRef} from '../common/util';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
-import {isRef, ValueView} from './ValueView';
+import {ValueView} from './ValueView';
 
 type Data = Record<string, any>;
 
