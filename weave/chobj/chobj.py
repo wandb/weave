@@ -1,4 +1,4 @@
-from typing import Optional, Any, TypedDict
+from typing import Optional, Any, TypedDict, Literal, Union
 import clickhouse_connect
 import copy
 import uuid
@@ -448,7 +448,7 @@ class ObjectServer:
                     table_path = tuple(mutation.path[:i])
                     return None, (
                         table_path,
-                        Mutation(
+                        make_mutation(
                             [op, arg, *mutation.path[i + 2 :]],
                             mutation.operation,
                             mutation.args,
@@ -468,7 +468,7 @@ class ObjectServer:
             if isinstance(val, TableRef):
                 return None, (
                     tuple(mutation.path),
-                    Mutation(
+                    make_mutation(
                         [],
                         mutation.operation,
                         mutation.args,
@@ -566,7 +566,7 @@ class ObjectServer:
             new_val, table_mutation = self._apply_mutation(root, mutation)
             if new_val is not None:
                 root = new_val
-            else:
+            elif table_mutation is not None:
                 table_mutations.setdefault(table_mutation[0], []).append(
                     table_mutation[1]
                 )
@@ -612,10 +612,38 @@ def set_path_step(val, op, arg, new_val):
 
 
 @dataclasses.dataclass
-class Mutation:
+class MutationSetitem:
     path: list[str]
-    operation: str
+    operation: Literal["setitem"]
+    args: tuple[str, Any]
+
+
+@dataclasses.dataclass
+class MutationSetattr:
+    path: list[str]
+    operation: Literal["setattr"]
+    args: tuple[str, Any]
+
+
+@dataclasses.dataclass
+class MutationAppend:
+    path: list[str]
+    operation: Literal["append"]
     args: tuple[Any]
+
+
+Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
+
+
+def make_mutation(path, operation, args):
+    if operation == "setitem":
+        return MutationSetitem(path, operation, args)
+    elif operation == "setattr":
+        return MutationSetattr(path, operation, args)
+    elif operation == "append":
+        return MutationAppend(path, operation, args)
+    else:
+        raise ValueError(f"Unknown operation: {operation}")
 
 
 class Tracable:
@@ -629,7 +657,7 @@ class Tracable:
     def add_mutation(self, path, operation, *args):
         if self.mutations is None:
             self.mutations = []
-        self.mutations.append(Mutation(path, operation, args))
+        self.mutations.append(make_mutation(path, operation, args))
 
     def save(self):
         if not isinstance(self.ref, ObjectRef):

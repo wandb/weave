@@ -142,7 +142,7 @@ def test_encode():
     assert call == call2
 
 
-def test_mutations(client):
+def test_mutations(client, server):
     dataset = client.save(
         chobj.Dataset(
             [
@@ -157,20 +157,20 @@ def test_mutations(client):
     dataset.rows[1]["somelist"][0]["a"] = 12
     dataset.cows = "moo"
     assert dataset.mutations == [
-        chobj.Mutation(
+        chobj.MutationAppend(
             path=["attr", "rows"],
             operation="append",
             args=({"doc": "zz", "label": "e"},),
         ),
-        chobj.Mutation(
+        chobj.MutationSetitem(
             path=["attr", "rows", "id", 1], operation="setitem", args=("doc", "jjj")
         ),
-        chobj.Mutation(
+        chobj.MutationSetitem(
             path=["attr", "rows", "id", 1, "key", "somelist", "id", 0],
             operation="setitem",
             args=("a", 12),
         ),
-        chobj.Mutation(path=[], operation="setattr", args=("cows", "moo")),
+        chobj.MutationSetattr(path=[], operation="setattr", args=("cows", "moo")),
     ]
     new_ref = dataset.save()
     new_ds = client.get(new_ref)
