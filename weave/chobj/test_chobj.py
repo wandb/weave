@@ -2,7 +2,6 @@ from typing import Any, Generator
 import pytest
 import uuid
 import chobj
-import dataclasses
 
 
 @pytest.fixture
@@ -117,7 +116,7 @@ def test_calls_query(client, server):
     client.create_call("x", {"a": 5, "b": 10})
     client.create_call("x", {"a": 6, "b": 11})
     client.create_call("y", {"a": 5, "b": 10})
-    result = list(client.calls({"op_name": "x"}))
+    result = list(client.calls({"val": {"op_name": "x"}}))
     assert len(result) == 2
     assert result[0] == chobj.Call("x", {"a": 5, "b": 10})
     assert result[1] == chobj.Call("x", {"a": 6, "b": 11})

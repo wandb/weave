@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional, Any, TypedDict
 import clickhouse_connect
 import copy
 import uuid
@@ -173,12 +173,21 @@ def json_loads(d):
     return json.loads(d, object_hook=ref_decoder)
 
 
-def make_value_filter(filter: dict):
+class ValueFilter(TypedDict):
+    ref: Optional[Ref]
+    val: Optional[dict]
+
+
+def make_value_filter(filter: ValueFilter):
     query_parts = []
-    for key, value in filter.items():
-        # Assume all values are to be treated as strings for simplicity. Adjust the casting as necessary.
-        query_part = f"JSONExtractString(val, '{key}') = '{value}'"
-        query_parts.append(query_part)
+    if filter["val"]:
+        for key, value in filter["val"].items():
+            # Assume all values are to be treated as strings for simplicity. Adjust the casting as necessary.
+            query_part = f"JSONExtractString(val, '{key}') = '{value}'"
+            query_parts.append(query_part)
+    elif filter["ref"]:
+        ref = filter["ref"]
+        query_parts.append(f"{ref} IN refs")
     return " AND ".join(query_parts)
 
 
@@ -269,7 +278,7 @@ class ObjectServer:
     def table_query(
         self,
         table_ref: TableRef,
-        filter: Optional[dict] = None,
+        filter: Optional[ValueFilter] = None,
         offset: Optional[int] = 0,
         limit: Optional[int] = 100,
     ):
@@ -390,7 +399,7 @@ class ObjectServer:
         return json_loads(query_result.result_rows[0][0])
 
     def query_vals(
-        self, filter: dict, offset: Optional[int] = 0, limit: Optional[int] = 100
+        self, filter: ValueFilter, offset: Optional[int] = 0, limit: Optional[int] = 100
     ):
         predicate = make_value_filter(filter)
         query_result = self.client.query(
@@ -847,7 +856,10 @@ class Call:
 
 
 class ValueIter:
-    def __init__(self, server, filter):
+    server: ObjectServer
+    filter: ValueFilter
+
+    def __init__(self, server, filter: ValueFilter):
         self.server = server
         self.filter = filter
 
@@ -879,9 +891,11 @@ class ObjectClient:
 
         return make_trace_obj(val, ref, self.server, None)
 
-    def calls(self, filter: dict):
-        filt = copy.copy(filter)
-        filt["_type"] = "Call"
+    def calls(self, filter: ValueFilter):
+        filt = copy.deepcopy(filter)
+        if "val" not in filt:
+            filt["val"] = {}
+        filt["val"]["_type"] = "Call"
         return ValueIter(self.server, filt)
 
     def call(self, call_id: uuid.UUID) -> Optional[Call]:
@@ -900,12 +914,16 @@ class ObjectClient:
 
 
 # TODO
+# Fix types
+# Pull out value type to top-level
+
+# TODO
 #
 # must prove
 #   - [x] mutations (append, set, remove)
 #   - calls on dataset rows are stable
-#   - custom objects
 #   - batch ref resolution in call query / dataset join path
+#   - custom objects
 #   - files
 #   - ensure true client/server wire interface
 #   - table ID refs instead of index
