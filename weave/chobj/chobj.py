@@ -1000,5 +1000,6 @@ class ObjectClient:
 # bugs
 #   - filter non-string
 #   - filter table when not dicts
+#   - duplicating _type into value and column (maybe fine)
 
 # Biggest question, can the val table be stored as a table?
