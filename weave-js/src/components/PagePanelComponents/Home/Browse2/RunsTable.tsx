@@ -272,6 +272,7 @@ export const RunsTable: FC<{
               opName={opVersionRefOpName(opVersion)}
               callId={rowParams.row.id}
               fullWidth={true}
+              preservePath
             />
           );
         },
