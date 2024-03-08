@@ -74,7 +74,7 @@ def main():
 
     eval = weave.Evaluation(
         dataset=dataset,
-        scores=[MulticlassF1Score(class_names=["name", "shares"])],
+        scorers=[MulticlassF1Score(class_names=["name", "shares"])],
     )
     asyncio.run(eval.evaluate(model))
 

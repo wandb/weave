@@ -34,12 +34,12 @@ def async_call(
 
 class Evaluation(Object):
     dataset: Union[Dataset, list]
-    scores: Optional[list[Union[Callable, op_def.OpDef, Scorer]]] = None
+    scorers: Optional[list[Union[Callable, op_def.OpDef, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
 
     def model_post_init(self, __context: Any) -> None:
         scorers = []
-        for scorer in self.scores or []:
+        for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
             elif callable(scorer) and not isinstance(scorer, op_def.OpDef):
@@ -49,7 +49,7 @@ class Evaluation(Object):
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
             scorers.append(scorer)
-        self.scores = scorers
+        self.scorers = scorers
 
         if isinstance(self.dataset, list):
             self.dataset = Dataset(rows=self.dataset)
@@ -92,7 +92,7 @@ class Evaluation(Object):
             prediction = None
 
         scores = {}
-        scorers = typing.cast(list[Union[op_def.OpDef, Scorer]], self.scores or [])
+        scorers = typing.cast(list[Union[op_def.OpDef, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
             score_signature = inspect.signature(score_fn)
@@ -122,7 +122,7 @@ class Evaluation(Object):
         prediction_summary = auto_summarize(eval_table.column("prediction"))
         if prediction_summary:
             summary["prediction"] = prediction_summary
-        scorers = self.scores or []
+        scorers = self.scorers or []
         for scorer in scorers:
             scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
             scorer_scores = eval_table.column("scores").column(scorer_name)
@@ -160,7 +160,7 @@ class Evaluation(Object):
                 eval_row = {"prediction": None, "scores": {}}
             if eval_row["scores"] == None:
                 eval_row["scores"] = {}
-            for scorer in self.scores or []:
+            for scorer in self.scorers or []:
                 scorer_name, _, _ = get_scorer_attributes(scorer)
                 if scorer_name not in eval_row["scores"]:
                     eval_row["scores"][scorer_name] = {}

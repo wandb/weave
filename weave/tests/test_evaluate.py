@@ -35,7 +35,7 @@ def test_evaluate_basic():
 
         evaluation = Evaluation(
             dataset=dataset,
-            scores=[score],
+            scorers=[score],
             preprocess_model_input=example_to_model_input,
         )
         model = EvalModel()
@@ -108,7 +108,7 @@ def test_evaluate_callable_as_model():
     with weave.local_client():
         evaluation = Evaluation(
             dataset=dataset_rows,
-            scores=[score],
+            scorers=[score],
         )
         result = asyncio.run(evaluation.evaluate(model_predict))
         assert result == expected_eval_result
@@ -122,7 +122,7 @@ def test_predict_can_receive_other_params():
     with weave.local_client():
         evaluation = Evaluation(
             dataset=dataset_rows,
-            scores=[score],
+            scorers=[score],
         )
         result = asyncio.run(evaluation.evaluate(model_predict))
         assert result == {
@@ -143,7 +143,7 @@ def test_can_preprocess_model_input():
     with weave.local_client():
         evaluation = Evaluation(
             dataset=dataset_rows,
-            scores=[score],
+            scorers=[score],
             preprocess_model_input=preprocess,
         )
         result = asyncio.run(evaluation.evaluate(model_predict))
@@ -154,7 +154,7 @@ def test_evaluate_rows_only():
     with weave.local_client():
         evaluation = Evaluation(
             dataset=dataset_rows,
-            scores=[score],
+            scorers=[score],
         )
         model = EvalModel()
         result = asyncio.run(evaluation.evaluate(model))
@@ -170,7 +170,7 @@ def test_evaluate_other_model_method_names():
     with weave.local_client():
         evaluation = Evaluation(
             dataset=dataset_rows,
-            scores=[score],
+            scorers=[score],
         )
         model = EvalModel()
         result = asyncio.run(evaluation.evaluate(model))
@@ -185,7 +185,7 @@ def test_score_as_class():
     with weave.local_client():
         evaluation = Evaluation(
             dataset=dataset_rows,
-            scores=[MyScorer()],
+            scorers=[MyScorer()],
         )
         model = EvalModel()
         result = asyncio.run(evaluation.evaluate(model))
@@ -207,7 +207,7 @@ def test_score_with_custom_summarize():
     with weave.local_client():
         evaluation = Evaluation(
             dataset=dataset_rows,
-            scores=[MyScorer()],
+            scorers=[MyScorer()],
         )
         model = EvalModel()
         result = asyncio.run(evaluation.evaluate(model))
@@ -223,7 +223,7 @@ def test_multiclass_f1_score():
             dataset=[
                 {"target": {"a": False, "b": True}, "pred": {"a": True, "b": False}}
             ],
-            scores=[MulticlassF1Score(class_names=["a", "b"])],
+            scorers=[MulticlassF1Score(class_names=["a", "b"])],
         )
 
         @weave.op()
