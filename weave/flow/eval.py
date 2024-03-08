@@ -19,7 +19,7 @@ console = Console()
 
 
 def async_call(
-    func: typing.Union[Callable, op_def.OpDef], *args, **kwargs
+    func: typing.Union[Callable, op_def.OpDef], *args: Any, **kwargs: Any
 ) -> typing.Coroutine:
     is_async = False
     if isinstance(func, op_def.OpDef):
