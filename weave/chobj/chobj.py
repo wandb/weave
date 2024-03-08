@@ -1,4 +1,4 @@
-from typing import Optional, Any, TypedDict, Literal, Union
+from typing import Optional, Any, TypedDict, NamedTuple, Literal, Union
 import clickhouse_connect
 import copy
 import uuid
@@ -45,7 +45,10 @@ class Ref:
     def with_attr(self, attr: str) -> "Ref":
         raise NotImplementedError
 
-    def with_id(self, index: int) -> "Ref":
+    def with_index(self, index: int) -> "Ref":
+        raise NotImplementedError
+
+    def with_item(self, item_id: uuid.UUID, item_version: uuid.UUID) -> "Ref":
         raise NotImplementedError
 
 
@@ -74,8 +77,11 @@ class ValRef(Ref):
     def with_attr(self, attr) -> "ValRef":
         return ValRef(self.val_id, self.extra + ["attr", attr])
 
-    def with_id(self, index) -> "ValRef":
-        return ValRef(self.val_id, self.extra + ["id", str(index)])
+    def with_index(self, index) -> "ValRef":
+        return ValRef(self.val_id, self.extra + ["index", str(index)])
+
+    def with_item(self, item_id, item_version) -> "ValRef":
+        return ValRef(self.val_id, self.extra + ["id", f"{item_id},{item_version}"])
 
 
 @dataclasses.dataclass
@@ -96,8 +102,13 @@ class ObjectRef(Ref):
     def with_attr(self, attr) -> "ObjectRef":
         return ObjectRef(self.name, self.val_id, self.extra + ["attr", attr])
 
-    def with_id(self, index) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + ["id", str(index)])
+    def with_index(self, index) -> "ObjectRef":
+        return ObjectRef(self.name, self.val_id, self.extra + ["index", str(index)])
+
+    def with_item(self, item_id, item_version) -> "ObjectRef":
+        return ObjectRef(
+            self.name, self.val_id, self.extra + ["id", f"{item_id},{item_version}"]
+        )
 
 
 def dataclasses_asdict_one_level(obj):
@@ -201,6 +212,7 @@ def json_loads(d):
 
 
 class ValueFilter(TypedDict, total=False):
+    id: uuid.UUID
     ref: Ref
     type: str
     val: dict
@@ -208,6 +220,8 @@ class ValueFilter(TypedDict, total=False):
 
 def make_value_filter(filter: ValueFilter):
     query_parts = []
+    if "id" in filter:
+        query_parts.append(f"id = '{filter['id']}'")
     if "val" in filter:
         for key, value in filter["val"].items():
             # Assume all values are to be treated as strings for simplicity. Adjust the casting as necessary.
@@ -219,6 +233,12 @@ def make_value_filter(filter: ValueFilter):
         ref = filter["ref"]
         query_parts.append(f"has(refs, '{ref.uri()}')")
     return " AND ".join(query_parts)
+
+
+class TableItem(NamedTuple):
+    id: uuid.UUID
+    version: uuid.UUID
+    val: Any
 
 
 class ObjectServer:
@@ -275,8 +295,8 @@ class ObjectServer:
             """
             CREATE TABLE IF NOT EXISTS table_transactions
             (
+                tx_id UUID,
                 id UUID,
-                item_id UUID,
                 item_version UUID,
                 type String,
                 created_at DateTime64 DEFAULT now64(),
@@ -285,19 +305,19 @@ class ObjectServer:
                 val Nullable(String)
             ) 
             ENGINE = MergeTree() 
-            ORDER BY (id, tx_order)"""
+            ORDER BY (tx_id, tx_order)"""
         )
 
     def new_table(self, initial_table: list):
         tx_id = uuid.uuid4().hex
         tx_items = [
-            (tx_id, uuid.uuid4().hex, i, refs(v), json_dumps(v))
+            (tx_id, uuid.uuid4(), uuid.uuid4(), i, refs(v), json_dumps(v))
             for i, v in enumerate(initial_table)
         ]
         self.client.insert(
             "table_transactions",
             data=tx_items,
-            column_names=("id", "item_id", "tx_order", "refs", "val"),
+            column_names=("tx_id", "id", "item_version", "tx_order", "refs", "val"),
         )
         table_id = uuid.uuid4()
         self.client.insert(
@@ -319,13 +339,14 @@ class ObjectServer:
             f"""
             WITH RankedItems AS (
                 SELECT
+                    tx_id,
                     id,
-                    item_id,
-                    FIRST_VALUE(tuple(created_at, tx_order)) OVER (PARTITION BY item_id ORDER BY (created_at, tx_order) DESC) AS item_record_time_order,
-                    ROW_NUMBER() OVER (PARTITION BY item_id ORDER BY (created_at, tx_order) DESC) AS item_record_index,
+                    item_version,
+                    FIRST_VALUE(tuple(created_at, tx_order)) OVER (PARTITION BY id ORDER BY (created_at, tx_order) DESC) AS item_record_time_order,
+                    ROW_NUMBER() OVER (PARTITION BY id ORDER BY (created_at, tx_order) DESC) AS item_record_index,
                     val,
                 FROM table_transactions
-                WHERE id IN (
+                WHERE tx_id IN (
                     SELECT tx_id
                     FROM tables
                     ARRAY JOIN transaction_ids AS tx_id
@@ -334,7 +355,7 @@ class ObjectServer:
                 ORDER BY item_record_time_order ASC
             )
             SELECT
-            item_id, val
+            id, item_version, val
             FROM RankedItems
             WHERE item_record_index = 1 AND val IS NOT NULL AND {predicate}
             LIMIT %(limit)s OFFSET %(offset)s
@@ -348,7 +369,9 @@ class ObjectServer:
         # TODO: we shouldn't json load here, this can be put on the wire
         # as encoded json, and then decoded on the read side (split server into
         # client/server pair)
-        return [(r[0], json_loads(r[1])) for r in query_result.result_rows]
+        return [
+            TableItem(r[0], r[1], json_loads(r[2])) for r in query_result.result_rows
+        ]
 
     def _add_table_transaction(self, table_ref: TableRef, tx_id: uuid.UUID):
         # TODO: this can be one command instead of two
@@ -372,22 +395,24 @@ class ObjectServer:
     def table_append(self, table_ref: TableRef, value):
         tx_id = uuid.uuid4()
         item_id = uuid.uuid4()
-        tx_items = [(tx_id, item_id, 0, get_type(value), json.dumps(value))]
+        tx_items = [
+            (tx_id, item_id, uuid.uuid4(), 0, get_type(value), json.dumps(value))
+        ]
         self.client.insert(
             "table_transactions",
             data=tx_items,
-            column_names=("id", "item_id", "tx_order", "type", "val"),
+            column_names=("tx_id", "id", "item_version", "tx_order", "type", "val"),
         )
         new_table_ref = self._add_table_transaction(table_ref, tx_id)
         return new_table_ref, item_id
 
     def table_remove(self, table_row_ref: TableRef, item_id: uuid.UUID):
         tx_id = uuid.uuid4()
-        tx_items = [(tx_id, item_id, 0, get_type(None), None)]
+        tx_items = [(tx_id, item_id, uuid.uuid4(), 0, get_type(None), None)]
         self.client.insert(
             "table_transactions",
             data=tx_items,
-            column_names=("id", "item_id", "tx_order", "type", "val"),
+            column_names=("tx_id", "id", "item_version", "tx_order", "type", "val"),
         )
         return self._add_table_transaction(TableRef(table_row_ref.table_id), tx_id)
 
@@ -492,7 +517,7 @@ class ObjectServer:
                 val = getattr(val, arg)
             elif op == "key":
                 val = val[arg]
-            elif op == "id":
+            elif op == "index":
                 val = val[arg]
         if mutation.operation == "setattr":
             setattr(val, mutation.args[0], mutation.args[1])
@@ -513,11 +538,10 @@ class ObjectServer:
         return val, None
 
     def _table_mutate(self, table_ref: TableRef, mutations: list["Mutation"]):
-        table_items = self.table_query(table_ref, limit=10000)
-        if len(table_items) >= 100000:
-            raise ValueError(
-                "mutation not yet implemented for tables with >= 100000 items"
-            )
+        # we're going to mutate this list with the updates
+        # TODO: throw error if too big
+        table_items_values = self.table_query(table_ref, limit=100000)
+        table_items = {item.id: item for item in table_items_values}
 
         tx_id = uuid.uuid4()
         tx_append_items = []
@@ -530,6 +554,7 @@ class ObjectServer:
                         (
                             tx_id,
                             item_id,
+                            uuid.uuid4(),
                             len(tx_append_items),
                             get_type(mutation.args[0]),
                             json.dumps(mutation.args[0]),
@@ -545,15 +570,15 @@ class ObjectServer:
                     raise ValueError(
                         f"Mutation path incorrect for table: {mutation.path}"
                     )
-                item_id = int(arg)
+                item_id = uuid.UUID(arg.split(",")[0])
                 updated_item_ids.add(item_id)
-                row = table_items[item_id][1]
+                row = table_items[item_id].val
                 val = row
                 for i in range(2, len(mutation.path), 2):
                     op, arg = mutation.path[i], mutation.path[i + 1]
                     if op == "key":
                         val = val[arg]
-                    elif op == "id":
+                    elif op == "index":
                         val = val[int(arg)]
                     else:
                         raise ValueError(f"Unknown op: {op}")
@@ -570,10 +595,11 @@ class ObjectServer:
             tx_items.append(
                 (
                     tx_id,
-                    table_items[item_id][0],
+                    table_items[item_id].id,
+                    uuid.uuid4(),
                     len(tx_items),
-                    get_type(table_items[item_id][1]),
-                    json.dumps(table_items[item_id][1]),
+                    get_type(table_items[item_id].val),
+                    json.dumps(table_items[item_id].val),
                 )
             )
         for tx_append_item in tx_append_items:
@@ -581,16 +607,17 @@ class ObjectServer:
                 (
                     tx_id,
                     tx_append_item[1],
+                    tx_append_item[2],
                     len(tx_items),
-                    tx_append_item[3],
                     tx_append_item[4],
+                    tx_append_item[5],
                 )
             )
 
         self.client.insert(
             "table_transactions",
             data=tx_items,
-            column_names=("id", "item_id", "tx_order", "type", "val"),
+            column_names=("tx_id", "id", "item_version", "tx_order", "type", "val"),
         )
         return self._add_table_transaction(table_ref, tx_id)
 
@@ -630,7 +657,7 @@ def apply_path_step(val, op, arg):
         return getattr(val, arg)
     elif op == "key":
         return val[arg]
-    elif op == "id":
+    elif op == "index":
         return val[arg]
     raise ValueError(f"Unknown op: {op}")
 
@@ -640,7 +667,7 @@ def set_path_step(val, op, arg, new_val):
         setattr(val, arg, new_val)
     elif op == "key":
         val[arg] = new_val
-    elif op == "id":
+    elif op == "index":
         val[arg] = new_val
     else:
         raise ValueError(f"Unknown op: {op}")
@@ -745,6 +772,8 @@ class TraceObject(Tracable):
 
 
 class TraceTable(Tracable):
+    filter: ValueFilter
+
     def __init__(self, table_ref, ref, server, filter, root):
         self.table_ref = table_ref
         self.filter = filter
@@ -754,12 +783,24 @@ class TraceTable(Tracable):
         if self.root is None:
             self.root = self
 
-    def __getitem__(self, i):
-        page_data = self.server.table_query(
-            self.table_ref, self.filter, offset=i, limit=1
-        )
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            raise ValueError("Slices not yet supported")
+        elif isinstance(key, int):
+            page_data = self.server.table_query(
+                self.table_ref, self.filter, offset=key, limit=1
+            )
+        else:
+            filter = self.filter.copy()
+            filter["id"] = key
+            page_data = self.server.table_query(
+                self.table_ref, filter, offset=0, limit=1
+            )
         return make_trace_obj(
-            page_data[0][1], self.ref.with_id(i), self.server, self.root
+            page_data[0].val,
+            self.ref.with_item(page_data[0].id, page_data[0].version),
+            self.server,
+            self.root,
         )
 
     def __iter__(self):
@@ -775,7 +816,10 @@ class TraceTable(Tracable):
             )
             for item in page_data:
                 yield make_trace_obj(
-                    item[1], self.ref.with_id(i), self.server, self.root
+                    item.val,
+                    self.ref.with_item(item.id, item.version),
+                    self.server,
+                    self.root,
                 )
                 i += 1
             if len(page_data) < page_size:
@@ -796,7 +840,9 @@ class TraceList(Tracable):
             self.root = self
 
     def __getitem__(self, i):
-        return make_trace_obj(self.val[i], self.ref.with_id(i), self.server, self.root)
+        return make_trace_obj(
+            self.val[i], self.ref.with_index(i), self.server, self.root
+        )
 
     def __eq__(self, other):
         return self.val == other
@@ -856,14 +902,18 @@ def make_trace_obj(
     if extra:
         # This is where extra resolution happens?
         for extra_index in range(0, len(extra), 2):
-            if extra[extra_index] == "key":
-                val = val[extra[extra_index + 1]]
-            elif extra[extra_index] == "attr":
-                val = getattr(val, extra[extra_index + 1])
-            elif extra[extra_index] == "id":
-                val = val[int(extra[extra_index + 1])]
+            op, arg = extra[extra_index], extra[extra_index + 1]
+            if op == "key":
+                val = val[arg]
+            elif op == "attr":
+                val = getattr(val, arg)
+            elif op == "index":
+                val = val[int(arg)]
+            elif op == "id":
+                item_id, item_version = arg.split(",")
+                val = val[item_id]
             else:
-                raise ValueError(f"Unknown ref type: {val}")
+                raise ValueError(f"Unknown ref type: {extra[extra_index]}")
 
             # need to deref if we encounter these
             if isinstance(val, ValRef):

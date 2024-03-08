@@ -1,7 +1,18 @@
 from typing import Any, Generator
+import re
 import pytest
 import uuid
 import chobj
+
+
+class RegexStringMatcher(str):
+    def __init__(self, pattern):
+        self.pattern = pattern
+
+    def __eq__(self, other_string):
+        if not isinstance(other_string, str):
+            return NotImplemented
+        return bool(re.match(self.pattern, other_string))
 
 
 @pytest.fixture
@@ -19,9 +30,9 @@ def client() -> Generator[chobj.ObjectClient, None, None]:
 
 def test_table_create(server):
     table_ref = server.new_table([1, 2, 3])
-    assert list(r[1] for r in server.table_query(table_ref)) == [1, 2, 3]
-    assert list(r[1] for r in server.table_query(table_ref, offset=1)) == [2, 3]
-    assert list(r[1] for r in server.table_query(table_ref, offset=1, limit=1)) == [2]
+    assert list(r.val for r in server.table_query(table_ref)) == [1, 2, 3]
+    assert list(r.val for r in server.table_query(table_ref, offset=1)) == [2, 3]
+    assert list(r.val for r in server.table_query(table_ref, offset=1, limit=1)) == [2]
     # TODO: This doesn't work
     # assert list(server._table_query(table_ref, filter={"": 2})) == [2]
 
@@ -29,7 +40,7 @@ def test_table_create(server):
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])
     new_table_ref, item_id = server.table_append(table_ref, 4)
-    assert list(r[1] for r in server.table_query(new_table_ref)) == [1, 2, 3, 4]
+    assert list(r.val for r in server.table_query(new_table_ref)) == [1, 2, 3, 4]
 
 
 def test_table_remove(server):
@@ -37,7 +48,7 @@ def test_table_remove(server):
     table_ref1, item_id2 = server.table_append(table_ref0, 2)
     table_ref2, item_id3 = server.table_append(table_ref1, 3)
     table_ref3 = server.table_remove(table_ref2, item_id2)
-    assert list(r[1] for r in server.table_query(table_ref3)) == [1, 3]
+    assert list(r.val for r in server.table_query(table_ref3)) == [1, 3]
 
 
 def new_val_single(server):
@@ -51,7 +62,7 @@ def test_new_val_with_list(server):
     table_ref = server_val["a"]
     assert isinstance(table_ref, chobj.TableRef)
     table_val = server.table_query(table_ref)
-    assert list(r[1] for r in table_val) == [1, 2, 3]
+    assert list(r.val for r in table_val) == [1, 2, 3]
 
 
 def test_object(server):
@@ -87,21 +98,27 @@ def test_dataset_refs(client, server):
     ref0_aref = row0["a_ref"]
     assert ref0_aref == 1
     assert chobj.get_ref(ref0_aref) == chobj.ObjectRef(
-        "my-dataset2", ref2.ref.val_id, ["id", "0", "key", "a_ref"]
+        "my-dataset2",
+        ref2.ref.val_id,
+        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
     )
 
     row1 = ref2_list[1]
     ref1_aref = row1["a_ref"]
     assert ref1_aref == 2
     assert chobj.get_ref(ref1_aref) == chobj.ObjectRef(
-        "my-dataset2", ref2.ref.val_id, ["id", "1", "key", "a_ref"]
+        "my-dataset2",
+        ref2.ref.val_id,
+        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
     )
 
     row2 = ref2_list[2]
     ref2_aref = row2["a_ref"]
     assert ref2_aref == 3
     assert chobj.get_ref(ref2_aref) == chobj.ObjectRef(
-        "my-dataset2", ref2.ref.val_id, ["id", "2", "key", "a_ref"]
+        "my-dataset2",
+        ref2.ref.val_id,
+        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
     )
 
 
@@ -163,10 +180,21 @@ def test_mutations(client, server):
             args=({"doc": "zz", "label": "e"},),
         ),
         chobj.MutationSetitem(
-            path=["attr", "rows", "id", "1"], operation="setitem", args=("doc", "jjj")
+            path=["attr", "rows", "id", RegexStringMatcher(".*,.*")],
+            operation="setitem",
+            args=("doc", "jjj"),
         ),
         chobj.MutationSetitem(
-            path=["attr", "rows", "id", "1", "key", "somelist", "id", "0"],
+            path=[
+                "attr",
+                "rows",
+                "id",
+                RegexStringMatcher(".*,.*"),
+                "key",
+                "somelist",
+                "index",
+                "0",
+            ],
             operation="setitem",
             args=("a", 12),
         ),
