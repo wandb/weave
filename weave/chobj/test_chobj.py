@@ -70,7 +70,7 @@ def test_save_load(client):
     assert val_table[2] == 3
 
 
-def test_dataset_refs(client):
+def test_dataset_refs(client, server):
     ref = client.save(chobj.Dataset([1, 2, 3]), "my-dataset")
     new_table_rows = []
     for row in ref.rows:
@@ -87,21 +87,21 @@ def test_dataset_refs(client):
     ref0_aref = row0["a_ref"]
     assert ref0_aref == 1
     assert chobj.get_ref(ref0_aref) == chobj.ObjectRef(
-        "my-dataset2", ref2.ref.val_id, ["id", 0, "key", "a_ref"]
+        "my-dataset2", ref2.ref.val_id, ["id", "0", "key", "a_ref"]
     )
 
     row1 = ref2_list[1]
     ref1_aref = row1["a_ref"]
     assert ref1_aref == 2
     assert chobj.get_ref(ref1_aref) == chobj.ObjectRef(
-        "my-dataset2", ref2.ref.val_id, ["id", 1, "key", "a_ref"]
+        "my-dataset2", ref2.ref.val_id, ["id", "1", "key", "a_ref"]
     )
 
     row2 = ref2_list[2]
     ref2_aref = row2["a_ref"]
     assert ref2_aref == 3
     assert chobj.get_ref(ref2_aref) == chobj.ObjectRef(
-        "my-dataset2", ref2.ref.val_id, ["id", 2, "key", "a_ref"]
+        "my-dataset2", ref2.ref.val_id, ["id", "2", "key", "a_ref"]
     )
 
 
@@ -163,10 +163,10 @@ def test_mutations(client, server):
             args=({"doc": "zz", "label": "e"},),
         ),
         chobj.MutationSetitem(
-            path=["attr", "rows", "id", 1], operation="setitem", args=("doc", "jjj")
+            path=["attr", "rows", "id", "1"], operation="setitem", args=("doc", "jjj")
         ),
         chobj.MutationSetitem(
-            path=["attr", "rows", "id", 1, "key", "somelist", "id", 0],
+            path=["attr", "rows", "id", "1", "key", "somelist", "id", "0"],
             operation="setitem",
             args=("a", 12),
         ),

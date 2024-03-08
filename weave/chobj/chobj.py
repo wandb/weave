@@ -9,10 +9,6 @@ from rich import print
 from weave import box
 
 
-class Ref:
-    pass
-
-
 def log_ch_commands():
     from clickhouse_connect.driver import httpclient
     from clickhouse_connect.driver import client
@@ -35,6 +31,19 @@ def log_ch_commands():
 
 
 # log_ch_commands()
+
+
+class Ref:
+    extra: list[str]
+
+    def with_key(self, key: str) -> "Ref":
+        raise NotImplementedError
+
+    def with_attr(self, attr: str) -> "Ref":
+        raise NotImplementedError
+
+    def with_id(self, index: int) -> "Ref":
+        raise NotImplementedError
 
 
 @dataclasses.dataclass
@@ -63,7 +72,7 @@ class ValRef(Ref):
         return ValRef(self.val_id, self.extra + ["attr", attr])
 
     def with_id(self, index) -> "ValRef":
-        return ValRef(self.val_id, self.extra + ["id", index])
+        return ValRef(self.val_id, self.extra + ["id", str(index)])
 
 
 @dataclasses.dataclass
@@ -85,7 +94,7 @@ class ObjectRef(Ref):
         return ObjectRef(self.name, self.val_id, self.extra + ["attr", attr])
 
     def with_id(self, index) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + ["id", index])
+        return ObjectRef(self.name, self.val_id, self.extra + ["id", str(index)])
 
 
 def dataclasses_asdict_one_level(obj):
@@ -173,19 +182,19 @@ def json_loads(d):
     return json.loads(d, object_hook=ref_decoder)
 
 
-class ValueFilter(TypedDict):
-    ref: Optional[Ref]
-    val: Optional[dict]
+class ValueFilter(TypedDict, total=False):
+    ref: Ref
+    val: dict
 
 
 def make_value_filter(filter: ValueFilter):
     query_parts = []
-    if filter["val"]:
+    if "val" in filter:
         for key, value in filter["val"].items():
             # Assume all values are to be treated as strings for simplicity. Adjust the casting as necessary.
             query_part = f"JSONExtractString(val, '{key}') = '{value}'"
             query_parts.append(query_part)
-    elif filter["ref"]:
+    elif "ref" in filter:
         ref = filter["ref"]
         query_parts.append(f"{ref} IN refs")
     return " AND ".join(query_parts)
@@ -512,7 +521,7 @@ class ObjectServer:
                     raise ValueError(
                         f"Mutation path incorrect for table: {mutation.path}"
                     )
-                row_id = arg
+                row_id = int(arg)
                 updated_row_ids.add(row_id)
                 row = table_items[row_id][1]
                 val = row
@@ -521,7 +530,7 @@ class ObjectServer:
                     if op == "key":
                         val = val[arg]
                     elif op == "id":
-                        val = val[arg]
+                        val = val[int(arg)]
                     else:
                         raise ValueError(f"Unknown op: {op}")
                 if mutation.operation == "setitem":
@@ -826,7 +835,7 @@ def make_trace_obj(
             elif extra[extra_index] == "attr":
                 val = getattr(val, extra[extra_index + 1])
             elif extra[extra_index] == "id":
-                val = val[extra[extra_index + 1]]
+                val = val[int(extra[extra_index + 1])]
             else:
                 raise ValueError(f"Unknown ref type: {val}")
 
@@ -921,9 +930,7 @@ class ObjectClient:
 
     def calls(self, filter: ValueFilter):
         filt = copy.deepcopy(filter)
-        if "val" not in filt:
-            filt["val"] = {}
-        filt["val"]["_type"] = "Call"
+        filt.setdefault("val", {})["_type"] = "Call"
         return ValueIter(self.server, filt)
 
     def call(self, call_id: uuid.UUID) -> Optional[Call]:
