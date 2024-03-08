@@ -231,7 +231,18 @@ def make_value_filter(filter: ValueFilter):
         query_parts.append(f"type = '{filter['type']}'")
     if "ref" in filter:
         ref = filter["ref"]
-        query_parts.append(f"has(refs, '{ref.uri()}')")
+        # if we have an 'id' op in extra, then we filter to just the item_id
+        # portion of the extra.
+        item_sub_ref = None
+        for i in range(0, len(ref.extra), 2):
+            op, arg = ref.extra[i], ref.extra[i + 1]
+            if op == "id":
+                item_sub_ref = "/".join(ref.extra[i:])
+                break
+        if item_sub_ref:
+            query_parts.append(f"arrayExists(x -> endsWith(x, '{item_sub_ref}'), refs)")
+        else:
+            query_parts.append(f"has(refs, '{ref.uri()}')")
     return " AND ".join(query_parts)
 
 
