@@ -118,6 +118,20 @@ def json_dumps(val):
     return json.dumps(val, cls=RefEncoder)
 
 
+def get_type(val):
+    if val == None:
+        return "none"
+    elif isinstance(val, dict):
+        return "dict"
+    elif isinstance(val, list):
+        return "list"
+    elif isinstance(val, ObjectRecord):
+        return val._type
+    elif dataclasses.is_dataclass(val):
+        return val.__class__.__name__
+    return "unknown"
+
+
 def refs(val):
     result_refs = []
 
@@ -145,6 +159,8 @@ def refs(val):
 
 
 class ObjectRecord:
+    _type: str
+
     def __init__(self, attrs):
         for k, v in attrs.items():
             setattr(self, k, v)
@@ -179,11 +195,13 @@ def ref_decoder(d):
 
 
 def json_loads(d):
+    print("D", d)
     return json.loads(d, object_hook=ref_decoder)
 
 
 class ValueFilter(TypedDict, total=False):
     ref: Ref
+    type: str
     val: dict
 
 
@@ -194,6 +212,8 @@ def make_value_filter(filter: ValueFilter):
             # Assume all values are to be treated as strings for simplicity. Adjust the casting as necessary.
             query_part = f"JSONExtractString(val, '{key}') = '{value}'"
             query_parts.append(query_part)
+    if "type" in filter:
+        query_parts.append(f"type = '{filter['type']}'")
     elif "ref" in filter:
         ref = filter["ref"]
         query_parts.append(f"{ref} IN refs")
@@ -232,12 +252,12 @@ class ObjectServer:
             (
                 id UUID,
                 created_at DateTime64 DEFAULT now64(),
+                type String,
                 refs Array(String),
-                # TODO: should be type, val
                 val String
             ) 
             ENGINE = MergeTree() 
-            ORDER BY (id, created_at)"""
+            ORDER BY (id, type, created_at)"""
         )
         self.client.command(
             """
@@ -256,6 +276,7 @@ class ObjectServer:
             (
                 id UUID,
                 item_id UUID,
+                type String,
                 created_at DateTime64 DEFAULT now64(),
                 tx_order UInt32,
                 refs Array(String),
@@ -349,22 +370,22 @@ class ObjectServer:
     def table_append(self, table_ref: TableRef, value):
         tx_id = uuid.uuid4()
         item_id = uuid.uuid4()
-        tx_items = [(tx_id, item_id, 0, json.dumps(value))]
+        tx_items = [(tx_id, item_id, 0, get_type(value), json.dumps(value))]
         self.client.insert(
             "table_transactions",
             data=tx_items,
-            column_names=("id", "item_id", "tx_order", "val"),
+            column_names=("id", "item_id", "tx_order", "type", "val"),
         )
         new_table_ref = self._add_table_transaction(table_ref, tx_id)
         return new_table_ref, item_id
 
     def table_remove(self, table_row_ref: TableRef, item_id: uuid.UUID):
         tx_id = uuid.uuid4()
-        tx_items = [(tx_id, item_id, 0, None)]
+        tx_items = [(tx_id, item_id, 0, get_type(None), None)]
         self.client.insert(
             "table_transactions",
             data=tx_items,
-            column_names=("id", "item_id", "tx_order", "val"),
+            column_names=("id", "item_id", "tx_order", "type", "val"),
         )
         return self._add_table_transaction(TableRef(table_row_ref.table_id), tx_id)
 
@@ -390,8 +411,8 @@ class ObjectServer:
             value_id = uuid.uuid4()
         self.client.insert(
             "values",
-            data=[(value_id, refs(val), encoded_val)],
-            column_names=("id", "refs", "val"),
+            data=[(value_id, refs(val), get_type(val), encoded_val)],
+            column_names=("id", "refs", "type", "val"),
         )
         return ValRef(val_id=value_id)
 
@@ -508,6 +529,7 @@ class ObjectServer:
                             tx_id,
                             item_id,
                             len(tx_append_items),
+                            get_type(mutation.args[0]),
                             json.dumps(mutation.args[0]),
                         )
                     )
@@ -548,6 +570,7 @@ class ObjectServer:
                     tx_id,
                     table_items[row_id][0],
                     len(tx_items),
+                    get_type(table_items[row_id][1]),
                     json.dumps(table_items[row_id][1]),
                 )
             )
@@ -558,13 +581,14 @@ class ObjectServer:
                     tx_append_item[1],
                     len(tx_items),
                     tx_append_item[3],
+                    tx_append_item[4],
                 )
             )
 
         self.client.insert(
             "table_transactions",
             data=tx_items,
-            column_names=("id", "item_id", "tx_order", "val"),
+            column_names=("id", "item_id", "tx_order", "type", "val"),
         )
         return self._add_table_transaction(table_ref, tx_id)
 
@@ -929,8 +953,8 @@ class ObjectClient:
         return make_trace_obj(val, ref, self.server, None)
 
     def calls(self, filter: ValueFilter):
-        filt = copy.deepcopy(filter)
-        filt.setdefault("val", {})["_type"] = "Call"
+        filt = copy.copy(filter)
+        filt["type"] = "Call"
         return ValueIter(self.server, filt)
 
     def call(self, call_id: uuid.UUID) -> Optional[Call]:
@@ -949,7 +973,6 @@ class ObjectClient:
 
 
 # TODO
-# Fix types
 # Pull out value type to top-level
 
 # TODO
