@@ -1,7 +1,15 @@
 import numpy as np
-from typing import Union, Callable, Optional, Tuple
+from typing import Union, Callable, Optional, Tuple, Any
 from weave.flow import Object
 from weave import op_def, WeaveList
+
+
+class Scorer(Object):
+    def score(self, target: Any, prediction: Any) -> Any:
+        raise NotImplementedError
+
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        return auto_summarize(score_rows)
 
 
 def auto_summarize(data: WeaveList) -> Optional[dict]:
@@ -51,22 +59,34 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
     return None
 
 
-class Scorer(Object):
-    def score(self, label: dict, prediction: dict) -> dict: ...
-
-    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
-        return auto_summarize(score_rows)
+def get_scorer_attributes(
+    scorer: Union[Callable, op_def.OpDef, Scorer]
+) -> Tuple[str, Callable, Callable]:
+    if isinstance(scorer, Scorer):
+        scorer_name = scorer.name
+        if scorer_name == None:
+            scorer_name = scorer.__class__.__name__
+        score_fn = scorer.score
+        summarize_fn = scorer.summarize  # type: ignore
+    else:
+        if isinstance(scorer, op_def.OpDef):
+            scorer_name = scorer.common_name
+        else:
+            scorer_name = scorer.__name__
+        score_fn = scorer
+        summarize_fn = auto_summarize  # type: ignore
+    return (scorer_name, score_fn, summarize_fn)  # type: ignore
 
 
 def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:
     # if any denom is zero, then zero. could use NaN instead...
-    precision = 0
+    precision: float = 0
     if tp or fp:
         precision = tp / (tp + fp)
-    recall = 0
+    recall: float = 0
     if tp or fn:
         recall = tp / (tp + fn)
-    f1 = 0
+    f1: float = 0
     if precision or recall:
         f1 = 2 * (precision * recall) / (precision + recall)
     return precision, recall, f1
@@ -75,7 +95,7 @@ def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:
 class MulticlassF1Score(Scorer):
     class_names: list[str]
 
-    def summarize(self, score_rows: WeaveList):
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
         # Compute f1, precision, recall
         result = {}
         for class_name in self.class_names:
@@ -95,30 +115,13 @@ class MulticlassF1Score(Scorer):
             result[class_name] = {"f1": f1, "precision": precision, "recall": recall}
         return result
 
-    def score(self, label: dict, prediction: Optional[dict]):
+    def score(self, target: dict, prediction: Optional[dict]) -> dict:
         result = {}
         for class_name in self.class_names:
-            class_label = label.get(class_name)
+            class_label = target.get(class_name)
             class_prediction = prediction.get(class_name) if prediction else None
             result[class_name] = {
                 "correct": class_label == class_prediction,
                 "negative": not class_prediction,
             }
         return result
-
-
-def get_scorer_attributes(scorer: Union[Callable, op_def.OpDef, Scorer]):
-    if isinstance(scorer, Scorer):
-        scorer_name = scorer.name
-        if scorer_name == None:
-            scorer_name = scorer.__class__.__name__
-        score_fn = scorer.score
-        summarize_fn = scorer.summarize
-    else:
-        if isinstance(scorer, op_def.OpDef):
-            scorer_name = scorer.common_name
-        else:
-            scorer_name = scorer.__name__
-        score_fn = scorer
-        summarize_fn = auto_summarize
-    return (scorer_name, score_fn, summarize_fn)
