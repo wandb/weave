@@ -1,8 +1,11 @@
 from typing import Any, Generator
 import re
 import pytest
-import uuid
+import pydantic
 import chobj
+import uuid
+import weave
+from weave import op_def
 
 
 class RegexStringMatcher(str):
@@ -122,6 +125,17 @@ def test_dataset_refs(client, server):
     )
 
 
+def test_pydantic(client):
+    class PydanticObj(pydantic.BaseModel):
+        a: int
+        b: str
+
+    val = PydanticObj(a=5, b="x")
+    ref = client.save_object(val, "my-pydantic-obj")
+    val2 = client.get(ref)
+    assert val == val2
+
+
 def test_call_create(client, server):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
@@ -233,6 +247,66 @@ def test_stable_dataset_row_refs(client, server):
     x = client.calls({"ref": chobj.get_ref(dataset.rows[0]["doc"])})
 
     assert len(list(x)) == 2
+
+
+def test_opdef(server):
+    @weave.op()
+    def add2(x, y):
+        return x + y
+
+    with weave.chobj_client() as client:
+        res = add2(1, 3)
+        assert res == 4
+        assert len(list(client.calls())) == 1
+
+
+def test_saveload_customtype(server):
+    @weave.op()
+    def add2(x, y):
+        return x + y
+
+    @weave.op()
+    def add3(x, y, z):
+        return x + y + z
+
+    with weave.chobj_client() as client:
+        obj = {"a": add2, "b": add3}
+        ref = client.save_object(obj, "my-ops")
+        obj2 = client.get(ref)
+        assert isinstance(obj2["a"], op_def.OpDef)
+        assert obj2["a"].name == "op-add2"
+        assert isinstance(obj2["b"], op_def.OpDef)
+        assert obj2["b"].name == "op-add3"
+
+
+def test_save_unknown_type(server):
+    class SomeUnknownThing:
+        def __init__(self, a):
+            self.a = a
+
+    with weave.chobj_client() as client:
+        obj = SomeUnknownThing(3)
+        ref = client.save_object(obj, "my-np-array")
+        obj2 = client.get(ref)
+        # Expect None for now
+        assert obj2 == None
+
+
+def test_save_model(server):
+    class MyModel(weave.Model):
+        prompt: str
+
+        @weave.op()
+        def predict(self, input):
+            return self.prompt.format(input=input)
+
+    with weave.chobj_client() as client:
+
+        model = MyModel(prompt="input is: {input}")
+        ref = client.save_object(model, "my-model")
+        model2 = client.get(ref)
+        # TODO: wrong, have to manually pass self
+        assert model2.predict(model2, "x") == "input is: x"
 
 
 # def test_publish_big_list(server):

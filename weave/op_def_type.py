@@ -504,8 +504,11 @@ class OpDefType(types.Type):
 
         od: "OpDef" = getattr(mod, last_op_function.name)
 
-        location = artifact.uri_obj.with_path(name)
-        registry_mem.memory_registry.register_op(od, location=location)
+        try:
+            location = artifact.uri_obj.with_path(name)
+            registry_mem.memory_registry.register_op(od, location=location)
+        except NotImplementedError:
+            pass
 
         return od
 

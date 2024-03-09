@@ -4,9 +4,13 @@ import copy
 import uuid
 import json
 import dataclasses
+import pydantic
+import inspect
 from rich import print
 
 from weave import box
+from weave import op_def
+from weave.chobj import custom_objs
 
 
 def log_ch_commands():
@@ -116,12 +120,19 @@ def dataclasses_asdict_one_level(obj):
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
 
 
+def pydantic_asdict_one_level(obj: pydantic.BaseModel):
+    return {k: getattr(obj, k) for k in obj.model_fields}
+
+
 class RefEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, uuid.UUID):
             return {"_type": "UUID", "uuid": o.hex}
         elif dataclasses.is_dataclass(o):
             data = dataclasses_asdict_one_level(o)
+            return {"_type": o.__class__.__name__, **data}
+        elif isinstance(o, pydantic.BaseModel):
+            data = pydantic_asdict_one_level(o)
             return {"_type": o.__class__.__name__, **data}
         elif isinstance(o, ObjectRecord):
             return o.__dict__
@@ -143,6 +154,8 @@ def get_type(val):
         return val._type
     elif dataclasses.is_dataclass(val):
         return val.__class__.__name__
+    elif isinstance(val, pydantic.BaseModel):
+        return val.__class__.__name__
     return "unknown"
 
 
@@ -162,6 +175,8 @@ def refs(val):
                 check_val = inner_val.__dict__.values()
             elif dataclasses.is_dataclass(inner_val):
                 check_val = dataclasses_asdict_one_level(inner_val).values()
+            elif isinstance(inner_val, pydantic.BaseModel):
+                check_val = pydantic_asdict_one_level(inner_val).values()
             if check_val:
                 for val in check_val:
                     find_refs(val)
@@ -286,7 +301,8 @@ class ObjectServer:
                 created_at DateTime64 DEFAULT now64(),
                 type String,
                 refs Array(String),
-                val String
+                val String,
+                val_hash String MATERIALIZED MD5(val)
             ) 
             ENGINE = MergeTree() 
             ORDER BY (id, type, created_at)"""
@@ -313,7 +329,8 @@ class ObjectServer:
                 created_at DateTime64 DEFAULT now64(),
                 tx_order UInt32,
                 refs Array(String),
-                val Nullable(String)
+                val Nullable(String),
+                val_hash Nullable(String) MATERIALIZED MD5(val)
             ) 
             ENGINE = MergeTree() 
             ORDER BY (tx_id, tx_order)"""
@@ -432,7 +449,27 @@ class ObjectServer:
         def lists_to_tables(val):
             if isinstance(val, dict):
                 return {k: lists_to_tables(v) for k, v in val.items()}
-            elif isinstance(val, ObjectRecord):
+            elif isinstance(val, pydantic.BaseModel):
+                ObjectRecord(
+                    {
+                        "_type": val.__class__.__name__,
+                        **{
+                            k: lists_to_tables(v)
+                            for k, v in pydantic_asdict_one_level(val).items()
+                        },
+                    }
+                )
+            elif dataclasses.is_dataclass(val) and not isinstance(val, Ref):
+                return ObjectRecord(
+                    {
+                        "_type": val.__class__.__name__,
+                        **{
+                            k: lists_to_tables(v)
+                            for k, v in dataclasses_asdict_one_level(val).items()
+                        },
+                    }
+                )
+            elif isinstance(val, ObjectRecord) and not val._type.endswith("Ref"):
                 return ObjectRecord(
                     {k: lists_to_tables(v) for k, v in val.__dict__.items()}
                 )
@@ -933,6 +970,8 @@ def make_trace_obj(
                 val = TraceTable(val, new_ref, server, {}, root)
 
     if isinstance(val, ObjectRecord):
+        if val._type == "custom_obj":
+            return custom_objs.decode_custom_obj(val.weave_type, val.files)  # type: ignore
         return TraceObject(val, new_ref, server, root)
     elif isinstance(val, list):
         return TraceList(val, new_ref, server, root)
@@ -948,21 +987,51 @@ def get_ref(obj: Any) -> Optional[ObjectRef]:
 
 
 def map_to_refs(obj: Any) -> Any:
+    ref = get_ref(obj)
+    if ref:
+        return ref
     if dataclasses.is_dataclass(obj):
         return ObjectRecord(
             {
                 "_type": obj.__class__.__name__,
-                **{k: map_to_refs(v) for k, v in dataclasses.asdict(obj).items()},
+                **{
+                    k: map_to_refs(v)
+                    for k, v in dataclasses_asdict_one_level(obj).items()
+                },
+                **{
+                    k: map_to_refs(v)
+                    for k, v in inspect.getmembers(
+                        obj, lambda x: isinstance(x, op_def.OpDef)
+                    )
+                    if isinstance(v, op_def.OpDef)
+                },
+            },
+        )
+    elif isinstance(obj, pydantic.BaseModel):
+        return ObjectRecord(
+            {
+                "_type": obj.__class__.__name__,
+                **{
+                    k: map_to_refs(v) for k, v in pydantic_asdict_one_level(obj).items()
+                },
+                **{
+                    k: map_to_refs(v)
+                    for k, v in inspect.getmembers(
+                        obj, lambda x: isinstance(x, op_def.OpDef)
+                    )
+                    if isinstance(v, op_def.OpDef)
+                },
             },
         )
     elif isinstance(obj, list):
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
-    ref = get_ref(obj)
-    if ref:
-        return ref
-    return obj
+
+    if isinstance(obj, (int, float, str, bool, box.BoxedNone)) or obj is None:
+        return obj
+
+    return custom_objs.encode_custom_obj(obj)
 
 
 @dataclasses.dataclass
@@ -977,6 +1046,10 @@ class Call:
     id: Optional[uuid.UUID] = None
     parent_id: Optional[uuid.UUID] = None
     output: Any = None
+
+    @property
+    def ui_url(self):
+        return "<CALL URL NOT YET IMPLEMENTED>"
 
 
 class ValueIter:
@@ -1005,18 +1078,27 @@ class ObjectClient:
     def __init__(self):
         self.server = ObjectServer()
 
-    def save(self, val, name: str, branch: str = "latest") -> Any:
+    def ref_is_own(self, ref):
+        return isinstance(ref, Ref)
+
+    # This is used by tests and op_execute still, but the save() interface
+    # is nicer for clients I think?
+    def save_object(self, val, name: str, branch: str = "latest") -> Any:
         val = map_to_refs(val)
-        ref = self.server.new_object(val, name, branch)
+        return self.server.new_object(val, name, branch)
+
+    def save(self, val, name: str, branch: str = "latest") -> Any:
+        ref = self.save_object(val, name, branch)
         return self.get(ref)
 
-    def get(self, ref: ObjectRef):
+    def get(self, ref: ObjectRef) -> Any:
         val = self.server.get_val(ValRef(ref.val_id))
 
         return make_trace_obj(val, ref, self.server, None)
 
-    def calls(self, filter: ValueFilter):
-        print("FILT", filter)
+    def calls(self, filter: Optional[ValueFilter] = None):
+        if filter is None:
+            filter = {}
         filt = copy.copy(filter)
         filt["type"] = "Call"
         return ValueIter(self.server, filt)
@@ -1035,21 +1117,35 @@ class ObjectClient:
         call.output = output
         self.server.new_val(call, value_id=call.id)
 
+    # These are the old client interface terms, op_execute still relies
+    # on them.
+    def create_run(self, op_name: str, parent_run, inputs, refs):
+        return self.create_call(op_name, inputs)
+
+    def finish_run(self, run, output, refs):
+        self.finish_call(run, output)
+
+    def fail_run(self, run, exception):
+        self.finish_call(run, str(exception))
+
 
 # TODO
 #
 # must prove
 #   - [x] mutations (append, set, remove)
-#   - calls on dataset rows are stable
+#   - [x] calls on dataset rows are stable
 #   - batch ref resolution in call query / dataset join path
 #   - custom objects
 #   - files
+#   - can't efficiently fetch OpDef, and custom objects, by type yet.
 #   - ensure true client/server wire interface
-#   - table ID refs instead of index
+#   - [x] table ID refs instead of index
+#   - runs setting run ID for memoization
 #   - dedupe, content ID
 #   - efficient walking of all relationships
 #   - call outputs as refs
 #   - performance tests
+#   - save all ops as top-level objects
 #
 # perf related
 #   - pull out _type to top-level of value and index
@@ -1059,6 +1155,7 @@ class ObjectClient:
 #   - merge extra stuff in refs
 #   - naming: Value / Object / Record etc.
 # bugs
+#   - have to manually pass self when reloading op_def on Object
 #   - filter non-string
 #   - filter table when not dicts
 #   - duplicating _type into value and column (maybe fine)

@@ -6,6 +6,7 @@ from .trace_server import graph_client_trace, remote_http_trace_server
 from . import context_state
 from . import errors
 from . import autopatch
+from .chobj import chobj
 
 
 class InitializedClient:
@@ -48,6 +49,20 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
         raise ValueError("entity_name must be non-empty")
 
     return entity_name, project_name
+
+
+def init_chobj() -> InitializedClient:
+    # entity_name, project_name = get_entity_project_from_project_name(project_name)
+    client = chobj.ObjectClient()
+
+    init_client = InitializedClient(client)  # type: ignore
+
+    # autopatching is only supporte for the wandb client, because OpenAI calls are not
+    # logged in local mode currently. When that's fixed, this autopatch call can be
+    # moved to InitializedClient.__init__
+    autopatch.autopatch()
+
+    return init_client
 
 
 def init_wandb(project_name: str) -> InitializedClient:

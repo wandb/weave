@@ -183,6 +183,19 @@ def init_trace_client(project_name: str) -> _graph_client.GraphClient:
     return _weave_init.init_trace_remote(project_name).client
 
 
+def init_chobj() -> _weave_init.chobj.ObjectClient:
+    return _weave_init.init_chobj().client
+
+
+@contextlib.contextmanager
+def chobj_client() -> typing.Iterator[_weave_init.chobj.ObjectClient]:
+    inited_client = _weave_init.init_chobj()
+    try:
+        yield inited_client.client
+    finally:
+        inited_client.reset()
+
+
 def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
     """Save and version a python object.
 
