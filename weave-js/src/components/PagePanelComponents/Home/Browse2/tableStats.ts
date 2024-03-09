@@ -151,10 +151,6 @@ export const getBoringColumns = (tableStats: TableStats): string[] => {
       // For now, output is always interesting
       continue;
     }
-    if (columnHasRefs(tableStats, col)) {
-      // Need to be able to expand columns that have refs in them.
-      continue;
-    }
     const {typeCounts, valueCounts} = tableStats.column[col];
     const values = Object.values(valueCounts);
     if (values.length === 1 && values[0] === tableStats.rowCount) {
