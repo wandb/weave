@@ -1146,6 +1146,7 @@ class ObjectClient:
 #   - call outputs as refs
 #   - performance tests
 #   - save all ops as top-level objects
+#   - WeaveList
 #
 # perf related
 #   - pull out _type to top-level of value and index
