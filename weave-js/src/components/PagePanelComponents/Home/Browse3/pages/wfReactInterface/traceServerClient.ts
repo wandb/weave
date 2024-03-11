@@ -61,6 +61,7 @@ type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
+  offset?: number;
 };
 
 export type TraceCallsQueryRes = {

@@ -107,7 +107,7 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
-  const {useCalls} = useWFHooks();
+  const {usePaginatedCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
@@ -134,7 +134,7 @@ export const CallsTable: FC<{
     return convertHighLevelFilterToLowLevelFilter(effectiveFilter);
   }, [effectiveFilter]);
 
-  const calls = useCalls(props.entity, props.project, lowLevelFilter);
+  const calls = usePaginatedCalls(props.entity, props.project, lowLevelFilter);
 
   const opVersionOptions = useOpVersionOptions(
     props.entity,

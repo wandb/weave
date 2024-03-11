@@ -178,6 +178,104 @@ const useCalls = (
   }, [callRes, deepFilter.opCategory, entity, project, opts?.skip]);
 };
 
+const usePaginatedCalls = (
+  entity: string,
+  project: string,
+  filter: CallFilter,
+  // Arbitrary limit, in conjunction with the max 50 pages limits calls to 500000
+  limit: number = 10000
+): Loadable<CallSchema[]> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const [callRes, setCallRes] = useState<traceServerClient.TraceCallSchema[]>(
+    []
+  );
+  const deepFilter = useDeepMemo(filter);
+  const [allCallsLoaded, setAllCallsLoaded] = useState(false);
+
+  // This is a recursive function that loads calls in pages from the trace server into an accumulator
+  // This is a workaround for the trace server not being able to send super large pages over the wire
+  async function loadCalls(
+    pageNumber: number,
+    acc: traceServerClient.TraceCallSchema[]
+  ) {
+    if (allCallsLoaded) {
+      // if all calls are already loaded, we dont need to do anything
+      return;
+    }
+
+    try {
+      const res = await getTsClient().callsQuery({
+        project_id: projectIdFromParts({entity, project}),
+        filter: {
+          op_version_refs: deepFilter.opVersionRefs,
+          input_object_version_refs: deepFilter.inputObjectVersionRefs,
+          output_object_version_refs: deepFilter.outputObjectVersionRefs,
+          parent_ids: deepFilter.parentIds,
+          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+          call_ids: deepFilter.callIds,
+          trace_roots_only: deepFilter.traceRootsOnly,
+          wb_run_ids: deepFilter.runIds,
+          wb_user_ids: deepFilter.userIds,
+        },
+        limit,
+        offset: pageNumber * limit,
+      });
+
+      if (res.calls.length < limit || pageNumber > 50) {
+        // If we get less than the limit (ie we reached the end)
+        // or we've fetched more than 10 pages, we stop fetching (this is arbitrary, but we don't want to fetch forever)
+        setAllCallsLoaded(true);
+        setCallRes([...acc, ...res.calls]);
+      } else {
+        // Continue fetching the next page
+        loadCalls(pageNumber + 1, [...acc, ...res.calls]);
+      }
+    } catch (e) {
+      setAllCallsLoaded(true);
+      console.error(e);
+    }
+  }
+
+  loadCalls(0, []);
+
+  return useMemo(() => {
+    const allResults = (!allCallsLoaded ? [] : callRes).map(
+      traceCallToUICallSchema
+    );
+    const result = allResults.filter((row: any) => {
+      return (
+        deepFilter.opCategory == null ||
+        (row.opVersionRef &&
+          deepFilter.opCategory.includes(
+            opVersionRefOpCategory(row.opVersionRef) as OpCategory
+          ))
+      );
+    });
+
+    if (!allCallsLoaded) {
+      return {
+        loading: true,
+        result: [],
+      };
+    } else {
+      allResults.forEach(call => {
+        setCallInCache(
+          {
+            entity,
+            project,
+            callId: call.callId,
+          },
+          call
+        );
+      });
+      return {
+        loading: false,
+        result,
+      };
+    }
+  }, [callRes, deepFilter.opCategory, entity, project, allCallsLoaded]);
+};
+
 const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
@@ -367,4 +465,5 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   derived: {
     useChildCallsForCompare,
   },
+  usePaginatedCalls,
 };

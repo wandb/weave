@@ -284,6 +284,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions=conditions,
             parameters=parameters,
             limit=req.limit,
+            offset=req.offset,
         )
         calls = [_ch_call_to_call_schema(call) for call in ch_calls]
         return tsi.CallsQueryRes(calls=calls)

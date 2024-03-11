@@ -787,6 +787,7 @@ const typeNameToCategory = (typeName: string): ObjectCategory | null => {
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  usePaginatedCalls: useCalls,
   useOpVersion,
   useOpVersions,
   useObjectVersion,
