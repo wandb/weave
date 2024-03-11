@@ -4,6 +4,9 @@ import datetime
 import json
 import typing
 import wandb
+
+from importlib.metadata import version
+from packaging.version import parse as parse_version
 from wandb import errors as wandb_errors
 from wandb.apis.public import Run
 from wandb.sdk.artifacts.artifact_saver import ArtifactSaver
@@ -26,6 +29,7 @@ logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 
 WANDB_HIDDEN_JOB_TYPE = "sweep-controller"
 
+wandb_ver = parse_version(version('wandb'))
 
 class InMemoryLazyLiteRun:
     # ID
@@ -218,7 +222,7 @@ class InMemoryLazyLiteRun:
             )
 
         with tracer.trace("ArtifactSaver.save"):
-            res = saver.save(
+            save_result = saver.save(
                 type=artifact_type_name,
                 name=artifact_name,
                 client_id=artifact._client_id,
@@ -228,6 +232,14 @@ class InMemoryLazyLiteRun:
                 aliases=["latest"] + additional_aliases,
                 use_after_commit=False,
             )  # type: ignore
+
+            if wandb_ver < parse_version("0.16.4"):
+                res, future = save_result
+                # wait for the artifact to be committed before returning the result
+                if future is not None:
+                    future.result()
+            else:
+                res = save_result
         return res
 
     def upsert_project(self) -> None:
