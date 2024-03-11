@@ -10,9 +10,10 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {useWeaveContext} from '../../../../../../context';
 import {constString, opGet} from '../../../../../../core';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {isRef} from '../common/util';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
 import {mapObject, traverse, TraverseContext, traversed} from './traverse';
-import {isRef, ValueView} from './ValueView';
+import {ValueView} from './ValueView';
 
 type Data = Record<string, any>;
 

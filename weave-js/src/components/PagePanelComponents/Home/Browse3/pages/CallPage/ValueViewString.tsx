@@ -67,25 +67,12 @@ const Full = styled.div`
 `;
 Full.displayName = 'S.Full';
 
-const isJSON = (value: string): boolean => {
-  try {
-    const parsed = JSON.parse(value);
-    if (typeof parsed === 'object') {
-      return true;
-    }
-  } catch (err) {
-    // ignore
-  }
-  return false;
-};
-
 export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
   const trimmed = value.trim();
   const hasScrolling = trimmed.indexOf('\n') !== -1 || value.length > 100;
   const [hasFull, setHasFull] = useState(false);
 
-  const json = isJSON(trimmed);
-  const [format, setFormat] = useState(json ? 'JSON' : 'Text');
+  const [format, setFormat] = useState('Text');
 
   const [mode, setMode] = useState(hasScrolling ? (isExpanded ? 1 : 0) : 0);
 
