@@ -1003,6 +1003,10 @@ def map_to_refs(obj: Any) -> Any:
     ref = get_ref(obj)
     if ref:
         return ref
+    if isinstance(obj, ObjectRecord):
+        return ObjectRecord(
+            {k: map_to_refs(v) for k, v in obj.__dict__.items()},
+        )
     if dataclasses.is_dataclass(obj):
         return ObjectRecord(
             {
