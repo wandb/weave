@@ -65,7 +65,7 @@ export const ObjectVersionPage: React.FC<{
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
-  const {useRootObjectVersions, useCalls} = useWFHooks();
+  const {useRootObjectVersions, usePaginatedCalls} = useWFHooks();
   const objectVersionHash = objectVersion.versionHash;
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -80,10 +80,10 @@ const ObjectVersionPageInner: React.FC<{
   const objectTypeCategory = objectVersion.category;
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
-  const producingCalls = useCalls(entityName, projectName, {
+  const producingCalls = usePaginatedCalls(entityName, projectName, {
     outputObjectVersionRefs: [refUri],
   });
-  const consumingCalls = useCalls(entityName, projectName, {
+  const consumingCalls = usePaginatedCalls(entityName, projectName, {
     inputObjectVersionRefs: [refUri],
   });
 

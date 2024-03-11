@@ -234,7 +234,7 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
 };
 
 const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
-  const {useCalls} = useWFHooks();
+  const {usePaginatedCalls} = useWFHooks();
 
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
@@ -244,7 +244,7 @@ const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
   // the meantime we will just fetch the first 100 versions and display 99+ if
   // there are at least 100. Someone can come back and add `count` to the 3
   // query APIs which will make this faster.
-  const calls = useCalls(
+  const calls = usePaginatedCalls(
     obj.entity,
     obj.project,
     {

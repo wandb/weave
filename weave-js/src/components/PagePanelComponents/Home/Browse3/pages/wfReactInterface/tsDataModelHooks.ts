@@ -183,14 +183,17 @@ const usePaginatedCalls = (
   project: string,
   filter: CallFilter,
   // Arbitrary limit, in conjunction with the max 50 pages limits calls to 500000
-  limit: number = 10000
+  limit: number = 10000,
+  opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const [callRes, setCallRes] = useState<traceServerClient.TraceCallSchema[]>(
     []
   );
   const deepFilter = useDeepMemo(filter);
-  const [allCallsLoaded, setAllCallsLoaded] = useState(false);
+  // if allCallsLoaded is true, we have loaded all calls
+  // if skip is true, we don't need to load any calls
+  const [allCallsLoaded, setAllCallsLoaded] = useState(!opts?.skip);
 
   // This is a recursive function that loads calls in pages from the trace server into an accumulator
   // This is a workaround for the trace server not being able to send super large pages over the wire
@@ -239,6 +242,12 @@ const usePaginatedCalls = (
   loadCalls(0, []);
 
   return useMemo(() => {
+    if (opts?.skip) {
+      return {
+        loading: false,
+        result: [],
+      };
+    }
     const allResults = (!allCallsLoaded ? [] : callRes).map(
       traceCallToUICallSchema
     );
@@ -273,7 +282,14 @@ const usePaginatedCalls = (
         result,
       };
     }
-  }, [callRes, deepFilter.opCategory, entity, project, allCallsLoaded]);
+  }, [
+    callRes,
+    deepFilter.opCategory,
+    entity,
+    project,
+    allCallsLoaded,
+    opts?.skip,
+  ]);
 };
 
 const useOpVersion = (
@@ -327,7 +343,7 @@ const useChildCallsForCompare = (
     parentCallIds.length === 0 ||
     selectedObjectVersionRef == null;
 
-  const parentCalls = useCalls(
+  const parentCalls = usePaginatedCalls(
     entity,
     project,
     {
@@ -347,7 +363,7 @@ const useChildCallsForCompare = (
   const skipChild =
     subParentCallIds.length === 0 || selectedOpVersionRef == null;
 
-  const childCalls = useCalls(
+  const childCalls = usePaginatedCalls(
     entity,
     project,
     {

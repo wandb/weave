@@ -43,7 +43,7 @@ export const OpVersionPage: React.FC<{
 const OpVersionPageInner: React.FC<{
   opVersion: OpVersionSchema;
 }> = ({opVersion}) => {
-  const {useOpVersions, useCalls} = useWFHooks();
+  const {useOpVersions, usePaginatedCalls} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
   const {entity, project, opId, versionIndex, category} = opVersion;
 
@@ -51,7 +51,7 @@ const OpVersionPageInner: React.FC<{
     opIds: [opId],
   });
   const opVersionCount = (opVersions.result ?? []).length;
-  const calls = useCalls(entity, project, {
+  const calls = usePaginatedCalls(entity, project, {
     opVersionRefs: [uri],
   });
   const opVersionCallCount = (calls.result ?? []).length;
