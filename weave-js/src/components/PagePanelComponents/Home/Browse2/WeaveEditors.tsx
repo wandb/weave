@@ -70,6 +70,7 @@ import {
 } from '../Browse3/pages/wfReactInterface/constants';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject, unflattenObject} from './browse2Util';
+import {CellValue} from './CellValue';
 import {
   mutationPublishArtifact,
   mutationSet,
@@ -704,6 +705,9 @@ const typeToDataGridColumnSpec = (
             editable: editable && !disableEdits,
             field: key,
             headerName: key,
+            renderCell: params => {
+              return <CellValue value={params.row[key] ?? ''} />;
+            },
           },
         ];
       }

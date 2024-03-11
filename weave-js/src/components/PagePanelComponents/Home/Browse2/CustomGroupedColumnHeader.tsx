@@ -8,6 +8,8 @@
 
 import React from 'react';
 
+import {Tooltip} from '../../../Tooltip';
+
 type CustomGroupedColumnProps = {
   field: string;
 };
@@ -16,5 +18,5 @@ export const CustomGroupedColumnHeader = ({
   field,
 }: CustomGroupedColumnProps) => {
   const tail = field.split('.').slice(-1)[0];
-  return <span>{tail}</span>;
+  return <Tooltip trigger={<span>{tail}</span>} content={field} />;
 };
