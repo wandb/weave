@@ -1,5 +1,5 @@
 /**
- * TODO: Combine common functionality between this and ValueViewString.
+ * TODO: Combine common functionality between this and ValueViewString
  */
 
 import Grow from '@material-ui/core/Grow';
