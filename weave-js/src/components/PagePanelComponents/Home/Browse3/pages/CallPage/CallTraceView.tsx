@@ -11,11 +11,12 @@ import styled from 'styled-components';
 import {Button} from '../../../../../Button';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
-import {querySetBoolean} from '../../urlQueryUtil';
+import {querySetBoolean, querySetString} from '../../urlQueryUtil';
 import {CallStatusType} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
+import {scorePathSimilarity, updatePath} from './pathPreservation';
 
 const CallTrace = styled.div`
   display: flex;
@@ -44,15 +45,15 @@ const CallTraceHeaderTitle = styled.div`
 `;
 CallTraceHeaderTitle.displayName = 'S.CallTraceHeaderTitle';
 
-export const CallTraceView: FC<{call: CallSchema}> = ({call}) => {
+export const CallTraceView: FC<{
+  call: CallSchema;
+  selectedCall: CallSchema;
+  rows: Row[];
+  forcedExpandKeys: Set<string>;
+}> = ({call, selectedCall, rows, forcedExpandKeys}) => {
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
-  const {
-    rows,
-    expandKeys: forcedExpandKeys,
-    loading: treeLoading,
-  } = useCallFlattenedTraceTree(call);
   const [expandKeys, setExpandKeys] = useState(forcedExpandKeys);
   useEffect(() => {
     setExpandKeys(curr => new Set([...curr, ...forcedExpandKeys]));
@@ -101,7 +102,31 @@ export const CallTraceView: FC<{call: CallSchema}> = ({call}) => {
       if (!params.row.call) {
         return;
       }
+      const rowCall = params.row.call as CallSchema;
       setSuppressScroll(true);
+      if (params.row.isParentRow) {
+        // Allow navigating up the tree
+        history.push(
+          currentRouter.callUIUrl(
+            rowCall.entity,
+            rowCall.project,
+            '',
+            rowCall.callId,
+            ''
+          )
+        );
+      } else {
+        // Browse within selected call
+        querySetString(history, 'path', params.row.path);
+      }
+    },
+    [currentRouter, history]
+  );
+  const onRowDoubleClick: DataGridProProps['onRowDoubleClick'] = useCallback(
+    params => {
+      if (!params.row.call) {
+        return;
+      }
       const rowCall = params.row.call as CallSchema;
       history.push(
         currentRouter.callUIUrl(
@@ -125,7 +150,7 @@ export const CallTraceView: FC<{call: CallSchema}> = ({call}) => {
 
   // Informs DataGridPro how to style the rows. In this case, we highlight
   // the current call.
-  const callClass = `.callId-${call.callId}`;
+  const callClass = `.callId-${selectedCall.callId}`;
   const getRowClassName: DataGridProProps['getRowClassName'] = useCallback(
     params => {
       if (!params.row.call) {
@@ -211,9 +236,10 @@ export const CallTraceView: FC<{call: CallSchema}> = ({call}) => {
             rowHeight={38}
             columnHeaderHeight={0}
             treeData
-            loading={treeLoading || animationBuffer}
+            loading={animationBuffer}
             onRowClick={onRowClick}
-            rows={treeLoading || animationBuffer ? [] : rows}
+            onRowDoubleClick={onRowDoubleClick}
+            rows={animationBuffer ? [] : rows}
             columns={[]}
             getTreeDataPath={getTreeDataPath}
             groupingColDef={groupingColDef}
@@ -275,6 +301,7 @@ type CallRow = {
   call: CallSchema;
   status: CallStatusType;
   hierarchy: string[];
+  path: string;
   isTraceRootCall: boolean;
   isParentRow?: boolean;
 };
@@ -284,7 +311,35 @@ type CountRow = {
   hierarchy: string[];
 };
 type Row = CallRow | CountRow;
-const useCallFlattenedTraceTree = (call: CallSchema) => {
+
+type CallMap = Record<string, CallSchema>;
+type ChildCallLookup = Record<string, string[]>;
+
+const getIndexWithinSameNameSiblings = (
+  call: CallSchema,
+  traceCallMap: CallMap,
+  childCallLookup: ChildCallLookup
+) => {
+  const sameParentIds = call.parentId
+    ? childCallLookup[call.parentId] ?? []
+    : [];
+  const sameParentCalls = _.sortBy(
+    sameParentIds.map(c => traceCallMap[c]).filter(c => c),
+    [getCallSortExampleRow, getCallSortStartTime]
+  );
+  const indexWithinSameNameSiblings =
+    sameParentCalls.length > 0
+      ? sameParentCalls
+          .filter(c => c.spanName === call.spanName)
+          .findIndex(c => c.callId === call.callId)
+      : -1;
+  return indexWithinSameNameSiblings;
+};
+
+export const useCallFlattenedTraceTree = (
+  call: CallSchema,
+  selectedPath: string | null
+) => {
   const {usePaginatedCalls} = useWFHooks();
   const traceCalls = usePaginatedCalls(call.entity, call.project, {
     traceId: call.traceId,
@@ -310,15 +365,23 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
     return lookup;
   }, [traceCallsResult]);
   return useMemo(() => {
+    let selectedCall = null;
+    let selectedCallSimilarity = Number.POSITIVE_INFINITY;
+
     const rows: Row[] = [];
-    const expandKeys = new Set<string>();
     // Ascend to the root
     let currentCall: CallSchema | null = call;
     let lastCall: CallSchema = call;
 
+    let pathPrefix = '';
     while (currentCall != null) {
       lastCall = currentCall;
-      expandKeys.add(currentCall.callId);
+      const idx = getIndexWithinSameNameSiblings(
+        currentCall,
+        traceCallMap,
+        childCallLookup
+      );
+      pathPrefix = updatePath(pathPrefix, currentCall.spanName, idx);
       currentCall = currentCall.parentId
         ? traceCallMap[currentCall.parentId]
         : null;
@@ -332,6 +395,7 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
         call: parentCall,
         status: parentCall.rawSpan.status_code,
         hierarchy: [parentCall.callId],
+        path: '',
         isTraceRootCall: parentCall.callId === lastCall.callId,
         isParentRow: true,
       });
@@ -341,20 +405,34 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
     const queue: Array<{
       targetCall: CallSchema;
       parentHierarchy: string[];
+      path: string;
     }> = [
       {
         targetCall: call,
         parentHierarchy: call.parentId ? [call.parentId] : [],
+        path: pathPrefix,
       },
     ];
     while (queue.length > 0) {
-      const {targetCall, parentHierarchy} = queue.shift()!;
+      const {targetCall, parentHierarchy, path} = queue.shift()!;
       const newHierarchy = [...parentHierarchy, targetCall.callId];
+      const idx = getIndexWithinSameNameSiblings(
+        targetCall,
+        traceCallMap,
+        childCallLookup
+      );
+      const newPath = updatePath(path, targetCall.spanName, idx);
+      const similarity = scorePathSimilarity(newPath, selectedPath ?? '');
+      if (similarity < selectedCallSimilarity) {
+        selectedCall = targetCall;
+        selectedCallSimilarity = similarity;
+      }
       rows.push({
         id: targetCall.callId,
         call: targetCall,
         status: targetCall.rawSpan.status_code,
         hierarchy: newHierarchy,
+        path: newPath,
         isTraceRootCall: targetCall.callId === lastCall.callId,
       });
       const childIds = childCallLookup[targetCall.callId] ?? [];
@@ -363,7 +441,11 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
         [getCallSortExampleRow, getCallSortStartTime]
       );
       childCalls.forEach(c =>
-        queue.push({targetCall: c, parentHierarchy: newHierarchy})
+        queue.push({
+          targetCall: c,
+          parentHierarchy: newHierarchy,
+          path: newPath,
+        })
       );
     }
 
@@ -406,12 +488,27 @@ const useCallFlattenedTraceTree = (call: CallSchema) => {
       }
     }
 
-    return {rows, expandKeys, loading: traceCalls.loading};
+    if (!selectedCall) {
+      selectedCall = call;
+    }
+
+    // Epand the path to the selected call.
+    const expandKeys = new Set<string>();
+    let callToExpand: CallSchema | null = selectedCall;
+    while (callToExpand != null) {
+      expandKeys.add(callToExpand.callId);
+      callToExpand = callToExpand.parentId
+        ? traceCallMap[callToExpand.parentId]
+        : null;
+    }
+
+    return {rows, selectedCall, expandKeys, loading: traceCalls.loading};
   }, [
     call,
     childCallLookup,
     traceCallMap,
     traceCallsResult,
+    selectedPath,
     traceCalls.loading,
   ]);
 };

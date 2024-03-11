@@ -1,10 +1,15 @@
 import {Box} from '@material-ui/core';
 import React, {FC} from 'react';
 import {useHistory} from 'react-router-dom';
+import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {queryGetBoolean, queryToggleBoolean} from '../../urlQueryUtil';
+import {
+  queryGetBoolean,
+  queryGetString,
+  queryToggleBoolean,
+} from '../../urlQueryUtil';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -12,7 +17,7 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
-import {CallTraceView} from './CallTraceView';
+import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
 
 export const CallPage: FC<{
   entity: string;
@@ -59,12 +64,24 @@ const useCallTabs = (call: CallSchema) => {
 const CallPageInnerVertical: FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const callTabs = useCallTabs(call);
   const history = useHistory();
   const showTraceTree = queryGetBoolean(history, 'tracetree', true);
   const onToggleTraceTree = () => {
     queryToggleBoolean(history, 'tracetree', true);
   };
+
+  const path = queryGetString(history, 'path');
+  const {rows, selectedCall, expandKeys, loading} = useCallFlattenedTraceTree(
+    call,
+    path
+  );
+
+  const callTabs = useCallTabs(selectedCall);
+
+  if (loading) {
+    return <Loader active />;
+  }
+
   return (
     <SimplePageLayoutWithHeader
       headerExtra={
@@ -82,8 +99,15 @@ const CallPageInnerVertical: FC<{
         </Box>
       }
       isSidebarOpen={showTraceTree}
-      headerContent={<CallOverview call={call} />}
-      leftSidebar={<CallTraceView call={call} />}
+      headerContent={<CallOverview call={selectedCall} />}
+      leftSidebar={
+        <CallTraceView
+          call={call}
+          selectedCall={selectedCall}
+          rows={rows}
+          forcedExpandKeys={expandKeys}
+        />
+      }
       tabs={callTabs}
     />
   );

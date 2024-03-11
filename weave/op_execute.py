@@ -15,6 +15,10 @@ if typing.TYPE_CHECKING:
     from .op_def import OpDef
 
 
+def print_run_link(run):
+    print(f"🍩 {run.ui_url}")
+
+
 def _deref_all(obj: typing.Any):
     if isinstance(obj, dict):
         return {k: _deref_all(v) for k, v in obj.items()}
@@ -47,7 +51,12 @@ def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
 
     client = graph_client_context.require_graph_client()
     if not ref:
-        ref = client.save_object(obj, f"{obj.__class__.__name__}", "latest")
+        name = getattr(obj, "name", None)
+        if name == None:
+            name = f"{obj.__class__.__name__}"
+        if not isinstance(name, str):
+            raise ValueError(f"Object's name attribute is not a string: {name}")
+        ref = client.save_object(obj, name, "latest")
 
     output_refs.append(ref)
     return ref
@@ -63,27 +72,27 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode():
         parent_run = run_context.get_current_run()
+        op_def_ref = storage._get_ref(op_def)
+        if not client.ref_is_own(op_def_ref):
+            op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
+        mon_span_inputs, refs = auto_publish(inputs)
+
+        # Memoization disabled for now.
+        # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
+        # if found_run:
+        #     return found_run.output
+
+        # if not parent_run:
+        #     print("Running ", op_def.name)
+        run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
         try:
-            op_def_ref = storage._get_ref(op_def)
-            if not client.ref_is_own(op_def_ref):
-                op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-            mon_span_inputs, refs = auto_publish(inputs)
-
-            # Memoization disabled for now.
-            # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
-            # if found_run:
-            #     return found_run.output
-
-            # if not parent_run:
-            #     print("Running ", op_def.name)
-            run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
             with run_context.current_run(run):
                 res = op_def.raw_resolve_fn(**inputs)
                 res = box.box(res)
         except BaseException as e:
             client.fail_run(run, e)
             if not parent_run:
-                print("🍩 View call:", run.ui_url)
+                print_run_link(run)
             raise
         if isinstance(res, box.BoxedNone):
             res = None
@@ -108,12 +117,12 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
                     # output = box.box(output)
                     client.finish_run(run, output, output_refs)
                     if not parent_run:
-                        print("🍩 View call:", run.ui_url)
+                        print_run_link(run)
                     return _deref_all(output)
                 except BaseException as e:
                     client.fail_run(run, e)
                     if not parent_run:
-                        print("🍩 View call:", run.ui_url)
+                        print_run_link(run)
                     raise
 
             return _run_async()
@@ -125,7 +134,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
             client.finish_run(run, output, output_refs)
             if not parent_run:
-                print("🍩 View trace:", run.ui_url)
+                print_run_link(run)
             res = _deref_all(output)
 
     else:

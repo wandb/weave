@@ -663,7 +663,8 @@ const useCallPeekRedirect = () => {
           params.entity,
           params.project,
           call.traceId,
-          params.itemName
+          params.itemName,
+          undefined
         )
       );
       const newSearch = searchParams.toString();
