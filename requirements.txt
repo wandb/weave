@@ -29,7 +29,7 @@ python-json-logger>=2.0.4
 numpy>=1.21
 
 # required for wandb
-wandb>=0.16.2
+wandb>=0.16.4
 graphql-core>3
 gql[requests]>=3.4.1
 
