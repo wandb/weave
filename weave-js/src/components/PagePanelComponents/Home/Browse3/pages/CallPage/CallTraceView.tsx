@@ -285,8 +285,8 @@ type CountRow = {
 };
 type Row = CallRow | CountRow;
 const useCallFlattenedTraceTree = (call: CallSchema) => {
-  const {useCalls} = useWFHooks();
-  const traceCalls = useCalls(call.entity, call.project, {
+  const {usePaginatedCalls} = useWFHooks();
+  const traceCalls = usePaginatedCalls(call.entity, call.project, {
     traceId: call.traceId,
   });
   const traceCallsResult = useMemo(

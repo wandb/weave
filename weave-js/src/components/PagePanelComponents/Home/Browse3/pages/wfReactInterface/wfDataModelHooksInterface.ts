@@ -140,7 +140,8 @@ export type WFDataModelHooksInterface = {
     entity: string,
     project: string,
     filter: CallFilter,
-    pageLimit?: number
+    pageLimit?: number,
+    opts?: {skip?: boolean}
   ) => Loadable<CallSchema[]>;
 };
 
