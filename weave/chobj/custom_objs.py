@@ -3,7 +3,6 @@ import io
 import os
 from typing import Optional, Union, Mapping, Iterator
 from weave import weave_types as types
-from weave import box
 from weave import artifact_fs
 from weave.trace_server.trace_server_interface_util import (
     encode_bytes_as_b64,
@@ -94,7 +93,6 @@ def encode_custom_obj(obj):
         # We silently return None right now. We could warn here. This object
         # will not be recoverable with client.get
         return None
-    obj = box.box(obj)
     art = MemTraceFilesArtifact()
     weave_type.save_instance(obj, art, "obj")
 

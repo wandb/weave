@@ -118,6 +118,8 @@ class Evaluation(Object):
     @weave.op()
     async def summarize(self, eval_table: weave.WeaveList) -> dict:
         summary = {}
+        if not isinstance(eval_table, weave.WeaveList):
+            eval_table = weave.WeaveList(eval_table)
         prediction_summary = auto_summarize(eval_table.column("prediction"))
         if prediction_summary:
             summary["prediction"] = prediction_summary
@@ -149,11 +151,9 @@ class Evaluation(Object):
         _rows = dataset.rows
         async for example, eval_row in util.async_foreach(_rows, eval_example, 30):
             n_complete += 1
-            # prediction_errors += int(eval_row["prediction_error"])
-            # score_errors += eval_row["score_errors"]
             duration = time.time() - start_time
             # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete] [{prediction_errors} prediction errors] [{score_errors} score errors]"
+            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"
             # )
             if eval_row == None:
                 eval_row = {"prediction": None, "scores": {}}
@@ -165,9 +165,9 @@ class Evaluation(Object):
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
 
-        eval_table: weave.WeaveList = weave.WeaveList(eval_rows)
+        # eval_table: weave.WeaveList = weave.WeaveList(eval_rows)
 
-        summary = await self.summarize(eval_table)
+        summary = await self.summarize(eval_rows)
 
         print("Evaluation summary", summary)
 

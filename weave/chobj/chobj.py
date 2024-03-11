@@ -1,4 +1,4 @@
-from typing import Optional, Any, TypedDict, NamedTuple, Literal, Union
+from typing import Optional, Any, TypedDict, NamedTuple, Literal, Union, Callable
 import clickhouse_connect
 import copy
 import uuid
@@ -157,6 +157,18 @@ def get_type(val):
     elif isinstance(val, pydantic.BaseModel):
         return val.__class__.__name__
     return "unknown"
+
+
+def get_obj_name(val):
+    name = getattr(val, "name", None)
+    if name == None:
+        if isinstance(val, ObjectRecord):
+            name = val._type
+        else:
+            name = f"{val.__class__.__name__}"
+    if not isinstance(name, str):
+        raise ValueError(f"Object's name attribute is not a string: {name}")
+    return name
 
 
 def refs(val):
@@ -896,7 +908,7 @@ class TraceList(Tracable):
         return self.val == other
 
 
-class TraceDict(Tracable):
+class TraceDict(Tracable, dict):
     def __init__(self, val, ref, server, root):
         self.val = val
         self.ref = ref
@@ -921,7 +933,8 @@ class TraceDict(Tracable):
         return self.val.values()
 
     def items(self):
-        return self.val.items()
+        for k in self.keys():
+            yield k, self[k]
 
     def __iter__(self):
         return iter(self.val)
@@ -1034,6 +1047,81 @@ def map_to_refs(obj: Any) -> Any:
     return custom_objs.encode_custom_obj(obj)
 
 
+def save_nested_objects(obj: Any, client: "ObjectClient") -> Any:
+    if dataclasses.is_dataclass(obj):
+        if hasattr(obj, "_trace_object"):
+            return obj._trace_object
+        obj_rec = ObjectRecord(
+            {
+                "_type": obj.__class__.__name__,
+                **{
+                    k: save_nested_objects(v, client)
+                    for k, v in dataclasses_asdict_one_level(obj).items()
+                },
+                **{
+                    k: save_nested_objects(v, client)
+                    for k, v in inspect.getmembers(
+                        obj, lambda x: isinstance(x, op_def.OpDef)
+                    )
+                    if isinstance(v, op_def.OpDef)
+                },
+            },
+        )
+        ref = client.save_object(obj_rec, get_obj_name(obj_rec))
+        trace_obj = make_trace_obj(obj_rec, ref, client.server, None)
+        obj._trace_object = trace_obj
+        return trace_obj
+    elif isinstance(obj, pydantic.BaseModel):
+        if hasattr(obj, "_trace_object"):
+            return obj._trace_object
+        obj_rec = ObjectRecord(
+            {
+                "_type": obj.__class__.__name__,
+                **{
+                    k: save_nested_objects(v, client)
+                    for k, v in pydantic_asdict_one_level(obj).items()
+                },
+                **{
+                    k: save_nested_objects(v, client)
+                    for k, v in inspect.getmembers(
+                        obj, lambda x: isinstance(x, op_def.OpDef)
+                    )
+                    if isinstance(v, op_def.OpDef)
+                },
+            },
+        )
+        ref = client.save_object(obj_rec, get_obj_name(obj_rec))
+        # return make_trace_obj(obj_rec, ref, client.server, None)
+        trace_obj = make_trace_obj(obj_rec, ref, client.server, None)
+        obj._trace_object = trace_obj
+        return trace_obj
+    elif isinstance(obj, list):
+        return [save_nested_objects(v, client) for v in obj]
+    elif isinstance(obj, dict):
+        return {k: save_nested_objects(v, client) for k, v in obj.items()}
+
+    if isinstance(obj, op_def.OpDef):
+        make_op_ref(obj, client)
+        return obj
+
+    # Leave custom objects alone. They do not need to be saved by the
+    # time user code interacts with them since they are always leaves
+    # and we don't do ref-tracking inside them.
+    return obj
+
+
+def make_op_ref(op: op_def.OpDef, client: "ObjectClient") -> ObjectRef:
+    if isinstance(op, op_def.BoundOpDef):
+        op = op.op_def
+    ref = get_ref(op)
+    if ref:
+        return ref
+    encoded = custom_objs.encode_custom_obj(op)
+    ref = client.server.new_object(ObjectRecord(encoded), op.name, "latest")
+    op.ref = ref
+    return ref
+
+
 @dataclasses.dataclass
 class Dataset:
     rows: list[Any]
@@ -1106,12 +1194,17 @@ class ObjectClient:
     def call(self, call_id: uuid.UUID) -> Optional[Call]:
         return self.server.get_val(ValRef(call_id))
 
-    def create_call(self, op_name: str, inputs: dict):
-        inputs = map_to_refs(inputs)
-        call = Call(op_name, inputs)
+    def create_call(self, op: Union[str, op_def.OpDef], inputs: dict):
+        if isinstance(op, op_def.OpDef):
+            op_def_ref = make_op_ref(op, self)
+            op = op_def_ref.uri()
+        inputs = save_nested_objects(inputs, self)
+        inputs_with_refs = map_to_refs(inputs)
+        call = Call(op, inputs_with_refs)
+
         val_ref = self.server.new_val(call)
         call.id = val_ref.val_id
-        return call
+        return call, inputs
 
     def finish_call(self, call: Call, output: Any):
         call.output = output
@@ -1132,14 +1225,24 @@ class ObjectClient:
 # TODO
 #
 # must prove
+# - eval test
+#   - why are there null values
+#   - why are there two tables
+#   - ensure there is no duplicate stuff logged.
+#   - top-level op-name instead of via nested ref?
+#     - ie we need some logic for "ref switching when walking refs"
+#   - Is this whole evaluation relocatable?
 #   - [x] mutations (append, set, remove)
 #   - [x] calls on dataset rows are stable
 #   - batch ref resolution in call query / dataset join path
-#   - custom objects
-#   - files
+#   - [x] custom objects
+#   - [x] files
+#   - large files
+#   - store files at top-level?
 #   - can't efficiently fetch OpDef, and custom objects, by type yet.
 #   - ensure true client/server wire interface
 #   - [x] table ID refs instead of index
+#   - Don't save the same objects over and over again.
 #   - runs setting run ID for memoization
 #   - dedupe, content ID
 #   - efficient walking of all relationships

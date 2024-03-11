@@ -19,52 +19,52 @@ def print_run_link(run):
     print(f"🍩 {run.ui_url}")
 
 
-def _deref_all(obj: typing.Any):
-    if isinstance(obj, dict):
-        return {k: _deref_all(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_deref_all(v) for v in obj]
-    elif isinstance(obj, ref_base.Ref):
-        return obj.get()
-    return obj
+# def _deref_all(obj: typing.Any):
+#     if isinstance(obj, dict):
+#         return {k: _deref_all(v) for k, v in obj.items()}
+#     elif isinstance(obj, list):
+#         return [_deref_all(v) for v in obj]
+#     elif isinstance(obj, ref_base.Ref):
+#         return obj.get()
+#     return obj
 
 
-def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
-    import numpy as np
+# def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
+#     import numpy as np
 
-    ref = storage.get_ref(obj)
-    if ref:
-        output_refs.append(ref)
-        return ref
+#     ref = storage.get_ref(obj)
+#     if ref:
+#         output_refs.append(ref)
+#         return ref
 
-    if isinstance(obj, dict):
-        return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_auto_publish(v, output_refs) for v in obj]
-    weave_type = types.TypeRegistry.type_of(obj)
-    if weave_type == types.UnknownType():
-        return f"<UnknownType: {type(obj)}>"
-    if not (
-        types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
-    ):
-        return obj
+#     if isinstance(obj, dict):
+#         return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
+#     elif isinstance(obj, list):
+#         return [_auto_publish(v, output_refs) for v in obj]
+#     weave_type = types.TypeRegistry.type_of(obj)
+#     if weave_type == types.UnknownType():
+#         return f"<UnknownType: {type(obj)}>"
+#     if not (
+#         types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
+#     ):
+#         return obj
 
-    client = graph_client_context.require_graph_client()
-    if not ref:
-        name = getattr(obj, "name", None)
-        if name == None:
-            name = f"{obj.__class__.__name__}"
-        if not isinstance(name, str):
-            raise ValueError(f"Object's name attribute is not a string: {name}")
-        ref = client.save_object(obj, name, "latest")
+#     client = graph_client_context.require_graph_client()
+#     if not ref:
+#         name = getattr(obj, "name", None)
+#         if name == None:
+#             name = f"{obj.__class__.__name__}"
+#         if not isinstance(name, str):
+#             raise ValueError(f"Object's name attribute is not a string: {name}")
+#         ref = client.save_object(obj, name, "latest")
 
-    output_refs.append(ref)
-    return ref
+#     output_refs.append(ref)
+#     return ref
 
 
-def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
-    refs: typing.List[ref_base.Ref] = []
-    return _auto_publish(obj, refs), refs
+# def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
+#     refs: typing.List[ref_base.Ref] = []
+#     return _auto_publish(obj, refs), refs
 
 
 def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
@@ -72,10 +72,12 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode():
         parent_run = run_context.get_current_run()
-        op_def_ref = storage._get_ref(op_def)
-        if not client.ref_is_own(op_def_ref):
-            op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-        mon_span_inputs, refs = auto_publish(inputs)
+        # op_def_ref = storage._get_ref(op_def)
+        # if not client.ref_is_own(op_def_ref):
+        #     op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
+        # mon_span_inputs, refs = auto_publish(inputs)
+        mon_span_inputs, refs = inputs, []
+        # mon_span_inputs, refs = client.save_nested_objects(inputs), []
 
         # Memoization disabled for now.
         # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
@@ -84,10 +86,12 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
         # if not parent_run:
         #     print("Running ", op_def.name)
-        run = client.create_run(str(op_def_ref), parent_run, mon_span_inputs, refs)
+        run, trackable_inputs = client.create_run(
+            op_def, parent_run, mon_span_inputs, refs
+        )
         try:
             with run_context.current_run(run):
-                res = op_def.raw_resolve_fn(**inputs)
+                res = op_def.raw_resolve_fn(**trackable_inputs)
                 res = box.box(res)
         except BaseException as e:
             client.fail_run(run, e)
@@ -111,14 +115,16 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
                             # in a row.
                             while inspect.iscoroutine(awaited_res):
                                 awaited_res = await awaited_res
-                    output, output_refs = auto_publish(awaited_res)
+                    # output, output_refs = auto_publish(awaited_res)
+                    output, output_refs = awaited_res, []
                     # TODO: boxing enables full ref-tracking of run outputs
                     # to other run inputs, but its not working yet.
                     # output = box.box(output)
                     client.finish_run(run, output, output_refs)
                     if not parent_run:
                         print_run_link(run)
-                    return _deref_all(output)
+                    return output
+                    # return _deref_all(output)
                 except BaseException as e:
                     client.fail_run(run, e)
                     if not parent_run:
@@ -127,7 +133,8 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
             return _run_async()
         else:
-            output, output_refs = auto_publish(res)
+            # output, output_refs = auto_publish(res)
+            output, output_refs = res, []
             # TODO: boxing enables full ref-tracking of run outputs
             # to other run inputs, but its not working yet.
             # output = box.box(output)
@@ -135,7 +142,8 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
             client.finish_run(run, output, output_refs)
             if not parent_run:
                 print_run_link(run)
-            res = _deref_all(output)
+            res = output
+            # res = _deref_all(output)
 
     else:
         res = op_def.resolve_fn(**inputs)

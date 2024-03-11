@@ -5,7 +5,8 @@ import pydantic
 import chobj
 import uuid
 import weave
-from weave import op_def
+import asyncio
+from weave import op_def, Evaluation
 
 
 class RegexStringMatcher(str):
@@ -137,7 +138,7 @@ def test_pydantic(client):
 
 
 def test_call_create(client, server):
-    call = client.create_call("x", {"a": 5, "b": 10})
+    call, _ = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.call(call.id)
     assert result == chobj.Call("x", {"a": 5, "b": 10}, output="hello")
@@ -237,12 +238,12 @@ def test_stable_dataset_row_refs(client, server):
         ),
         "my-dataset",
     )
-    call = client.create_call("x", {"a": dataset.rows[0]["doc"]})
+    call, _ = client.create_call("x", {"a": dataset.rows[0]["doc"]})
     client.finish_call(call, "call1")
     dataset.rows.append({"doc": "zz", "label": "e"})
     dataset2_ref = dataset.save()
     dataset2 = client.get(dataset2_ref)
-    call = client.create_call("x", {"a": dataset2.rows[0]["doc"]})
+    call, _ = client.create_call("x", {"a": dataset2.rows[0]["doc"]})
     client.finish_call(call, "call2")
     x = client.calls({"ref": chobj.get_ref(dataset.rows[0]["doc"])})
 
@@ -307,6 +308,30 @@ def test_save_model(server):
         model2 = client.get(ref)
         # TODO: wrong, have to manually pass self
         assert model2.predict(model2, "x") == "input is: x"
+
+
+def test_evaluate(server):
+    @weave.op()
+    async def model_predict(input) -> str:
+        return eval(input)
+
+    dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+
+    @weave.op()
+    async def score(target, prediction):
+        return target == prediction
+
+    with weave.chobj_client():
+        evaluation = Evaluation(
+            dataset=dataset_rows,
+            scorers=[score],
+        )
+        result = asyncio.run(evaluation.evaluate(model_predict))
+        expected_eval_result = {
+            "prediction": {"mean": 9.5},
+            "score": {"true_count": 1, "true_fraction": 0.5},
+        }
+        assert result == expected_eval_result
 
 
 # def test_publish_big_list(server):

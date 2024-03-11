@@ -24,6 +24,8 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
     Returns:
       dict of summary stats, with structure matching input dict structure.
     """
+    if not isinstance(data, WeaveList):
+        data = WeaveList(data)
     if data.is_number():
         valid_data = [x for x in data if x is not None]
         if not valid_data:
