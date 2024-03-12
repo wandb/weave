@@ -26,6 +26,7 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -282,7 +283,7 @@ const useChildCallsForCompare = (
   return result;
 };
 
-const useRefsData = (refUris: string[]): Loadable<any[]> => {
+const useRefsData = (refUris: string[],tableQuery?:TableQuery): Loadable<any[]> => {
   throw new Error('Not implemented');
 };
 

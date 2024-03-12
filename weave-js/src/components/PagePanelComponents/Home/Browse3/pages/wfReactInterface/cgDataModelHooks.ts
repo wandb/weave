@@ -44,6 +44,7 @@ import {
   Type,
   typedDict,
 } from '../../../../../../core';
+import { useDeepMemo } from '../../../../../../hookUtils';
 import {useNodeValue} from '../../../../../../react';
 import {nodeFromExtra} from '../../../Browse2/Browse2ObjectVersionItemPage';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
@@ -80,6 +81,7 @@ import {
   OpVersionSchema,
   RawSpanFromStreamTableEra,
   RawSpanFromStreamTableEraWithFeedback,
+  TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -743,21 +745,51 @@ const useOpVersionsNode = (
   return dataNode;
 };
 
-const useRefsData = (refUris: string[]): Loadable<any[]> => {
+const useRefsData = (refUris: string[], tableQuery?:TableQuery): Loadable<any[]> => {
+  const refUrisDeep = useDeepMemo(refUris);
+  const tableQueryDeep = useDeepMemo(tableQuery);
+
   const itemsNode = useMemo(() => {
-    const nodes = refUris.map(refToNode);
+    let nodes = refUrisDeep.map(refToNode);
+    if (tableQueryDeep) {
+      nodes = nodes.map(node => {
+        if (tableQueryDeep.columns.length > 0) {
+          node = opMap({
+            arr: node,
+            mapFn: constFunction({row: 'any'}, ({row}) =>
+              opDict(
+                _.fromPairs(
+                  tableQueryDeep.columns.map(key => [
+                    key,
+                    opPick({obj: row, key: constString(key)}),
+                  ])
+                ) as any
+              )
+            ),
+          })
+        }
+        if (tableQueryDeep.limit) {
+          node = opLimit({
+            arr: node,
+            limit: constNumber(tableQueryDeep.limit),
+          });
+        }
+        return node
+      })
+    }
     return opArray(_.fromPairs(nodes.map((node, i) => [i, node])) as any);
-  }, [refUris]);
+  }, [refUrisDeep, tableQueryDeep]);
   return useNodeValue(itemsNode);
 };
 
 const useRefsType = (refUris: string[]) : Loadable<Type[]> => {
   const weave = useWeaveContext();
+  const refUrisDeep = useDeepMemo(refUris);
   const [results, setResults] = useState<Type[] | null>(null);
   useEffect(() => {
     let mounted = true;
     const loadTypes = () => {
-      const proms =  refUris.map(refUri => weave.refineNode(refToNode(refUri), []));
+      const proms =  refUrisDeep.map(refUri => weave.refineNode(refToNode(refUri), []));
       Promise.all(proms).then((nodes) => {
         if (mounted) {
           const simpleTypes: Type[] = nodes.map((node) => {
@@ -773,7 +805,7 @@ const useRefsType = (refUris: string[]) : Loadable<Type[]> => {
     return () => {
       mounted = false;
     };
-  }, [refUris, weave])
+  }, [refUrisDeep, weave])
   return useMemo(() => {
     if (results == null) {
       return {

@@ -98,6 +98,11 @@ export type ObjectVersionFilter = {
   latestOnly?: boolean;
 };
 
+export type TableQuery = {
+  columns: string[];
+  limit?: number;
+}
+
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
@@ -125,7 +130,7 @@ export type WFDataModelHooksInterface = {
     limit?: number,
     opts?: {skip?: boolean}
   ) => Loadable<ObjectVersionSchema[]>;
-  useRefsData: (refUris: string[]) => Loadable<any[]>;
+  useRefsData: (refUris: string[], tableQuery?:TableQuery) => Loadable<any[]>;
   // Derived are under a subkey because they are not directly from the data model
   // and the logic should be pushed into the core APIs. This is a temporary solution
   // during the transition period.
