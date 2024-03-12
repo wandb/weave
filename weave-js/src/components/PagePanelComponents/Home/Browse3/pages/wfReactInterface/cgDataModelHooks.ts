@@ -60,14 +60,7 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from '../../../Browse2/easyWeave';
-import {
-  getCallFromCache,
-  getObjectVersionFromCache,
-  getOpVersionFromCache,
-  setCallInCache,
-  setObjectVersionInCache,
-  setOpVersionInCache,
-} from './cache';
+import {callCache, objectVersionCache, opVersionCache} from './cache';
 import {
   OBJECT_CATEGORIES,
   PROJECT_CALL_STREAM_NAME,
@@ -99,7 +92,7 @@ import {
 } from './wfDataModelHooksInterface';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
-  const cachedCall = key ? getCallFromCache(key) : null;
+  const cachedCall = key ? callCache.get(key) : null;
   const calls = useRuns(
     {
       entityName: key?.entity ?? '',
@@ -136,7 +129,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
       };
     } else {
       if (result) {
-        setCallInCache(key, result);
+        callCache.set(key, result);
       }
       return {
         loading: false,
@@ -199,7 +192,7 @@ const useCalls = (
       };
     } else {
       allResults.forEach(call => {
-        setCallInCache(
+        callCache.set(
           {
             entity,
             project,
@@ -220,7 +213,7 @@ const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
-  const cachedOpVersion = key ? getOpVersionFromCache(key) : null;
+  const cachedOpVersion = key ? opVersionCache.get(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
       entity: constString(key?.entity ?? ''),
@@ -263,7 +256,7 @@ const useOpVersion = (
       };
     } else {
       if (result) {
-        setOpVersionInCache(key, result);
+        opVersionCache.set(key, result);
       }
       return {
         loading: false,
@@ -320,7 +313,7 @@ const useOpVersions = (
       };
     } else {
       result.forEach(op => {
-        setOpVersionInCache(
+        opVersionCache.set(
           {
             entity,
             project,
@@ -349,7 +342,7 @@ const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
-  const cachedObjectVersion = key ? getObjectVersionFromCache(key) : null;
+  const cachedObjectVersion = key ? objectVersionCache.get(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
       entity: constString(key?.entity ?? ''),
@@ -395,7 +388,7 @@ const useObjectVersion = (
       };
     } else {
       if (result) {
-        setObjectVersionInCache(key, result);
+        objectVersionCache.set(key, result);
       }
       return {
         loading: false,
@@ -455,7 +448,7 @@ const useRootObjectVersions = (
       };
     } else {
       result.forEach(obj => {
-        setObjectVersionInCache(
+        objectVersionCache.set(
           {
             entity,
             project,
