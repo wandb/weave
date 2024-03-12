@@ -52,6 +52,7 @@ import {
   useNodeValue,
   WandbArtifactRef,
 } from '../../../../../../react';
+import { WeaveApp } from '../../../../../../weave';
 import {nodeFromExtra} from '../../../Browse2/Browse2ObjectVersionItemPage';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
 import {
@@ -97,7 +98,6 @@ import {
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
-import { WeaveApp } from '../../../../../../weave';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? callCache.get(key) : null;
@@ -946,7 +946,7 @@ const spanToCallSchema = (
   };
 };
 
-const refToNode = (refUri: string): Node => {
+const refToNode = (refUri: string): Promise<Node> => {
   const uriParts = refUri.split('#');
   const baseUri = uriParts[0];
   const objNode = opGet({uri: constString(baseUri)});

@@ -579,9 +579,10 @@ export const WeaveEditorTypedDict: FC<{
   // const val = useNodeValue(node);
   // return <Typography>{JSON.stringify(val)}</Typography>;
   const makeLinkPath = useObjectVersionLinkPathForPath();
+  const propertyTypes = typedDictPropertyTypes(refWithType.type);
   return (
     <Grid container spacing={2}>
-      {Object.entries(typedDictPropertyTypes(refWithType.type))
+      {Object.entries(propertyTypes)
         .filter(([key, value]) => key !== 'type' && !key.startsWith('_'))
         .flatMap(([key, valueType]) => {
           const singleRow = displaysAsSingleRow(valueType);
@@ -613,12 +614,10 @@ export const WeaveEditorTypedDict: FC<{
                     refUri: refUri(
                       objectRefWithExtra(
                         parseRef(refWithType.refUri),
-                        OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + key
+                        DICT_KEY_EDGE_TYPE + '/' + key
                       )
                     ),
-                    type: (refWithType.type as TypedDictType).propertyTypes[
-                      key
-                    ] as Type,
+                    type: propertyTypes[key] as Type,
                   }}
                   path={[...path, {type: 'pick', key}]}
                   disableEdits={disableEdits}

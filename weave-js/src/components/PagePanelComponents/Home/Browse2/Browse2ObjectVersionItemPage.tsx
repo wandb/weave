@@ -34,6 +34,9 @@ import {makeObjRefUri} from './CommonLib';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 
 export const nodeFromExtra = (node: Node, extra: string[]): Node => {
+  if (node.type === 'any') {
+    console.warn('nodeFromExtra: node is any type');
+  }
   if (extra.length === 0) {
     return node;
   }
