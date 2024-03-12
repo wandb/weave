@@ -56,6 +56,7 @@ const WFDataModelFromTraceServerCallsOnlyProvider: FC = ({children}) => {
       useObjectVersion: cgWFDataModelHooks.useObjectVersion,
       useRootObjectVersions: cgWFDataModelHooks.useRootObjectVersions,
       useRefsData: tsWFDataModelHooks.useRefsData,
+      useApplyMutationsToRef: tsWFDataModelHooks.useApplyMutationsToRef,
       derived: {
         useChildCallsForCompare:
           tsWFDataModelHooks.derived.useChildCallsForCompare,

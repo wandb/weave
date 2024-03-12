@@ -235,7 +235,8 @@ export const Browse2ObjectVersionItemComponent: FC<{
                   {/* <Typography variant="h6" gutterBottom>
                       Value
                     </Typography> */}
-                  <WeaveEditor objType={params.rootType} node={itemNode} />
+                  <>Not Implemented</>
+                  {/* <WeaveEditor objType={params.rootType} node={itemNode} /> */}
                   {/* <Box p={2} sx={{height: 1000}}>
                       {panel != null && (
                         <ChildPanel

@@ -101,7 +101,7 @@ export type ObjectVersionFilter = {
 export type TableQuery = {
   columns: string[];
   limit?: number;
-}
+};
 
 interface PathElObject {
   type: 'getattr';
@@ -115,10 +115,18 @@ interface PathElTypedDict {
 
 type PathEl = PathElObject | PathElTypedDict;
 
-export type RefMutation = {
+type SetRefMutation = {
+  type: 'set';
   path: PathEl[];
   newValue: any;
-}
+};
+
+type AppendRefMutation = {
+  type: 'append';
+  newValue: {[key: string]: any};
+};
+
+export type RefMutation = SetRefMutation | AppendRefMutation;
 
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
@@ -148,11 +156,12 @@ export type WFDataModelHooksInterface = {
     opts?: {skip?: boolean}
   ) => Loadable<ObjectVersionSchema[]>;
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
-  useRefsData: (refUris: string[], tableQuery?:TableQuery) => Loadable<any[]>;
+  useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
   // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB
-  useApplyMutationsToRef(
-
-  ): ((refUri: string, mutations: RefMutation[]) => Promise<string>);
+  useApplyMutationsToRef(): (
+    refUri: string,
+    mutations: RefMutation[]
+  ) => Promise<string>;
   // Derived are under a subkey because they are not directly from the data model
   // and the logic should be pushed into the core APIs. This is a temporary solution
   // during the transition period.

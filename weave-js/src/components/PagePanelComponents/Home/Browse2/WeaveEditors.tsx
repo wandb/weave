@@ -20,7 +20,6 @@ import {
   listObjectType,
   maybe,
   ObjectType,
-  OutputNode,
   Type,
   typedDictPropertyTypes,
   TypedDictType,
@@ -31,7 +30,6 @@ import {
   refUri,
   WandbArtifactRef,
 } from '@wandb/weave/react';
-import * as _ from 'lodash';
 import React, {
   createContext,
   FC,
@@ -61,12 +59,6 @@ import {TableQuery} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInte
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {CellValue} from './CellValue';
-import {
-  mutationPublishArtifact,
-  mutationSet,
-  nodeToEasyNode,
-  weaveGet,
-} from './easyWeave';
 import {parseRefMaybe, SmallRef} from './SmallRef';
 import {useRefPageUrl} from './url';
 
@@ -160,7 +152,16 @@ const WeaveEditorCommit: FC<{
 
   const handleSubmit = useCallback(async () => {
     setWorking('addingRow');
-    const finalRootUri = await applyMutationsToRef(refWithType.refUri, edits);
+    const finalRootUri = await applyMutationsToRef(
+      refWithType.refUri,
+      edits.map(edit => {
+        return {
+          type: 'set',
+          path: edit.path,
+          newValue: edit.newValue,
+        };
+      })
+    );
     setWorking('done');
     handleClearEdits();
     history.push(refPageUrl(objName, finalRootUri));
@@ -423,9 +424,9 @@ const WeaveEditorField: FC<{
   return <div>[No editor for type {weave.typeToString(refWithType.type)}]</div>;
 };
 
-const useValueOfRefUri = (refUri: string, tableQuery?: TableQuery) => {
+const useValueOfRefUri = (refUriStr: string, tableQuery?: TableQuery) => {
   const {useRefsData} = useWFHooks();
-  const data = useRefsData([refUri], tableQuery);
+  const data = useRefsData([refUriStr], tableQuery);
   return useMemo(() => {
     if (data.loading) {
       return {

@@ -284,7 +284,10 @@ const useChildCallsForCompare = (
   return result;
 };
 
-const useRefsData = (refUris: string[],tableQuery?:TableQuery): Loadable<any[]> => {
+const useRefsData = (
+  refUris: string[],
+  tableQuery?: TableQuery
+): Loadable<any[]> => {
   throw new Error('Not implemented');
 };
 
@@ -293,9 +296,9 @@ const useApplyMutationsToRef = (): ((
   edits: RefMutation[]
 ) => Promise<string>) => {
   throw new Error('Not implemented');
-}
+};
 
-const useRefsType = (refUris: string[]) : Loadable<Types.Type[]> => {
+const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
   throw new Error('Not implemented');
 };
 

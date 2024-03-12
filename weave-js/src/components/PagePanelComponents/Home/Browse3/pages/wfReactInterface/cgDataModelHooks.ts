@@ -7,7 +7,7 @@
 import _ from 'lodash';
 import {useCallback, useEffect, useMemo, useState} from 'react';
 
-import { useWeaveContext } from '../../../../../../context';
+import {useWeaveContext} from '../../../../../../context';
 import {
   constBoolean,
   constFunction,
@@ -45,11 +45,21 @@ import {
   Type,
   typedDict,
 } from '../../../../../../core';
-import { useDeepMemo } from '../../../../../../hookUtils';
-import {parseRef, useNodeValue, WandbArtifactRef} from '../../../../../../react';
+import {useDeepMemo} from '../../../../../../hookUtils';
+import {
+  parseRef,
+  useNodeValue,
+  WandbArtifactRef,
+} from '../../../../../../react';
 import {nodeFromExtra} from '../../../Browse2/Browse2ObjectVersionItemPage';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
-import { mutationPublishArtifact, mutationSet, nodeToEasyNode, weaveGet } from '../../../Browse2/easyWeave';
+import {
+  mutationAppend,
+  mutationPublishArtifact,
+  mutationSet,
+  nodeToEasyNode,
+  weaveGet,
+} from '../../../Browse2/easyWeave';
 import {
   getCallFromCache,
   getObjectVersionFromCache,
@@ -748,7 +758,10 @@ const useOpVersionsNode = (
   return dataNode;
 };
 
-const useRefsData = (refUris: string[], tableQuery?:TableQuery): Loadable<any[]> => {
+const useRefsData = (
+  refUris: string[],
+  tableQuery?: TableQuery
+): Loadable<any[]> => {
   const refUrisDeep = useDeepMemo(refUris);
   const tableQueryDeep = useDeepMemo(tableQuery);
 
@@ -769,7 +782,7 @@ const useRefsData = (refUris: string[], tableQuery?:TableQuery): Loadable<any[]>
                 ) as any
               )
             ),
-          })
+          });
         }
         if (tableQueryDeep.limit) {
           node = opLimit({
@@ -777,41 +790,51 @@ const useRefsData = (refUris: string[], tableQuery?:TableQuery): Loadable<any[]>
             limit: constNumber(tableQueryDeep.limit),
           });
         }
-        return node
-      })
+        return node;
+      });
     }
     return opArray(_.fromPairs(nodes.map((node, i) => [i, node])) as any);
   }, [refUrisDeep, tableQueryDeep]);
   return useNodeValue(itemsNode);
 };
 
-
 const useApplyMutationsToRef = (): ((
   refUri: string,
-  edits: RefMutation[]
+  mutations: RefMutation[]
 ) => Promise<string>) => {
   const weave = useWeaveContext();
   const applyMutationsToRef = useCallback(
-    async (refUri: string, edits: RefMutation[]): Promise<string> => {
+    async (refUri: string, mutations: RefMutation[]): Promise<string> => {
       let workingRootNode = refToNode(refUri);
       const rootObjectRef = parseRef(refUri) as WandbArtifactRef;
-      for (const edit of edits) {
+      for (const edit of mutations) {
         let targetNode = nodeToEasyNode(workingRootNode as OutputNode);
-        for (const pathEl of edit.path) {
-          if (pathEl.type === 'getattr') {
-            targetNode = targetNode.getAttr(pathEl.key);
-          } else if (pathEl.type === 'pick') {
-            targetNode = targetNode.pick(pathEl.key);
-          } else {
-            throw new Error('invalid pathEl type');
+        if (edit.type === 'set') {
+          for (const pathEl of edit.path) {
+            if (pathEl.type === 'getattr') {
+              targetNode = targetNode.getAttr(pathEl.key);
+            } else if (pathEl.type === 'pick') {
+              targetNode = targetNode.pick(pathEl.key);
+            } else {
+              throw new Error('invalid pathEl type');
+            }
           }
+          const workingRootUri = await mutationSet(
+            weave,
+            targetNode,
+            edit.newValue
+          );
+          workingRootNode = weaveGet(workingRootUri);
+        } else if (edit.type === 'append') {
+          const workingRootUri = await mutationAppend(
+            weave,
+            targetNode,
+            edit.newValue
+          );
+          workingRootNode = weaveGet(workingRootUri);
+        } else {
+          throw new Error('invalid mutation type');
         }
-        const workingRootUri = await mutationSet(
-          weave,
-          targetNode,
-          edit.newValue
-        );
-        workingRootNode = weaveGet(workingRootUri);
       }
       const finalRootUri = await mutationPublishArtifact(
         weave,
@@ -830,31 +853,32 @@ const useApplyMutationsToRef = (): ((
   return applyMutationsToRef;
 };
 
-
-const useRefsType = (refUris: string[]) : Loadable<Type[]> => {
+const useRefsType = (refUris: string[]): Loadable<Type[]> => {
   const weave = useWeaveContext();
   const refUrisDeep = useDeepMemo(refUris);
   const [results, setResults] = useState<Type[] | null>(null);
   useEffect(() => {
     let mounted = true;
     const loadTypes = () => {
-      const proms =  refUrisDeep.map(refUri => weave.refineNode(refToNode(refUri), []));
-      Promise.all(proms).then((nodes) => {
+      const proms = refUrisDeep.map(refUri =>
+        weave.refineNode(refToNode(refUri), [])
+      );
+      Promise.all(proms).then(nodes => {
         if (mounted) {
-          const simpleTypes: Type[] = nodes.map((node) => {
-            return node.type
-          })
+          const simpleTypes: Type[] = nodes.map(node => {
+            return node.type;
+          });
           setResults(simpleTypes);
         }
       });
-    }
+    };
 
     loadTypes();
 
     return () => {
       mounted = false;
     };
-  }, [refUrisDeep, weave])
+  }, [refUrisDeep, weave]);
   return useMemo(() => {
     if (results == null) {
       return {
@@ -866,7 +890,7 @@ const useRefsType = (refUris: string[]) : Loadable<Type[]> => {
       loading: false,
       result: results,
     };
-  }, [results])
+  }, [results]);
 };
 
 // Converters //
@@ -914,7 +938,6 @@ const refToNode = (refUri: string): Node => {
   const extraFields = uriParts[1].split('/');
   return nodeFromExtra(objNode, extraFields);
 };
-
 
 // Helpers //
 const typeNameToCategory = (typeName: string): ObjectCategory | null => {
