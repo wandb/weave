@@ -124,6 +124,7 @@ export type WFDataModelHooksInterface = {
     limit?: number,
     opts?: {skip?: boolean}
   ) => Loadable<ObjectVersionSchema[]>;
+  useRefsData: (refUris: string[]) => Loadable<any[]>;
   // Derived are under a subkey because they are not directly from the data model
   // and the logic should be pushed into the core APIs. This is a temporary solution
   // during the transition period.

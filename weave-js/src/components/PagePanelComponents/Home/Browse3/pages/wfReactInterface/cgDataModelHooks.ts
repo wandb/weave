@@ -29,6 +29,7 @@ import {
   opDict,
   opFilter,
   opFlatten,
+  opGet,
   opIsNone,
   opJoin,
   opLimit,
@@ -78,6 +79,7 @@ import {
   RawSpanFromStreamTableEraWithFeedback,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
+import { nodeFromExtra } from '../../../Browse2/Browse2ObjectVersionItemPage';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? getCallFromCache(key) : null;
@@ -739,6 +741,14 @@ const useOpVersionsNode = (
   return dataNode;
 };
 
+const useRefsData = (refUris: string[]): Loadable<any[]> => {
+  const itemsNode = useMemo(() => {
+    const nodes = refUris.map(refToNode);
+    return opArray(_.fromPairs(nodes.map((node, i) => [i, node])) as any);
+  }, [refUris]);
+  return useNodeValue(itemsNode);
+};
+
 // Converters //
 const spanToCallSchema = (
   entity: string,
@@ -774,6 +784,17 @@ const spanToCallSchema = (
   };
 };
 
+const refToNode = (refUri: string): Node => {
+  const uriParts = refUri.split('#');
+    const baseUri = uriParts[0];
+    const objNode = opGet({uri: constString(baseUri)});
+    if (uriParts.length === 1) {
+      return objNode;
+    }
+    const extraFields = uriParts[1].split('/');
+    return nodeFromExtra(objNode, extraFields);
+  }
+
 // Helpers //
 const typeNameToCategory = (typeName: string): ObjectCategory | null => {
   for (const category of OBJECT_CATEGORIES) {
@@ -791,5 +812,6 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useOpVersions,
   useObjectVersion,
   useRootObjectVersions,
+  useRefsData,
   derived: {useChildCallsForCompare},
 };

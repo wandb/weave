@@ -281,6 +281,10 @@ const useChildCallsForCompare = (
   return result;
 };
 
+const useRefsData = (refUris: string[]): Loadable<any[]> => {
+  throw new Error('Not implemented');
+}
+
 /// Converters ///
 
 const traceCallToLegacySpan = (
@@ -364,6 +368,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useOpVersions,
   useObjectVersion,
   useRootObjectVersions,
+  useRefsData,
   derived: {
     useChildCallsForCompare,
   },
