@@ -322,11 +322,11 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
 }
 
 const expensiveOpNames = new Set([
-  'get',
+  // 'get',
   'set',
-  'getReturnType',
-  'Ref-type',
-  'ref',
+  // 'getReturnType',
+  // 'Ref-type',
+  // 'ref',
 ]);
 
 // Heuristic to determine if an op is expensive. We should merge

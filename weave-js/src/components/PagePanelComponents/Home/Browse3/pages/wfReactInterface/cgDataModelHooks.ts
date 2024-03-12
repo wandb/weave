@@ -97,6 +97,7 @@ import {
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
+import { WeaveApp } from '../../../../../../weave';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? callCache.get(key) : null;
@@ -758,115 +759,78 @@ const useOpVersionsNode = (
   return dataNode;
 };
 
+const makeTypedRefNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
+  const type = await getCachedRefType(weave, refUri);
+  const refNode = refToNode(refUri);
+  refNode.type = type; 
+  return refNode;
+}
+
+const applyTableQuery = (node: Node, tableQuery: TableQuery): Node => {
+  if (tableQuery.columns.length > 0) {
+    node = opMap({
+      arr: node,
+      mapFn: constFunction({row: listObjectType(node.type)}, ({row}) =>
+        opDict(
+          _.fromPairs(
+            tableQuery.columns.map(key => [
+              key,
+              opPick({obj: row, key: constString(key)}),
+            ])
+          ) as any
+        )
+      ),
+    });
+  }
+  if (tableQuery.limit) {
+    node = opLimit({
+      arr: node,
+      limit: constNumber(tableQuery.limit),
+    });
+  }
+  return node;
+}
+
+const getCachedRefData = async (weave: WeaveApp,uri: string, tableQuery?: TableQuery): Promise<any> => {
+  const key = uri + (tableQuery ? ("?query=" + JSON.stringify(tableQuery)) : '');
+  const cacheRes = refDataCache.get(key);
+  if (cacheRes != null) {
+    return cacheRes;
+  }
+  let node = await makeTypedRefNode(weave, uri);
+  if (tableQuery) {
+    node = applyTableQuery(node, tableQuery);
+  }
+  const res = await weave.client.query(node);
+  refDataCache.set(key, res);
+  return res;
+}
+
 const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
   const refUrisDeep = useDeepMemo(refUris);
-  const maybeResult: Array<Type | undefined> = useMemo(
-    () => refUrisDeep.map(refDataCache.get),
-    [refUrisDeep]
-  );
-  const neededRefUris = useMemo(
-    () =>
-      refUrisDeep
-        .map((uri, ndx) => {
-          if (maybeResult[ndx] == null) {
-            return {uri, ndx};
-          } else {
-            return null;
-          }
-        })
-        .filter((x): x is {uri: string; ndx: number} => x != null),
-    [maybeResult, refUrisDeep]
-  );
-
-  const tableQueryDeep = useDeepMemo(tableQuery);
-
-  const getRefsType = useGetRefsType();
-  const [neededTypes, setNeededTypes] = useState<Type[]>();
+  const weave = useWeaveContext();
+  const [refData, setRefData] = useState<any[]>();
   useEffect(() => {
-    if (tableQueryDeep == null) {
-      return;
-    }
     let isMounted = true;
-    const updateNeededTypes = async () => {
-      const uris = neededRefUris.map(x => x.uri)
-      console.log(uris)
-      const types = await getRefsType(uris);
+    const updateRefData = async () => {
+      const data = await Promise.all(refUrisDeep.map(uri => getCachedRefData(weave, uri, tableQuery)));
       if (!isMounted) {
         return;
       }
-      setNeededTypes(types);
-    }
-    if (neededRefUris.length > 0) {
-      updateNeededTypes();
-    }
+      setRefData(data);
+    };
+    updateRefData();
     return () => {
       isMounted = false;
-    }
-  }, [getRefsType, neededRefUris, tableQueryDeep])
-
-  const itemsNode = useMemo(() => {
-
-    let nodes = neededRefUris.map(needed => refToNode(needed.uri));
-
-    if (tableQueryDeep) {
-      if (neededTypes == null) {
-        return opArray({} as any);
-      }
-      neededTypes.forEach((type, ndx) => {
-        nodes[ndx].type = type;
-      })
-      nodes = nodes.map(node => {
-        if (tableQueryDeep.columns.length > 0) {
-          node = opMap({
-            arr: node,
-            mapFn: constFunction({row: listObjectType(node.type)}, ({row}) =>
-              opDict(
-                _.fromPairs(
-                  tableQueryDeep.columns.map(key => [
-                    key,
-                    opPick({obj: row, key: constString(key)}),
-                  ])
-                ) as any
-              )
-            ),
-          });
-        }
-        if (tableQueryDeep.limit) {
-          node = opLimit({
-            arr: node,
-            limit: constNumber(tableQueryDeep.limit),
-          });
-        }
-        return node;
-      });
-    }
-    return opArray(_.fromPairs(nodes.map((node, i) => [i, node])) as any);
-  }, [neededRefUris, neededTypes, tableQueryDeep]);
-
-  const res = useNodeValue(itemsNode);
-  return useMemo(() => {
-    if (res.loading || (neededTypes == null && tableQueryDeep != null)) {
-      return {loading: true, result: []};
-    }
-    const resultLookup = new Map<string, any>();
-    res.result.forEach((item, ndx) => {
-      refDataCache.set(neededRefUris[ndx].uri, item);
-      resultLookup.set(neededRefUris[ndx].uri, item);
-    });
-    return {
-      loading: false,
-      result: refUrisDeep.map((uri, ndx) => {
-        if (maybeResult[ndx] !== undefined) {
-          return maybeResult[ndx];
-        } else {
-          return resultLookup.get(uri);
-        }
-      }),
     };
-  }, [maybeResult, neededRefUris, neededTypes, refUrisDeep, res.loading, res.result, tableQueryDeep]);
+  }, [refUrisDeep, tableQuery, weave]);
+  return {
+    loading: refData == null,
+    result: refData ?? [],
+  };
 };
 
 const useApplyMutationsToRef = (): ((
@@ -924,32 +888,23 @@ const useApplyMutationsToRef = (): ((
   return applyMutationsToRef;
 };
 
+const getCachedRefType = async (weave: WeaveApp, refUri: string): Promise<Type> => {
+  const cachedType = refTypeCache.get(refUri);
+  if (cachedType != null) {
+    return cachedType;
+  }
+  const node = refToNode(refUri);
+  const type = (await weave.refineNode(node, [])).type;
+  refTypeCache.set(refUri, type);
+  return type;
+}
+
 const useGetRefsType = (): ((refUris: string[]) => Promise<Type[]>) => {
   const weave = useWeaveContext();
   const getRefsType = useCallback(
     async (refUris: string[]): Promise<Type[]> => {
-      const maybeResult: Array<Type | undefined> = refUris.map(
-        refTypeCache.get
-      );
-      const neededRefUris = refUris
-        .map((uri, ndx) => {
-          if (maybeResult[ndx] == null) {
-            return {uri, ndx};
-          } else {
-            return null;
-          }
-        })
-        .filter((x): x is {uri: string; ndx: number} => x != null);
-
-      const proms = neededRefUris.map(needed =>
-        weave.refineNode(refToNode(needed.uri), [])
-      );
-      const nodes = await Promise.all(proms);
-      nodes.forEach((node, ndx) => {
-        refTypeCache.set(neededRefUris[ndx].uri, node.type);
-        maybeResult[neededRefUris[ndx].ndx] = node.type;
-      });
-      return maybeResult as Type[];
+      const results = refUris.map(refUri => getCachedRefType(weave, refUri))
+      return Promise.all(results);
     },
     [weave]
   );
