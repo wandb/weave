@@ -49,18 +49,18 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
 
     const refValues: RefValues = {};
     for (const [r, v] of _.zip(refs, resolvedRefData)) {
-      if (!r || !v) {
+      if (!r) {
         // Shouldn't be possible
         continue;
       }
       let val = r;
-      if (v.status === 'rejected') {
+      if (v == null) {
         console.error('Error resolving ref', r);
       } else {
-        val = v.value;
+        val = v;
         if (typeof val === 'object' && val !== null) {
           val = {
-            ...v.value,
+            ...v,
             _ref: r,
           };
         }

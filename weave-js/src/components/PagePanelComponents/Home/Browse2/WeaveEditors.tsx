@@ -885,7 +885,6 @@ export const WeaveEditorTable: FC<{
 export const WeaveViewSmallRef: FC<{
   refWithType: RefWithType;
 }> = ({refWithType}) => {
-  console.log(refWithType);
   const opDefQuery = useValueOfRefUri(refWithType.refUri);
   const opDefRef = useMemo(
     () => parseRefMaybe(opDefQuery.result ?? ''),
