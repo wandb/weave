@@ -1,8 +1,6 @@
 import React, {useMemo} from 'react';
 
-import {constString, opGet} from '../../../../../core';
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
 import {
   WeaveEditor,
   WeaveEditorSourceContext,
