@@ -55,12 +55,12 @@ const WFDataModelFromTraceServerCallsOnlyProvider: FC = ({children}) => {
       useOpVersions: cgWFDataModelHooks.useOpVersions,
       useObjectVersion: cgWFDataModelHooks.useObjectVersion,
       useRootObjectVersions: cgWFDataModelHooks.useRootObjectVersions,
-      useRefsData: tsWFDataModelHooks.useRefsData,
-      useApplyMutationsToRef: tsWFDataModelHooks.useApplyMutationsToRef,
+      useRefsData: cgWFDataModelHooks.useRefsData,
+      useApplyMutationsToRef: cgWFDataModelHooks.useApplyMutationsToRef,
       derived: {
         useChildCallsForCompare:
           tsWFDataModelHooks.derived.useChildCallsForCompare,
-        useGetRefsType: tsWFDataModelHooks.derived.useGetRefsType,
+        useGetRefsType: cgWFDataModelHooks.derived.useGetRefsType,
       },
     };
   }, []);
