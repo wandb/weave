@@ -42,6 +42,8 @@ export interface TrackedWandbLoaderProps extends WandbLoaderProps {
   samplingRate?: number;
   /* Tell me you're a Segment .track() event without telling me about Segment */
   track: (eventName: string, data: Record<string, unknown> | undefined) => void;
+  /* Optional callback fired 100% of the time */
+  onComplete?(data: Record<string, unknown> | undefined): void;
 }
 
 export const TrackedWandbLoader = ({
@@ -50,6 +52,7 @@ export const TrackedWandbLoader = ({
   profilingCb,
   samplingRate = 0.1,
   track,
+  onComplete,
   ...props
 }: TrackedWandbLoaderProps) => {
   useLifecycleProfiling(name, (data: ProfileData) => {
@@ -61,6 +64,9 @@ export const TrackedWandbLoader = ({
         duration: data.duration,
         ...additionalData,
       };
+      if (onComplete) {
+        onComplete(trackedData);
+      }
       const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
       if (randomNum <= samplingRate * 100) {
         track('wandb-loader-onscreen', trackedData);
