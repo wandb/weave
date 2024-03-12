@@ -54,7 +54,7 @@ def root_all_projects_gql_resolver(gql_result):
     plugins=wb_gql_op_plugin(
         lambda inputs, inner: f"""
     instance {{
-        projects_500: projects(limit: 500) {{
+        projects_500: projects {{
             edges {{
                 node {{
                     {wdt.Project.REQUIRED_FRAGMENT}
