@@ -283,7 +283,7 @@ const useChildCallsForCompare = (
 
 const useRefsData = (refUris: string[]): Loadable<any[]> => {
   throw new Error('Not implemented');
-}
+};
 
 /// Converters ///
 

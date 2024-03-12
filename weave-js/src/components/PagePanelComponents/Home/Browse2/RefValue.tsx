@@ -1,10 +1,4 @@
-import {constString, opGet} from '@wandb/weave/core';
-import {
-  objectRefWithExtra,
-  parseRef,
-  refUri,
-  useNodeWithServerType,
-} from '@wandb/weave/react';
+import {objectRefWithExtra, parseRef, refUri} from '@wandb/weave/react';
 import React, {useMemo} from 'react';
 
 import {isRef} from '../Browse3/pages/common/util';

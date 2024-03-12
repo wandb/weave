@@ -43,7 +43,7 @@ import {
   typedDict,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
-import { nodeFromExtra } from '../../../Browse2/Browse2ObjectVersionItemPage';
+import {nodeFromExtra} from '../../../Browse2/Browse2ObjectVersionItemPage';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
 import {
   getCallFromCache,
@@ -786,14 +786,14 @@ const spanToCallSchema = (
 
 const refToNode = (refUri: string): Node => {
   const uriParts = refUri.split('#');
-    const baseUri = uriParts[0];
-    const objNode = opGet({uri: constString(baseUri)});
-    if (uriParts.length === 1) {
-      return objNode;
-    }
-    const extraFields = uriParts[1].split('/');
-    return nodeFromExtra(objNode, extraFields);
+  const baseUri = uriParts[0];
+  const objNode = opGet({uri: constString(baseUri)});
+  if (uriParts.length === 1) {
+    return objNode;
   }
+  const extraFields = uriParts[1].split('/');
+  return nodeFromExtra(objNode, extraFields);
+};
 
 // Helpers //
 const typeNameToCategory = (typeName: string): ObjectCategory | null => {
