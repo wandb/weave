@@ -32,9 +32,7 @@ export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
       OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + attribute
     );
   }, [attribute, objRef]);
-  const refValue = useRefsData(
-    useMemo(() => [refUri(objRefWithExtra)], [objRefWithExtra])
-  );
+  const refValue = useRefsData([refUri(objRefWithExtra)]);
 
   if (refValue.loading) {
     return <>loading...</>;

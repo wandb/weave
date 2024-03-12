@@ -103,6 +103,23 @@ export type TableQuery = {
   limit?: number;
 }
 
+interface PathElObject {
+  type: 'getattr';
+  key: string;
+}
+
+interface PathElTypedDict {
+  type: 'pick';
+  key: string;
+}
+
+type PathEl = PathElObject | PathElTypedDict;
+
+export type RefMutation = {
+  path: PathEl[];
+  newValue: any;
+}
+
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
@@ -130,7 +147,12 @@ export type WFDataModelHooksInterface = {
     limit?: number,
     opts?: {skip?: boolean}
   ) => Loadable<ObjectVersionSchema[]>;
+  // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?:TableQuery) => Loadable<any[]>;
+  // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB
+  useApplyMutationsToRef(
+
+  ): ((refUri: string, mutations: RefMutation[]) => Promise<string>);
   // Derived are under a subkey because they are not directly from the data model
   // and the logic should be pushed into the core APIs. This is a temporary solution
   // during the transition period.
@@ -142,6 +164,7 @@ export type WFDataModelHooksInterface = {
       selectedOpVersionRef: string | null,
       selectedObjectVersionRef: string | null
     ) => Loadable<CallSchema[]>;
+    // `useRefsType` is in beta while we integrate Shawn's new Object DB
     useRefsType: (refUris: string[]) => Loadable<Types.Type[]>;
   };
 };

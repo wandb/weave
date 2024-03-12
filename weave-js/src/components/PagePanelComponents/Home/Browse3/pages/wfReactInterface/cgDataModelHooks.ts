@@ -5,7 +5,7 @@
  */
 
 import _ from 'lodash';
-import {useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 
 import { useWeaveContext } from '../../../../../../context';
 import {
@@ -41,11 +41,12 @@ import {
   opProjectArtifactVersion,
   opRootProject,
   opStringEqual,
+  OutputNode,
   Type,
   typedDict,
 } from '../../../../../../core';
 import { useDeepMemo } from '../../../../../../hookUtils';
-import {useNodeValue} from '../../../../../../react';
+import {parseRef, useNodeValue, WandbArtifactRef} from '../../../../../../react';
 import {nodeFromExtra} from '../../../Browse2/Browse2ObjectVersionItemPage';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
 import {
@@ -81,9 +82,11 @@ import {
   OpVersionSchema,
   RawSpanFromStreamTableEra,
   RawSpanFromStreamTableEraWithFeedback,
+  RefMutation,
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
+import { mutationPublishArtifact, mutationSet, nodeToEasyNode, weaveGet } from '../../../Browse2/easyWeave';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? getCallFromCache(key) : null;
@@ -782,6 +785,52 @@ const useRefsData = (refUris: string[], tableQuery?:TableQuery): Loadable<any[]>
   return useNodeValue(itemsNode);
 };
 
+
+const useApplyMutationsToRef = (): ((
+  refUri: string,
+  edits: RefMutation[]
+) => Promise<string>) => {
+  const weave = useWeaveContext();
+  const applyMutationsToRef = useCallback(
+    async (refUri: string, edits: RefMutation[]): Promise<string> => {
+      let workingRootNode = refToNode(refUri);
+      const rootObjectRef = parseRef(refUri) as WandbArtifactRef;
+      for (const edit of edits) {
+        let targetNode = nodeToEasyNode(workingRootNode as OutputNode);
+        for (const pathEl of edit.path) {
+          if (pathEl.type === 'getattr') {
+            targetNode = targetNode.getAttr(pathEl.key);
+          } else if (pathEl.type === 'pick') {
+            targetNode = targetNode.pick(pathEl.key);
+          } else {
+            throw new Error('invalid pathEl type');
+          }
+        }
+        const workingRootUri = await mutationSet(
+          weave,
+          targetNode,
+          edit.newValue
+        );
+        workingRootNode = weaveGet(workingRootUri);
+      }
+      const finalRootUri = await mutationPublishArtifact(
+        weave,
+        // Local branch
+        workingRootNode,
+        // Target branch
+        rootObjectRef.entityName,
+        rootObjectRef.projectName,
+        rootObjectRef.artifactName
+      );
+      return finalRootUri;
+    },
+
+    [weave]
+  );
+  return applyMutationsToRef;
+};
+
+
 const useRefsType = (refUris: string[]) : Loadable<Type[]> => {
   const weave = useWeaveContext();
   const refUrisDeep = useDeepMemo(refUris);
@@ -885,5 +934,6 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useObjectVersion,
   useRootObjectVersions,
   useRefsData,
+  useApplyMutationsToRef,
   derived: {useChildCallsForCompare, useRefsType},
 };

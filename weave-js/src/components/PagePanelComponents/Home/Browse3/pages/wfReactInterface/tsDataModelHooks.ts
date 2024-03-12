@@ -26,6 +26,7 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  RefMutation,
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
@@ -287,6 +288,13 @@ const useRefsData = (refUris: string[],tableQuery?:TableQuery): Loadable<any[]> 
   throw new Error('Not implemented');
 };
 
+const useApplyMutationsToRef = (): ((
+  refUri: string,
+  edits: RefMutation[]
+) => Promise<string>) => {
+  throw new Error('Not implemented');
+}
+
 const useRefsType = (refUris: string[]) : Loadable<Types.Type[]> => {
   throw new Error('Not implemented');
 };
@@ -375,6 +383,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useObjectVersion,
   useRootObjectVersions,
   useRefsData,
+  useApplyMutationsToRef,
   derived: {
     useChildCallsForCompare,
     useRefsType,
