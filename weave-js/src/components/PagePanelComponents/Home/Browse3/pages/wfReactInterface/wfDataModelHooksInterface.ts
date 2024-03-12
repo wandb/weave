@@ -9,6 +9,7 @@
  *    - `ObjectVersionSchema`
  */
 
+import * as Types from '../../../../../../core/model/types';
 import {OBJECT_CATEGORIES, OP_CATEGORIES} from './constants';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
@@ -136,6 +137,7 @@ export type WFDataModelHooksInterface = {
       selectedOpVersionRef: string | null,
       selectedObjectVersionRef: string | null
     ) => Loadable<CallSchema[]>;
+    useRefsType: (refUris: string[]) => Loadable<Types.Type[]>;
   };
 };
 

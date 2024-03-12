@@ -6,6 +6,7 @@
 
 import {useEffect, useMemo, useRef, useState} from 'react';
 
+import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {getCallFromCache, setCallInCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
@@ -285,6 +286,10 @@ const useRefsData = (refUris: string[]): Loadable<any[]> => {
   throw new Error('Not implemented');
 };
 
+const useRefsType = (refUris: string[]) : Loadable<Types.Type[]> => {
+  throw new Error('Not implemented');
+};
+
 /// Converters ///
 
 const traceCallToLegacySpan = (
@@ -371,5 +376,6 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useRefsData,
   derived: {
     useChildCallsForCompare,
+    useRefsType,
   },
 };

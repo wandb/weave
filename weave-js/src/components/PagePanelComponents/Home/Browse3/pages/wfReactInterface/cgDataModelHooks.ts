@@ -5,8 +5,9 @@
  */
 
 import _ from 'lodash';
-import {useMemo} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 
+import { useWeaveContext } from '../../../../../../context';
 import {
   constBoolean,
   constFunction,
@@ -40,6 +41,7 @@ import {
   opProjectArtifactVersion,
   opRootProject,
   opStringEqual,
+  Type,
   typedDict,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
@@ -749,6 +751,43 @@ const useRefsData = (refUris: string[]): Loadable<any[]> => {
   return useNodeValue(itemsNode);
 };
 
+const useRefsType = (refUris: string[]) : Loadable<Type[]> => {
+  const weave = useWeaveContext();
+  const [results, setResults] = useState<Type[] | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    const loadTypes = () => {
+      const proms =  refUris.map(refUri => weave.refineNode(refToNode(refUri), []));
+      Promise.all(proms).then((nodes) => {
+        if (mounted) {
+          const simpleTypes: Type[] = nodes.map((node) => {
+            return node.type
+          })
+          setResults(simpleTypes);
+        }
+      });
+    }
+
+    loadTypes();
+
+    return () => {
+      mounted = false;
+    };
+  }, [refUris, weave])
+  return useMemo(() => {
+    if (results == null) {
+      return {
+        loading: true,
+        result: [],
+      };
+    }
+    return {
+      loading: false,
+      result: results,
+    };
+  }, [results])
+};
+
 // Converters //
 const spanToCallSchema = (
   entity: string,
@@ -795,6 +834,7 @@ const refToNode = (refUri: string): Node => {
   return nodeFromExtra(objNode, extraFields);
 };
 
+
 // Helpers //
 const typeNameToCategory = (typeName: string): ObjectCategory | null => {
   for (const category of OBJECT_CATEGORIES) {
@@ -813,5 +853,5 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useObjectVersion,
   useRootObjectVersions,
   useRefsData,
-  derived: {useChildCallsForCompare},
+  derived: {useChildCallsForCompare, useRefsType},
 };

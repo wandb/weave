@@ -59,6 +59,7 @@ const WFDataModelFromTraceServerCallsOnlyProvider: FC = ({children}) => {
       derived: {
         useChildCallsForCompare:
           tsWFDataModelHooks.derived.useChildCallsForCompare,
+        useRefsType: tsWFDataModelHooks.derived.useRefsType,
       },
     };
   }, []);
