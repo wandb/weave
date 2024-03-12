@@ -42,8 +42,10 @@ export interface TrackedWandbLoaderProps extends WandbLoaderProps {
   samplingRate?: number;
   /* Tell me you're a Segment .track() event without telling me about Segment */
   track: (eventName: string, data: Record<string, unknown> | undefined) => void;
-  /* Optional callback fired 100% of the time */
+  /* Optional callback fired when finished loading */
   onComplete?(data: Record<string, unknown> | undefined): void;
+  /* Optional callback fired when started loading */
+  onStart?(): void;
 }
 
 export const TrackedWandbLoader = ({
@@ -53,29 +55,34 @@ export const TrackedWandbLoader = ({
   samplingRate = 0.1,
   track,
   onComplete,
+  onStart,
   ...props
 }: TrackedWandbLoaderProps) => {
-  useLifecycleProfiling(name, (data: ProfileData) => {
-    try {
-      // log the lifecycle for each loader to segment
-      const additionalData = profilingCb ? profilingCb() : {};
-      const trackedData = {
-        componentId: data.id,
-        duration: data.duration,
-        ...additionalData,
-      };
-      if (onComplete) {
-        onComplete(trackedData);
+  useLifecycleProfiling(
+    name,
+    (data: ProfileData) => {
+      try {
+        // log the lifecycle for each loader to segment
+        const additionalData = profilingCb ? profilingCb() : {};
+        const trackedData = {
+          componentId: data.id,
+          duration: data.duration,
+          ...additionalData,
+        };
+        if (onComplete) {
+          onComplete(trackedData);
+        }
+        const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
+        if (randomNum <= samplingRate * 100) {
+          track('wandb-loader-onscreen', trackedData);
+        }
+      } catch (e) {
+        // Tracking should be able to fail gracefully without breaking the app
+        captureException?.(e);
       }
-      const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
-      if (randomNum <= samplingRate * 100) {
-        track('wandb-loader-onscreen', trackedData);
-      }
-    } catch (e) {
-      // Tracking should be able to fail gracefully without breaking the app
-      captureException?.(e);
-    }
-  });
+    },
+    onStart
+  );
 
   return <WandbLoader {...props} />;
 };
