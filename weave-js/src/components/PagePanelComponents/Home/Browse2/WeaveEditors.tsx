@@ -443,7 +443,7 @@ const useValueOfRefUri = (refUriStr: string, tableQuery?: TableQuery) => {
       loading: false,
       result: data.result[0],
     };
-  }, [data.loading, data.result]);
+  }, [data]);
 };
 
 export const WeaveEditorBoolean: FC<{

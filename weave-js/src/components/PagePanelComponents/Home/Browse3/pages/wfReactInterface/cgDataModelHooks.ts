@@ -848,7 +848,7 @@ const useRefsData = (
 
   const res = useNodeValue(itemsNode);
   return useMemo(() => {
-    if (res.loading || neededTypes == null) {
+    if (res.loading || (neededTypes == null && tableQueryDeep != null)) {
       return {loading: true, result: []};
     }
     const resultLookup = new Map<string, any>();
@@ -866,7 +866,7 @@ const useRefsData = (
         }
       }),
     };
-  }, [maybeResult, neededRefUris, refUrisDeep, res.loading, res.result]);
+  }, [maybeResult, neededRefUris, neededTypes, refUrisDeep, res.loading, res.result, tableQueryDeep]);
 };
 
 const useApplyMutationsToRef = (): ((
