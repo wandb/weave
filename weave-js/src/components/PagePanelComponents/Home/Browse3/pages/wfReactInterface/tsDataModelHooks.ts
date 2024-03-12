@@ -298,7 +298,7 @@ const useApplyMutationsToRef = (): ((
   throw new Error('Not implemented');
 };
 
-const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
+const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
   throw new Error('Not implemented');
 };
 
@@ -389,6 +389,6 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useApplyMutationsToRef,
   derived: {
     useChildCallsForCompare,
-    useRefsType,
+    useGetRefsType,
   },
 };

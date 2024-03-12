@@ -853,45 +853,53 @@ const useApplyMutationsToRef = (): ((
   return applyMutationsToRef;
 };
 
-const useRefsType = (refUris: string[]): Loadable<Type[]> => {
+const useGetRefsType = (): ((refUris: string[]) => Promise<Type[]>) => {
   const weave = useWeaveContext();
-  const refUrisDeep = useDeepMemo(refUris);
-  const [results, setResults] = useState<Type[] | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    const loadTypes = () => {
-      const proms = refUrisDeep.map(refUri =>
-        weave.refineNode(refToNode(refUri), [])
-      );
-      Promise.all(proms).then(nodes => {
-        if (mounted) {
-          const simpleTypes: Type[] = nodes.map(node => {
-            return node.type;
-          });
-          setResults(simpleTypes);
-        }
-      });
-    };
+  const useGetRefsType = useCallback(async (refUris: string[]): Promise<Type[]> => {
+    const proms = refUris.map(refUri =>
+      weave.refineNode(refToNode(refUri), [])
+    );
+    const nodes = await Promise.all(proms)
+    return nodes.map(node => {
+      return node.type;
+    });
 
-    loadTypes();
+  }, [weave])
+  return useGetRefsType;
+}
 
-    return () => {
-      mounted = false;
-    };
-  }, [refUrisDeep, weave]);
-  return useMemo(() => {
-    if (results == null) {
-      return {
-        loading: true,
-        result: [],
-      };
-    }
-    return {
-      loading: false,
-      result: results,
-    };
-  }, [results]);
-};
+// const useRefsType = (refUris: string[]): Loadable<Type[]> => {
+//   const refUrisDeep = useDeepMemo(refUris);
+//   const [results, setResults] = useState<Type[] | null>(null);
+//   const getRefsType = useGetRefsType();
+//   useEffect(() => {
+//     let mounted = true;
+//     const loadTypes = async () => {
+//       const simpleTypes = await getRefsType(refUrisDeep);
+//       if (mounted) {
+//         setResults(simpleTypes);
+//       }
+//     };
+
+//     loadTypes();
+
+//     return () => {
+//       mounted = false;
+//     };
+//   }, [getRefsType, refUrisDeep]);
+//   return useMemo(() => {
+//     if (results == null) {
+//       return {
+//         loading: true,
+//         result: [],
+//       };
+//     }
+//     return {
+//       loading: false,
+//       result: results,
+//     };
+//   }, [results]);
+// };
 
 // Converters //
 const spanToCallSchema = (
@@ -958,5 +966,5 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
-  derived: {useChildCallsForCompare, useRefsType},
+  derived: {useChildCallsForCompare, useGetRefsType},
 };

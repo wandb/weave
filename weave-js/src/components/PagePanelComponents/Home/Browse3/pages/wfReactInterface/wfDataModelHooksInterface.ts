@@ -158,7 +158,7 @@ export type WFDataModelHooksInterface = {
   // `useRefsData` is in beta while we integrate Shawn's new Object DB
   useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
   // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB
-  useApplyMutationsToRef(): (
+  useApplyMutationsToRef: () => (
     refUri: string,
     mutations: RefMutation[]
   ) => Promise<string>;
@@ -174,7 +174,7 @@ export type WFDataModelHooksInterface = {
       selectedObjectVersionRef: string | null
     ) => Loadable<CallSchema[]>;
     // `useRefsType` is in beta while we integrate Shawn's new Object DB
-    useRefsType: (refUris: string[]) => Loadable<Types.Type[]>;
+    useGetRefsType:() => (refUris: string[]) => Promise<Types.Type[]>;
   };
 };
 

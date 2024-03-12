@@ -267,7 +267,7 @@ export const WeaveEditor: FC<{
   disableEdits?: boolean;
 }> = ({objType, objectRefUri, disableEdits}) => {
   const {
-    derived: {useRefsType},
+    derived: {useGetRefsType},
   } = useWFHooks();
   // const weave = useWeaveContext();
   // const {stack} = usePanelContext();
@@ -287,22 +287,21 @@ export const WeaveEditor: FC<{
   );
   const contextVal = useMemo(() => ({edits, addEdit}), [edits, addEdit]);
   const [commitChangesOpen, setCommitChangesOpen] = useState(false);
-  const refsType = useRefsType([objectRefUri]);
+  const getRefsType = useGetRefsType();
   useEffect(() => {
-    if (refsType.loading) {
-      return;
-    }
-    if (refsType.result == null || refsType.result.length === 0) {
-      return;
-    }
-    setRefType(refsType.result[0]);
-    // const doRefine = async () => {
-    //   const refined = await weave.refineNode(node, stack); // TODO (Tim): Audit and potentially remove this opGet
-    //   // console.log('GOT REFINED', refined);
-    //   setRefinedNode(refined);
-    // };
-    // doRefine();
-  }, [refsType.loading, refsType.result]);
+    let mounted = true;
+    const doRefine = async () => {
+      const refsType = await getRefsType([objectRefUri]);
+      if (!mounted) {
+        return;
+      }
+      setRefType(refsType[0]);
+    };
+    doRefine();
+    return () => {
+      mounted = false;
+    };
+  }, [getRefsType, objectRefUri]);
   const refWithType: RefWithType | undefined = useMemo(() => {
     if (refType == null) {
       return;
