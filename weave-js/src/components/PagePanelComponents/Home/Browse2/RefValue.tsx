@@ -1,11 +1,15 @@
 import {constString, opGet} from '@wandb/weave/core';
 import {
+  objectRefWithExtra,
   parseRef,
-  useNodeValue,
+  refUri,
   useNodeWithServerType,
 } from '@wandb/weave/react';
-import React from 'react';
+import React, {useMemo} from 'react';
 
+import {isRef} from '../Browse3/pages/common/util';
+import {OBJECT_ATTRIBUTE_EDGE_TYPE} from '../Browse3/pages/wfReactInterface/constants';
+import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {CellValue} from './CellValue';
 import {NotApplicable} from './NotApplicable';
 import {SmallRef} from './SmallRef';
@@ -18,37 +22,42 @@ type RefValueProps = {
   attribute: string;
 };
 
-const RefValueTypeChecked = ({weaveRef, attribute}: RefValueProps) => {
-  let valueUrl = weaveRef;
-  if (attribute !== 'propertyTypes') {
-    valueUrl += `#atr/${attribute}`;
-  }
-  const valueNode = opGet({uri: constString(valueUrl)});
-  const query = useNodeValue(valueNode);
-  if (query.loading) {
-    return <>loading...</>;
-  }
-  return <CellValue value={query.result} />;
-};
-
-const RENDER_DIRECTLY = new Set(['none', 'string']);
+const RENDER_DIRECTLY = new Set([
+  typeof 0,
+  typeof '',
+  typeof true,
+  typeof false,
+]);
 
 export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
-  const refNode = opGet({uri: constString(weaveRef)});
-  const refNodeTyped = useNodeWithServerType(refNode);
-  if (refNodeTyped.loading) {
+  const {useRefsData} = useWFHooks();
+  const objRef = parseRef(weaveRef);
+  const objRefWithExtra = useMemo(() => {
+    return objectRefWithExtra(
+      objRef,
+      OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + attribute
+    );
+  }, [attribute, objRef]);
+  const refValue = useRefsData(
+    useMemo(() => [refUri(objRefWithExtra)], [objRefWithExtra])
+  );
+
+  if (refValue.loading) {
     return <>loading...</>;
   }
-  const refType = refNodeTyped.result.type as any;
-  if (typeof refType === 'string') {
-    return <>TODO</>;
-  } else if (attribute in refType) {
-    const attributeType = refType[attribute];
-    if (RENDER_DIRECTLY.has(attributeType) || attribute === 'propertyTypes') {
-      return <RefValueTypeChecked weaveRef={weaveRef} attribute={attribute} />;
-    }
-    const valueUrl = `${weaveRef}#atr/${attribute}`;
-    return <SmallRef objRef={parseRef(valueUrl)} />;
+
+  if (refValue.result == null || refValue.result.length === 0) {
+    console.error('RefValueTypeChecked: no result', weaveRef);
+    return <NotApplicable />;
   }
-  return <NotApplicable />;
+
+  const refData = refValue.result[0];
+
+  if (isRef(refData)) {
+    return <SmallRef objRef={parseRef(refData)} />;
+  } else if (RENDER_DIRECTLY.has(typeof refData)) {
+    return <CellValue value={refData} />;
+  } else {
+    return <SmallRef objRef={objRefWithExtra} />;
+  }
 };

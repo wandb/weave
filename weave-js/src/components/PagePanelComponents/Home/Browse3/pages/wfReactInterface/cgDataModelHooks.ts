@@ -43,6 +43,7 @@ import {
   typedDict,
 } from '../../../../../../core';
 import {useNodeValue} from '../../../../../../react';
+import { nodeFromExtra } from '../../../Browse2/Browse2ObjectVersionItemPage';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
 import {
   getCallFromCache,
@@ -79,7 +80,6 @@ import {
   RawSpanFromStreamTableEraWithFeedback,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
-import { nodeFromExtra } from '../../../Browse2/Browse2ObjectVersionItemPage';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? getCallFromCache(key) : null;
