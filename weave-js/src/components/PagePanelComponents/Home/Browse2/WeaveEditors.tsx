@@ -13,34 +13,22 @@ import {
   Typography,
 } from '@mui/material';
 import {GridColDef, useGridApiRef} from '@mui/x-data-grid-pro';
-import {usePanelContext} from '@wandb/weave/components/Panel2/PanelContext';
 import {useWeaveContext} from '@wandb/weave/context';
 import {
-  constFunction,
-  constNumber,
-  constString,
   isAssignableTo,
-  isConstNode,
   isTypedDict,
-  linearize,
   listObjectType,
   maybe,
-  Node,
-  NodeOrVoidNode,
-  opDict,
-  opLimit,
-  opMap,
-  opObjGetAttr,
-  opPick,
+  ObjectType,
   OutputNode,
   Type,
   typedDictPropertyTypes,
-  voidNode,
+  TypedDictType,
 } from '@wandb/weave/core';
 import {
-  isWandbArtifactRef,
+  objectRefWithExtra,
   parseRef,
-  useNodeValue,
+  refUri,
   WandbArtifactRef,
 } from '@wandb/weave/react';
 import * as _ from 'lodash';
@@ -68,6 +56,8 @@ import {
   LIST_INDEX_EDGE_TYPE,
   OBJECT_ATTRIBUTE_EDGE_TYPE,
 } from '../Browse3/pages/wfReactInterface/constants';
+import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
+import {TableQuery} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject, unflattenObject} from './browse2Util';
 import {CellValue} from './CellValue';
@@ -146,77 +136,44 @@ const useWeaveEditorContextAddEdit = () => {
 };
 
 const WeaveEditorCommit: FC<{
-  objType: string;
+  objName: string;
   rootObjectRef: WandbArtifactRef;
-  node: Node;
+  refWithType: RefWithType;
   edits: WeaveEditorEdit[];
   handleClose: () => void;
   handleClearEdits: () => void;
-}> = ({objType, rootObjectRef, node, edits, handleClose, handleClearEdits}) => {
-  const weave = useWeaveContext();
+}> = ({
+  objName,
+  refWithType,
+  rootObjectRef,
+  edits,
+  handleClose,
+  handleClearEdits,
+}) => {
+  const {useApplyMutationsToRef} = useWFHooks();
   const refPageUrl = useRefPageUrl();
   const history = useHistory();
   const [working, setWorking] = useState<
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
+  const applyMutationsToRef = useApplyMutationsToRef();
+
   const handleSubmit = useCallback(async () => {
     setWorking('addingRow');
-
-    let workingRootNode = node;
-
-    for (const edit of edits) {
-      let targetNode = nodeToEasyNode(workingRootNode as OutputNode);
-      for (const pathEl of edit.path) {
-        if (pathEl.type === 'getattr') {
-          targetNode = targetNode.getAttr(pathEl.key);
-        } else if (pathEl.type === 'pick') {
-          targetNode = targetNode.pick(pathEl.key);
-        } else {
-          throw new Error('invalid pathEl type');
-        }
-      }
-      const workingRootUri = await mutationSet(
-        weave,
-        targetNode,
-        edit.newValue
-      );
-      workingRootNode = weaveGet(workingRootUri);
-    }
-
-    setWorking('publishing');
-
-    // Returns final root uri if we need it.
-    const finalRootUri = await mutationPublishArtifact(
-      weave,
-      // Local branch
-      workingRootNode,
-      // Target branch
-      rootObjectRef.entityName,
-      rootObjectRef.projectName,
-      rootObjectRef.artifactName
-    );
-
-    // if ((orm?.projectConnection as WFNaiveProject).reload) {
-    //   await (orm!.projectConnection as WFNaiveProject).reload();
-    // }
-
+    const finalRootUri = await applyMutationsToRef(refWithType.refUri, edits);
     setWorking('done');
-
     handleClearEdits();
-    history.push(refPageUrl(objType, finalRootUri));
+    history.push(refPageUrl(objName, finalRootUri));
     handleClose();
   }, [
-    node,
-    weave,
-    rootObjectRef.entityName,
-    rootObjectRef.projectName,
-    rootObjectRef.artifactName,
+    applyMutationsToRef,
+    refWithType.refUri,
+    edits,
     handleClearEdits,
     history,
     refPageUrl,
-    objType,
+    objName,
     handleClose,
-    edits,
   ]);
   return (
     <Dialog fullWidth maxWidth="sm" open={true} onClose={handleClose}>
@@ -298,35 +255,28 @@ const useObjectVersionLinkPathForPath = () => {
   );
 };
 
+type RefWithType = {
+  refUri: string;
+  type: Type;
+};
+
 export const WeaveEditor: FC<{
   objType: string;
-  node: Node;
+  objectRefUri: string;
   disableEdits?: boolean;
-}> = ({objType, node, disableEdits}) => {
-  const weave = useWeaveContext();
-  const {stack} = usePanelContext();
-  const [refinedNode, setRefinedNode] = useState<NodeOrVoidNode>(voidNode());
+}> = ({objType, objectRefUri, disableEdits}) => {
+  const {
+    derived: {useRefsType},
+  } = useWFHooks();
+  // const weave = useWeaveContext();
+  // const {stack} = usePanelContext();
+  // const [refinedNode, setRefinedNode] = useState<NodeOrVoidNode>(voidNode());
+  const [refType, setRefType] = useState<Type>();
   const rootObjectRef = useMemo(() => {
-    const linearNodes = linearize(node);
-    if (linearNodes == null) {
-      throw new Error('invalid node for WeaveEditor');
-    }
-    const node0 = linearNodes[0];
-    if (!node0.fromOp.name.endsWith('get')) {
-      throw new Error('invalid node for WeaveEditor');
-    }
-    if (node0.fromOp.inputs.uri == null) {
-      throw new Error('invalid node for WeaveEditor');
-    }
-    if (!isConstNode(node0.fromOp.inputs.uri)) {
-      throw new Error('invalid node for WeaveEditor');
-    }
-    const ref = parseRef(node0.fromOp.inputs.uri.val);
-    if (!isWandbArtifactRef(ref)) {
-      throw new Error('invalid node for WeaveEditor');
-    }
-    return ref;
-  }, [node]);
+    const ref = parseRef(objectRefUri);
+    ref.artifactRefExtra = undefined;
+    return ref as WandbArtifactRef;
+  }, [objectRefUri]);
   const [edits, setEdits] = useState<WeaveEditorEdit[]>([]);
   const addEdit = useCallback(
     (edit: WeaveEditorEdit) => {
@@ -336,20 +286,38 @@ export const WeaveEditor: FC<{
   );
   const contextVal = useMemo(() => ({edits, addEdit}), [edits, addEdit]);
   const [commitChangesOpen, setCommitChangesOpen] = useState(false);
+  const refsType = useRefsType([objectRefUri]);
   useEffect(() => {
-    const doRefine = async () => {
-      const refined = await weave.refineNode(node, stack);
-      // console.log('GOT REFINED', refined);
-      setRefinedNode(refined);
+    if (refsType.loading) {
+      return;
+    }
+    if (refsType.result == null || refsType.result.length === 0) {
+      return;
+    }
+    setRefType(refsType.result[0]);
+    // const doRefine = async () => {
+    //   const refined = await weave.refineNode(node, stack); // TODO (Tim): Audit and potentially remove this opGet
+    //   // console.log('GOT REFINED', refined);
+    //   setRefinedNode(refined);
+    // };
+    // doRefine();
+  }, [refsType.loading, refsType.result]);
+  const refWithType: RefWithType | undefined = useMemo(() => {
+    if (refType == null) {
+      return;
+    }
+    return {
+      refUri: objectRefUri,
+      type: refType!,
     };
-    doRefine();
-  }, [node, stack, weave]);
-  return refinedNode.nodeType === 'void' ? (
+  }, [objectRefUri, refType]);
+
+  return refWithType == null ? (
     <div>loading</div>
   ) : (
     <WeaveEditorContext.Provider value={contextVal}>
       <Box mb={4}>
-        <WeaveEditorField node={refinedNode} path={[]} disableEdits />
+        <WeaveEditorField refWithType={refWithType} path={[]} disableEdits />
       </Box>
       {!disableEdits && (
         <>
@@ -359,9 +327,9 @@ export const WeaveEditor: FC<{
           </Button>
           {commitChangesOpen && (
             <WeaveEditorCommit
-              objType={objType}
+              objName={objType}
               rootObjectRef={rootObjectRef}
-              node={refinedNode}
+              refWithType={refWithType}
               edits={edits}
               handleClose={() => setCommitChangesOpen(false)}
               handleClearEdits={() => setEdits([])}
@@ -374,55 +342,118 @@ export const WeaveEditor: FC<{
 };
 
 const WeaveEditorField: FC<{
-  node: Node;
+  refWithType: RefWithType;
   path: WeaveEditorPathEl[];
   disableEdits?: boolean;
-}> = ({node, path, disableEdits}) => {
+}> = ({refWithType, path, disableEdits}) => {
   const weave = useWeaveContext();
-  if (node.type === 'none') {
+  if (refWithType.type === 'none') {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
-  if (isAssignableTo(node.type, maybe('boolean'))) {
-    return <WeaveEditorBoolean node={node} path={path} disableEdits />;
+  if (isAssignableTo(refWithType.type, maybe('boolean'))) {
+    return (
+      <WeaveEditorBoolean
+        refWithType={refWithType}
+        path={path}
+        disableEdits={disableEdits}
+      />
+    );
   }
-  if (isAssignableTo(node.type, maybe('string'))) {
-    return <WeaveEditorString node={node} path={path} disableEdits />;
+  if (isAssignableTo(refWithType.type, maybe('string'))) {
+    return (
+      <WeaveEditorString
+        refWithType={refWithType}
+        path={path}
+        disableEdits={disableEdits}
+      />
+    );
   }
-  if (isAssignableTo(node.type, maybe('number'))) {
-    return <WeaveEditorNumber node={node} path={path} disableEdits />;
-  }
-  if (
-    isAssignableTo(node.type, maybe({type: 'typedDict', propertyTypes: {}}))
-  ) {
-    return <WeaveEditorTypedDict node={node} path={path} disableEdits />;
+  if (isAssignableTo(refWithType.type, maybe('number'))) {
+    return (
+      <WeaveEditorNumber
+        refWithType={refWithType}
+        path={path}
+        disableEdits={disableEdits}
+      />
+    );
   }
   if (
     isAssignableTo(
-      node.type,
+      refWithType.type,
+      maybe({type: 'typedDict', propertyTypes: {}})
+    )
+  ) {
+    return (
+      <WeaveEditorTypedDict
+        refWithType={refWithType}
+        path={path}
+        disableEdits={disableEdits}
+      />
+    );
+  }
+  if (
+    isAssignableTo(
+      refWithType.type,
       maybe({type: 'list', objectType: {type: 'typedDict', propertyTypes: {}}})
     )
   ) {
-    return <WeaveEditorTable node={node} path={path} disableEdits />;
+    return (
+      <WeaveEditorTable
+        refWithType={refWithType}
+        path={path}
+        disableEdits={disableEdits}
+      />
+    );
   }
-  if (isAssignableTo(node.type, maybe({type: 'Object'}))) {
-    return <WeaveEditorObject node={node} path={path} disableEdits />;
+  if (isAssignableTo(refWithType.type, maybe({type: 'Object'}))) {
+    return (
+      <WeaveEditorObject
+        refWithType={refWithType}
+        path={path}
+        disableEdits={disableEdits}
+      />
+    );
   }
-  if (isAssignableTo(node.type, maybe({type: 'OpDef'}))) {
-    return <WeaveViewSmallRef node={node} />;
+  if (isAssignableTo(refWithType.type, maybe({type: 'OpDef'}))) {
+    return <WeaveViewSmallRef refWithType={refWithType} />;
   }
-  if (isAssignableTo(node.type, maybe({type: 'WandbArtifactRef'}))) {
-    return <WeaveViewSmallRef node={node} />;
+  if (isAssignableTo(refWithType.type, maybe({type: 'WandbArtifactRef'}))) {
+    return <WeaveViewSmallRef refWithType={refWithType} />;
   }
-  return <div>[No editor for type {weave.typeToString(node.type)}]</div>;
+  return <div>[No editor for type {weave.typeToString(refWithType.type)}]</div>;
+};
+
+const useValueOfRefUri = (refUri: string, tableQuery?: TableQuery) => {
+  const {useRefsData} = useWFHooks();
+  const data = useRefsData([refUri], tableQuery);
+  return useMemo(() => {
+    if (data.loading) {
+      return {
+        loading: true,
+        result: undefined,
+      };
+    }
+    if (data.result == null || data.result.length === 0) {
+      return {
+        loading: true,
+        result: undefined,
+      };
+    }
+    return {
+      loading: false,
+      result: data.result[0],
+    };
+  }, [data.loading, data.result]);
 };
 
 export const WeaveEditorBoolean: FC<{
-  node: Node;
+  refWithType: RefWithType;
   path: WeaveEditorPathEl[];
   disableEdits?: boolean;
-}> = ({node, path, disableEdits}) => {
+}> = ({refWithType, path, disableEdits}) => {
   const addEdit = useWeaveEditorContextAddEdit();
-  const query = useNodeValue(node);
+  const query = useValueOfRefUri(refWithType.refUri);
+
   const [curVal, setCurVal] = useState<boolean>(false);
   const loadedOnce = useRef(false);
   useEffect(() => {
@@ -453,12 +484,12 @@ export const WeaveEditorBoolean: FC<{
 };
 
 export const WeaveEditorString: FC<{
-  node: Node;
+  refWithType: RefWithType;
   path: WeaveEditorPathEl[];
   disableEdits?: boolean;
-}> = ({node, path, disableEdits}) => {
+}> = ({refWithType, path, disableEdits}) => {
   const addEdit = useWeaveEditorContextAddEdit();
-  const query = useNodeValue(node);
+  const query = useValueOfRefUri(refWithType.refUri);
   const [curVal, setCurVal] = useState<string>('');
   const loadedOnce = useRef(false);
   useEffect(() => {
@@ -503,12 +534,12 @@ export const WeaveEditorString: FC<{
 };
 
 export const WeaveEditorNumber: FC<{
-  node: Node;
+  refWithType: RefWithType;
   path: WeaveEditorPathEl[];
   disableEdits?: boolean;
-}> = ({node, path, disableEdits}) => {
+}> = ({refWithType, path, disableEdits}) => {
   const addEdit = useWeaveEditorContextAddEdit();
-  const query = useNodeValue(node);
+  const query = useValueOfRefUri(refWithType.refUri);
   const [curVal, setCurVal] = useState<string>('');
   const loadedOnce = useRef(false);
   useEffect(() => {
@@ -541,16 +572,16 @@ export const WeaveEditorNumber: FC<{
 };
 
 export const WeaveEditorTypedDict: FC<{
-  node: Node;
+  refWithType: RefWithType;
   path: WeaveEditorPathEl[];
   disableEdits?: boolean;
-}> = ({node, path, disableEdits}) => {
+}> = ({refWithType, path, disableEdits}) => {
   // const val = useNodeValue(node);
   // return <Typography>{JSON.stringify(val)}</Typography>;
   const makeLinkPath = useObjectVersionLinkPathForPath();
   return (
     <Grid container spacing={2}>
-      {Object.entries(typedDictPropertyTypes(node.type))
+      {Object.entries(typedDictPropertyTypes(refWithType.type))
         .filter(([key, value]) => key !== 'type' && !key.startsWith('_'))
         .flatMap(([key, valueType]) => {
           const singleRow = displaysAsSingleRow(valueType);
@@ -578,10 +609,17 @@ export const WeaveEditorTypedDict: FC<{
             <Grid item key={key + '-value'} xs={singleRow ? 10 : 12}>
               <Box ml={singleRow ? 0 : 2}>
                 <WeaveEditorField
-                  node={opPick({
-                    obj: node,
-                    key: constString(key.replace('.', '\\.')),
-                  })}
+                  refWithType={{
+                    refUri: refUri(
+                      objectRefWithExtra(
+                        parseRef(refWithType.refUri),
+                        OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + key
+                      )
+                    ),
+                    type: (refWithType.type as TypedDictType).propertyTypes[
+                      key
+                    ] as Type,
+                  }}
                   path={[...path, {type: 'pick', key}]}
                   disableEdits={disableEdits}
                 />
@@ -606,14 +644,14 @@ const Row = styled.div`
 Row.displayName = 'S.Row';
 
 export const WeaveEditorObject: FC<{
-  node: Node;
+  refWithType: RefWithType;
   path: WeaveEditorPathEl[];
   disableEdits?: boolean;
-}> = ({node, path, disableEdits}) => {
+}> = ({refWithType, path, disableEdits}) => {
   const makeLinkPath = useObjectVersionLinkPathForPath();
   return (
     <Table>
-      {Object.entries(node.type)
+      {Object.entries(refWithType.type)
         .filter(([key, value]) => key !== 'type' && !key.startsWith('_'))
         .flatMap(([key, valueType]) => {
           const singleRow = displaysAsSingleRow(valueType);
@@ -632,7 +670,15 @@ export const WeaveEditorObject: FC<{
           const value = (
             <Box>
               <WeaveEditorField
-                node={opObjGetAttr({self: node, name: constString(key)})}
+                refWithType={{
+                  refUri: refUri(
+                    objectRefWithExtra(
+                      parseRef(refWithType.refUri),
+                      OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + key
+                    )
+                  ),
+                  type: (refWithType.type as ObjectType)[key] as Type,
+                }}
                 path={[...path, {type: 'getattr', key}]}
                 disableEdits={disableEdits}
               />
@@ -725,38 +771,22 @@ const typeToDataGridColumnSpec = (
 const MAX_ROWS = 1000;
 
 export const WeaveEditorTable: FC<{
-  node: Node;
+  refWithType: RefWithType;
   path: WeaveEditorPathEl[];
   disableEdits?: boolean;
-}> = ({node, path, disableEdits}) => {
+}> = ({refWithType, path, disableEdits}) => {
   const apiRef = useGridApiRef();
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const addEdit = useWeaveEditorContextAddEdit();
   const makeLinkPath = useObjectVersionLinkPathForPath();
-  const objectType = listObjectType(node.type);
+  const objectType = listObjectType(refWithType.type);
   if (!isTypedDict(objectType)) {
     throw new Error('invalid node for WeaveEditorList');
   }
-  const fetchAllNode = useMemo(() => {
-    return opLimit({
-      arr: opMap({
-        arr: node,
-        mapFn: constFunction({row: objectType}, ({row}) =>
-          opDict(
-            _.fromPairs(
-              Object.keys(objectType.propertyTypes).map(key => [
-                key,
-                opPick({obj: row, key: constString(key)}),
-              ])
-            ) as any
-          )
-        ),
-      }),
-      limit: constNumber(MAX_ROWS + 1),
-    });
-  }, [node, objectType]);
-  const fetchQuery = useNodeValue(fetchAllNode);
-
+  const fetchQuery = useValueOfRefUri(refWithType.refUri, {
+    columns: Object.keys(objectType.propertyTypes),
+    limit: MAX_ROWS + 1,
+  });
   const [isTruncated, setIsTruncated] = useState(false);
   const [sourceRows, setSourceRows] = useState<any[] | undefined>();
   useEffect(() => {
@@ -872,9 +902,9 @@ export const WeaveEditorTable: FC<{
 };
 
 export const WeaveViewSmallRef: FC<{
-  node: Node;
-}> = ({node}) => {
-  const opDefQuery = useNodeValue(node);
+  refWithType: RefWithType;
+}> = ({refWithType}) => {
+  const opDefQuery = useValueOfRefUri(refWithType.refUri);
   const opDefRef = useMemo(
     () => parseRefMaybe(opDefQuery.result ?? ''),
     [opDefQuery.result]
