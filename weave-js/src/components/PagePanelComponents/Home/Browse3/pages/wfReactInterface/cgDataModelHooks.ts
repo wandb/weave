@@ -786,6 +786,9 @@ const useRefsData = (
   const getRefsType = useGetRefsType();
   const [neededTypes, setNeededTypes] = useState<Type[]>();
   useEffect(() => {
+    if (tableQueryDeep == null) {
+      return;
+    }
     let isMounted = true;
     const updateNeededTypes = async () => {
       const uris = neededRefUris.map(x => x.uri)
@@ -802,17 +805,19 @@ const useRefsData = (
     return () => {
       isMounted = false;
     }
-  }, [getRefsType, neededRefUris])
+  }, [getRefsType, neededRefUris, tableQueryDeep])
 
   const itemsNode = useMemo(() => {
-    if (neededTypes == null) {
-      return opArray({} as any);
-    }
+
     let nodes = neededRefUris.map(needed => refToNode(needed.uri));
-    neededTypes.forEach((type, ndx) => {
-      nodes[ndx].type = type;
-    })
+
     if (tableQueryDeep) {
+      if (neededTypes == null) {
+        return opArray({} as any);
+      }
+      neededTypes.forEach((type, ndx) => {
+        nodes[ndx].type = type;
+      })
       nodes = nodes.map(node => {
         if (tableQueryDeep.columns.length > 0) {
           node = opMap({
