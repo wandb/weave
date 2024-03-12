@@ -49,6 +49,7 @@ import { useDeepMemo } from '../../../../../../hookUtils';
 import {parseRef, useNodeValue, WandbArtifactRef} from '../../../../../../react';
 import {nodeFromExtra} from '../../../Browse2/Browse2ObjectVersionItemPage';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
+import { mutationPublishArtifact, mutationSet, nodeToEasyNode, weaveGet } from '../../../Browse2/easyWeave';
 import {
   getCallFromCache,
   getObjectVersionFromCache,
@@ -86,7 +87,6 @@ import {
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
-import { mutationPublishArtifact, mutationSet, nodeToEasyNode, weaveGet } from '../../../Browse2/easyWeave';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const cachedCall = key ? getCallFromCache(key) : null;
