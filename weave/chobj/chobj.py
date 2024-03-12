@@ -456,7 +456,7 @@ class ObjectServer:
         )
         return self._add_table_transaction(TableRef(table_row_ref.table_id), tx_id)
 
-    def new_val(self, val, value_id: Optional[uuid.UUID] = None):
+    def new_val(self, val: Any, value_id: Optional[uuid.UUID] = None):
         # map val (this could do more than lists_to_tables)
         def lists_to_tables(val):
             if isinstance(val, dict):
@@ -1175,7 +1175,7 @@ class ObjectClient:
 
     # This is used by tests and op_execute still, but the save() interface
     # is nicer for clients I think?
-    def save_object(self, val, name: str, branch: str = "latest") -> Any:
+    def save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
         val = map_to_refs(val)
         return self.server.new_object(val, name, branch)
 
@@ -1230,9 +1230,13 @@ class ObjectClient:
 #
 # must prove
 # - eval test
-#   - why are there null values
-#   - why are there two tables
-#   - ensure there is no duplicate stuff logged.
+#   - why are there two tables. two problems:
+#     - create_run, finish_run
+#       - issue is that the client doesn't handle table saving, so it can't
+#         associate the table with an ID
+#     - seems like we're not using a ref?
+#       - this is because this is the eval_rows table, which is output
+#         by eval
 #   - top-level op-name instead of via nested ref?
 #     - ie we need some logic for "ref switching when walking refs"
 #   - Is this whole evaluation relocatable?
