@@ -32,7 +32,6 @@ import {PageEl} from './CommonLib';
 import {PageHeader} from './CommonLib';
 import {makeObjRefUri} from './CommonLib';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {WeaveEditor} from './WeaveEditors';
 
 export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {

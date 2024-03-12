@@ -5,7 +5,7 @@
  */
 
 import _ from 'lodash';
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useMemo} from 'react';
 
 import {useWeaveContext} from '../../../../../../context';
 import {
@@ -855,18 +855,20 @@ const useApplyMutationsToRef = (): ((
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Type[]>) => {
   const weave = useWeaveContext();
-  const useGetRefsType = useCallback(async (refUris: string[]): Promise<Type[]> => {
-    const proms = refUris.map(refUri =>
-      weave.refineNode(refToNode(refUri), [])
-    );
-    const nodes = await Promise.all(proms)
-    return nodes.map(node => {
-      return node.type;
-    });
-
-  }, [weave])
-  return useGetRefsType;
-}
+  const getRefsType = useCallback(
+    async (refUris: string[]): Promise<Type[]> => {
+      const proms = refUris.map(refUri =>
+        weave.refineNode(refToNode(refUri), [])
+      );
+      const nodes = await Promise.all(proms);
+      return nodes.map(node => {
+        return node.type;
+      });
+    },
+    [weave]
+  );
+  return getRefsType;
+};
 
 // const useRefsType = (refUris: string[]): Loadable<Type[]> => {
 //   const refUrisDeep = useDeepMemo(refUris);
