@@ -5,7 +5,7 @@
  */
 
 import _ from 'lodash';
-import {useCallback, useMemo} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {useWeaveContext} from '../../../../../../context';
 import {
@@ -13,6 +13,7 @@ import {
   constFunction,
   constNumber,
   constString,
+  listObjectType,
   Node,
   opAnd,
   opArray,
@@ -782,14 +783,41 @@ const useRefsData = (
 
   const tableQueryDeep = useDeepMemo(tableQuery);
 
+  const getRefsType = useGetRefsType();
+  const [neededTypes, setNeededTypes] = useState<Type[]>();
+  useEffect(() => {
+    let isMounted = true;
+    const updateNeededTypes = async () => {
+      const uris = neededRefUris.map(x => x.uri)
+      console.log(uris)
+      const types = await getRefsType(uris);
+      if (!isMounted) {
+        return;
+      }
+      setNeededTypes(types);
+    }
+    if (neededRefUris.length > 0) {
+      updateNeededTypes();
+    }
+    return () => {
+      isMounted = false;
+    }
+  }, [getRefsType, neededRefUris])
+
   const itemsNode = useMemo(() => {
+    if (neededTypes == null) {
+      return opArray({} as any);
+    }
     let nodes = neededRefUris.map(needed => refToNode(needed.uri));
+    neededTypes.forEach((type, ndx) => {
+      nodes[ndx].type = type;
+    })
     if (tableQueryDeep) {
       nodes = nodes.map(node => {
         if (tableQueryDeep.columns.length > 0) {
           node = opMap({
             arr: node,
-            mapFn: constFunction({row: 'any'}, ({row}) =>
+            mapFn: constFunction({row: listObjectType(node.type)}, ({row}) =>
               opDict(
                 _.fromPairs(
                   tableQueryDeep.columns.map(key => [
@@ -811,11 +839,11 @@ const useRefsData = (
       });
     }
     return opArray(_.fromPairs(nodes.map((node, i) => [i, node])) as any);
-  }, [neededRefUris, tableQueryDeep]);
+  }, [neededRefUris, neededTypes, tableQueryDeep]);
 
   const res = useNodeValue(itemsNode);
   return useMemo(() => {
-    if (res.loading) {
+    if (res.loading || neededTypes == null) {
       return {loading: true, result: []};
     }
     const resultLookup = new Map<string, any>();
