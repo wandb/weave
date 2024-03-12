@@ -1,8 +1,14 @@
 import {objectRefWithExtra, parseRef, refUri} from '@wandb/weave/react';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 
+import {isListLike, isObjectTypeLike, isTypedDictLike} from '../../../../core';
+import {Type} from '../../../../core/model/types';
 import {isRef} from '../Browse3/pages/common/util';
-import {OBJECT_ATTRIBUTE_EDGE_TYPE} from '../Browse3/pages/wfReactInterface/constants';
+import {
+  DICT_KEY_EDGE_TYPE,
+  LIST_INDEX_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+} from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {CellValue} from './CellValue';
 import {NotApplicable} from './NotApplicable';
@@ -24,13 +30,46 @@ const RENDER_DIRECTLY = new Set([
 ]);
 
 export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
+  const {
+    derived: {useGetRefsType},
+  } = useWFHooks();
+  const getRefsType = useGetRefsType();
+  const [refType, setRefType] = useState<Type>();
+  useEffect(() => {
+    getRefsType([weaveRef]).then(types => setRefType(types[0]));
+  }, [weaveRef, attribute, getRefsType]);
+  if (refType == null) {
+    return <></>;
+  } else if (isTypedDictLike(refType)) {
+    return (
+      <RefValueWithExtra
+        weaveRef={weaveRef}
+        attribute={DICT_KEY_EDGE_TYPE + '/' + attribute}
+      />
+    );
+  } else if (isObjectTypeLike(refType)) {
+    return (
+      <RefValueWithExtra
+        weaveRef={weaveRef}
+        attribute={OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + attribute}
+      />
+    );
+  } else if (isListLike(refType)) {
+    return (
+      <RefValueWithExtra
+        weaveRef={weaveRef}
+        attribute={LIST_INDEX_EDGE_TYPE + '/' + attribute}
+      />
+    );
+  }
+  return <>Unknown Type</>;
+};
+
+const RefValueWithExtra = ({weaveRef, attribute}: RefValueProps) => {
   const {useRefsData} = useWFHooks();
   const objRef = parseRef(weaveRef);
   const objRefWithExtra = useMemo(() => {
-    return objectRefWithExtra(
-      objRef,
-      OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + attribute
-    );
+    return objectRefWithExtra(objRef, attribute);
   }, [attribute, objRef]);
   const refValue = useRefsData([refUri(objRefWithExtra)]);
 

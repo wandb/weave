@@ -3,25 +3,13 @@ import {Box, Button, Grid, Typography} from '@mui/material';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useWeaveContext} from '@wandb/weave/context';
-import {
-  callOpVeryUnsafe,
-  constNumber,
-  constString,
-  Node,
-  opGet,
-} from '@wandb/weave/core';
+import {constString, opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useMemo, useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {usePanelContext} from '../../../Panel2/PanelContext';
 import {useMakeLocalBoardFromNode} from '../../../Panel2/pyBoardGen';
-import {
-  DICT_KEY_EDGE_TYPE,
-  LIST_INDEX_EDGE_TYPE,
-  OBJECT_ATTRIBUTE_EDGE_TYPE,
-  TABLE_COLUMN_EDGE_TYPE,
-  TABLE_ROW_EDGE_TYPE,
-} from '../Browse3/pages/wfReactInterface/constants';
+import {nodeFromExtra} from '../Browse3/pages/wfReactInterface/cgDataModelHooks';
 import {SEED_BOARD_OP_NAME} from '../HomePreviewSidebar';
 import {Browse2CallsPage} from './Browse2CallsPage';
 import {Browse2OpDefPage} from './Browse2OpDefPage';
@@ -32,45 +20,6 @@ import {PageEl} from './CommonLib';
 import {PageHeader} from './CommonLib';
 import {makeObjRefUri} from './CommonLib';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
-
-export const nodeFromExtra = (node: Node, extra: string[]): Node => {
-  if (node.type === 'any') {
-    console.warn('nodeFromExtra: node is any type');
-  }
-  if (extra.length === 0) {
-    return node;
-  }
-  if (extra[0] === LIST_INDEX_EDGE_TYPE || extra[0] === TABLE_ROW_EDGE_TYPE) {
-    return nodeFromExtra(
-      callOpVeryUnsafe('index', {
-        arr: node,
-        index: constNumber(parseInt(extra[1], 10)),
-      }) as Node,
-      extra.slice(2)
-    );
-  } else if (
-    extra[0] === DICT_KEY_EDGE_TYPE ||
-    extra[0] === TABLE_COLUMN_EDGE_TYPE
-  ) {
-    return nodeFromExtra(
-      callOpVeryUnsafe('pick', {
-        obj: node,
-        key: constString(extra[1]),
-      }) as Node,
-      extra.slice(2)
-    );
-  } else if (extra[0] === OBJECT_ATTRIBUTE_EDGE_TYPE) {
-    return nodeFromExtra(
-      callOpVeryUnsafe('Object-__getattr__', {
-        self: node,
-        name: constString(extra[1]),
-      }) as Node,
-      extra.slice(2)
-    );
-  } else {
-    throw new Error('Unknown extra type: ' + extra);
-  }
-};
 
 export const Browse2ObjectVersionItemPage: FC = props => {
   const params = useParams<Browse2RootObjectVersionItemParams>();

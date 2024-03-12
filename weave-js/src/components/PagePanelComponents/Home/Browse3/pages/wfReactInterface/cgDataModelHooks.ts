@@ -9,6 +9,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {useWeaveContext} from '../../../../../../context';
 import {
+  callOpVeryUnsafe,
   constBoolean,
   constFunction,
   constNumber,
@@ -53,7 +54,6 @@ import {
   WandbArtifactRef,
 } from '../../../../../../react';
 import { WeaveApp } from '../../../../../../weave';
-import {nodeFromExtra} from '../../../Browse2/Browse2ObjectVersionItemPage';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
 import {
   mutationAppend,
@@ -68,10 +68,16 @@ import {
   opVersionCache,
   refDataCache,
   refTypeCache,
+  refTypedNodeCache,
 } from './cache';
 import {
+  DICT_KEY_EDGE_TYPE,
+  LIST_INDEX_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
   OBJECT_CATEGORIES,
   PROJECT_CALL_STREAM_NAME,
+  TABLE_COLUMN_EDGE_TYPE,
+  TABLE_ROW_EDGE_TYPE,
   WANDB_ARTIFACT_REF_PREFIX,
 } from './constants';
 import {
@@ -760,10 +766,11 @@ const useOpVersionsNode = (
 };
 
 const makeTypedRefNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
-  const type = await getCachedRefType(weave, refUri);
-  const refNode = refToNode(refUri);
-  refNode.type = type; 
-  return refNode;
+  // const type = await getCachedRefType(weave, refUri);
+  const refNode = refUri.includes("#") ?  await refToNode(weave, refUri) : opGet({uri: constString(refUri)});
+  const typedNode = await weave.refineNode(refNode, [])
+  // refNode.type = type; 
+  return typedNode;
 }
 
 const applyTableQuery = (node: Node, tableQuery: TableQuery): Node => {
@@ -797,7 +804,7 @@ const getCachedRefData = async (weave: WeaveApp,uri: string, tableQuery?: TableQ
   if (cacheRes != null) {
     return cacheRes;
   }
-  let node = await makeTypedRefNode(weave, uri);
+  let node = await getCachedRefToTypedNode(weave, uri);
   if (tableQuery) {
     node = applyTableQuery(node, tableQuery);
   }
@@ -811,13 +818,15 @@ const useRefsData = (
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
   const refUrisDeep = useDeepMemo(refUris);
+  const tableQueryDeep = useDeepMemo(tableQuery);
   const weave = useWeaveContext();
   const [refData, setRefData] = useState<any[]>();
   useEffect(() => {
     let isMounted = true;
     const updateRefData = async () => {
-      const data = await Promise.all(refUrisDeep.map(uri => getCachedRefData(weave, uri, tableQuery)));
-      if (!isMounted) {
+      const uris = [...refUrisDeep]
+      const data = await Promise.all(uris.map(uri => getCachedRefData(weave, uri, tableQueryDeep)));
+      if (!isMounted || !_.isEqual(uris, refUrisDeep)) {
         return;
       }
       setRefData(data);
@@ -826,12 +835,14 @@ const useRefsData = (
     return () => {
       isMounted = false;
     };
-  }, [refUrisDeep, tableQuery, weave]);
-  return {
+  }, [refUrisDeep, tableQueryDeep, weave]);
+
+return useMemo(() => ({
     loading: refData == null,
     result: refData ?? [],
-  };
+  }), [refData]);
 };
+
 
 const useApplyMutationsToRef = (): ((
   refUri: string,
@@ -840,7 +851,7 @@ const useApplyMutationsToRef = (): ((
   const weave = useWeaveContext();
   const applyMutationsToRef = useCallback(
     async (refUri: string, mutations: RefMutation[]): Promise<string> => {
-      let workingRootNode = refToNode(refUri);
+      let workingRootNode = await refToNode(weave, refUri);
       const rootObjectRef = parseRef(refUri) as WandbArtifactRef;
       for (const edit of mutations) {
         let targetNode = nodeToEasyNode(workingRootNode as OutputNode);
@@ -888,23 +899,83 @@ const useApplyMutationsToRef = (): ((
   return applyMutationsToRef;
 };
 
-const getCachedRefType = async (weave: WeaveApp, refUri: string): Promise<Type> => {
-  const cachedType = refTypeCache.get(refUri);
-  if (cachedType != null) {
-    return cachedType;
+// const getCachedBaseRefToTypedNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
+//   const cachedTypedNode = refTypedNodeCache.get(refUri); 
+//   if (cachedTypedNode != null) {
+//     return cachedTypedNode;
+//   }
+
+//   const uriParts = refUri.split('#')
+//   if (uriParts.length !== 1) {
+//     throw new Error('Ref uri should not contain extra fields');
+//   }
+
+//   const baseUri = uriParts[0];
+//   const baseUriNode = opGet({uri: constString(baseUri)});
+//   const typedBaseUriNode = await weave.refineNode(baseUriNode, []);
+
+//   refTypedNodeCache.set(refUri, typedBaseUriNode);
+
+//   return typedBaseUriNode;
+// }
+
+
+const getCachedRefToTypedNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
+  const cachedTypedNode = refTypedNodeCache.get(refUri); 
+  if (cachedTypedNode != null) {
+    return cachedTypedNode;
   }
-  const node = refToNode(refUri);
-  const type = (await weave.refineNode(node, [])).type;
-  refTypeCache.set(refUri, type);
-  return type;
+
+  const uriParts = refUri.split('#');
+  const baseUri = uriParts[0];
+  let node: Node = opGet({uri: constString(baseUri)});
+  // const typedBaseUriNode = await getCachedBaseRefToTypedNode(weave, baseUri);
+
+  if (uriParts.length !== 1) {
+    const extraFields = uriParts[1].split('/');
+    node = nodeFromExtra(node, extraFields);
+  }
+
+  const typedNode = await weave.refineNode(node, []);
+
+  refTypedNodeCache.set(refUri, typedNode);
+
+  return typedNode;
+
 }
+
+
+
+  // const refToNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
+  //   const uriParts = refUri.split('#');
+  //   const baseUri = uriParts[0];
+  //   const objNode = await makeTypedRefNode(weave, baseUri);
+  //   if (uriParts.length === 1) {
+  //     return objNode;
+  //   }
+  //   const extraFields = uriParts[1].split('/');
+  //   return nodeFromExtra(objNode, extraFields);
+  // };
+
+
+
+// const getCachedRefType = async (weave: WeaveApp, refUri: string): Promise<Type> => {
+//   const cachedType = refTypeCache.get(refUri);
+//   if (cachedType != null) {
+//     return cachedType;
+//   }
+//   const node = refUri.includes("#") ? await refToNode(weave, refUri) : opGet({uri: constString(refUri)});
+//   const type = (await weave.refineNode(node, [])).type;
+//   refTypeCache.set(refUri, type);
+//   return type;
+// }
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Type[]>) => {
   const weave = useWeaveContext();
   const getRefsType = useCallback(
     async (refUris: string[]): Promise<Type[]> => {
-      const results = refUris.map(refUri => getCachedRefType(weave, refUri))
-      return Promise.all(results);
+      const results = refUris.map(refUri => getCachedRefToTypedNode(weave, refUri))
+      return Promise.all(results).then(nodes => nodes.map(node => node.type));
     },
     [weave]
   );
@@ -946,16 +1017,54 @@ const spanToCallSchema = (
   };
 };
 
-const refToNode = (refUri: string): Promise<Node> => {
+const refToNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
   const uriParts = refUri.split('#');
   const baseUri = uriParts[0];
-  const objNode = opGet({uri: constString(baseUri)});
+  const objNode = await makeTypedRefNode(weave, baseUri);
   if (uriParts.length === 1) {
     return objNode;
   }
   const extraFields = uriParts[1].split('/');
   return nodeFromExtra(objNode, extraFields);
 };
+
+
+export const nodeFromExtra = (node: Node, extra: string[]): Node => {
+  if (extra.length === 0) {
+    return node;
+  }
+  if (extra[0] === LIST_INDEX_EDGE_TYPE || extra[0] === TABLE_ROW_EDGE_TYPE) {
+    return nodeFromExtra(
+      callOpVeryUnsafe('index', {
+        arr: node,
+        index: constNumber(parseInt(extra[1], 10)),
+      }) as Node,
+      extra.slice(2)
+    );
+  } else if (
+    extra[0] === DICT_KEY_EDGE_TYPE ||
+    extra[0] === TABLE_COLUMN_EDGE_TYPE
+  ) {
+    return nodeFromExtra(
+      callOpVeryUnsafe('pick', {
+        obj: node,
+        key: constString(extra[1]),
+      }) as Node,
+      extra.slice(2)
+    );
+  } else if (extra[0] === OBJECT_ATTRIBUTE_EDGE_TYPE) {
+    return nodeFromExtra(
+      callOpVeryUnsafe('Object-__getattr__', {
+        self: node,
+        name: constString(extra[1]),
+      }) as Node,
+      extra.slice(2)
+    );
+  } else {
+    throw new Error('Unknown extra type: ' + extra);
+  }
+};
+
 
 // Helpers //
 const typeNameToCategory = (typeName: string): ObjectCategory | null => {

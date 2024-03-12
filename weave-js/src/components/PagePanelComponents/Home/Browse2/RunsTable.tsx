@@ -21,6 +21,12 @@ import {useParams} from 'react-router-dom';
 import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
 import {useWeaveContext} from '../../../../context';
+import {
+  isObjectType,
+  isObjectTypeLike,
+  isTypedDictLike,
+  typedDictPropertyTypes,
+} from '../../../../core';
 import {parseRef} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
@@ -136,10 +142,15 @@ type ExtraColumns = Record<string, string[]>;
 const getExtraColumns = (result: any): string[] => {
   const cols: Set<string> = new Set();
   for (const refInfo of result) {
-    const keys = Object.keys(refInfo).filter(
-      k => k !== 'type' && !k.startsWith('_')
-    );
-    keys.forEach(k => cols.add(k));
+    if (isObjectTypeLike(refInfo)) {
+      const keys = Object.keys(refInfo).filter(
+        k => k !== 'type' && !k.startsWith('_')
+      );
+      keys.forEach(k => cols.add(k));
+    } else if (isTypedDictLike(refInfo)) {
+      const keys = Object.keys(typedDictPropertyTypes(refInfo));
+      keys.forEach(k => cols.add(k));
+    }
   }
   return Array.from(cols);
 };
