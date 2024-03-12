@@ -60,7 +60,13 @@ import {
   nodeToEasyNode,
   weaveGet,
 } from '../../../Browse2/easyWeave';
-import {callCache, objectVersionCache, opVersionCache} from './cache';
+import {
+  callCache,
+  objectVersionCache,
+  opVersionCache,
+  refDataCache,
+  refTypeCache,
+} from './cache';
 import {
   OBJECT_CATEGORIES,
   PROJECT_CALL_STREAM_NAME,
@@ -756,10 +762,28 @@ const useRefsData = (
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
   const refUrisDeep = useDeepMemo(refUris);
+  const maybeResult: Array<Type | undefined> = useMemo(
+    () => refUrisDeep.map(refDataCache.get),
+    [refUrisDeep]
+  );
+  const neededRefUris = useMemo(
+    () =>
+      refUrisDeep
+        .map((uri, ndx) => {
+          if (maybeResult[ndx] == null) {
+            return {uri, ndx};
+          } else {
+            return null;
+          }
+        })
+        .filter((x): x is {uri: string; ndx: number} => x != null),
+    [maybeResult, refUrisDeep]
+  );
+
   const tableQueryDeep = useDeepMemo(tableQuery);
 
   const itemsNode = useMemo(() => {
-    let nodes = refUrisDeep.map(refToNode);
+    let nodes = neededRefUris.map(needed => refToNode(needed.uri));
     if (tableQueryDeep) {
       nodes = nodes.map(node => {
         if (tableQueryDeep.columns.length > 0) {
@@ -787,8 +811,29 @@ const useRefsData = (
       });
     }
     return opArray(_.fromPairs(nodes.map((node, i) => [i, node])) as any);
-  }, [refUrisDeep, tableQueryDeep]);
-  return useNodeValue(itemsNode);
+  }, [neededRefUris, tableQueryDeep]);
+
+  const res = useNodeValue(itemsNode);
+  return useMemo(() => {
+    if (res.loading) {
+      return {loading: true, result: []};
+    }
+    const resultLookup = new Map<string, any>();
+    res.result.forEach((item, ndx) => {
+      refDataCache.set(neededRefUris[ndx].uri, item);
+      resultLookup.set(neededRefUris[ndx].uri, item);
+    });
+    return {
+      loading: false,
+      result: refUrisDeep.map((uri, ndx) => {
+        if (maybeResult[ndx] !== undefined) {
+          return maybeResult[ndx];
+        } else {
+          return resultLookup.get(uri);
+        }
+      }),
+    };
+  }, [maybeResult, neededRefUris, refUrisDeep, res.loading, res.result]);
 };
 
 const useApplyMutationsToRef = (): ((
@@ -850,51 +895,33 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Type[]>) => {
   const weave = useWeaveContext();
   const getRefsType = useCallback(
     async (refUris: string[]): Promise<Type[]> => {
-      const proms = refUris.map(refUri =>
-        weave.refineNode(refToNode(refUri), [])
+      const maybeResult: Array<Type | undefined> = refUris.map(
+        refTypeCache.get
+      );
+      const neededRefUris = refUris
+        .map((uri, ndx) => {
+          if (maybeResult[ndx] == null) {
+            return {uri, ndx};
+          } else {
+            return null;
+          }
+        })
+        .filter((x): x is {uri: string; ndx: number} => x != null);
+
+      const proms = neededRefUris.map(needed =>
+        weave.refineNode(refToNode(needed.uri), [])
       );
       const nodes = await Promise.all(proms);
-      return nodes.map(node => {
-        return node.type;
+      nodes.forEach((node, ndx) => {
+        refTypeCache.set(neededRefUris[ndx].uri, node.type);
+        maybeResult[neededRefUris[ndx].ndx] = node.type;
       });
+      return maybeResult as Type[];
     },
     [weave]
   );
   return getRefsType;
 };
-
-// const useRefsType = (refUris: string[]): Loadable<Type[]> => {
-//   const refUrisDeep = useDeepMemo(refUris);
-//   const [results, setResults] = useState<Type[] | null>(null);
-//   const getRefsType = useGetRefsType();
-//   useEffect(() => {
-//     let mounted = true;
-//     const loadTypes = async () => {
-//       const simpleTypes = await getRefsType(refUrisDeep);
-//       if (mounted) {
-//         setResults(simpleTypes);
-//       }
-//     };
-
-//     loadTypes();
-
-//     return () => {
-//       mounted = false;
-//     };
-//   }, [getRefsType, refUrisDeep]);
-//   return useMemo(() => {
-//     if (results == null) {
-//       return {
-//         loading: true,
-//         result: [],
-//       };
-//     }
-//     return {
-//       loading: false,
-//       result: results,
-//     };
-//   }, [results]);
-// };
 
 // Converters //
 const spanToCallSchema = (

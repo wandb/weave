@@ -10,6 +10,7 @@
 
 import LRUCache from 'lru-cache';
 
+import * as Types from '../../../../../../core/model/types';
 import {
   CallKey,
   CallSchema,
@@ -54,4 +55,12 @@ export const objectVersionCache = makeSpecificCache<
   ObjectVersionSchema
 >(key => {
   return `obj:${key.entity}/${key.project}/${key.objectId}/${key.versionHash}/${key.path}/${key.refExtra}`;
+});
+
+export const refDataCache = makeSpecificCache<string, any>(key => {
+  return key;
+});
+
+export const refTypeCache = makeSpecificCache<string, Types.Type>(key => {
+  return key;
 });
