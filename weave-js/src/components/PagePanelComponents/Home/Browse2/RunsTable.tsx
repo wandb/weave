@@ -22,7 +22,6 @@ import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
 import {useWeaveContext} from '../../../../context';
 import {
-  isObjectType,
   isObjectTypeLike,
   isTypedDictLike,
   typedDictPropertyTypes,

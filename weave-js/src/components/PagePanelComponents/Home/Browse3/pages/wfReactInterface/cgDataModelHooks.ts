@@ -53,7 +53,7 @@ import {
   useNodeValue,
   WandbArtifactRef,
 } from '../../../../../../react';
-import { WeaveApp } from '../../../../../../weave';
+import {WeaveApp} from '../../../../../../weave';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
 import {
   mutationAppend,
@@ -764,13 +764,18 @@ const useOpVersionsNode = (
   return dataNode;
 };
 
-const makeTypedRefNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
+const makeTypedRefNode = async (
+  weave: WeaveApp,
+  refUri: string
+): Promise<Node> => {
   // const type = await getCachedRefType(weave, refUri);
-  const refNode = refUri.includes("#") ?  await refToNode(weave, refUri) : opGet({uri: constString(refUri)});
-  const typedNode = await weave.refineNode(refNode, [])
-  // refNode.type = type; 
+  const refNode = refUri.includes('#')
+    ? await refToNode(weave, refUri)
+    : opGet({uri: constString(refUri)});
+  const typedNode = await weave.refineNode(refNode, []);
+  // refNode.type = type;
   return typedNode;
-}
+};
 
 const applyTableQuery = (node: Node, tableQuery: TableQuery): Node => {
   if (tableQuery.columns.length > 0) {
@@ -795,10 +800,14 @@ const applyTableQuery = (node: Node, tableQuery: TableQuery): Node => {
     });
   }
   return node;
-}
+};
 
-const getCachedRefData = async (weave: WeaveApp,uri: string, tableQuery?: TableQuery): Promise<any> => {
-  const key = uri + (tableQuery ? ("?query=" + JSON.stringify(tableQuery)) : '');
+const getCachedRefData = async (
+  weave: WeaveApp,
+  uri: string,
+  tableQuery?: TableQuery
+): Promise<any> => {
+  const key = uri + (tableQuery ? '?query=' + JSON.stringify(tableQuery) : '');
   const cacheRes = refDataCache.get(key);
   if (cacheRes != null) {
     return cacheRes;
@@ -810,7 +819,7 @@ const getCachedRefData = async (weave: WeaveApp,uri: string, tableQuery?: TableQ
   const res = await weave.client.query(node);
   refDataCache.set(key, res);
   return res;
-}
+};
 
 const useRefsData = (
   refUris: string[],
@@ -823,8 +832,10 @@ const useRefsData = (
   useEffect(() => {
     let isMounted = true;
     const updateRefData = async () => {
-      const uris = [...refUrisDeep]
-      const data = await Promise.all(uris.map(uri => getCachedRefData(weave, uri, tableQueryDeep)));
+      const uris = [...refUrisDeep];
+      const data = await Promise.all(
+        uris.map(uri => getCachedRefData(weave, uri, tableQueryDeep))
+      );
       if (!isMounted || !_.isEqual(uris, refUrisDeep)) {
         return;
       }
@@ -836,12 +847,14 @@ const useRefsData = (
     };
   }, [refUrisDeep, tableQueryDeep, weave]);
 
-return useMemo(() => ({
-    loading: refData == null,
-    result: refData ?? [],
-  }), [refData]);
+  return useMemo(
+    () => ({
+      loading: refData == null,
+      result: refData ?? [],
+    }),
+    [refData]
+  );
 };
-
 
 const useApplyMutationsToRef = (): ((
   refUri: string,
@@ -899,7 +912,7 @@ const useApplyMutationsToRef = (): ((
 };
 
 // const getCachedBaseRefToTypedNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
-//   const cachedTypedNode = refTypedNodeCache.get(refUri); 
+//   const cachedTypedNode = refTypedNodeCache.get(refUri);
 //   if (cachedTypedNode != null) {
 //     return cachedTypedNode;
 //   }
@@ -918,9 +931,11 @@ const useApplyMutationsToRef = (): ((
 //   return typedBaseUriNode;
 // }
 
-
-const getCachedRefToTypedNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
-  const cachedTypedNode = refTypedNodeCache.get(refUri); 
+const getCachedRefToTypedNode = async (
+  weave: WeaveApp,
+  refUri: string
+): Promise<Node> => {
+  const cachedTypedNode = refTypedNodeCache.get(refUri);
   if (cachedTypedNode != null) {
     return cachedTypedNode;
   }
@@ -940,23 +955,18 @@ const getCachedRefToTypedNode = async (weave: WeaveApp, refUri: string): Promise
   refTypedNodeCache.set(refUri, typedNode);
 
   return typedNode;
+};
 
-}
-
-
-
-  // const refToNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
-  //   const uriParts = refUri.split('#');
-  //   const baseUri = uriParts[0];
-  //   const objNode = await makeTypedRefNode(weave, baseUri);
-  //   if (uriParts.length === 1) {
-  //     return objNode;
-  //   }
-  //   const extraFields = uriParts[1].split('/');
-  //   return nodeFromExtra(objNode, extraFields);
-  // };
-
-
+// const refToNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
+//   const uriParts = refUri.split('#');
+//   const baseUri = uriParts[0];
+//   const objNode = await makeTypedRefNode(weave, baseUri);
+//   if (uriParts.length === 1) {
+//     return objNode;
+//   }
+//   const extraFields = uriParts[1].split('/');
+//   return nodeFromExtra(objNode, extraFields);
+// };
 
 // const getCachedRefType = async (weave: WeaveApp, refUri: string): Promise<Type> => {
 //   const cachedType = refTypeCache.get(refUri);
@@ -973,14 +983,15 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Type[]>) => {
   const weave = useWeaveContext();
   const getRefsType = useCallback(
     async (refUris: string[]): Promise<Type[]> => {
-      const results = refUris.map(refUri => getCachedRefToTypedNode(weave, refUri))
+      const results = refUris.map(refUri =>
+        getCachedRefToTypedNode(weave, refUri)
+      );
       return Promise.all(results).then(nodes => nodes.map(node => node.type));
     },
     [weave]
   );
   return getRefsType;
 };
-
 
 const useRefsType = (refUris: string[]): Loadable<Type[]> => {
   const refUrisDeep = useDeepMemo(refUris);
@@ -1004,7 +1015,6 @@ const useRefsType = (refUris: string[]): Loadable<Type[]> => {
     loading: results == null,
     result: results ?? [],
   };
-  
 };
 
 // Converters //
@@ -1053,7 +1063,6 @@ const refToNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
   return nodeFromExtra(objNode, extraFields);
 };
 
-
 export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
     return node;
@@ -1089,7 +1098,6 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
     throw new Error('Unknown extra type: ' + extra);
   }
 };
-
 
 // Helpers //
 const typeNameToCategory = (typeName: string): ObjectCategory | null => {

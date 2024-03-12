@@ -302,9 +302,9 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
   throw new Error('Not implemented');
 };
 
-const useRefsType = (refUris: string[]) : Loadable<Types.Type[]> => {
+const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
   throw new Error('Not implemented');
-}
+};
 
 /// Converters ///
 

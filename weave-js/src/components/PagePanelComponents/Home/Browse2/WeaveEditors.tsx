@@ -22,7 +22,6 @@ import {
   ObjectType,
   Type,
   typedDictPropertyTypes,
-  TypedDictType,
 } from '@wandb/weave/core';
 import {
   objectRefWithExtra,

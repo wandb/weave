@@ -10,7 +10,7 @@
 
 import LRUCache from 'lru-cache';
 
-import { Node } from '../../../../../../core';
+import {Node} from '../../../../../../core';
 import * as Types from '../../../../../../core/model/types';
 import {
   CallKey,

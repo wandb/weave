@@ -1,8 +1,7 @@
 import {objectRefWithExtra, parseRef, refUri} from '@wandb/weave/react';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 
 import {isListLike, isObjectTypeLike, isTypedDictLike} from '../../../../core';
-import {Type} from '../../../../core/model/types';
 import {isRef} from '../Browse3/pages/common/util';
 import {
   DICT_KEY_EDGE_TYPE,

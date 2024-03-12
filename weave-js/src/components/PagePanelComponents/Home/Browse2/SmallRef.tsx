@@ -1,20 +1,13 @@
 import {Box} from '@mui/material';
-import {
-  callOpVeryUnsafe,
-  constString,
-  getTypeName,
-  Node,
-  Type,
-} from '@wandb/weave/core';
+import {getTypeName, Type} from '@wandb/weave/core';
 import {
   ArtifactRef,
   isWandbArtifactRef,
   ObjectRef,
   parseRef,
   refUri,
-  useNodeValue,
 } from '@wandb/weave/react';
-import React, {FC, useMemo} from 'react';
+import React, {FC} from 'react';
 
 import {hexToRGB, MOON_300} from '../../../../common/css/globals.styles';
 import {Icon, IconName, IconNames} from '../../../Icon';
