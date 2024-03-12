@@ -70,7 +70,10 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   objRef,
   wfTable,
 }) => {
-  const {useObjectVersion} = useWFHooks();
+  const {
+    useObjectVersion,
+    derived: {useRefsType},
+  } = useWFHooks();
 
   const objVersionKey =
     'entityName' in objRef
@@ -87,13 +90,11 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   const versionIndex = objectVersion.result?.versionIndex;
 
   const {peekingRouter} = useWeaveflowRouteContext();
-  const refTypeNode = useMemo(() => {
-    const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
-    return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
-  }, [objRef]);
-
-  const refTypeQuery = useNodeValue(refTypeNode);
-  const refType: Type = refTypeQuery.result ?? 'unknown';
+  const refTypeQuery = useRefsType([refUri(objRef)]);
+  const refType: Type =
+    refTypeQuery.loading || refTypeQuery.result == null
+      ? 'unknown'
+      : refTypeQuery.result[0];
   const rootType = getRootType(refType);
   const {label} = objectRefDisplayName(objRef, versionIndex);
 

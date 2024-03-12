@@ -324,8 +324,8 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
 const expensiveOpNames = new Set([
   'get',
   'set',
-  'getReturnType',
-  'Ref-type',
+  // 'getReturnType',
+  // 'Ref-type',
   'ref',
 ]);
 

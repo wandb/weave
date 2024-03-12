@@ -10,6 +10,7 @@
 
 import LRUCache from 'lru-cache';
 
+import { Node } from '../../../../../../core';
 import * as Types from '../../../../../../core/model/types';
 import {
   CallKey,
@@ -62,5 +63,9 @@ export const refDataCache = makeSpecificCache<string, any>(key => {
 });
 
 export const refTypeCache = makeSpecificCache<string, Types.Type>(key => {
+  return key;
+});
+
+export const refTypedNodeCache = makeSpecificCache<string, Node>(key => {
   return key;
 });

@@ -173,8 +173,10 @@ export type WFDataModelHooksInterface = {
       selectedOpVersionRef: string | null,
       selectedObjectVersionRef: string | null
     ) => Loadable<CallSchema[]>;
-    // `useRefsType` is in beta while we integrate Shawn's new Object DB
+    // `useGetRefsType` is in beta while we integrate Shawn's new Object DB
     useGetRefsType: () => (refUris: string[]) => Promise<Types.Type[]>;
+    // `useRefsType` is in beta while we integrate Shawn's new Object DB
+    useRefsType: (refUris: string[]) => Loadable<Types.Type[]>
   };
 };
 

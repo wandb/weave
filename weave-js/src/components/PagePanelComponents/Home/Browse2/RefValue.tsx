@@ -31,30 +31,26 @@ const RENDER_DIRECTLY = new Set([
 
 export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
   const {
-    derived: {useGetRefsType},
+    derived: {useRefsType},
   } = useWFHooks();
-  const getRefsType = useGetRefsType();
-  const [refType, setRefType] = useState<Type>();
-  useEffect(() => {
-    getRefsType([weaveRef]).then(types => setRefType(types[0]));
-  }, [weaveRef, attribute, getRefsType]);
-  if (refType == null) {
+  const getRefsType = useRefsType([weaveRef]);
+  if (getRefsType.loading || getRefsType.result == null) {
     return <></>;
-  } else if (isTypedDictLike(refType)) {
+  } else if (isTypedDictLike(getRefsType.result[0])) {
     return (
       <RefValueWithExtra
         weaveRef={weaveRef}
         attribute={DICT_KEY_EDGE_TYPE + '/' + attribute}
       />
     );
-  } else if (isObjectTypeLike(refType)) {
+  } else if (isObjectTypeLike(getRefsType.result[0])) {
     return (
       <RefValueWithExtra
         weaveRef={weaveRef}
         attribute={OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + attribute}
       />
     );
-  } else if (isListLike(refType)) {
+  } else if (isListLike(getRefsType.result[0])) {
     return (
       <RefValueWithExtra
         weaveRef={weaveRef}

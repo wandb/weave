@@ -267,12 +267,8 @@ export const WeaveEditor: FC<{
   disableEdits?: boolean;
 }> = ({objType, objectRefUri, disableEdits}) => {
   const {
-    derived: {useGetRefsType},
+    derived: {useRefsType},
   } = useWFHooks();
-  // const weave = useWeaveContext();
-  // const {stack} = usePanelContext();
-  // const [refinedNode, setRefinedNode] = useState<NodeOrVoidNode>(voidNode());
-  const [refType, setRefType] = useState<Type>();
   const rootObjectRef = useMemo(() => {
     const ref = parseRef(objectRefUri);
     ref.artifactRefExtra = undefined;
@@ -287,30 +283,17 @@ export const WeaveEditor: FC<{
   );
   const contextVal = useMemo(() => ({edits, addEdit}), [edits, addEdit]);
   const [commitChangesOpen, setCommitChangesOpen] = useState(false);
-  const getRefsType = useGetRefsType();
-  useEffect(() => {
-    let mounted = true;
-    const doRefine = async () => {
-      const refsType = await getRefsType([objectRefUri]);
-      if (!mounted) {
-        return;
-      }
-      setRefType(refsType[0]);
-    };
-    doRefine();
-    return () => {
-      mounted = false;
-    };
-  }, [getRefsType, objectRefUri]);
+  const refsType = useRefsType([objectRefUri]);
+
   const refWithType: RefWithType | undefined = useMemo(() => {
-    if (refType == null) {
+    if (refsType.loading || refsType.result == null) {
       return;
     }
     return {
       refUri: objectRefUri,
-      type: refType!,
+      type: refsType.result[0]!,
     };
-  }, [objectRefUri, refType]);
+  }, [objectRefUri, refsType.loading, refsType.result]);
 
   return refWithType == null ? (
     <div>loading</div>

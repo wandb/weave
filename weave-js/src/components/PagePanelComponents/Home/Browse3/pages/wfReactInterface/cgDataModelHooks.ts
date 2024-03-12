@@ -67,7 +67,6 @@ import {
   objectVersionCache,
   opVersionCache,
   refDataCache,
-  refTypeCache,
   refTypedNodeCache,
 } from './cache';
 import {
@@ -982,6 +981,32 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Type[]>) => {
   return getRefsType;
 };
 
+
+const useRefsType = (refUris: string[]): Loadable<Type[]> => {
+  const refUrisDeep = useDeepMemo(refUris);
+  const [results, setResults] = useState<Type[]>();
+  const getRefsType = useGetRefsType();
+  useEffect(() => {
+    let isMounted = true;
+    const updateResults = async () => {
+      const res = await getRefsType(refUrisDeep);
+      if (!isMounted) {
+        return;
+      }
+      setResults(res);
+    };
+    updateResults();
+    return () => {
+      isMounted = false;
+    };
+  }, [getRefsType, refUrisDeep]);
+  return {
+    loading: results == null,
+    result: results ?? [],
+  };
+  
+};
+
 // Converters //
 const spanToCallSchema = (
   entity: string,
@@ -1085,5 +1110,5 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
-  derived: {useChildCallsForCompare, useGetRefsType},
+  derived: {useChildCallsForCompare, useGetRefsType, useRefsType},
 };
