@@ -74,6 +74,8 @@ def init_local() -> InitializedClient:
 def init_trace_remote(project_name: str) -> InitializedClient:
     from . import wandb_api
 
+    wandb_api.init()
+
     entity_name, project_name = get_entity_project_from_project_name(project_name)
 
     remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
