@@ -13,7 +13,6 @@ import {
   Typography,
 } from '@mui/material';
 import {GridColDef, useGridApiRef} from '@mui/x-data-grid-pro';
-import {useWeaveContext} from '@wandb/weave/context';
 import {
   isAssignableTo,
   isTypedDict,
@@ -328,7 +327,6 @@ const WeaveEditorField: FC<{
   path: WeaveEditorPathEl[];
   disableEdits?: boolean;
 }> = ({refWithType, path, disableEdits}) => {
-  const weave = useWeaveContext();
   if (refWithType.type === 'none') {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
