@@ -55,7 +55,8 @@ export const AddRowToTable: FC<{
   const addRowToDataset = useCallback(async () => {
     if (projectName && datasetName) {
       setWorking('addingRow');
-      // Note: this is not necessarily correct when we move to the new object server - we may need to use a different ref type
+      // Note: this is not necessarily correct when we move to the new object
+      // server - we may need to use a different ref type
       const refUri = `wandb-artifact:///${entityName}/${projectName}/${datasetName.name}:latest/obj#atr/rows`;
       const finalRootUri = await applyMutationsToRef(refUri, [
         {
