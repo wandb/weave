@@ -50,6 +50,9 @@ const BoringValue = styled.div`
   background-color: ${MOON_100};
   padding: 4px 8px;
   border-radius: 0 8px 8px 0;
+  max-width: 300px;
+  display: flex;
+  align-items: center;
 `;
 BoringValue.displayName = 'S.BoringValue';
 
