@@ -187,6 +187,7 @@ export const CellValueString = ({value}: CellValueStringProps) => {
           vertical: 'top',
           horizontal: 'center',
         }}
+        onClose={() => setAnchorEl(null)}
         TransitionComponent={DraggableGrow}>
         <Popped>
           <TooltipContent>
