@@ -6,12 +6,9 @@
  * re-fetching the same data multiple times in a single page view.
  */
 
-// TODO: add new ref data and ref types cache!
-
 import LRUCache from 'lru-cache';
 
 import {Node} from '../../../../../../core';
-import * as Types from '../../../../../../core/model/types';
 import {
   CallKey,
   CallSchema,
@@ -59,10 +56,6 @@ export const objectVersionCache = makeSpecificCache<
 });
 
 export const refDataCache = makeSpecificCache<string, any>(key => {
-  return key;
-});
-
-export const refTypeCache = makeSpecificCache<string, Types.Type>(key => {
   return key;
 });
 

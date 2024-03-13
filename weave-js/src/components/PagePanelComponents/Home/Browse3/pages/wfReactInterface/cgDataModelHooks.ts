@@ -1007,17 +1007,6 @@ const spanToCallSchema = (
   };
 };
 
-// const refToNode = async (weave: WeaveApp, refUri: string): Promise<Node> => {
-//   const uriParts = refUri.split('#');
-//   const baseUri = uriParts[0];
-//   const objNode = await makeTypedRefNode(weave, baseUri);
-//   if (uriParts.length === 1) {
-//     return objNode;
-//   }
-//   const extraFields = uriParts[1].split('/');
-//   return nodeFromExtra(objNode, extraFields);
-// };
-
 export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
     return node;

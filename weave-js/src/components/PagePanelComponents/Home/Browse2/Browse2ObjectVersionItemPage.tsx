@@ -186,6 +186,7 @@ export const Browse2ObjectVersionItemComponent: FC<{
                   {/* <Typography variant="h6" gutterBottom>
                       Value
                     </Typography> */}
+                  {/* Marking this as not implemented as it is the old app and we probably are going to delete this whole file anyway. */}
                   <>Not Implemented</>
                   {/* <WeaveEditor objType={params.rootType} node={itemNode} /> */}
                   {/* <Box p={2} sx={{height: 1000}}>

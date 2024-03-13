@@ -324,6 +324,10 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
 const expensiveOpNames = new Set([
   'get',
   'set',
+  // Marking `getReturnType` and `Ref-type` as inexpensive for now so that the
+  // weave app can bundle them into the same graph. This is typically used to
+  // determine the combined column type, so it should be done in one shot. This
+  // is a short term optimization until we have the new object store.
   // 'getReturnType',
   // 'Ref-type',
   'ref',

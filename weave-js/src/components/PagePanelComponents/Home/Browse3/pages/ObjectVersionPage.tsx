@@ -204,7 +204,6 @@ const ObjectVersionPageInner: React.FC<{
                 <WeaveEditor
                   objType={objectName}
                   objectRefUri={refUri}
-                  // node={itemNode}
                   disableEdits
                 />
               </ScrollableTabContent>
