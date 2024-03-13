@@ -1,6 +1,8 @@
 import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
 import {useState} from 'react';
 
+import {isRef} from '../Browse3/pages/common/util';
+
 type ValueType =
   | 'undefined'
   | 'null'
@@ -32,7 +34,7 @@ type ColumnStats = {
   valueCount: number;
   // TODO: Would make code more complex but could only store counts for types seen
   typeCounts: Record<ValueType, number>;
-
+  refCounts: Record<string, number>;
   valueCounts: Record<any, number>;
 };
 export type TableStats = {
@@ -64,6 +66,7 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
                 number: 0,
                 other: 0,
               },
+              refCounts: {},
               valueCounts: {},
             };
           }
@@ -72,6 +75,13 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
           const value = row[colName];
           const valueType = determineType(value);
           colStats.typeCounts[valueType] += 1;
+          // Keep track of unique refs seen in column
+          if (isRef(value)) {
+            if (!(value in colStats.refCounts)) {
+              colStats.refCounts[value] = 0;
+            }
+            colStats.refCounts[value] += 1;
+          }
           if (!(value in colStats.valueCounts)) {
             colStats.valueCounts[value] = 0;
           }
@@ -152,4 +162,25 @@ export const getBoringColumns = (tableStats: TableStats): string[] => {
   }
 
   return boring;
+};
+
+// Return the unique ref values in the column.
+export const columnRefs = (
+  tableStats: TableStats,
+  colName: string
+): string[] => {
+  const colStats = tableStats.column[colName];
+  if (!colStats) {
+    return [];
+  }
+  return Object.keys(colStats.refCounts);
+};
+
+// Return true if there are any ref values in the column.
+export const columnHasRefs = (
+  tableStats: TableStats,
+  colName: string
+): boolean => {
+  const refs = columnRefs(tableStats, colName);
+  return refs.length > 0;
 };

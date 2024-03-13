@@ -18,15 +18,18 @@ import React, {
 } from 'react';
 import {useParams} from 'react-router-dom';
 
-import {MOON_250} from '../../../../common/css/color.styles';
 import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
+import {useWeaveContext} from '../../../../context';
+import {constString, opArray, opGetReturnType} from '../../../../core';
 import {parseRef} from '../../../../react';
+import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
+import {listToObject} from '../Browse3/pages/common/util';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {
@@ -36,9 +39,16 @@ import {
 import {CallSchema} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
+import {CellValue} from './CellValue';
+import {CollapseGroupHeader} from './CollapseGroupHeader';
 import {Browse2RootObjectVersionItemParams} from './CommonLib';
 import {CustomGroupedColumnHeader} from './CustomGroupedColumnHeader';
+import {ExpandHeader} from './ExpandHeader';
+import {NotApplicable} from './NotApplicable';
+import {RefValue} from './RefValue';
 import {
+  columnHasRefs,
+  columnRefs,
   computeTableStats,
   getInputColumns,
   useColumnVisibility,
@@ -123,12 +133,45 @@ const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
   ) : null;
 };
 
+type ExtraColumns = Record<string, string[]>;
+
+const getExtraColumns = (result: any): string[] => {
+  const cols: Set<string> = new Set();
+  for (const refInfo of result) {
+    const keys = Object.keys(refInfo).filter(
+      k => k !== 'type' && !k.startsWith('_')
+    );
+    keys.forEach(k => cols.add(k));
+  }
+  return Array.from(cols);
+};
+
 export const RunsTable: FC<{
   loading: boolean;
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
 }> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+  // Support for expanding and collapsing ref values in columns
+  // This is a set of fields that have been expanded.
+  const weave = useWeaveContext();
+  const {client} = weave;
+  const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
+    new Set()
+  );
+  const onExpand = (col: string) => {
+    setExpandedRefCols(prevState => new Set(prevState).add(col));
+  };
+  const onCollapse = (col: string) => {
+    setExpandedRefCols(prevState => {
+      const newSet = new Set(prevState);
+      newSet.delete(col);
+      return newSet;
+    });
+  };
+
+  const [expandedColInfo, setExpandedColInfo] = useState<ExtraColumns>({});
+
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
   }, [spans]);
@@ -181,32 +224,20 @@ export const RunsTable: FC<{
         status_code: call.rawSpan.status_code,
         timestampMs: call.rawSpan.timestamp,
         latency: call.rawSpan.summary.latency_s,
-        ..._.mapValues(
-          _.mapKeys(
-            _.omitBy(args, v => v == null),
-            (v, k) => {
-              return 'input.' + k;
-            }
-          ),
-          v =>
-            typeof v === 'string' || typeof v === 'number'
-              ? v
-              : JSON.stringify(v)
+        ..._.mapKeys(
+          _.omitBy(args, v => v == null),
+          (v, k) => {
+            return 'input.' + k;
+          }
         ),
-        ..._.mapValues(
-          _.mapKeys(
-            _.omitBy(
-              flattenObject(call.rawSpan.output!),
-              (v, k) => v == null || (k.startsWith('_') && k !== '_result')
-            ),
-            (v, k) => {
-              return 'output.' + k;
-            }
+        ..._.mapKeys(
+          _.omitBy(
+            flattenObject(call.rawSpan.output!),
+            (v, k) => v == null || (k.startsWith('_') && k !== '_result')
           ),
-          v =>
-            typeof v === 'string' || typeof v === 'number'
-              ? v
-              : JSON.stringify(v)
+          (v, k) => {
+            return 'output.' + k;
+          }
         ),
         ..._.mapKeys(
           flattenObject(call.rawFeedback ?? {}),
@@ -222,6 +253,30 @@ export const RunsTable: FC<{
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      for (const col of expandedRefCols) {
+        if (!(col in expandedColInfo)) {
+          const refs = columnRefs(tableStats, col);
+          const returnTypeNodes = refs.map(ref =>
+            opGetReturnType({path: constString(ref)})
+          );
+          const listNode = opArray(listToObject(returnTypeNodes) as any);
+          const result = await client.query(listNode);
+          const extraCols = getExtraColumns(result);
+          setExpandedColInfo(prevState => ({
+            ...prevState,
+            [col]: extraCols,
+          }));
+        }
+      }
+    };
+
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedRefCols, client, tableStats]);
+
   const {allShown, columnVisibilityModel, forceShowAll, setForceShowAll} =
     useColumnVisibility(tableStats);
   const showVisibilityAlert = !isSingleOpVersion && !allShown && !forceShowAll;
@@ -429,21 +484,71 @@ export const RunsTable: FC<{
     };
     for (const key of inputOrder) {
       const field = 'input.' + key;
+      const isExpanded = expandedRefCols.has(field);
       cols.push({
         flex: 1,
         minWidth: 150,
         field,
-        renderHeader: headerParams => {
-          return <CustomGroupedColumnHeader field={headerParams.field} />;
+        renderHeader: () => {
+          const hasExpand = columnHasRefs(tableStats, field);
+          return (
+            <ExpandHeader
+              headerName={isExpanded ? 'Ref' : key}
+              field={field}
+              hasExpand={hasExpand && !isExpanded}
+              onExpand={onExpand}
+            />
+          );
         },
         renderCell: cellParams => {
           if (field in cellParams.row) {
-            return renderCell((cellParams.row as any)[field]);
+            const value = (cellParams.row as any)[field];
+            return <CellValue value={value} />;
           }
           return <NotApplicable />;
         },
       });
-      inputGroup.children.push({field: 'input.' + key});
+      if (isExpanded) {
+        const inputGroupChildren = [{field}];
+        const expandCols = expandedColInfo[field] ?? [];
+        for (const col of expandCols) {
+          const expandField = field + '.' + col;
+          cols.push({
+            field: expandField,
+            renderHeader: headerParams => (
+              <CustomGroupedColumnHeader field={headerParams.field} />
+            ),
+            renderCell: cellParams => {
+              const weaveRef = (cellParams.row as any)[field];
+              if (weaveRef === undefined) {
+                return <NotApplicable />;
+              }
+              return (
+                <ErrorBoundary>
+                  <RefValue weaveRef={weaveRef} attribute={col} />
+                </ErrorBoundary>
+              );
+            },
+          });
+          inputGroupChildren.push({field: expandField});
+        }
+        inputGroup.children.push({
+          groupId: field,
+          headerName: key,
+          children: inputGroupChildren,
+          renderHeaderGroup: () => {
+            return (
+              <CollapseGroupHeader
+                headerName={key}
+                field={field}
+                onCollapse={onCollapse}
+              />
+            );
+          },
+        });
+      } else {
+        inputGroup.children.push({field});
+      }
     }
     colGroupingModel.push(inputGroup);
 
@@ -472,16 +577,27 @@ export const RunsTable: FC<{
     colGroupingModel.push(outputGrouping);
     for (const key of outputOrder) {
       const field = 'output.' + key;
+      const isExpanded = expandedRefCols.has(field);
       cols.push({
         flex: 1,
         minWidth: 150,
         field,
-        renderHeader: headerParams => {
-          return <CustomGroupedColumnHeader field={headerParams.field} />;
+        renderHeader: () => {
+          const hasExpand = columnHasRefs(tableStats, field);
+          const tail = key.split('.').slice(-1)[0];
+          return (
+            <ExpandHeader
+              headerName={isExpanded ? 'Ref' : tail}
+              field={field}
+              hasExpand={hasExpand && !isExpanded}
+              onExpand={onExpand}
+            />
+          );
         },
         renderCell: cellParams => {
           if (field in cellParams.row) {
-            return renderCell((cellParams.row as any)[field]);
+            const value = (cellParams.row as any)[field];
+            return <CellValue value={value} />;
           }
           return <NotApplicable />;
         },
@@ -528,7 +644,6 @@ export const RunsTable: FC<{
       width: 100,
       minWidth: 100,
       maxWidth: 100,
-      // flex: !showIO ? 1 : undefined,
       renderCell: cellParams => {
         return monthRoundedTime(cellParams.row.latency);
       },
@@ -543,6 +658,8 @@ export const RunsTable: FC<{
     isSingleOp,
     isSingleOpVersion,
     tableStats,
+    expandedRefCols,
+    expandedColInfo,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();
@@ -654,8 +771,4 @@ export const RunsTable: FC<{
       />
     </>
   );
-};
-
-const NotApplicable = () => {
-  return <Box sx={{color: MOON_250}}>N/A</Box>;
 };
