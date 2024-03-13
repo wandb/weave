@@ -15,13 +15,13 @@ export type ProfileData = {
 export function useLifecycleProfiling(
   id: string,
   cb: (d: ProfileData) => void,
-  onStart?: () => void
+  onStart?: (name: string) => void
 ) {
   useEffect(() => {
     const x = performance.now();
 
     if (onStart) {
-      onStart();
+      onStart(id);
     }
 
     return () => {

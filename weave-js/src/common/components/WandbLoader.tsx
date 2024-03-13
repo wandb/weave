@@ -43,9 +43,9 @@ export interface TrackedWandbLoaderProps extends WandbLoaderProps {
   /* Tell me you're a Segment .track() event without telling me about Segment */
   track: (eventName: string, data: Record<string, unknown> | undefined) => void;
   /* Optional callback fired when finished loading */
-  onComplete?(data: Record<string, unknown> | undefined): void;
+  onComplete?(name: string, data: Record<string, unknown> | undefined): void;
   /* Optional callback fired when started loading */
-  onStart?(): void;
+  onStart?(name: string): void;
 }
 
 export const TrackedWandbLoader = ({
@@ -70,7 +70,7 @@ export const TrackedWandbLoader = ({
           ...additionalData,
         };
         if (onComplete) {
-          onComplete(trackedData);
+          onComplete(name, trackedData);
         }
         const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
         if (randomNum <= samplingRate * 100) {
