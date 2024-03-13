@@ -187,7 +187,9 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> (
+        int
+    ):  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
@@ -606,6 +608,7 @@ def test_trace_call_query_limit(trace_client):
         )
 
         assert len(inner_res.calls) == exp_count
+
 
 def test_trace_call_query_offset(trace_client):
     call_spec = simple_line_call_bootstrap()
