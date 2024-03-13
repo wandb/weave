@@ -279,14 +279,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conditions.append("wb_run_id IN {wb_run_ids: Array(String)}")
                 parameters["wb_run_ids"] = req.filter.wb_run_ids
 
-
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
             conditions=conditions,
             parameters=parameters,
             limit=req.limit,
         )
-        calls = [_ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts]
+        calls = [
+            _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
+        ]
         return tsi.CallsQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -403,7 +404,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"Call with id {req.id} not found")
 
         return ch_calls[0]
-    
+
     def _select_calls_query(
         self,
         project_id: str,
@@ -428,7 +429,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             calls.append(_raw_call_dict_to_ch_call(row))
         return calls
 
-        
     def _select_calls_query_raw(
         self,
         project_id: str,
@@ -512,6 +512,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for row in raw_res.result_rows:
             dicts.append(dict(zip(columns, row)))
         return dicts
+
     def _obj_read(self, req: tsi.ObjReadReq, op_only: bool) -> SelectableCHObjSchema:
         conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
 
@@ -683,7 +684,6 @@ def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHOb
     return SelectableCHObjSchema.model_validate(obj)
 
 
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -702,23 +702,24 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         wb_user_id=ch_call.wb_user_id,
     )
 
+
 # Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
     return dict(
-        project_id=ch_call_dict.get('project_id'),
-        id=ch_call_dict.get('id'),
-        trace_id=ch_call_dict.get('trace_id'),
-        parent_id=ch_call_dict.get('parent_id'),
-        name=ch_call_dict.get('name'),
-        start_datetime=_ensure_datetimes_have_tz(ch_call_dict.get('start_datetime')),
-        end_datetime=_ensure_datetimes_have_tz(ch_call_dict.get('end_datetime')),
-        attributes=_dict_dump_to_dict(ch_call_dict.get('attributes_dump')),
-        inputs=_dict_dump_to_dict(ch_call_dict.get('inputs_dump')),
-        outputs=_nullable_dict_dump_to_dict(ch_call_dict.get('outputs_dump')),
-        summary=_nullable_dict_dump_to_dict(ch_call_dict.get('summary_dump')),
-        exception=ch_call_dict.get('exception'),
-        wb_run_id=ch_call_dict.get('wb_run_id'),
-        wb_user_id=ch_call_dict.get('wb_user_id'),
+        project_id=ch_call_dict.get("project_id"),
+        id=ch_call_dict.get("id"),
+        trace_id=ch_call_dict.get("trace_id"),
+        parent_id=ch_call_dict.get("parent_id"),
+        name=ch_call_dict.get("name"),
+        start_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("start_datetime")),
+        end_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("end_datetime")),
+        attributes=_dict_dump_to_dict(ch_call_dict.get("attributes_dump")),
+        inputs=_dict_dump_to_dict(ch_call_dict.get("inputs_dump")),
+        outputs=_nullable_dict_dump_to_dict(ch_call_dict.get("outputs_dump")),
+        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
+        exception=ch_call_dict.get("exception"),
+        wb_run_id=ch_call_dict.get("wb_run_id"),
+        wb_user_id=ch_call_dict.get("wb_user_id"),
     )
 
 
