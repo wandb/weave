@@ -402,7 +402,10 @@ const WeaveEditorField: FC<{
   if (isAssignableTo(refWithType.type, maybe({type: 'WandbArtifactRef'}))) {
     return <WeaveViewSmallRef refWithType={refWithType} />;
   }
-  return <div>[No editor for type {weave.typeToString(refWithType.type)}]</div>;
+  // Instead of displaying "no editor", just display the stringified value.
+  // This could be risky if we have a large object, but it's fine for now.
+  return <WeaveEditorString node={node} path={path} disableEdits />;
+  // return <div>[No editor for type {weave.typeToString(node.type)}]</div>;
 };
 
 const useValueOfRefUri = (refUriStr: string, tableQuery?: TableQuery) => {
@@ -500,7 +503,7 @@ export const WeaveEditorString: FC<{
           margin: '0',
           fontFamily: 'Source Sans Pro',
         }}>
-        {curVal ?? ''}
+        {(curVal ?? '').toString()}
       </pre>
     );
   }
@@ -683,7 +686,8 @@ export const WeaveEditorObject: FC<{
 const typeToDataGridColumnSpec = (
   type: Type,
   isPeeking?: boolean,
-  disableEdits?: boolean
+  disableEdits?: boolean,
+  parentKey?: string
 ): GridColDef[] => {
   //   const cols: GridColDef[] = [];
   //   const colGrouping: GridColumnGroup[] = [];
@@ -691,7 +695,13 @@ const typeToDataGridColumnSpec = (
     const maxWidth = window.innerWidth * (isPeeking ? 0.5 : 0.75);
     const propertyTypes = typedDictPropertyTypes(type);
     return Object.entries(propertyTypes).flatMap(([key, valueType]) => {
-      const valTypeCols = typeToDataGridColumnSpec(valueType);
+      const innerKey = parentKey ? `${parentKey}.${key}` : key;
+      const valTypeCols = typeToDataGridColumnSpec(
+        valueType,
+        undefined,
+        undefined,
+        innerKey
+      );
       if (valTypeCols.length === 0) {
         let colType = 'string';
         let editable = false;
@@ -711,14 +721,14 @@ const typeToDataGridColumnSpec = (
               maxWidth,
               type: 'string',
               editable: false,
-              field: key,
-              headerName: key,
+              field: innerKey,
+              headerName: innerKey,
               renderCell: params => {
                 return (
                   <Typography>
-                    {params.row[key] == null
+                    {params.row[innerKey] == null
                       ? '-'
-                      : `[${params.row[key].length} item list]`}
+                      : `[${params.row[innerKey].length} item list]`}
                   </Typography>
                 );
               },
@@ -730,10 +740,10 @@ const typeToDataGridColumnSpec = (
             maxWidth,
             type: colType,
             editable: editable && !disableEdits,
-            field: key,
-            headerName: key,
+            field: innerKey,
+            headerName: innerKey,
             renderCell: params => {
-              return <CellValue value={params.row[key] ?? ''} />;
+              return <CellValue value={params.row[innerKey] ?? ''} />;
             },
           },
         ];

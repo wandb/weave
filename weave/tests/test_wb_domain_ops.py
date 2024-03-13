@@ -243,7 +243,7 @@ def test_all_projects(fake_wandb):
         # this could in theory change in the future.
         """query WeavePythonCG {
             instance {
-                projects_500: projects(limit: 500) {
+                projects_500: projects {
                     edges {
                         node {
                             id
@@ -398,7 +398,7 @@ def test_multi_root_merging(fake_wandb, cache_mode_minimal):
                 }
             }
             instance{
-                projects_500:projects(limit:500){
+                projects_500:projects {
                     edges{
                         node{
                             id 
