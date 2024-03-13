@@ -279,13 +279,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conditions.append("wb_run_id IN {wb_run_ids: Array(String)}")
                 parameters["wb_run_ids"] = req.filter.wb_run_ids
 
-        ch_calls = self._select_calls_query(
+        ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
             conditions=conditions,
             parameters=parameters,
             limit=req.limit,
         )
-        calls = [_ch_call_to_call_schema(call) for call in ch_calls]
+        calls = [
+            _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
+        ]
         return tsi.CallsQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -413,7 +415,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHCallSchema]:
+        dicts = self._select_calls_query_raw(
+            project_id,
+            columns=columns,
+            conditions=conditions,
+            order_by=order_by,
+            offset=offset,
+            limit=limit,
+            parameters=parameters,
+        )
+        calls = []
+        for row in dicts:
+            calls.append(_raw_call_dict_to_ch_call(row))
+        return calls
 
+    def _select_calls_query_raw(
+        self,
+        project_id: str,
+        columns: typing.Optional[typing.List[str]] = None,
+        conditions: typing.Optional[typing.List[str]] = None,
+        order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
+        offset: typing.Optional[int] = None,
+        limit: typing.Optional[int] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> typing.List[typing.Dict]:
         if not parameters:
             parameters = {}
         parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
@@ -483,10 +508,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters,
         )
 
-        calls = []
+        dicts = []
         for row in raw_res.result_rows:
-            calls.append(_raw_call_dict_to_ch_call(dict(zip(columns, row))))
-        return calls
+            dicts.append(dict(zip(columns, row)))
+        return dicts
 
     def _obj_read(self, req: tsi.ObjReadReq, op_only: bool) -> SelectableCHObjSchema:
         conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
@@ -675,6 +700,26 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
+    )
+
+
+# Keep in sync with `_ch_call_to_call_schema`. This copy is for performance
+def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
+    return dict(
+        project_id=ch_call_dict.get("project_id"),
+        id=ch_call_dict.get("id"),
+        trace_id=ch_call_dict.get("trace_id"),
+        parent_id=ch_call_dict.get("parent_id"),
+        name=ch_call_dict.get("name"),
+        start_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("start_datetime")),
+        end_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("end_datetime")),
+        attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
+        inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
+        outputs=_nullable_dict_dump_to_dict(ch_call_dict.get("outputs_dump")),
+        summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
+        exception=ch_call_dict.get("exception"),
+        wb_run_id=ch_call_dict.get("wb_run_id"),
+        wb_user_id=ch_call_dict.get("wb_user_id"),
     )
 
 
