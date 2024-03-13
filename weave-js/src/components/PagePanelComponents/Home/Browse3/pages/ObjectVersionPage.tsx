@@ -1,8 +1,6 @@
 import React, {useMemo} from 'react';
 
-import {constString, opGet} from '../../../../../core';
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {nodeFromExtra} from '../../Browse2/Browse2ObjectVersionItemPage';
 import {
   WeaveEditor,
   WeaveEditorSourceContext,
@@ -86,17 +84,6 @@ const ObjectVersionPageInner: React.FC<{
   const consumingCalls = useCalls(entityName, projectName, {
     inputObjectVersionRefs: [refUri],
   });
-
-  const itemNode = useMemo(() => {
-    const uriParts = refUri.split('#');
-    const baseUri = uriParts[0];
-    const objNode = opGet({uri: constString(baseUri)});
-    if (uriParts.length === 1) {
-      return objNode;
-    }
-    const extraFields = uriParts[1].split('/');
-    return nodeFromExtra(objNode, extraFields);
-  }, [refUri]);
 
   return (
     <SimplePageLayoutWithHeader
@@ -216,7 +203,7 @@ const ObjectVersionPageInner: React.FC<{
               <ScrollableTabContent>
                 <WeaveEditor
                   objType={objectName}
-                  node={itemNode}
+                  objectRefUri={refUri}
                   disableEdits
                 />
               </ScrollableTabContent>

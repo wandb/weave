@@ -525,11 +525,29 @@ export const parseRef = (ref: string): ObjectRef => {
   };
 };
 
-export const refUri = (ref: ArtifactRef): string => {
+export const objectRefWithExtra = (
+  objRef: ObjectRef,
+  extra: string
+): ObjectRef => {
+  let newExtra = '';
+  if (objRef.artifactRefExtra != null) {
+    newExtra = objRef.artifactRefExtra + '/';
+  }
+  newExtra += extra;
+  return {
+    ...objRef,
+    artifactRefExtra: newExtra,
+  };
+};
+
+export const refUri = (ref: ObjectRef): string => {
   if (isWandbArtifactRef(ref)) {
     let uri = `wandb-artifact:///${ref.entityName}/${ref.projectName}/${ref.artifactName}:${ref.artifactVersion}`;
     if (ref.artifactPath) {
       uri = `${uri}/${ref.artifactPath}`;
+      if (ref.artifactRefExtra) {
+        uri = `${uri}#${ref.artifactRefExtra}`;
+      }
     }
     return uri;
   } else {
