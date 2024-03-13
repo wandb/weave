@@ -404,7 +404,13 @@ const WeaveEditorField: FC<{
   }
   // Instead of displaying "no editor", just display the stringified value.
   // This could be risky if we have a large object, but it's fine for now.
-  return <WeaveEditorString node={node} path={path} disableEdits />;
+  return (
+    <WeaveEditorString
+      refWithType={refWithType}
+      path={path}
+      disableEdits={disableEdits}
+    />
+  );
   // return <div>[No editor for type {weave.typeToString(node.type)}]</div>;
 };
 
