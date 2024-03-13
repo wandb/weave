@@ -8,6 +8,7 @@
 
 import LRUCache from 'lru-cache';
 
+import {Node} from '../../../../../../core';
 import {
   CallKey,
   CallSchema,
@@ -19,59 +20,45 @@ import {
 
 const CACHE_SIZE = 5 * 2 ** 20; // 5MB
 
-const callCache = new LRUCache<string, CallSchema>({
-  max: CACHE_SIZE,
-  updateAgeOnGet: true,
-});
+const makeSpecificCache = <K, V>(
+  keyFn: (externalKey: K) => string,
+  lruOptions: LRUCache.Options<string, V> = {
+    max: CACHE_SIZE,
+    updateAgeOnGet: true,
+  }
+) => {
+  const cache = new LRUCache<string, V>(lruOptions);
+  return {
+    get: (key: K) => {
+      return cache.get(keyFn(key));
+    },
+    set: (key: K, value: V) => {
+      cache.set(keyFn(key), value);
+    },
+  };
+};
 
-const callCacheKeyFn = (key: CallKey) => {
+export const callCache = makeSpecificCache<CallKey, CallSchema>(key => {
   return `call:${key.entity}/${key.project}/${key.callId}`;
-};
-
-export const getCallFromCache = (key: CallKey) => {
-  return callCache.get(callCacheKeyFn(key));
-};
-
-export const setCallInCache = (key: CallKey, value: CallSchema) => {
-  callCache.set(callCacheKeyFn(key), value);
-};
-
-const opVersionCache = new LRUCache<string, OpVersionSchema>({
-  max: CACHE_SIZE,
-  updateAgeOnGet: true,
 });
 
-const opVersionCacheKeyFn = (key: OpVersionKey) => {
-  return `op:${key.entity}/${key.project}/${key.opId}/${key.versionHash}`;
-};
+export const opVersionCache = makeSpecificCache<OpVersionKey, OpVersionSchema>(
+  key => {
+    return `op:${key.entity}/${key.project}/${key.opId}/${key.versionHash}`;
+  }
+);
 
-export const getOpVersionFromCache = (key: OpVersionKey) => {
-  return opVersionCache.get(opVersionCacheKeyFn(key));
-};
-
-export const setOpVersionInCache = (
-  key: OpVersionKey,
-  value: OpVersionSchema
-) => {
-  opVersionCache.set(opVersionCacheKeyFn(key), value);
-};
-
-const objectVersionCache = new LRUCache<string, ObjectVersionSchema>({
-  max: CACHE_SIZE,
-  updateAgeOnGet: true,
-});
-
-const objectVersionCacheKeyFn = (key: ObjectVersionKey) => {
+export const objectVersionCache = makeSpecificCache<
+  ObjectVersionKey,
+  ObjectVersionSchema
+>(key => {
   return `obj:${key.entity}/${key.project}/${key.objectId}/${key.versionHash}/${key.path}/${key.refExtra}`;
-};
+});
 
-export const getObjectVersionFromCache = (key: ObjectVersionKey) => {
-  return objectVersionCache.get(objectVersionCacheKeyFn(key));
-};
+export const refDataCache = makeSpecificCache<string, any>(key => {
+  return key;
+});
 
-export const setObjectVersionInCache = (
-  key: ObjectVersionKey,
-  value: ObjectVersionSchema
-) => {
-  objectVersionCache.set(objectVersionCacheKeyFn(key), value);
-};
+export const refTypedNodeCache = makeSpecificCache<string, Node>(key => {
+  return key;
+});

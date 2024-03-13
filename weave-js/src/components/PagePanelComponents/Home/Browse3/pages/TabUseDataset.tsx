@@ -5,6 +5,10 @@ import {isValidVarName} from '../../../../../core/util/var';
 import {parseRef} from '../../../../../react';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
+import {
+  LIST_INDEX_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+} from './wfReactInterface/constants';
 
 type TabUseDatasetProps = {
   name: string;
@@ -12,7 +16,7 @@ type TabUseDatasetProps = {
   versionIndex: number;
 };
 
-const ROW_PATH_PREFIX = 'atr/rows/ndx/';
+const ROW_PATH_PREFIX = `${OBJECT_ATTRIBUTE_EDGE_TYPE}/rows/${LIST_INDEX_EDGE_TYPE}/`;
 
 export const TabUseDataset = ({
   name,

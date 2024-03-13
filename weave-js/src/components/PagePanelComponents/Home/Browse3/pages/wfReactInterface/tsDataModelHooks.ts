@@ -6,8 +6,9 @@
 
 import {useEffect, useMemo, useRef, useState} from 'react';
 
+import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {getCallFromCache, setCallInCache} from './cache';
+import {callCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -25,6 +26,8 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  RefMutation,
+  TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -39,7 +42,7 @@ const projectIdFromParts = ({
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const cachedCall = key ? getCallFromCache(key) : null;
+  const cachedCall = key ? callCache.get(key) : null;
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
@@ -80,7 +83,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
       };
     } else {
       if (result) {
-        setCallInCache(key, result);
+        callCache.set(key, result);
       }
       return {
         loading: false,
@@ -161,7 +164,7 @@ const useCalls = (
       };
     } else {
       allResults.forEach(call => {
-        setCallInCache(
+        callCache.set(
           {
             entity,
             project,
@@ -281,6 +284,28 @@ const useChildCallsForCompare = (
   return result;
 };
 
+const useRefsData = (
+  refUris: string[],
+  tableQuery?: TableQuery
+): Loadable<any[]> => {
+  throw new Error('Not implemented');
+};
+
+const useApplyMutationsToRef = (): ((
+  refUri: string,
+  edits: RefMutation[]
+) => Promise<string>) => {
+  throw new Error('Not implemented');
+};
+
+const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
+  throw new Error('Not implemented');
+};
+
+const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
+  throw new Error('Not implemented');
+};
+
 /// Converters ///
 
 const traceCallToLegacySpan = (
@@ -364,7 +389,11 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useOpVersions,
   useObjectVersion,
   useRootObjectVersions,
+  useRefsData,
+  useApplyMutationsToRef,
   derived: {
     useChildCallsForCompare,
+    useGetRefsType,
+    useRefsType,
   },
 };

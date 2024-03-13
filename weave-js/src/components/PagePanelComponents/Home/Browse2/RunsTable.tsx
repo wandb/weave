@@ -21,7 +21,11 @@ import {useParams} from 'react-router-dom';
 import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
 import {useWeaveContext} from '../../../../context';
-import {constString, opArray, opGetReturnType} from '../../../../core';
+import {
+  isObjectTypeLike,
+  isTypedDictLike,
+  typedDictPropertyTypes,
+} from '../../../../core';
 import {parseRef} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
@@ -29,7 +33,6 @@ import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
-import {listToObject} from '../Browse3/pages/common/util';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {
@@ -138,10 +141,15 @@ type ExtraColumns = Record<string, string[]>;
 const getExtraColumns = (result: any): string[] => {
   const cols: Set<string> = new Set();
   for (const refInfo of result) {
-    const keys = Object.keys(refInfo).filter(
-      k => k !== 'type' && !k.startsWith('_')
-    );
-    keys.forEach(k => cols.add(k));
+    if (isObjectTypeLike(refInfo)) {
+      const keys = Object.keys(refInfo).filter(
+        k => k !== 'type' && !k.startsWith('_')
+      );
+      keys.forEach(k => cols.add(k));
+    } else if (isTypedDictLike(refInfo)) {
+      const keys = Object.keys(typedDictPropertyTypes(refInfo));
+      keys.forEach(k => cols.add(k));
+    }
   }
   return Array.from(cols);
 };
@@ -155,6 +163,9 @@ export const RunsTable: FC<{
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
+  const {
+    derived: {useGetRefsType},
+  } = useWFHooks();
   const {client} = weave;
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
     new Set()
@@ -253,18 +264,14 @@ export const RunsTable: FC<{
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
-
+  const getRefsType = useGetRefsType();
   useEffect(() => {
     const fetchData = async () => {
       for (const col of expandedRefCols) {
         if (!(col in expandedColInfo)) {
           const refs = columnRefs(tableStats, col);
-          const returnTypeNodes = refs.map(ref =>
-            opGetReturnType({path: constString(ref)})
-          );
-          const listNode = opArray(listToObject(returnTypeNodes) as any);
-          const result = await client.query(listNode);
-          const extraCols = getExtraColumns(result);
+          const refTypes = await getRefsType(refs);
+          const extraCols = getExtraColumns(refTypes);
           setExpandedColInfo(prevState => ({
             ...prevState,
             [col]: extraCols,
