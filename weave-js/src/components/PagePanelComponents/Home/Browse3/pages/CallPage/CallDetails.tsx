@@ -54,14 +54,14 @@ export const CallSchemaLink = ({call}: {call: CallSchema}) => {
 export const CallDetails: FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const {usePaginatedCalls} = useWFHooks();
+  const {useCalls} = useWFHooks();
 
   const {inputs, output} = useMemo(
     () => getDisplayInputsAndOutput(call),
     [call]
   );
 
-  const childCalls = usePaginatedCalls(call.entity, call.project, {
+  const childCalls = useCalls(call.entity, call.project, {
     parentIds: [call.callId],
   });
 

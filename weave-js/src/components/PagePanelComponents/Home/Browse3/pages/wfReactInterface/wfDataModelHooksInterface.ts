@@ -136,13 +136,6 @@ export type WFDataModelHooksInterface = {
       selectedObjectVersionRef: string | null
     ) => Loadable<CallSchema[]>;
   };
-  usePaginatedCalls: (
-    entity: string,
-    project: string,
-    filter: CallFilter,
-    pageLimit?: number,
-    opts?: {skip?: boolean}
-  ) => Loadable<CallSchema[]>;
 };
 
 /**

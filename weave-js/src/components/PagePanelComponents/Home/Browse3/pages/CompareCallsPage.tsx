@@ -21,7 +21,7 @@ export const CompareCallsPage: FC<{
   secondaryDim?: string;
 }> = props => {
   const {
-    usePaginatedCalls,
+    useCalls,
     derived: {useChildCallsForCompare},
   } = useWFHooks();
   const [selectedOpVersionRef, setSelectedOpVersionRef] = useState<
@@ -41,7 +41,7 @@ export const CompareCallsPage: FC<{
       selectedObjectVersionRef
     );
 
-  const parentCallsValue = usePaginatedCalls(
+  const parentCallsValue = useCalls(
     props.entity,
     props.project,
     {

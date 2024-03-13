@@ -155,6 +155,7 @@ class CallsQueryReq(BaseModel):
     project_id: str
     filter: typing.Optional[_CallsFilter] = None
     limit: typing.Optional[int] = None
+    offset: typing.Optional[int] = None
 
 
 class CallsQueryRes(BaseModel):

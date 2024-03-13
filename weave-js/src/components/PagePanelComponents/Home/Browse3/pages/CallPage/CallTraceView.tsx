@@ -340,8 +340,8 @@ export const useCallFlattenedTraceTree = (
   call: CallSchema,
   selectedPath: string | null
 ) => {
-  const {usePaginatedCalls} = useWFHooks();
-  const traceCalls = usePaginatedCalls(call.entity, call.project, {
+  const {useCalls} = useWFHooks();
+  const traceCalls = useCalls(call.entity, call.project, {
     traceId: call.traceId,
   });
   const traceCallsResult = useMemo(
