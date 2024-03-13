@@ -593,15 +593,35 @@ def test_trace_call_query_limit(trace_client):
     for limit, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
-        # Test the True
+        # Test limit of 1
         (1, 1),
-        # Test the False
+        # Test limit of 10
         (10, 10),
     ]:
         inner_res = trace_client.trace_server.calls_query(
             tsi.CallsQueryReq(
                 project_id=trace_client.project_id(),
                 limit=limit,
+            )
+        )
+
+        assert len(inner_res.calls) == exp_count
+
+def test_trace_call_query_offset(trace_client):
+    call_spec = simple_line_call_bootstrap()
+
+    for offset, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test offset of 1
+        (1, call_spec.total_calls - 1),
+        # Test offset of 10
+        (10, call_spec.total_calls - 10),
+    ]:
+        inner_res = trace_client.trace_server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=trace_client.project_id(),
+                offset=offset,
             )
         )
 

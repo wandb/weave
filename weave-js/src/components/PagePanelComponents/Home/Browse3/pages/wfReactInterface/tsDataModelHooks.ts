@@ -110,7 +110,7 @@ const useCalls = (
   // otherwise we use a default of 10,000 and load 50 pages to return all calls
   // Arbitrary page limit of 10,000, in conjunction with the max 50 pages limits calls to 500,000
   const pageSize = limit ?? 10000;
-  const pageLimit = limit ? 0 : 50;
+  const maxPages = limit ? 0 : 50;
 
   // This is a recursive function that loads calls in pages from the trace server into an accumulator
   // This is a workaround for the trace server not being able to send super large pages over the wire
@@ -140,9 +140,9 @@ const useCalls = (
           offset: pageNumber * pageSize,
         });
 
-        if (res.calls.length < pageSize || pageNumber + 1 > pageLimit) {
+        if (res.calls.length < pageSize || pageNumber + 1 > maxPages) {
           // If we get less than the pageSize (ie we reached the end)
-          // or we've fetched more than 10 pages, we stop fetching (this is arbitrary, but we don't want to fetch forever)
+          // or we've fetched the max amount pages, we stop fetching (so we don't want to fetch forever)
           setAllCallsLoaded(true);
           setCallRes([...acc, ...res.calls]);
         } else {
@@ -167,7 +167,7 @@ const useCalls = (
       deepFilter.userIds,
       entity,
       getTsClient,
-      pageLimit,
+      maxPages,
       pageSize,
       project,
     ]
