@@ -983,7 +983,7 @@ def make_trace_obj(
                 val = TraceTable(val, new_ref, server, {}, root)
 
     if isinstance(val, ObjectRecord):
-        if val._type == "custom_obj":
+        if val._type == "WeaveTypeObj":
             return custom_objs.decode_custom_obj(val.weave_type, val.files)  # type: ignore
         return TraceObject(val, new_ref, server, root)
     elif isinstance(val, list):

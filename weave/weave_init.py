@@ -7,6 +7,7 @@ from . import context_state
 from . import errors
 from . import autopatch
 from .chobj import chobj
+from . import weave_client
 
 
 class InitializedClient:
@@ -54,6 +55,22 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
 def init_chobj() -> InitializedClient:
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
     client = chobj.ObjectClient()
+
+    init_client = InitializedClient(client)  # type: ignore
+
+    # autopatching is only supporte for the wandb client, because OpenAI calls are not
+    # logged in local mode currently. When that's fixed, this autopatch call can be
+    # moved to InitializedClient.__init__
+    autopatch.autopatch()
+
+    return init_client
+
+
+def init_weave() -> InitializedClient:
+    # entity_name, project_name = get_entity_project_from_project_name(project_name)
+    from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+
+    client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
 
     init_client = InitializedClient(client)  # type: ignore
 

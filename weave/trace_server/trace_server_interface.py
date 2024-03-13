@@ -90,26 +90,18 @@ class ObjSchema(BaseModel):
     entity: str
     project: str
     name: str
-    version_hash: str
-    version_index: int
-
-    type_dict: typing.Dict[str, typing.Any]
-    b64_file_map: typing.Dict[str, str]
-    metadata_dict: typing.Dict[str, typing.Any]
-
-    created_datetime: datetime.datetime
+    created_at: datetime.datetime
+    digest: str
+    # version_index: int
+    type: str
+    val: typing.Any
 
 
 class ObjSchemaForInsert(BaseModel):
     entity: str
     project: str
     name: str
-
-    type_dict: typing.Dict[str, typing.Any]
-    b64_file_map: typing.Dict[str, str]
-    metadata_dict: typing.Dict[str, typing.Any]
-
-    created_datetime: datetime.datetime
+    val: typing.Any
 
 
 class CallStartReq(BaseModel):
@@ -202,14 +194,14 @@ class ObjCreateReq(BaseModel):
 
 
 class ObjCreateRes(BaseModel):
-    version_hash: str
+    version_digest: str
 
 
 class ObjReadReq(BaseModel):
     entity: str
     project: str
     name: str
-    version_hash: str
+    version_digest: str
 
 
 class ObjReadRes(BaseModel):

@@ -196,6 +196,19 @@ def chobj_client() -> typing.Iterator[_weave_init.chobj.ObjectClient]:
         inited_client.reset()
 
 
+def init_weave() -> _weave_init.chobj.ObjectClient:
+    return _weave_init.init_chobj().client
+
+
+@contextlib.contextmanager
+def client() -> typing.Iterator[_weave_init.weave_client.WeaveClient]:
+    inited_client = _weave_init.init_weave()
+    try:
+        yield inited_client.client
+    finally:
+        inited_client.reset()
+
+
 def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
     """Save and version a python object.
 

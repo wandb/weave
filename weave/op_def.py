@@ -613,6 +613,10 @@ class OpDef:
         client = graph_client_context.require_graph_client()
         return client.op_runs(self)
 
+    def calls(self) -> Sequence[Run]:
+        client = graph_client_context.require_graph_client()
+        return client.op_calls(self)
+
 
 class AutoTagHandlingArrowOpDef(OpDef):
     pass

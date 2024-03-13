@@ -103,28 +103,22 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 class ObjCHInsertable(BaseModel):
     entity: str
     project: str
-    is_op: bool
+    type: str
     name: str
-    version_hash: str
-    created_datetime: datetime.datetime
-
-    type_dict_dump: str
-    bytes_file_map: typing.Dict[str, bytes]
-    metadata_dict_dump: str
+    refs: typing.List[str]
+    val: str
+    digest: str
 
 
 class SelectableCHObjSchema(BaseModel):
     entity: str
     project: str
-    is_op: bool
     name: str
-    version_hash: str
-    created_datetime: datetime.datetime
-    version_index: int
-
-    type_dict_dump: str
-    bytes_file_map: typing.Dict[str, bytes]
-    metadata_dict_dump: str
+    created_at: datetime.datetime
+    refs: typing.List[str]
+    val: str
+    type: str
+    digest: str
 
 
 all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
@@ -292,9 +286,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj, is_op=True)
+        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
         self._insert_obj(ch_obj)
-        return tsi.OpCreateRes(version_hash=ch_obj.version_hash)
+        return tsi.OpCreateRes(version_hash=str(ch_obj.id))
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         return tsi.OpReadRes(
@@ -321,14 +315,54 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        ch_obj = _partial_obj_schema_to_ch_obj(req.obj, is_op=False)
-        self._insert_obj(ch_obj)
-        return tsi.ObjCreateRes(version_hash=ch_obj.version_hash)
+        import hashlib
+
+        hasher = hashlib.sha256()
+
+        json_val = json.dumps(req.obj.val)
+        hasher.update(json_val.encode())
+
+        digest = hasher.hexdigest()
+
+        req_obj = req.obj
+        ch_obj = ObjCHInsertable(
+            entity=req_obj.entity,
+            project=req_obj.project,
+            name=req_obj.name,
+            type="unknown",
+            refs=[],
+            val=json_val,
+            digest=digest,
+        )
+
+        self.ch_client.insert(
+            "objects",
+            data=[list(ch_obj.model_dump().values())],
+            column_names=list(ch_obj.model_fields.keys()),
+        )
+        return tsi.ObjCreateRes(version_digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        return tsi.ObjReadRes(
-            obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=False))
+        conds = []
+        conds.append(f"entity = '{req.entity}'")
+        conds.append(f"project = '{req.project}'")
+        conds.append(f"name = '{req.name}'")
+        conds.append(f"digest = '{req.version_digest}'")
+        predicate = " AND ".join(conds)
+
+        query_result = self.ch_client.query(
+            f"""
+            SELECT *
+            FROM objects
+            WHERE {predicate}
+            """,
         )
+        if len(query_result.result_rows) == 0:
+            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
+        result = SelectableCHObjSchema.model_validate(
+            dict(zip(query_result.column_names, query_result.result_rows[0]))
+        )
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(result))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conditions: typing.List[str] = []
@@ -515,12 +549,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return dicts
 
     def _obj_read(self, req: tsi.ObjReadReq, op_only: bool) -> SelectableCHObjSchema:
-        conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
+        conditions = [
+            "name = {name: String}",
+            "version_digest = {version_hash: String}",
+        ]
 
-        if op_only:
-            conditions.append("is_op == 1")
-        else:
-            conditions.append("is_op == 0")
+        # if op_only:
+        #     conditions.append("is_op == 1")
+        # else:
+        #     conditions.append("is_op == 0")
 
         ch_objs = self._select_objs_query(
             req.entity,
@@ -528,12 +565,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             columns=all_obj_select_columns,
             conditions=conditions,
             limit=1,
-            parameters={"name": req.name, "version_hash": req.version_hash},
+            parameters={"name": req.name, "version_digest": req.version_digest},
         )
 
         # If the obj is not found, raise a NotFoundError
         if not ch_objs:
-            raise NotFoundError(f"Obj with id {req.id} not found")
+            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
 
         return ch_objs[0]
 
@@ -635,10 +672,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 def _dict_value_to_dump(
     value: dict,
 ) -> str:
+    return json.dumps(value)
     cpy = value.copy()
     if cpy:
         keys = list(cpy.keys())
-        cpy["_keys"] = keys
+        # cpy["_keys"] = keys
     return json.dumps(cpy)
 
 
@@ -729,12 +767,10 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         entity=ch_obj.entity,
         project=ch_obj.project,
         name=ch_obj.name,
-        version_hash=ch_obj.version_hash,
-        type_dict=_dict_dump_to_dict(ch_obj.type_dict_dump),
-        b64_file_map=encode_bytes_as_b64(ch_obj.bytes_file_map),
-        metadata_dict=_dict_dump_to_dict(ch_obj.metadata_dict_dump),
-        created_datetime=_ensure_datetimes_have_tz(ch_obj.created_datetime),
-        version_index=ch_obj.version_index,
+        created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
+        digest=ch_obj.digest,
+        type=ch_obj.type,
+        val=json.loads(ch_obj.val),
     )
 
 
@@ -790,20 +826,33 @@ def _process_parameters(
     return parameters
 
 
-def _partial_obj_schema_to_ch_obj(
-    partial_obj: tsi.ObjSchemaForInsert,
-    is_op: bool,
-) -> ObjCHInsertable:
-    version_hash = version_hash_for_object(partial_obj)
+# def _get_type(val):
+#     if val == None:
+#         return "none"
+#     elif isinstance(val, dict):
+#         return "dict"
+#     elif isinstance(val, list):
+#         return "list"
+#     elif isinstance(val, ObjectRecord):
+#         return val._type
+#     elif dataclasses.is_dataclass(val):
+#         return val.__class__.__name__
+#     elif isinstance(val, pydantic.BaseModel):
+#         return val.__class__.__name__
+#     return "unknown"
 
-    return ObjCHInsertable(
-        entity=partial_obj.entity,
-        project=partial_obj.project,
-        name=partial_obj.name,
-        version_hash=version_hash,
-        is_op=is_op,
-        type_dict_dump=_dict_value_to_dump(partial_obj.type_dict),
-        bytes_file_map=decode_b64_to_bytes(partial_obj.b64_file_map or {}),
-        metadata_dict_dump=_dict_value_to_dump(partial_obj.metadata_dict),
-        created_datetime=partial_obj.created_datetime,
-    )
+
+# def _partial_obj_schema_to_ch_obj(
+#     partial_obj: tsi.ObjSchemaForInsert,
+# ) -> ObjCHInsertable:
+#     version_hash = version_hash_for_object(partial_obj)
+
+#     return ObjCHInsertable(
+#         id=uuid.uuid4(),
+#         entity=partial_obj.entity,
+#         project=partial_obj.project,
+#         name=partial_obj.name,
+#         type="unknown",
+#         refs=[],
+#         val=json.dumps(partial_obj.val),
+#     )
