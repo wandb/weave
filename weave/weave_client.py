@@ -8,6 +8,7 @@ import copy
 import datetime
 
 from weave import box
+from weave import urls
 from weave import op_def
 from weave import run_context
 from weave.chobj import custom_objs
@@ -23,6 +24,7 @@ from weave.trace_server.trace_server_interface import (
     CallSchema,
     _CallsFilter,
 )
+from weave.wandb_interface import project_creator
 
 
 def generate_id():
@@ -496,69 +498,6 @@ def map_to_refs(obj: Any) -> Any:
     return custom_objs.encode_custom_obj(obj)
 
 
-def save_nested_objects(obj: Any, client: "WeaveClient") -> Any:
-    # if dataclasses.is_dataclass(obj):
-    #     if hasattr(obj, "_trace_object"):
-    #         return obj._trace_object
-    #     obj_rec = ObjectRecord(
-    #         {
-    #             "_class_name": obj.__class__.__name__,
-    #             **{
-    #                 k: save_nested_objects(v, client)
-    #                 for k, v in dataclasses_asdict_one_level(obj).items()
-    #             },
-    #             **{
-    #                 k: save_nested_objects(v, client)
-    #                 for k, v in inspect.getmembers(
-    #                     obj, lambda x: isinstance(x, op_def.OpDef)
-    #                 )
-    #                 if isinstance(v, op_def.OpDef)
-    #             },
-    #         },
-    #     )
-    #     ref = client.save_object(obj_rec, get_obj_name(obj_rec))
-    #     trace_obj = make_trace_obj(obj_rec, ref, client.server, None)
-    #     obj._trace_object = trace_obj
-    #     return trace_obj
-    if isinstance(obj, pydantic.BaseModel):
-        if hasattr(obj, "_trace_object"):
-            return obj._trace_object
-        obj_rec = ObjectRecord(
-            {
-                "_class_name": obj.__class__.__name__,
-                **{
-                    k: save_nested_objects(v, client)
-                    for k, v in pydantic_asdict_one_level(obj).items()
-                },
-                **{
-                    k: save_nested_objects(v, client)
-                    for k, v in inspect.getmembers(
-                        obj, lambda x: isinstance(x, op_def.OpDef)
-                    )
-                    if isinstance(v, op_def.OpDef)
-                },
-            },
-        )
-        ref = client.save_object(obj_rec, get_obj_name(obj_rec))
-        # return make_trace_obj(obj_rec, ref, client.server, None)
-        trace_obj = make_trace_obj(obj_rec, ref, client.server, None)
-        obj._trace_object = trace_obj
-        return trace_obj
-    elif isinstance(obj, list):
-        return [save_nested_objects(v, client) for v in obj]
-    elif isinstance(obj, dict):
-        return {k: save_nested_objects(v, client) for k, v in obj.items()}
-
-    if isinstance(obj, op_def.OpDef):
-        client._save_op(obj)
-        return obj
-
-    # Leave custom objects alone. They do not need to be saved by the
-    # time user code interacts with them since they are always leaves
-    # and we don't do ref-tracking inside them.
-    return obj
-
-
 def to_json(obj: Any) -> Any:
     if isinstance(obj, uuid.UUID):
         return {"_type": "UUID", "uuid": obj.hex}
@@ -617,6 +556,7 @@ class Dataset:
 class Call:
     op_name: str
     trace_id: str
+    project_id: str
     parent_id: Optional[str]
     inputs: dict
     id: Optional[str] = None
@@ -624,7 +564,11 @@ class Call:
 
     @property
     def ui_url(self):
-        return "<CALL URL NOT YET IMPLEMENTED>"
+        project_parts = self.project_id.split("/")
+        if len(project_parts) != 2:
+            raise ValueError(f"Invalid project_id: {self.project_id}")
+        entity, project = project_parts
+        return urls.call_path_as_peek(entity, project, self.id)
 
 
 class CallsIter:
@@ -666,6 +610,7 @@ def make_client_call(server_call: CallSchema, server: TraceServerInterface):
         output = output["_result"]
     call = Call(
         op_name=server_call.name,
+        project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
         id=server_call.id,
@@ -682,6 +627,13 @@ class WeaveClient:
         self.entity = entity
         self.project = project
         self.server = server
+
+        # Maybe this should happen on the first write event? For now, let's just ensure
+        # the project exists when the client is initialized. For production, we can move
+        # this to the service layer which will: a) save a round trip, and b) reduce the amount
+        # of client-side logic to duplicate to TS in the future. We already do auth checks
+        # in the service layer, so this is just a matter of convenience.
+        project_creator.ensure_project_exists(entity, project)
 
     def ref_is_own(self, ref):
         return isinstance(ref, Ref)
@@ -762,7 +714,7 @@ class WeaveClient:
             op_str = op_def_ref.uri()
         else:
             op_str = op
-        inputs = save_nested_objects(inputs, self)
+        inputs = self.save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
@@ -774,6 +726,7 @@ class WeaveClient:
             parent_id = None
         call = Call(
             op_name=op_str,
+            project_id=self._project_id(),
             trace_id=trace_id,
             parent_id=parent_id,
             id=call_id,
@@ -792,7 +745,7 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
-        return call, inputs
+        return call
         # return CallSchemaRun(start)
 
     def finish_call(self, call: Call, output: Any):
@@ -824,6 +777,68 @@ class WeaveClient:
 
     def fail_run(self, run, exception):
         self.finish_call(run, str(exception))
+
+    def save_nested_objects(self, obj: Any) -> Any:
+        # if dataclasses.is_dataclass(obj):
+        #     if hasattr(obj, "_trace_object"):
+        #         return obj._trace_object
+        #     obj_rec = ObjectRecord(
+        #         {
+        #             "_class_name": obj.__class__.__name__,
+        #             **{
+        #                 k: save_nested_objects(v, client)
+        #                 for k, v in dataclasses_asdict_one_level(obj).items()
+        #             },
+        #             **{
+        #                 k: save_nested_objects(v, client)
+        #                 for k, v in inspect.getmembers(
+        #                     obj, lambda x: isinstance(x, op_def.OpDef)
+        #                 )
+        #                 if isinstance(v, op_def.OpDef)
+        #             },
+        #         },
+        #     )
+        #     ref = client.save_object(obj_rec, get_obj_name(obj_rec))
+        #     trace_obj = make_trace_obj(obj_rec, ref, client.server, None)
+        #     obj._trace_object = trace_obj
+        #     return trace_obj
+        if isinstance(obj, pydantic.BaseModel):
+            if hasattr(obj, "_trace_object"):
+                return obj._trace_object
+            obj_rec = ObjectRecord(
+                {
+                    "_class_name": obj.__class__.__name__,
+                    **{
+                        k: self.save_nested_objects(v)
+                        for k, v in pydantic_asdict_one_level(obj).items()
+                    },
+                    **{
+                        k: self.save_nested_objects(v)
+                        for k, v in inspect.getmembers(
+                            obj, lambda x: isinstance(x, op_def.OpDef)
+                        )
+                        if isinstance(v, op_def.OpDef)
+                    },
+                },
+            )
+            ref = self.save_object(obj_rec, get_obj_name(obj_rec))
+            # return make_trace_obj(obj_rec, ref, client.server, None)
+            trace_obj = make_trace_obj(obj_rec, ref, self.server, None)
+            obj._trace_object = trace_obj
+            return trace_obj
+        elif isinstance(obj, list):
+            return [self.save_nested_objects(v) for v in obj]
+        elif isinstance(obj, dict):
+            return {k: self.save_nested_objects(v) for k, v in obj.items()}
+
+        if isinstance(obj, op_def.OpDef):
+            self._save_op(obj)
+            return obj
+
+        # Leave custom objects alone. They do not need to be saved by the
+        # time user code interacts with them since they are always leaves
+        # and we don't do ref-tracking inside them.
+        return obj
 
 
 # TODO

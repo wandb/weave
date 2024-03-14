@@ -76,7 +76,8 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
         # if not client.ref_is_own(op_def_ref):
         #     op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
         # mon_span_inputs, refs = auto_publish(inputs)
-        mon_span_inputs, refs = inputs, []
+        trackable_inputs = client.save_nested_objects(inputs)
+        trackable_inputs, refs = inputs, []
         # mon_span_inputs, refs = client.save_nested_objects(inputs), []
 
         # Memoization disabled for now.
@@ -86,9 +87,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
         # if not parent_run:
         #     print("Running ", op_def.name)
-        run, trackable_inputs = client.create_run(
-            op_def, parent_run, mon_span_inputs, refs
-        )
+        run = client.create_run(op_def, parent_run, trackable_inputs, refs)
         try:
             with run_context.current_run(run):
                 res = op_def.raw_resolve_fn(**trackable_inputs)
