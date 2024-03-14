@@ -174,7 +174,6 @@ export const chunkedCallsQuery = (
           return;
         }
         allCallResults.push(...page.calls);
-        effectiveLimit -= page.calls.length;
         effectiveOffset += page.calls.length;
 
         if (page.calls.length < MAX_CHUNK_SIZE) {
