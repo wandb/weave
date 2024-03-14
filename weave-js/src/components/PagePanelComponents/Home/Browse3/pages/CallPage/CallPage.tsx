@@ -4,7 +4,6 @@ import {useHistory} from 'react-router-dom';
 import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
-import {WeaveAnimatedLoader} from '../../../../../Panel2/WeaveAnimatedLoader';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {
   queryGetBoolean,
@@ -111,7 +110,7 @@ const CallPageInnerVertical: FC<{
       headerContent={<CallOverview call={selectedCall} />}
       leftSidebar={
         loading ? (
-          <WeaveAnimatedLoader />
+          <Loader active />
         ) : (
           <CallTraceView
             call={call}
