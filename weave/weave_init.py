@@ -66,11 +66,27 @@ def init_chobj() -> InitializedClient:
     return init_client
 
 
-def init_weave() -> InitializedClient:
+def init_weave(project_name: str) -> InitializedClient:
+    from . import wandb_api
+
+    # entity_name, project_name = get_entity_project_from_project_name(project_name)
+    entity_name, project_name = project_name.split("/", 1)
+
+    # remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
+    from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+
+    # wandb_context = wandb_api.get_wandb_api_context()
+    # if wandb_context is not None and wandb_context.api_key is not None:
+    #     remote_server.set_auth(("api", wandb_context.api_key))
+
+    server = ClickHouseTraceServer(host="localhost")
+    client = weave_client.WeaveClient(entity_name, project_name, server)
+
+    init_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
     from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
-    client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
+    # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
 
     init_client = InitializedClient(client)  # type: ignore
 

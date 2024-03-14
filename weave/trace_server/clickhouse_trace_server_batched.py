@@ -344,6 +344,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = []
+        # TODO: sql injection
         conds.append(f"entity = '{req.entity}'")
         conds.append(f"project = '{req.project}'")
         conds.append(f"name = '{req.name}'")

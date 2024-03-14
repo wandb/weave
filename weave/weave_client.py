@@ -53,7 +53,7 @@ class TableRef(Ref):
     table_id: uuid.UUID
 
     def uri(self) -> str:
-        return f"table:///{self.table_id}"
+        return f"weave:///table/{self.table_id}"
 
 
 @dataclasses.dataclass
@@ -63,7 +63,7 @@ class ObjectRef(Ref):
     extra: list[str] = dataclasses.field(default_factory=list)
 
     def uri(self) -> str:
-        u = f"object:///{self.name}/{self.val_id}"
+        u = f"weave:///object/{self.name}/{self.val_id}"
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
@@ -89,7 +89,7 @@ class CallRef(Ref):
     extra: list[str] = dataclasses.field(default_factory=list)
 
     def uri(self) -> str:
-        u = f"call:///{self.id}"
+        u = f"weave:///call/{self.id}"
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
@@ -616,9 +616,10 @@ class Dataset:
 @dataclasses.dataclass
 class Call:
     op_name: str
+    trace_id: str
+    parent_id: Optional[str]
     inputs: dict
     id: Optional[str] = None
-    parent_id: Optional[uuid.UUID] = None
     output: Any = None
 
     @property
@@ -630,8 +631,9 @@ class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
 
-    def __init__(self, server, filter: _CallsFilter):
+    def __init__(self, server, project_id: str, filter: _CallsFilter):
         self.server = server
+        self.project_id = project_id
         self.filter = filter
 
     def __iter__(self):
@@ -640,7 +642,7 @@ class CallsIter:
         while True:
             response = self.server.calls_query(
                 CallsQueryReq(
-                    project_id="none/none",
+                    project_id=self.project_id,
                     filter=self.filter,
                     # TODO: server doesn't implement offset yet.
                     # offset=page_index * page_size,
@@ -663,9 +665,11 @@ def make_client_call(server_call: CallSchema, server: TraceServerInterface):
     if isinstance(output, dict) and "_result" in output:
         output = output["_result"]
     call = Call(
-        server_call.name,
-        from_json(server_call.inputs),
+        op_name=server_call.name,
+        trace_id=server_call.trace_id,
+        parent_id=server_call.parent_id,
         id=server_call.id,
+        inputs=from_json(server_call.inputs),
         output=output,
     )
     return TraceObject(call, CallRef(call.id), server, call)
@@ -674,11 +678,16 @@ def make_client_call(server_call: CallSchema, server: TraceServerInterface):
 class WeaveClient:
     server: TraceServerInterface
 
-    def __init__(self, server: TraceServerInterface):
+    def __init__(self, entity: str, project: str, server: TraceServerInterface):
+        self.entity = entity
+        self.project = project
         self.server = server
 
     def ref_is_own(self, ref):
         return isinstance(ref, Ref)
+
+    def _project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
 
     # This is used by tests and op_execute still, but the save() interface
     # is nicer for clients I think?
@@ -718,12 +727,12 @@ class WeaveClient:
         if filter is None:
             filter = _CallsFilter()
 
-        return CallsIter(self.server, filter)
+        return CallsIter(self.server, self._project_id(), filter)
 
     def call(self, call_id: str) -> TraceObject:
         response = self.server.calls_query(
             CallsQueryReq(
-                project_id="none/none",
+                project_id=self._project_id(),
                 filter=_CallsFilter(call_ids=[call_id]),
             )
         )
@@ -745,7 +754,9 @@ class WeaveClient:
         op.ref = op_def_ref
         return op_def_ref
 
-    def create_call(self, op: Union[str, op_def.OpDef], inputs: dict):
+    def create_call(
+        self, op: Union[str, op_def.OpDef], parent: Optional[Call], inputs: dict
+    ):
         if isinstance(op, op_def.OpDef):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
@@ -754,21 +765,23 @@ class WeaveClient:
         inputs = save_nested_objects(inputs, self)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
-        call = Call(op_str, inputs_with_refs, id=call_id)
 
-        # val_ref = self.server.new_val(call)
-        # call.id = val_ref.val_id
-        # return call, inputs
-        # if parent:
-        #     trace_id = parent.trace_id
-        #     parent_id = parent.id
-        # else:
-        project_id = "none/none"
-        trace_id = generate_id()
-        parent_id = None
+        if parent:
+            trace_id = parent.trace_id
+            parent_id = parent.id
+        else:
+            trace_id = generate_id()
+            parent_id = None
+        call = Call(
+            op_name=op_str,
+            trace_id=trace_id,
+            parent_id=parent_id,
+            id=call_id,
+            inputs=inputs_with_refs,
+        )
         current_wb_run_id = safe_current_wb_run_id()
         start = StartedCallSchemaForInsert(
-            project_id=project_id,
+            project_id=self._project_id(),
             id=call_id,
             name=op_str,
             trace_id=trace_id,
@@ -791,7 +804,7 @@ class WeaveClient:
             CallEndReq.model_validate(
                 {
                     "end": {
-                        "project_id": "none/none",
+                        "project_id": self._project_id(),
                         "id": call.id,
                         "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
                         "outputs": output,
@@ -804,7 +817,7 @@ class WeaveClient:
     # These are the old client interface terms, op_execute still relies
     # on them.
     def create_run(self, op_name: str, parent_run, inputs, refs):
-        return self.create_call(op_name, inputs)
+        return self.create_call(op_name, parent_run, inputs)
 
     def finish_run(self, run, output, refs):
         self.finish_call(run, output)
