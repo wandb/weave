@@ -121,11 +121,9 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
       <Box
         sx={{
           height: '22px',
-          // display: 'flex',
-          // alignItems: 'center',
           flex: 1,
           minWidth: 0,
-          overflow: 'hidden', 
+          overflow: 'hidden',
           whiteSpace: 'nowrap',
           textOverflow: 'ellipsis',
         }}>
