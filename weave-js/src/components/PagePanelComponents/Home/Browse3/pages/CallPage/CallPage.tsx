@@ -4,6 +4,7 @@ import {useHistory} from 'react-router-dom';
 import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
+import {WeaveAnimatedLoader} from '../../../../../Panel2/WeaveAnimatedLoader';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {
   queryGetBoolean,
@@ -61,6 +62,11 @@ const useCallTabs = (call: CallSchema) => {
   ];
 };
 
+// Setting to true is prohibitively slow for large traces and blocks
+// the UI from rendering the data. We need a different approach to
+// handle this. Making a flag for now to avoid the issue.
+const MAINTAIN_SELECTED_PATH = false;
+
 const CallPageInnerVertical: FC<{
   call: CallSchema;
 }> = ({call}) => {
@@ -71,14 +77,17 @@ const CallPageInnerVertical: FC<{
   };
 
   const path = queryGetString(history, 'path');
-  const {rows, selectedCall, expandKeys, loading} = useCallFlattenedTraceTree(
-    call,
-    path
-  );
+  const tree = useCallFlattenedTraceTree(call, path);
+  const {rows, expandKeys, loading} = tree;
+  let {selectedCall} = tree;
+
+  if (!MAINTAIN_SELECTED_PATH) {
+    selectedCall = call;
+  }
 
   const callTabs = useCallTabs(selectedCall);
 
-  if (loading) {
+  if (loading && MAINTAIN_SELECTED_PATH) {
     return <Loader active />;
   }
 
@@ -101,12 +110,16 @@ const CallPageInnerVertical: FC<{
       isSidebarOpen={showTraceTree}
       headerContent={<CallOverview call={selectedCall} />}
       leftSidebar={
-        <CallTraceView
-          call={call}
-          selectedCall={selectedCall}
-          rows={rows}
-          forcedExpandKeys={expandKeys}
-        />
+        loading ? (
+          <WeaveAnimatedLoader />
+        ) : (
+          <CallTraceView
+            call={call}
+            selectedCall={selectedCall}
+            rows={rows}
+            forcedExpandKeys={expandKeys}
+          />
+        )
       }
       tabs={callTabs}
     />
