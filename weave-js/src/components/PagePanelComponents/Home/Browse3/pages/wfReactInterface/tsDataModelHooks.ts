@@ -4,7 +4,7 @@
  * backed by the "Trace Server" engine.
  */
 
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -30,9 +30,6 @@ import {
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
-
-const DEFAULT_PAGE_SIZE = 10000;
-const DEFAULT_MAX_PAGES = 50;
 
 const projectIdFromParts = ({
   entity,
@@ -132,19 +129,24 @@ const useCalls = (
         wb_user_ids: deepFilter.userIds,
       },
       limit,
-    }
+    };
     const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
       loadingRef.current = false;
       setCallRes(res);
-    }
+    };
     const onError = (e: any) => {
       loadingRef.current = false;
       console.error(e);
       setCallRes({calls: []});
-    }
-    const {cancel} = traceServerClient.chunkedCallsQuery(getTsClient(), req, onSuccess, onError)
-    currentCancelRef.current = cancel
-    return cancel
+    };
+    const {cancel} = traceServerClient.chunkedCallsQuery(
+      getTsClient(),
+      req,
+      onSuccess,
+      onError
+    );
+    currentCancelRef.current = cancel;
+    return cancel;
   }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
 
   return useMemo(() => {

@@ -74,7 +74,6 @@ export class TraceServerClient {
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
-  
 
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
@@ -116,27 +115,31 @@ const MAX_CHUNK_SIZE = 10000;
  * Use this function to query calls from the trace server. This function will
  * handle chunking the results if the user requests more than `MAX_CHUNK_SIZE`
  * calls. This is to protect the server from returning too much data at once.
- * 
+ *
  * Note: we should probably roll this into the `callsQuery` directly, but I don't
  * want to change the API right now to support cancelation.
  */
-export const chunkedCallsQuery = (client: TraceServerClient, req: TraceCallsQueryReq,   onSuccess: (res: TraceCallsQueryRes) => void,
-onError: (err: any) => void): ({
+export const chunkedCallsQuery = (
+  client: TraceServerClient,
+  req: TraceCallsQueryReq,
+  onSuccess: (res: TraceCallsQueryRes) => void,
+  onError: (err: any) => void
+): {
   cancel: () => void;
-}) => {
+} => {
   let cancelled = false;
 
   const safeOnSuccess = (res: TraceCallsQueryRes) => {
     if (!cancelled) {
       onSuccess(res);
     }
-  }
+  };
 
   const safeOnError = (err: any) => {
     if (!cancelled) {
       onError(err);
     }
-  }
+  };
 
   const fetchCalls = async () => {
     const userRequestedLimit = req.limit ?? Infinity;
@@ -154,7 +157,7 @@ onError: (err: any) => void): ({
     } else {
       // Do the hard work
       const allCallResults: TraceCallSchema[] = [];
-      let effectiveLimit = Math.min(userRequestedLimit, MAX_CHUNK_SIZE)
+      let effectiveLimit = Math.min(userRequestedLimit, MAX_CHUNK_SIZE);
       let effectiveOffset = userRequestedOffset;
 
       while (effectiveLimit > 0) {
@@ -181,10 +184,8 @@ onError: (err: any) => void): ({
 
       safeOnSuccess({
         calls: allCallResults,
-      })
-
+      });
     }
-
   };
   fetchCalls();
   return {
@@ -192,4 +193,4 @@ onError: (err: any) => void): ({
       cancelled = true;
     },
   };
-}
+};
