@@ -74,6 +74,7 @@ export class TraceServerClient {
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
+  
 
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
@@ -106,5 +107,89 @@ export class TraceServerClient {
     });
     const res = await response.json();
     return res;
+  };
+}
+
+const MAX_CHUNK_SIZE = 10000;
+
+/**
+ * Use this function to query calls from the trace server. This function will
+ * handle chunking the results if the user requests more than `MAX_CHUNK_SIZE`
+ * calls. This is to protect the server from returning too much data at once.
+ * 
+ * Note: we should probably roll this into the `callsQuery` directly, but I don't
+ * want to change the API right now to support cancelation.
+ */
+export const chunkedCallsQuery = (client: TraceServerClient, req: TraceCallsQueryReq,   onSuccess: (res: TraceCallsQueryRes) => void,
+onError: (err: any) => void): ({
+  cancel: () => void;
+}) => {
+  let cancelled = false;
+
+  const safeOnSuccess = (res: TraceCallsQueryRes) => {
+    if (!cancelled) {
+      onSuccess(res);
+    }
+  }
+
+  const safeOnError = (err: any) => {
+    if (!cancelled) {
+      onError(err);
+    }
+  }
+
+  const fetchCalls = async () => {
+    const userRequestedLimit = req.limit ?? Infinity;
+    const userRequestedOffset = req.offset ?? 0;
+    const shouldPage = userRequestedLimit > MAX_CHUNK_SIZE;
+    if (!shouldPage) {
+      let page: TraceCallsQueryRes;
+      try {
+        page = await client.callsQuery(req);
+      } catch (err) {
+        safeOnError(err);
+        return;
+      }
+      safeOnSuccess(page);
+    } else {
+      // Do the hard work
+      const allCallResults: TraceCallSchema[] = [];
+      let effectiveLimit = Math.min(userRequestedLimit, MAX_CHUNK_SIZE)
+      let effectiveOffset = userRequestedOffset;
+
+      while (effectiveLimit > 0) {
+        const pageReq = {
+          ...req,
+          limit: effectiveLimit,
+          offset: effectiveOffset,
+        };
+        let page: TraceCallsQueryRes;
+        try {
+          page = await client.callsQuery(pageReq);
+        } catch (err) {
+          safeOnError(err);
+          return;
+        }
+        allCallResults.push(...page.calls);
+        effectiveLimit -= page.calls.length;
+        effectiveOffset += page.calls.length;
+
+        if (page.calls.length < MAX_CHUNK_SIZE) {
+          break;
+        }
+      }
+
+      safeOnSuccess({
+        calls: allCallResults,
+      })
+
+    }
+
+  };
+  fetchCalls();
+  return {
+    cancel: () => {
+      cancelled = true;
+    },
   };
 }
