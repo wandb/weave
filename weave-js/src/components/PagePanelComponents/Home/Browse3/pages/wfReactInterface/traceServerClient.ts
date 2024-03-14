@@ -157,7 +157,7 @@ export const chunkedCallsQuery = (
     } else {
       // Do the hard work
       const allCallResults: TraceCallSchema[] = [];
-      const effectiveLimit = MAX_CHUNK_SIZE
+      const effectiveLimit = MAX_CHUNK_SIZE;
       let effectiveOffset = userRequestedOffset;
 
       while (effectiveLimit > 0) {
