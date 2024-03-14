@@ -146,6 +146,8 @@ export const chunkedCallsQuery = (
     const userRequestedOffset = req.offset ?? 0;
     const shouldPage = userRequestedLimit > MAX_CHUNK_SIZE;
     if (!shouldPage) {
+      // If the user requested less than the max chunk size, we can just
+      // make a single request.
       let page: TraceCallsQueryRes;
       try {
         page = await client.callsQuery(req);
@@ -155,12 +157,16 @@ export const chunkedCallsQuery = (
       }
       safeOnSuccess(page);
     } else {
-      // Do the hard work
       const allCallResults: TraceCallSchema[] = [];
-      const effectiveLimit = MAX_CHUNK_SIZE;
       let effectiveOffset = userRequestedOffset;
+      let effectiveRemainingLimit = userRequestedLimit;
 
-      while (effectiveLimit > 0) {
+      // Keep paging until we have all the results requested.
+      while (effectiveRemainingLimit > 0) {
+        const effectiveLimit = Math.min(
+          effectiveRemainingLimit,
+          MAX_CHUNK_SIZE
+        );
         const pageReq = {
           ...req,
           limit: effectiveLimit,
@@ -174,9 +180,11 @@ export const chunkedCallsQuery = (
           return;
         }
         allCallResults.push(...page.calls);
+        effectiveRemainingLimit -= page.calls.length;
         effectiveOffset += page.calls.length;
 
-        if (page.calls.length < MAX_CHUNK_SIZE) {
+        // Break if we have less than the requested limit.
+        if (page.calls.length < effectiveLimit) {
           break;
         }
       }
