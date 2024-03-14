@@ -31,6 +31,9 @@ import {
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
+const DEFAULT_PAGE_SIZE = 10000;
+const DEFAULT_MAX_PAGES = 50;
+
 const projectIdFromParts = ({
   entity,
   project,
@@ -109,16 +112,27 @@ const useCalls = (
   );
   const deepFilter = useDeepMemo(filter);
 
-  // if a limit is provided, we use that and only return the single page
-  // otherwise we use a default of 10,000 and load 50 pages to return all calls
+  // this is only used if the limit that is passed in is greater than the default page size
+  const isLargeLimit = limit !== undefined && limit >= DEFAULT_PAGE_SIZE;
+  const isSmallLimit = limit !== undefined && limit < DEFAULT_PAGE_SIZE;
+  const callLimit = isLargeLimit
+    ? limit
+    : DEFAULT_PAGE_SIZE * DEFAULT_MAX_PAGES;
+
+  // if a limit is provided and is less than 10,000, we use that and only return the single page
+  // otherwise we use a default of 10,000 and load a max of 50 pages to return all calls
   // Arbitrary page limit of 10,000, in conjunction with the max 50 pages limits calls to 500,000
-  const pageSize = limit ?? 10000;
-  const maxPages = limit ? 0 : 50;
+  const pageSize = isSmallLimit ? limit : DEFAULT_PAGE_SIZE;
+  const maxPages = isSmallLimit ? 0 : DEFAULT_MAX_PAGES;
 
   // This is a recursive function that loads calls in pages from the trace server into an accumulator
   // This is a workaround for the trace server not being able to send super large pages over the wire
   const loadCalls = useCallback(
-    async (pageNumber: number, acc: traceServerClient.TraceCallSchema[]) => {
+    async (
+      pageNumber: number,
+      acc: traceServerClient.TraceCallSchema[],
+      leftoverCalls: number
+    ) => {
       // opts.skip will set this true if passed in
       // if all calls are already loaded, we dont need to do anything
       if (allCallsLoaded) {
@@ -139,18 +153,22 @@ const useCalls = (
             wb_run_ids: deepFilter.runIds,
             wb_user_ids: deepFilter.userIds,
           },
-          limit: pageSize,
+          limit: leftoverCalls < pageSize ? leftoverCalls : pageSize,
           offset: pageNumber * pageSize,
         });
 
-        if (res.calls.length < pageSize || pageNumber + 1 > maxPages) {
+        if (res.calls.length < pageSize || pageNumber >= maxPages) {
           // If we get less than the pageSize (ie we reached the end)
           // or we've fetched the max amount pages, we stop fetching (so we don't want to fetch forever)
           setAllCallsLoaded(true);
           setCallRes([...acc, ...res.calls]);
         } else {
           // Continue fetching the next page
-          loadCalls(pageNumber + 1, [...acc, ...res.calls]);
+          loadCalls(
+            pageNumber + 1,
+            [...acc, ...res.calls],
+            leftoverCalls - pageSize
+          );
         }
       } catch (e) {
         setAllCallsLoaded(true);
@@ -179,17 +197,18 @@ const useCalls = (
   // loads calls based on page size and page limit
   useEffect(() => {
     if (!allCallsLoaded && !opts?.skip) {
-      loadCalls(0, []);
+      loadCalls(0, [], callLimit);
     }
   }, [
-    entity,
-    project,
-    deepFilter,
-    limit,
-    opts?.skip,
-    getTsClient,
-    loadCalls,
     allCallsLoaded,
+    callLimit,
+    deepFilter,
+    entity,
+    getTsClient,
+    limit,
+    loadCalls,
+    opts?.skip,
+    project,
   ]);
 
   return useMemo(() => {
@@ -234,12 +253,12 @@ const useCalls = (
       };
     }
   }, [
+    allCallsLoaded,
     callRes,
     deepFilter.opCategory,
     entity,
-    project,
-    allCallsLoaded,
     opts?.skip,
+    project,
   ]);
 };
 
