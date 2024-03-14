@@ -4,7 +4,7 @@
  * backed by the "Trace Server" engine.
  */
 
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -30,6 +30,9 @@ import {
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
+
+const DEFAULT_PAGE_SIZE = 10000;
+const DEFAULT_MAX_PAGES = 50;
 
 const projectIdFromParts = ({
   entity,
@@ -101,43 +104,112 @@ const useCalls = (
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
-  const loadingRef = useRef(false);
-  const [callRes, setCallRes] =
-    useState<traceServerClient.TraceCallsQueryRes | null>(null);
+  // if allCallsLoaded is true, we have loaded all calls, this is how we tell if we are loading
+  // if skip is true, we don't need to load any calls
+  const [allCallsLoaded, setAllCallsLoaded] = useState(opts?.skip ?? false);
+  const [callRes, setCallRes] = useState<traceServerClient.TraceCallSchema[]>(
+    []
+  );
   const deepFilter = useDeepMemo(filter);
-  useEffect(() => {
-    if (opts?.skip) {
-      return;
-    }
-    setCallRes(null);
-    loadingRef.current = true;
-    getTsClient()
-      .callsQuery({
-        project_id: projectIdFromParts({entity, project}),
-        filter: {
-          op_version_refs: deepFilter.opVersionRefs,
-          input_object_version_refs: deepFilter.inputObjectVersionRefs,
-          output_object_version_refs: deepFilter.outputObjectVersionRefs,
-          parent_ids: deepFilter.parentIds,
-          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-          call_ids: deepFilter.callIds,
-          trace_roots_only: deepFilter.traceRootsOnly,
-          wb_run_ids: deepFilter.runIds,
-          wb_user_ids: deepFilter.userIds,
-        },
-        limit,
-      })
-      .then(res => {
-        loadingRef.current = false;
-        setCallRes(res);
-      })
-      .catch(e => {
-        // Temp fix before more robust error handling
-        loadingRef.current = false;
+
+  // this is only used if the limit that is passed in is greater than the default page size
+  const isLargeLimit = limit !== undefined && limit >= DEFAULT_PAGE_SIZE;
+  const isSmallLimit = limit !== undefined && limit < DEFAULT_PAGE_SIZE;
+  const callLimit = isLargeLimit
+    ? limit
+    : DEFAULT_PAGE_SIZE * DEFAULT_MAX_PAGES;
+
+  // if a limit is provided and is less than 10,000, we use that and only return the single page
+  // otherwise we use a default of 10,000 and load a max of 50 pages to return all calls
+  // Arbitrary page limit of 10,000, in conjunction with the max 50 pages limits calls to 500,000
+  const pageSize = isSmallLimit ? limit : DEFAULT_PAGE_SIZE;
+  const maxPages = isSmallLimit ? 0 : DEFAULT_MAX_PAGES;
+
+  // This is a recursive function that loads calls in pages from the trace server into an accumulator
+  // This is a workaround for the trace server not being able to send super large pages over the wire
+  const loadCalls = useCallback(
+    async (
+      pageNumber: number,
+      acc: traceServerClient.TraceCallSchema[],
+      leftoverCalls: number
+    ) => {
+      // opts.skip will set this true if passed in
+      // if all calls are already loaded, we dont need to do anything
+      if (allCallsLoaded) {
+        return;
+      }
+
+      try {
+        const res = await getTsClient().callsQuery({
+          project_id: projectIdFromParts({entity, project}),
+          filter: {
+            op_version_refs: deepFilter.opVersionRefs,
+            input_object_version_refs: deepFilter.inputObjectVersionRefs,
+            output_object_version_refs: deepFilter.outputObjectVersionRefs,
+            parent_ids: deepFilter.parentIds,
+            trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+            call_ids: deepFilter.callIds,
+            trace_roots_only: deepFilter.traceRootsOnly,
+            wb_run_ids: deepFilter.runIds,
+            wb_user_ids: deepFilter.userIds,
+          },
+          limit: leftoverCalls < pageSize ? leftoverCalls : pageSize,
+          offset: pageNumber * pageSize,
+        });
+
+        if (res.calls.length < pageSize || pageNumber >= maxPages) {
+          // If we get less than the pageSize (ie we reached the end)
+          // or we've fetched the max amount pages, we stop fetching (so we don't want to fetch forever)
+          setAllCallsLoaded(true);
+          setCallRes([...acc, ...res.calls]);
+        } else {
+          // Continue fetching the next page
+          loadCalls(
+            pageNumber + 1,
+            [...acc, ...res.calls],
+            leftoverCalls - pageSize
+          );
+        }
+      } catch (e) {
+        setAllCallsLoaded(true);
         console.error(e);
-        setCallRes({calls: []});
-      });
-  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
+      }
+    },
+    [
+      allCallsLoaded,
+      deepFilter.callIds,
+      deepFilter.inputObjectVersionRefs,
+      deepFilter.opVersionRefs,
+      deepFilter.outputObjectVersionRefs,
+      deepFilter.parentIds,
+      deepFilter.runIds,
+      deepFilter.traceId,
+      deepFilter.traceRootsOnly,
+      deepFilter.userIds,
+      entity,
+      getTsClient,
+      maxPages,
+      pageSize,
+      project,
+    ]
+  );
+
+  // loads calls based on page size and page limit
+  useEffect(() => {
+    if (!allCallsLoaded && !opts?.skip) {
+      loadCalls(0, [], callLimit);
+    }
+  }, [
+    allCallsLoaded,
+    callLimit,
+    deepFilter,
+    entity,
+    getTsClient,
+    limit,
+    loadCalls,
+    opts?.skip,
+    project,
+  ]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -146,7 +218,9 @@ const useCalls = (
         result: [],
       };
     }
-    const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
+    const allResults = (!allCallsLoaded ? [] : callRes).map(
+      traceCallToUICallSchema
+    );
     const result = allResults.filter((row: any) => {
       return (
         deepFilter.opCategory == null ||
@@ -157,7 +231,7 @@ const useCalls = (
       );
     });
 
-    if (callRes == null || loadingRef.current) {
+    if (!allCallsLoaded) {
       return {
         loading: true,
         result: [],
@@ -178,7 +252,14 @@ const useCalls = (
         result,
       };
     }
-  }, [callRes, deepFilter.opCategory, entity, project, opts?.skip]);
+  }, [
+    allCallsLoaded,
+    callRes,
+    deepFilter.opCategory,
+    entity,
+    opts?.skip,
+    project,
+  ]);
 };
 
 const useOpVersion = (

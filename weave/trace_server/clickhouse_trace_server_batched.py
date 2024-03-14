@@ -284,6 +284,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions=conditions,
             parameters=parameters,
             limit=req.limit,
+            offset=req.offset,
         )
         calls = [
             _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
