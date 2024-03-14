@@ -31,23 +31,27 @@ def generate_id():
     return str(uuid.uuid4())
 
 
+@dataclasses.dataclass
 class Ref:
-    extra: list[str]
-
     def uri(self) -> str:
         raise NotImplementedError
 
+    def with_extra(self, extra: list[str]) -> "Ref":
+        params = dataclasses.asdict(self)
+        params["extra"] = self.extra + extra
+        return self.__class__(**params)
+
     def with_key(self, key: str) -> "Ref":
-        raise NotImplementedError
+        return self.with_extra(["key", key])
 
     def with_attr(self, attr: str) -> "Ref":
-        raise NotImplementedError
+        return self.with_extra(["attr", attr])
 
     def with_index(self, index: int) -> "Ref":
-        raise NotImplementedError
+        return self.with_extra(["index", str(index)])
 
     def with_item(self, item_id: uuid.UUID, item_version: uuid.UUID) -> "Ref":
-        raise NotImplementedError
+        return self.with_extra(["id", f"{item_id},{item_version}"])
 
 
 @dataclasses.dataclass
@@ -70,20 +74,6 @@ class ObjectRef(Ref):
             u += "/" + "/".join(self.extra)
         return u
 
-    def with_key(self, key) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + ["key", key])
-
-    def with_attr(self, attr) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + ["attr", attr])
-
-    def with_index(self, index) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + ["index", str(index)])
-
-    def with_item(self, item_id, item_version) -> "ObjectRef":
-        return ObjectRef(
-            self.name, self.val_id, self.extra + ["id", f"{item_id},{item_version}"]
-        )
-
 
 @dataclasses.dataclass
 class CallRef(Ref):
@@ -95,18 +85,6 @@ class CallRef(Ref):
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
-
-    def with_key(self, key) -> "CallRef":
-        return CallRef(self.id, self.extra + ["key", key])
-
-    def with_attr(self, attr) -> "CallRef":
-        return CallRef(self.id, self.extra + ["attr", attr])
-
-    def with_index(self, index) -> "CallRef":
-        return CallRef(self.id, self.extra + ["index", str(index)])
-
-    def with_item(self, item_id, item_version) -> "CallRef":
-        return CallRef(self.id, self.extra + ["id", f"{item_id},{item_version}"])
 
 
 class ValueFilter(TypedDict, total=False):
