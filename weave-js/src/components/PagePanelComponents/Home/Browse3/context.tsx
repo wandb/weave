@@ -558,27 +558,6 @@ const useSetSearchParam = () => {
   );
 };
 
-// Update multiple query params
-const useSetSearchParams = () => {
-  const location = useLocation();
-  return useCallback(
-    (pairs: Record<string, string | null>) => {
-      const searchParams = new URLSearchParams(location.search);
-      Object.entries(pairs).forEach(([key, value]) => {
-        if (value === null) {
-          searchParams.delete(key);
-        } else {
-          searchParams.set(key, value);
-        }
-      });
-      const newSearch = searchParams.toString();
-      const newUrl = `${location.pathname}?${newSearch}`;
-      return newUrl;
-    },
-    [location]
-  );
-};
-
 export const PEAK_SEARCH_PARAM = 'peekPath';
 export const TRACETREE_PARAM = 'tracetree';
 export const PATH_PARAM = 'path';
@@ -591,7 +570,6 @@ export const baseContext = browse3ContextGen(
 
 const useMakePeekingRouter = (): RouteType => {
   const setSearchParam = useSetSearchParam();
-  // const setSearchParams = useSetSearchParams();
 
   return {
     refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {

@@ -10,7 +10,12 @@ import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
 
 import {TargetBlank} from '../../../../../../common/util/links';
-import {useWeaveflowRouteContext} from '../../context';
+import {
+  PATH_PARAM,
+  TRACETREE_PARAM,
+  usePeekLocation,
+  useWeaveflowRouteContext,
+} from '../../context';
 import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
@@ -251,8 +256,23 @@ export const CallLink: React.FC<{
   const {peekingRouter} = useWeaveflowRouteContext();
   const opName = opNiceName(props.opName);
   const truncatedId = props.callId.slice(-4);
-  const tracetree = props.tracetree ?? opName !== 'Evaluation-evaluate';
-  const path = props.preservePath ? undefined : null;
+
+  // Custom logic to calculate path and tracetree here is not good. Shows
+  // a leak of abstraction. We should not be reaching into the peek location and
+  // URL params here. This is a smell that we need to refactor the context
+  // to provide the right abstractions.
+  const peekLoc = usePeekLocation();
+  const peekParams = new URLSearchParams(peekLoc?.search ?? '');
+  const existingTraceTreeOpen = peekParams.get(TRACETREE_PARAM) === '1';
+  const existingPath = peekParams.get(PATH_PARAM) ?? '';
+  // Don't show trace tree by default for Evaluation-evaluate when not already open
+  const tracetree =
+    props.tracetree ??
+    existingTraceTreeOpen ??
+    opName !== 'Evaluation-evaluate';
+  // Preserve the path only when showing trace tree
+  const path = props.preservePath && tracetree ? existingPath : null;
+
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,

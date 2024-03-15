@@ -335,6 +335,11 @@ export const RunsTable: FC<{
     }
   }, [rowIds, peekId]);
 
+  // Custom logic to control path reservation preference
+  const preservePath = useMemo(() => {
+    return isSingleOp;
+  }, [isSingleOp]);
+
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
@@ -355,7 +360,7 @@ export const RunsTable: FC<{
               opName={opVersionRefOpName(opVersion)}
               callId={rowParams.row.id}
               fullWidth={true}
-              preservePath
+              preservePath={preservePath}
             />
           );
         },
@@ -700,6 +705,7 @@ export const RunsTable: FC<{
     onlyOneOutputResult,
     params.entity,
     params.project,
+    preservePath,
     spans,
     tableStats,
   ]);
