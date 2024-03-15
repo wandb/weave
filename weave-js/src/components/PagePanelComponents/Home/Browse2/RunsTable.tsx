@@ -26,6 +26,7 @@ import {
   isTypedDictLike,
   typedDictPropertyTypes,
 } from '../../../../core';
+import {useDeepMemo} from '../../../../hookUtils';
 import {parseRef} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
@@ -719,7 +720,7 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
-  const initialState: ComponentProps<typeof DataGridPro>['initialState'] =
+  const initialStateRaw: ComponentProps<typeof DataGridPro>['initialState'] =
     useMemo(() => {
       if (loading) {
         return undefined;
@@ -735,6 +736,10 @@ export const RunsTable: FC<{
       };
     }, [loading, columnVisibilityModel]);
 
+  // Various interactions (correctly) cause new data to be loaded, which causes
+  // a trickle of state updates. However, if the ultimate state is the same,
+  // we don't want to re-render the table.
+  const initialState = useDeepMemo(initialStateRaw);
   // This is a workaround.
   // initialState won't take effect if columns are not set.
   // see https://github.com/mui/mui-x/issues/6206
