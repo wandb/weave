@@ -10,12 +10,7 @@ import styled from 'styled-components';
 
 import {Button} from '../../../../../Button';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {
-  PATH_PARAM,
-  TRACETREE_PARAM,
-  useWeaveflowCurrentRouteContext,
-} from '../../context';
-import {querySetBoolean, querySetString} from '../../urlQueryUtil';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CallStatusType} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -121,10 +116,26 @@ export const CallTraceView: FC<{
         );
       } else {
         // Browse within selected call
-        querySetString(history, PATH_PARAM, params.row.path);
+        history.replace(
+          currentRouter.callUIUrl(
+            call.entity,
+            call.project,
+            call.traceId,
+            call.callId,
+            params.row.path,
+            true
+          )
+        );
       }
     },
-    [currentRouter, history]
+    [
+      call.callId,
+      call.entity,
+      call.project,
+      call.traceId,
+      currentRouter,
+      history,
+    ]
   );
   const onRowDoubleClick: DataGridProProps['onRowDoubleClick'] = useCallback(
     params => {
@@ -214,9 +225,25 @@ export const CallTraceView: FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiRef, callId]);
 
-  const onCloseTraceTree = () => {
-    querySetBoolean(history, TRACETREE_PARAM, false);
-  };
+  const onCloseTraceTree = useCallback(() => {
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        null,
+        false
+      )
+    );
+  }, [
+    call.callId,
+    call.entity,
+    call.project,
+    call.traceId,
+    currentRouter,
+    history,
+  ]);
 
   // This is used because when we first load the trace view in a drawer, the animation cant handle all the rows
   // so we delay for the first render

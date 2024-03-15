@@ -89,7 +89,9 @@ export const browse2Context = {
     entityName: string,
     projectName: string,
     traceId: string,
-    callId: string
+    callId: string,
+    path?: string | null,
+    tracetree?: boolean
   ) => {
     return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
   },
@@ -345,11 +347,19 @@ const browse3ContextGen = (
       projectName: string,
       traceId: string,
       callId: string,
-      path?: string | null
+      path?: string | null,
+      tracetree?: boolean
     ) => {
       let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
+      const params = new URLSearchParams();
       if (path) {
-        url += `?path=${encodeURIComponent(path)}`;
+        params.set(PATH_PARAM, path);
+      }
+      if (tracetree) {
+        params.set(TRACETREE_PARAM, '1');
+      }
+      if (params.toString()) {
+        url += '?' + params.toString();
       }
       return url;
     },
@@ -569,8 +579,8 @@ const useSetSearchParams = () => {
   );
 };
 
-export const TRACETREE_PARAM = 'tracetree';
 export const PEAK_SEARCH_PARAM = 'peekPath';
+export const TRACETREE_PARAM = 'tracetree';
 export const PATH_PARAM = 'path';
 
 export const baseContext = browse3ContextGen(
@@ -581,7 +591,7 @@ export const baseContext = browse3ContextGen(
 
 const useMakePeekingRouter = (): RouteType => {
   const setSearchParam = useSetSearchParam();
-  const setSearchParams = useSetSearchParams();
+  // const setSearchParams = useSetSearchParams();
 
   return {
     refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
@@ -645,30 +655,8 @@ const useMakePeekingRouter = (): RouteType => {
         baseContext.opVersionUIUrl(...args)
       );
     },
-    callUIUrl: (
-      entityName: string,
-      projectName: string,
-      traceId: string,
-      callId: string,
-      path?: string | null,
-      tracetree?: boolean
-    ) => {
-      const callUrl = baseContext.callUIUrl(
-        entityName,
-        projectName,
-        traceId,
-        callId,
-        path
-      );
-      const tt = tracetree ?? true;
-      const params: Record<string, string | null> = {
-        [PEAK_SEARCH_PARAM]: callUrl,
-        [TRACETREE_PARAM]: tt ? '1' : '0',
-      };
-      if (path !== undefined) {
-        params[PATH_PARAM] = path;
-      }
-      return setSearchParams(params);
+    callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
+      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callUIUrl(...args));
     },
     callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {
       return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callsUIUrl(...args));

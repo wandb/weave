@@ -1,16 +1,11 @@
 import {Box} from '@material-ui/core';
-import React, {FC} from 'react';
+import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {PATH_PARAM, TRACETREE_PARAM} from '../../context';
-import {
-  queryGetBoolean,
-  queryGetString,
-  queryToggleBoolean,
-} from '../../urlQueryUtil';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -24,6 +19,8 @@ export const CallPage: FC<{
   entity: string;
   project: string;
   callId: string;
+  showTraceTree?: boolean;
+  path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
 
@@ -64,21 +61,34 @@ const useCallTabs = (call: CallSchema) => {
 
 const CallPageInnerVertical: FC<{
   call: CallSchema;
-}> = ({call}) => {
-  // Note: use of history in this component is a sign that we are leaking
-  // the concept of URL query parameters into the component. This is a
-  // violation of the separation of concerns. We should refactor this
-  // component to accept props for the query parameters it needs. History
-  // consumption should only be in the top-level component that is responsible
-  // for routing and URL query parameters.
+  showTraceTree?: boolean;
+  path?: string;
+}> = ({call, showTraceTree, path}) => {
   const history = useHistory();
-  const showTraceTree = queryGetBoolean(history, TRACETREE_PARAM, true);
-  const onToggleTraceTree = () => {
-    queryToggleBoolean(history, TRACETREE_PARAM, true);
-  };
+  const currentRouter = useWeaveflowCurrentRouteContext();
 
-  const path = queryGetString(history, PATH_PARAM);
-  const tree = useCallFlattenedTraceTree(call, path);
+  const onToggleTraceTree = useCallback(() => {
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        null,
+        !showTraceTree
+      )
+    );
+  }, [
+    call.callId,
+    call.entity,
+    call.project,
+    call.traceId,
+    currentRouter,
+    history,
+    showTraceTree,
+  ]);
+
+  const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading} = tree;
   let {selectedCall} = tree;
 
