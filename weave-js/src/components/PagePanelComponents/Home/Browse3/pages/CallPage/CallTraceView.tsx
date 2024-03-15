@@ -111,7 +111,8 @@ export const CallTraceView: FC<{
             rowCall.project,
             '',
             rowCall.callId,
-            ''
+            '',
+            true
           )
         );
       } else {
