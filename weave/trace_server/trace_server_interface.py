@@ -92,7 +92,8 @@ class ObjSchema(BaseModel):
     name: str
     created_at: datetime.datetime
     digest: str
-    # version_index: int
+    version_index: int
+    is_latest: int
     type: str
     val: typing.Any
 

@@ -16,7 +16,7 @@ import {tsWFDataModelHooks} from './tsDataModelHooks';
 import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
 //  Set this to `true` once the trace server supports objects
-const TRACE_SERVER_SUPPORTS_OBJECTS = false;
+const TRACE_SERVER_SUPPORTS_OBJECTS = true;
 
 const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
   null
@@ -76,7 +76,8 @@ export const WFDataModelAutoProvider: FC<{
   entityName: string;
   projectName: string;
 }> = ({entityName, projectName, children}) => {
-  const hasTSData = useProjectHasTraceServerCalls(entityName, projectName);
+  // const hasTSData = useProjectHasTraceServerCalls(entityName, projectName);
+  const hasTSData = true;
 
   if (hasTSData) {
     if (TRACE_SERVER_SUPPORTS_OBJECTS) {

@@ -266,6 +266,10 @@ const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
+  return {
+    loading: false,
+    result: null,
+  };
   throw new Error('Not implemented');
 };
 
@@ -276,6 +280,10 @@ const useOpVersions = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<OpVersionSchema[]> => {
+  return {
+    loading: false,
+    result: [],
+  };
   throw new Error('Not implemented');
 };
 
@@ -283,6 +291,10 @@ const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
+  return {
+    loading: false,
+    result: null,
+  };
   throw new Error('Not implemented');
 };
 
@@ -293,6 +305,11 @@ const useRootObjectVersions = (
   limit?: number,
   opts?: {skip?: boolean}
 ): Loadable<ObjectVersionSchema[]> => {
+  console.log('USE ROOT OBJ', entity, project, filter, limit, opts);
+  return {
+    loading: false,
+    result: [],
+  };
   throw new Error('Not implemented');
 };
 
@@ -380,6 +397,9 @@ const useApplyMutationsToRef = (): ((
 };
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
+  return (refUris: string[]) => {
+    return Promise.resolve([]);
+  };
   throw new Error('Not implemented');
 };
 

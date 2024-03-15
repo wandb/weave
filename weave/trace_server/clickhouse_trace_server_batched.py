@@ -119,6 +119,8 @@ class SelectableCHObjSchema(BaseModel):
     val: str
     type: str
     digest: str
+    version_index: int
+    is_latest: int
 
 
 all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
@@ -366,23 +368,43 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(result))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        conditions: typing.List[str] = []
-        parameters: typing.Dict[str, typing.Any] = {}
+        conds: typing.List[str] = []
+        conds.append(f"entity = '{req.entity}'")
+        conds.append(f"project = '{req.project}'")
         if req.filter:
             if req.filter.object_names:
-                raise NotImplementedError()
+                in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
+                conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
-                raise NotImplementedError()
-        conditions.append("is_op == 0")
+                conds.append("is_latest = 1")
+        predicate = " AND ".join(conds)
 
-        ch_objs = self._select_objs_query(
-            req.entity,
-            req.project,
-            conditions=conditions,
-            parameters=parameters,
+        # TODO: sql injection
+        query_result = self.ch_client.query(
+            f"""
+            SELECT *
+            FROM objects_deduped
+            WHERE {predicate}
+            """,
         )
-        objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
-        return tsi.ObjQueryRes(objs=objs)
+        result = []
+        for row in query_result.result_rows:
+            result.append(
+                _ch_obj_to_obj_schema(
+                    SelectableCHObjSchema.model_validate(
+                        dict(zip(query_result.column_names, row))
+                    )
+                )
+            )
+
+        # ch_objs = self._select_objs_query(
+        #     req.entity,
+        #     req.project,
+        #     conditions=conds,
+        #     parameters=parameters,
+        # )
+        # objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
+        return tsi.ObjQueryRes(objs=result)
 
     # Private Methods
     def _mint_client(self) -> CHClient:
@@ -769,6 +791,8 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         project=ch_obj.project,
         name=ch_obj.name,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
+        version_index=ch_obj.version_index,
+        is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,
         type=ch_obj.type,
         val=json.loads(ch_obj.val),

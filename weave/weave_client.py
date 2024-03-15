@@ -22,7 +22,10 @@ from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     CallEndReq,
     CallSchema,
+    ObjQueryReq,
+    ObjQueryRes,
     _CallsFilter,
+    _ObjectVersionFilter,
 )
 from weave.wandb_interface import project_creator
 
@@ -628,7 +631,7 @@ class WeaveClient:
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
-                    entity="none", project="none", name=name, val=json_val
+                    entity=self.entity, project=self.project, name=name, val=json_val
                 )
             )
         )
@@ -676,6 +679,16 @@ class WeaveClient:
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
         return self.calls(_CallsFilter(op_version_refs=[op_ref.uri()]))
+
+    def objects(self, filter: Optional[_ObjectVersionFilter] = None):
+        response = self.server.objs_query(
+            ObjQueryReq(
+                entity=self.entity,
+                project=self.project,
+                filter=filter,
+            )
+        )
+        return response.objs
 
     def _save_op(self, op: op_def.OpDef) -> ObjectRef:
         if isinstance(op, op_def.BoundOpDef):
