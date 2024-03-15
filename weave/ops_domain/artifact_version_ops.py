@@ -42,6 +42,19 @@ static_art_file_gql = """
             }
         """
 
+static_art_file_gql_no_entity = """
+            commitHash
+            artifactSequence {
+                id
+                name
+                defaultArtifactType {
+                    id
+                    name
+                }
+            }
+        """
+
+
 # Section 1/6: Tag Getters
 # None
 
@@ -594,7 +607,7 @@ def file_(
 
 @op(
     name="artifactVersion-files",
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql_no_entity),
 )
 def files(
     artifactVersion: wdt.ArtifactVersion,
