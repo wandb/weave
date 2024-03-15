@@ -5,53 +5,14 @@ hide_table_of_contents: true
 
 # Tutorial: Build an Evaluation pipeline
 
-To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same dataset when there is a change. Weave has a first-class way to track evaluations with `Dataset`, `Model` & `Evaluation` classes. We have built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases.
-
-### Upload a `Dataset`
-
-`Dataset`s enable you to store examples for evaluation. Weave automatically captures when they are used and updates the `Dataset` version when there are changes. `Dataset`s are created with lists of examples, where each example row is a dict.
-
-```python
-import weave
-from weave import weaveflow
-
-sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.", 
-"Pounits are a bright green color and are more savory than sweet.", 
-"Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them."]
-labels = [
-    {'fruit': 'neoskizzles', 'color': 'purple', 'flavor': 'candy'},
-    {'fruit': 'pounits', 'color': 'bright green', 'flavor': 'savory'},
-    {'fruit': 'glowls', 'color': 'pale orange', 'flavor': 'sour and bitter'}
-]
-
-weave.init('intro-example')
-# highlight-next-line
-dataset = weaveflow.Dataset([
-    {'id': '0', 'sentence': sentences[0], 'extracted': labels[0]},
-    {'id': '1', 'sentence': sentences[1], 'extracted': labels[1]},
-    {'id': '2', 'sentence': sentences[2], 'extracted': labels[2]}
-])
-# highlight-next-line
-dataset_ref = weave.publish(dataset, 'example_labels')
-```
-
-In a new script, run this code to publish a `Dataset` and follow the link to view it in the UI.
-If you make edits to the `Dataset` in the UI, you can pull the latest version in code using:
-
-```python
-dataset = weave.ref('example_labels').get()
-```
-
-:::note
-Checkout the [Datasets](/guides/core-types/datasets) guide to learn more.
-:::
+To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same set of examples when there is a change. Weave has a first-class way to track evaluations with `Model` & `Evaluation` classes. We have built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases.
 
 ### Build a `Model`
 
 `Model`s store and version information about your system, such as prompts, temperatures, and more.
-Like `Dataset`s, Weave automatically captures when they are used and update the version when there are changes.
+Weave automatically captures when they are used and update the version when there are changes.
 
-`Model`s are declared by subclassing `Model` and decorating them with `@weave.type()`. `Model` classes also need a `predict` function definition, which takes one example and returns the response.
+`Model`s are declared by subclassing `Model` and implementing a `predict` function definition, which takes one example and returns the response.
 
 :::warning
 
@@ -61,44 +22,38 @@ Like `Dataset`s, Weave automatically captures when they are used and update the 
 
 ```python
 import json
-from weave.weaveflow import Model
+import openai
 import weave
 
-@weave.type()
 # highlight-next-line
-class ExtractFruitsModel(Model):
-    system_message: str
-    model_name: str = "gpt-3.5-turbo-1106"
+class ExtractFruitsModel(weave.Model):
+    model_name: str
+    prompt_template: str
 
     # highlight-next-line
     @weave.op()
     # highlight-next-line
     async def predict(self, sentence: str) -> dict:
-        from openai import OpenAI
-        client = OpenAI()
-        response = client.chat.completions.create(
+        client = openai.AsyncClient()
+
+        response = await client.chat.completions.create(
             model=self.model_name,
             messages=[
-                {
-                    "role": "system",
-                    "content": self.system_message
-                },
-                {
-                    "role": "user",
-                    "content": sentence
-                }
+                {"role": "user", "content": self.prompt_template.format(sentence=sentence)}
             ],
-            temperature=0.7,
-            response_format={ "type": "json_object" }
         )
-        extracted = response.choices[0].message.content
-        return json.loads(extracted)
+        result = response.choices[0].message.content
+            if result is None:
+                raise ValueError("No response from model")
+        parsed = json.loads(result)
+        return parsed
 ```
 
-You can instantiate `@weave.type()` objects like this.
+You can instantiate `Model` objects as normal like this:
 
 ```python
-model = ExtractFruitsModel("You will be provided with unstructured data, and your task is to parse it one JSON dictionary with fruit, color and flavor as keys.")
+model = ExtractFruitsModel(model_name='gpt-3.5-turbo-1106',
+                          prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor": <str>) from the following text, as json: {sentence}')
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
 print(asyncio.run(model.predict(sentence))) 
 # note: you can also call `await model.predict(sentence)` within async functions
@@ -108,87 +63,10 @@ print(asyncio.run(model.predict(sentence)))
 Checkout the [Models](/guides/core-types/models) guide to learn more.
 :::
 
-### Evaluate a `Model` on a `Dataset`
 
-`Evaluation`s assess a `Model`s performance on a `Dataset` using a list of specified scoring functions.
-Each scoring function takes an example row and the resulting prediction and return a dictionary of scores for that example.
-`example_to_model_input` tells `evaluate` how to use an input from a given example row of the `Dataset`.
-
-Here, we'll add two scoring functions to test the extracted data matches our labels:
+### Collect some examples
 
 ```python
-from weave.weaveflow import evaluate
-import weave
-
-@weave.op()
-def color_score(example: dict, prediction: dict) -> dict:
-    # example is a row from the Dataset, prediction is the output of predict function.
-    return {'correct': example['extracted']['color'] == prediction['color']}
-
-@weave.op()
-def fruit_name_score(example: dict, prediction: dict) -> dict:
-    return {'correct': example['extracted']['fruit'] == prediction['fruit']}
-
-@weave.op()
-def example_to_model_input(example: dict) -> str:
-    # example is a row from the Dataset, the output of this function should be the input to model.predict.
-    return example["sentence"]
-
-# highlight-next-line
-evaluation = evaluate.Evaluation(
-    # highlight-next-line
-    dataset, scores=[color_score, fruit_name_score], example_to_model_input=example_to_model_input
-# highlight-next-line
-)
-print(asyncio.run(evaluation.evaluate(model)))
-```
-
-## Pulling it all together
-
-```python
-# highlight-next-line
-import weave
-import asyncio
-# highlight-next-line
-from weave.weaveflow import Model, Evaluation, Dataset
-import json
-
-# We create a model class with one predict function. 
-# All inputs, predictions and parameters are automatically captured for easy inspection.
-@weave.type()
-# highlight-next-line
-class ExtractFruitsModel(Model):
-    system_message: str
-    model_name: str = "gpt-3.5-turbo-1106"
-
-    @weave.op()
-    # highlight-next-line
-    async def predict(self, sentence: str) -> dict:
-        from openai import OpenAI
-        client = OpenAI()
-        response = client.chat.completions.create(
-            model=self.model_name,
-            messages=[
-                {
-                    "role": "system",
-                    "content": self.system_message
-                },
-                {
-                    "role": "user",
-                    "content": sentence
-                }
-            ],
-            temperature=0.7,
-            response_format={ "type": "json_object" }
-        )
-        extracted = response.choices[0].message.content
-        return json.loads(extracted)
-
-# We call init to begin capturing data in the project, intro-example.
-weave.init('intro-example')
-
-# We create our model with our system prompt.
-model = ExtractFruitsModel("You will be provided with unstructured data, and your task is to parse it one JSON dictionary with fruit, color and flavor as keys.")
 sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.", 
 "Pounits are a bright green color and are more savory than sweet.", 
 "Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them."]
@@ -197,40 +75,114 @@ labels = [
     {'fruit': 'pounits', 'color': 'bright green', 'flavor': 'savory'},
     {'fruit': 'glowls', 'color': 'pale orange', 'flavor': 'sour and bitter'}
 ]
-# Here, we track a Dataset in weave. This makes it easy to 
-# automatically score a given model and compare outputs from different configurations.
-# highlight-next-line
-dataset = Dataset([
+examples = [
     {'id': '0', 'sentence': sentences[0], 'extracted': labels[0]},
     {'id': '1', 'sentence': sentences[1], 'extracted': labels[1]},
     {'id': '2', 'sentence': sentences[2], 'extracted': labels[2]}
-])
-# highlight-next-line
-dataset_ref = weave.publish(dataset, 'example_labels')
-# If you have already published the Dataset, you can run:
-# dataset = weave.ref('example_labels').get()
+]
+```
 
-# We define two scoring functions to compare our model predictions with a ground truth label.
-@weave.op()
-def color_score(example: dict, prediction: dict) -> dict:
-    # example is a row from the Dataset, prediction is the output of predict function
-    return {'correct': example['extracted']['color'] == prediction['color']}
+### Evaluate a `Model`
+
+`Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions.
+Each scoring function takes an example row and the resulting prediction and return a dictionary of scores for that example.
+
+Here, we'll use a default scoring function `MulticlassF1Score` and we'll also define our own `fruit_name_score`.
+
+```python
+from weave.weaveflow import evaluate
+import weave
+from weave.flow.scorer import MulticlassF1Score
 
 @weave.op()
 def fruit_name_score(example: dict, prediction: dict) -> dict:
     return {'correct': example['extracted']['fruit'] == prediction['fruit']}
 
+# highlight-next-line
+evaluation = evaluate.Evaluation(
+    # highlight-next-line
+    dataset, scores=[MulticlassF1Score(class_names=["name", "shares"]), fruit_name_score],
+# highlight-next-line
+)
+# highlight-next-line
+print(asyncio.run(evaluation.evaluate(model)))
+```
+
+## Pulling it all together
+
+```python
+import json
+import asyncio
+# highlight-next-line
+from weave import evaluate
+# highlight-next-line
+import weave
+# highlight-next-line
+from weave.flow.scorer import MulticlassF1Score
+import openai
+
+# We create a model class with one predict function. 
+# All inputs, predictions and parameters are automatically captured for easy inspection.
+
+# highlight-next-line
+class ExtractFruitsModel(weave.Model):
+    model_name: str
+    prompt_template: str
+
+    # highlight-next-line
+    @weave.op()
+    # highlight-next-line
+    async def predict(self, sentence: str) -> dict:
+        client = openai.AsyncClient()
+
+        response = await client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "user", "content": self.prompt_template.format(sentence=sentence)}
+            ],
+            response_format={ "type": "json_object" }
+        )
+        result = response.choices[0].message.content
+        if result is None:
+            raise ValueError("No response from model")
+        parsed = json.loads(result)
+        return parsed
+
+# We call init to begin capturing data in the project, intro-example.
+weave.init('intro-example')
+
+# We create our model with our system prompt.
+model = ExtractFruitsModel(name='gpt4',
+                           model_name='gpt-4-0125-preview', 
+                           prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: {sentence}')
+sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.", 
+"Pounits are a bright green color and are more savory than sweet.", 
+"Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them."]
+labels = [
+    {'fruit': 'neoskizzles', 'color': 'purple', 'flavor': 'candy'},
+    {'fruit': 'pounits', 'color': 'bright green', 'flavor': 'savory'},
+    {'fruit': 'glowls', 'color': 'pale orange', 'flavor': 'sour and bitter'}
+]
+examples = [
+    {'id': '0', 'sentence': sentences[0], 'target': labels[0]},
+    {'id': '1', 'sentence': sentences[1], 'target': labels[1]},
+    {'id': '2', 'sentence': sentences[2], 'target': labels[2]}
+]
+# If you have already published the Dataset, you can run:
+# dataset = weave.ref('example_labels').get()
+
+# We define a scoring functions to compare our model predictions with a ground truth label.
 @weave.op()
-def example_to_model_input(example: dict) -> str:
-    # example is a row from the Dataset, the output of this function should be the input to model.predict.
-    return example["sentence"]
+def fruit_name_score(example: dict, prediction: dict) -> dict:
+    return {'correct': example['target']['fruit'] == prediction['fruit']}
 
 # Finally, we run an evaluation of this model. 
 # This will generate a prediction for each input example, and then score it with each scoring function.
 # highlight-next-line
-evaluation = Evaluation(
+evaluation = weave.Evaluation(
+    name='fruit_eval',
     # highlight-next-line
-    dataset, scores=[color_score, fruit_name_score], example_to_model_input=example_to_model_input
+    dataset=examples, scorers=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
 # highlight-next-line
 )
 print(asyncio.run(evaluation.evaluate(model)))
