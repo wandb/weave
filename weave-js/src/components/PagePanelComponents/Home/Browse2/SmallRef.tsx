@@ -1,20 +1,13 @@
 import {Box} from '@mui/material';
-import {
-  callOpVeryUnsafe,
-  constString,
-  getTypeName,
-  Node,
-  Type,
-} from '@wandb/weave/core';
+import {getTypeName, Type} from '@wandb/weave/core';
 import {
   ArtifactRef,
   isWandbArtifactRef,
   ObjectRef,
   parseRef,
   refUri,
-  useNodeValue,
 } from '@wandb/weave/react';
-import React, {FC, useMemo} from 'react';
+import React, {FC} from 'react';
 
 import {hexToRGB, MOON_300} from '../../../../common/css/globals.styles';
 import {Icon, IconName, IconNames} from '../../../Icon';
@@ -70,7 +63,10 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   objRef,
   wfTable,
 }) => {
-  const {useObjectVersion} = useWFHooks();
+  const {
+    useObjectVersion,
+    derived: {useRefsType},
+  } = useWFHooks();
 
   const objVersionKey =
     'entityName' in objRef
@@ -87,13 +83,11 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   const versionIndex = objectVersion.result?.versionIndex;
 
   const {peekingRouter} = useWeaveflowRouteContext();
-  const refTypeNode = useMemo(() => {
-    const refNode = callOpVeryUnsafe('ref', {uri: constString(refUri(objRef))});
-    return callOpVeryUnsafe('Ref-type', {ref: refNode}) as Node;
-  }, [objRef]);
-
-  const refTypeQuery = useNodeValue(refTypeNode);
-  const refType: Type = refTypeQuery.result ?? 'unknown';
+  const refTypeQuery = useRefsType([refUri(objRef)]);
+  const refType: Type =
+    refTypeQuery.loading || refTypeQuery.result == null
+      ? 'unknown'
+      : refTypeQuery.result[0];
   const rootType = getRootType(refType);
   const {label} = objectRefDisplayName(objRef, versionIndex);
 
@@ -118,12 +112,23 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
           width: '22px',
           borderRadius: '16px',
           display: 'flex',
+          flex: '0 0 22px',
           justifyContent: 'center',
           alignItems: 'center',
         }}>
         <Icon name={icon} width={14} height={14} />
       </Box>
-      {label}
+      <Box
+        sx={{
+          height: '22px',
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+        }}>
+        {label}
+      </Box>
     </Box>
   );
   if (refTypeQuery.loading) {
@@ -135,6 +140,9 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   return (
     <Link
       $variant="secondary"
+      style={{
+        width: '100%',
+      }}
       to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
       {Item}
     </Link>

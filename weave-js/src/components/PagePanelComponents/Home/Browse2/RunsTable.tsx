@@ -21,7 +21,11 @@ import {useParams} from 'react-router-dom';
 import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
 import {useWeaveContext} from '../../../../context';
-import {constString, opArray, opGetReturnType} from '../../../../core';
+import {
+  isObjectTypeLike,
+  isTypedDictLike,
+  typedDictPropertyTypes,
+} from '../../../../core';
 import {parseRef} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
@@ -29,7 +33,6 @@ import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {CallLink} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
-import {listToObject} from '../Browse3/pages/common/util';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {
@@ -138,10 +141,15 @@ type ExtraColumns = Record<string, string[]>;
 const getExtraColumns = (result: any): string[] => {
   const cols: Set<string> = new Set();
   for (const refInfo of result) {
-    const keys = Object.keys(refInfo).filter(
-      k => k !== 'type' && !k.startsWith('_')
-    );
-    keys.forEach(k => cols.add(k));
+    if (isObjectTypeLike(refInfo)) {
+      const keys = Object.keys(refInfo).filter(
+        k => k !== 'type' && !k.startsWith('_')
+      );
+      keys.forEach(k => cols.add(k));
+    } else if (isTypedDictLike(refInfo)) {
+      const keys = Object.keys(typedDictPropertyTypes(refInfo));
+      keys.forEach(k => cols.add(k));
+    }
   }
   return Array.from(cols);
 };
@@ -155,6 +163,9 @@ export const RunsTable: FC<{
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
+  const {
+    derived: {useGetRefsType},
+  } = useWFHooks();
   const {client} = weave;
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
     new Set()
@@ -191,6 +202,23 @@ export const RunsTable: FC<{
     [spans]
   );
   const params = useParams<Browse2RootObjectVersionItemParams>();
+
+  let onlyOneOutputResult = true;
+  for (const s of spans) {
+    // get display keys
+    const keys = Object.keys(
+      _.omitBy(
+        flattenObject(s.rawSpan.output!),
+        (v, k) => v == null || (k.startsWith('_') && k !== '_result')
+      )
+    );
+    // ensure there is only one output _result
+    if (keys.length > 1 || (keys[0] && keys[0] !== '_result')) {
+      onlyOneOutputResult = false;
+      break;
+    }
+  }
+
   const tableData = useMemo(() => {
     return spans.map((call: CallSchema) => {
       const argOrder = call.rawSpan.inputs._input_order;
@@ -236,6 +264,10 @@ export const RunsTable: FC<{
             (v, k) => v == null || (k.startsWith('_') && k !== '_result')
           ),
           (v, k) => {
+            // If there is only one output _result, we don't need to nest it
+            if (onlyOneOutputResult && k === '_result') {
+              return 'output';
+            }
             return 'output.' + k;
           }
         ),
@@ -249,22 +281,18 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [spans, loading]);
+  }, [loading, onlyOneOutputResult, spans]);
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
-
+  const getRefsType = useGetRefsType();
   useEffect(() => {
     const fetchData = async () => {
       for (const col of expandedRefCols) {
         if (!(col in expandedColInfo)) {
           const refs = columnRefs(tableStats, col);
-          const returnTypeNodes = refs.map(ref =>
-            opGetReturnType({path: constString(ref)})
-          );
-          const listNode = opArray(listToObject(returnTypeNodes) as any);
-          const result = await client.query(listNode);
-          const extraCols = getExtraColumns(result);
+          const refTypes = await getRefsType(refs);
+          const extraCols = getExtraColumns(refTypes);
           setExpandedColInfo(prevState => ({
             ...prevState,
             [col]: extraCols,
@@ -553,55 +581,68 @@ export const RunsTable: FC<{
     colGroupingModel.push(inputGroup);
 
     // All output keys as we don't have the order key yet.
-    let outputKeys: {[key: string]: true} = {};
-    spans.forEach(span => {
-      for (const [k, v] of Object.entries(
-        flattenObject(span.rawSpan.output ?? {})
-      )) {
-        if (v != null && (!k.startsWith('_') || k === '_result')) {
-          outputKeys[k] = true;
-        }
-      }
-    });
-    // sort shallowest keys first
-    outputKeys = _.fromPairs(
-      Object.entries(outputKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
-
-    const outputOrder = Object.keys(outputKeys);
-    const outputGrouping = buildTree(outputOrder, 'output');
-    colGroupingModel.push(outputGrouping);
-    for (const key of outputOrder) {
-      const field = 'output.' + key;
-      const isExpanded = expandedRefCols.has(field);
+    if (onlyOneOutputResult) {
+      // If there is only one output _result, we don't need to do all the work on outputs
       cols.push({
         flex: 1,
         minWidth: 150,
-        field,
-        renderHeader: () => {
-          const hasExpand = columnHasRefs(tableStats, field);
-          const tail = key.split('.').slice(-1)[0];
-          return (
-            <ExpandHeader
-              headerName={isExpanded ? 'Ref' : tail}
-              field={field}
-              hasExpand={hasExpand && !isExpanded}
-              onExpand={onExpand}
-            />
-          );
-        },
+        field: 'output',
+        headerName: 'output',
         renderCell: cellParams => {
-          if (field in cellParams.row) {
-            const value = (cellParams.row as any)[field];
-            return <CellValue value={value} />;
-          }
-          return <NotApplicable />;
+          return <CellValue value={(cellParams.row as any).output} />;
         },
       });
+    } else {
+      let outputKeys: {[key: string]: true} = {};
+      spans.forEach(span => {
+        for (const [k, v] of Object.entries(
+          flattenObject(span.rawSpan.output ?? {})
+        )) {
+          if (v != null && (!k.startsWith('_') || k === '_result')) {
+            outputKeys[k] = true;
+          }
+        }
+      });
+      // sort shallowest keys first
+      outputKeys = _.fromPairs(
+        Object.entries(outputKeys).sort((a, b) => {
+          const aDepth = a[0].split('.').length;
+          const bDepth = b[0].split('.').length;
+          return aDepth - bDepth;
+        })
+      );
+
+      const outputOrder = Object.keys(outputKeys);
+      const outputGrouping = buildTree(outputOrder, 'output');
+      colGroupingModel.push(outputGrouping);
+      for (const key of outputOrder) {
+        const field = 'output.' + key;
+        const isExpanded = expandedRefCols.has(field);
+        cols.push({
+          flex: 1,
+          minWidth: 150,
+          field,
+          renderHeader: () => {
+            const hasExpand = columnHasRefs(tableStats, field);
+            const tail = key.split('.').slice(-1)[0];
+            return (
+              <ExpandHeader
+                headerName={isExpanded ? 'Ref' : tail}
+                field={field}
+                hasExpand={hasExpand && !isExpanded}
+                onExpand={onExpand}
+              />
+            );
+          },
+          renderCell: cellParams => {
+            if (field in cellParams.row) {
+              const value = (cellParams.row as any)[field];
+              return <CellValue value={value} />;
+            }
+            return <NotApplicable />;
+          },
+        });
+      }
     }
 
     let feedbackKeys: {[key: string]: true} = {};
@@ -651,15 +692,16 @@ export const RunsTable: FC<{
 
     return {cols, colGroupingModel};
   }, [
+    expandedColInfo,
+    expandedRefCols,
     ioColumnsOnly,
-    spans,
-    params.entity,
-    params.project,
     isSingleOp,
     isSingleOpVersion,
+    onlyOneOutputResult,
+    params.entity,
+    params.project,
+    spans,
     tableStats,
-    expandedRefCols,
-    expandedColInfo,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();

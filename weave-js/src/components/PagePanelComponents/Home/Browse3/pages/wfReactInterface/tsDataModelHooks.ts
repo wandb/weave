@@ -6,8 +6,9 @@
 
 import {useEffect, useMemo, useRef, useState} from 'react';
 
+import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {getCallFromCache, setCallInCache} from './cache';
+import {callCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -25,6 +26,8 @@ import {
   OpVersionKey,
   OpVersionSchema,
   RawSpanFromStreamTableEra,
+  RefMutation,
+  TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -39,7 +42,7 @@ const projectIdFromParts = ({
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const cachedCall = key ? getCallFromCache(key) : null;
+  const cachedCall = key ? callCache.get(key) : null;
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
@@ -80,7 +83,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
       };
     } else {
       if (result) {
-        setCallInCache(key, result);
+        callCache.set(key, result);
       }
       return {
         loading: false,
@@ -89,7 +92,6 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
     }
   }, [cachedCall, callRes, key]);
 };
-
 const useCalls = (
   entity: string,
   project: string,
@@ -99,6 +101,7 @@ const useCalls = (
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
+  const currentCancelRef = useRef<() => void>();
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
@@ -106,34 +109,44 @@ const useCalls = (
     if (opts?.skip) {
       return;
     }
+    if (currentCancelRef.current) {
+      currentCancelRef.current();
+      currentCancelRef.current = undefined;
+    }
     setCallRes(null);
     loadingRef.current = true;
-    getTsClient()
-      .callsQuery({
-        project_id: projectIdFromParts({entity, project}),
-        filter: {
-          op_version_refs: deepFilter.opVersionRefs,
-          input_object_version_refs: deepFilter.inputObjectVersionRefs,
-          output_object_version_refs: deepFilter.outputObjectVersionRefs,
-          parent_ids: deepFilter.parentIds,
-          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-          call_ids: deepFilter.callIds,
-          trace_roots_only: deepFilter.traceRootsOnly,
-          wb_run_ids: deepFilter.runIds,
-          wb_user_ids: deepFilter.userIds,
-        },
-        limit,
-      })
-      .then(res => {
-        loadingRef.current = false;
-        setCallRes(res);
-      })
-      .catch(e => {
-        // Temp fix before more robust error handling
-        loadingRef.current = false;
-        console.error(e);
-        setCallRes({calls: []});
-      });
+    const req = {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        op_version_refs: deepFilter.opVersionRefs,
+        input_object_version_refs: deepFilter.inputObjectVersionRefs,
+        output_object_version_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+        wb_run_ids: deepFilter.runIds,
+        wb_user_ids: deepFilter.userIds,
+      },
+      limit,
+    };
+    const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
+      loadingRef.current = false;
+      setCallRes(res);
+    };
+    const onError = (e: any) => {
+      loadingRef.current = false;
+      console.error(e);
+      setCallRes({calls: []});
+    };
+    const {cancel} = traceServerClient.chunkedCallsQuery(
+      getTsClient(),
+      req,
+      onSuccess,
+      onError
+    );
+    currentCancelRef.current = cancel;
+    return cancel;
   }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
 
   return useMemo(() => {
@@ -161,7 +174,7 @@ const useCalls = (
       };
     } else {
       allResults.forEach(call => {
-        setCallInCache(
+        callCache.set(
           {
             entity,
             project,
@@ -281,6 +294,28 @@ const useChildCallsForCompare = (
   return result;
 };
 
+const useRefsData = (
+  refUris: string[],
+  tableQuery?: TableQuery
+): Loadable<any[]> => {
+  throw new Error('Not implemented');
+};
+
+const useApplyMutationsToRef = (): ((
+  refUri: string,
+  edits: RefMutation[]
+) => Promise<string>) => {
+  throw new Error('Not implemented');
+};
+
+const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
+  throw new Error('Not implemented');
+};
+
+const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
+  throw new Error('Not implemented');
+};
+
 /// Converters ///
 
 const traceCallToLegacySpan = (
@@ -364,7 +399,11 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useOpVersions,
   useObjectVersion,
   useRootObjectVersions,
+  useRefsData,
+  useApplyMutationsToRef,
   derived: {
     useChildCallsForCompare,
+    useGetRefsType,
+    useRefsType,
   },
 };

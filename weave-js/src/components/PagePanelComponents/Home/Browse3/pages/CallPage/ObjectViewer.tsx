@@ -8,9 +8,9 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {useWeaveContext} from '../../../../../../context';
-import {constString, opGet} from '../../../../../../core';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
+import {useWFHooks} from '../wfReactInterface/context';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
 import {mapObject, traverse, TraverseContext, traversed} from './traverse';
 import {ValueView} from './ValueView';
@@ -38,45 +38,43 @@ type RefValues = Record<string, any>; // ref URI to value
 
 export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   const weave = useWeaveContext();
+  const {useRefsData} = useWFHooks();
   const {client} = weave;
   const [resolvedData, setResolvedData] = useState<Data>(data);
+  const refs = useMemo(() => getRefs(data), [data]);
+  const refsData = useRefsData(refs);
 
   useEffect(() => {
-    const refs = getRefs(data);
-    const refValueNodes = refs.map(ref =>
-      opGet({uri: constString(ref)} as any)
-    );
-    const refQueries = refValueNodes.map(node => client.query(node));
-    Promise.allSettled(refQueries).then(values => {
-      const refValues: RefValues = {};
-      for (const [r, v] of _.zip(refs, values)) {
-        if (!r || !v) {
-          // Shouldn't be possible
-          continue;
-        }
-        let val = r;
-        if (v.status === 'rejected') {
-          console.error('Error resolving ref', r);
-        } else {
-          val = v.value;
-          if (typeof val === 'object' && val !== null) {
-            val = {
-              ...v.value,
-              _ref: r,
-            };
-          }
-        }
-        refValues[r] = val;
+    const resolvedRefData = refsData.result;
+
+    const refValues: RefValues = {};
+    for (const [r, v] of _.zip(refs, resolvedRefData)) {
+      if (!r) {
+        // Shouldn't be possible
+        continue;
       }
-      const resolved = mapObject(data, context => {
-        if (isRef(context.value)) {
-          return refValues[context.value];
+      let val = r;
+      if (v == null) {
+        console.error('Error resolving ref', r);
+      } else {
+        val = v;
+        if (typeof val === 'object' && val !== null) {
+          val = {
+            ...v,
+            _ref: r,
+          };
         }
-        return context.value;
-      });
-      setResolvedData(resolved);
+      }
+      refValues[r] = val;
+    }
+    const resolved = mapObject(data, context => {
+      if (isRef(context.value)) {
+        return refValues[context.value];
+      }
+      return context.value;
     });
-  }, [data, client]);
+    setResolvedData(resolved);
+  }, [data, client, refsData.result, refs]);
 
   const rows = useMemo(() => {
     const contexts = traversed(
