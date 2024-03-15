@@ -31,7 +31,7 @@ import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
-import {CallLink} from '../Browse3/pages/common/Links';
+import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
@@ -186,9 +186,12 @@ export const RunsTable: FC<{
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
   }, [spans]);
-  const isSingleOp = useMemo(() => {
-    return _.uniq(spans.map(span => span.spanName)).length === 1;
+  const uniqueSpanNames = useMemo(() => {
+    return _.uniq(spans.map(span => span.spanName));
   }, [spans]);
+  const isSingleOp = useMemo(() => {
+    return uniqueSpanNames.length === 1;
+  }, [uniqueSpanNames]);
 
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
@@ -337,8 +340,11 @@ export const RunsTable: FC<{
 
   // Custom logic to control path reservation preference
   const preservePath = useMemo(() => {
-    return isSingleOp;
-  }, [isSingleOp]);
+    return (
+      uniqueSpanNames.length === 1 &&
+      opNiceName(uniqueSpanNames[0]) === 'Evaluation-predict_and_score'
+    );
+  }, [uniqueSpanNames]);
 
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
