@@ -356,7 +356,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query_result = self.ch_client.query(
             f"""
             SELECT *
-            FROM objects
+            FROM objects_deduped
             WHERE {predicate}
             """,
         )

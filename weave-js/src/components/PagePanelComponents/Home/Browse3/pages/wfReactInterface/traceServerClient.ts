@@ -64,6 +64,33 @@ type TraceCallsQueryReq = {
   offset?: number;
 };
 
+interface TraceObjectsFilter {
+  object_names?: string[];
+  latest_only?: boolean;
+}
+
+type TraceObjQueryReq = {
+  entity: string;
+  project: string;
+  filter?: TraceObjectsFilter;
+};
+
+export interface TraceObjSchema {
+  entity: string;
+  project: string;
+  name: string;
+  created_at: string;
+  digest: string;
+  version_index: number;
+  is_latest: number;
+  type: string;
+  val: any;
+}
+
+type TraceObjQueryRes = {
+  objs: TraceObjSchema[];
+};
+
 export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
 };
@@ -85,6 +112,12 @@ export class TraceServerClient {
   callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = req => {
     return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
       '/call/read',
+      req
+    );
+  };
+  objsQuery: (req: TraceObjQueryReq) => Promise<TraceObjQueryRes> = req => {
+    return this.makeRequest<TraceObjQueryReq, TraceObjQueryRes>(
+      '/objs/query',
       req
     );
   };

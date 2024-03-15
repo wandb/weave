@@ -25,7 +25,7 @@ class RegexStringMatcher(str):
 
 
 @pytest.fixture
-def client(clickhouse_server) -> Generator[weave_client.WeaveClient, None, None]:
+def client() -> Generator[weave_client.WeaveClient, None, None]:
     clickhouse_trace_server = (
         clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
             use_async_insert=False
@@ -358,6 +358,16 @@ def test_evaluate(client):
         "score": {"true_count": 1, "true_fraction": 0.5},
     }
     assert result == expected_eval_result
+
+
+def test_obj_dedupe(client):
+    client.save_object({"a": 1}, "my-obj")
+    client.save_object({"a": 1}, "my-obj")
+    client.save_object({"a": 2}, "my-obj")
+    res = client.objects()
+    assert len(res) == 2
+    assert res[0].version_index == 1
+    assert res[1].version_index == 2
 
 
 # def test_publish_big_list(server):

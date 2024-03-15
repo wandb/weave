@@ -20,6 +20,12 @@ export type Loadable<T> = {
   result: T | null;
 };
 
+export type LoadableWithError<T> = {
+  loading: boolean;
+  result: T | null;
+  error: Error | null;
+};
+
 export type CallKey = {
   entity: string;
   project: string;

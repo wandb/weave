@@ -4,10 +4,12 @@
  * backed by the "Trace Server" engine.
  */
 
+import {toWeaveType} from '@wandb/weave/components/Panel2/toWeaveType';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
+import {refStringToRefDict} from '../wfInterface/naive';
 import {callCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
@@ -18,6 +20,7 @@ import {
   CallKey,
   CallSchema,
   Loadable,
+  LoadableWithError,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -291,27 +294,119 @@ const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
+  const result = useRootObjectVersions(key?.entity, key?.project, {
+    objectIds: [key?.objectId ?? ''],
+  });
   return {
-    loading: false,
-    result: null,
+    loading: result.loading,
+    result: result.result?.find(
+      obj => obj.versionHash === key?.versionHash
+    ) as ObjectVersionSchema | null,
   };
-  throw new Error('Not implemented');
 };
 
-const useRootObjectVersions = (
-  entity: string,
-  project: string,
-  filter: ObjectVersionFilter,
-  limit?: number,
-  opts?: {skip?: boolean}
-): Loadable<ObjectVersionSchema[]> => {
-  console.log('USE ROOT OBJ', entity, project, filter, limit, opts);
-  return {
-    loading: false,
-    result: [],
+let count = 0;
+
+// useTraceServerRequest, a hook that takes a trace server function (which has arguments and returns a promise)
+// as well as the arguments to pass to the function. It'll return a Loadable with the result of the promise.
+const makeTraceServerEndpointHook = <
+  FN extends keyof traceServerClient.TraceServerClient,
+  Input extends any[],
+  Output
+>(
+  traceServerFnName: FN,
+  preprocessFn: (
+    ...input: Input
+  ) => Parameters<traceServerClient.TraceServerClient[FN]>[0],
+  postprocessFn: (
+    res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>
+  ) => Output
+) => {
+  const useTraceServerRequest = (
+    ...input: Input
+  ): LoadableWithError<Output> => {
+    input = useDeepMemo(input);
+    const getTsClient = useGetTraceServerClientContext();
+    const client = getTsClient();
+    const [loading, setLoading] = useState(true);
+    const [result, setResult] = useState<Output | null>(null);
+    const [error, setError] = useState<Error | null>(null);
+    count++;
+    if (count > 500) {
+      throw new Error('Too many calls');
+    }
+
+    useEffect(() => {
+      setLoading(true);
+      const req = preprocessFn(...input);
+      client[traceServerFnName](req)
+        .then(res => {
+          const output = postprocessFn(res);
+          setLoading(false);
+          setResult(output);
+        })
+        .catch(err => {
+          setLoading(false);
+          setError(err);
+        });
+    }, [input]);
+
+    return {
+      loading,
+      result,
+      error,
+    };
   };
-  throw new Error('Not implemented');
+  return useTraceServerRequest;
 };
+
+// const serverObjToClientObj = (
+//   obj: traceServerClient.TraceObjSchema
+// ): ObjectVersionSchema => {
+//   return {
+//     entity: obj.entity,
+//     project: obj.project,
+//     objectId: obj.name,
+//     versionHash: obj.digest,
+//     typeName: obj.type,
+//     path: '',
+//     createdAtMs: convertISOToDate(obj.created_at).getTime(),
+//     category: null,
+//     versionIndex: obj.version_index,
+//   };
+// };
+
+const useRootObjectVersions = makeTraceServerEndpointHook(
+  'objsQuery',
+  (
+    entity: string,
+    project: string,
+    filter: ObjectVersionFilter,
+    limit?: number,
+    opts?: {skip?: boolean}
+  ) => ({
+    entity,
+    project,
+    filter: {
+      object_names: filter.objectIds,
+      latest_only: filter.latestOnly,
+    },
+  }),
+  res =>
+    res.objs.map(obj => ({
+      entity: obj.entity,
+      project: obj.project,
+      objectId: obj.name,
+      versionHash: obj.digest,
+      typeName: obj.type,
+      name: obj.name,
+      path: '',
+      createdAtMs: convertISOToDate(obj.created_at).getTime(),
+      category: null,
+      versionIndex: obj.version_index,
+      value: obj.val,
+    }))
+);
 
 const useChildCallsForCompare = (
   entity: string,
@@ -386,7 +481,36 @@ const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
-  throw new Error('Not implemented');
+  // Bad implementations! Fetches all versions of all objects in the refUris, and finds the specific
+  // versions on the client-side. Also doesn't yet do ref-walking
+  const parsed = refUris.map(refStringToRefDict);
+  const ref0 = parsed[0];
+  const artifactNames = parsed.map(p => p.artifactName);
+  const objVersionsResult = useRootObjectVersions(ref0.entity, ref0.project, {
+    objectIds: artifactNames,
+  });
+  return useMemo(() => {
+    if (!objVersionsResult.loading) {
+      return {
+        loading: false,
+        result: parsed.map(
+          p =>
+            objVersionsResult.result?.find(
+              o =>
+                o.versionHash === p.versionCommitHash &&
+                o.name === p.artifactName
+            )?.value
+        ),
+        error: null,
+      };
+    } else {
+      return {
+        loading: true,
+        result: null,
+        error: null,
+      };
+    }
+  }, [objVersionsResult.loading, objVersionsResult.result, parsed]);
 };
 
 const useApplyMutationsToRef = (): ((
@@ -404,7 +528,27 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
 };
 
 const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
-  throw new Error('Not implemented');
+  const dataResult = useRefsData(refUris);
+  // console.log('USE REFS TYPE', dataResult);
+  // const key0 = refUriToObjectVersionKey(refUris[0]);
+  // console.log('REF URIS', refUris);
+  const finalRes = useMemo(() => {
+    if (!dataResult.loading) {
+      return {
+        loading: false,
+        result: dataResult.result?.map(toWeaveType) ?? [],
+        error: null,
+      };
+    } else {
+      return {
+        loading: true,
+        result: null,
+        error: null,
+      };
+    }
+  }, [dataResult.loading, dataResult.result]);
+  console.log('useRefsType', finalRes);
+  return finalRes;
 };
 
 /// Converters ///

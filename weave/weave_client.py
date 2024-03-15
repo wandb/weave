@@ -626,6 +626,8 @@ class WeaveClient:
     # is nicer for clients I think?
     def save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
         val = map_to_refs(val)
+        if isinstance(val, ObjectRef):
+            return val
         json_val = to_json(val)
 
         response = self.server.obj_create(
@@ -647,8 +649,8 @@ class WeaveClient:
     def get(self, ref: ObjectRef) -> Any:
         read_res = self.server.obj_read(
             ObjReadReq(
-                entity="none",
-                project="none",
+                entity=self.entity,
+                project=self.project,
                 name=ref.name,
                 version_digest=ref.val_id,
             )
