@@ -569,9 +569,9 @@ const useSetSearchParams = () => {
   );
 };
 
-const TRACETREE_PARAM = 'tracetree';
-const PEAK_SEARCH_PARAM = 'peekPath';
-const PATH_PARAM = 'path';
+export const TRACETREE_PARAM = 'tracetree';
+export const PEAK_SEARCH_PARAM = 'peekPath';
+export const PATH_PARAM = 'path';
 
 export const baseContext = browse3ContextGen(
   (entityName: string, projectName: string) => {
@@ -734,8 +734,18 @@ export const useClosePeek = () => {
   const history = useHistory();
   return () => {
     const queryParams = new URLSearchParams(history.location.search);
-    if (queryParams.has('peekPath')) {
-      queryParams.delete('peekPath');
+    if (queryParams.has(PEAK_SEARCH_PARAM)) {
+      queryParams.delete(PEAK_SEARCH_PARAM);
+
+      // SUPER HACK! The TRACE_TREE and PATH params are being managed outside
+      // of the context correctly. This means that these params are present on
+      // the outer URL, not contained internally to the peek path. This violates
+      // the pattern where peekPath contains all information needed to display
+      // content. We should never need to delete these params from the outer
+      // URL, but we do for now because we're not managing them correctly.
+      // queryParams.delete(TRACETREE_PARAM);
+      // queryParams.delete(PATH_PARAM);
+
       history.replace({
         search: queryParams.toString(),
       });

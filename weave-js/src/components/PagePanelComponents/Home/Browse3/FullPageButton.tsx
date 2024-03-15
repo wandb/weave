@@ -2,6 +2,7 @@ import React from 'react';
 import {Link} from 'react-router-dom';
 
 import {Button} from '../../../Button';
+import {PATH_PARAM, TRACETREE_PARAM} from './context';
 
 type FullPageButtonProps = {
   query: Record<string, any>;
@@ -19,7 +20,7 @@ export const FullPageButton = ({
   }
   const [pathname, search] = query.peekPath.split('?');
   const params = new URLSearchParams(search);
-  const preserveKeys = ['tracetree', 'path'];
+  const preserveKeys = [TRACETREE_PARAM, PATH_PARAM];
   for (const key of preserveKeys) {
     if (key in query) {
       params.set(key, query[key]);

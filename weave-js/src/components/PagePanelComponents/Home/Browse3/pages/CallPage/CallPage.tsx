@@ -5,6 +5,7 @@ import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
+import {PATH_PARAM, TRACETREE_PARAM} from '../../context';
 import {
   queryGetBoolean,
   queryGetString,
@@ -61,32 +62,36 @@ const useCallTabs = (call: CallSchema) => {
   ];
 };
 
-// Setting to true is prohibitively slow for large traces and blocks
-// the UI from rendering the data. We need a different approach to
-// handle this. Making a flag for now to avoid the issue.
-const MAINTAIN_SELECTED_PATH = false;
-
 const CallPageInnerVertical: FC<{
   call: CallSchema;
 }> = ({call}) => {
+  // Note: use of history in this component is a sign that we are leaking
+  // the concept of URL query parameters into the component. This is a
+  // violation of the separation of concerns. We should refactor this
+  // component to accept props for the query parameters it needs. History
+  // consumption should only be in the top-level component that is responsible
+  // for routing and URL query parameters.
   const history = useHistory();
-  const showTraceTree = queryGetBoolean(history, 'tracetree', true);
+  const showTraceTree = queryGetBoolean(history, TRACETREE_PARAM, true);
   const onToggleTraceTree = () => {
-    queryToggleBoolean(history, 'tracetree', true);
+    queryToggleBoolean(history, TRACETREE_PARAM, true);
   };
 
-  const path = queryGetString(history, 'path');
+  const path = queryGetString(history, PATH_PARAM);
   const tree = useCallFlattenedTraceTree(call, path);
   const {rows, expandKeys, loading} = tree;
   let {selectedCall} = tree;
 
-  if (!MAINTAIN_SELECTED_PATH) {
+  const assumeCallIsSelectedCall = path == null || path === '';
+
+  if (assumeCallIsSelectedCall) {
+    // Allows us to bypass the loading state when the call is already selected.
     selectedCall = call;
   }
 
   const callTabs = useCallTabs(selectedCall);
 
-  if (loading && MAINTAIN_SELECTED_PATH) {
+  if (loading && !assumeCallIsSelectedCall) {
     return <Loader active />;
   }
 

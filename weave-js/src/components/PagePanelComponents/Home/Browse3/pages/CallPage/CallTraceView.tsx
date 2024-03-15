@@ -10,7 +10,11 @@ import styled from 'styled-components';
 
 import {Button} from '../../../../../Button';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {useWeaveflowCurrentRouteContext} from '../../context';
+import {
+  PATH_PARAM,
+  TRACETREE_PARAM,
+  useWeaveflowCurrentRouteContext,
+} from '../../context';
 import {querySetBoolean, querySetString} from '../../urlQueryUtil';
 import {CallStatusType} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -117,7 +121,7 @@ export const CallTraceView: FC<{
         );
       } else {
         // Browse within selected call
-        querySetString(history, 'path', params.row.path);
+        querySetString(history, PATH_PARAM, params.row.path);
       }
     },
     [currentRouter, history]
@@ -211,7 +215,7 @@ export const CallTraceView: FC<{
   }, [apiRef, callId]);
 
   const onCloseTraceTree = () => {
-    querySetBoolean(history, 'tracetree', false);
+    querySetBoolean(history, TRACETREE_PARAM, false);
   };
 
   // This is used because when we first load the trace view in a drawer, the animation cant handle all the rows

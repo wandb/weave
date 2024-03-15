@@ -42,6 +42,7 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
+  PEAK_SEARCH_PARAM,
   useClosePeek,
   usePeekLocation,
   useWeaveflowCurrentRouteContext,
@@ -658,7 +659,7 @@ const useCallPeekRedirect = () => {
       });
       const searchParams = new URLSearchParams();
       searchParams.set(
-        'peekPath',
+        PEAK_SEARCH_PARAM,
         baseContext.callUIUrl(
           params.entity,
           params.project,
