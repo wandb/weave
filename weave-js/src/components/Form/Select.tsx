@@ -30,54 +30,72 @@ import ReactSelect, {
   StylesConfig,
 } from 'react-select';
 import AsyncSelect, {AsyncProps} from 'react-select/async';
+import AsyncCreatableSelect, {
+  AsyncCreatableProps,
+} from 'react-select/async-creatable';
 
 export const SelectSizes = {
   Small: 'small',
   Medium: 'medium',
   Large: 'large',
+  Variable: 'variable',
 } as const;
 export type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
-const HEIGHTS: Record<SelectSize, number> = {
+const HEIGHTS: Record<SelectSize, number | undefined> = {
   small: 24,
   medium: 32,
   large: 40,
+  variable: undefined,
 } as const;
 
-const LINE_HEIGHTS: Record<SelectSize, string> = {
+const MIN_HEIGHTS: Record<SelectSize, number | undefined> = {
+  small: undefined,
+  medium: undefined,
+  large: undefined,
+  variable: 40,
+} as const;
+
+const LINE_HEIGHTS: Record<SelectSize, string | undefined> = {
   small: '20px',
   medium: '24px',
   large: '24px',
+  variable: undefined,
 } as const;
 
 const FONT_SIZES: Record<SelectSize, string> = {
   small: '14px',
   medium: '16px',
   large: '16px',
+  variable: '14px',
 } as const;
 
 const PADDING: Record<SelectSize, string> = {
   small: '2px 8px',
   medium: '4px 12px',
   large: '8px 12px',
+  variable: '2px 8px',
 } as const;
 
 const OUTWARD_MARGINS: Record<SelectSize, string> = {
   small: '-8px',
   medium: '-12px',
   large: '-12px',
+  variable: '-8px',
 } as const;
 
 const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
   small: 2,
   medium: 6,
   large: 8,
+  variable: 2,
 } as const;
 
-type AdditionalProps = {
+export type AdditionalProps = {
   size?: SelectSize;
   errorState?: boolean;
   groupDivider?: boolean;
+  cursor?: string;
 };
 
 // Toggle icon when open
@@ -131,6 +149,7 @@ const getGroupHeading = <
 type StylesProps = {
   size?: SelectSize;
   errorState?: boolean;
+  cursor?: string;
 };
 
 // Override styling to come closer to design spec.
@@ -151,6 +170,7 @@ const getStyles = <
     clearIndicator: baseStyles => ({
       ...baseStyles,
       padding: CLEAR_INDICATOR_PADDING[size],
+      cursor: 'pointer',
     }),
     input: baseStyles => {
       return {
@@ -159,10 +179,22 @@ const getStyles = <
         margin: 0,
       };
     },
+
     valueContainer: baseStyles => {
       const padding = PADDING[size];
       return {...baseStyles, padding};
     },
+    multiValueLabel: baseStyles => {
+      const fontSize = FONT_SIZES[size];
+      return {
+        ...baseStyles,
+        fontSize,
+      };
+    },
+    multiValueRemove: baseStyles => ({
+      ...baseStyles,
+      cursor: 'pointer',
+    }),
     dropdownIndicator: baseStyles => ({...baseStyles, padding: '0 8px 0 0'}),
     container: baseStyles => {
       const height = HEIGHTS[size];
@@ -178,15 +210,18 @@ const getStyles = <
         ? hexToRGB(RED_550, 0.64)
         : hexToRGB(TEAL_500, 0.64);
       const height = HEIGHTS[size];
+      const minHeight = MIN_HEIGHTS[size] ?? height;
       const lineHeight = LINE_HEIGHTS[size];
       const fontSize = FONT_SIZES[size];
       return {
         ...baseStyles,
         height,
-        minHeight: height,
+        minHeight,
         lineHeight,
         fontSize,
+        cursor: props.cursor ? props.cursor : 'default',
         border: 0,
+
         boxShadow: state.menuIsOpen
           ? `0 0 0 2px ${colorBorderOpen}`
           : state.isFocused
@@ -199,6 +234,14 @@ const getStyles = <
         },
       };
     },
+    menu: baseStyles => ({
+      ...baseStyles,
+      // TODO: Semantic-UI based dropdowns have their z-index set to 3,
+      //       which causes their selected value to appear in front of the
+      //       react-select popup. We should remove this hack once we've
+      //       eliminated Semantic-UI based dropdowns.
+      zIndex: 4,
+    }),
     menuList: baseStyles => {
       return {
         ...baseStyles,
@@ -285,6 +328,29 @@ export const SelectAsync = <
   const GroupHeading = getGroupHeading(size, showDivider);
   return (
     <AsyncSelect
+      {...props}
+      components={Object.assign(
+        {DropdownIndicator, GroupHeading},
+        props.components
+      )}
+      styles={styles}
+    />
+  );
+};
+
+export const SelectAsyncCreatable = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: AsyncCreatableProps<Option, IsMulti, Group> & AdditionalProps
+) => {
+  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
+  const size = props.size ?? 'medium';
+  const showDivider = props.groupDivider ?? false;
+  const GroupHeading = getGroupHeading(size, showDivider);
+  return (
+    <AsyncCreatableSelect
       {...props}
       components={Object.assign(
         {DropdownIndicator, GroupHeading},
