@@ -179,7 +179,6 @@ const getStyles = <
         margin: 0,
       };
     },
-
     valueContainer: baseStyles => {
       const padding = PADDING[size];
       return {...baseStyles, padding};
@@ -221,7 +220,6 @@ const getStyles = <
         fontSize,
         cursor: props.cursor ? props.cursor : 'default',
         border: 0,
-
         boxShadow: state.menuIsOpen
           ? `0 0 0 2px ${colorBorderOpen}`
           : state.isFocused
