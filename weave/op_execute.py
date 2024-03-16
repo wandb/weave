@@ -66,6 +66,14 @@ def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
     refs: typing.List[ref_base.Ref] = []
     return _auto_publish(obj, refs), refs
 
+def apply_fn_defaults_to_inputs(fn: typing.Callable, inputs: Mapping[str, typing.Any]) -> Mapping[str, typing.Any]:
+    inputs = {**inputs}
+    sig = inspect.signature(fn)
+    for param_name, param in sig.parameters.items():
+        if param_name not in inputs:
+            if param.default != inspect.Parameter.empty:
+                inputs[param_name] = param.default
+    return inputs
 
 def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
     mon_span_inputs = {**inputs}
@@ -75,7 +83,9 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
         op_def_ref = storage._get_ref(op_def)
         if not client.ref_is_own(op_def_ref):
             op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-        mon_span_inputs, refs = auto_publish(inputs)
+        
+        inputs_with_defaults = apply_fn_defaults_to_inputs(op_def.raw_resolve_fn, inputs)
+        mon_span_inputs, refs = auto_publish(inputs_with_defaults)
 
         # Memoization disabled for now.
         # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
