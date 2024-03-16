@@ -5,6 +5,8 @@ import Component from './Component';
 export const Spec: Panel2.PanelSpec = {
   id: 'barchart',
   displayName: 'Bar Chart',
+  icon: 'chart-horizontal-bars',
+  category: 'Data',
   Component,
   inputType,
   canFullscreen: true,

@@ -3,7 +3,8 @@ import random
 import socket
 import string
 import gc, inspect
-import ipynbname
+
+# import ipynbname
 import typing
 from .errors import WeaveFingerprintErrorMixin
 
@@ -52,8 +53,8 @@ def capture_exception_with_sentry_if_available(
     return None
 
 
-def get_notebook_name():
-    return ipynbname.name()
+# def get_notebook_name():
+#     return ipynbname.name()
 
 
 def get_hostname():
@@ -62,6 +63,14 @@ def get_hostname():
 
 def get_pid():
     return os.getpid()
+
+
+def read_or_default(path: str, default: str = "") -> str:
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return default
 
 
 def rand_string_n(n: int) -> str:

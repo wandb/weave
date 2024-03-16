@@ -8,12 +8,6 @@ from .. import weave_internal
 from . import panel_group
 
 
-# @dataclasses.dataclass
-# class Board:
-#     vars: typing.Dict[str, typing.Any]
-#     panels: typing.Dict[str, typing.Any]
-
-
 @dataclasses.dataclass
 class BoardPanelLayout:
     x: int
@@ -54,6 +48,14 @@ def varbar(editable=True, items=None) -> panel_group.Group:
             childNameBase="var",
         ),
         items=items,
+    )
+
+
+def main() -> panel_group.Group:
+    return weave.panels.Group(
+        layoutMode="grid",
+        showExpressions=True,
+        enableAddPanel=True,
     )
 
 

@@ -13,13 +13,12 @@ type State = {
 };
 
 export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-  };
-
   public static getDerivedStateFromError(_: Error): State {
     return {hasError: true};
   }
+  public state: State = {
+    hasError: false,
+  };
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     datadogRum.addAction(

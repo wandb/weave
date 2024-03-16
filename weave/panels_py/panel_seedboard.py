@@ -15,7 +15,7 @@ class PyBoardSeedBoardConfig:
     hidden=True,
 )
 def seed_board(
-    input_node: weave.Node[list[dict]],
+    input_node: weave.Node[typing.Any],
     config: typing.Optional[PyBoardSeedBoardConfig] = None,
 ) -> weave.panels.Group:
     control_items = [
@@ -28,7 +28,7 @@ def seed_board(
     panels = [
         weave.panels.BoardPanel(
             weave_internal.make_var_node(input_node.type, "data"),
-            id="table",
+            id="panel",
             layout=weave.panels.BoardPanelLayout(x=0, y=0, w=24, h=6),
         ),
     ]

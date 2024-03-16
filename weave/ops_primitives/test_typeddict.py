@@ -1,7 +1,7 @@
 import pytest
 import weave
 
-from ..ops_arrow.arrow import ArrowWeaveListType
+from ..arrow.arrow import ArrowWeaveListType
 from ..tests.list_arrow_test_helpers import ArrowNode
 from .. import weave_internal
 from ..language_features.tagging import tag_store, tagged_value_type

@@ -6,6 +6,7 @@ import {GlobalCGEventTracker} from '../analytics/tracker';
 import {Node, serialize, serializeMulti} from '../model';
 import type {OpStore} from '../opStore';
 import {batchIntervalOverride, isWeaveDebugEnabled} from '../util/debug';
+import {uuidv4} from '../util/id';
 import type {Server} from './types';
 
 const BATCH_INTERVAL_MS = () => batchIntervalOverride() ?? 50;
@@ -107,7 +108,7 @@ const createClientCacheKey = (windowSizeMs: number = 15000) => {
 export class RemoteHttpServer implements Server {
   public clientCacheKey: string | undefined = createClientCacheKey();
   private readonly opts: RemoteWeaveOptions;
-  private readonly flushInterval: NodeJS.Timer;
+  private readonly flushInterval: NodeJS.Timeout;
   private pendingNodes: Map<Node, NodeEntry> = new Map();
   private pendingRequests: Set<Promise<any>> = new Set();
   private nextFlushTime = 0;
@@ -351,6 +352,8 @@ export class RemoteHttpServer implements Server {
         if (this.clientCacheKey != null) {
           additionalHeaders['x-weave-client-cache-key'] = this.clientCacheKey;
         }
+
+        additionalHeaders['x-request-id'] = uuidv4();
 
         let respJson: any = {
           data: new Array(nodes.length).fill(null),

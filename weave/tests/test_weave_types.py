@@ -6,7 +6,7 @@ import weave.weave_types
 from .. import errors
 from .. import weave_types as types
 from .. import runs
-from ..ops_primitives import _dict_utils
+from .. import _dict_utils
 from ..ops_domain import wbmedia
 
 
@@ -724,3 +724,15 @@ def test_union_auto_execute():
     assert weave.types.optional(weave.types.Timestamp()).assign_type(
         weave.types.Function(output_type=weave.types.optional(weave.types.Timestamp()))
     )
+
+
+def test_load_unknown_subobj_type():
+    t = weave.types.TypeRegistry.type_from_dict(
+        {
+            "type": "typedDict",
+            "propertyTypes": {"a": "int", "b": {"type": "some_unknown_type"}},
+        }
+    )
+    assert isinstance(t, types.TypedDict)
+    assert t.property_types["a"] == types.Int()
+    assert t.property_types["b"] == types.UnknownType()

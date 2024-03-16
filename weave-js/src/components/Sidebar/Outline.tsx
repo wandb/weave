@@ -3,7 +3,7 @@ import * as _ from 'lodash';
 import React, {useCallback, useState} from 'react';
 import styled, {css} from 'styled-components';
 
-import {Icon, IconHideHidden, IconLockClosed, IconName} from '../Icon';
+import {Icon, IconHideHidden, IconLockClosed} from '../Icon';
 import {IconButton} from '../IconButton';
 import {getPanelStacksForType} from '../Panel2/availablePanels';
 import {ChildPanelConfig, ChildPanelFullConfig} from '../Panel2/ChildPanel';
@@ -16,6 +16,7 @@ import {
   usePanelIsHoveredByPath,
   useSetPanelIsHoveredInOutline,
 } from '../Panel2/PanelInteractContext';
+import {getPanelIcon} from '../Panel2/PanelRegistry';
 import {panelChildren} from '../Panel2/panelTree';
 import {Tooltip} from '../Tooltip';
 import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
@@ -128,20 +129,6 @@ export const shouldDisablePanelDelete = (
   path.length === 0 ||
   (path.length === 1 && ['main', 'sidebar'].includes(path[0]));
 
-const PANEL_TYPE_TO_ICON: Record<string, IconName> = {
-  Group: 'group',
-  boolean: 'boolean',
-  number: 'number',
-  string: 'text-language-alt',
-  date: 'date',
-  DateRange: 'date',
-  FilterEditor: 'filter-alt',
-  table: 'table',
-  plot: 'chart-horizontal-bars',
-  Histogram: 'chart-vertical-bars',
-  object: 'list-bullets',
-  Expression: 'code-alt',
-};
 const getPanelTypeIcon = (panelId: string | undefined) => {
   if (!panelId) {
     return 'panel';
@@ -152,7 +139,7 @@ const getPanelTypeIcon = (panelId: string | undefined) => {
   if (panelId.startsWith('maybe.')) {
     panelId = panelId.slice(6);
   }
-  return PANEL_TYPE_TO_ICON[panelId] ?? 'panel';
+  return getPanelIcon(panelId);
 };
 
 const OutlinePanel: React.FC<OutlinePanelProps> = props => {

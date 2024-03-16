@@ -811,12 +811,23 @@ def filter_node_to_selection(
             selection_min = selection[0]  # type: ignore
             selection_max = selection[1]  # type: ignore
 
+            # This is a hack to handle selection of data from plots that have a temporal
+            # range defined with bins ("start", "stop") instead of a single timestamp.
+            # Should naievly handle selection of data from plots using op timestamps-binsnice
             if (
+                weave.types.TypedDict({"start": weave.types.Timestamp()}).assign_type(
+                    target.type
+                )
+                and isinstance(selection_min, (int, float))
+                and isinstance(selection_max, (int, float))
+            ):
+                target = target["start"].toNumber()
+            elif (
                 weave.types.Timestamp().assign_type(target.type)
                 and isinstance(selection_min, (int, float))
                 and isinstance(selection_max, (int, float))
             ):
-                target = target.toNumber() * 1000
+                target = target.toNumber()
 
             return boolean.Boolean.bool_and(
                 target >= selection_min, target <= selection_max

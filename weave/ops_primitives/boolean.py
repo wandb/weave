@@ -46,9 +46,10 @@ def none_coalesce(lhs: typing.Any, rhs: typing.Any):
 
 
 @op(
+    name="cond",
     output_type=lambda input_type: types.optional(
         types.union(*input_type["results"].property_types.values())
-    )
+    ),
 )
 def cond(cases: dict[str, bool], results: dict[str, typing.Any]):
     """Return first result.values()[i] for which case.values()[i] is True.

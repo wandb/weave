@@ -32,7 +32,10 @@ import {
 import {produce} from 'immer';
 import * as _ from 'lodash';
 
-import {PanelBankSectionConfig} from '../WeavePanelBank/panelbank';
+import {
+  LayoutParameters,
+  PanelBankSectionConfig,
+} from '../WeavePanelBank/panelbank';
 import {
   ChildPanelConfig,
   childPanelFromTableState,
@@ -305,22 +308,43 @@ export const movePath = (
 export const addChild = (
   node: PanelTreeNode,
   path: string[],
-  value: PanelTreeNode
+  value: PanelTreeNode,
+  panelName: string,
+  layout?: LayoutParameters
 ) => {
   const group = getPath(node, path);
   if (!isGroupNode(group)) {
     throw new Error('Cannot add child to non-group panel');
   }
-  return setPath(node, path, {
+  const groupValue = {
     ...group,
     config: {
       ...group.config,
       items: {
         ...group.config.items,
-        [nextPanelName(Object.keys(group.config.items))]: value,
+        [panelName]: value,
       },
     },
-  });
+  };
+
+  // Set the location for the new child
+  if (layout && groupValue.config.gridConfig) {
+    groupValue.config = {
+      ...groupValue.config,
+      gridConfig: {
+        ...groupValue.config.gridConfig,
+        panels: [
+          ...groupValue.config.gridConfig.panels,
+          {
+            id: panelName,
+            layout,
+          },
+        ],
+      },
+    };
+  }
+
+  return setPath(node, path, groupValue);
 };
 
 type DefinitionWithDirtyHandler = Definition & {

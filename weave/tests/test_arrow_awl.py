@@ -9,7 +9,7 @@ from .concrete_tagged_value import (
     concrete_to_tagstore,
     concrete_from_tagstore,
 )
-from ..ops_arrow.convert import to_arrow
+from ..arrow.convert import to_arrow
 from .. import ops_arrow, box
 from ..language_features.tagging import tag_store, tagged_value_type
 

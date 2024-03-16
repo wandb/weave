@@ -183,12 +183,32 @@ gql_prop_op(
     types.Number(),
 )
 
+gql_prop_op(
+    "artifactVersion-ttlIsInherited",
+    wdt.ArtifactVersionType,
+    "ttlIsInherited",
+    types.Boolean(),
+)
 
 gql_prop_op(
     "artifactVersion-historyStep",
     wdt.ArtifactVersionType,
     "historyStep",
     types.optional(types.Int()),
+)
+
+gql_prop_op(
+    "artifactVersion-fileCount",
+    wdt.ArtifactVersionType,
+    "fileCount",
+    types.Int(),
+)
+
+gql_prop_op(
+    "artifactVersion-isGenerated",
+    wdt.ArtifactVersionType,
+    "isGenerated",
+    types.Boolean(),
 )
 
 

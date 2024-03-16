@@ -12,33 +12,26 @@ import {
   useWeaveContext,
   useWeaveRedesignedPlotConfigEnabled,
 } from '../../../context';
+import {Button} from '../../Button';
 import {IconLockedConstrained, IconUnlockedUnconstrained} from '../../Icon';
-import {IconButton} from '../../IconButton';
 import {PopupMenu, Section} from '../../Sidebar/PopupMenu';
 import {Tooltip} from '../../Tooltip';
-import * as ConfigPanel from '../ConfigPanel';
 import {
   IconAddNew,
   IconCheckmark,
   IconDelete,
   IconFullScreenModeExpand,
   IconMinimizeMode,
-  IconOverflowHorizontal,
   IconWeave,
 } from '../Icons';
 import * as TableState from '../PanelTable/tableState';
 import {ConfigDimLabel} from './ConfigDimLabel';
+import {ConfigSelect} from './ConfigSelect';
 import * as PlotState from './plotState';
 import * as S from './styles';
 import {DimComponentInputType, DimOption, DimOptionOrSection} from './types';
 import {PLOT_DIMS_UI, SeriesConfig} from './versions';
 import {WeaveExpressionDimConfig} from './WeaveExpressionDimConfig';
-
-const ConfigDimMenuButton = styled(IconButton).attrs({small: true})`
-  margin-left: 4px;
-  padding: 3px;
-`;
-ConfigDimMenuButton.displayName = 'S.ConfigDimMenuButton';
 
 const IconBlank = styled.svg`
   width: 18px;
@@ -307,9 +300,7 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
           <PopupMenu
             position="bottom left"
             trigger={
-              <ConfigDimMenuButton>
-                <IconOverflowHorizontal />
-              </ConfigDimMenuButton>
+              <Button variant="ghost" size="small" icon="overflow-horizontal" />
             }
             items={menuItems}
             sections={menuSections}
@@ -444,13 +435,12 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
         postfixComponent={postFixComponent}
         multiline={redesignedPlotConfigEnabled && multiline}
         redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
-        <ConfigPanel.ModifiedDropdownConfigField
-          selection
-          data-testid={`dropdown-${dimName}`}
+        <ConfigSelect
+          testId={`dropdown-${dimName}`}
           placeholder={dimension.defaultState().compareValue}
           value={dimension.state().value}
           options={dimension.options}
-          onChange={(e, {value}) => {
+          onChange={({value}) => {
             const newSeries = produce(config.series, draft => {
               draft.forEach(s => {
                 if (isShared || _.isEqual(s, dimension.series)) {
@@ -468,22 +458,20 @@ export const ConfigDimComponent: React.FC<DimComponentInputType> = props => {
     );
   } else if (PlotState.isWeaveExpression(dimension)) {
     return (
-      <>
-        <ConfigDimLabel
-          {...props}
-          postfixComponent={postFixComponent}
-          multiline={redesignedPlotConfigEnabled && multiline}
-          redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
-          <WeaveExpressionDimConfig
-            dimName={dimension.name}
-            input={input}
-            config={config}
-            updateConfig={updateConfig}
-            series={isShared ? config.series : [dimension.series]}
-          />
-        </ConfigDimLabel>
-      </>
+      <ConfigDimLabel
+        {...props}
+        postfixComponent={postFixComponent}
+        multiline={redesignedPlotConfigEnabled && multiline}
+        redesignedPlotConfigEnabled={redesignedPlotConfigEnabled}>
+        <WeaveExpressionDimConfig
+          dimName={dimension.name}
+          input={input}
+          config={config}
+          updateConfig={updateConfig}
+          series={isShared ? config.series : [dimension.series]}
+        />
+      </ConfigDimLabel>
     );
   }
-  return <></>;
+  return null;
 };

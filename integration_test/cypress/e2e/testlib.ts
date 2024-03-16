@@ -169,7 +169,7 @@ export const tableAppendColumn = (path: string[], expr) => {
 };
 
 export const tableCheckContainsValue = (path: string[], value: string) => {
-  const panel = getPanel(path);
+  const panel = getPanel(path).scrollIntoView();
   panel.find('.BaseTable__row-cell div').contains(value);
 };
 

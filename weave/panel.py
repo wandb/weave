@@ -9,7 +9,6 @@ from . import weave_types as types
 from . import weave_internal
 from . import panel_util
 from . import errors
-from .ops import get as op_get
 
 
 def run_variable_lambdas(
@@ -128,7 +127,9 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
             if isinstance(config_val, graph.Node) and isinstance(
                 config_val.type, types.Function
             ):
-                new_config_val = weave.define_fn(config_val.type.input_types, v)
+                new_config_val = weave_internal.define_fn(
+                    config_val.type.input_types, v
+                )
             elif isinstance(config_val, graph.Node):
                 new_config_val = panel_util.make_node(v)
             else:
@@ -156,3 +157,8 @@ class Panel(typing.Generic[InputNodeType, VarsType]):
             "id": self.id,
             "config": self.config,
         }
+
+    def _ipython_display_(self):
+        from . import show
+
+        show.show(self)

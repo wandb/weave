@@ -106,6 +106,10 @@ export class CachedClient implements Client {
     };
   }
 
+  public isWeavePythonBackend(): boolean {
+    return this.client.isWeavePythonBackend();
+  }
+
   public clearCacheForNode(node: Node<any>): Promise<void> {
     return this.client.clearCacheForNode(node).then(() => {
       return this.cache.invalidate(node);

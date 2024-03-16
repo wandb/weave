@@ -50,6 +50,9 @@ def not_equal(lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]) -> pa.Array
     if rhs == None:
         rhs = None
 
+    if isinstance(lhs, pa.NullArray) and (isinstance(rhs, pa.NullArray) or not rhs):
+        return pc.fill_null(pc.cast(lhs, pa.bool_()), False)
+
     one_null, both_null = _eq_null_consumer_helper(lhs, rhs)
     result = pc.not_equal(lhs, rhs)
     result = pc.replace_with_mask(result, both_null, False)

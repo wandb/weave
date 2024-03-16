@@ -66,15 +66,21 @@ panels = [
 
 did_define = False
 
+# Needed to avoid garbage collection
+type_cache = []
+
 
 def define_panel(p: LPanel):
     class DummyClass(weave.panel.Panel):
         id = p.panel_id
 
+    type_cache.append(DummyClass)
     name = p.typename_override or p.panel_id
     if weave.types.type_name_to_type(name) is not None:
         raise RuntimeError(f"Panel {name} already defined")
-    return weave.type(__override_name=name)(DummyClass)  # type: ignore
+    w_type = weave.type(__override_name=name)(DummyClass)  # type: ignore
+    type_cache.append(w_type)
+    return w_type
 
 
 if not did_define:

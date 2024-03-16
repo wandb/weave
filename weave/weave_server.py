@@ -71,7 +71,13 @@ if engine_trace.datadog_is_enabled():
     # crashes
     import ddtrace
 
-    ddtrace.patch_all(logging=True)
+    # patch all libraries to datadog except logging
+    ddtrace.patch_all(logging=False)
+
+    if not environment.disable_weave_pii():
+        # patch logging to datadog, if not disabled
+        ddtrace.patch(logging=True)
+
     custom_dd_patch()
 
 
@@ -96,6 +102,10 @@ blueprint = Blueprint("weave", "weave-server", static_folder=static_folder)
 
 
 def import_ecosystem():
+    from weave import ops
+    from weave import panels
+    from weave import panels_py
+
     # Attempt to import MVP ecosystem modules
     try:
         from weave.ecosystem import langchain, replicate
@@ -103,6 +113,13 @@ def import_ecosystem():
         pass
 
     if not util.parse_boolean_env_var("WEAVE_SERVER_DISABLE_ECOSYSTEM"):
+        # try:
+        #     from weave.weaveflow import faiss
+
+        #     # Turn eager mode back off.
+        #     context_state._eager_mode.set(False)
+        # except (ImportError, OSError, wandb.Error):
+        #     print("Error: Couldn't import faiss module for Weaveflow.")
         try:
             from weave.ecosystem import all
         except (ImportError, OSError, wandb.Error):
@@ -341,15 +358,18 @@ def execute():
                     "http://localhost:8080/snakeviz/"
                     + urllib.parse.quote(profile_filename),
                 )
-    if root_span is not None:
-        root_span.set_tag("request_size", len(req_bytes))
-    fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
 
+    fixed_response = response.results.safe_map(weavejs_fixes.fixup_data)
     response_payload = _value_or_errors_to_response(fixed_response)
 
     if root_span is not None:
-        root_span.set_metric("node_count", len(response_payload["data"]))
-        root_span.set_metric("error_count", len(response_payload["node_to_error"]))
+        root_span.set_metric("request_size", len(req_bytes), True)
+        root_span.set_metric("node_count", len(response_payload["data"]), True)
+        root_span.set_metric(
+            "error_count",
+            len(response_payload["node_to_error"]),
+            True,
+        )
 
     _log_errors(response_payload, response.nodes)
 
@@ -388,6 +408,11 @@ def send_local_file(path):
     return send_from_directory("/", path)
 
 
+@blueprint.before_request
+def _disable_eager_mode():
+    context_state._eager_mode.set(False)
+
+
 def frontend_env():
     """If you add vars here, make sure to define their types in weave-js/src/config.ts"""
     return {
@@ -395,6 +420,7 @@ def frontend_env():
         "ANALYTICS_DISABLED": environment.analytics_disabled(),
         "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
+        "TRACE_BACKEND_BASE_URL": environment.trace_backend_base_url(),
         "WANDB_BASE_URL": environment.wandb_base_url(),
         "DD_ENV": environment.dd_env(),
         "ENV_IS_CI": environment.env_is_ci(),

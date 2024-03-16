@@ -8,7 +8,8 @@ import pytest
 import shutil
 import tempfile
 
-from weave.panels import table_state
+import weave
+
 from . import context_state
 from .tests import fixture_fakewandb
 from . import serialize
@@ -23,35 +24,18 @@ import logging
 from flask.testing import FlaskClient
 
 from .tests.wandb_system_tests_conftest import *
-
-from _pytest.config import Config
-from _pytest.reports import TestReport
-from typing import Tuple, Optional
+from .tests.trace_server_clickhouse_conftest import *
 
 logs.configure_logger()
 
+# Lazy mode was the default for a long time. Eager is now the default for the user API.
+# A lot of tests are written to expect lazy mode, so just make lazy mode the default for
+# tests.
+context_state._eager_mode.set(False)
 
-def pytest_report_teststatus(
-    report: TestReport, config: Config
-) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    if report.when == "call":
-        duration = "{:.2f}s".format(report.duration)
-        if report.failed:
-            return "failed", "F", f"FAILED({duration})"
-        elif report.passed:
-            return "passed", ".", f"PASSED({duration})"
-        elif hasattr(
-            report, "wasxfail"
-        ):  # 'xfail' means that the test was expected to fail
-            return report.outcome, "x", "XFAIL"
-        elif report.skipped:
-            return report.outcome, "s", "SKIPPED"
-
-    elif report.when in ("setup", "teardown"):
-        if report.failed:
-            return "error", "E", "ERROR"
-
-    return None, None, None
+# A lot of tests rely on weave.ops.* being in scope. Importing this here
+# makes that work...
+from weave import ops
 
 
 ### Disable datadog engine tracing
@@ -132,6 +116,13 @@ def pre_post_each_test(test_artifact_dir, caplog):
     del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
 
 
+@pytest.fixture(autouse=True)
+def throw_on_error():
+    os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
+    yield
+    del os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"]
+
+
 @pytest.fixture()
 def cache_mode_minimal():
     os.environ["WEAVE_NO_CACHE"] = "true"
@@ -158,6 +149,12 @@ def cereal_csv():
         cereal_path = os.path.join(d, "cereal.csv")
         shutil.copy("testdata/cereal.csv", cereal_path)
         yield cereal_path
+
+
+@pytest.fixture()
+def eager_mode():
+    with context_state.eager_execution():
+        yield
 
 
 @pytest.fixture()
@@ -271,5 +268,19 @@ def io_server_factory():
 
 @pytest.fixture()
 def consistent_table_col_ids():
+    from weave.panels import table_state
+
     with table_state.use_consistent_col_ids():
+        yield
+
+
+@pytest.fixture()
+def ref_tracking():
+    with context_state.ref_tracking(True):
+        yield
+
+
+@pytest.fixture()
+def strict_op_saving():
+    with context_state.strict_op_saving(True):
         yield

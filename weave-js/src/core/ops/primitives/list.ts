@@ -25,7 +25,6 @@ import {
   isAssignableTo,
   isConcreteTaggedValue,
   isFunction,
-  isList,
   isListLike,
   isTaggedValue,
   isTypedDict,
@@ -1345,8 +1344,8 @@ export const opUnnest = makeOp({
       if (propertyType == null) {
         throw new Error('opUnnest: expected all property types to be non-null');
       }
-      newPropertyTypes[key] = isList(propertyType)
-        ? propertyType.objectType
+      newPropertyTypes[key] = isListLike(propertyType)
+        ? listObjectType(propertyType)
         : propertyType;
     }
     return maybe({

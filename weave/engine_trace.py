@@ -18,6 +18,7 @@ import time
 import json
 import dataclasses
 
+from . import environment
 from . import logs
 from . import stream_data_interfaces
 
@@ -37,10 +38,13 @@ class DummySpan:
         logs.reset_indent(self.log_indent_token)
         logging.debug("<- %s", self.args[0])
 
-    def set_tag(self, *args, **kwargs):
+    def set_tag(self, key, unredacted_val, redacted_val=None):
         pass
 
     def set_meta(self, *args, **kwargs):
+        pass
+
+    def set_metric(self, *args, **kwargs):
         pass
 
     def finish(self, *args, **kwargs):
@@ -149,15 +153,29 @@ class WeaveTraceSpan:
             self.span.attributes = {}
         return self.span.attributes
 
-    def set_tag(self, key, val):
+    def set_tag(self, key, unredacted_val, redacted_val=None):
         if "tags" not in self.attributes:
             self.attributes["tags"] = {}
-        self.attributes["tags"][key] = val
+        if not environment.disable_weave_pii():
+            self.attributes["tags"][key] = unredacted_val
+        elif redacted_val is not None:
+            self.attributes["tags"][key] = redacted_val
 
-    def set_meta(self, key, val):
+    def set_meta(self, key, unredacted_val, redacted_val=None):
         if "metadata" not in self.attributes:
             self.attributes["metadata"] = {}
-        self.attributes["metadata"][key] = val
+        if not environment.disable_weave_pii():
+            self.attributes["metadata"][key] = unredacted_val
+        elif redacted_val is not None:
+            self.attributes["metadata"][key] = redacted_val
+
+    def set_metric(self, key, unredacted_val, redacted_val=None):
+        if "metrics" not in self.attributes:
+            self.attributes["metrics"] = {}
+        if not environment.disable_weave_pii():
+            self.attributes["metrics"][key] = unredacted_val
+        elif redacted_val is not None:
+            self.attributes["metrics"][key] = redacted_val
 
     def finish(self, *args, **kwargs):
         pass
@@ -255,10 +273,42 @@ class WeaveWriter:
         self._orig_writer.flush_queue()
 
 
+def patch_ddtrace_set_tag():
+    from ddtrace import span as ddtrace_span
+    from inspect import signature
+
+    set_tag_signature = signature(ddtrace_span.Span.set_tag)
+
+    # replaces ddtrace.Span.set_tag and ddtrace.Span.set_metric if not patched already
+    if "redacted_val" not in set_tag_signature.parameters:
+        old_set_tag = ddtrace_span.Span.set_tag
+        old_set_metric = ddtrace_span.Span.set_metric
+
+        # Only logged redacted values if flag is on
+        def set_tag(self, key, unredacted_val=None, redacted_val=None):
+            if redacted_val is not None and environment.disable_weave_pii():
+                old_set_tag(self, key, redacted_val)
+            elif (
+                unredacted_val is not None
+                and not environment.disable_weave_pii()
+                or "_dd." in key
+            ):
+                old_set_tag(self, key, unredacted_val)
+
+        # Log metric if flag is off or if flag is on and redacted
+        def set_metric(self, key, val, is_pii_redacted=False):
+            if not environment.disable_weave_pii() or is_pii_redacted or "_dd." in key:
+                old_set_metric(self, key, val)
+
+        ddtrace_span.Span.set_metric = set_metric
+        ddtrace_span.Span.set_tag = set_tag
+
+
 def tracer():
     if os.getenv("DD_ENV"):
         from ddtrace import tracer as ddtrace_tracer
 
+        patch_ddtrace_set_tag()
         if os.getenv("WEAVE_TRACE_STREAM"):
             # In DataDog mode, if WEAVE_TRACE_STREAM is set, experimentally
             # mirror DataDog trace info to W&B.

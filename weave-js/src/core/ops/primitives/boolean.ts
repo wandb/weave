@@ -91,7 +91,10 @@ export const opCond = makeStandardOp({
   argTypes: {
     cases: {
       type: 'dict' as const,
-      objectType: 'boolean' as const,
+      objectType: {
+        type: 'union' as const,
+        members: ['none' as const, 'boolean' as const],
+      },
     },
     results: {
       type: 'dict' as const,

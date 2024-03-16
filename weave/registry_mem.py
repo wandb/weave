@@ -3,8 +3,6 @@ import datetime
 
 from weave.op_args import OpNamedArgs
 
-from . import op_def
-from . import op_def_type
 from . import op_args
 from . import weave_types
 from . import errors
@@ -13,6 +11,9 @@ from . import storage
 from . import uris
 from . import op_aliases
 
+if typing.TYPE_CHECKING:
+    from .op_def import OpDef
+
 
 class Registry:
     _types: typing.Dict[str, weave_types.Type]
@@ -20,12 +21,13 @@ class Registry:
     # This most recent register_op() call for a given OpDef.name
     # TODO: Get rid of this! Always use versioning! This is a temporary
     # state.
-    _ops: typing.Dict[str, op_def.OpDef]
+    _ops: typing.Dict[str, "OpDef"]
 
     # common_name: name: op_def
-    _ops_by_common_name: typing.Dict[str, dict[str, op_def.OpDef]]
+    _ops_by_common_name: typing.Dict[str, dict[str, "OpDef"]]
 
-    _op_versions: typing.Dict[typing.Tuple[str, str], op_def.OpDef]
+    # Ops stored by their URI (for ops that are non-builtin).
+    _op_versions: typing.Dict[str, "OpDef"]
 
     # Maintains a timestamp of when the registry was last updated.
     # This is useful for caching the ops dictionary when serving
@@ -45,18 +47,29 @@ class Registry:
     def updated_at(self) -> float:
         return self._updated_at
 
-    def register_op(self, op: op_def.OpDef):
+    def register_op(self, op: "OpDef", location=None):
+        if context_state.get_no_op_register():
+            return op
         self.mark_updated()
-        # Always save OpDefs any time they are declared
-        location = context_state.get_loading_op_location()
-        is_loading = location is not None
         # do not save built-in ops today
-        should_save = not is_loading and not op.is_builtin
+
+        # Do not save ops ever. We used to register all ops, and save
+        # non-builtin ops immediately. This causes a lot of unnecessary
+        # writing to the filesystem. Disable for weaveflow, where typically
+        # we don't need registered ops since we eagerly execute.
+        # should_save = not location and not op.is_builtin
+        should_save = False
         if should_save:
             # if we're not loading an existing op, save it.
             ref = storage.save(op, name=op.name + ":latest")
             version = ref.version
             location = ref.artifact.path_uri("obj")
+        # Hmm...
+        # if location:
+        #     # PR: Something is f'd and we don't get the right "obj" on location
+        #     # TODO: Fix
+        #     location.path = "obj"
+
         version = location.version if location is not None else None
         op.version = version
         op.location = location
@@ -64,17 +77,17 @@ class Registry:
         # if not is_loading:
         self._ops[op.name] = op
         self._ops_by_common_name.setdefault(op.common_name, {})[op.name] = op
-        if version:
-            self._op_versions[(op.name, version)] = op
+        if location:
+            self._op_versions[str(location)] = op
         return op
 
     def have_op(self, op_name: str) -> bool:
         return op_name in self._ops
 
-    def get_op(self, uri: str) -> op_def.OpDef:
+    def get_op(self, uri: str) -> "OpDef":
         object_uri = uris.WeaveURI.parse(uri)
         if object_uri.version is not None:
-            object_key = (object_uri.name, object_uri.version)
+            object_key = str(object_uri)
             if object_key in self._op_versions:
                 res = self._op_versions[object_key]
             else:
@@ -96,16 +109,14 @@ class Registry:
                 return op_def
         raise Exception("Op def doesn't exist for %s" % lazy_local_fn)
 
-    def find_ops_by_common_name(self, common_name: str) -> typing.List[op_def.OpDef]:
+    def find_ops_by_common_name(self, common_name: str) -> typing.List["OpDef"]:
         aliases = op_aliases.get_op_aliases(common_name)
-        ops: list[op_def.OpDef] = []
+        ops: list["OpDef"] = []
         for alias in aliases:
             ops.extend(self._ops_by_common_name.get(alias, {}).values())
         return ops
 
-    def find_chainable_ops(
-        self, arg0_type: weave_types.Type
-    ) -> typing.List[op_def.OpDef]:
+    def find_chainable_ops(self, arg0_type: weave_types.Type) -> typing.List["OpDef"]:
         def is_chainable(op):
             if not isinstance(op.input_type, op_args.OpNamedArgs):
                 return False
@@ -117,6 +128,8 @@ class Registry:
         return [op for op in self._ops.values() if is_chainable(op)]
 
     def load_saved_ops(self):
+        from . import op_def_type
+
         for op_ref in storage.objects(op_def_type.OpDefType()):
             try:
                 op_ref.get()
@@ -124,7 +137,7 @@ class Registry:
                 # print("Failed to load non-builtin op: %s" % op_ref.uri)
                 pass
 
-    def list_ops(self) -> typing.List[op_def.OpDef]:
+    def list_ops(self) -> typing.List["OpDef"]:
         # Note this uses self._ops, so provides the most recent registered op, which could
         # be the last one we loaded() [rather than the last one the user declared] which
         # is incorrect behavior
@@ -133,7 +146,7 @@ class Registry:
     # Currently this just returns all ops that take no arguments.
     # Perhaps a better extension is to require a return type that
     # subclasses some abstract package type?
-    def list_packages(self) -> typing.List[op_def.OpDef]:
+    def list_packages(self) -> typing.List["OpDef"]:
         packages = [
             a
             for a in list(self._ops.values())
@@ -152,20 +165,18 @@ class Registry:
         self._ops_by_common_name[op.common_name].pop(name)
         self._ops_by_common_name.setdefault(op.common_name, {})[new_name] = op
 
-        old_version = op.version
+        old_location = op.location
 
         # TODO(DG): find a better way to do this than to save the op again
         # see comment here: https://github.com/wandb/weave-internal/pull/554#discussion_r1103875156
         if op.location is not None:
             ref = storage.save(op, name=new_name)
-            location = ref.artifact.uri_obj
-            version = ref.version
-            op.version = version
-            op.location = location
+            op.version = ref.version
+            op.location = uris.WeaveURI.parse(ref.uri)
 
         if op.version is not None:
-            self._op_versions.pop((name, old_version))
-            self._op_versions[(new_name, op.version)] = op
+            self._op_versions.pop(str(old_location))
+            self._op_versions[str(op.location)] = op
 
     # def register_type(self, type: weave_types.Type):
     #    self._types[type.name] = type

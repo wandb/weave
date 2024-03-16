@@ -125,3 +125,13 @@ export const opEntityOrg = makeEntityOp({
   returnType: inputTypes => maybe('org'),
   resolver: ({entity}) => entity.organization,
 });
+
+export const opEntityArtifactTTLDurationSeconds = makeEntityOp({
+  hidden: true,
+  name: 'entity-artifactTTLDurationSeconds',
+  argTypes: entityArgTypes,
+  returnType: inputTypes => 'number',
+  resolver: ({entity}) => {
+    return entity.artifactTTLDurationSeconds;
+  },
+});

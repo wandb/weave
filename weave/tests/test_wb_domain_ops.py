@@ -243,7 +243,7 @@ def test_all_projects(fake_wandb):
         # this could in theory change in the future.
         """query WeavePythonCG {
             instance {
-                projects_500: projects(limit: 500) {
+                projects_500: projects {
                     edges {
                         node {
                             id
@@ -310,7 +310,7 @@ def test_rpt_op(fake_wandb):
     )
 
 
-def test_multi_root_merging(fake_wandb):
+def test_multi_root_merging(fake_wandb, cache_mode_minimal):
     fake_wandb.fake_api.add_mock(
         lambda query, ndx: {
             "project_8d1592567720841659de23c02c97d594": {
@@ -398,7 +398,7 @@ def test_multi_root_merging(fake_wandb):
                 }
             }
             instance{
-                projects_500:projects(limit:500){
+                projects_500:projects {
                     edges{
                         node{
                             id 

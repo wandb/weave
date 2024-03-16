@@ -9,10 +9,10 @@ import requests
 import logging
 
 from wandb import Artifact
-from wandb.apis import public as wb_public
+from wandb.apis.public import api as wb_public
 from wandb.sdk.lib.hashutil import hex_to_b64_id, b64_to_hex_id
 
-
+from . import urls
 from . import uris
 from . import util
 from . import errors
@@ -24,6 +24,8 @@ from . import weave_types as types
 from . import artifact_fs
 from . import filesystem
 from . import memo
+from . import eager
+from . import graph_client_context
 from .wandb_interface import wandb_artifact_pusher
 from . import engine_trace
 
@@ -31,6 +33,7 @@ from urllib import parse
 
 if typing.TYPE_CHECKING:
     from weave.wandb_interface.wandb_lite_run import InMemoryLazyLiteRun
+    from .run_streamtable_span import RunStreamTableSpan
 
 
 quote_slashes = functools.partial(parse.quote, safe="")
@@ -97,7 +100,12 @@ class WandbArtifactManifest:
 def get_wandb_read_artifact(path: str):
     tracer = engine_trace.tracer()
     with tracer.trace("get_wandb_read_artifact"):
-        return wandb_client_api.wandb_public_api().artifact(path)
+        try:
+            return wandb_client_api.wandb_public_api().artifact(path)
+        except wandb_client_api.WandbCommError:
+            raise errors.WeaveArtifactVersionNotFound(
+                f"Could not find artifact with path {path} in W&B"
+            )
 
 
 def is_valid_version_index(version_index: str) -> bool:
@@ -428,6 +436,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             # TODO: we could technically support writable artifacts by creating a new version?
             self._unresolved_read_artifact_or_client_uri = uri
         self._local_path: dict[str, str] = {}
+        # self._path_handlers: dict[str, typing.Any] = {}
 
     @property
     def branch(self) -> typing.Optional[str]:
@@ -571,7 +580,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
-            raise FileNotFoundError("Path not in artifact")
+            raise FileNotFoundError("Path not in artifact %s %s" % (self, name))
         return self.io_service.fs.path(fs_path)
 
     def size(self, path: str) -> int:
@@ -613,6 +622,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             yield f
 
     @contextlib.contextmanager
+    def writeable_file_path(self, path):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            full_path = os.path.join(tmpdir, path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            yield full_path
+            self._writeable_artifact.add_file(full_path, path)
+
+    @contextlib.contextmanager
     def new_dir(self, path):
         if not self._writeable_artifact:
             raise errors.WeaveInternalError("cannot add new file to readonly artifact")
@@ -631,8 +648,12 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         with file_util.safe_open(p, mode) as f:
             yield f
 
-    def get_path_handler(self, path, handler_constructor):
-        raise NotImplementedError()
+    # def get_path_handler(self, path, handler_constructor):
+    #     handler = self._path_handlers.get(path)
+    #     if handler is None:
+    #         handler = handler_constructor(self, path)
+    #         self._path_handlers[path] = handler
+    #     return handler
 
     def read_metadata(self):
         raise NotImplementedError()
@@ -649,6 +670,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         *,
         _lite_run: typing.Optional["InMemoryLazyLiteRun"] = None,
     ):
+        # for handler in self._path_handlers.values():
+        #     handler.close()
         additional_aliases = [] if branch is None else [branch]
         res = wandb_artifact_pusher.write_artifact_to_wandb(
             self._writeable_artifact,
@@ -808,7 +831,31 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
         return cls(
             WandbArtifact(uri.name, uri=uri),
             path=uri.path,
+            extra=uri.extra,
         )
+
+    @property
+    def ui_url(self):
+        root_type = self.type.root_type_class()
+        from .op_def_type import OpDefType
+
+        if issubclass(root_type, OpDefType):
+            return urls.op_version_path(
+                self.artifact.uri_obj.entity_name,
+                self.artifact.uri_obj.project_name,
+                self.artifact.uri_obj.name,
+                self.artifact.uri_obj.version,
+            )
+        else:
+            return urls.object_version_path(
+                self.artifact.uri_obj.entity_name,
+                self.artifact.uri_obj.project_name,
+                self.artifact.uri_obj.name,
+                self.artifact.uri_obj.version,
+            )
+
+        # Before Tim's Weaveflow changes
+        # return f"http://localhost:3000/browse2/{self.artifact.uri_obj.entity_name}/{self.artifact.uri_obj.project_name}/{self.type.root_type_class().name}/{self.artifact.uri_obj.name}/{self.artifact.uri_obj.version}"
 
 
 types.WandbArtifactRefType.instance_class = WandbArtifactRef
@@ -941,6 +988,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
     # wandb-logged-artifact://afdsjaksdjflkasjdf12341234hv12h3v4k12j3hv41kh4v1423k14v1k2j3hv1k2j3h4v1k23h4v:[version|latest]/path
     #  scheme                                 name                                                              version      path
     path: typing.Optional[str] = None
+    extra: typing.Optional[list[str]] = None
 
     # private attrs
 

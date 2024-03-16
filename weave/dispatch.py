@@ -36,7 +36,9 @@ from . import memo
 def _op_args_is_subtype(lhs: op_args.OpArgs, rhs: op_args.OpArgs) -> bool:
     """Returns true if rhs is subtype of lhs"""
     if isinstance(lhs, op_args.OpNamedArgs) and isinstance(rhs, op_args.OpNamedArgs):
-        if len(lhs.arg_types) != len(rhs.arg_types):
+        # PR: fixing to allow different length var lists to distinguish
+        # (supports get_with_default style op)
+        if len(lhs.arg_types) > len(rhs.arg_types):
             return False
         for self_type, other_type in list(
             zip(lhs.initial_arg_types.values(), rhs.initial_arg_types.values())
@@ -162,8 +164,8 @@ def _resolve_op_ambiguity(
         candidates,
         first_arg_type,
         [
-            ("If Null Input, Choose First", _nullability_ambiguity_resolution_rule),
             ("Prefer Non-Mapped", _mapped_ambiguity_resolution_rule),
+            ("If Null Input, Choose First", _nullability_ambiguity_resolution_rule),
             ("Prefer Non-Tagged", _tagged_ambiguity_resolution_rule),
             (
                 "Prefer Sub Type of Super Type",
@@ -179,7 +181,7 @@ def _get_ops_by_name(fq_op_name: str) -> list[op_def.OpDef]:
     """Returns a single op that matches the given name and raw inputs (inputs can be python objects or nodes)"""
     shared_name_ops: list[op_def.OpDef]
 
-    if fq_op_name.startswith("local-artifact://"):
+    if "://" in fq_op_name:
         # If the incoming op is a locally-defined op, then we are just going to look at the derived op space.
         # We don't need to search the whole registry since by definition it is user-defined
         op = registry_mem.memory_registry.get_op(fq_op_name)
@@ -468,6 +470,8 @@ class DispatchMixin:
     __ne__ = _dispatch_dunder("__ne__")  # type: ignore
     __neg__ = _dispatch_dunder("__neg__")
     __contains__ = _dispatch_dunder("__contains__")
+    __and__ = _dispatch_dunder("and")
+    __or__ = _dispatch_dunder("and")
 
 
 class RuntimeOutputNode(graph.OutputNode, DispatchMixin):

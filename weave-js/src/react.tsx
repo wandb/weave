@@ -456,13 +456,34 @@ export const useValue = <T extends Type>(
   );
 };
 
-interface ArtifactURI {
+interface LocalArtifactRef {
   artifactName: string;
   artifactVersion: string;
   artifactPath: string;
 }
 
-export const parseRef = (ref: string): ArtifactURI => {
+export interface WandbArtifactRef {
+  entityName: string;
+  projectName: string;
+  artifactName: string;
+  artifactVersion: string;
+  artifactPath: string;
+  artifactRefExtra?: string;
+}
+
+export type ArtifactRef = LocalArtifactRef | WandbArtifactRef;
+
+export type ObjectRef = ArtifactRef & {
+  artifactRefExtra?: string;
+};
+
+export const isWandbArtifactRef = (
+  ref: ArtifactRef
+): ref is WandbArtifactRef => {
+  return 'entityName' in ref;
+};
+
+export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
   let splitLimit: number;
 
@@ -483,14 +504,55 @@ export const parseRef = (ref: string): ArtifactURI => {
     throw new Error(`Invalid Artifact URI: ${url}`);
   }
 
-  const path = isWandbArtifact ? splitUri.slice(2) : splitUri;
-  const [artifactId, artifactPath] = path;
-  const [artifactName, artifactVersion] = artifactId.split(':', 2);
+  if (isWandbArtifact) {
+    const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
+    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+    return {
+      entityName,
+      projectName,
+      artifactName: artifactNamePart,
+      artifactVersion,
+      artifactPath: artifactPathPart,
+      artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
+    };
+  }
+
+  const [artifactName, artifactPath] = splitUri;
   return {
     artifactName,
-    artifactVersion,
+    artifactVersion: 'latest',
     artifactPath,
   };
+};
+
+export const objectRefWithExtra = (
+  objRef: ObjectRef,
+  extra: string
+): ObjectRef => {
+  let newExtra = '';
+  if (objRef.artifactRefExtra != null) {
+    newExtra = objRef.artifactRefExtra + '/';
+  }
+  newExtra += extra;
+  return {
+    ...objRef,
+    artifactRefExtra: newExtra,
+  };
+};
+
+export const refUri = (ref: ObjectRef): string => {
+  if (isWandbArtifactRef(ref)) {
+    let uri = `wandb-artifact:///${ref.entityName}/${ref.projectName}/${ref.artifactName}:${ref.artifactVersion}`;
+    if (ref.artifactPath) {
+      uri = `${uri}/${ref.artifactPath}`;
+      if (ref.artifactRefExtra) {
+        uri = `${uri}#${ref.artifactRefExtra}`;
+      }
+    }
+    return uri;
+  } else {
+    return `local-artifact:///${ref.artifactName}/${ref.artifactPath}`;
+  }
 };
 
 export const absoluteTargetMutation = (absoluteTarget: NodeOrVoidNode) => {

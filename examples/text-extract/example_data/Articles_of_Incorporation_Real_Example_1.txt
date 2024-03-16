@@ -1,0 +1,32 @@
+
+Articles of Incorporation of TechBoost Corp
+
+Article I: Name
+The name of the corporation is TechBoost Corp.
+
+Article II: Purpose
+The purpose of this corporation is to engage in any lawful act or activity for which corporations may be organized under the California Corporation Code.
+
+Article III: Registered Agent
+The address of the registered agent is 1234 Silicon Valley Blvd, San Jose, CA 95131.
+
+Article IV: Share Structure
+The corporation is authorized to issue 1,000,000 shares of Common Stock.
+
+Article V: Directors
+The names and addresses of the initial directors are as follows:
+- Alice Johnson, 5678 Tech Park Dr, Palo Alto, CA 94306
+- Bob Smith, 9101 Innovation Way, Mountain View, CA 94043
+
+Article VI: Incorporators
+The names and addresses of the incorporators are as follows:
+- Emily Davis, 1112 Startup St, San Francisco, CA 94103
+- Mark Lee, 1314 Venture Ave, Santa Clara, CA 95050
+
+Article VII: Dissolution
+Upon dissolution, assets will be distributed for one or more exempt purposes within the meaning of Section 501(c)(3) of the Internal Revenue Code.
+
+In witness whereof, the undersigned incorporator has executed these Articles of Incorporation.
+
+_________________________
+Emily Davis

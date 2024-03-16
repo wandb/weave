@@ -12,6 +12,7 @@ from ..language_features.tagging import (
 )
 from .. import weave_types as types
 from .. import box
+from .. import weave_internal
 
 
 def test_tagged_value():
@@ -27,6 +28,10 @@ def test_tagged_types():
     class _TestNumber:
         inner: int
 
+    from .. import context_state
+
+    _loading_builtins_token = context_state.set_loading_built_ins()
+
     @weave.op()
     def add_tester(a: _TestNumber, b: _TestNumber) -> _TestNumber:
         return _TestNumber(a.inner + b.inner)
@@ -37,6 +42,8 @@ def test_tagged_types():
 
     get_a_tag = make_tag_getter_op.make_tag_getter_op("a", _TestNumber.WeaveType())
     get_d_tag = make_tag_getter_op.make_tag_getter_op("d", _TestNumber.WeaveType())
+
+    context_state.clear_loading_built_ins(_loading_builtins_token)
 
     # 1: Assert that that the tester works
     three = add_tester(_TestNumber(1), _TestNumber(2))
@@ -294,7 +301,7 @@ def test_list_tags_accessible_to_map_elements(list_data):
     tagged = tag_store.add_tags(list_data(), {"run": run})
     saved_node = weave.save(tagged)
     map_fn = lambda row: run_tag_getter_op(row)
-    fn = weave.define_fn(
+    fn = weave_internal.define_fn(
         {"row": tagged_value_type.TaggedValueType(tag_type, types.Int())}, map_fn
     )
     mapped = list_ops.List.map(saved_node, fn)

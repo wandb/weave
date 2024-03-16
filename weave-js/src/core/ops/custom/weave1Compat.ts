@@ -169,6 +169,10 @@ export const opGetFeaturedBoardTemplatesForNode = (inputs: {
   );
 };
 
+export const opRunDefaultColorIndex = (inputs: {run: Node<'run'>}) => {
+  return directlyConstructOpCall('run-defaultColorIndex', inputs, 'number');
+};
+
 export const opRunHistoryLineCount = (inputs: {run: Node<'run'>}) => {
   return directlyConstructOpCall('run-historyLineCount', inputs, 'number');
 };

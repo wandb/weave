@@ -81,7 +81,7 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         self._branch: typing.Optional[str] = None
         self._root = os.path.join(local_artifact_dir(), name)
         self._original_uri = None
-        self._path_handlers: dict[str, typing.Any] = {}
+        # self._path_handlers: dict[str, typing.Any] = {}
         self._existing_dirs = []
         self._metadata = {}
         self._setup_dirs()
@@ -302,6 +302,12 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         f.close()
 
     @contextlib.contextmanager
+    def writeable_file_path(self, path):
+        full_path = os.path.join(self._write_dirname, path)
+        self._makedir(os.path.dirname(full_path))
+        yield full_path
+
+    @contextlib.contextmanager
     def new_dir(self, path):
         full_path = self._get_write_path(path)
         self._makedir(full_path)
@@ -317,12 +323,12 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
         yield f
         f.close()
 
-    def get_path_handler(self, path, handler_constructor):
-        handler = self._path_handlers.get(path)
-        if handler is None:
-            handler = handler_constructor(self, path)
-            self._path_handlers[path] = handler
-        return handler
+    # def get_path_handler(self, path, handler_constructor):
+    #     handler = self._path_handlers.get(path)
+    #     if handler is None:
+    #         handler = handler_constructor(self, path)
+    #         self._path_handlers[path] = handler
+    #     return handler
 
     def read_metadata(self):
         if not self._read_dirname:
@@ -342,9 +348,9 @@ class LocalArtifact(artifact_fs.FilesystemArtifact):
             json.dump({"created_at": datetime.now().isoformat(), **metadata}, f)
 
     def save(self, branch=None):
-        for handler in self._path_handlers.values():
-            handler.close()
-        self._path_handlers = {}
+        # for handler in self._path_handlers.values():
+        #     handler.close()
+        # self._path_handlers = {}
         manifest = {}
         if self._read_dirname:
             for dirpath, dnames, fnames in os.walk(self._read_dirname):
@@ -595,6 +601,14 @@ class WeaveLocalArtifactURI(uris.WeaveURI):
         if self.extra:
             uri += f"#{'/'.join(self.extra)}"
         return uri
+
+    def with_path(self, path: str) -> "WeaveLocalArtifactURI":
+        return WeaveLocalArtifactURI(
+            self.name,
+            self.version,
+            path,
+            self.extra,
+        )
 
     def to_ref(self) -> LocalArtifactRef:
         return LocalArtifactRef.from_uri(self)

@@ -73,11 +73,13 @@ function forEachWeaveOutputCellInNotebook(
         // patches resolving the issue. I'm not sure if this is the best way
         // to handle this, but it seems to work.
         cy.on('uncaught:exception', err => {
+
           if (
-            err.name.includes('ResizeObserver') ||
-            err.message.includes('ResizeObserver')
+            err.name?.includes('ResizeObserver') ||
+            err.message?.includes('ResizeObserver')
           ) {
             return false;
+
           }
         });
 

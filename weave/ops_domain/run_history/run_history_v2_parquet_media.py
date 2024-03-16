@@ -11,7 +11,9 @@ from ... import artifact_mem
 from .. import wb_util
 from ...ops_domain import wbmedia
 from ...ops_arrow.list_ops import concat
-from ...ops_arrow import ArrowWeaveList, ArrowWeaveListType, convert
+from ...arrow.list_ import ArrowWeaveList
+from ...arrow.list_ import ArrowWeaveListType
+from ...arrow import convert
 from ... import engine_trace
 from ... import gql_json_cache
 
@@ -81,7 +83,7 @@ def history2(run: wdt.Run):
 
 def _get_history2(run: wdt.Run, columns=None):
     with tracer.trace("get_history") as span:
-        span.set_tag("history_version", 2)
+        span.set_tag("history_version", 2, 2)
     """Dont read binary columns. Keep everything in arrow. Faster, but not as full featured as get_history"""
     scalar_keys = history_op_common.history_keys(run)
     columns = [c for c in columns if c in scalar_keys]

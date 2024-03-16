@@ -6,13 +6,13 @@ import json
 import os
 
 
-def test_graph_playback():
+def test_graph_playback(dev_only_admin_env_override):
     for payload in execute_payloads:
         res = handle_request(payload, True, storage.make_js_serializer())
         res.results.unwrap()
 
 
-def test_zlib_playback(use_server_gql_schema):
+def test_zlib_playback(dev_only_admin_env_override, use_server_gql_schema):
     if zlib_str == "":
         return
     req_bytes = zlib.decompress(base64.b64decode(zlib_str.encode("ascii")))
@@ -55,5 +55,11 @@ if os.path.exists(zlib_path):
     if zlib_str.startswith(prefix):
         zlib_str = zlib_str[len(prefix) :]
 
-# Paste graphs below (from DD or Network tab to test)
+# Paste graphs into execute.json (from network console)
 execute_payloads: list[dict] = []
+execute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "execute.json")
+if os.path.exists(execute_path):
+    with open(execute_path, "r") as f:
+        execute_str = f.read()
+    if execute_str and execute_str != "":
+        execute_payloads: list[dict] = [json.loads(execute_str)]

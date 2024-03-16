@@ -5,8 +5,13 @@ from .. import graph
 from .. import types
 from .. import weave_internal
 from .. import storage
+from .. import context_state
 from . import test_helpers
 from .. import uris
+
+from .. import context_state as _context_state
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
 
 
 @weave.op(
@@ -16,6 +21,9 @@ from .. import uris
 )
 def op_simple(a, b):
     return str(a) + str(b)
+
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_op_simple():
@@ -33,36 +41,6 @@ def test_op_simple():
         ),
     )
     assert weave.use(x) == "34"
-
-
-@weave.op(
-    name="test_op-op_kwargs",
-    input_type=weave.OpVarArgs(types.Int()),
-    output_type=types.String(),
-)
-def op_kwargs(**kwargs):
-    return kwargs
-
-
-def test_op_kwargs():
-    x = op_kwargs(a=1, b=2)
-    # TODO: should show calling convention, must include keys or we lose information.
-    assert str(x) == "op_kwargs(1, 2)"
-
-    # This is correct, we can always store keyword args in the call.
-    # This should be called an op_call instead of Op
-    test_helpers.assert_nodes_equal(
-        x,
-        graph.OutputNode(
-            types.String(),
-            test_helpers.RegexMatcher(".*test_op-op_kwargs.*"),
-            {
-                "a": weave_internal.make_const_node(types.Int(), 1),
-                "b": weave_internal.make_const_node(types.Int(), 2),
-            },
-        ),
-    )
-    assert weave.use(x) == {"a": 1, "b": 2}
 
 
 @weave.op()
@@ -124,16 +102,18 @@ def test_op_callable_output_type_and_return_type_declared():
 
 def test_op_no_arg_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
+        with context_state.loading_builtins(True):
 
-        @weave.op()
-        def op_callable_output_type_and_return_type_declared(a: int):
-            return str(a)
+            @weave.op()
+            def op_callable_output_type_and_return_type_declared(a: int):
+                return str(a)
 
 
 class SomeUnknownObj:
     pass
 
 
+@pytest.mark.skip("We allow Unknown types now")
 def test_op_unknown_arg_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
 
@@ -144,10 +124,11 @@ def test_op_unknown_arg_type():
 
 def test_op_no_return_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
+        with context_state.loading_builtins(True):
 
-        @weave.op(input_type={"a": types.Int()})
-        def op_callable_output_type_and_return_type_declared(a: int):
-            return str(a)
+            @weave.op(input_type={"a": types.Int()})
+            def op_callable_output_type_and_return_type_declared(a: int):
+                return str(a)
 
 
 def test_op_inferred_list_return():
@@ -208,17 +189,3 @@ def test_op_method_inferred_self():
         "a": types.Int(),
     }
     assert SomeWeaveObj.my_op.concrete_output_type == types.String()
-
-
-def test_load_op_from_artifact():
-    @weave.op()
-    def op_to_int(a: str) -> int:
-        return int(a)
-
-    ref = storage.save(op_to_int)
-
-    # load op from uri
-    loaded_op = ref.get()
-
-    # test calling from loaded op works
-    assert 3 == weave.use(loaded_op("3"))

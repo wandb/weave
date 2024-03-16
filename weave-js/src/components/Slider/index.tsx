@@ -75,8 +75,9 @@ export const Display = React.forwardRef(
     return (
       <input
         className={twMerge(
-          'ml-8  h-[40px] w-[56px] rounded border-[1px] border-solid border-moon-250 text-center',
-          'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
+          'ml-8 h-[32px] w-[56px] rounded text-center outline outline-1 outline-moon-250',
+          'hover:outline-2 hover:outline-teal-500/[0.4]',
+          'focus:outline-2 focus:outline-teal-500/[0.64]',
           isDirty ? 'text-moon-800' : 'text-moon-250',
           className
         )}

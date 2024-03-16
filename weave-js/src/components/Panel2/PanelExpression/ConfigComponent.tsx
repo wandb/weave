@@ -1,7 +1,8 @@
 import Loader from '@wandb/weave/common/components/WandbLoader';
 import React from 'react';
-import {Button, Icon, Popup} from 'semantic-ui-react';
+import {Icon, Popup} from 'semantic-ui-react';
 
+import {Button} from '../../Button';
 import {PanelStack} from '../availablePanels';
 import {ConfigOption, ModifiedDropdownConfigField} from '../ConfigPanel';
 import {PanelContext, UpdateContext} from '../panel';
@@ -170,7 +171,7 @@ export const ConfigComponent: React.FC<
                         <fieldset style={{borderWidth: '1px'}}>
                           <legend>Table Query</legend>
                           <Button
-                            size="tiny"
+                            variant="secondary"
                             data-test="edit-table-query-button"
                             onClick={() => {
                               deleteTailPanelOps({
@@ -214,7 +215,7 @@ export const ConfigComponent: React.FC<
                   <fieldset style={{borderWidth: '1px'}}>
                     <legend>Table Query</legend>
                     <Button
-                      size="tiny"
+                      variant="secondary"
                       data-test="plot-table-query-button"
                       onClick={() => {
                         updateConfig({
@@ -234,20 +235,20 @@ export const ConfigComponent: React.FC<
       <ConfigurationContentControls>
         <div>
           <Button
-            size="tiny"
+            size="large"
+            variant="ghost"
+            className="mr-12"
             data-test="cancel-panel-config"
             disabled={isLoading}
             onClick={() => {
               setConfigOpen(false);
               discardEditingConfig();
-            }}
-            style={{border: '0', backgroundColor: 'transparent'}}>
+            }}>
             Cancel
           </Button>
           <Button
-            primary
+            size="large"
             data-test="ok-panel-config"
-            size="tiny"
             disabled={!editingConfigIsModified || isLoading}
             onClick={() => {
               setConfigOpen(false);
