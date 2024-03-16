@@ -644,11 +644,11 @@ def test_ops_with_default_params(trace_client):
     assert op_with_default(b=5, a=1) == 6
 
     inner_res = trace_client.trace_server.calls_query(
-            tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
-            )
+        tsi.CallsQueryReq(
+            project_id=trace_client.project_id(),
         )
-    
+    )
+
     assert len(inner_res.calls) == 6
     assert inner_res.calls[0].inputs == {"a": 1, "b": 10, "_keys": ["a", "b"]}
     assert inner_res.calls[1].inputs == {"a": 1, "b": 5, "_keys": ["a", "b"]}
