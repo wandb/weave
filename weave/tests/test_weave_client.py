@@ -40,7 +40,7 @@ def client() -> Generator[weave_client.WeaveClient, None, None]:
     clickhouse_trace_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
     clickhouse_trace_server.ch_client.command("DROP DATABASE IF EXISTS default")
     clickhouse_trace_server._run_migrations()
-    with weave_api_client("shawn/chobj-text-extract1") as client:
+    with weave_api_client("shawn/test-project") as client:
         yield client
 
 
@@ -111,45 +111,34 @@ def test_save_load(client):
     assert val_table[2] == 3
 
 
-@pytest.mark.skip()
 def test_dataset_refs(client):
-    ref = client.save(weave.Dataset(rows=[1, 2, 3]), "my-dataset")
+    ref = client.save(weave.Dataset(rows=[{"v": 1}, {"v": 2}]), "my-dataset")
     new_table_rows = []
     for row in ref.rows:
-        new_table_rows.append({"a_ref": row, "b": row + 42})
+        new_table_rows.append({"a_ref": row["v"], "b": row["v"] + 42})
     ref2 = client.save(new_table_rows, "my-dataset2")
     ref2_list = list(ref2)
-
-    # if we access a_ref values, we actually get values, but we
-    # can also get correct references.
-    # TODO: shit this is wrong... those should be the underlying
-    # refs I think?
 
     row0 = ref2_list[0]
     ref0_aref = row0["a_ref"]
     assert ref0_aref == 1
     assert weave_client.get_ref(ref0_aref) == weave_client.ObjectRef(
-        "my-dataset2",
-        ref2.ref.val_id,
-        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
+        "shawn",
+        "test-project",
+        "my-dataset",
+        ref.ref.version,
+        ["attr", "rows", "id", RegexStringMatcher(".*"), "key", "v"],
     )
 
     row1 = ref2_list[1]
     ref1_aref = row1["a_ref"]
     assert ref1_aref == 2
-    assert weave_client.get_ref(ref1_aref) == weave_client.ObjectRef(
-        "my-dataset2",
-        ref2.ref.val_id,
-        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
-    )
-
-    row2 = ref2_list[2]
-    ref2_aref = row2["a_ref"]
-    assert ref2_aref == 3
-    assert weave_client.get_ref(ref2_aref) == weave_client.ObjectRef(
-        "my-dataset2",
-        ref2.ref.val_id,
-        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
+    assert weave_client.get_ref(ref0_aref) == weave_client.ObjectRef(
+        "shawn",
+        "test-project",
+        "my-dataset",
+        ref.ref.version,
+        ["attr", "rows", "id", RegexStringMatcher(".*"), "key", "v"],
     )
 
 
@@ -157,7 +146,7 @@ def test_obj_with_table(client):
     class ObjWithTable(weave.Object):
         table: weave_client.Table
 
-    o = ObjWithTable(table=weave_client.Table(columns=("a",), rows=[(1,), (2,), (3,)]))
+    o = ObjWithTable(table=weave_client.Table([{"a": 1}, {"a": 2}, {"a": 3}]))
     res = client.save_object(o, "my-obj")
     o2 = client.get(res)
     row_vals = list(o2.table)

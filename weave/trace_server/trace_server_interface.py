@@ -245,11 +245,16 @@ class TableCreateRes(BaseModel):
     digest: str
 
 
+class _TableRowFilter(BaseModel):
+    # object_categories: typing.Optional[typing.List[str]] = None
+    row_digests: typing.Optional[typing.List[str]] = None
+
+
 class TableQueryReq(BaseModel):
     entity: str
     project: str
     table_digest: str
-    filter: typing.Optional[_ObjectVersionFilter] = None
+    filter: typing.Optional[_TableRowFilter] = None
 
 
 class TableQueryRes(BaseModel):

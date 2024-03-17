@@ -423,16 +423,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.TableCreateRes(digest=table_digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        conds = []
+        if req.filter:
+            if req.filter.row_digests:
+                in_list = ", ".join([f"'{rd}'" for rd in req.filter.row_digests])
+                conds.append(f"tr.digest IN ({in_list})")
+        else:
+            conds.append("1 = 1")
+        predicate = " AND ".join(conds)
         query_result = self.ch_client.query(
-            """
+            f"""
                 SELECT tr.digest, tr.val
                 FROM (
                     SELECT entity, project, row_digest
                     FROM tables 
                     ARRAY JOIN row_digests AS row_digest
-                    WHERE digest = {table_digest:String}
+                    WHERE digest = {{table_digest:String}}
                 ) AS t
                 JOIN table_rows tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
+                WHERE {predicate}
             """,
             parameters={"table_digest": req.table_digest},
         )

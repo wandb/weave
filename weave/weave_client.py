@@ -8,6 +8,7 @@ import copy
 import datetime
 
 from weave import box
+from weave.table import Table
 from weave import urls
 from weave import op_def
 from weave import run_context
@@ -27,6 +28,7 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
     TableQueryReq,
+    _TableRowFilter,
     _CallsFilter,
     _ObjectVersionFilter,
 )
@@ -277,14 +279,8 @@ class TraceObject(Tracable):
         return self.val == other
 
 
-class Table:
-    def __init__(self, columns, rows):
-        self.columns = columns
-        self.rows = rows
-
-
 class TraceTable(Tracable):
-    filter: ValueFilter
+    filter: _TableRowFilter
 
     def __init__(self, table_ref: TableRef, ref, server, filter, root):
         self.table_ref = table_ref
@@ -299,24 +295,28 @@ class TraceTable(Tracable):
         if isinstance(key, slice):
             raise ValueError("Slices not yet supported")
         elif isinstance(key, int):
-            page_data = self.server.table_query(
+            response = self.server.table_query(
                 TableQueryReq(
                     entity=self.table_ref.entity,
                     project=self.table_ref.project,
-                    table_id=self.table_ref.digest,
-                    # filter=self.filter,
+                    table_digest=self.table_ref.digest,
                 )
             )
-            print("PAGE DATA", page_data)
         else:
-            filter = self.filter.copy()
-            filter["id"] = key
-            page_data = self.server.table_query(
-                self.table_ref, filter, offset=0, limit=1
+            filter = self.filter.model_copy()
+            filter.row_digests = [key]
+            response = self.server.table_query(
+                TableQueryReq(
+                    entity=self.table_ref.entity,
+                    project=self.table_ref.project,
+                    table_digest=self.table_ref.digest,
+                    filter=_TableRowFilter(row_digests=[key]),
+                )
             )
+        row = response.rows[0]
         return make_trace_obj(
-            page_data[0].val,
-            self.ref.with_item(page_data[0].id, page_data[0].version),
+            row.val,
+            self.ref.with_item(row.digest),
             self.server,
             self.root,
         )
@@ -418,6 +418,7 @@ def make_trace_obj(
     # Derefence val and create the appropriate wrapper object
     extra: list[str] = []
     if isinstance(val, ObjectRef):
+        new_ref = val
         extra = val.extra
         read_res = server.obj_read(
             ObjReadReq(
@@ -431,7 +432,7 @@ def make_trace_obj(
         # val = server._resolve_object(val.name, "latest")
 
     if isinstance(val, TableRef):
-        val = TraceTable(val, new_ref, server, {}, root)
+        val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
 
     if extra:
         # This is where extra resolution happens?
@@ -444,14 +445,13 @@ def make_trace_obj(
             elif op == "index":
                 val = val[int(arg)]
             elif op == "id":
-                item_id, item_version = arg.split(",")
-                val = val[item_id]
+                val = val[arg]
             else:
                 raise ValueError(f"Unknown ref type: {extra[extra_index]}")
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
-                val = TraceTable(val, new_ref, server, {}, root)
+                val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
 
     if isinstance(val, ObjectRecord):
         # if val._type == "custom_obj":
@@ -642,7 +642,7 @@ class WeaveClient:
     # This is used by tests and op_execute still, but the save() interface
     # is nicer for clients I think?
     def save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
-        val = self.save_nested_objects(val)
+        val = self.save_nested_objects(val, name=name)
         return self._save_object(val, name, branch)
 
     def _save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
@@ -680,16 +680,10 @@ class WeaveClient:
         return make_trace_obj(val, ref, self.server, None)
 
     def save_table(self, table: Table) -> TableRef:
-        table_cols = table.columns
-        table_rows = table.rows
-        dict_rows = [
-            {table_cols[i]: row[i] for i in range(len(table_cols))}
-            for row in table_rows
-        ]
         response = self.server.table_create(
             TableCreateReq(
                 table=TableSchemaForInsert(
-                    entity=self.entity, project=self.project, rows=dict_rows
+                    entity=self.entity, project=self.project, rows=table.rows
                 )
             )
         )
@@ -816,7 +810,7 @@ class WeaveClient:
     def fail_run(self, run, exception):
         self.finish_call(run, str(exception))
 
-    def save_nested_objects(self, obj: Any) -> Any:
+    def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if isinstance(obj, pydantic.BaseModel):
             if hasattr(obj, "_trace_object"):
                 return obj._trace_object
@@ -836,14 +830,16 @@ class WeaveClient:
                     },
                 },
             )
-            ref = self._save_object(obj_rec, get_obj_name(obj_rec))
+            ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
             # return make_trace_obj(obj_rec, ref, client.server, None)
             trace_obj = make_trace_obj(obj_rec, ref, self.server, None)
             obj._trace_object = trace_obj
             return trace_obj
         elif isinstance(obj, Table):
             table_ref = self.save_table(obj)
-            return TraceTable(table_ref, table_ref, self.server, {}, None)
+            return TraceTable(
+                table_ref, table_ref, self.server, _TableRowFilter(), None
+            )
         elif isinstance(obj, list):
             return [self.save_nested_objects(v) for v in obj]
         elif isinstance(obj, dict):
