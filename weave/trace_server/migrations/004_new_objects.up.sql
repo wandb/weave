@@ -35,26 +35,22 @@ FROM (
 WINDOW w AS (PARTITION BY entity, project, type, name ORDER BY created_at ASC)
 ORDER BY entity, project, type, name, created_at;
 
+CREATE TABLE table_rows
+(
+    entity String,
+    project String,
+    digest String,
+    val String,
+) 
+ENGINE = MergeTree() 
+ORDER BY (entity, project, digest);
+
 CREATE TABLE tables
 (
-    id UUID,
-    created_at DateTime64 DEFAULT now64(),
-    transaction_ids Array(UUID)
+    entity String,
+    project String,
+    digest String,
+    row_digests Array(String),
 ) 
 ENGINE = MergeTree() 
-ORDER BY (id);
-
-CREATE TABLE table_transactions
-(
-    tx_id UUID,
-    id UUID,
-    item_version UUID,
-    type String,
-    created_at DateTime64 DEFAULT now64(),
-    tx_order UInt32,
-    refs Array(String),
-    val Nullable(String),
-    val_hash Nullable(String) MATERIALIZED MD5(val)
-) 
-ENGINE = MergeTree() 
-ORDER BY (tx_id, tx_order);
+ORDER BY (entity, project, digest);
