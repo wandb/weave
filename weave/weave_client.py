@@ -465,9 +465,9 @@ def map_to_refs(obj: Any) -> Any:
 
 
 def to_json(obj: Any) -> Any:
-    if isinstance(obj, uuid.UUID):
-        return {"_type": "UUID", "uuid": obj.hex}
-    elif isinstance(obj, TableRef):
+    # if isinstance(obj, uuid.UUID):
+    #     return {"_type": "UUID", "uuid": obj.hex}
+    if isinstance(obj, TableRef):
         return {"_type": "TableRef", "table_id": obj.table_id}
     elif isinstance(obj, ObjectRef):
         return {
@@ -501,9 +501,7 @@ def from_json(obj: Any) -> Any:
         val_type = obj.get("_type")
         if val_type is not None:
             del obj["_type"]
-            if val_type == "UUID":
-                return uuid.UUID(obj["uuid"])
-            elif val_type == "TableRef":
+            if val_type == "TableRef":
                 return TableRef(obj["table_id"])
             elif val_type == "ObjectRef":
                 return ObjectRef(
