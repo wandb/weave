@@ -107,20 +107,6 @@ def pydantic_asdict_one_level(obj: pydantic.BaseModel):
 
 
 # TODO: unused
-def get_type(val):
-    if val == None:
-        return "none"
-    elif isinstance(val, dict):
-        return "dict"
-    elif isinstance(val, list):
-        return "list"
-    elif isinstance(val, ObjectRecord):
-        return val._type
-    elif dataclasses.is_dataclass(val):
-        return val.__class__.__name__
-    elif isinstance(val, pydantic.BaseModel):
-        return val.__class__.__name__
-    return "unknown"
 
 
 def get_obj_name(val):

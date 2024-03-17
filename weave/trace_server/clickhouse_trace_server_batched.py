@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import datetime
 import json
 import typing
+import hashlib
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
@@ -293,32 +294,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpCreateRes(version_hash=str(ch_obj.id))
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        return tsi.OpReadRes(
-            op_obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=True))
+        conds = [
+            f"name = '{req.name}'",
+            f"digest = '{req.version_hash}'",
+            "is_op = 1",
+        ]
+        objs = self._select_objs_query(
+            req.entity,
+            req.project,
+            conditions=conds,
         )
+        if len(objs) == 0:
+            raise NotFoundError(f"Obj {req.name}:{req.version_hash} not found")
+
+        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        conditions: typing.List[str] = []
-        parameters: typing.Dict[str, typing.Any] = {}
+        conds: typing.List[str] = ["is_op = 1"]
         if req.filter:
             if req.filter.op_names:
-                raise NotImplementedError()
+                in_list = ", ".join([f"'{n}'" for n in req.filter.op_names])
+                conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
-                raise NotImplementedError()
-        conditions.append("is_op == 1")
+                conds.append("is_latest = 1")
 
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
-            conditions=conditions,
-            parameters=parameters,
+            conditions=conds,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        import hashlib
-
         hasher = hashlib.sha256()
 
         json_val = json.dumps(req.obj.val)
@@ -331,7 +339,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             entity=req_obj.entity,
             project=req_obj.project,
             name=req_obj.name,
-            type="unknown",
+            type=get_type(req.obj.val),
             refs=[],
             val=json_val,
             digest=digest,
@@ -345,66 +353,42 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(version_digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = []
-        # TODO: sql injection
-        conds.append(f"entity = '{req.entity}'")
-        conds.append(f"project = '{req.project}'")
-        conds.append(f"name = '{req.name}'")
-        conds.append(f"digest = '{req.version_digest}'")
-        predicate = " AND ".join(conds)
-
-        query_result = self.ch_client.query(
-            f"""
-            SELECT *
-            FROM objects_deduped
-            WHERE {predicate}
-            """,
+        conds = [
+            f"name = '{req.name}'",
+            f"digest = '{req.version_digest}'",
+            "is_op = 0",
+        ]
+        objs = self._select_objs_query(
+            req.entity,
+            req.project,
+            conditions=conds,
         )
-        if len(query_result.result_rows) == 0:
+        if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
-        result = SelectableCHObjSchema.model_validate(
-            dict(zip(query_result.column_names, query_result.result_rows[0]))
-        )
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(result))
+
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        conds: typing.List[str] = []
-        conds.append(f"entity = '{req.entity}'")
-        conds.append(f"project = '{req.project}'")
+        conds: list[str] = []
         if req.filter:
+            if req.filter.is_op is not None:
+                if req.filter.is_op:
+                    conds.append(f"is_op = 1")
+                else:
+                    conds.append(f"is_op = 0")
             if req.filter.object_names:
                 in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
                 conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
-        predicate = " AND ".join(conds)
 
-        # TODO: sql injection
-        query_result = self.ch_client.query(
-            f"""
-            SELECT *
-            FROM objects_deduped
-            WHERE {predicate}
-            """,
+        objs = self._select_objs_query(
+            req.entity,
+            req.project,
+            conditions=conds,
         )
-        result = []
-        for row in query_result.result_rows:
-            result.append(
-                _ch_obj_to_obj_schema(
-                    SelectableCHObjSchema.model_validate(
-                        dict(zip(query_result.column_names, row))
-                    )
-                )
-            )
 
-        # ch_objs = self._select_objs_query(
-        #     req.entity,
-        #     req.project,
-        #     conditions=conds,
-        #     parameters=parameters,
-        # )
-        # objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
-        return tsi.ObjQueryRes(objs=result)
+        return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     # Private Methods
     def _mint_client(self) -> CHClient:
@@ -601,30 +585,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         entity: str,
         project: str,
-        columns: typing.Optional[typing.List[str]] = None,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHObjSchema]:
-
-        if not parameters:
-            parameters = {}
-        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
-
-        parameters["entity_scope"] = entity
-        parameters["project_scope"] = project
-        if columns == None:
-            columns = all_obj_select_columns
-        columns = typing.cast(typing.List[str], columns)
-
-        remaining_columns = set(columns) - set(required_obj_select_columns)
-        columns = required_obj_select_columns + list(remaining_columns)
-        # # Stop injection
-        assert (
-            set(columns) - set(all_obj_select_columns) == set()
-        ), f"Invalid columns: {columns}"
-        select_columns_part = ", ".join(columns)
-
         if not conditions:
             conditions = ["1 = 1"]
 
@@ -634,22 +597,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if limit != None:
             limit_part = f"LIMIT {limit}"
 
-        raw_res = self._query(
+        query_result = self._query(
             f"""
-            SELECT {select_columns_part}
-            FROM objects_versioned
-            WHERE entity = {{entity_scope: String}} AND project = {{project_scope: String}}
+            SELECT *
+            FROM objects_deduped
+            WHERE entity = {{entity: String}} AND project = {{project: String}}
             AND {conditions_part}
             {limit_part}
         """,
-            parameters,
-            column_formats={"bytes_file_map": {"string": "bytes"}},
+            {"entity": entity, "project": project},
         )
+        result: typing.List[SelectableCHObjSchema] = []
+        for row in query_result.result_rows:
+            result.append(
+                SelectableCHObjSchema.model_validate(
+                    dict(zip(query_result.column_names, row))
+                )
+            )
 
-        objs = []
-        for row in raw_res.result_rows:
-            objs.append(_raw_obj_dict_to_ch_obj(dict(zip(columns, row))))
-        return objs
+        return result
 
     def _run_migrations(self) -> None:
         print("Running migrations")
@@ -851,22 +817,6 @@ def _process_parameters(
     return parameters
 
 
-# def _get_type(val):
-#     if val == None:
-#         return "none"
-#     elif isinstance(val, dict):
-#         return "dict"
-#     elif isinstance(val, list):
-#         return "list"
-#     elif isinstance(val, ObjectRecord):
-#         return val._type
-#     elif dataclasses.is_dataclass(val):
-#         return val.__class__.__name__
-#     elif isinstance(val, pydantic.BaseModel):
-#         return val.__class__.__name__
-#     return "unknown"
-
-
 # def _partial_obj_schema_to_ch_obj(
 #     partial_obj: tsi.ObjSchemaForInsert,
 # ) -> ObjCHInsertable:
@@ -881,3 +831,17 @@ def _process_parameters(
 #         refs=[],
 #         val=json.dumps(partial_obj.val),
 #     )
+
+
+def get_type(val):
+    if val == None:
+        return "none"
+    elif isinstance(val, dict):
+        if "_type" in val:
+            if "weave_type" in val:
+                return val["weave_type"]["type"]
+            return val["_type"]
+        return "dict"
+    elif isinstance(val, list):
+        return "list"
+    return "unknown"

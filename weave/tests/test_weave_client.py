@@ -366,8 +366,19 @@ def test_obj_dedupe(client):
     client.save_object({"a": 2}, "my-obj")
     res = client.objects()
     assert len(res) == 2
-    assert res[0].version_index == 1
-    assert res[1].version_index == 2
+    assert res[0].version_index == 0
+    assert res[1].version_index == 1
+
+
+def test_op_query(client):
+    @weave.op()
+    def myop(x):
+        return x
+
+    client.save_object({"a": 1}, "my-obj")
+    client.save_object(myop, "my-op")
+    res = client.objects()
+    assert len(res) == 1
 
 
 # def test_publish_big_list(server):

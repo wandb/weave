@@ -46,6 +46,49 @@ const projectIdFromParts = ({
   project: string;
 }) => `${entity}/${project}`;
 
+const makeTraceServerEndpointHook = <
+  FN extends keyof traceServerClient.TraceServerClient,
+  Input extends any[],
+  Output
+>(
+  traceServerFnName: FN,
+  preprocessFn: (
+    ...input: Input
+  ) => Parameters<traceServerClient.TraceServerClient[FN]>[0],
+  postprocessFn: (
+    res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>
+  ) => Output
+) => {
+  const useTraceServerRequest = (
+    ...input: Input
+  ): LoadableWithError<Output> => {
+    input = useDeepMemo(input);
+    const getTsClient = useGetTraceServerClientContext();
+    const client = getTsClient();
+    const [state, setState] = useState<LoadableWithError<Output>>({
+      loading: true,
+      result: null,
+      error: null,
+    });
+
+    useEffect(() => {
+      setState({loading: true, result: null, error: null});
+      const req = preprocessFn(...input);
+      client[traceServerFnName](req)
+        .then(res => {
+          const output = postprocessFn(res);
+          setState({loading: false, result: output, error: null});
+        })
+        .catch(err => {
+          setState({loading: false, result: null, error: err});
+        });
+    }, [input]);
+
+    return state;
+  };
+  return useTraceServerRequest;
+};
+
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
@@ -270,26 +313,49 @@ const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
+  const result = useOpVersions(key?.entity, key?.project, {
+    objectIds: [key?.opId ?? ''],
+  });
   return {
-    loading: false,
-    result: null,
+    loading: result.loading,
+    result: result.result?.find(
+      obj => obj.versionHash === key?.versionHash
+    ) as OpVersionSchema | null,
   };
-  throw new Error('Not implemented');
 };
 
-const useOpVersions = (
-  entity: string,
-  project: string,
-  filter: OpVersionFilter,
-  limit?: number,
-  opts?: {skip?: boolean}
-): Loadable<OpVersionSchema[]> => {
-  return {
-    loading: false,
-    result: [],
-  };
-  throw new Error('Not implemented');
-};
+const useOpVersions = makeTraceServerEndpointHook(
+  'objsQuery',
+  (
+    entity: string,
+    project: string,
+    filter: OpVersionFilter,
+    limit?: number,
+    opts?: {skip?: boolean}
+  ) => ({
+    entity,
+    project,
+    filter: {
+      object_names: filter.opIds,
+      latest_only: filter.latestOnly,
+      is_op: true,
+    },
+  }),
+  (res): OpVersionSchema[] =>
+    res.objs.map(obj => ({
+      entity: obj.entity,
+      project: obj.project,
+      opId: obj.name,
+      versionHash: obj.digest,
+      typeName: obj.type,
+      name: obj.name,
+      path: 'obj',
+      createdAtMs: convertISOToDate(obj.created_at).getTime(),
+      category: null,
+      versionIndex: obj.version_index,
+      value: obj.val,
+    }))
+);
 
 const useObjectVersion = (
   // Null value skips
@@ -306,68 +372,40 @@ const useObjectVersion = (
   };
 };
 
-// useTraceServerRequest, a hook that takes a trace server function (which has arguments and returns a promise)
-// as well as the arguments to pass to the function. It'll return a Loadable with the result of the promise.
-const makeTraceServerEndpointHook = <
-  FN extends keyof traceServerClient.TraceServerClient,
-  Input extends any[],
-  Output
->(
-  traceServerFnName: FN,
-  preprocessFn: (
-    ...input: Input
-  ) => Parameters<traceServerClient.TraceServerClient[FN]>[0],
-  postprocessFn: (
-    res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>
-  ) => Output
-) => {
-  const useTraceServerRequest = (
-    ...input: Input
-  ): LoadableWithError<Output> => {
-    input = useDeepMemo(input);
-    const getTsClient = useGetTraceServerClientContext();
-    const client = getTsClient();
-    const [state, setState] = useState<LoadableWithError<Output>>({
-      loading: true,
-      result: null,
-      error: null,
-    });
-
-    useEffect(() => {
-      setState({loading: true, result: null, error: null});
-      const req = preprocessFn(...input);
-      client[traceServerFnName](req)
-        .then(res => {
-          const output = postprocessFn(res);
-          setState({loading: false, result: output, error: null});
-        })
-        .catch(err => {
-          setState({loading: false, result: null, error: err});
-        });
-    }, [input]);
-
-    return state;
-  };
-  return useTraceServerRequest;
-};
-
-// const serverObjToClientObj = (
-//   obj: traceServerClient.TraceObjSchema
-// ): ObjectVersionSchema => {
-//   return {
-//     entity: obj.entity,
-//     project: obj.project,
-//     objectId: obj.name,
-//     versionHash: obj.digest,
-//     typeName: obj.type,
-//     path: '',
-//     createdAtMs: convertISOToDate(obj.created_at).getTime(),
-//     category: null,
-//     versionIndex: obj.version_index,
-//   };
-// };
-
 const useRootObjectVersions = makeTraceServerEndpointHook(
+  'objsQuery',
+  (
+    entity: string,
+    project: string,
+    filter: ObjectVersionFilter,
+    limit?: number,
+    opts?: {skip?: boolean}
+  ) => ({
+    entity,
+    project,
+    filter: {
+      object_names: filter.objectIds,
+      latest_only: filter.latestOnly,
+      is_op: false,
+    },
+  }),
+  (res): ObjectVersionSchema[] =>
+    res.objs.map(obj => ({
+      entity: obj.entity,
+      project: obj.project,
+      objectId: obj.name,
+      versionHash: obj.digest,
+      typeName: obj.type,
+      name: obj.name,
+      path: 'obj',
+      createdAtMs: convertISOToDate(obj.created_at).getTime(),
+      category: null,
+      versionIndex: obj.version_index,
+      value: obj.val,
+    }))
+);
+
+const useObjectOrOpVersions = makeTraceServerEndpointHook(
   'objsQuery',
   (
     entity: string,
@@ -383,7 +421,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       latest_only: filter.latestOnly,
     },
   }),
-  res =>
+  (res): ObjectVersionSchema[] =>
     res.objs.map(obj => ({
       entity: obj.entity,
       project: obj.project,
@@ -490,10 +528,9 @@ const useRefsData = (
   // Bad implementations! Fetches all versions of all objects in the refUris, and finds the specific
   // versions on the client-side. Also doesn't yet do ref-walking
   const parsed = refUris.map(refStringToRefDict);
-
   const ref0 = parsed[0];
   const artifactNames = parsed.map(p => p.artifactName);
-  const objVersionsResult = useRootObjectVersions(ref0.entity, ref0.project, {
+  const objVersionsResult = useObjectOrOpVersions(ref0.entity, ref0.project, {
     objectIds: artifactNames,
   });
   const result = useMemo(() => {
@@ -528,9 +565,10 @@ const useApplyMutationsToRef = (): ((
 };
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
-  // return (refUris: string[]) => {
-  //   return Promise.resolve([]);
-  // };
+  console.warn('useGetRefsType not implemented');
+  return (refUris: string[]) => {
+    return Promise.resolve([]);
+  };
   throw new Error('Not implemented');
 };
 

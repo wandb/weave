@@ -64,8 +64,13 @@ type TraceCallsQueryReq = {
   offset?: number;
 };
 
+export type TraceCallsQueryRes = {
+  calls: TraceCallSchema[];
+};
+
 interface TraceObjectsFilter {
   object_names?: string[];
+  is_op?: boolean;
   latest_only?: boolean;
 }
 
@@ -89,10 +94,6 @@ export interface TraceObjSchema {
 
 type TraceObjQueryRes = {
   objs: TraceObjSchema[];
-};
-
-export type TraceCallsQueryRes = {
-  calls: TraceCallSchema[];
 };
 
 export class TraceServerClient {
