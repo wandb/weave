@@ -22,9 +22,10 @@ SELECT
     refs,
     val,
     digest,
-    row_number() OVER (PARTITION BY entity, project, type, name ORDER BY created_at ASC) AS version_index,
+    row_number() OVER (PARTITION BY entity, project, type, name ORDER BY created_at ASC) AS _version_index_plus_1,
+    _version_index_plus_1 - 1 AS version_index,
     count(*) OVER (PARTITION BY entity, project, type, name) as version_count,
-    if(version_index = version_count, 1, 0) AS is_latest
+    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
 FROM (
     SELECT *,
            row_number() OVER (PARTITION BY entity, project, type, name, digest ORDER BY created_at ASC) AS rn

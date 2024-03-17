@@ -4,7 +4,8 @@
  * backed by the "Trace Server" engine.
  */
 
-import {toWeaveType} from '@wandb/weave/components/Panel2/toWeaveType';
+import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
+import * as _ from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
@@ -305,8 +306,6 @@ const useObjectVersion = (
   };
 };
 
-let count = 0;
-
 // useTraceServerRequest, a hook that takes a trace server function (which has arguments and returns a promise)
 // as well as the arguments to pass to the function. It'll return a Loadable with the result of the promise.
 const makeTraceServerEndpointHook = <
@@ -328,34 +327,26 @@ const makeTraceServerEndpointHook = <
     input = useDeepMemo(input);
     const getTsClient = useGetTraceServerClientContext();
     const client = getTsClient();
-    const [loading, setLoading] = useState(true);
-    const [result, setResult] = useState<Output | null>(null);
-    const [error, setError] = useState<Error | null>(null);
-    count++;
-    if (count > 500) {
-      throw new Error('Too many calls');
-    }
+    const [state, setState] = useState<LoadableWithError<Output>>({
+      loading: true,
+      result: null,
+      error: null,
+    });
 
     useEffect(() => {
-      setLoading(true);
+      setState({loading: true, result: null, error: null});
       const req = preprocessFn(...input);
       client[traceServerFnName](req)
         .then(res => {
           const output = postprocessFn(res);
-          setLoading(false);
-          setResult(output);
+          setState({loading: false, result: output, error: null});
         })
         .catch(err => {
-          setLoading(false);
-          setError(err);
+          setState({loading: false, result: null, error: err});
         });
     }, [input]);
 
-    return {
-      loading,
-      result,
-      error,
-    };
+    return state;
   };
   return useTraceServerRequest;
 };
@@ -400,7 +391,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       versionHash: obj.digest,
       typeName: obj.type,
       name: obj.name,
-      path: '',
+      path: 'obj',
       createdAtMs: convertISOToDate(obj.created_at).getTime(),
       category: null,
       versionIndex: obj.version_index,
@@ -477,6 +468,21 @@ const useChildCallsForCompare = (
   return result;
 };
 
+const applyExtra = (
+  value: any,
+  refExtraTuples: {edgeType: string; edgeName: string}[]
+): any => {
+  const tuple0 = refExtraTuples[0];
+  if (refExtraTuples.length === 0) {
+    return value;
+  }
+  if (tuple0.edgeType === 'atr') {
+    return applyExtra(value?.[tuple0.edgeName], refExtraTuples.slice(1));
+  } else {
+    throw new Error('unhandled edge type ' + tuple0.edgeType);
+  }
+};
+
 const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
@@ -484,23 +490,23 @@ const useRefsData = (
   // Bad implementations! Fetches all versions of all objects in the refUris, and finds the specific
   // versions on the client-side. Also doesn't yet do ref-walking
   const parsed = refUris.map(refStringToRefDict);
+
   const ref0 = parsed[0];
   const artifactNames = parsed.map(p => p.artifactName);
   const objVersionsResult = useRootObjectVersions(ref0.entity, ref0.project, {
     objectIds: artifactNames,
   });
-  return useMemo(() => {
+  const result = useMemo(() => {
     if (!objVersionsResult.loading) {
       return {
         loading: false,
-        result: parsed.map(
-          p =>
-            objVersionsResult.result?.find(
-              o =>
-                o.versionHash === p.versionCommitHash &&
-                o.name === p.artifactName
-            )?.value
-        ),
+        result: parsed.map(p => {
+          const rootValue = objVersionsResult.result?.find(
+            o =>
+              o.versionHash === p.versionCommitHash && o.name === p.artifactName
+          )?.value;
+          return applyExtra(rootValue, p.refExtraTuples);
+        }),
         error: null,
       };
     } else {
@@ -511,6 +517,7 @@ const useRefsData = (
       };
     }
   }, [objVersionsResult.loading, objVersionsResult.result, parsed]);
+  return result;
 };
 
 const useApplyMutationsToRef = (): ((
@@ -521,22 +528,88 @@ const useApplyMutationsToRef = (): ((
 };
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
-  return (refUris: string[]) => {
-    return Promise.resolve([]);
-  };
+  // return (refUris: string[]) => {
+  //   return Promise.resolve([]);
+  // };
   throw new Error('Not implemented');
+};
+
+const mergeTypes = (a: Types.Type, b: Types.Type): Types.Type => {
+  // TODO: this should match the python merge_types implementation.
+  if (isSimpleTypeShape(a) && isSimpleTypeShape(b)) {
+    if (a === b) {
+      return a;
+    } else {
+      return union([a, b]);
+    }
+  }
+  if (!isSimpleTypeShape(a) && !isSimpleTypeShape(b)) {
+    if (a.type === 'typedDict' && b.type === 'typedDict') {
+      const allKeysDict = Object.assign({}, a.propertyTypes, b.propertyTypes);
+      const nextPropTypes = _.mapValues(allKeysDict, (value, key) => {
+        const selfPropType = a.propertyTypes[key] ?? 'none';
+        const otherPropType = b.propertyTypes[key] ?? 'none';
+        return mergeTypes(selfPropType, otherPropType);
+      });
+      return {
+        type: 'typedDict',
+        propertyTypes: nextPropTypes,
+      };
+    } else if (a.type === 'list' && b.type === 'list') {
+      return {
+        type: 'list',
+        objectType: mergeTypes(a.objectType, b.objectType),
+      };
+    } else {
+      throw new Error('unhandled type merge ' + a.type + ' ' + b.type);
+    }
+  }
+  return union([a, b]);
+};
+
+const mergeAllTypes = (types: Types.Type[]): Types.Type => {
+  return types.reduce(mergeTypes);
+};
+
+const weaveTypeOf = (o: any): Types.Type => {
+  if (o == null) {
+    return 'none';
+  } else if (_.isArray(o)) {
+    return {
+      type: 'list',
+      objectType:
+        o.length === 0 ? 'unknown' : mergeAllTypes(o.map(weaveTypeOf)),
+    };
+  } else if (_.isObject(o)) {
+    if ('_type' in o) {
+      return {
+        type: o._type,
+        _base_type: {type: 'Object'},
+        ..._.mapValues(_.omit(o, ['_type']), weaveTypeOf),
+      };
+    } else {
+      return {
+        type: 'typedDict',
+        propertyTypes: _.mapValues(o, weaveTypeOf),
+      };
+    }
+  } else if (_.isString(o)) {
+    return 'string';
+  } else if (_.isNumber(o)) {
+    return 'number'; // TODO
+  } else if (_.isBoolean(o)) {
+    return 'boolean';
+  }
+  throw new Error('Type conversion not implemeneted for value: ' + o);
 };
 
 const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
   const dataResult = useRefsData(refUris);
-  // console.log('USE REFS TYPE', dataResult);
-  // const key0 = refUriToObjectVersionKey(refUris[0]);
-  // console.log('REF URIS', refUris);
   const finalRes = useMemo(() => {
     if (!dataResult.loading) {
       return {
         loading: false,
-        result: dataResult.result?.map(toWeaveType) ?? [],
+        result: dataResult.result?.map(weaveTypeOf) ?? [],
         error: null,
       };
     } else {
@@ -547,7 +620,6 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
       };
     }
   }, [dataResult.loading, dataResult.result]);
-  console.log('useRefsType', finalRes);
   return finalRes;
 };
 

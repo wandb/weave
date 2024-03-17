@@ -103,7 +103,7 @@ def encode_custom_obj(obj):
         }
     )
     return {
-        "_type": "WeaveTypeObj",
+        "_type": "CustomWeaveType",
         "weave_type": weave_type.to_dict(),
         "files": encoded_path_contents,
     }

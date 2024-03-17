@@ -473,10 +473,7 @@ def map_to_refs(obj: Any) -> Any:
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
 
-    if isinstance(obj, (int, float, str, bool, box.BoxedNone)) or obj is None:
-        return obj
-
-    return custom_objs.encode_custom_obj(obj)
+    return obj
 
 
 def to_json(obj: Any) -> Any:
@@ -492,7 +489,7 @@ def to_json(obj: Any) -> Any:
             "extra": obj.extra,
         }
     elif isinstance(obj, ObjectRecord):
-        res = {"_type": "ObjectRecord"}
+        res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
             res[k] = to_json(v)
         return res
@@ -501,7 +498,10 @@ def to_json(obj: Any) -> Any:
     elif isinstance(obj, dict):
         return {k: to_json(v) for k, v in obj.items()}
 
-    return obj
+    if isinstance(obj, (int, float, str, bool, box.BoxedNone)) or obj is None:
+        return obj
+
+    return custom_objs.encode_custom_obj(obj)
 
 
 def from_json(obj: Any) -> Any:
@@ -519,10 +519,10 @@ def from_json(obj: Any) -> Any:
                 return ObjectRef(obj["name"], obj["val_id"], obj["extra"])
             elif val_type == "ObjectRecord":
                 return ObjectRecord({k: from_json(v) for k, v in obj.items()})
-            elif val_type == "WeaveTypeObj":
+            elif val_type == "CustomWeaveType":
                 return custom_objs.decode_custom_obj(obj["weave_type"], obj["files"])
             else:
-                raise ValueError(f"Unknown val type: {val_type}")
+                return ObjectRecord({k: from_json(v) for k, v in obj.items()})
         return {k: from_json(v) for k, v in obj.items()}
 
     return obj
