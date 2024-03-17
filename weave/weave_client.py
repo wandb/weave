@@ -73,8 +73,27 @@ class ObjectRef(Ref):
     val_id: uuid.UUID
     extra: list[str] = dataclasses.field(default_factory=list)
 
+    @classmethod
+    def from_uri(cls, uri: str) -> "ObjectRef":
+        if not uri.startswith("weave:///"):
+            raise ValueError(f"Invalid URI: {uri}")
+        path = uri[len("weave:///") :]
+        parts = path.split("/")
+        if len(parts) < 4:
+            raise ValueError(f"Invalid URI: {uri}")
+        entity, project, name_version = parts[:3]
+        name, version = name_version.split(":")
+        extra = parts[3:]
+        return cls(
+            entity=entity,
+            project=project,
+            name=name,
+            val_id=version,
+            extra=extra,
+        )
+
     def uri(self) -> str:
-        u = f"weave:///object/{self.name}/{self.val_id}"
+        u = f"weave:///{self.entity}/{self.project}/{self.name}:{self.val_id}"
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
@@ -470,6 +489,7 @@ def to_json(obj: Any) -> Any:
     if isinstance(obj, TableRef):
         return {"_type": "TableRef", "table_id": obj.table_id}
     elif isinstance(obj, ObjectRef):
+        return obj.uri()
         return {
             "_type": "ObjectRef",
             "entity": obj.entity,
@@ -518,6 +538,8 @@ def from_json(obj: Any) -> Any:
             else:
                 return ObjectRecord({k: from_json(v) for k, v in obj.items()})
         return {k: from_json(v) for k, v in obj.items()}
+    elif isinstance(obj, str) and obj.startswith("weave://"):
+        return ObjectRef.from_uri(obj)
 
     return obj
 
