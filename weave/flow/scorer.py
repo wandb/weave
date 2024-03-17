@@ -74,7 +74,10 @@ def get_scorer_attributes(
         if isinstance(scorer, op_def.OpDef):
             scorer_name = scorer.common_name
         else:
-            scorer_name = scorer.__name__
+            try:
+                scorer_name = scorer.__name__
+            except AttributeError:
+                scorer_name = scorer._class_name
         score_fn = scorer
         summarize_fn = auto_summarize  # type: ignore
     return (scorer_name, score_fn, summarize_fn)  # type: ignore

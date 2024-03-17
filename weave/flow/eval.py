@@ -9,6 +9,7 @@ import numpy as np
 import weave
 from weave import op_def
 from weave.flow import Object, Dataset, Model
+from weave.flow.model import get_infer_method
 from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
 from weave.weaveflow import util
 
@@ -65,10 +66,10 @@ class Evaluation(Object):
         else:
             model_input = self.preprocess_model_input(example)  # type: ignore
 
-        if isinstance(model, Model):
-            model_predict = model.get_infer_method()
-        else:
+        if callable(model):
             model_predict = model
+        else:
+            model_predict = get_infer_method(model)
         predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
         if isinstance(model_input, dict):
