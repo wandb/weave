@@ -131,6 +131,12 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
+def val_digest(json_val: str):
+    hasher = hashlib.sha256()
+    hasher.update(json_val.encode())
+    return hasher.hexdigest()
+
+
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     ch_client: CHClient
 
@@ -327,12 +333,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        hasher = hashlib.sha256()
-
         json_val = json.dumps(req.obj.val)
-        hasher.update(json_val.encode())
-
-        digest = hasher.hexdigest()
+        digest = val_digest(json_val)
 
         req_obj = req.obj
         ch_obj = ObjCHInsertable(
@@ -356,7 +358,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conds = [
             f"name = '{req.name}'",
             f"digest = '{req.version_digest}'",
-            "is_op = 0",
         ]
         objs = self._select_objs_query(
             req.entity,
@@ -389,6 +390,58 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        insert_rows = []
+        for r in req.table.rows:
+            if not isinstance(r, dict):
+                raise ValueError("All rows must be dictionaries")
+            row_json = json.dumps(r)
+            row_digest = val_digest(row_json)
+            insert_rows.append(
+                (req.table.entity, req.table.project, row_digest, row_json)
+            )
+
+        self.ch_client.insert(
+            "table_rows",
+            data=insert_rows,
+            column_names=["entity", "project", "digest", "val"],
+        )
+
+        row_digests = [r[2] for r in insert_rows]
+
+        table_hasher = hashlib.sha256()
+        for row_digest in row_digests:
+            table_hasher.update(row_digest.encode())
+        table_digest = table_hasher.hexdigest()
+
+        self.ch_client.insert(
+            "tables",
+            data=[(req.table.entity, req.table.project, table_digest, row_digests)],
+            column_names=["entity", "project", "digest", "row_digests"],
+        )
+        return tsi.TableCreateRes(digest=table_digest)
+
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        query_result = self.ch_client.query(
+            """
+                SELECT tr.digest, tr.val
+                FROM (
+                    SELECT entity, project, row_digest
+                    FROM tables 
+                    ARRAY JOIN row_digests AS row_digest
+                    WHERE digest = {table_digest:String}
+                ) AS t
+                JOIN table_rows tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
+            """,
+            parameters={"table_digest": req.table_digest},
+        )
+        return tsi.TableQueryRes(
+            rows=[
+                tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
+                for r in query_result.result_rows
+            ],
+        )
 
     # Private Methods
     def _mint_client(self) -> CHClient:

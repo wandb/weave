@@ -24,6 +24,9 @@ from weave.trace_server.trace_server_interface import (
     CallSchema,
     ObjQueryReq,
     ObjQueryRes,
+    TableCreateReq,
+    TableSchemaForInsert,
+    TableQueryReq,
     _CallsFilter,
     _ObjectVersionFilter,
 )
@@ -53,16 +56,22 @@ class Ref:
     def with_index(self, index: int) -> "Ref":
         return self.with_extra(["index", str(index)])
 
-    def with_item(self, item_id: uuid.UUID, item_version: uuid.UUID) -> "Ref":
-        return self.with_extra(["id", f"{item_id},{item_version}"])
+    def with_item(self, item_digest: str) -> "Ref":
+        return self.with_extra(["id", f"{item_digest}"])
 
 
 @dataclasses.dataclass
 class TableRef(Ref):
-    table_id: uuid.UUID
+    entity: str
+    project: str
+    digest: str
+    extra: list[str] = dataclasses.field(default_factory=list)
 
     def uri(self) -> str:
-        return f"weave:///table/{self.table_id}"
+        u = f"weave:///{self.entity}/{self.project}/table/{self.digest}"
+        if self.extra:
+            u += "/" + "/".join(self.extra)
+        return u
 
 
 @dataclasses.dataclass
@@ -70,33 +79,40 @@ class ObjectRef(Ref):
     entity: str
     project: str
     name: str
-    val_id: uuid.UUID
+    version: str
     extra: list[str] = dataclasses.field(default_factory=list)
 
-    @classmethod
-    def from_uri(cls, uri: str) -> "ObjectRef":
-        if not uri.startswith("weave:///"):
-            raise ValueError(f"Invalid URI: {uri}")
-        path = uri[len("weave:///") :]
-        parts = path.split("/")
-        if len(parts) < 4:
-            raise ValueError(f"Invalid URI: {uri}")
-        entity, project, name_version = parts[:3]
-        name, version = name_version.split(":")
-        extra = parts[3:]
-        return cls(
-            entity=entity,
-            project=project,
-            name=name,
-            val_id=version,
-            extra=extra,
-        )
-
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/{self.name}:{self.val_id}"
+        u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.version}"
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
+
+
+def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
+    if not uri.startswith("weave:///"):
+        raise ValueError(f"Invalid URI: {uri}")
+    path = uri[len("weave:///") :]
+    parts = path.split("/")
+    if len(parts) < 3:
+        raise ValueError(f"Invalid URI: {uri}")
+    entity, project, kind = parts[:3]
+    remaining = parts[3:]
+    if kind == "table":
+        return TableRef(
+            entity=entity, project=project, digest=remaining[0], extra=remaining[1:]
+        )
+    elif kind == "object":
+        name, version = remaining[0].split(":")
+        return ObjectRef(
+            entity=entity,
+            project=project,
+            name=name,
+            version=version,
+            extra=remaining[1:],
+        )
+    else:
+        raise ValueError(f"Unknown ref kind: {kind}")
 
 
 @dataclasses.dataclass
@@ -261,10 +277,16 @@ class TraceObject(Tracable):
         return self.val == other
 
 
+class Table:
+    def __init__(self, columns, rows):
+        self.columns = columns
+        self.rows = rows
+
+
 class TraceTable(Tracable):
     filter: ValueFilter
 
-    def __init__(self, table_ref, ref, server, filter, root):
+    def __init__(self, table_ref: TableRef, ref, server, filter, root):
         self.table_ref = table_ref
         self.filter = filter
         self.ref = ref
@@ -278,8 +300,14 @@ class TraceTable(Tracable):
             raise ValueError("Slices not yet supported")
         elif isinstance(key, int):
             page_data = self.server.table_query(
-                self.table_ref, self.filter, offset=key, limit=1
+                TableQueryReq(
+                    entity=self.table_ref.entity,
+                    project=self.table_ref.project,
+                    table_id=self.table_ref.digest,
+                    # filter=self.filter,
+                )
             )
+            print("PAGE DATA", page_data)
         else:
             filter = self.filter.copy()
             filter["id"] = key
@@ -298,21 +326,29 @@ class TraceTable(Tracable):
         page_size = 10
         i = 0
         while True:
-            page_data = self.server.table_query(
-                self.table_ref,
-                self.filter,
-                offset=page_index * page_size,
-                limit=page_size,
+            # page_data = self.server.table_query(
+            #     self.table_ref,
+            #     self.filter,
+            #     offset=page_index * page_size,
+            #     limit=page_size,
+            # )
+            response = self.server.table_query(
+                TableQueryReq(
+                    entity=self.table_ref.entity,
+                    project=self.table_ref.project,
+                    table_digest=self.table_ref.digest,
+                    # filter=self.filter,
+                )
             )
-            for item in page_data:
+            for item in response.rows:
                 yield make_trace_obj(
                     item.val,
-                    self.ref.with_item(item.id, item.version),
+                    self.ref.with_item(item.digest),
                     self.server,
                     self.root,
                 )
                 i += 1
-            if len(page_data) < page_size:
+            if len(response.rows) < page_size:
                 break
             page_index += 1
 
@@ -388,7 +424,7 @@ def make_trace_obj(
                 entity=val.entity,
                 project=val.project,
                 name=val.name,
-                version_digest=val.val_id,
+                version_digest=val.version,
             )
         )
         val = from_json(read_res.obj.val)
@@ -442,23 +478,6 @@ def map_to_refs(obj: Any) -> Any:
         return ObjectRecord(
             {k: map_to_refs(v) for k, v in obj.__dict__.items()},
         )
-    # if dataclasses.is_dataclass(obj):
-    #     return ObjectRecord(
-    #         {
-    #             "_class_name": obj.__class__.__name__,
-    #             **{
-    #                 k: map_to_refs(v)
-    #                 for k, v in dataclasses_asdict_one_level(obj).items()
-    #             },
-    #             **{
-    #                 k: map_to_refs(v)
-    #                 for k, v in inspect.getmembers(
-    #                     obj, lambda x: isinstance(x, op_def.OpDef)
-    #                 )
-    #                 if isinstance(v, op_def.OpDef)
-    #             },
-    #         },
-    #     )
     if isinstance(obj, pydantic.BaseModel):
         return ObjectRecord(
             {
@@ -487,17 +506,9 @@ def to_json(obj: Any) -> Any:
     # if isinstance(obj, uuid.UUID):
     #     return {"_type": "UUID", "uuid": obj.hex}
     if isinstance(obj, TableRef):
-        return {"_type": "TableRef", "table_id": obj.table_id}
+        return obj.uri()
     elif isinstance(obj, ObjectRef):
         return obj.uri()
-        return {
-            "_type": "ObjectRef",
-            "entity": obj.entity,
-            "project": obj.project,
-            "name": obj.name,
-            "val_id": obj.val_id,
-            "extra": obj.extra,
-        }
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
@@ -521,17 +532,7 @@ def from_json(obj: Any) -> Any:
         val_type = obj.get("_type")
         if val_type is not None:
             del obj["_type"]
-            if val_type == "TableRef":
-                return TableRef(obj["table_id"])
-            elif val_type == "ObjectRef":
-                return ObjectRef(
-                    obj["entity"],
-                    obj["project"],
-                    obj["name"],
-                    obj["val_id"],
-                    obj["extra"],
-                )
-            elif val_type == "ObjectRecord":
+            if val_type == "ObjectRecord":
                 return ObjectRecord({k: from_json(v) for k, v in obj.items()})
             elif val_type == "CustomWeaveType":
                 return custom_objs.decode_custom_obj(obj["weave_type"], obj["files"])
@@ -539,7 +540,7 @@ def from_json(obj: Any) -> Any:
                 return ObjectRecord({k: from_json(v) for k, v in obj.items()})
         return {k: from_json(v) for k, v in obj.items()}
     elif isinstance(obj, str) and obj.startswith("weave://"):
-        return ObjectRef.from_uri(obj)
+        return parse_uri(obj)
 
     return obj
 
@@ -641,6 +642,10 @@ class WeaveClient:
     # This is used by tests and op_execute still, but the save() interface
     # is nicer for clients I think?
     def save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
+        val = self.save_nested_objects(val)
+        return self._save_object(val, name, branch)
+
+    def _save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
@@ -668,11 +673,29 @@ class WeaveClient:
                 entity=self.entity,
                 project=self.project,
                 name=ref.name,
-                version_digest=ref.val_id,
+                version_digest=ref.version,
             )
         )
         val = from_json(read_res.obj.val)
         return make_trace_obj(val, ref, self.server, None)
+
+    def save_table(self, table: Table) -> TableRef:
+        table_cols = table.columns
+        table_rows = table.rows
+        dict_rows = [
+            {table_cols[i]: row[i] for i in range(len(table_cols))}
+            for row in table_rows
+        ]
+        response = self.server.table_create(
+            TableCreateReq(
+                table=TableSchemaForInsert(
+                    entity=self.entity, project=self.project, rows=dict_rows
+                )
+            )
+        )
+        return TableRef(
+            entity=self.entity, project=self.project, digest=response.digest
+        )
 
     def calls(self, filter: Optional[_CallsFilter] = None):
         if filter is None:
@@ -717,7 +740,7 @@ class WeaveClient:
     def _save_op(self, op: op_def.OpDef) -> ObjectRef:
         if isinstance(op, op_def.BoundOpDef):
             op = op.op_def
-        op_def_ref = self.save_object(op, op.name)
+        op_def_ref = self._save_object(op, op.name)
         op.ref = op_def_ref
         return op_def_ref
 
@@ -794,29 +817,6 @@ class WeaveClient:
         self.finish_call(run, str(exception))
 
     def save_nested_objects(self, obj: Any) -> Any:
-        # if dataclasses.is_dataclass(obj):
-        #     if hasattr(obj, "_trace_object"):
-        #         return obj._trace_object
-        #     obj_rec = ObjectRecord(
-        #         {
-        #             "_class_name": obj.__class__.__name__,
-        #             **{
-        #                 k: save_nested_objects(v, client)
-        #                 for k, v in dataclasses_asdict_one_level(obj).items()
-        #             },
-        #             **{
-        #                 k: save_nested_objects(v, client)
-        #                 for k, v in inspect.getmembers(
-        #                     obj, lambda x: isinstance(x, op_def.OpDef)
-        #                 )
-        #                 if isinstance(v, op_def.OpDef)
-        #             },
-        #         },
-        #     )
-        #     ref = client.save_object(obj_rec, get_obj_name(obj_rec))
-        #     trace_obj = make_trace_obj(obj_rec, ref, client.server, None)
-        #     obj._trace_object = trace_obj
-        #     return trace_obj
         if isinstance(obj, pydantic.BaseModel):
             if hasattr(obj, "_trace_object"):
                 return obj._trace_object
@@ -836,11 +836,14 @@ class WeaveClient:
                     },
                 },
             )
-            ref = self.save_object(obj_rec, get_obj_name(obj_rec))
+            ref = self._save_object(obj_rec, get_obj_name(obj_rec))
             # return make_trace_obj(obj_rec, ref, client.server, None)
             trace_obj = make_trace_obj(obj_rec, ref, self.server, None)
             obj._trace_object = trace_obj
             return trace_obj
+        elif isinstance(obj, Table):
+            table_ref = self.save_table(obj)
+            return TraceTable(table_ref, table_ref, self.server, {}, None)
         elif isinstance(obj, list):
             return [self.save_nested_objects(v) for v in obj]
         elif isinstance(obj, dict):

@@ -13,6 +13,12 @@ from weave.trace_server import (
     clickhouse_trace_server_batched,
 )
 
+from weave.trace_server.trace_server_interface import (
+    TableCreateReq,
+    TableSchemaForInsert,
+    TableQueryReq,
+)
+
 
 class RegexStringMatcher(str):
     def __init__(self, pattern):
@@ -34,18 +40,26 @@ def client() -> Generator[weave_client.WeaveClient, None, None]:
     clickhouse_trace_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
     clickhouse_trace_server.ch_client.command("DROP DATABASE IF EXISTS default")
     clickhouse_trace_server._run_migrations()
-    with weave_api_client("shawn/test-project") as client:
+    with weave_api_client("shawn/chobj-text-extract1") as client:
         yield client
 
 
-@pytest.mark.skip()
-def test_table_create(server):
-    table_ref = server.new_table([1, 2, 3])
-    assert list(r.val for r in server.table_query(table_ref)) == [1, 2, 3]
-    assert list(r.val for r in server.table_query(table_ref, offset=1)) == [2, 3]
-    assert list(r.val for r in server.table_query(table_ref, offset=1, limit=1)) == [2]
-    # TODO: This doesn't work
-    # assert list(server._table_query(table_ref, filter={"": 2})) == [2]
+def test_table_create(client):
+    res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                entity="test",
+                project="test-project",
+                rows=[{"id": 1, "val": 1}, {"id": 2, "val": 2}, {"id": 3, "val": 3}],
+            )
+        )
+    )
+    result = client.server.table_query(
+        TableQueryReq(entity="test", project="test-project", table_digest=res.digest)
+    )
+    assert result.rows[0].val["val"] == 1
+    assert result.rows[1].val["val"] == 2
+    assert result.rows[2].val["val"] == 3
 
 
 @pytest.mark.skip()
@@ -137,6 +151,19 @@ def test_dataset_refs(client):
         ref2.ref.val_id,
         ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
     )
+
+
+def test_obj_with_table(client):
+    class ObjWithTable(weave.Object):
+        table: weave_client.Table
+
+    o = ObjWithTable(table=weave_client.Table(columns=("a",), rows=[(1,), (2,), (3,)]))
+    res = client.save_object(o, "my-obj")
+    o2 = client.get(res)
+    row_vals = list(o2.table)
+    assert row_vals[0]["a"] == 1
+    assert row_vals[1]["a"] == 2
+    assert row_vals[2]["a"] == 3
 
 
 def test_pydantic(client):

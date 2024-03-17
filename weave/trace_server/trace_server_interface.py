@@ -105,6 +105,12 @@ class ObjSchemaForInsert(BaseModel):
     val: typing.Any
 
 
+class TableSchemaForInsert(BaseModel):
+    entity: str
+    project: str
+    rows: list[typing.Any]
+
+
 class CallStartReq(BaseModel):
     start: StartedCallSchemaForInsert
 
@@ -226,6 +232,30 @@ class ObjQueryRes(BaseModel):
     objs: typing.List[ObjSchema]
 
 
+class TableCreateReq(BaseModel):
+    table: TableSchemaForInsert
+
+
+class TableRowSchema(BaseModel):
+    digest: str
+    val: typing.Any
+
+
+class TableCreateRes(BaseModel):
+    digest: str
+
+
+class TableQueryReq(BaseModel):
+    entity: str
+    project: str
+    table_digest: str
+    filter: typing.Optional[_ObjectVersionFilter] = None
+
+
+class TableQueryRes(BaseModel):
+    rows: typing.List[TableRowSchema]
+
+
 class TraceServerInterface:
     # Call API
     @abc.abstractmethod
@@ -259,3 +289,9 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+
+    @abc.abstractmethod
+    def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+
+    @abc.abstractmethod
+    def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
