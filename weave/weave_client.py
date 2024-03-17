@@ -67,6 +67,8 @@ class TableRef(Ref):
 
 @dataclasses.dataclass
 class ObjectRef(Ref):
+    entity: str
+    project: str
     name: str
     val_id: uuid.UUID
     extra: list[str] = dataclasses.field(default_factory=list)
@@ -364,8 +366,8 @@ def make_trace_obj(
         extra = val.extra
         read_res = server.obj_read(
             ObjReadReq(
-                entity="none",
-                project="none",
+                entity=val.entity,
+                project=val.project,
                 name=val.name,
                 version_digest=val.val_id,
             )
@@ -470,6 +472,8 @@ def to_json(obj: Any) -> Any:
     elif isinstance(obj, ObjectRef):
         return {
             "_type": "ObjectRef",
+            "entity": obj.entity,
+            "project": obj.project,
             "name": obj.name,
             "val_id": obj.val_id,
             "extra": obj.extra,
@@ -502,7 +506,13 @@ def from_json(obj: Any) -> Any:
             elif val_type == "TableRef":
                 return TableRef(obj["table_id"])
             elif val_type == "ObjectRef":
-                return ObjectRef(obj["name"], obj["val_id"], obj["extra"])
+                return ObjectRef(
+                    obj["entity"],
+                    obj["project"],
+                    obj["name"],
+                    obj["val_id"],
+                    obj["extra"],
+                )
             elif val_type == "ObjectRecord":
                 return ObjectRecord({k: from_json(v) for k, v in obj.items()})
             elif val_type == "CustomWeaveType":
@@ -623,7 +633,7 @@ class WeaveClient:
                 )
             )
         )
-        ref = ObjectRef(name, response.version_digest)
+        ref = ObjectRef(self.entity, self.project, name, response.version_digest)
         # TODO: Try to put a ref onto val? Or should user code use a style like
         # save instead?
         return ref
@@ -669,6 +679,12 @@ class WeaveClient:
         return self.calls(_CallsFilter(op_version_refs=[op_ref.uri()]))
 
     def objects(self, filter: Optional[_ObjectVersionFilter] = None):
+        if not filter:
+            filter = _ObjectVersionFilter()
+        else:
+            filter = filter.model_copy()
+        filter.is_op = False
+
         response = self.server.objs_query(
             ObjQueryReq(
                 entity=self.entity,
