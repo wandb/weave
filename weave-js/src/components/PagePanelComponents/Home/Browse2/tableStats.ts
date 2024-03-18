@@ -147,7 +147,7 @@ export const getBoringColumns = (tableStats: TableStats): string[] => {
   }
   const allNull = new Set<string>();
   for (const col of columns) {
-    if (col.startsWith('output.')) {
+    if (col.startsWith('output.') || col === 'output') {
       // For now, output is always interesting
       continue;
     }
