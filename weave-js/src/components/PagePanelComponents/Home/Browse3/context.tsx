@@ -558,7 +558,7 @@ const useSetSearchParam = () => {
   );
 };
 
-export const PEAK_SEARCH_PARAM = 'peekPath';
+export const PEEK_PARAM = 'peekPath';
 export const TRACETREE_PARAM = 'tracetree';
 export const PATH_PARAM = 'path';
 
@@ -573,111 +573,87 @@ const useMakePeekingRouter = (): RouteType => {
 
   return {
     refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.refUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.refUIUrl(...args));
     },
     entityUrl: (...args: Parameters<typeof baseContext.entityUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.entityUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.entityUrl(...args));
     },
     projectUrl: (...args: Parameters<typeof baseContext.projectUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.projectUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.projectUrl(...args));
     },
     typeUIUrl: (...args: Parameters<typeof baseContext.typeUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.typeUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.typeUIUrl(...args));
     },
     objectUIUrl: (...args: Parameters<typeof baseContext.objectUIUrl>) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.objectUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.objectUIUrl(...args));
     },
     opUIUrl: (...args: Parameters<typeof baseContext.opUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.opUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.opUIUrl(...args));
     },
     typeVersionUIUrl: (
       ...args: Parameters<typeof baseContext.typeVersionUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.typeVersionUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.typeVersionUIUrl(...args));
     },
     typeVersionsUIUrl: (
       ...args: Parameters<typeof baseContext.typeVersionsUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.typeVersionsUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.typeVersionsUIUrl(...args));
     },
     objectVersionUIUrl: (
       ...args: Parameters<typeof baseContext.objectVersionUIUrl>
     ) => {
       return setSearchParam(
-        PEAK_SEARCH_PARAM,
+        PEEK_PARAM,
         baseContext.objectVersionUIUrl(...args)
       );
     },
     opVersionsUIUrl: (
       ...args: Parameters<typeof baseContext.opVersionsUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.opVersionsUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.opVersionsUIUrl(...args));
     },
     opVersionUIUrl: (
       ...args: Parameters<typeof baseContext.opVersionUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.opVersionUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.opVersionUIUrl(...args));
     },
     callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.callUIUrl(...args));
     },
     callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callsUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.callsUIUrl(...args));
     },
     objectVersionsUIUrl: (
       ...args: Parameters<typeof baseContext.objectVersionsUIUrl>
     ) => {
       return setSearchParam(
-        PEAK_SEARCH_PARAM,
+        PEEK_PARAM,
         baseContext.objectVersionsUIUrl(...args)
       );
     },
     opPageUrl: (...args: Parameters<typeof baseContext.opPageUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.opPageUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.opPageUrl(...args));
     },
     boardsUIUrl: (...args: Parameters<typeof baseContext.boardsUIUrl>) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.boardsUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.boardsUIUrl(...args));
     },
     tablesUIUrl: (...args: Parameters<typeof baseContext.tablesUIUrl>) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.tablesUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.tablesUIUrl(...args));
     },
     boardForExpressionUIUrl: (
       ...args: Parameters<typeof baseContext.boardForExpressionUIUrl>
     ) => {
       throw new Error('Not implemented');
       // return setSearchParam(
-      //   PEAK_SEARCH_PARAM,
+      //   PEEK_PARAM,
       //   baseContext.boardForExpressionUIUrl(...args)
       // );
     },
     compareCallsUIUrl: (
       ...args: Parameters<typeof baseContext.compareCallsUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.compareCallsUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.compareCallsUIUrl(...args));
     },
   };
 };
@@ -700,8 +676,8 @@ export const useClosePeek = () => {
   const history = useHistory();
   return () => {
     const queryParams = new URLSearchParams(history.location.search);
-    if (queryParams.has(PEAK_SEARCH_PARAM)) {
-      queryParams.delete(PEAK_SEARCH_PARAM);
+    if (queryParams.has(PEEK_PARAM)) {
+      queryParams.delete(PEEK_PARAM);
       history.replace({
         search: queryParams.toString(),
       });

@@ -338,7 +338,7 @@ export const RunsTable: FC<{
     }
   }, [rowIds, peekId]);
 
-  // Custom logic to control path reservation preference
+  // Custom logic to control path preservation preference
   const preservePath = useMemo(() => {
     return (
       uniqueSpanNames.length === 1 &&
