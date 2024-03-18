@@ -268,8 +268,7 @@ export const CallLink: React.FC<{
   // Don't show trace tree by default for Evaluation-evaluate when not already open
   const tracetree =
     props.tracetree ??
-    existingTraceTreeOpen ??
-    opName !== 'Evaluation-evaluate';
+    (existingTraceTreeOpen || opName !== 'Evaluation-evaluate');
   // Preserve the path only when showing trace tree
   const path = props.preservePath && tracetree ? existingPath : null;
 

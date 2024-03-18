@@ -74,7 +74,7 @@ const CallPageInnerVertical: FC<{
         call.project,
         call.traceId,
         call.callId,
-        null,
+        path,
         !showTraceTree
       )
     );
@@ -85,6 +85,7 @@ const CallPageInnerVertical: FC<{
     call.traceId,
     currentRouter,
     history,
+    path,
     showTraceTree,
   ]);
 
