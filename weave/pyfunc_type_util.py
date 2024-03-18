@@ -123,10 +123,11 @@ def determine_output_type(
     else:
         inferred_output_type = infer_types.python_type_to_type(python_return_type)
         if inferred_output_type == types.UnknownType():
-            raise errors.WeaveDefinitionError(
-                "Could not infer Weave Type from declared Python return type: %s"
-                % python_return_type
-            )
+            pass
+            # raise errors.WeaveDefinitionError(
+            #     "Could not infer Weave Type from declared Python return type: %s"
+            #     % python_return_type
+            # )
 
     weave_output_type = expected_output_type
     if weave_output_type is None:
