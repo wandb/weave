@@ -218,7 +218,7 @@ const getStyles = <
         minHeight,
         lineHeight,
         fontSize,
-        cursor: props.cursor ? props.cursor : 'default',
+        cursor: props.cursor ?? 'default',
         border: 0,
         boxShadow: state.menuIsOpen
           ? `0 0 0 2px ${colorBorderOpen}`
