@@ -59,10 +59,11 @@ export const objectRefDisplayName = (
   return {label};
 };
 
-export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
-  objRef,
-  wfTable,
-}) => {
+export const SmallRef: FC<{
+  objRef: ObjectRef;
+  wfTable?: WFDBTableType;
+  iconOnly?: boolean;
+}> = ({objRef, wfTable, iconOnly = false}) => {
   const {
     useObjectVersion,
     derived: {useRefsType},
@@ -118,17 +119,19 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
         }}>
         <Icon name={icon} width={14} height={14} />
       </Box>
-      <Box
-        sx={{
-          height: '22px',
-          flex: 1,
-          minWidth: 0,
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-          textOverflow: 'ellipsis',
-        }}>
-        {label}
-      </Box>
+      {!iconOnly && (
+        <Box
+          sx={{
+            height: '22px',
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+          }}>
+          {label}
+        </Box>
+      )}
     </Box>
   );
   if (refTypeQuery.loading) {
