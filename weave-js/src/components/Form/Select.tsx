@@ -30,6 +30,9 @@ import ReactSelect, {
   StylesConfig,
 } from 'react-select';
 import AsyncSelect, {AsyncProps} from 'react-select/async';
+import AsyncCreatableSelect, {
+  AsyncCreatableProps,
+} from 'react-select/async-creatable';
 
 export const SelectSizes = {
   Small: 'small',
@@ -92,6 +95,7 @@ export type AdditionalProps = {
   size?: SelectSize;
   errorState?: boolean;
   groupDivider?: boolean;
+  cursor?: string;
 };
 
 // Toggle icon when open
@@ -145,6 +149,7 @@ const getGroupHeading = <
 type StylesProps = {
   size?: SelectSize;
   errorState?: boolean;
+  cursor?: string;
 };
 
 // Override styling to come closer to design spec.
@@ -213,6 +218,7 @@ const getStyles = <
         minHeight,
         lineHeight,
         fontSize,
+        cursor: props.cursor ?? 'default',
         border: 0,
         boxShadow: state.menuIsOpen
           ? `0 0 0 2px ${colorBorderOpen}`
@@ -320,6 +326,29 @@ export const SelectAsync = <
   const GroupHeading = getGroupHeading(size, showDivider);
   return (
     <AsyncSelect
+      {...props}
+      components={Object.assign(
+        {DropdownIndicator, GroupHeading},
+        props.components
+      )}
+      styles={styles}
+    />
+  );
+};
+
+export const SelectAsyncCreatable = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: AsyncCreatableProps<Option, IsMulti, Group> & AdditionalProps
+) => {
+  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
+  const size = props.size ?? 'medium';
+  const showDivider = props.groupDivider ?? false;
+  const GroupHeading = getGroupHeading(size, showDivider);
+  return (
+    <AsyncCreatableSelect
       {...props}
       components={Object.assign(
         {DropdownIndicator, GroupHeading},
