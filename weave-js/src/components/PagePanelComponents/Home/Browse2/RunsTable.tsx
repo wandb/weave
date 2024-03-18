@@ -169,7 +169,7 @@ export const RunsTable: FC<{
   } = useWFHooks();
   const {client} = weave;
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
-    new Set()
+    new Set<string>().add('input.example')
   );
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
@@ -294,10 +294,12 @@ export const RunsTable: FC<{
           const refs = columnRefs(tableStats, col);
           const refTypes = await getRefsType(refs);
           const extraCols = getExtraColumns(refTypes);
-          setExpandedColInfo(prevState => ({
-            ...prevState,
-            [col]: extraCols,
-          }));
+          if (tableStats.rowCount !== 0) {
+            setExpandedColInfo(prevState => ({
+              ...prevState,
+              [col]: extraCols,
+            }));
+          }
         }
       }
     };
@@ -515,8 +517,14 @@ export const RunsTable: FC<{
       const field = 'input.' + key;
       const isExpanded = expandedRefCols.has(field);
       cols.push({
-        flex: 1,
-        minWidth: 150,
+        ...(isExpanded
+          ? {
+              width: 100,
+            }
+          : {
+              flex: 1,
+              minWidth: 150,
+            }),
         field,
         renderHeader: () => {
           const hasExpand = columnHasRefs(tableStats, field);
@@ -532,7 +540,7 @@ export const RunsTable: FC<{
         renderCell: cellParams => {
           if (field in cellParams.row) {
             const value = (cellParams.row as any)[field];
-            return <CellValue value={value} />;
+            return <CellValue value={value} isExpanded={isExpanded} />;
           }
           return <NotApplicable />;
         },
@@ -638,7 +646,7 @@ export const RunsTable: FC<{
           renderCell: cellParams => {
             if (field in cellParams.row) {
               const value = (cellParams.row as any)[field];
-              return <CellValue value={value} />;
+              return <CellValue value={value} isExpanded={isExpanded} />;
             }
             return <NotApplicable />;
           },
