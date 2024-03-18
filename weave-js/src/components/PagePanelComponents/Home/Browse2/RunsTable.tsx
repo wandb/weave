@@ -551,6 +551,7 @@ export const RunsTable: FC<{
         for (const col of expandCols) {
           const expandField = field + '.' + col;
           cols.push({
+            flex: 1,
             field: expandField,
             renderHeader: headerParams => (
               <CustomGroupedColumnHeader field={headerParams.field} />
