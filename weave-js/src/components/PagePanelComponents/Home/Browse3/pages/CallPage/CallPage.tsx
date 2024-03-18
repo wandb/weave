@@ -133,6 +133,7 @@ const CallPageInnerVertical: FC<{
             selectedCall={selectedCall}
             rows={rows}
             forcedExpandKeys={expandKeys}
+            path={path}
           />
         )
       }

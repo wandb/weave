@@ -49,7 +49,8 @@ export const CallTraceView: FC<{
   selectedCall: CallSchema;
   rows: Row[];
   forcedExpandKeys: Set<string>;
-}> = ({call, selectedCall, rows, forcedExpandKeys}) => {
+  path?: string;
+}> = ({call, selectedCall, rows, forcedExpandKeys, path}) => {
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
@@ -233,7 +234,7 @@ export const CallTraceView: FC<{
         call.project,
         call.traceId,
         call.callId,
-        null,
+        path,
         false
       )
     );
@@ -242,6 +243,7 @@ export const CallTraceView: FC<{
     call.entity,
     call.project,
     call.traceId,
+    path,
     currentRouter,
     history,
   ]);
@@ -259,7 +261,12 @@ export const CallTraceView: FC<{
     <CallTrace>
       <CallTraceHeader>
         <CallTraceHeaderTitle>Trace tree</CallTraceHeaderTitle>
-        <Button icon="close" variant="ghost" onClick={onCloseTraceTree} />
+        <Button
+          icon="close"
+          variant="ghost"
+          onClick={onCloseTraceTree}
+          tooltip="Hide trace tree"
+        />
       </CallTraceHeader>
       <CallTraceTree>
         <ErrorBoundary>
