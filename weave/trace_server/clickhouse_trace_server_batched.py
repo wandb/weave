@@ -426,16 +426,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         entity, project = req.project_id.split("/")
-        conds = [f"entity = '{entity}'", f"project = '{project}'"]
+        conds = []
         if req.filter:
             if req.filter.row_digests:
                 in_list = ", ".join([f"'{rd}'" for rd in req.filter.row_digests])
                 conds.append(f"tr.digest IN ({in_list})")
         else:
             conds.append("1 = 1")
+        rows = self._table_query(entity, project, req.table_digest, conditions=conds)
+        return tsi.TableQueryRes(rows=rows)
+
+    def _table_query(
+        self,
+        entity: str,
+        project: str,
+        table_digest: str,
+        conditions: typing.Optional[typing.List[str]] = None,
+        limit: typing.Optional[int] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> typing.List[tsi.TableRowSchema]:
+        conds = ["entity = {entity: String}", "project = {project: String}"]
+        if conditions:
+            conds.extend(conditions)
+
         predicate = " AND ".join(conds)
-        query_result = self.ch_client.query(
-            f"""
+        query = f"""
                 SELECT tr.digest, tr.val
                 FROM (
                     SELECT entity, project, row_digest
@@ -445,15 +460,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 ) AS t
                 JOIN table_rows_deduped tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
                 WHERE {predicate}
-            """,
-            parameters={"table_digest": req.table_digest},
+            """
+        if limit:
+            query += f" LIMIT {limit}"
+
+        query_result = self.ch_client.query(
+            query,
+            parameters={
+                "entity": entity,
+                "project": project,
+                "table_digest": table_digest,
+                **(parameters or {}),
+            },
         )
-        return tsi.TableQueryRes(
-            rows=[
-                tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
-                for r in query_result.result_rows
-            ],
-        )
+
+        return [
+            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
+            for r in query_result.result_rows
+        ]
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         if len(req.refs) > 1000:
@@ -484,11 +508,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if op == "key":
                     val = val[arg]
                 elif op == "attr":
-                    val = getattr(val, arg)
+                    val = val[arg]
                 elif op == "index":
                     val = val[int(arg)]
                 elif op == "id":
-                    raise ValueError("Id not supported")
+                    if isinstance(val, str) and val.startswith("weave://"):
+                        table_ref = refs.parse_uri(val)
+                        if not isinstance(table_ref, refs.TableRef):
+                            raise ValueError(
+                                "invalid data layout encountered, expected TableRef when resolving id"
+                            )
+                        rows = self._table_query(
+                            entity=table_ref.entity,
+                            project=table_ref.project,
+                            table_digest=table_ref.digest,
+                            conditions=["digest = {digest: String}"],
+                            limit=1,
+                            parameters={"digest": arg},
+                        )
+                        if len(rows) == 0:
+                            raise NotFoundError(f"Row {val} not found")
+                        val = rows[0].val
+                    else:
+                        raise ValueError(
+                            "invalid data layout encountered, expected TableRef when resolving id"
+                        )
                 else:
                     raise ValueError(f"Unknown ref type: {extra[extra_index]}")
             return val

@@ -221,6 +221,7 @@ class TraceTable(Tracable):
                     table_digest=self.table_ref.digest,
                 )
             )
+            row = response.rows[key]
         else:
             filter = self.filter.model_copy()
             filter.row_digests = [key]
@@ -231,7 +232,7 @@ class TraceTable(Tracable):
                     filter=_TableRowFilter(row_digests=[key]),
                 )
             )
-        row = response.rows[0]
+            row = response.rows[0]
         return make_trace_obj(
             row.val,
             self.ref.with_item(row.digest),

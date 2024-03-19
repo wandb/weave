@@ -539,6 +539,16 @@ def test_refs_read_batch_with_extra(client):
     assert res.vals[1] == {"a": 6}
 
 
+def test_refs_read_batch_dataset_rows(client):
+    saved = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
+    ref1 = saved.rows[0]["a"].ref
+    ref2 = saved.rows[1]["a"].ref
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri(), ref2.uri()]))
+    assert len(res.vals) == 2
+    assert res.vals[0] == 5
+    assert res.vals[1] == 6
+
+
 # def test_publish_big_list(server):
 #     import time
 
