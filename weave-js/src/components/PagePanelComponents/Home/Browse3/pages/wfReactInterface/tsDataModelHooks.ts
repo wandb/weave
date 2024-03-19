@@ -669,7 +669,7 @@ const mergeTypes = (a: Types.Type, b: Types.Type): Types.Type => {
         objectType: mergeTypes(a.objectType, b.objectType),
       };
     } else {
-      console.warn('unhandled type merge ' + a.type + ' ' + b.type)
+      console.warn('unhandled type merge ' + a.type + ' ' + b.type);
     }
   }
   return union([a, b]);
@@ -705,10 +705,10 @@ const weaveTypeOf = (o: any): Types.Type => {
   } else if (_.isString(o)) {
     if (o.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
       return {
-        type: 'WandbArtifactRef'
-      }
+        type: 'WandbArtifactRef',
+      };
     } else if (o.startsWith(WEAVE_REF_PREFIX)) {
-      return {type: 'Ref'}
+      return {type: 'Ref'};
     }
     return 'string';
   } else if (_.isNumber(o)) {
