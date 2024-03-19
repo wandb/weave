@@ -6,16 +6,21 @@
 
 import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
+import {useTraceUpdate} from '../../../../../../common/util/hooks';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {refStringToRefDict} from '../wfInterface/naive';
+// import {refStringToRefDict} from '../wfInterface/naive';
 import {callCache} from './cache';
-import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
-import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
+import {
+  opVersionRefOpCategory,
+  refStringToRefDict,
+  refUriToOpVersionKey,
+} from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -79,12 +84,40 @@ const makeTraceServerEndpointHook = <
         .catch(err => {
           setState({loading: false, result: null, error: err});
         });
-    }, [input]);
+    }, [client, input]);
 
     return state;
   };
   return useTraceServerRequest;
 };
+
+
+const useMakeTraceServerEndpoint = <
+  FN extends keyof traceServerClient.TraceServerClient,
+  Input extends any[],
+  Output
+>(
+  traceServerFnName: FN,
+  preprocessFn: (
+    ...input: Input
+  ) => Parameters<traceServerClient.TraceServerClient[FN]>[0],
+  postprocessFn: (
+    res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>
+  ) => Output
+) => {
+  const getTsClient = useGetTraceServerClientContext();
+  const client = getTsClient();
+  const traceServerRequest = useCallback((
+    ...input: Input
+  ): Promise<Output> => {
+      return client[traceServerFnName](preprocessFn(...input))
+        .then(res => {
+          return postprocessFn(res);
+        })
+  }, [client, postprocessFn, preprocessFn, traceServerFnName]);
+  return traceServerRequest;
+};
+
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -242,9 +275,17 @@ const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
-  const result = useOpVersions(key?.entity, key?.project, {
-    objectIds: [key?.opId ?? ''],
-  });
+  const result = useOpVersions(
+    key?.entity ?? '',
+    key?.project ?? '',
+    {
+      opIds: [key?.opId ?? ''],
+    },
+    undefined,
+    {
+      skip: key == null,
+    }
+  );
   return {
     loading: result.loading,
     result: result.result?.find(
@@ -262,8 +303,9 @@ const useOpVersions = makeTraceServerEndpointHook(
     limit?: number,
     opts?: {skip?: boolean}
   ) => ({
-    entity,
-    project,
+    project_id: projectIdFromParts({entity, project}),
+    // entity,
+    // project,
     filter: {
       object_names: filter.opIds,
       latest_only: filter.latestOnly,
@@ -271,33 +313,44 @@ const useOpVersions = makeTraceServerEndpointHook(
     },
   }),
   (res): OpVersionSchema[] =>
-    res.objs.map(obj => ({
-      entity: obj.entity,
-      project: obj.project,
-      opId: obj.name,
-      versionHash: obj.digest,
-      typeName: obj.type,
-      name: obj.name,
-      path: 'obj',
-      createdAtMs: convertISOToDate(obj.created_at).getTime(),
-      category: null,
-      versionIndex: obj.version_index,
-      value: obj.val,
-    }))
+    res.objs.map(obj => {
+      const [entity, project] = obj.project_id.split('/');
+      return {
+        entity,
+        project,
+        opId: obj.name,
+        versionHash: obj.digest,
+        typeName: obj.type,
+        name: obj.name,
+        path: 'obj',
+        createdAtMs: convertISOToDate(obj.created_at).getTime(),
+        category: null,
+        versionIndex: obj.version_index,
+        value: obj.val,
+      };
+    })
 );
 
 const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
-  const result = useRootObjectVersions(key?.entity, key?.project, {
-    objectIds: [key?.objectId ?? ''],
-  });
+  const result = useRootObjectVersions(
+    key?.entity ?? '',
+    key?.project ?? '',
+    {
+      objectIds: [key?.objectId ?? ''],
+    },
+    undefined,
+    {
+      skip: key == null,
+    }
+  );
   return {
     loading: result.loading,
-    result: result.result?.find(
+    result: {...key, ...result.result?.find(
       obj => obj.versionHash === key?.versionHash
-    ) as ObjectVersionSchema | null,
+    ), } as ObjectVersionSchema | null,
   };
 };
 
@@ -310,8 +363,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     limit?: number,
     opts?: {skip?: boolean}
   ) => ({
-    entity,
-    project,
+    project_id: projectIdFromParts({entity, project}),
     filter: {
       object_names: filter.objectIds,
       latest_only: filter.latestOnly,
@@ -319,19 +371,23 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     },
   }),
   (res): ObjectVersionSchema[] =>
-    res.objs.map(obj => ({
-      entity: obj.entity,
-      project: obj.project,
-      objectId: obj.name,
-      versionHash: obj.digest,
-      typeName: obj.type,
-      name: obj.name,
-      path: 'obj',
-      createdAtMs: convertISOToDate(obj.created_at).getTime(),
-      category: null,
-      versionIndex: obj.version_index,
-      value: obj.val,
-    }))
+    res.objs.map(obj => {
+      const [entity, project] = obj.project_id.split('/');
+      return {
+        scheme: 'weave',
+        entity,
+        project,
+        objectId: obj.name,
+        versionHash: obj.digest,
+        typeName: obj.type,
+        name: obj.name,
+        path: 'obj',
+        createdAtMs: convertISOToDate(obj.created_at).getTime(),
+        category: null,
+        versionIndex: obj.version_index,
+        val: obj.val,
+      };
+    })
 );
 
 const useObjectOrOpVersions = makeTraceServerEndpointHook(
@@ -343,28 +399,34 @@ const useObjectOrOpVersions = makeTraceServerEndpointHook(
     limit?: number,
     opts?: {skip?: boolean}
   ) => ({
-    entity,
-    project,
+    // entity,
+    // project,
+    project_id: projectIdFromParts({entity, project}),
     filter: {
       object_names: filter.objectIds,
       latest_only: filter.latestOnly,
     },
   }),
   (res): ObjectVersionSchema[] =>
-    res.objs.map(obj => ({
-      entity: obj.entity,
-      project: obj.project,
-      objectId: obj.name,
-      versionHash: obj.digest,
-      typeName: obj.type,
-      name: obj.name,
-      path: 'obj',
-      createdAtMs: convertISOToDate(obj.created_at).getTime(),
-      category: null,
-      versionIndex: obj.version_index,
-      value: obj.val,
-    }))
+    res.objs.map(obj => {
+      const [entity, project] = obj.project_id.split('/');
+      return {
+        scheme: 'weave',
+        entity,
+        project,
+        objectId: obj.name,
+        versionHash: obj.digest,
+        typeName: obj.type,
+        name: obj.name,
+        path: 'obj',
+        createdAtMs: convertISOToDate(obj.created_at).getTime(),
+        category: null,
+        versionIndex: obj.version_index,
+        val: obj.val,
+      };
+    })
 );
+
 
 const useChildCallsForCompare = (
   entity: string,
@@ -437,7 +499,7 @@ const useChildCallsForCompare = (
 
 const applyExtra = (
   value: any,
-  refExtraTuples: {edgeType: string; edgeName: string}[]
+  refExtraTuples: Array<{edgeType: string; edgeName: string}>
 ): any => {
   const tuple0 = refExtraTuples[0];
   if (refExtraTuples.length === 0) {
@@ -456,7 +518,7 @@ const useRefsData = (
 ): Loadable<any[]> => {
   // Bad implementations! Fetches all versions of all objects in the refUris, and finds the specific
   // versions on the client-side. Also doesn't yet do ref-walking
-  const parsed = refUris.map(refStringToRefDict);
+  const parsed = useMemo(() => refUris.map(refStringToRefDict), [refUris]);
   const ref0 = parsed[0];
   const artifactNames = parsed.map(p => p.artifactName);
   const objVersionsResult = useObjectOrOpVersions(ref0.entity, ref0.project, {
@@ -469,8 +531,9 @@ const useRefsData = (
         result: parsed.map(p => {
           const rootValue = objVersionsResult.result?.find(
             o =>
-              o.versionHash === p.versionCommitHash && o.name === p.artifactName
-          )?.value;
+              o.versionHash === p.versionCommitHash &&
+              o.objectId === p.artifactName
+          )?.val;
           return applyExtra(rootValue, p.refExtraTuples);
         }),
         error: null,
@@ -494,11 +557,65 @@ const useApplyMutationsToRef = (): ((
 };
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
-  console.warn('useGetRefsType not implemented');
-  return (refUris: string[]) => {
-    return Promise.resolve([]);
+  // NOT DRY!
+  const objectOrOpVersions  = useMakeTraceServerEndpoint(
+    'objsQuery',
+    (
+      entity: string,
+      project: string,
+      filter: ObjectVersionFilter,
+      limit?: number,
+      opts?: {skip?: boolean}
+    ) => ({
+      // entity,
+      // project,
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        object_names: filter.objectIds,
+        latest_only: filter.latestOnly,
+      },
+    }),
+    (res): ObjectVersionSchema[] =>
+      res.objs.map(obj => {
+        const [entity, project] = obj.project_id.split('/');
+        return {
+          scheme: 'weave',
+          entity,
+          project,
+          objectId: obj.name,
+          versionHash: obj.digest,
+          typeName: obj.type,
+          name: obj.name,
+          path: 'obj',
+          createdAtMs: convertISOToDate(obj.created_at).getTime(),
+          category: null,
+          versionIndex: obj.version_index,
+          val: obj.val,
+        };
+      })
+  );
+  return async (refUris: string[]) => {
+    if (refUris.length === 0) {
+      return [];
+    }
+    // Bad implementations! Fetches all versions of all objects in the refUris, and finds the specific
+    // versions on the client-side. Also doesn't yet do ref-walking
+    const parsed = refUris.map(refStringToRefDict)
+    const ref0 = parsed[0];
+    const artifactNames = parsed.map(p => p.artifactName);
+    const objVersionsResult = await objectOrOpVersions(ref0.entity, ref0.project, {
+      objectIds: artifactNames,
+    });
+    const result =  parsed.map(p => {
+      const rootValue = objVersionsResult.find(
+        o =>
+          o.versionHash === p.versionCommitHash &&
+          o.objectId === p.artifactName
+      )?.val;
+      return applyExtra(rootValue, p.refExtraTuples);
+    })
+    return result.map(weaveTypeOf)
   };
-  throw new Error('Not implemented');
 };
 
 const mergeTypes = (a: Types.Type, b: Types.Type): Types.Type => {
@@ -552,6 +669,7 @@ const weaveTypeOf = (o: any): Types.Type => {
       return {
         type: o._type,
         _base_type: {type: 'Object'},
+        _is_object: true,
         ..._.mapValues(_.omit(o, ['_type']), weaveTypeOf),
       };
     } else {
@@ -645,12 +763,16 @@ const traceCallToUICallSchema = (
     callId: traceCall.id,
     traceId: traceCall.trace_id,
     parentId: traceCall.parent_id ?? null,
-    spanName: traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
-      ? refUriToOpVersionKey(traceCall.name).opId
-      : traceCall.name,
-    opVersionRef: traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
-      ? traceCall.name
-      : null,
+    spanName:
+      traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.name.startsWith(WEAVE_REF_PREFIX)
+        ? refUriToOpVersionKey(traceCall.name).opId
+        : traceCall.name,
+    opVersionRef:
+      traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.name.startsWith(WEAVE_REF_PREFIX)
+        ? traceCall.name
+        : null,
     rawSpan: traceCallToLegacySpan(traceCall),
     rawFeedback: {},
     userId: traceCall.wb_user_id ?? null,

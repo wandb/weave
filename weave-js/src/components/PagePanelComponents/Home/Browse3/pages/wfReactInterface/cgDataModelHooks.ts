@@ -393,6 +393,7 @@ const useObjectVersion = (
             typeName: dataValue.result.typeName as string,
             category: typeNameToCategory(dataValue.result.typeName as string),
             createdAtMs: dataValue.result.createdAtMs as number,
+            val: null,
           };
     if (dataValue.loading) {
       return {
@@ -463,6 +464,7 @@ const useRootObjectVersions = (
       result.forEach(obj => {
         objectVersionCache.set(
           {
+            scheme: 'wandb-artifact',
             entity,
             project,
             objectId: obj.objectId,

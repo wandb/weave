@@ -8,7 +8,7 @@ def test_save_object(clickhouse_trace_server):
     create_res = clickhouse_trace_server.obj_create(
         tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
-                entity="shawn", project="proj", name="my-obj", val={"a": 1}
+                project_id="shawn/proj", name="my-obj", val={"a": 1}
             )
         )
     )

@@ -337,9 +337,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         digest = val_digest(json_val)
 
         req_obj = req.obj
+        entity, project = req_obj.project_id.split("/")
         ch_obj = ObjCHInsertable(
-            entity=req_obj.entity,
-            project=req_obj.project,
+            entity=entity,
+            project=project,
             name=req_obj.name,
             type=get_type(req.obj.val),
             refs=[],
@@ -382,10 +383,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
-
+        print(req.project_id)
+        entity, project = req.project_id.split("/")
         objs = self._select_objs_query(
-            req.entity,
-            req.project,
+            entity,
+            project,
             conditions=conds,
         )
 
@@ -815,8 +817,9 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
 
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
-        entity=ch_obj.entity,
-        project=ch_obj.project,
+        # entity=ch_obj.entity,
+        # project=ch_obj.project,
+        project_id=f"{ch_obj.entity}/{ch_obj.project}",
         name=ch_obj.name,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
         version_index=ch_obj.version_index,

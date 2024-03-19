@@ -604,8 +604,8 @@ class GraphClientTrace(GraphClient[CallSchemaRun]):
             }
         )
         partial_obj = tsi.ObjSchemaForInsert(
-            entity=self.entity,
-            project=self.project,
+            # entity=self.entity,
+            project_id=self.entity + "/" + self.project,
             name=name,
             type_dict=weave_type.to_dict(),
             b64_file_map=encoded_path_contents,

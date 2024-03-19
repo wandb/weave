@@ -11,6 +11,7 @@ export const useRefPageUrl = () => {
     }
 
     return baseRouter.refUIUrl(objectType, {
+      scheme: ref.scheme,
       entityName: ref.entityName,
       projectName: ref.projectName,
       artifactName: ref.artifactName,
