@@ -96,11 +96,11 @@ type TraceObjQueryRes = {
 
 export type TraceRefsReadBatchReq = {
   refs: string[];
-}
+};
 
 export type TraceRefsReadBatchRes = {
   vals: any[];
-}
+};
 
 export class TraceServerClient {
   private baseUrl: string;
@@ -129,12 +129,13 @@ export class TraceServerClient {
     );
   };
 
-  readBatch: (req: TraceRefsReadBatchReq) => Promise<TraceRefsReadBatchRes> = req => {
-    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
-      "/refs/read_batch",
-      req
-    );
-  };
+  readBatch: (req: TraceRefsReadBatchReq) => Promise<TraceRefsReadBatchRes> =
+    req => {
+      return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
+        '/refs/read_batch',
+        req
+      );
+    };
 
   private makeRequest = async <QT, ST>(
     endpoint: string,

@@ -17,7 +17,6 @@ import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {
   opVersionRefOpCategory,
-  refStringToRefDict,
   refUriToOpVersionKey,
   typeNameToCategory,
 } from './utilities';
@@ -410,14 +409,11 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
 
 const useRefsReadBatch = makeTraceServerEndpointHook(
   'readBatch',
-  (
-    refs: string[],
-  ) => ({
-    refs
+  (refs: string[]) => ({
+    refs,
   }),
   (res): any[] => res.vals
 );
-
 
 const useChildCallsForCompare = (
   entity: string,
@@ -492,7 +488,7 @@ const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
-  const valsResult = useRefsReadBatch(refUris)
+  const valsResult = useRefsReadBatch(refUris);
   return useMemo(() => {
     if (refUris.length === 0) {
       return {
@@ -501,7 +497,7 @@ const useRefsData = (
         error: null,
       };
     }
-    return valsResult
+    return valsResult;
   }, [refUris.length, valsResult]);
 };
 
@@ -515,10 +511,8 @@ const useApplyMutationsToRef = (): ((
 const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
   const readBatch = useMakeTraceServerEndpoint(
     'readBatch',
-    (
-      refs: string[],
-    ) => ({
-      refs
+    (refs: string[]) => ({
+      refs,
     }),
     (res): any[] => res.vals
   );
