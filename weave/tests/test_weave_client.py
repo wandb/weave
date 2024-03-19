@@ -10,6 +10,7 @@ from weave import op_def, Evaluation
 from weave import weave_init
 from weave import weave_client
 from weave.api import client as weave_api_client
+from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, ID_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE
 from weave.trace_server import (
     clickhouse_trace_server_batched,
 )
@@ -58,7 +59,7 @@ def test_table_create(client):
         TableCreateReq(
             table=TableSchemaForInsert(
                 project_id="test/test-project",
-                rows=[{"id": 1, "val": 1}, {"id": 2, "val": 2}, {"id": 3, "val": 3}],
+                rows=[{ID_EDGE_TYPE: 1, "val": 1}, {ID_EDGE_TYPE: 2, "val": 2}, {ID_EDGE_TYPE: 3, "val": 3}],
             )
         )
     )
@@ -135,7 +136,7 @@ def test_dataset_refs(client):
         "test-project",
         "my-dataset",
         ref.ref.version,
-        ["attr", "rows", "id", RegexStringMatcher(".*"), "key", "v"],
+        [ATTRIBUTE_EDGE_TYPE, "rows", ID_EDGE_TYPE, RegexStringMatcher(".*"), KEY_EDGE_TYPE, "v"],
     )
 
     row1 = ref2_list[1]
@@ -146,7 +147,7 @@ def test_dataset_refs(client):
         "test-project",
         "my-dataset",
         ref.ref.version,
-        ["attr", "rows", "id", RegexStringMatcher(".*"), "key", "v"],
+        [ATTRIBUTE_EDGE_TYPE, "rows", ID_EDGE_TYPE, RegexStringMatcher(".*"), KEY_EDGE_TYPE, "v"],
     )
 
 
@@ -243,24 +244,24 @@ def test_mutations(client):
     dataset.cows = "moo"
     assert dataset.mutations == [
         weave_client.MutationAppend(
-            path=["attr", "rows"],
+            path=[ATTRIBUTE_EDGE_TYPE, "rows"],
             operation="append",
             args=({"doc": "zz", "label": "e"},),
         ),
         weave_client.MutationSetitem(
-            path=["attr", "rows", "id", RegexStringMatcher(".*,.*")],
+            path=[ATTRIBUTE_EDGE_TYPE, "rows", ID_EDGE_TYPE, RegexStringMatcher(".*,.*")],
             operation="setitem",
             args=("doc", "jjj"),
         ),
         weave_client.MutationSetitem(
             path=[
-                "attr",
+                ATTRIBUTE_EDGE_TYPE,
                 "rows",
-                "id",
+                ID_EDGE_TYPE,
                 RegexStringMatcher(".*,.*"),
-                "key",
+                KEY_EDGE_TYPE,
                 "somelist",
-                "index",
+                INDEX_EDGE_TYPE,
                 "0",
             ],
             operation="setitem",
@@ -366,7 +367,7 @@ def test_dataset_rows_ref(client):
     saved = client.save_nested_objects(dataset)
     assert isinstance(saved.rows.ref, weave_client.ObjectRef)
     assert saved.rows.ref.name == "Dataset"
-    assert saved.rows.ref.extra == ["attr", "rows"]
+    assert saved.rows.ref.extra == [ATTRIBUTE_EDGE_TYPE, "rows"]
 
 
 def test_evaluate(client):
@@ -432,31 +433,31 @@ def test_evaluate(client):
     example0_obj = child0.inputs["example"]
     assert example0_obj.ref.name == "Dataset"
     assert example0_obj.ref.extra == [
-        "attr",
+        ATTRIBUTE_EDGE_TYPE,
         "rows",
-        "id",
+        ID_EDGE_TYPE,
         RegexStringMatcher(".*"),
     ]
     example0_obj_input = example0_obj["input"]
     assert example0_obj_input == "1 + 2"
     assert example0_obj_input.ref.name == "Dataset"
     assert example0_obj_input.ref.extra == [
-        "attr",
+        ATTRIBUTE_EDGE_TYPE,
         "rows",
-        "id",
+        ID_EDGE_TYPE,
         RegexStringMatcher(".*"),
-        "key",
+        KEY_EDGE_TYPE,
         "input",
     ]
     example0_obj_target = example0_obj["target"]
     assert example0_obj_target == 3
     assert example0_obj_target.ref.name == "Dataset"
     assert example0_obj_target.ref.extra == [
-        "attr",
+        ATTRIBUTE_EDGE_TYPE,
         "rows",
-        "id",
+        ID_EDGE_TYPE,
         RegexStringMatcher(".*"),
-        "key",
+        KEY_EDGE_TYPE,
         "target",
     ]
 
@@ -472,9 +473,9 @@ def test_evaluate(client):
     example1_obj = child1.inputs["example"]
     assert example1_obj.ref.name == "Dataset"
     assert example1_obj.ref.extra == [
-        "attr",
+        ATTRIBUTE_EDGE_TYPE,
         "rows",
-        "id",
+        ID_EDGE_TYPE,
         RegexStringMatcher(".*"),
     ]
     # Should be a different row ref

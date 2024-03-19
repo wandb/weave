@@ -615,6 +615,9 @@ export const refUri = (ref: ObjectRef): string => {
         uri = `${uri}/${ref.artifactRefExtra}`;
       }
     }
+    if (uri.endsWith('/')) {
+      uri = uri.slice(0, -1);
+    }
     return uri;
   } else {
     return `local-artifact:///${ref.artifactName}/${ref.artifactPath}`;

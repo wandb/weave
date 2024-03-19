@@ -91,9 +91,13 @@ export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
       key.objectId
     }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
   } else if (key.scheme === WEAVE_REF_SCHEME) {
-    return `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/object/${
+    let res = `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/object/${
       key.objectId
-    }:${key.versionHash}/${key.refExtra ?? ''}`;
+    }:${key.versionHash}`
+    if (key.refExtra != null && key.refExtra !== '') {
+      res += `/${key.refExtra}`;
+    }
+  return res
   }
   throw new Error('Invalid scheme: ' + key);
 };

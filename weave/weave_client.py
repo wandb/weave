@@ -34,7 +34,7 @@ from weave.trace_server.trace_server_interface import (
     _ObjectVersionFilter,
 )
 from weave.wandb_interface import project_creator
-from weave.trace.refs import Ref, ObjectRef, TableRef, CallRef, parse_uri
+from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, ID_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE, Ref, ObjectRef, TableRef, CallRef, parse_uri
 
 
 def generate_id():
@@ -366,13 +366,13 @@ def make_trace_obj(
         # This is where extra resolution happens?
         for extra_index in range(0, len(extra), 2):
             op, arg = extra[extra_index], extra[extra_index + 1]
-            if op == "key":
+            if op == KEY_EDGE_TYPE:
                 val = val[arg]
-            elif op == "attr":
+            elif op == ATTRIBUTE_EDGE_TYPE:
                 val = getattr(val, arg)
-            elif op == "index":
+            elif op == INDEX_EDGE_TYPE:
                 val = val[int(arg)]
-            elif op == "id":
+            elif op == ID_EDGE_TYPE:
                 val = val[arg]
             else:
                 raise ValueError(f"Unknown ref type: {extra[extra_index]}")

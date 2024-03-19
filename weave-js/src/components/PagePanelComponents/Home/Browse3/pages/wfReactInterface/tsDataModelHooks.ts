@@ -408,43 +408,16 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       })
 );
 
-const useObjectOrOpVersions = makeTraceServerEndpointHook(
-  'objsQuery',
+const useRefsReadBatch = makeTraceServerEndpointHook(
+  'readBatch',
   (
-    entity: string,
-    project: string,
-    filter: ObjectVersionFilter,
-    limit?: number,
-    opts?: {skip?: boolean}
+    refs: string[],
   ) => ({
-    // entity,
-    // project,
-    project_id: projectIdFromParts({entity, project}),
-    filter: {
-      object_names: filter.objectIds,
-      latest_only: filter.latestOnly,
-    },
+    refs
   }),
-  (res): ObjectVersionSchema[] =>
-    res.objs.map(obj => {
-      const [entity, project] = obj.project_id.split('/');
-      return {
-        scheme: 'weave' as const,
-        entity,
-        project,
-        weaveKind: obj.type === 'OpDef' ? ('object' as const) : ('op' as const),
-        objectId: obj.name,
-        versionHash: obj.digest,
-        typeName: obj.type,
-        name: obj.name,
-        path: 'obj',
-        createdAtMs: convertISOToDate(obj.created_at).getTime(),
-        category: null,
-        versionIndex: obj.version_index,
-        val: obj.val,
-      };
-    })
+  (res): any[] => res.vals
 );
+
 
 const useChildCallsForCompare = (
   entity: string,
@@ -515,65 +488,12 @@ const useChildCallsForCompare = (
   return result;
 };
 
-const applyExtra = (
-  value: any,
-  refExtraTuples: Array<{edgeType: string; edgeName: string}>
-): any => {
-  const tuple0 = refExtraTuples[0];
-  if (refExtraTuples.length === 0) {
-    return value;
-  }
-  if (typeof value !== 'object') {
-    console.warn('applyExtra short term hack. Tim/Shawn to fix');
-    if (typeof value === 'string' && value.startsWith(WEAVE_REF_PREFIX)) {
-      if (!value.endsWith('/')) {
-        value += '/';
-      }
-      return (
-        value + refExtraTuples.map(t => `${t.edgeType}/${t.edgeName}`).join('/')
-      );
-    }
-    if (value == null) {
-      return null;
-    }
-    throw new Error('value is not an object');
-  }
-  if (
-    tuple0.edgeType === 'atr' ||
-    tuple0.edgeType === 'attr' ||
-    tuple0.edgeType === 'key'
-  ) {
-    return applyExtra(value?.[tuple0.edgeName], refExtraTuples.slice(1));
-  } else if (tuple0.edgeType === 'ndx' || tuple0.edgeType === 'index') {
-    return applyExtra(value?.[tuple0.edgeName], refExtraTuples.slice(1));
-  } else {
-    throw new Error(
-      'unhandled edge type ' + tuple0.edgeType + '=' + tuple0.edgeName
-    );
-  }
-};
-
 const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
-  // Bad implementations! Fetches all versions of all objects in the refUris, and finds the specific
-  // versions on the client-side. Also doesn't yet do ref-walking
-  const parsed = useMemo(() => refUris.map(refStringToRefDict), [refUris]);
-  const ref0 = parsed[0];
-  const artifactNames = parsed.map(p => p.artifactName);
-  const objVersionsResult = useObjectOrOpVersions(
-    ref0?.entity ?? '',
-    ref0?.project ?? '',
-    {
-      objectIds: artifactNames,
-    },
-    undefined,
-    {
-      skip: refUris.length === 0,
-    }
-  );
-  const result = useMemo(() => {
+  const valsResult = useRefsReadBatch(refUris)
+  return useMemo(() => {
     if (refUris.length === 0) {
       return {
         loading: false,
@@ -581,33 +501,8 @@ const useRefsData = (
         error: null,
       };
     }
-    if (!objVersionsResult.loading) {
-      return {
-        loading: false,
-        result: parsed.map(p => {
-          const rootValue = objVersionsResult.result?.find(
-            o =>
-              o.versionHash === p.versionCommitHash &&
-              o.objectId === p.artifactName
-          )?.val;
-          return applyExtra(rootValue, p.refExtraTuples);
-        }),
-        error: null,
-      };
-    } else {
-      return {
-        loading: true,
-        result: null,
-        error: null,
-      };
-    }
-  }, [
-    objVersionsResult.loading,
-    objVersionsResult.result,
-    parsed,
-    refUris.length,
-  ]);
-  return result;
+    return valsResult
+  }, [refUris.length, valsResult]);
 };
 
 const useApplyMutationsToRef = (): ((
@@ -618,69 +513,21 @@ const useApplyMutationsToRef = (): ((
 };
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
-  // NOT DRY!
-  const objectOrOpVersions = useMakeTraceServerEndpoint(
-    'objsQuery',
+  const readBatch = useMakeTraceServerEndpoint(
+    'readBatch',
     (
-      entity: string,
-      project: string,
-      filter: ObjectVersionFilter,
-      limit?: number,
-      opts?: {skip?: boolean}
+      refs: string[],
     ) => ({
-      // entity,
-      // project,
-      project_id: projectIdFromParts({entity, project}),
-      filter: {
-        object_names: filter.objectIds,
-        latest_only: filter.latestOnly,
-      },
+      refs
     }),
-    (res): ObjectVersionSchema[] =>
-      res.objs.map(obj => {
-        const [entity, project] = obj.project_id.split('/');
-        return {
-          scheme: 'weave',
-          entity,
-          project,
-          weaveKind:
-            obj.type === 'OpDef' ? ('object' as const) : ('op' as const),
-          objectId: obj.name,
-          versionHash: obj.digest,
-          typeName: obj.type,
-          name: obj.name,
-          path: 'obj',
-          createdAtMs: convertISOToDate(obj.created_at).getTime(),
-          category: null,
-          versionIndex: obj.version_index,
-          val: obj.val,
-        };
-      })
+    (res): any[] => res.vals
   );
   return async (refUris: string[]) => {
     if (refUris.length === 0) {
       return [];
     }
-    // Bad implementations! Fetches all versions of all objects in the refUris, and finds the specific
-    // versions on the client-side. Also doesn't yet do ref-walking
-    const parsed = refUris.map(refStringToRefDict);
-    const ref0 = parsed[0];
-    const artifactNames = parsed.map(p => p.artifactName);
-    const objVersionsResult = await objectOrOpVersions(
-      ref0.entity,
-      ref0.project,
-      {
-        objectIds: artifactNames,
-      }
-    );
-    const result = parsed.map(p => {
-      const rootValue = objVersionsResult.find(
-        o =>
-          o.versionHash === p.versionCommitHash && o.objectId === p.artifactName
-      )?.val;
-      return applyExtra(rootValue, p.refExtraTuples);
-    });
-    return result.map(weaveTypeOf);
+    const objVersionsResult = await readBatch(refUris);
+    return objVersionsResult.map(weaveTypeOf);
   };
 };
 

@@ -509,13 +509,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-                if op == "key":
+                if op == refs.KEY_EDGE_TYPE:
                     val = val[arg]
-                elif op == "attr":
+                elif op == refs.ATTRIBUTE_EDGE_TYPE:
                     val = val[arg]
-                elif op == "index":
+                elif op == refs.INDEX_EDGE_TYPE:
                     val = val[int(arg)]
-                elif op == "id":
+                elif op == refs.ID_EDGE_TYPE:
                     if isinstance(val, str) and val.startswith("weave://"):
                         table_ref = refs.parse_uri(val)
                         if not isinstance(table_ref, refs.TableRef):

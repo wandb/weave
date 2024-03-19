@@ -11,6 +11,7 @@ from rich import print
 from weave import box
 from weave import op_def
 from weave.chobj import custom_objs
+from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, ID_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE
 
 
 def log_ch_commands():
@@ -76,16 +77,16 @@ class ValRef(Ref):
         return u
 
     def with_key(self, key) -> "ValRef":
-        return ValRef(self.val_id, self.extra + ["key", key])
+        return ValRef(self.val_id, self.extra + [KEY_EDGE_TYPE, key])
 
     def with_attr(self, attr) -> "ValRef":
-        return ValRef(self.val_id, self.extra + ["attr", attr])
+        return ValRef(self.val_id, self.extra + [ATTRIBUTE_EDGE_TYPE, attr])
 
     def with_index(self, index) -> "ValRef":
-        return ValRef(self.val_id, self.extra + ["index", str(index)])
+        return ValRef(self.val_id, self.extra + [INDEX_EDGE_TYPE, str(index)])
 
     def with_item(self, item_id, item_version) -> "ValRef":
-        return ValRef(self.val_id, self.extra + ["id", f"{item_id},{item_version}"])
+        return ValRef(self.val_id, self.extra + [ID_EDGE_TYPE, f"{item_id},{item_version}"])
 
 
 @dataclasses.dataclass
@@ -101,17 +102,17 @@ class ObjectRef(Ref):
         return u
 
     def with_key(self, key) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + ["key", key])
+        return ObjectRef(self.name, self.val_id, self.extra + [KEY_EDGE_TYPE, key])
 
     def with_attr(self, attr) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + ["attr", attr])
+        return ObjectRef(self.name, self.val_id, self.extra + [ATTRIBUTE_EDGE_TYPE, attr])
 
     def with_index(self, index) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + ["index", str(index)])
+        return ObjectRef(self.name, self.val_id, self.extra + [INDEX_EDGE_TYPE, str(index)])
 
     def with_item(self, item_id, item_version) -> "ObjectRef":
         return ObjectRef(
-            self.name, self.val_id, self.extra + ["id", f"{item_id},{item_version}"]
+            self.name, self.val_id, self.extra + [ID_EDGE_TYPE, f"{item_id},{item_version}"]
         )
 
 
@@ -561,7 +562,7 @@ class ObjectServer:
         for i in range(0, len(mutation.path), 2):
             op, arg = mutation.path[i], mutation.path[i + 1]
             if isinstance(val, TableRef):
-                if op == "id":
+                if op == ID_EDGE_TYPE:
                     table_path = tuple(mutation.path[:i])
                     return None, (
                         table_path,
@@ -573,11 +574,11 @@ class ObjectServer:
                     )
                 else:
                     raise ValueError(f"Unknown table op: {op}")
-            if op == "attr":
+            if op == ATTRIBUTE_EDGE_TYPE:
                 val = getattr(val, arg)
-            elif op == "key":
+            elif op == KEY_EDGE_TYPE:
                 val = val[arg]
-            elif op == "index":
+            elif op == INDEX_EDGE_TYPE:
                 val = val[arg]
         if mutation.operation == "setattr":
             setattr(val, mutation.args[0], mutation.args[1])
@@ -713,21 +714,21 @@ class ObjectServer:
 
 
 def apply_path_step(val, op, arg):
-    if op == "attr":
+    if op == ATTRIBUTE_EDGE_TYPE:
         return getattr(val, arg)
-    elif op == "key":
+    elif op == KEY_EDGE_TYPE:
         return val[arg]
-    elif op == "index":
+    elif op == INDEX_EDGE_TYPE:
         return val[arg]
     raise ValueError(f"Unknown op: {op}")
 
 
 def set_path_step(val, op, arg, new_val):
-    if op == "attr":
+    if op == ATTRIBUTE_EDGE_TYPE:
         setattr(val, arg, new_val)
-    elif op == "key":
+    elif op == KEY_EDGE_TYPE:
         val[arg] = new_val
-    elif op == "index":
+    elif op == INDEX_EDGE_TYPE:
         val[arg] = new_val
     else:
         raise ValueError(f"Unknown op: {op}")
@@ -964,13 +965,13 @@ def make_trace_obj(
         # This is where extra resolution happens?
         for extra_index in range(0, len(extra), 2):
             op, arg = extra[extra_index], extra[extra_index + 1]
-            if op == "key":
+            if op == KEY_EDGE_TYPE:
                 val = val[arg]
-            elif op == "attr":
+            elif op == ATTRIBUTE_EDGE_TYPE:
                 val = getattr(val, arg)
-            elif op == "index":
+            elif op == INDEX_EDGE_TYPE:
                 val = val[int(arg)]
-            elif op == "id":
+            elif op == ID_EDGE_TYPE:
                 item_id, item_version = arg.split(",")
                 val = val[item_id]
             else:

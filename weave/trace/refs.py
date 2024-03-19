@@ -1,6 +1,11 @@
 from typing import Union
 import dataclasses
 
+KEY_EDGE_TYPE = 'key';
+INDEX_EDGE_TYPE = 'ndx';
+ATTRIBUTE_EDGE_TYPE = 'atr';
+ID_EDGE_TYPE = 'id';
+
 
 @dataclasses.dataclass
 class Ref:
@@ -13,16 +18,16 @@ class Ref:
         return self.__class__(**params)
 
     def with_key(self, key: str) -> "Ref":
-        return self.with_extra(["key", key])
+        return self.with_extra([KEY_EDGE_TYPE, key])
 
     def with_attr(self, attr: str) -> "Ref":
-        return self.with_extra(["attr", attr])
+        return self.with_extra([ATTRIBUTE_EDGE_TYPE, attr])
 
     def with_index(self, index: int) -> "Ref":
-        return self.with_extra(["index", str(index)])
+        return self.with_extra([INDEX_EDGE_TYPE, str(index)])
 
     def with_item(self, item_digest: str) -> "Ref":
-        return self.with_extra(["id", f"{item_digest}"])
+        return self.with_extra([ID_EDGE_TYPE, f"{item_digest}"])
 
 
 @dataclasses.dataclass

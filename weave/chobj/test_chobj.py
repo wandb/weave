@@ -7,6 +7,7 @@ import uuid
 import weave
 import asyncio
 from weave import op_def, Evaluation
+from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE
 
 
 class RegexStringMatcher(str):
@@ -104,7 +105,7 @@ def test_dataset_refs(client, server):
     assert chobj.get_ref(ref0_aref) == chobj.ObjectRef(
         "my-dataset2",
         ref2.ref.val_id,
-        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
+        [ATTRIBUTE_EDGE_TYPE, RegexStringMatcher(".*,.*"), KEY_EDGE_TYPE, "a_ref"],
     )
 
     row1 = ref2_list[1]
@@ -113,7 +114,7 @@ def test_dataset_refs(client, server):
     assert chobj.get_ref(ref1_aref) == chobj.ObjectRef(
         "my-dataset2",
         ref2.ref.val_id,
-        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
+        [ATTRIBUTE_EDGE_TYPE, RegexStringMatcher(".*,.*"), KEY_EDGE_TYPE, "a_ref"],
     )
 
     row2 = ref2_list[2]
@@ -122,7 +123,7 @@ def test_dataset_refs(client, server):
     assert chobj.get_ref(ref2_aref) == chobj.ObjectRef(
         "my-dataset2",
         ref2.ref.val_id,
-        ["id", RegexStringMatcher(".*,.*"), "key", "a_ref"],
+        [ATTRIBUTE_EDGE_TYPE, RegexStringMatcher(".*,.*"), KEY_EDGE_TYPE, "a_ref"],
     )
 
 
@@ -190,24 +191,24 @@ def test_mutations(client, server):
     dataset.cows = "moo"
     assert dataset.mutations == [
         chobj.MutationAppend(
-            path=["attr", "rows"],
+            path=[ATTRIBUTE_EDGE_TYPE, "rows"],
             operation="append",
             args=({"doc": "zz", "label": "e"},),
         ),
         chobj.MutationSetitem(
-            path=["attr", "rows", "id", RegexStringMatcher(".*,.*")],
+            path=[ATTRIBUTE_EDGE_TYPE, "rows", ATTRIBUTE_EDGE_TYPE, RegexStringMatcher(".*,.*")],
             operation="setitem",
             args=("doc", "jjj"),
         ),
         chobj.MutationSetitem(
             path=[
-                "attr",
+                ATTRIBUTE_EDGE_TYPE,
                 "rows",
-                "id",
+                ATTRIBUTE_EDGE_TYPE,
                 RegexStringMatcher(".*,.*"),
-                "key",
+                KEY_EDGE_TYPE,
                 "somelist",
-                "index",
+                INDEX_EDGE_TYPE,
                 "0",
             ],
             operation="setitem",

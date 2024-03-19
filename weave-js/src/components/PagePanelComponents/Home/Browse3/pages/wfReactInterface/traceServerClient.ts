@@ -94,6 +94,14 @@ type TraceObjQueryRes = {
   objs: TraceObjSchema[];
 };
 
+export type TraceRefsReadBatchReq = {
+  refs: string[];
+}
+
+export type TraceRefsReadBatchRes = {
+  vals: any[];
+}
+
 export class TraceServerClient {
   private baseUrl: string;
 
@@ -117,6 +125,13 @@ export class TraceServerClient {
   objsQuery: (req: TraceObjQueryReq) => Promise<TraceObjQueryRes> = req => {
     return this.makeRequest<TraceObjQueryReq, TraceObjQueryRes>(
       '/objs/query',
+      req
+    );
+  };
+
+  readBatch: (req: TraceRefsReadBatchReq) => Promise<TraceRefsReadBatchRes> = req => {
+    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
+      "/refs/read_batch",
       req
     );
   };
