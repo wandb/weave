@@ -34,7 +34,7 @@ from weave.trace_server.trace_server_interface import (
     _ObjectVersionFilter,
 )
 from weave.wandb_interface import project_creator
-from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, ID_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE, Ref, ObjectRef, TableRef, CallRef, parse_uri
+from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, ID_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE, Ref, ObjectRef, TableRef, CallRef, parse_uri, OpRef
 
 
 def generate_id():
@@ -601,7 +601,10 @@ class WeaveClient:
                 )
             )
         )
-        ref = ObjectRef(self.entity, self.project, name, response.version_digest)
+        if isinstance(val, op_def.OpDef):
+            ref = OpRef(self.entity, self.project, name, response.version_digest)
+        else:
+            ref = ObjectRef(self.entity, self.project, name, response.version_digest)
         # TODO: Try to put a ref onto val? Or should user code use a style like
         # save instead?
         return ref

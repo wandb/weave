@@ -15,6 +15,7 @@ from weave.trace_server import (
     clickhouse_trace_server_batched,
 )
 
+from weave.trace import refs
 from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
@@ -313,6 +314,7 @@ def test_opdef(client):
         return x + y
 
     res = add2(1, 3)
+    assert isinstance(weave_client.get_ref(add2), refs.OpRef)
     assert res == 4
     assert len(list(client.calls())) == 1
 
