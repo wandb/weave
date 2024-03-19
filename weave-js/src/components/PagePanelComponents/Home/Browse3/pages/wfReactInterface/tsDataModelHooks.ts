@@ -641,6 +641,9 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
 
 const mergeTypes = (a: Types.Type, b: Types.Type): Types.Type => {
   // TODO: this should match the python merge_types implementation.
+  if (_.isEqual(a, b)) {
+    return a;
+  }
   if (isSimpleTypeShape(a) && isSimpleTypeShape(b)) {
     if (a === b) {
       return a;
@@ -666,7 +669,7 @@ const mergeTypes = (a: Types.Type, b: Types.Type): Types.Type => {
         objectType: mergeTypes(a.objectType, b.objectType),
       };
     } else {
-      throw new Error('unhandled type merge ' + a.type + ' ' + b.type);
+      console.warn('unhandled type merge ' + a.type + ' ' + b.type)
     }
   }
   return union([a, b]);
@@ -700,6 +703,13 @@ const weaveTypeOf = (o: any): Types.Type => {
       } as any;
     }
   } else if (_.isString(o)) {
+    if (o.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
+      return {
+        type: 'WandbArtifactRef'
+      }
+    } else if (o.startsWith(WEAVE_REF_PREFIX)) {
+      return {type: 'Ref'}
+    }
     return 'string';
   } else if (_.isNumber(o)) {
     return 'number'; // TODO

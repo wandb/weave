@@ -407,6 +407,9 @@ const WeaveEditorField: FC<{
   if (isAssignableTo(refWithType.type, maybe({type: 'WandbArtifactRef'}))) {
     return <WeaveViewSmallRef refWithType={refWithType} />;
   }
+  if (isAssignableTo(refWithType.type, maybe({type: 'Ref'}))) {
+    return <WeaveViewSmallRef refWithType={refWithType} />;
+  }
   // Instead of displaying "no editor", just display the stringified value.
   // This could be risky if we have a large object, but it's fine for now.
   return (
