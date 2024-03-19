@@ -464,7 +464,6 @@ export const WeaveEditorBoolean: FC<{
   }, [curVal, query.loading, query.result]);
   const onChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      console.log('CHECKED', e.target.checked);
       setCurVal(e.target.checked);
       addEdit({path, newValue: !!e.target.checked});
     },

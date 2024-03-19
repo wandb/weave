@@ -542,21 +542,30 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactPath,
     };
   } else if (isWeaveRef) {
-    const [entityName, projectName, weaveType, artifactIdAndExtra] = splitUri;
+    const [
+      entityName,
+      projectName,
+      weaveType,
+      artifactNameAndVersion,
+      ...refExtraParts
+    ] = url.pathname.replace(/^\/+/, '').split('/');
 
     if (!['object', 'op', 'table'].includes(weaveType)) {
       throw new Error('Invalid uri: ' + ref + '. got: ' + weaveType);
     }
 
-    const [artifactId, artifactRefExtra] = artifactIdAndExtra.split('/', 2);
-    const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
+    // const [artifactId, artifactRefExtra] = artifactIdAndExtra.split('/', 2);
+    const [artifactNamePart, artifactVersion] = artifactNameAndVersion.split(
+      ':',
+      2
+    );
     return {
       scheme: 'weave',
       entityName,
       projectName,
       artifactName: artifactNamePart,
       artifactVersion,
-      artifactRefExtra,
+      artifactRefExtra: refExtraParts.join('/'),
     };
   }
   throw new Error(`Unknown protocol: ${url.protocol}`);
@@ -589,8 +598,13 @@ export const refUri = (ref: ObjectRef): string => {
     return uri;
   } else if (isWeaveObjectRef(ref)) {
     let uri = `weave:///${ref.entityName}/${ref.projectName}/object/${ref.artifactName}:${ref.artifactVersion}`;
-    if (ref.artifactRefExtra) {
-      uri = `${uri}/${ref.artifactRefExtra}`;
+    if (ref.artifactRefExtra != null && ref.artifactRefExtra !== '') {
+      if (ref.artifactRefExtra.startsWith('/')) {
+        // UGG Why does this happen???
+        uri = `${uri}${ref.artifactRefExtra}`;
+      } else {
+        uri = `${uri}/${ref.artifactRefExtra}`;
+      }
     }
     return uri;
   } else {

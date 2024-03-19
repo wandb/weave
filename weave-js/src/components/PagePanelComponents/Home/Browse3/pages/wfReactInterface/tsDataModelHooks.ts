@@ -521,7 +521,9 @@ const applyExtra = (
   if (refExtraTuples.length === 0) {
     return value;
   }
-  if (tuple0.edgeType === 'atr') {
+  if (tuple0.edgeType === 'atr' || tuple0.edgeType === 'key') {
+    return applyExtra(value?.[tuple0.edgeName], refExtraTuples.slice(1));
+  } else if (tuple0.edgeType === 'ndx') {
     return applyExtra(value?.[tuple0.edgeName], refExtraTuples.slice(1));
   } else {
     throw new Error('unhandled edge type ' + tuple0.edgeType);
