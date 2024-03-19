@@ -756,8 +756,7 @@ class WeaveClient:
 
         response = self.server.objs_query(
             ObjQueryReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self._project_id(),
                 filter=filter,
             )
         )
