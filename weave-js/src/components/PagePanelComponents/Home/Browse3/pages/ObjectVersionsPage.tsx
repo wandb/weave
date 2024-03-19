@@ -124,14 +124,15 @@ const ObjectVersionsTable: React.FC<{
   const rows: GridRowsProp = useMemo(() => {
     return props.objectVersions.map((ov, i) => {
       return {
+        ...ov,
         id: objectVersionKeyToRefUri(ov),
+        object: `${ov.objectId}:v${ov.versionIndex}`,
         obj: ov,
-        createdAt: ov.createdAtMs,
       };
     });
   }, [props.objectVersions]);
   const columns: GridColDef[] = [
-    basicField('version', 'Object', {
+    basicField('object', 'Object', {
       hideable: false,
       renderCell: cellParams => {
         // Icon to indicate navigation to the object version
@@ -147,24 +148,26 @@ const ObjectVersionsTable: React.FC<{
         );
       },
     }),
-    basicField('typeCategory', 'Category', {
+    basicField('category', 'Category', {
       width: 100,
       renderCell: cellParams => {
-        const obj: ObjectVersionSchema = cellParams.row.obj;
-        return <TypeVersionCategoryChip typeCategory={obj.category} />;
+        const category = cellParams.value;
+        return <TypeVersionCategoryChip typeCategory={category} />;
       },
     }),
-    basicField('createdAt', 'Created', {
+    basicField('createdAtMs', 'Created', {
       width: 100,
       renderCell: cellParams => {
-        const obj: ObjectVersionSchema = cellParams.row.obj;
-        return <Timestamp value={obj.createdAtMs / 1000} format="relative" />;
+        const createdAtMs = cellParams.value;
+        return <Timestamp value={createdAtMs / 1000} format="relative" />;
       },
     }),
     ...(props.usingLatestFilter
       ? [
           basicField('peerVersions', 'Versions', {
             width: 100,
+            sortable: false,
+            filterable: false,
             renderCell: cellParams => {
               const obj: ObjectVersionSchema = cellParams.row.obj;
               return <PeerVersionsLink obj={obj} />;
@@ -206,7 +209,7 @@ const ObjectVersionsTable: React.FC<{
       rows={rows}
       initialState={{
         sorting: {
-          sortModel: [{field: 'createdAt', sort: 'desc'}],
+          sortModel: [{field: 'createdAtMs', sort: 'desc'}],
         },
       }}
       columnHeaderHeight={40}
