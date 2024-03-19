@@ -524,6 +524,7 @@ const applyExtra = (
     return value;
   }
   if (typeof value !== 'object') {
+    console.warn('applyExtra short term hack. Tim/Shawn to fix');
     if (typeof value === 'string' && value.startsWith(WEAVE_REF_PREFIX)) {
       if (!value.endsWith('/')) {
         value += '/';

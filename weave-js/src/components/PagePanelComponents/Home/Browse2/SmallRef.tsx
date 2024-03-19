@@ -116,7 +116,11 @@ export const SmallRef: FC<{
     refTypeQuery.loading || refTypeQuery.result == null
       ? 'unknown'
       : refTypeQuery.result[0];
-  const rootType = getRootType(refType);
+  let rootType = getRootType(refType);
+  if (objRef.artifactName.startsWith('op-')) {
+    console.warn('SmallRef short term hack. Tim/Shawn to fix');
+    rootType = {type: 'OpDef'};
+  }
   const {label} = objectRefDisplayName(objRef, versionIndex);
 
   const rootTypeName = getTypeName(rootType);
