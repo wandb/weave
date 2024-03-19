@@ -80,8 +80,7 @@ export type OpVersionFilter = {
   latestOnly?: boolean;
 };
 
-export type ObjectVersionKey = {
-  scheme: string;
+type CommonObjectVersionKey = {
   entity: string;
   project: string;
   objectId: string;
@@ -89,6 +88,19 @@ export type ObjectVersionKey = {
   path: string;
   refExtra?: string;
 };
+
+type WandbArtifactObjectVersionKey = {
+  scheme: 'wandb-artifact';
+} & CommonObjectVersionKey;
+
+type WeaveObjectVersionKey = {
+  scheme: 'weave';
+  weaveKind: 'object' | 'table' | 'op';
+} & CommonObjectVersionKey;
+
+export type ObjectVersionKey =
+  | WandbArtifactObjectVersionKey
+  | WeaveObjectVersionKey;
 
 export type ObjectVersionSchema = ObjectVersionKey & {
   // TODO: Add more fields & FKs

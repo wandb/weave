@@ -384,9 +384,10 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       .map(obj => {
         const [entity, project] = obj.project_id.split('/');
         return {
-          scheme: 'weave',
+          scheme: 'weave' as const,
           entity,
           project,
+          weaveKind: 'object' as const,
           objectId: obj.name,
           versionHash: obj.digest,
           typeName: obj.type,
@@ -428,9 +429,10 @@ const useObjectOrOpVersions = makeTraceServerEndpointHook(
     res.objs.map(obj => {
       const [entity, project] = obj.project_id.split('/');
       return {
-        scheme: 'weave',
+        scheme: 'weave' as const,
         entity,
         project,
+        weaveKind: obj.type === 'OpDef' ? ('object' as const) : ('op' as const),
         objectId: obj.name,
         versionHash: obj.digest,
         typeName: obj.type,
@@ -530,6 +532,9 @@ const applyExtra = (
         value + refExtraTuples.map(t => `${t.edgeType}/${t.edgeName}`).join('/')
       );
     }
+    if (value == null) {
+      return null;
+    }
     throw new Error('value is not an object');
   }
   if (
@@ -595,7 +600,12 @@ const useRefsData = (
         error: null,
       };
     }
-  }, [objVersionsResult.loading, objVersionsResult.result, parsed]);
+  }, [
+    objVersionsResult.loading,
+    objVersionsResult.result,
+    parsed,
+    refUris.length,
+  ]);
   return result;
 };
 
@@ -632,6 +642,8 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
           scheme: 'weave',
           entity,
           project,
+          weaveKind:
+            obj.type === 'OpDef' ? ('object' as const) : ('op' as const),
           objectId: obj.name,
           versionHash: obj.digest,
           typeName: obj.type,

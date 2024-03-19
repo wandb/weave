@@ -477,6 +477,7 @@ export interface WeaveObjectRef {
   scheme: 'weave';
   entityName: string;
   projectName: string;
+  weaveKind: 'object' | 'op' | 'table';
   artifactName: string;
   artifactVersion: string;
   artifactRefExtra?: string;
@@ -545,24 +546,32 @@ export const parseRef = (ref: string): ObjectRef => {
     const [
       entityName,
       projectName,
-      weaveType,
+      weaveKind,
       artifactNameAndVersion,
       ...refExtraParts
     ] = url.pathname.replace(/^\/+/, '').split('/');
 
-    if (!['object', 'op', 'table'].includes(weaveType)) {
-      throw new Error('Invalid uri: ' + ref + '. got: ' + weaveType);
+    if (!['object', 'op', 'table'].includes(weaveKind)) {
+      throw new Error('Invalid uri: ' + ref + '. got: ' + weaveKind);
     }
 
     // const [artifactId, artifactRefExtra] = artifactIdAndExtra.split('/', 2);
-    const [artifactNamePart, artifactVersion] = artifactNameAndVersion.split(
+    let [artifactNamePart, artifactVersion] = artifactNameAndVersion.split(
       ':',
       2
     );
+    if (weaveKind === 'table') {
+      if (artifactVersion != null && artifactVersion !== '') {
+        throw new Error('Invalid uri: ' + ref + '. got: ' + artifactVersion);
+      }
+      artifactVersion = artifactNamePart;
+      artifactNamePart = '';
+    }
     return {
       scheme: 'weave',
       entityName,
       projectName,
+      weaveKind: weaveKind as 'object' | 'op' | 'table',
       artifactName: artifactNamePart,
       artifactVersion,
       artifactRefExtra: refExtraParts.join('/'),

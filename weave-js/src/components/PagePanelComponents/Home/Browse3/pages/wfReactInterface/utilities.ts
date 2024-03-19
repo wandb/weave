@@ -52,17 +52,37 @@ export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
 
 export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
   const refDict = refStringToRefDict(refUri);
-  return {
-    scheme: refDict.scheme,
-    entity: refDict.entity,
-    project: refDict.project,
-    objectId: refDict.artifactName,
-    versionHash: refDict.versionCommitHash,
-    path: refDict.filePathParts.join('/'),
-    refExtra: refDict.refExtraTuples
-      .map(t => `${t.edgeType}/${t.edgeName}`)
-      .join('/'),
-  };
+  if (refDict.scheme === WANDB_ARTIFACT_REF_SCHEME) {
+    return {
+      scheme: refDict.scheme,
+      entity: refDict.entity,
+      project: refDict.project,
+      objectId: refDict.artifactName,
+      versionHash: refDict.versionCommitHash,
+      path: refDict.filePathParts.join('/'),
+      refExtra: refDict.refExtraTuples
+        .map(t => `${t.edgeType}/${t.edgeName}`)
+        .join('/'),
+    };
+  } else if (refDict.scheme === WEAVE_REF_SCHEME) {
+    if (refDict.weaveKind == null) {
+      throw new Error('Invalid weaveKind: ' + refDict.weaveKind);
+    }
+    return {
+      scheme: refDict.scheme,
+      entity: refDict.entity,
+      project: refDict.project,
+      weaveKind: refDict.weaveKind,
+      objectId: refDict.artifactName,
+      versionHash: refDict.versionCommitHash,
+      path: refDict.filePathParts.join('/'),
+      refExtra: refDict.refExtraTuples
+        .map(t => `${t.edgeType}/${t.edgeName}`)
+        .join('/'),
+    };
+  } else {
+    throw new Error('Invalid scheme: ' + refDict.scheme);
+  }
 };
 
 export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
@@ -75,13 +95,14 @@ export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
       key.objectId
     }:${key.versionHash}/${key.refExtra ?? ''}`;
   }
-  throw new Error('Invalid scheme: ' + key.scheme);
+  throw new Error('Invalid scheme: ' + key);
 };
 
 type WFNaiveRefDict = {
   scheme: string;
   entity: string;
   project: string;
+  weaveKind?: 'object' | 'table' | 'op';
   artifactName: string;
   versionCommitHash: string;
   filePathParts: string[];
@@ -165,11 +186,11 @@ const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
   if (uriParts.endsWith('/')) {
     uriParts = uriParts.slice(0, -1);
   }
-  const [entity, project, weaveType, artifactNameAndVersion, ...refExtraParts] =
+  const [entity, project, weaveKind, artifactNameAndVersion, ...refExtraParts] =
     uriParts.split('/');
 
-  if (!['object', 'op', 'table'].includes(weaveType)) {
-    throw new Error('Invalid uri: ' + uri + '. got: ' + weaveType);
+  if (!['object', 'op', 'table'].includes(weaveKind)) {
+    throw new Error('Invalid uri: ' + uri + '. got: ' + weaveKind);
   }
 
   const [artifactName, versionCommitHash] = artifactNameAndVersion.split(':');
@@ -192,6 +213,7 @@ const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
     scheme,
     entity,
     project,
+    weaveKind: weaveKind as 'object' | 'table' | 'op',
     artifactName,
     versionCommitHash,
     filePathParts: [],

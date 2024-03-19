@@ -100,6 +100,7 @@ export const SmallRef: FC<{
       scheme: 'weave',
       entity: objRef.entityName,
       project: objRef.projectName,
+      weaveKind: objRef.weaveKind,
       objectId: objRef.artifactName,
       versionHash: objRef.artifactVersion,
       path: '',

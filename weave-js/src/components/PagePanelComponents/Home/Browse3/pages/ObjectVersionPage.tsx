@@ -48,6 +48,7 @@ export const ObjectVersionPage: React.FC<{
     scheme: 'weave',
     entity: props.entity,
     project: props.project,
+    weaveKind: 'object',
     objectId: props.objectName,
     versionHash: props.version,
     path: props.filePath,

@@ -143,6 +143,7 @@ const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
       scheme: 'weave',
       entity: ref.entityName,
       project: ref.projectName,
+      weaveKind: ref.weaveKind,
       objectId: ref.artifactName,
       versionHash: ref.artifactVersion,
       path: '',
