@@ -905,6 +905,13 @@ export const WeaveEditorTable: FC<{
   );
 };
 
+export const WeaveCHTable: FC<{
+  objRef: WeaveObjectRef;
+  // path: WeaveEditorPathEl[];
+}> = props => {
+  return <>TODO: Display a hot new table for {JSON.stringify(props.objRef)}</>;
+};
+
 export const WeaveViewSmallRef: FC<{
   refWithType: RefWithType;
 }> = ({refWithType}) => {
@@ -916,6 +923,9 @@ export const WeaveViewSmallRef: FC<{
   if (opDefQuery.loading) {
     return <div>loading</div>;
   } else if (opDefRef != null) {
+    if (opDefRef.scheme === 'weave' && opDefRef.weaveKind === 'table') {
+      return <WeaveCHTable objRef={opDefRef} />;
+    }
     return <SmallRef objRef={opDefRef} />;
   } else {
     return <div>invalid ref: {opDefQuery.result}</div>;
