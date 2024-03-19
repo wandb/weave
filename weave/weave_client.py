@@ -34,7 +34,18 @@ from weave.trace_server.trace_server_interface import (
     _ObjectVersionFilter,
 )
 from weave.wandb_interface import project_creator
-from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, ID_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE, Ref, ObjectRef, TableRef, CallRef, parse_uri, OpRef
+from weave.trace.refs import (
+    ATTRIBUTE_EDGE_TYPE,
+    ID_EDGE_TYPE,
+    INDEX_EDGE_TYPE,
+    KEY_EDGE_TYPE,
+    Ref,
+    ObjectRef,
+    TableRef,
+    CallRef,
+    parse_uri,
+    OpRef,
+)
 
 
 def generate_id():

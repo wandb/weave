@@ -1,10 +1,10 @@
 from typing import Union
 import dataclasses
 
-KEY_EDGE_TYPE = 'key';
-INDEX_EDGE_TYPE = 'ndx';
-ATTRIBUTE_EDGE_TYPE = 'atr';
-ID_EDGE_TYPE = 'id';
+KEY_EDGE_TYPE = "key"
+INDEX_EDGE_TYPE = "ndx"
+ATTRIBUTE_EDGE_TYPE = "atr"
+ID_EDGE_TYPE = "id"
 
 
 @dataclasses.dataclass

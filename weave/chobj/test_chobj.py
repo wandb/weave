@@ -196,7 +196,12 @@ def test_mutations(client, server):
             args=({"doc": "zz", "label": "e"},),
         ),
         chobj.MutationSetitem(
-            path=[ATTRIBUTE_EDGE_TYPE, "rows", ATTRIBUTE_EDGE_TYPE, RegexStringMatcher(".*,.*")],
+            path=[
+                ATTRIBUTE_EDGE_TYPE,
+                "rows",
+                ATTRIBUTE_EDGE_TYPE,
+                RegexStringMatcher(".*,.*"),
+            ],
             operation="setitem",
             args=("doc", "jjj"),
         ),

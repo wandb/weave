@@ -376,9 +376,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
-                    conds.append(f"is_op = 1")
+                    conds.append("is_op = 1")
                 else:
-                    conds.append(f"is_op = 0")
+                    conds.append("is_op = 0")
             if req.filter.object_names:
                 in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
                 conds.append(f"name IN ({in_list})")

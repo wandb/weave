@@ -10,7 +10,12 @@ from weave import op_def, Evaluation
 from weave import weave_init
 from weave import weave_client
 from weave.api import client as weave_api_client
-from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, ID_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE
+from weave.trace.refs import (
+    ATTRIBUTE_EDGE_TYPE,
+    ID_EDGE_TYPE,
+    INDEX_EDGE_TYPE,
+    KEY_EDGE_TYPE,
+)
 from weave.trace_server import (
     clickhouse_trace_server_batched,
 )
@@ -60,7 +65,11 @@ def test_table_create(client):
         TableCreateReq(
             table=TableSchemaForInsert(
                 project_id="test/test-project",
-                rows=[{ID_EDGE_TYPE: 1, "val": 1}, {ID_EDGE_TYPE: 2, "val": 2}, {ID_EDGE_TYPE: 3, "val": 3}],
+                rows=[
+                    {ID_EDGE_TYPE: 1, "val": 1},
+                    {ID_EDGE_TYPE: 2, "val": 2},
+                    {ID_EDGE_TYPE: 3, "val": 3},
+                ],
             )
         )
     )
@@ -137,7 +146,14 @@ def test_dataset_refs(client):
         "test-project",
         "my-dataset",
         ref.ref.version,
-        [ATTRIBUTE_EDGE_TYPE, "rows", ID_EDGE_TYPE, RegexStringMatcher(".*"), KEY_EDGE_TYPE, "v"],
+        [
+            ATTRIBUTE_EDGE_TYPE,
+            "rows",
+            ID_EDGE_TYPE,
+            RegexStringMatcher(".*"),
+            KEY_EDGE_TYPE,
+            "v",
+        ],
     )
 
     row1 = ref2_list[1]
@@ -148,7 +164,14 @@ def test_dataset_refs(client):
         "test-project",
         "my-dataset",
         ref.ref.version,
-        [ATTRIBUTE_EDGE_TYPE, "rows", ID_EDGE_TYPE, RegexStringMatcher(".*"), KEY_EDGE_TYPE, "v"],
+        [
+            ATTRIBUTE_EDGE_TYPE,
+            "rows",
+            ID_EDGE_TYPE,
+            RegexStringMatcher(".*"),
+            KEY_EDGE_TYPE,
+            "v",
+        ],
     )
 
 
@@ -250,7 +273,12 @@ def test_mutations(client):
             args=({"doc": "zz", "label": "e"},),
         ),
         weave_client.MutationSetitem(
-            path=[ATTRIBUTE_EDGE_TYPE, "rows", ID_EDGE_TYPE, RegexStringMatcher(".*,.*")],
+            path=[
+                ATTRIBUTE_EDGE_TYPE,
+                "rows",
+                ID_EDGE_TYPE,
+                RegexStringMatcher(".*,.*"),
+            ],
             operation="setitem",
             args=("doc", "jjj"),
         ),

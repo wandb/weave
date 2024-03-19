@@ -11,7 +11,12 @@ from rich import print
 from weave import box
 from weave import op_def
 from weave.chobj import custom_objs
-from weave.trace.refs import ATTRIBUTE_EDGE_TYPE, ID_EDGE_TYPE, INDEX_EDGE_TYPE, KEY_EDGE_TYPE
+from weave.trace.refs import (
+    ATTRIBUTE_EDGE_TYPE,
+    ID_EDGE_TYPE,
+    INDEX_EDGE_TYPE,
+    KEY_EDGE_TYPE,
+)
 
 
 def log_ch_commands():
@@ -86,7 +91,9 @@ class ValRef(Ref):
         return ValRef(self.val_id, self.extra + [INDEX_EDGE_TYPE, str(index)])
 
     def with_item(self, item_id, item_version) -> "ValRef":
-        return ValRef(self.val_id, self.extra + [ID_EDGE_TYPE, f"{item_id},{item_version}"])
+        return ValRef(
+            self.val_id, self.extra + [ID_EDGE_TYPE, f"{item_id},{item_version}"]
+        )
 
 
 @dataclasses.dataclass
@@ -105,14 +112,20 @@ class ObjectRef(Ref):
         return ObjectRef(self.name, self.val_id, self.extra + [KEY_EDGE_TYPE, key])
 
     def with_attr(self, attr) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + [ATTRIBUTE_EDGE_TYPE, attr])
+        return ObjectRef(
+            self.name, self.val_id, self.extra + [ATTRIBUTE_EDGE_TYPE, attr]
+        )
 
     def with_index(self, index) -> "ObjectRef":
-        return ObjectRef(self.name, self.val_id, self.extra + [INDEX_EDGE_TYPE, str(index)])
+        return ObjectRef(
+            self.name, self.val_id, self.extra + [INDEX_EDGE_TYPE, str(index)]
+        )
 
     def with_item(self, item_id, item_version) -> "ObjectRef":
         return ObjectRef(
-            self.name, self.val_id, self.extra + [ID_EDGE_TYPE, f"{item_id},{item_version}"]
+            self.name,
+            self.val_id,
+            self.extra + [ID_EDGE_TYPE, f"{item_id},{item_version}"],
         )
 
 
