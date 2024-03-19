@@ -64,7 +64,7 @@ def _local_path_and_download_url(
         return file_path, "{}/artifactsV2/{}/{}/{}/{}/{}".format(
             base_url,
             storage_region,
-
+            art_uri.entity_name,
             urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
             md5_hex,
             urllib.parse.quote(file_name),
