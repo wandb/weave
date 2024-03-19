@@ -26,12 +26,13 @@ import {
   isTypedDictLike,
   typedDictPropertyTypes,
 } from '../../../../core';
+import {useDeepMemo} from '../../../../hookUtils';
 import {parseRef} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
-import {CallLink} from '../Browse3/pages/common/Links';
+import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
@@ -168,7 +169,7 @@ export const RunsTable: FC<{
   } = useWFHooks();
   const {client} = weave;
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
-    new Set()
+    new Set<string>().add('input.example')
   );
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
@@ -186,9 +187,12 @@ export const RunsTable: FC<{
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
   }, [spans]);
-  const isSingleOp = useMemo(() => {
-    return _.uniq(spans.map(span => span.spanName)).length === 1;
+  const uniqueSpanNames = useMemo(() => {
+    return _.uniq(spans.map(span => span.spanName));
   }, [spans]);
+  const isSingleOp = useMemo(() => {
+    return uniqueSpanNames.length === 1;
+  }, [uniqueSpanNames]);
 
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
@@ -202,6 +206,23 @@ export const RunsTable: FC<{
     [spans]
   );
   const params = useParams<Browse2RootObjectVersionItemParams>();
+
+  let onlyOneOutputResult = true;
+  for (const s of spans) {
+    // get display keys
+    const keys = Object.keys(
+      _.omitBy(
+        flattenObject(s.rawSpan.output!),
+        (v, k) => v == null || (k.startsWith('_') && k !== '_result')
+      )
+    );
+    // ensure there is only one output _result
+    if (keys.length > 1 || (keys[0] && keys[0] !== '_result')) {
+      onlyOneOutputResult = false;
+      break;
+    }
+  }
+
   const tableData = useMemo(() => {
     return spans.map((call: CallSchema) => {
       const argOrder = call.rawSpan.inputs._input_order;
@@ -247,6 +268,10 @@ export const RunsTable: FC<{
             (v, k) => v == null || (k.startsWith('_') && k !== '_result')
           ),
           (v, k) => {
+            // If there is only one output _result, we don't need to nest it
+            if (onlyOneOutputResult && k === '_result') {
+              return 'output';
+            }
             return 'output.' + k;
           }
         ),
@@ -260,7 +285,7 @@ export const RunsTable: FC<{
         ),
       };
     });
-  }, [spans, loading]);
+  }, [loading, onlyOneOutputResult, spans]);
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
@@ -272,10 +297,12 @@ export const RunsTable: FC<{
           const refs = columnRefs(tableStats, col);
           const refTypes = await getRefsType(refs);
           const extraCols = getExtraColumns(refTypes);
-          setExpandedColInfo(prevState => ({
-            ...prevState,
-            [col]: extraCols,
-          }));
+          if (tableStats.rowCount !== 0) {
+            setExpandedColInfo(prevState => ({
+              ...prevState,
+              [col]: extraCols,
+            }));
+          }
         }
       }
     };
@@ -314,6 +341,14 @@ export const RunsTable: FC<{
     }
   }, [rowIds, peekId]);
 
+  // Custom logic to control path preservation preference
+  const preservePath = useMemo(() => {
+    return (
+      uniqueSpanNames.length === 1 &&
+      opNiceName(uniqueSpanNames[0]) === 'Evaluation-predict_and_score'
+    );
+  }, [uniqueSpanNames]);
+
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
@@ -334,7 +369,7 @@ export const RunsTable: FC<{
               opName={opVersionRefOpName(opVersion)}
               callId={rowParams.row.id}
               fullWidth={true}
-              preservePath
+              preservePath={preservePath}
             />
           );
         },
@@ -493,8 +528,14 @@ export const RunsTable: FC<{
       const field = 'input.' + key;
       const isExpanded = expandedRefCols.has(field);
       cols.push({
-        flex: 1,
-        minWidth: 150,
+        ...(isExpanded
+          ? {
+              width: 100,
+            }
+          : {
+              flex: 1,
+              minWidth: 150,
+            }),
         field,
         renderHeader: () => {
           const hasExpand = columnHasRefs(tableStats, field);
@@ -510,7 +551,7 @@ export const RunsTable: FC<{
         renderCell: cellParams => {
           if (field in cellParams.row) {
             const value = (cellParams.row as any)[field];
-            return <CellValue value={value} />;
+            return <CellValue value={value} isExpanded={isExpanded} />;
           }
           return <NotApplicable />;
         },
@@ -521,6 +562,7 @@ export const RunsTable: FC<{
         for (const col of expandCols) {
           const expandField = field + '.' + col;
           cols.push({
+            flex: 1,
             field: expandField,
             renderHeader: headerParams => (
               <CustomGroupedColumnHeader field={headerParams.field} />
@@ -560,55 +602,68 @@ export const RunsTable: FC<{
     colGroupingModel.push(inputGroup);
 
     // All output keys as we don't have the order key yet.
-    let outputKeys: {[key: string]: true} = {};
-    spans.forEach(span => {
-      for (const [k, v] of Object.entries(
-        flattenObject(span.rawSpan.output ?? {})
-      )) {
-        if (v != null && (!k.startsWith('_') || k === '_result')) {
-          outputKeys[k] = true;
-        }
-      }
-    });
-    // sort shallowest keys first
-    outputKeys = _.fromPairs(
-      Object.entries(outputKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
-
-    const outputOrder = Object.keys(outputKeys);
-    const outputGrouping = buildTree(outputOrder, 'output');
-    colGroupingModel.push(outputGrouping);
-    for (const key of outputOrder) {
-      const field = 'output.' + key;
-      const isExpanded = expandedRefCols.has(field);
+    if (onlyOneOutputResult) {
+      // If there is only one output _result, we don't need to do all the work on outputs
       cols.push({
         flex: 1,
         minWidth: 150,
-        field,
-        renderHeader: () => {
-          const hasExpand = columnHasRefs(tableStats, field);
-          const tail = key.split('.').slice(-1)[0];
-          return (
-            <ExpandHeader
-              headerName={isExpanded ? 'Ref' : tail}
-              field={field}
-              hasExpand={hasExpand && !isExpanded}
-              onExpand={onExpand}
-            />
-          );
-        },
+        field: 'output',
+        headerName: 'output',
         renderCell: cellParams => {
-          if (field in cellParams.row) {
-            const value = (cellParams.row as any)[field];
-            return <CellValue value={value} />;
-          }
-          return <NotApplicable />;
+          return <CellValue value={(cellParams.row as any).output} />;
         },
       });
+    } else {
+      let outputKeys: {[key: string]: true} = {};
+      spans.forEach(span => {
+        for (const [k, v] of Object.entries(
+          flattenObject(span.rawSpan.output ?? {})
+        )) {
+          if (v != null && (!k.startsWith('_') || k === '_result')) {
+            outputKeys[k] = true;
+          }
+        }
+      });
+      // sort shallowest keys first
+      outputKeys = _.fromPairs(
+        Object.entries(outputKeys).sort((a, b) => {
+          const aDepth = a[0].split('.').length;
+          const bDepth = b[0].split('.').length;
+          return aDepth - bDepth;
+        })
+      );
+
+      const outputOrder = Object.keys(outputKeys);
+      const outputGrouping = buildTree(outputOrder, 'output');
+      colGroupingModel.push(outputGrouping);
+      for (const key of outputOrder) {
+        const field = 'output.' + key;
+        const isExpanded = expandedRefCols.has(field);
+        cols.push({
+          flex: 1,
+          minWidth: 150,
+          field,
+          renderHeader: () => {
+            const hasExpand = columnHasRefs(tableStats, field);
+            const tail = key.split('.').slice(-1)[0];
+            return (
+              <ExpandHeader
+                headerName={isExpanded ? 'Ref' : tail}
+                field={field}
+                hasExpand={hasExpand && !isExpanded}
+                onExpand={onExpand}
+              />
+            );
+          },
+          renderCell: cellParams => {
+            if (field in cellParams.row) {
+              const value = (cellParams.row as any)[field];
+              return <CellValue value={value} isExpanded={isExpanded} />;
+            }
+            return <NotApplicable />;
+          },
+        });
+      }
     }
 
     let feedbackKeys: {[key: string]: true} = {};
@@ -658,15 +713,17 @@ export const RunsTable: FC<{
 
     return {cols, colGroupingModel};
   }, [
+    expandedColInfo,
+    expandedRefCols,
     ioColumnsOnly,
-    spans,
-    params.entity,
-    params.project,
     isSingleOp,
     isSingleOpVersion,
+    onlyOneOutputResult,
+    params.entity,
+    params.project,
+    preservePath,
+    spans,
     tableStats,
-    expandedRefCols,
-    expandedColInfo,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();
@@ -684,7 +741,7 @@ export const RunsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
-  const initialState: ComponentProps<typeof DataGridPro>['initialState'] =
+  const initialStateRaw: ComponentProps<typeof DataGridPro>['initialState'] =
     useMemo(() => {
       if (loading) {
         return undefined;
@@ -700,6 +757,10 @@ export const RunsTable: FC<{
       };
     }, [loading, columnVisibilityModel]);
 
+  // Various interactions (correctly) cause new data to be loaded, which causes
+  // a trickle of state updates. However, if the ultimate state is the same,
+  // we don't want to re-render the table.
+  const initialState = useDeepMemo(initialStateRaw);
   // This is a workaround.
   // initialState won't take effect if columns are not set.
   // see https://github.com/mui/mui-x/issues/6206

@@ -59,10 +59,11 @@ export const objectRefDisplayName = (
   return {label};
 };
 
-export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
-  objRef,
-  wfTable,
-}) => {
+export const SmallRef: FC<{
+  objRef: ObjectRef;
+  wfTable?: WFDBTableType;
+  iconOnly?: boolean;
+}> = ({objRef, wfTable, iconOnly = false}) => {
   const {
     useObjectVersion,
     derived: {useRefsType},
@@ -112,12 +113,25 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
           width: '22px',
           borderRadius: '16px',
           display: 'flex',
+          flex: '0 0 22px',
           justifyContent: 'center',
           alignItems: 'center',
         }}>
         <Icon name={icon} width={14} height={14} />
       </Box>
-      {label}
+      {!iconOnly && (
+        <Box
+          sx={{
+            height: '22px',
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+          }}>
+          {label}
+        </Box>
+      )}
     </Box>
   );
   if (refTypeQuery.loading) {
@@ -129,6 +143,9 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   return (
     <Link
       $variant="secondary"
+      style={{
+        width: '100%',
+      }}
       to={peekingRouter.refUIUrl(rootTypeName, objRef, wfTable)}>
       {Item}
     </Link>
