@@ -11,7 +11,12 @@ import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {CategoryChip} from './common/CategoryChip';
 import {basicField} from './common/DataTable';
-import {CallsLink, OpVersionLink, OpVersionsLink} from './common/Links';
+import {
+  CallsLink,
+  opNiceName,
+  OpVersionLink,
+  OpVersionsLink,
+} from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {HackyOpCategory} from './wfInterface/types';
@@ -93,14 +98,15 @@ export const FilterableOpVersionsTable: React.FC<{
   const rows: GridRowsProp = useMemo(() => {
     return (filteredObjectVersions.result ?? []).map((ov, i) => {
       return {
+        ...ov,
         id: opVersionKeyToRefUri(ov),
+        op: `${opNiceName(ov.opId)}:v${ov.versionIndex}`,
         obj: ov,
-        createdAt: ov.createdAtMs,
       };
     });
   }, [filteredObjectVersions.result]);
   const columns: GridColDef[] = [
-    basicField('version', 'Op', {
+    basicField('op', 'Op', {
       hideable: false,
       renderCell: cellParams => {
         // Icon to indicate navigation to the object version
@@ -119,25 +125,27 @@ export const FilterableOpVersionsTable: React.FC<{
 
     basicField('calls', 'Calls', {
       width: 100,
+      sortable: false,
+      filterable: false,
       renderCell: cellParams => {
         const obj: OpVersionSchema = cellParams.row.obj;
         return <OpCallsLink obj={obj} />;
       },
     }),
 
-    basicField('typeCategory', 'Category', {
+    basicField('category', 'Category', {
       width: 100,
       renderCell: cellParams => {
-        const obj: OpVersionSchema = cellParams.row.obj;
-        return obj.category && <CategoryChip value={obj.category} />;
+        const category = cellParams.value;
+        return category && <CategoryChip value={category} />;
       },
     }),
 
-    basicField('createdAt', 'Created', {
+    basicField('createdAtMs', 'Created', {
       width: 100,
       renderCell: cellParams => {
-        const obj: OpVersionSchema = cellParams.row.obj;
-        return <Timestamp value={obj.createdAtMs / 1000} format="relative" />;
+        const createdAtMs = cellParams.value;
+        return <Timestamp value={createdAtMs / 1000} format="relative" />;
       },
     }),
 
@@ -145,6 +153,8 @@ export const FilterableOpVersionsTable: React.FC<{
       ? [
           basicField('peerVersions', 'Versions', {
             width: 100,
+            sortable: false,
+            filterable: false,
             renderCell: cellParams => {
               const obj: OpVersionSchema = cellParams.row.obj;
               return <PeerVersionsLink obj={obj} />;
@@ -186,7 +196,7 @@ export const FilterableOpVersionsTable: React.FC<{
       rows={rows}
       initialState={{
         sorting: {
-          sortModel: [{field: 'createdAt', sort: 'desc'}],
+          sortModel: [{field: 'createdAtMs', sort: 'desc'}],
         },
       }}
       columnHeaderHeight={40}
