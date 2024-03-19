@@ -480,6 +480,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ]
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        # TODO: This reads one ref at a time, it should read them in batches
+        # where it can. Like it should group by object that we need to read.
+        # And it should also batch into table refs (like when we are reading a bunch
+        # of rows from a single Dataset)
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
