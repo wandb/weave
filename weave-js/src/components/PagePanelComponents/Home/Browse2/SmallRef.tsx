@@ -117,8 +117,8 @@ export const SmallRef: FC<{
       ? 'unknown'
       : refTypeQuery.result[0];
   let rootType = getRootType(refType);
-  if (objRef.artifactName.startsWith('op-')) {
-    console.warn('SmallRef short term hack. Tim/Shawn to fix');
+  if (objRef.scheme === 'weave' && objRef.weaveKind === 'op') {
+    // TODO: Why is this necessary? The type is coming back as `objRef`
     rootType = {type: 'OpDef'};
   }
   const {label} = objectRefDisplayName(objRef, versionIndex);
