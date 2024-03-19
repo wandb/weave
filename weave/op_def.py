@@ -613,6 +613,7 @@ class OpDef:
         client = graph_client_context.require_graph_client()
         return client.op_runs(self)
 
+    # TODO: Use Call type instead of Run
     def calls(self) -> Sequence[Run]:
         client = graph_client_context.require_graph_client()
         return client.op_calls(self)

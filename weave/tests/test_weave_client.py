@@ -353,6 +353,14 @@ def test_save_model(client):
     assert model2.predict(model2, "x") == "input is: x"
 
 
+def test_dataset_rows_ref(client):
+    dataset = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
+    saved = client.save_nested_objects(dataset)
+    assert isinstance(saved.rows.ref, weave_client.ObjectRef)
+    assert saved.rows.ref.name == "Dataset"
+    assert saved.rows.ref.extra == ["attr", "rows"]
+
+
 def test_evaluate(client):
     @weave.op()
     async def model_predict(input) -> str:
@@ -365,6 +373,7 @@ def test_evaluate(client):
         return target == prediction
 
     evaluation = Evaluation(
+        name="my-eval",
         dataset=dataset_rows,
         scorers=[score],
     )
@@ -374,6 +383,112 @@ def test_evaluate(client):
         "score": {"true_count": 1, "true_fraction": 0.5},
     }
     assert result == expected_eval_result
+
+    evaluate_calls = list(weave.as_op_def(evaluation.evaluate).calls())
+    assert len(evaluate_calls) == 1
+    eval_call = evaluate_calls[0]
+    eval_call_children = list(eval_call.children())
+    assert len(eval_call_children) == 3
+
+    # TODO: walk the whole graph and make sure all the refs and relationships
+    # are there.
+    child0 = eval_call_children[0]
+    assert child0.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
+
+    eval_obj = child0.inputs["self"]
+    eval_obj_val = eval_obj.val  # non-trace version so we don't automatically deref
+    assert eval_obj_val._class_name == "Evaluation"
+    assert eval_obj_val.name == "my-eval"
+    assert eval_obj_val.description == None
+    assert isinstance(eval_obj_val.dataset, weave_client.ObjectRef)
+    assert eval_obj.dataset._class_name == "Dataset"
+    assert len(eval_obj_val.scorers) == 1
+    assert isinstance(eval_obj_val.scorers[0], weave_client.ObjectRef)
+    assert isinstance(eval_obj.scorers[0], op_def.OpDef)
+    # WARNING: test ordering issue. Because we attach the ref to ops directly,
+    # the ref may be incorrect if we've blown away the database between tests.
+    # Running a different evaluation test before this check will cause a failure
+    # here.
+    assert isinstance(eval_obj_val.predict_and_score, weave_client.ObjectRef)
+    assert isinstance(eval_obj.predict_and_score, op_def.OpDef)
+    assert isinstance(eval_obj_val.summarize, weave_client.ObjectRef)
+    assert isinstance(eval_obj.summarize, op_def.OpDef)
+
+    model_obj = child0.inputs["model"]
+    assert isinstance(model_obj, op_def.OpDef)
+    assert (
+        weave_client.get_ref(model_obj).uri()
+        == weave_client.get_ref(model_predict).uri()
+    )
+
+    example0_obj = child0.inputs["example"]
+    assert example0_obj.ref.name == "Dataset"
+    assert example0_obj.ref.extra == [
+        "attr",
+        "rows",
+        "id",
+        RegexStringMatcher(".*"),
+    ]
+    example0_obj_input = example0_obj["input"]
+    assert example0_obj_input == "1 + 2"
+    assert example0_obj_input.ref.name == "Dataset"
+    assert example0_obj_input.ref.extra == [
+        "attr",
+        "rows",
+        "id",
+        RegexStringMatcher(".*"),
+        "key",
+        "input",
+    ]
+    example0_obj_target = example0_obj["target"]
+    assert example0_obj_target == 3
+    assert example0_obj_target.ref.name == "Dataset"
+    assert example0_obj_target.ref.extra == [
+        "attr",
+        "rows",
+        "id",
+        RegexStringMatcher(".*"),
+        "key",
+        "target",
+    ]
+
+    # second child is another predict_and_score call
+    child1 = eval_call_children[1]
+    assert child1.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
+    assert child0.inputs["self"].val == child1.inputs["self"].val
+
+    # TODO: these are not directly equal, we end up loading the same thing
+    # multiple times
+    # (these are ops)
+    assert child0.inputs["model"].name == child1.inputs["model"].name
+    example1_obj = child1.inputs["example"]
+    assert example1_obj.ref.name == "Dataset"
+    assert example1_obj.ref.extra == [
+        "attr",
+        "rows",
+        "id",
+        RegexStringMatcher(".*"),
+    ]
+    # Should be a different row ref
+    assert example1_obj.ref.extra[3] != example0_obj.ref.extra[3]
+
+
+def test_nested_ref_is_inner(client):
+    dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+
+    @weave.op()
+    async def score(target, prediction):
+        return target == prediction
+
+    evaluation = Evaluation(
+        name="my-eval",
+        dataset=dataset_rows,
+        scorers=[score],
+    )
+
+    saved = client.save_nested_objects(evaluation)
+    assert saved.dataset.ref.name == "Dataset"
+    assert saved.dataset.rows.ref.name == "Dataset"
 
 
 def test_obj_dedupe(client):

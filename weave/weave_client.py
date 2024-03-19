@@ -11,6 +11,7 @@ from weave import box
 from weave.table import Table
 from weave import urls
 from weave import op_def
+from weave import graph_client_context
 from weave import run_context
 from weave.chobj import custom_objs
 from weave.trace_server.trace_server_interface import (
@@ -171,8 +172,12 @@ class ObjectRecord:
         return f"ObjectRecord({self.__dict__})"
 
     def __eq__(self, other):
-        if other.__class__.__name__ != getattr(self, "_class_name"):
-            return False
+        if isinstance(other, ObjectRecord):
+            if self._class_name != other._class_name:
+                return False
+        else:
+            if other.__class__.__name__ != getattr(self, "_class_name"):
+                return False
         for k, v in self.__dict__.items():
             if k == "_class_name" or k == "id":
                 continue
@@ -256,8 +261,12 @@ class TraceObject(Tracable):
             return object.__getattribute__(self, __name)
         except AttributeError:
             pass
+        val_attr_val = object.__getattribute__(self.val, __name)
+        # Not ideal, what about properties?
+        if callable(val_attr_val):
+            return val_attr_val
         return make_trace_obj(
-            object.__getattribute__(self.val, __name),
+            val_attr_val,
             self.ref.with_attr(__name),
             self.server,
             self.root,
@@ -415,6 +424,13 @@ class TraceDict(Tracable, dict):
 def make_trace_obj(
     val: Any, new_ref: Ref, server: TraceServerInterface, root: Optional[Tracable]
 ):
+    if isinstance(val, Tracable):
+        # If val is a TraceTable, we want to refer to it via the outer object
+        # that it is within, rather than via the TableRef. For example we
+        # want Dataset row refs to be Dataset.rows[id] rather than table[id]
+        if isinstance(val, TraceTable):
+            val.ref = new_ref
+        return val
     # Derefence val and create the appropriate wrapper object
     extra: list[str] = []
     if isinstance(val, ObjectRef):
@@ -432,6 +448,7 @@ def make_trace_obj(
         # val = server._resolve_object(val.name, "latest")
 
     if isinstance(val, TableRef):
+        extra = val.extra
         val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
 
     if extra:
@@ -453,20 +470,25 @@ def make_trace_obj(
             if isinstance(val, TableRef):
                 val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
 
-    if isinstance(val, ObjectRecord):
-        # if val._type == "custom_obj":
-        #     return custom_objs.decode_custom_obj(val.weave_type, val.files)  # type: ignore
-        return TraceObject(val, new_ref, server, root)
-    elif isinstance(val, list):
-        return TraceList(val, new_ref, server, root)
-    elif isinstance(val, dict):
-        return TraceDict(val, new_ref, server, root)
+    if not isinstance(val, Tracable):
+        if isinstance(val, ObjectRecord):
+            return TraceObject(val, new_ref, server, root)
+        elif isinstance(val, list):
+            return TraceList(val, new_ref, server, root)
+        elif isinstance(val, dict):
+            return TraceDict(val, new_ref, server, root)
     box_val = box.box(val)
     setattr(box_val, "ref", new_ref)
     return box_val
 
 
 def get_ref(obj: Any) -> Optional[ObjectRef]:
+    if isinstance(obj, TraceTable):
+        # TODO: this path is odd. We want to use table_ref when serializing
+        # which is the direct ref to the table. But .ref on TraceTable is
+        # the "container ref", ie a ref to the root object that the TraceTable
+        # is within, with extra pointing to the table.
+        return obj.table_ref
     return getattr(obj, "ref", None)
 
 
@@ -567,6 +589,16 @@ class Call:
             raise ValueError(f"Invalid project_id: {self.project_id}")
         entity, project = project_parts
         return urls.call_path_as_peek(entity, project, self.id)
+
+    def children(self):
+        client = graph_client_context.require_graph_client()
+        if not self.id:
+            raise ValueError("Can't get children of call without ID")
+        return CallsIter(
+            client.server,
+            self.project_id,
+            _CallsFilter(parent_ids=[self.id]),
+        )
 
 
 class CallsIter:
@@ -811,6 +843,8 @@ class WeaveClient:
         self.finish_call(run, str(exception))
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
+        if isinstance(obj, Tracable):
+            return obj
         if isinstance(obj, pydantic.BaseModel):
             if hasattr(obj, "_trace_object"):
                 return obj._trace_object
@@ -837,9 +871,7 @@ class WeaveClient:
             return trace_obj
         elif isinstance(obj, Table):
             table_ref = self.save_table(obj)
-            return TraceTable(
-                table_ref, table_ref, self.server, _TableRowFilter(), None
-            )
+            return TraceTable(table_ref, None, self.server, _TableRowFilter(), None)
         elif isinstance(obj, list):
             return [self.save_nested_objects(v) for v in obj]
         elif isinstance(obj, dict):

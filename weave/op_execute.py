@@ -68,7 +68,6 @@ def print_run_link(run):
 
 
 def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
-    mon_span_inputs = {**inputs}
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode():
         parent_run = run_context.get_current_run()
@@ -77,7 +76,6 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
         #     op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
         # mon_span_inputs, refs = auto_publish(inputs)
         trackable_inputs = client.save_nested_objects(inputs)
-        trackable_inputs, refs = inputs, []
         # mon_span_inputs, refs = client.save_nested_objects(inputs), []
 
         # Memoization disabled for now.
@@ -87,7 +85,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
         # if not parent_run:
         #     print("Running ", op_def.name)
-        run = client.create_run(op_def, parent_run, trackable_inputs, refs)
+        run = client.create_call(op_def, parent_run, trackable_inputs)
         try:
             with run_context.current_run(run):
                 res = op_def.raw_resolve_fn(**trackable_inputs)
@@ -119,7 +117,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
                     # TODO: boxing enables full ref-tracking of run outputs
                     # to other run inputs, but its not working yet.
                     # output = box.box(output)
-                    client.finish_run(run, output, output_refs)
+                    client.finish_call(run, output)
                     if not parent_run:
                         print_run_link(run)
                     return output
@@ -138,7 +136,7 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
             # to other run inputs, but its not working yet.
             # output = box.box(output)
 
-            client.finish_run(run, output, output_refs)
+            client.finish_call(run, output)
             if not parent_run:
                 print_run_link(run)
             res = output
