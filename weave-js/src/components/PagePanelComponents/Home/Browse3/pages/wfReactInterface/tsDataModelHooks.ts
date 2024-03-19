@@ -521,12 +521,29 @@ const applyExtra = (
   if (refExtraTuples.length === 0) {
     return value;
   }
-  if (tuple0.edgeType === 'atr' || tuple0.edgeType === 'key') {
+  if (typeof value !== 'object') {
+    if (typeof value === 'string' && value.startsWith(WEAVE_REF_PREFIX)) {
+      if (!value.endsWith('/')) {
+        value += '/';
+      }
+      return (
+        value + refExtraTuples.map(t => `${t.edgeType}/${t.edgeName}`).join('/')
+      );
+    }
+    throw new Error('value is not an object');
+  }
+  if (
+    tuple0.edgeType === 'atr' ||
+    tuple0.edgeType === 'attr' ||
+    tuple0.edgeType === 'key'
+  ) {
     return applyExtra(value?.[tuple0.edgeName], refExtraTuples.slice(1));
-  } else if (tuple0.edgeType === 'ndx') {
+  } else if (tuple0.edgeType === 'ndx' || tuple0.edgeType === 'index') {
     return applyExtra(value?.[tuple0.edgeName], refExtraTuples.slice(1));
   } else {
-    throw new Error('unhandled edge type ' + tuple0.edgeType);
+    throw new Error(
+      'unhandled edge type ' + tuple0.edgeType + '=' + tuple0.edgeName
+    );
   }
 };
 
@@ -539,10 +556,25 @@ const useRefsData = (
   const parsed = useMemo(() => refUris.map(refStringToRefDict), [refUris]);
   const ref0 = parsed[0];
   const artifactNames = parsed.map(p => p.artifactName);
-  const objVersionsResult = useObjectOrOpVersions(ref0.entity, ref0.project, {
-    objectIds: artifactNames,
-  });
+  const objVersionsResult = useObjectOrOpVersions(
+    ref0?.entity ?? '',
+    ref0?.project ?? '',
+    {
+      objectIds: artifactNames,
+    },
+    undefined,
+    {
+      skip: refUris.length === 0,
+    }
+  );
   const result = useMemo(() => {
+    if (refUris.length === 0) {
+      return {
+        loading: false,
+        result: [],
+        error: null,
+      };
+    }
     if (!objVersionsResult.loading) {
       return {
         loading: false,
