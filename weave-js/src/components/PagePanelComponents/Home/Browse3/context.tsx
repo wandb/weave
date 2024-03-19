@@ -1,4 +1,9 @@
-import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
+import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
+  ObjectRef,
+  parseRef,
+} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {
   createContext,
@@ -71,7 +76,7 @@ type WFDBTableType =
 export const browse2Context = {
   refUIUrl: (
     rootTypeName: string,
-    objRef: ArtifactRef,
+    objRef: ObjectRef,
     wfTable?: WFDBTableType
   ) => {
     if (!isWandbArtifactRef(objRef)) {
@@ -204,10 +209,10 @@ const browse3ContextGen = (
   const browse3Context = {
     refUIUrl: (
       rootTypeName: string,
-      objRef: ArtifactRef,
+      objRef: ObjectRef,
       wfTable?: WFDBTableType
     ) => {
-      if (!isWandbArtifactRef(objRef)) {
+      if (!isWandbArtifactRef(objRef) && !isWeaveObjectRef(objRef)) {
         throw new Error('Not a wandb artifact ref: ' + JSON.stringify(objRef));
       }
       if (wfTable === 'OpVersion' || rootTypeName === 'OpDef') {
@@ -230,27 +235,41 @@ const browse3ContextGen = (
       // weave client before having landed and deployed
       // https://github.com/wandb/weave/pull/1169. Should be removed before the
       // public release.
-      if (objRef.artifactPath.endsWith('rows%2F0')) {
-        objRef.artifactPath = 'obj';
-        let newArtifactRefExtra = 'atr/rows';
-        objRef.artifactRefExtra?.split('/').forEach(part => {
-          if (isNaN(parseInt(part, 10))) {
-            newArtifactRefExtra += '/key/' + part;
-          } else {
-            newArtifactRefExtra += '/row/' + part;
-          }
-        });
-        objRef.artifactRefExtra = newArtifactRefExtra;
+      if (isWandbArtifactRef(objRef)) {
+        if (objRef.artifactPath.endsWith('rows%2F0')) {
+          objRef.artifactPath = 'obj';
+          let newArtifactRefExtra = 'atr/rows';
+          objRef.artifactRefExtra?.split('/').forEach(part => {
+            if (isNaN(parseInt(part, 10))) {
+              newArtifactRefExtra += '/key/' + part;
+            } else {
+              newArtifactRefExtra += '/row/' + part;
+            }
+          });
+          objRef.artifactRefExtra = newArtifactRefExtra;
+        }
       }
 
-      return browse3Context.objectVersionUIUrl(
-        objRef.entityName,
-        objRef.projectName,
-        objRef.artifactName,
-        objRef.artifactVersion,
-        objRef.artifactPath,
-        objRef.artifactRefExtra
-      );
+      if (isWandbArtifactRef(objRef)) {
+        return browse3Context.objectVersionUIUrl(
+          objRef.entityName,
+          objRef.projectName,
+          objRef.artifactName,
+          objRef.artifactVersion,
+          objRef.artifactPath,
+          objRef.artifactRefExtra
+        );
+      } else if (isWeaveObjectRef(objRef)) {
+        return browse3Context.objectVersionUIUrl(
+          objRef.entityName,
+          objRef.projectName,
+          objRef.artifactName,
+          objRef.artifactVersion,
+          undefined,
+          objRef.artifactRefExtra
+        );
+      }
+      throw new Error('Unknown ref type');
     },
     entityUrl: (entityName: string) => {
       return `/${entityName}`;
@@ -450,7 +469,7 @@ const browse3ContextGen = (
 type RouteType = {
   refUIUrl: (
     rootTypeName: string,
-    objRef: ArtifactRef,
+    objRef: ObjectRef,
     wfTable?: WFDBTableType
   ) => string;
   entityUrl: (entityName: string) => string;

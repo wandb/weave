@@ -23,10 +23,13 @@ import {
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
 import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
   objectRefWithExtra,
   parseRef,
   refUri,
   WandbArtifactRef,
+  WeaveObjectRef,
 } from '@wandb/weave/react';
 import React, {
   createContext,
@@ -127,7 +130,7 @@ const useWeaveEditorContextAddEdit = () => {
 
 const WeaveEditorCommit: FC<{
   objName: string;
-  rootObjectRef: WandbArtifactRef;
+  rootObjectRef: WandbArtifactRef | WeaveObjectRef;
   refWithType: RefWithType;
   edits: WeaveEditorEdit[];
   handleClose: () => void;
@@ -270,7 +273,7 @@ export const WeaveEditor: FC<{
   const rootObjectRef = useMemo(() => {
     const ref = parseRef(objectRefUri);
     ref.artifactRefExtra = undefined;
-    return ref as WandbArtifactRef;
+    return ref;
   }, [objectRefUri]);
   const [edits, setEdits] = useState<WeaveEditorEdit[]>([]);
   const addEdit = useCallback(
@@ -292,6 +295,10 @@ export const WeaveEditor: FC<{
       type: refsType.result[0]!,
     };
   }, [objectRefUri, refsType.loading, refsType.result]);
+
+  if (!isWeaveObjectRef(rootObjectRef) && !isWandbArtifactRef(rootObjectRef)) {
+    return <Alert severity="error">Invalid object ref</Alert>;
+  }
 
   return refWithType == null ? (
     <div>loading</div>

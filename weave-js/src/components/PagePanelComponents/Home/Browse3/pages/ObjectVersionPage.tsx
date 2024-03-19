@@ -44,6 +44,8 @@ export const ObjectVersionPage: React.FC<{
   const {useObjectVersion} = useWFHooks();
 
   const objectVersion = useObjectVersion({
+    // Blindly assume this is weave object?
+    scheme: 'weave',
     entity: props.entity,
     project: props.project,
     objectId: props.objectName,

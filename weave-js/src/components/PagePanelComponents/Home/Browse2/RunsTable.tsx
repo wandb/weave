@@ -27,7 +27,11 @@ import {
   typedDictPropertyTypes,
 } from '../../../../core';
 import {useDeepMemo} from '../../../../hookUtils';
-import {parseRef} from '../../../../react';
+import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
+  parseRef,
+} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
@@ -40,7 +44,10 @@ import {
   opVersionRefOpCategory,
   opVersionRefOpName,
 } from '../Browse3/pages/wfReactInterface/utilities';
-import {CallSchema} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallSchema,
+  ObjectVersionKey,
+} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {CellValue} from './CellValue';
@@ -120,17 +127,28 @@ type OpVersionIndexTextProps = {
 const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
   const {useObjectVersion} = useWFHooks();
   const ref = parseRef(opVersionRef);
-  const objVersionKey =
-    'entityName' in ref
-      ? {
-          entity: ref.entityName,
-          project: ref.projectName,
-          objectId: ref.artifactName,
-          versionHash: ref.artifactVersion,
-          path: ref.artifactPath,
-          refExtra: ref.artifactRefExtra,
-        }
-      : null;
+  let objVersionKey: ObjectVersionKey | null = null;
+  if (isWandbArtifactRef(ref)) {
+    objVersionKey = {
+      scheme: 'wandb-artifact',
+      entity: ref.entityName,
+      project: ref.projectName,
+      objectId: ref.artifactName,
+      versionHash: ref.artifactVersion,
+      path: ref.artifactPath,
+      refExtra: ref.artifactRefExtra,
+    };
+  } else if (isWeaveObjectRef(ref)) {
+    objVersionKey = {
+      scheme: 'weave',
+      entity: ref.entityName,
+      project: ref.projectName,
+      objectId: ref.artifactName,
+      versionHash: ref.artifactVersion,
+      path: '',
+      refExtra: ref.artifactRefExtra,
+    };
+  }
   const objVersion = useObjectVersion(objVersionKey);
   return objVersion.result ? (
     <span>v{objVersion.result.versionIndex}</span>

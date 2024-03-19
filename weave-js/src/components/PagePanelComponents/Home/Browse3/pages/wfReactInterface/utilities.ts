@@ -5,9 +5,17 @@
  * the context.
  */
 
-import {OP_CATEGORIES, WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import {
+  OBJECT_CATEGORIES,
+  OP_CATEGORIES,
+  WANDB_ARTIFACT_REF_PREFIX,
+  WANDB_ARTIFACT_REF_SCHEME,
+  WEAVE_REF_PREFIX,
+  WEAVE_REF_SCHEME,
+} from './constants';
 import {useWFHooks} from './context';
 import {
+  ObjectCategory,
   ObjectVersionKey,
   ObjectVersionSchema,
   OpCategory,
@@ -20,9 +28,10 @@ type RefUri = string;
 export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
   const refDict = refStringToRefDict(refUri);
   if (
-    refDict.filePathParts.length !== 1 ||
-    refDict.refExtraTuples.length !== 0 ||
-    refDict.filePathParts[0] !== 'obj'
+    refDict.scheme === WANDB_ARTIFACT_REF_PREFIX &&
+    (refDict.filePathParts.length !== 1 ||
+      refDict.refExtraTuples.length !== 0 ||
+      refDict.filePathParts[0] !== 'obj')
   ) {
     if (refDict.versionCommitHash !== '*') {
       throw new Error('Invalid refUri: ' + refUri);
@@ -37,12 +46,14 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
 };
 
 export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
-  return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
+  return `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/object/${key.opId}:${key.versionHash}`;
+  // return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
 };
 
 export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
   const refDict = refStringToRefDict(refUri);
   return {
+    scheme: refDict.scheme,
     entity: refDict.entity,
     project: refDict.project,
     objectId: refDict.artifactName,
@@ -55,12 +66,20 @@ export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
 };
 
 export const objectVersionKeyToRefUri = (key: ObjectVersionKey): RefUri => {
-  return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${
-    key.objectId
-  }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
+  if (key.scheme === WANDB_ARTIFACT_REF_SCHEME) {
+    return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${
+      key.objectId
+    }:${key.versionHash}/${key.path}${key.refExtra ? '#' + key.refExtra : ''}`;
+  } else if (key.scheme === WEAVE_REF_SCHEME) {
+    return `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/object/${
+      key.objectId
+    }:${key.versionHash}/${key.refExtra ?? ''}`;
+  }
+  throw new Error('Invalid scheme: ' + key.scheme);
 };
 
 type WFNaiveRefDict = {
+  scheme: string;
   entity: string;
   project: string;
   artifactName: string;
@@ -72,7 +91,16 @@ type WFNaiveRefDict = {
   }>;
 };
 
-const refStringToRefDict = (uri: string): WFNaiveRefDict => {
+export const refStringToRefDict = (uri: string): WFNaiveRefDict => {
+  if (uri.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
+    return wandbArtifactRefStringToRefDict(uri);
+  } else if (uri.startsWith(WEAVE_REF_PREFIX)) {
+    return weaveRefStringToRefDict(uri);
+  }
+  throw new Error('Invalid uri: ' + uri);
+};
+
+const wandbArtifactRefStringToRefDict = (uri: string): WFNaiveRefDict => {
   const scheme = WANDB_ARTIFACT_REF_PREFIX;
   if (!uri.startsWith(scheme)) {
     throw new Error('Invalid uri: ' + uri);
@@ -99,14 +127,74 @@ const refStringToRefDict = (uri: string): WFNaiveRefDict => {
     4
   );
   const [artifactName, versionCommitHash] = artifactNameAndVersion.split(':');
-  const filePathParts = filePath.split('/');
+  const filePathParts = filePath?.split('/') ?? [];
 
   return {
+    scheme,
     entity,
     project,
     artifactName,
     versionCommitHash,
     filePathParts,
+    refExtraTuples,
+  };
+};
+
+const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
+  const scheme = WEAVE_REF_PREFIX;
+  if (!uri.startsWith(scheme)) {
+    throw new Error('Invalid uri: ' + uri);
+  }
+  const uriWithoutScheme = uri.slice(scheme.length);
+  let uriParts = uriWithoutScheme;
+  // let refExtraPath = '';
+  // const refExtraTuples = [];
+  // if (uriWithoutScheme.includes('#')) {
+  //   [uriParts, refExtraPath] = uriWithoutScheme.split('#');
+  //   const refExtraParts = refExtraPath.split('/');
+  //   if (refExtraParts.length % 2 !== 0) {
+  //     throw new Error('Invalid uri: ' + uri);
+  //   }
+  //   for (let i = 0; i < refExtraParts.length; i += 2) {
+  //     refExtraTuples.push({
+  //       edgeType: refExtraParts[i],
+  //       edgeName: refExtraParts[i + 1],
+  //     });
+  //   }
+  // }
+  if (uriParts.endsWith('/')) {
+    uriParts = uriParts.slice(0, -1);
+  }
+  const [entity, project, weaveType, artifactNameAndVersion, ...refExtraParts] =
+    uriParts.split('/');
+
+  if (!['object', 'op', 'table'].includes(weaveType)) {
+    throw new Error('Invalid uri: ' + uri + '. got: ' + weaveType);
+  }
+
+  const [artifactName, versionCommitHash] = artifactNameAndVersion.split(':');
+  const refExtraTuples = [];
+
+  if (refExtraParts) {
+    // {const refExtraParts = refExtraPath.split('/');
+    if (refExtraParts.length % 2 !== 0) {
+      throw new Error('Invalid uri: ' + uri + '. got: ' + refExtraParts);
+    }
+    for (let i = 0; i < refExtraParts.length; i += 2) {
+      refExtraTuples.push({
+        edgeType: refExtraParts[i],
+        edgeName: refExtraParts[i + 1],
+      });
+    }
+  }
+
+  return {
+    scheme,
+    entity,
+    project,
+    artifactName,
+    versionCommitHash,
+    filePathParts: [],
     refExtraTuples,
   };
 };
@@ -131,6 +219,15 @@ export const opNameToCategory = (opName: string): OpCategory | null => {
   for (const category of OP_CATEGORIES) {
     if (opName.toLocaleLowerCase().includes(category)) {
       return category as OpCategory;
+    }
+  }
+  return null;
+};
+
+export const typeNameToCategory = (typeName: string): ObjectCategory | null => {
+  for (const category of OBJECT_CATEGORIES) {
+    if (typeName.toLocaleLowerCase().includes(category)) {
+      return category as ObjectCategory;
     }
   }
   return null;

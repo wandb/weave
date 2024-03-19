@@ -686,7 +686,7 @@ class WeaveClient:
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
-                    entity=self.entity, project=self.project, name=name, val=json_val
+                    project_id=self.entity + "/" + self.project, name=name, val=json_val
                 )
             )
         )
@@ -814,6 +814,8 @@ class WeaveClient:
 
     def finish_call(self, call: Call, output: Any):
         # TODO: not saving finished call yet
+        output = self.save_nested_objects(output)
+        output = map_to_refs(output)
         call.output = output
         if not isinstance(output, dict):
             output = {"_result": output}
@@ -824,7 +826,7 @@ class WeaveClient:
                         "project_id": self._project_id(),
                         "id": call.id,
                         "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
-                        "outputs": output,
+                        "outputs": to_json(output),
                         "summary": {},
                     },
                 }

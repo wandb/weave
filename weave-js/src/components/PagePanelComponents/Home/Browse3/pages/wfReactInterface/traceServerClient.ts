@@ -75,14 +75,12 @@ interface TraceObjectsFilter {
 }
 
 type TraceObjQueryReq = {
-  entity: string;
-  project: string;
+  project_id: string;
   filter?: TraceObjectsFilter;
 };
 
 export interface TraceObjSchema {
-  entity: string;
-  project: string;
+  project_id: string;
   name: string;
   created_at: string;
   digest: string;

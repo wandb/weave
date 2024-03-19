@@ -73,7 +73,6 @@ import {
   DICT_KEY_EDGE_TYPE,
   LIST_INDEX_EDGE_TYPE,
   OBJECT_ATTRIBUTE_EDGE_TYPE,
-  OBJECT_CATEGORIES,
   PROJECT_CALL_STREAM_NAME,
   TABLE_COLUMN_EDGE_TYPE,
   TABLE_ROW_EDGE_TYPE,
@@ -83,13 +82,13 @@ import {
   opNameToCategory,
   opVersionRefOpCategory,
   refUriToOpVersionKey,
+  typeNameToCategory,
 } from './utilities';
 import {
   CallFilter,
   CallKey,
   CallSchema,
   Loadable,
-  ObjectCategory,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -393,6 +392,7 @@ const useObjectVersion = (
             typeName: dataValue.result.typeName as string,
             category: typeNameToCategory(dataValue.result.typeName as string),
             createdAtMs: dataValue.result.createdAtMs as number,
+            val: null,
           };
     if (dataValue.loading) {
       return {
@@ -463,6 +463,7 @@ const useRootObjectVersions = (
       result.forEach(obj => {
         objectVersionCache.set(
           {
+            scheme: 'wandb-artifact',
             entity,
             project,
             objectId: obj.objectId,
@@ -1041,16 +1042,6 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   } else {
     throw new Error('Unknown extra type: ' + extra);
   }
-};
-
-// Helpers //
-const typeNameToCategory = (typeName: string): ObjectCategory | null => {
-  for (const category of OBJECT_CATEGORIES) {
-    if (typeName.toLocaleLowerCase().includes(category)) {
-      return category as ObjectCategory;
-    }
-  }
-  return null;
 };
 
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {

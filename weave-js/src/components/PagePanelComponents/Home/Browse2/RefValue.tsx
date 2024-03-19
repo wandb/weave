@@ -67,6 +67,7 @@ const RefValueWithExtra = ({weaveRef, attribute}: RefValueProps) => {
     return objectRefWithExtra(objRef, attribute);
   }, [attribute, objRef]);
   const refValue = useRefsData([refUri(objRefWithExtra)]);
+  console.log(objRefWithExtra, refValue);
 
   if (refValue.loading) {
     return <>loading...</>;

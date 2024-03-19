@@ -87,8 +87,7 @@ class EndedCallSchemaForInsert(BaseModel):
 
 
 class ObjSchema(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     name: str
     created_at: datetime.datetime
     digest: str
@@ -99,8 +98,7 @@ class ObjSchema(BaseModel):
 
 
 class ObjSchemaForInsert(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     name: str
     val: typing.Any
 
@@ -223,8 +221,7 @@ class _ObjectVersionFilter(BaseModel):
 
 
 class ObjQueryReq(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     filter: typing.Optional[_ObjectVersionFilter] = None
 
 

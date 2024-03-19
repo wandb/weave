@@ -1,7 +1,10 @@
 import _ from 'lodash';
 import React from 'react';
 
-import {WANDB_ARTIFACT_REF_PREFIX} from '../wfReactInterface/constants';
+import {
+  WANDB_ARTIFACT_REF_PREFIX,
+  WEAVE_REF_PREFIX,
+} from '../wfReactInterface/constants';
 
 export const isPrimitive = (val: any) => {
   return (
@@ -16,7 +19,9 @@ export const isPrimitive = (val: any) => {
 
 export const isRef = (value: any): boolean => {
   return (
-    typeof value === 'string' && value.startsWith(WANDB_ARTIFACT_REF_PREFIX)
+    typeof value === 'string' &&
+    (value.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      value.startsWith(WEAVE_REF_PREFIX))
   );
 };
 

@@ -81,6 +81,7 @@ export type OpVersionFilter = {
 };
 
 export type ObjectVersionKey = {
+  scheme: string;
   entity: string;
   project: string;
   objectId: string;
@@ -95,6 +96,7 @@ export type ObjectVersionSchema = ObjectVersionKey & {
   typeName: string;
   category: ObjectCategory | null;
   createdAtMs: number;
+  val: any;
 };
 
 export type ObjectVersionFilter = {
