@@ -18,6 +18,7 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
     TableQueryReq,
+    RefsReadBatchReq,
 )
 
 
@@ -517,6 +518,25 @@ def test_op_query(client):
     client.save_object(myop, "my-op")
     res = client.objects()
     assert len(res) == 1
+
+
+def test_refs_read_batch_noextra(client):
+    ref = client.save_object([1, 2, 3], "my-list")
+    ref2 = client.save_object({"a": [3, 4, 5]}, "my-obj")
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri(), ref2.uri()]))
+    assert len(res.vals) == 2
+    assert res.vals[0] == [1, 2, 3]
+    assert res.vals[1] == {"a": [3, 4, 5]}
+
+
+def test_refs_read_batch_with_extra(client):
+    saved = client.save([{"a": 5}, {"a": 6}], "my-list")
+    ref1 = saved[0]["a"].ref
+    ref2 = saved[1].ref
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri(), ref2.uri()]))
+    assert len(res.vals) == 2
+    assert res.vals[0] == 5
+    assert res.vals[1] == {"a": 6}
 
 
 # def test_publish_big_list(server):
