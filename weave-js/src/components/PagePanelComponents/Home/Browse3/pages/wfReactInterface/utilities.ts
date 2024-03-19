@@ -6,6 +6,7 @@
  */
 
 import {
+  OBJECT_CATEGORIES,
   OP_CATEGORIES,
   WANDB_ARTIFACT_REF_PREFIX,
   WANDB_ARTIFACT_REF_SCHEME,
@@ -14,6 +15,7 @@ import {
 } from './constants';
 import {useWFHooks} from './context';
 import {
+  ObjectCategory,
   ObjectVersionKey,
   ObjectVersionSchema,
   OpCategory,
@@ -163,23 +165,28 @@ const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
   if (uriParts.endsWith('/')) {
     uriParts = uriParts.slice(0, -1);
   }
-  const [entity, project, traceType, artifactNameAndVersion, ...refExtraParts] =
+  const [entity, project, weaveType, artifactNameAndVersion, ...refExtraParts] =
     uriParts.split('/');
+
+  if (!['object', 'op', 'table'].includes(weaveType)) {
+    throw new Error('Invalid uri: ' + uri + '. got: ' + weaveType);
+  }
+
   const [artifactName, versionCommitHash] = artifactNameAndVersion.split(':');
   const refExtraTuples = [];
 
-  if (refExtraParts)  {
-  // {const refExtraParts = refExtraPath.split('/');
-  if (refExtraParts.length % 2 !== 0) {
-    throw new Error('Invalid uri: ' + uri + ". got: " + refExtraParts)
+  if (refExtraParts) {
+    // {const refExtraParts = refExtraPath.split('/');
+    if (refExtraParts.length % 2 !== 0) {
+      throw new Error('Invalid uri: ' + uri + '. got: ' + refExtraParts);
+    }
+    for (let i = 0; i < refExtraParts.length; i += 2) {
+      refExtraTuples.push({
+        edgeType: refExtraParts[i],
+        edgeName: refExtraParts[i + 1],
+      });
+    }
   }
-  for (let i = 0; i < refExtraParts.length; i += 2) {
-    refExtraTuples.push({
-      edgeType: refExtraParts[i],
-      edgeName: refExtraParts[i + 1],
-    });
-  }}
-
 
   return {
     scheme,
@@ -212,6 +219,15 @@ export const opNameToCategory = (opName: string): OpCategory | null => {
   for (const category of OP_CATEGORIES) {
     if (opName.toLocaleLowerCase().includes(category)) {
       return category as OpCategory;
+    }
+  }
+  return null;
+};
+
+export const typeNameToCategory = (typeName: string): ObjectCategory | null => {
+  for (const category of OBJECT_CATEGORIES) {
+    if (typeName.toLocaleLowerCase().includes(category)) {
+      return category as ObjectCategory;
     }
   }
   return null;

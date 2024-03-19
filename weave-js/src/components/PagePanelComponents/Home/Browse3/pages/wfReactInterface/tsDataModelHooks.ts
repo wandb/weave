@@ -8,7 +8,6 @@ import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
-import {useTraceUpdate} from '../../../../../../common/util/hooks';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 // import {refStringToRefDict} from '../wfInterface/naive';
@@ -20,6 +19,7 @@ import {
   opVersionRefOpCategory,
   refStringToRefDict,
   refUriToOpVersionKey,
+  typeNameToCategory,
 } from './utilities';
 import {
   CallFilter,
@@ -58,7 +58,8 @@ const makeTraceServerEndpointHook = <
     ...input: Input
   ) => Parameters<traceServerClient.TraceServerClient[FN]>[0],
   postprocessFn: (
-    res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>
+    res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>,
+    ...input: Input
   ) => Output
 ) => {
   const useTraceServerRequest = (
@@ -76,9 +77,9 @@ const makeTraceServerEndpointHook = <
     useEffect(() => {
       setState({loading: true, result: null, error: null});
       const req = preprocessFn(...input);
-      client[traceServerFnName](req)
+      client[traceServerFnName](req as any)
         .then(res => {
-          const output = postprocessFn(res);
+          const output = postprocessFn(res as any, ...input);
           setState({loading: false, result: output, error: null});
         })
         .catch(err => {
@@ -90,7 +91,6 @@ const makeTraceServerEndpointHook = <
   };
   return useTraceServerRequest;
 };
-
 
 const useMakeTraceServerEndpoint = <
   FN extends keyof traceServerClient.TraceServerClient,
@@ -107,17 +107,18 @@ const useMakeTraceServerEndpoint = <
 ) => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
-  const traceServerRequest = useCallback((
-    ...input: Input
-  ): Promise<Output> => {
-      return client[traceServerFnName](preprocessFn(...input))
-        .then(res => {
-          return postprocessFn(res);
-        })
-  }, [client, postprocessFn, preprocessFn, traceServerFnName]);
+  const traceServerRequest = useCallback(
+    (...input: Input): Promise<Output> => {
+      return client[traceServerFnName](preprocessFn(...input) as any).then(
+        res => {
+          return postprocessFn(res as any);
+        }
+      );
+    },
+    [client, postprocessFn, preprocessFn, traceServerFnName]
+  );
   return traceServerRequest;
 };
-
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -348,9 +349,10 @@ const useObjectVersion = (
   );
   return {
     loading: result.loading,
-    result: {...key, ...result.result?.find(
-      obj => obj.versionHash === key?.versionHash
-    ), } as ObjectVersionSchema | null,
+    result: {
+      ...key,
+      ...result.result?.find(obj => obj.versionHash === key?.versionHash),
+    } as ObjectVersionSchema | null,
   };
 };
 
@@ -370,24 +372,39 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       is_op: false,
     },
   }),
-  (res): ObjectVersionSchema[] =>
-    res.objs.map(obj => {
-      const [entity, project] = obj.project_id.split('/');
-      return {
-        scheme: 'weave',
-        entity,
-        project,
-        objectId: obj.name,
-        versionHash: obj.digest,
-        typeName: obj.type,
-        name: obj.name,
-        path: 'obj',
-        createdAtMs: convertISOToDate(obj.created_at).getTime(),
-        category: null,
-        versionIndex: obj.version_index,
-        val: obj.val,
-      };
-    })
+  (
+    res,
+    inputEntity,
+    inputProject,
+    filter,
+    limit,
+    opts
+  ): ObjectVersionSchema[] =>
+    res.objs
+      .map(obj => {
+        const [entity, project] = obj.project_id.split('/');
+        return {
+          scheme: 'weave',
+          entity,
+          project,
+          objectId: obj.name,
+          versionHash: obj.digest,
+          typeName: obj.type,
+          name: obj.name,
+          path: 'obj',
+          createdAtMs: convertISOToDate(obj.created_at).getTime(),
+          category: null,
+          versionIndex: obj.version_index,
+          val: obj.val,
+        };
+      })
+      .filter(obj => {
+        const objCat = typeNameToCategory(obj.typeName);
+        return (
+          filter.category == null ||
+          (objCat != null && filter.category.includes(objCat))
+        );
+      })
 );
 
 const useObjectOrOpVersions = makeTraceServerEndpointHook(
@@ -426,7 +443,6 @@ const useObjectOrOpVersions = makeTraceServerEndpointHook(
       };
     })
 );
-
 
 const useChildCallsForCompare = (
   entity: string,
@@ -558,7 +574,7 @@ const useApplyMutationsToRef = (): ((
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
   // NOT DRY!
-  const objectOrOpVersions  = useMakeTraceServerEndpoint(
+  const objectOrOpVersions = useMakeTraceServerEndpoint(
     'objsQuery',
     (
       entity: string,
@@ -600,21 +616,24 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
     }
     // Bad implementations! Fetches all versions of all objects in the refUris, and finds the specific
     // versions on the client-side. Also doesn't yet do ref-walking
-    const parsed = refUris.map(refStringToRefDict)
+    const parsed = refUris.map(refStringToRefDict);
     const ref0 = parsed[0];
     const artifactNames = parsed.map(p => p.artifactName);
-    const objVersionsResult = await objectOrOpVersions(ref0.entity, ref0.project, {
-      objectIds: artifactNames,
-    });
-    const result =  parsed.map(p => {
+    const objVersionsResult = await objectOrOpVersions(
+      ref0.entity,
+      ref0.project,
+      {
+        objectIds: artifactNames,
+      }
+    );
+    const result = parsed.map(p => {
       const rootValue = objVersionsResult.find(
         o =>
-          o.versionHash === p.versionCommitHash &&
-          o.objectId === p.artifactName
+          o.versionHash === p.versionCommitHash && o.objectId === p.artifactName
       )?.val;
       return applyExtra(rootValue, p.refExtraTuples);
-    })
-    return result.map(weaveTypeOf)
+    });
+    return result.map(weaveTypeOf);
   };
 };
 
@@ -671,12 +690,12 @@ const weaveTypeOf = (o: any): Types.Type => {
         _base_type: {type: 'Object'},
         _is_object: true,
         ..._.mapValues(_.omit(o, ['_type']), weaveTypeOf),
-      };
+      } as any;
     } else {
       return {
         type: 'typedDict',
         propertyTypes: _.mapValues(o, weaveTypeOf),
-      };
+      } as any;
     }
   } else if (_.isString(o)) {
     return 'string';

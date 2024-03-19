@@ -1,5 +1,4 @@
 import {
-  ArtifactRef,
   isWandbArtifactRef,
   isWeaveObjectRef,
   ObjectRef,

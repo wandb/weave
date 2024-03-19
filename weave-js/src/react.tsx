@@ -543,6 +543,11 @@ export const parseRef = (ref: string): ObjectRef => {
     };
   } else if (isWeaveRef) {
     const [entityName, projectName, weaveType, artifactIdAndExtra] = splitUri;
+
+    if (!['object', 'op', 'table'].includes(weaveType)) {
+      throw new Error('Invalid uri: ' + ref + '. got: ' + weaveType);
+    }
+
     const [artifactId, artifactRefExtra] = artifactIdAndExtra.split('/', 2);
     const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
     return {
