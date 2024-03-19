@@ -54,6 +54,15 @@ class ObjectRef(Ref):
         return u
 
 
+@dataclasses.dataclass
+class OpRef(ObjectRef):
+    def uri(self) -> str:
+        u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.version}"
+        if self.extra:
+            u += "/" + "/".join(self.extra)
+        return u
+
+
 def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
     if not uri.startswith("weave:///"):
         raise ValueError(f"Invalid URI: {uri}")
@@ -70,6 +79,15 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(
+            entity=entity,
+            project=project,
+            name=name,
+            version=version,
+            extra=remaining[1:],
+        )
+    elif kind == "op":
+        name, version = remaining[0].split(":")
+        return OpRef(
             entity=entity,
             project=project,
             name=name,
