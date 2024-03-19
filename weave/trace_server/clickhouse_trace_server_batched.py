@@ -24,6 +24,7 @@ from .trace_server_interface_util import (
 )
 from . import trace_server_interface as tsi
 
+from weave.trace import refs
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -453,6 +454,46 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 for r in query_result.result_rows
             ],
         )
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        if len(req.refs) > 1000:
+            raise ValueError("Too many refs")
+
+        parsed_refs = [refs.parse_uri(r) for r in req.refs]
+        if any(isinstance(r, refs.TableRef) for r in parsed_refs):
+            raise ValueError("Table refs not supported")
+        parsed_refs = typing.cast(typing.List[refs.ObjectRef], parsed_refs)
+
+        def read_ref(r: refs.ObjectRef) -> typing.Any:
+            conds = [
+                f"name = '{r.name}'",
+                f"digest = '{r.version}'",
+            ]
+            objs = self._select_objs_query(
+                r.entity,
+                r.project,
+                conditions=conds,
+            )
+            if len(objs) == 0:
+                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
+            obj = objs[0]
+            val = json.loads(obj.val)
+            extra = r.extra
+            for extra_index in range(0, len(extra), 2):
+                op, arg = extra[extra_index], extra[extra_index + 1]
+                if op == "key":
+                    val = val[arg]
+                elif op == "attr":
+                    val = getattr(val, arg)
+                elif op == "index":
+                    val = val[int(arg)]
+                elif op == "id":
+                    raise ValueError("Id not supported")
+                else:
+                    raise ValueError(f"Unknown ref type: {extra[extra_index]}")
+            return val
+
+        return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_refs])
 
     # Private Methods
     def _mint_client(self) -> CHClient:

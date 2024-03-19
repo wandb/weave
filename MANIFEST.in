@@ -17,5 +17,6 @@ graft weave/flow
 graft weave/deploy
 graft weave/chobj
 graft weave/trace_server
+graft weave/trace
 global-exclude */__pycache__/*
 global-exclude *.pyc

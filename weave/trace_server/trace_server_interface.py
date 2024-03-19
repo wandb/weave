@@ -256,6 +256,14 @@ class TableQueryRes(BaseModel):
     rows: typing.List[TableRowSchema]
 
 
+class RefsReadBatchReq(BaseModel):
+    refs: typing.List[str]
+
+
+class RefsReadBatchRes(BaseModel):
+    vals: typing.List[typing.Any]
+
+
 class TraceServerInterface:
     # Call API
     @abc.abstractmethod
@@ -296,4 +304,8 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def table_query(self, req: TableQueryReq) -> TableQueryRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def refs_read(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
         raise NotImplementedError()
