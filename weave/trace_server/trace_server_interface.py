@@ -104,8 +104,7 @@ class ObjSchemaForInsert(BaseModel):
 
 
 class TableSchemaForInsert(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     rows: list[typing.Any]
 
 
@@ -248,8 +247,7 @@ class _TableRowFilter(BaseModel):
 
 
 class TableQueryReq(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     table_digest: str
     filter: typing.Optional[_TableRowFilter] = None
 
@@ -293,7 +291,9 @@ class TraceServerInterface:
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
 
     @abc.abstractmethod
-    def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    def table_create(self, req: TableCreateReq) -> TableCreateRes:
+        raise NotImplementedError()
 
     @abc.abstractmethod
-    def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
+    def table_query(self, req: TableQueryReq) -> TableQueryRes:
+        raise NotImplementedError()

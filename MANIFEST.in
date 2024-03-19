@@ -15,6 +15,7 @@ graft weave/core_types
 graft weave/weaveflow
 graft weave/flow
 graft weave/deploy
+graft weave/chobj
 graft weave/trace_server
 global-exclude */__pycache__/*
 global-exclude *.pyc

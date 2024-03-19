@@ -306,8 +306,7 @@ class TraceTable(Tracable):
         elif isinstance(key, int):
             response = self.server.table_query(
                 TableQueryReq(
-                    entity=self.table_ref.entity,
-                    project=self.table_ref.project,
+                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
                     table_digest=self.table_ref.digest,
                 )
             )
@@ -316,8 +315,7 @@ class TraceTable(Tracable):
             filter.row_digests = [key]
             response = self.server.table_query(
                 TableQueryReq(
-                    entity=self.table_ref.entity,
-                    project=self.table_ref.project,
+                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
                     table_digest=self.table_ref.digest,
                     filter=_TableRowFilter(row_digests=[key]),
                 )
@@ -332,7 +330,7 @@ class TraceTable(Tracable):
 
     def __iter__(self):
         page_index = 0
-        page_size = 10
+        page_size = 1000
         i = 0
         while True:
             # page_data = self.server.table_query(
@@ -343,9 +341,10 @@ class TraceTable(Tracable):
             # )
             response = self.server.table_query(
                 TableQueryReq(
-                    entity=self.table_ref.entity,
-                    project=self.table_ref.project,
+                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
                     table_digest=self.table_ref.digest,
+                    # TODO: must do paging or this will infinite loop
+                    # if table is larger than page_size!
                     # filter=self.filter,
                 )
             )
@@ -715,7 +714,7 @@ class WeaveClient:
         response = self.server.table_create(
             TableCreateReq(
                 table=TableSchemaForInsert(
-                    entity=self.entity, project=self.project, rows=table.rows
+                    project_id=self._project_id(), rows=table.rows
                 )
             )
         )

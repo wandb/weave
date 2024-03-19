@@ -394,15 +394,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        entity, project = req.table.project_id.split("/")
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
                 raise ValueError("All rows must be dictionaries")
             row_json = json.dumps(r)
             row_digest = val_digest(row_json)
-            insert_rows.append(
-                (req.table.entity, req.table.project, row_digest, row_json)
-            )
+            insert_rows.append((entity, project, row_digest, row_json))
 
         self.ch_client.insert(
             "table_rows",
@@ -419,13 +418,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         self.ch_client.insert(
             "tables",
-            data=[(req.table.entity, req.table.project, table_digest, row_digests)],
+            data=[(entity, project, table_digest, row_digests)],
             column_names=["entity", "project", "digest", "row_digests"],
         )
         return tsi.TableCreateRes(digest=table_digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        conds = []
+        entity, project = req.project_id.split("/")
+        conds = [f"entity = '{entity}'", f"project = '{project}'"]
         if req.filter:
             if req.filter.row_digests:
                 in_list = ", ".join([f"'{rd}'" for rd in req.filter.row_digests])
@@ -438,11 +438,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 SELECT tr.digest, tr.val
                 FROM (
                     SELECT entity, project, row_digest
-                    FROM tables 
+                    FROM tables_deduped
                     ARRAY JOIN row_digests AS row_digest
                     WHERE digest = {{table_digest:String}}
                 ) AS t
-                JOIN table_rows tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
+                JOIN table_rows_deduped tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
                 WHERE {predicate}
             """,
             parameters={"table_digest": req.table_digest},

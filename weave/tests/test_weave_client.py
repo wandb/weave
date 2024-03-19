@@ -7,6 +7,7 @@ import weave
 import asyncio
 from weave import op_def, Evaluation
 
+from weave import weave_init
 from weave import weave_client
 from weave.api import client as weave_api_client
 from weave.trace_server import (
@@ -40,22 +41,28 @@ def client() -> Generator[weave_client.WeaveClient, None, None]:
     clickhouse_trace_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
     clickhouse_trace_server.ch_client.command("DROP DATABASE IF EXISTS default")
     clickhouse_trace_server._run_migrations()
-    with weave_api_client("shawn/test-project") as client:
-        yield client
+    client = weave_client.WeaveClient("shawn", "test-project", clickhouse_trace_server)
+    inited_client = weave_init.InitializedClient(client)
+    try:
+        yield inited_client.client
+    finally:
+        inited_client.reset()
+
+    # with weave_api_client("shawn/test-project") as client:
+    #     yield client
 
 
 def test_table_create(client):
     res = client.server.table_create(
         TableCreateReq(
             table=TableSchemaForInsert(
-                entity="test",
-                project="test-project",
+                project_id="test/test-project",
                 rows=[{"id": 1, "val": 1}, {"id": 2, "val": 2}, {"id": 3, "val": 3}],
             )
         )
     )
     result = client.server.table_query(
-        TableQueryReq(entity="test", project="test-project", table_digest=res.digest)
+        TableQueryReq(project_id="test/test-project", table_digest=res.digest)
     )
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2

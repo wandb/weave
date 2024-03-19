@@ -45,6 +45,15 @@ CREATE TABLE table_rows
 ENGINE = MergeTree() 
 ORDER BY (entity, project, digest);
 
+CREATE VIEW table_rows_deduped AS
+SELECT *
+FROM (
+    SELECT *,
+           row_number() OVER (PARTITION BY entity, project, digest) AS rn
+    FROM table_rows
+) WHERE rn = 1
+ORDER BY entity, project, digest;
+
 CREATE TABLE tables
 (
     entity String,
@@ -54,3 +63,12 @@ CREATE TABLE tables
 ) 
 ENGINE = MergeTree() 
 ORDER BY (entity, project, digest);
+
+CREATE VIEW tables_deduped AS
+SELECT *
+FROM (
+    SELECT *,
+           row_number() OVER (PARTITION BY entity, project, digest) AS rn
+    FROM tables
+) WHERE rn = 1
+ORDER BY entity, project, digest;
