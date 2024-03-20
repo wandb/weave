@@ -15,6 +15,7 @@ import React, {FC, useCallback, useMemo} from 'react';
 
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
+import {isEvaluateOp} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
@@ -63,7 +64,7 @@ export const CallsPage: FC<{
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
       const niceName = opNiceName(opName);
-      if (niceName === 'Evaluation-evaluate') {
+      if (isEvaluateOp(niceName)) {
         // Very special case for now
         if (filter.isPivot) {
           return 'Evaluation Leaderboard';
@@ -215,10 +216,7 @@ export const CallsTable: FC<{
     );
     // Super restrictive for now - just showing pivot when
     // there is only one span name and it is the evaluation.
-    return (
-      shownSpanNames.length === 1 &&
-      shownSpanNames[0].includes('Evaluation-evaluate')
-    );
+    return shownSpanNames.length === 1 && isEvaluateOp(shownSpanNames[0]);
   }, [calls.result]);
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;

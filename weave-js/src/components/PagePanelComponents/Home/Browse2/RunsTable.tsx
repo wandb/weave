@@ -36,6 +36,7 @@ import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
+import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
 import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
@@ -364,7 +365,7 @@ export const RunsTable: FC<{
   const preservePath = useMemo(() => {
     return (
       uniqueSpanNames.length === 1 &&
-      opNiceName(uniqueSpanNames[0]) === 'Evaluation-predict_and_score'
+      isPredictAndScoreOp(opNiceName(uniqueSpanNames[0]))
     );
   }, [uniqueSpanNames]);
 
