@@ -1,10 +1,10 @@
-import {PivotTableChart} from '@mui/icons-material';
+// import {PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
   Chip,
   FormControl,
-  IconButton,
+  // IconButton,
   ListItem,
   ListItemButton,
   ListItemText,
@@ -176,20 +176,21 @@ export const CallsTable: FC<{
   const traceRootOptions = [true, false];
 
   const userEnabledPivot = effectiveFilter.isPivot ?? false;
-  const setUserEnabledPivot = useCallback(
-    (enabled: boolean) => {
-      setFilter({
-        ...filter,
-        isPivot: enabled,
-        // Reset the pivot dims when disabling pivot
-        pivotSpec:
-          filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
-            ? undefined
-            : filter.pivotSpec,
-      });
-    },
-    [filter, setFilter]
-  );
+  // TODO: Decide if we want to expose pivot or remove.
+  // const setUserEnabledPivot = useCallback(
+  //   (enabled: boolean) => {
+  //     setFilter({
+  //       ...filter,
+  //       isPivot: enabled,
+  //       // Reset the pivot dims when disabling pivot
+  //       pivotSpec:
+  //         filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
+  //           ? undefined
+  //           : filter.pivotSpec,
+  //     });
+  //   },
+  //   [filter, setFilter]
+  // );
   const setPivotDims = useCallback(
     (spec: Partial<WFHighLevelPivotSpec>) => {
       if (
@@ -261,7 +262,7 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <>
-          <IconButton
+          {/* <IconButton
             style={{width: '37px', height: '37px'}}
             size="small"
             color={userEnabledPivot ? 'primary' : 'default'}
@@ -270,7 +271,7 @@ export const CallsTable: FC<{
               setUserEnabledPivot(!userEnabledPivot);
             }}>
             <PivotTableChart />
-          </IconButton>
+          </IconButton> */}
 
           <ListItem sx={{width: '190px', flex: '0 0 190px'}}>
             <FormControl fullWidth>
@@ -310,7 +311,7 @@ export const CallsTable: FC<{
                   isPivoting ||
                   Object.keys(props.frozenFilter ?? {}).includes('opVersions')
                 }
-                value={opVersion ? opVersionRef : null}
+                value={opVersionRef}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
