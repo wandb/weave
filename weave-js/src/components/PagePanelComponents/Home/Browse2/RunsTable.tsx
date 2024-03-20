@@ -162,13 +162,15 @@ const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
   ) : null;
 };
 
-type ExtraColumns = Record<string, {label: string; path: string}[]>;
+type ExtraColumns = Record<string, Array<{label: string; path: string}>>;
 
 const isExpandableType = (type: Type): boolean => {
   return isObjectTypeLike(type) || isTypedDictLike(type);
 };
 
-const getExtraColumns = (result: Type[]): {label: string; path: string}[] => {
+const getExtraColumns = (
+  result: Type[]
+): Array<{label: string; path: string}> => {
   const cols: {[label: string]: string} = {};
   for (const refInfo of result) {
     if (isObjectTypeLike(refInfo)) {

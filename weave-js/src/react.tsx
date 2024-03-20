@@ -585,7 +585,7 @@ export const objectRefWithExtra = (
   extra: string
 ): ObjectRef => {
   let newExtra = '';
-  if (objRef.artifactRefExtra != null) {
+  if (objRef.artifactRefExtra != null && objRef.artifactRefExtra !== '') {
     newExtra = objRef.artifactRefExtra + '/';
   }
   newExtra += extra;
