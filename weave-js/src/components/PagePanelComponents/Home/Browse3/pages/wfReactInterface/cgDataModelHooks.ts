@@ -1044,6 +1044,15 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   }
 };
 
+const useFileContent = (
+  entity: string,
+  project: string,
+  digest: string,
+  opts?: {skip?: boolean}
+): Loadable<string> => {
+  throw new Error('Not implemented');
+};
+
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
@@ -1053,5 +1062,6 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
+  useFileContent,
   derived: {useChildCallsForCompare, useGetRefsType, useRefsType},
 };

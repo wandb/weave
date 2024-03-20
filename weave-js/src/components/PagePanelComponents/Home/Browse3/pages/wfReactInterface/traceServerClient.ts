@@ -119,6 +119,15 @@ export type TraceTableQueryRes = {
   }>;
 };
 
+export type TraceFileContentReadReq = {
+  project_id: string;
+  digest: string;
+};
+
+export type TraceFileContentReadRes = {
+  content: string;
+};
+
 const DEFAULT_BATCH_INTERVAL = 150;
 
 export class TraceServerClient {
@@ -178,6 +187,15 @@ export class TraceServerClient {
         req
       );
     };
+
+  fileContent: (
+    req: TraceFileContentReadReq
+  ) => Promise<TraceFileContentReadRes> = req => {
+    return this.makeRequest<TraceFileContentReadReq, TraceFileContentReadRes>(
+      '/files/content',
+      req
+    );
+  };
 
   private makeRequest = async <QT, ST>(
     endpoint: string,

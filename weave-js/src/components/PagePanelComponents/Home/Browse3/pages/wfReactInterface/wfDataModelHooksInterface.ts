@@ -185,6 +185,12 @@ export type WFDataModelHooksInterface = {
   // Derived are under a subkey because they are not directly from the data model
   // and the logic should be pushed into the core APIs. This is a temporary solution
   // during the transition period.
+  useFileContent: (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<string>;
   derived: {
     useChildCallsForCompare: (
       entity: string,

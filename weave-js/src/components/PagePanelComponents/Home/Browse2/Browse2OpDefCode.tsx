@@ -1,6 +1,7 @@
 import Editor from '@monaco-editor/react';
 import React, {FC, useMemo} from 'react';
 
+import {isWeaveObjectRef, parseRef} from '../../../../react';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 
 export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
@@ -12,21 +13,36 @@ export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
   // const opPyContentsQuery = useNodeValue(opPyContents);
   // const text = opPyContentsQuery.loading ? '' : opPyContentsQuery.result;
 
-  const {useRefsData} = useWFHooks();
+  const {useRefsData, useFileContent} = useWFHooks();
   const query = useRefsData([uri]);
-  const text = useMemo(() => {
+  const fileSpec = useMemo(() => {
     if (query.result == null) {
-      return '';
+      return null;
     }
-    const b64obj = query.result[0].files['obj.py'];
-    return atob(b64obj);
-  }, [query]);
+    const result = query.result[0];
+    const ref = parseRef(uri);
+    if (isWeaveObjectRef(ref)) {
+      return {
+        digest: result.files['obj.py'],
+        entity: ref.entityName,
+        project: ref.projectName,
+      };
+    }
+    return null;
+  }, [query.result, uri]);
+  const text = useFileContent(
+    fileSpec?.entity ?? '',
+    fileSpec?.project ?? '',
+    fileSpec?.digest ?? '',
+    {skip: fileSpec == null}
+  );
+
   return (
     <Editor
       height={'100%'}
       defaultLanguage="python"
       loading={query.loading}
-      value={text}
+      value={text.result ?? ''}
       options={{
         readOnly: true,
         minimap: {enabled: false},

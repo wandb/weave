@@ -340,6 +340,23 @@ const useOpVersions = makeTraceServerEndpointHook(
     })
 );
 
+const useFileContent = makeTraceServerEndpointHook(
+  'fileContent',
+  (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => ({
+    params: {
+      project_id: projectIdFromParts({entity, project}),
+      digest,
+    },
+    skip: opts?.skip,
+  }),
+  res => res.content
+);
+
 const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
@@ -884,6 +901,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
+  useFileContent,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,
