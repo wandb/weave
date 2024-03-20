@@ -40,21 +40,9 @@ def main():
         doc = open(os.path.join("example_data", example_id + ".txt")).read()
         dataset_rows.append({"id": example_id, "doc": doc, "target": label})
 
-    @weave.op()
-    def score(target: dict, prediction: dict) -> dict:
-        result = {}
-        for class_name in ["name", "shares"]:
-            class_label = target.get(class_name)
-            result[class_name] = {
-                "correct": class_label == prediction.get(class_name),
-                "negative": class_label is None,
-            }
-        return result
-
     eval = weave.Evaluation(
         dataset=dataset_rows,
-        scorers=[score],
-        # scorers=[MulticlassF1Score(class_names=["name", "shares"])],
+        scorers=[MulticlassF1Score(class_names=["name", "shares"])],
     )
 
     model = TextExtractModel(
