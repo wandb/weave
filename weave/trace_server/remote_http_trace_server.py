@@ -5,6 +5,7 @@ import requests
 from weave.trace_server import environment as wf_env
 
 
+from weave.wandb_interface import project_creator
 from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
 
@@ -34,6 +35,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: t.Optional[t.Tuple[str, str]] = None
+
+    def ensure_project_exists(self, entity: str, project: str) -> None:
+        # TODO: This should happen in the wandb backend, not here, and its slow
+        # (hundres of ms)
+        project_creator.ensure_project_exists(entity, project)
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
