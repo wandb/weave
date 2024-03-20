@@ -19,6 +19,7 @@ from weave.trace.refs import (
 from weave.trace_server import (
     clickhouse_trace_server_batched,
 )
+from weave.trace_server import clickhouse_trace_server_batched, sqlite_trace_server
 
 from weave.trace import refs
 from weave.trace_server.trace_server_interface import (
@@ -41,15 +42,19 @@ class RegexStringMatcher(str):
 
 @pytest.fixture
 def client() -> Generator[weave_client.WeaveClient, None, None]:
-    clickhouse_trace_server = (
-        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
+    server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
+        use_async_insert=False
     )
-    clickhouse_trace_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-    clickhouse_trace_server.ch_client.command("DROP DATABASE IF EXISTS default")
-    clickhouse_trace_server._run_migrations()
-    client = weave_client.WeaveClient("shawn", "test-project", clickhouse_trace_server)
+    server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+    server.ch_client.command("DROP DATABASE IF EXISTS default")
+    server._run_migrations()
+
+    # Uncomment to test against sqlite
+    # server = sqlite_trace_server.SqliteTraceServer("weave.db")
+    # server.drop_tables()
+    # server.setup_tables()
+
+    client = weave_client.WeaveClient("shawn", "test-project", server)
     inited_client = weave_init.InitializedClient(client)
     try:
         yield inited_client.client
