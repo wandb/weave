@@ -490,7 +490,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     ) -> tsi.TableRowSchema:
         # Now get the rows
         self.cursor.execute(
-            f"""
+            """
             SELECT digest, val FROM table_rows
             WHERE entity = ? AND project = ? AND digest = ?
             """,
