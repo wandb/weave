@@ -557,12 +557,12 @@ def history_metrics(
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
-    entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"][
-        "entity"
-    ]["name"]
-    project_name = artifactVersion["artifactSequence"]["defaultArtifactType"][
-        "project"
-    ]["name"]
+    entity_name = ""
+    project_name = ""
+    if "project" in artifactVersion["artifactSequence"]["defaultArtifactType"]:
+        entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"]["entity"]["name"]
+        project_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"]["name"]
+
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
     commit_hash = artifactVersion["commitHash"]
