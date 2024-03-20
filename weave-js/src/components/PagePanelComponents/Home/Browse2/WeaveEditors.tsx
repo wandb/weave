@@ -613,7 +613,12 @@ export const WeaveEditorTypedDict: FC<{
               </Typography>
             </Grid>,
             <Grid item key={key + '-value'} xs={singleRow ? 10 : 12}>
-              <Box ml={singleRow ? 0 : 2}>
+              <Box
+                ml={singleRow ? 0 : 2}
+                style={{
+                  width: '100%',
+                  overflow: 'hidden',
+                }}>
                 <WeaveEditorField
                   refWithType={{
                     refUri: refUri(
@@ -691,12 +696,26 @@ export const WeaveEditorObject: FC<{
           if (singleRow) {
             return [
               <div key={key + '-key'}>{label}</div>,
-              <div key={key + '-value'}>{value}</div>,
+              <div
+                key={key + '-value'}
+                style={{
+                  width: '100%',
+                  overflow: 'hidden',
+                }}>
+                {value}
+              </div>,
             ];
           }
           return [
             <Row key={key + '-key'}>{label}</Row>,
-            <Row key={key + '-value'}>{value}</Row>,
+            <Row
+              key={key + '-value'}
+              style={{
+                width: '100%',
+                overflow: 'hidden',
+              }}>
+              {value}
+            </Row>,
           ];
         })}
     </Table>
