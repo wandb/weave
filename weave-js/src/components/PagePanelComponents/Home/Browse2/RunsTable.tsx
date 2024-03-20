@@ -24,6 +24,7 @@ import {useWeaveContext} from '../../../../context';
 import {
   isObjectTypeLike,
   isTypedDictLike,
+  Type,
   typedDictPropertyTypes,
 } from '../../../../core';
 import {useDeepMemo} from '../../../../hookUtils';
@@ -40,6 +41,10 @@ import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
 import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
+import {
+  DICT_KEY_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+} from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {
   opVersionRefOpCategory,
@@ -157,22 +162,48 @@ const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
   ) : null;
 };
 
-type ExtraColumns = Record<string, string[]>;
+type ExtraColumns = Record<string, {label: string; path: string}[]>;
 
-const getExtraColumns = (result: any): string[] => {
-  const cols: Set<string> = new Set();
+const isExpandableType = (type: Type): boolean => {
+  return isObjectTypeLike(type) || isTypedDictLike(type);
+};
+
+const getExtraColumns = (result: Type[]): {label: string; path: string}[] => {
+  const cols: {[label: string]: string} = {};
   for (const refInfo of result) {
     if (isObjectTypeLike(refInfo)) {
       const keys = Object.keys(refInfo).filter(
         k => k !== 'type' && !k.startsWith('_')
       );
-      keys.forEach(k => cols.add(k));
+      keys.forEach(k => {
+        const innerType = (refInfo as any)[k] as Type;
+        if (isExpandableType(innerType)) {
+          const subKeys = getExtraColumns([innerType]);
+          subKeys.forEach(sk => {
+            cols[k + '.' + sk.label] =
+              k + `/${OBJECT_ATTRIBUTE_EDGE_TYPE}/` + sk.path;
+          });
+        } else {
+          cols[k] = k;
+        }
+      });
     } else if (isTypedDictLike(refInfo)) {
-      const keys = Object.keys(typedDictPropertyTypes(refInfo));
-      keys.forEach(k => cols.add(k));
+      const propTypes = typedDictPropertyTypes(refInfo);
+      const keys = Object.keys(propTypes);
+      keys.forEach(k => {
+        const innerType = propTypes[k] as Type;
+        if (isExpandableType(innerType)) {
+          const subKeys = getExtraColumns([innerType]);
+          subKeys.forEach(sk => {
+            cols[k + '.' + sk.label] = k + `/${DICT_KEY_EDGE_TYPE}/` + sk.path;
+          });
+        } else {
+          cols[k] = k;
+        }
+      });
     }
   }
-  return Array.from(cols);
+  return Object.entries(cols).map(([label, path]) => ({label, path}));
 };
 
 export const RunsTable: FC<{
@@ -317,6 +348,7 @@ export const RunsTable: FC<{
           const refs = columnRefs(tableStats, col);
           const refTypes = await getRefsType(refs);
           const extraCols = getExtraColumns(refTypes);
+          console.log('extraCols', extraCols);
           if (tableStats.rowCount !== 0) {
             setExpandedColInfo(prevState => ({
               ...prevState,
@@ -580,13 +612,19 @@ export const RunsTable: FC<{
         const inputGroupChildren = [{field}];
         const expandCols = expandedColInfo[field] ?? [];
         for (const col of expandCols) {
-          const expandField = field + '.' + col;
+          const expandField = field + '.' + col.label;
           cols.push({
             flex: 1,
             field: expandField,
-            renderHeader: headerParams => (
-              <CustomGroupedColumnHeader field={headerParams.field} />
-            ),
+            renderHeader: headerParams => {
+              return (
+                <CustomGroupedColumnHeader
+                  field={headerParams.field}
+                  // TODO: after merging object store stuff - re-write expansion logic. This should be grouped.
+                  titleOverride={col.label}
+                />
+              );
+            },
             renderCell: cellParams => {
               const weaveRef = (cellParams.row as any)[field];
               if (weaveRef === undefined) {
@@ -594,7 +632,7 @@ export const RunsTable: FC<{
               }
               return (
                 <ErrorBoundary>
-                  <RefValue weaveRef={weaveRef} attribute={col} />
+                  <RefValue weaveRef={weaveRef} attribute={col.path} />
                 </ErrorBoundary>
               );
             },
