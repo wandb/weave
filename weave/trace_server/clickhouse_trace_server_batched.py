@@ -548,6 +548,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     if index >= len(val):
                         return None
                     val = val[index]
+                elif op == refs.ID_EDGE_TYPE:
                     if isinstance(val, str) and val.startswith("weave://"):
                         table_ref = refs.parse_uri(val)
                         if not isinstance(table_ref, refs.TableRef):

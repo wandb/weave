@@ -350,7 +350,6 @@ export const RunsTable: FC<{
           const refs = columnRefs(tableStats, col);
           const refTypes = await getRefsType(refs);
           const extraCols = getExtraColumns(refTypes);
-          console.log('extraCols', extraCols);
           if (tableStats.rowCount !== 0) {
             setExpandedColInfo(prevState => ({
               ...prevState,
