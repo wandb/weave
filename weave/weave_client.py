@@ -9,7 +9,8 @@ from weave import box
 from weave.table import Table
 from weave import urls
 from weave import op_def
-from weave.trace.object_record import ObjectRecord
+from weave.trace.object_record import ObjectRecord, pydantic_object_record
+from weave.trace.serialize import to_json, from_json
 from weave import graph_client_context
 from weave.chobj import custom_objs
 from weave.trace_server.trace_server_interface import (
@@ -59,10 +60,6 @@ def dataclasses_asdict_one_level(obj):
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
 
 
-def pydantic_asdict_one_level(obj: pydantic.BaseModel):
-    return {k: getattr(obj, k) for k in obj.model_fields}
-
-
 # TODO: unused
 
 
@@ -93,72 +90,14 @@ def map_to_refs(obj: Any) -> Any:
     if ref:
         return ref
     if isinstance(obj, ObjectRecord):
-        return ObjectRecord(
-            {k: map_to_refs(v) for k, v in obj.__dict__.items()},
-        )
+        return obj.map_values(map_to_refs)
     if isinstance(obj, pydantic.BaseModel):
-        return ObjectRecord(
-            {
-                "_class_name": obj.__class__.__name__,
-                **{
-                    k: map_to_refs(v) for k, v in pydantic_asdict_one_level(obj).items()
-                },
-                **{
-                    k: map_to_refs(v)
-                    for k, v in inspect.getmembers(
-                        obj, lambda x: isinstance(x, op_def.OpDef)
-                    )
-                    if isinstance(v, op_def.OpDef)
-                },
-            },
-        )
+        obj_record = pydantic_object_record(obj)
+        return obj_record.map_values(map_to_refs)
     elif isinstance(obj, list):
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
-
-    return obj
-
-
-def to_json(obj: Any) -> Any:
-    # if isinstance(obj, uuid.UUID):
-    #     return {"_type": "UUID", "uuid": obj.hex}
-    if isinstance(obj, TableRef):
-        return obj.uri()
-    elif isinstance(obj, ObjectRef):
-        return obj.uri()
-    elif isinstance(obj, ObjectRecord):
-        res = {"_type": obj._class_name}
-        for k, v in obj.__dict__.items():
-            res[k] = to_json(v)
-        return res
-    elif isinstance(obj, list):
-        return [to_json(v) for v in obj]
-    elif isinstance(obj, dict):
-        return {k: to_json(v) for k, v in obj.items()}
-
-    if isinstance(obj, (int, float, str, bool, box.BoxedNone)) or obj is None:
-        return obj
-
-    return custom_objs.encode_custom_obj(obj)
-
-
-def from_json(obj: Any) -> Any:
-    if isinstance(obj, list):
-        return [from_json(v) for v in obj]
-    elif isinstance(obj, dict):
-        val_type = obj.get("_type")
-        if val_type is not None:
-            del obj["_type"]
-            if val_type == "ObjectRecord":
-                return ObjectRecord({k: from_json(v) for k, v in obj.items()})
-            elif val_type == "CustomWeaveType":
-                return custom_objs.decode_custom_obj(obj["weave_type"], obj["files"])
-            else:
-                return ObjectRecord({k: from_json(v) for k, v in obj.items()})
-        return {k: from_json(v) for k, v in obj.items()}
-    elif isinstance(obj, str) and obj.startswith("weave://"):
-        return parse_uri(obj)
 
     return obj
 
@@ -448,22 +387,7 @@ class WeaveClient:
         if isinstance(obj, pydantic.BaseModel):
             if hasattr(obj, "_trace_object"):
                 return obj._trace_object
-            obj_rec = ObjectRecord(
-                {
-                    "_class_name": obj.__class__.__name__,
-                    **{
-                        k: self.save_nested_objects(v)
-                        for k, v in pydantic_asdict_one_level(obj).items()
-                    },
-                    **{
-                        k: self.save_nested_objects(v)
-                        for k, v in inspect.getmembers(
-                            obj, lambda x: isinstance(x, op_def.OpDef)
-                        )
-                        if isinstance(v, op_def.OpDef)
-                    },
-                },
-            )
+            obj_rec = pydantic_object_record(obj).map_values(self.save_nested_objects)
             ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
             # return make_trace_obj(obj_rec, ref, client.server, None)
             trace_obj = make_trace_obj(obj_rec, ref, self.server, None)
