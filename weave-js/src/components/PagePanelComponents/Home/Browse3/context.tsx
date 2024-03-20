@@ -326,13 +326,13 @@ const browse3ContextGen = (
       filePath?: string,
       refExtra?: string
     ) => {
-      const path = filePath ? `?path=${encodeURIComponent(filePath)}` : '';
-      const extra =
-        path && refExtra ? `&extra=${encodeURIComponent(refExtra)}` : '';
+      const path = filePath ? `path=${encodeURIComponent(filePath)}` : '';
+      const extra = refExtra ? `extra=${encodeURIComponent(refExtra)}` : '';
+
       return `${projectRoot(
         entityName,
         projectName
-      )}/objects/${objectName}/versions/${objectVersionHash}${path}${extra}`;
+      )}/objects/${objectName}/versions/${objectVersionHash}?${path}&${extra}`;
     },
     opVersionsUIUrl: (
       entityName: string,
