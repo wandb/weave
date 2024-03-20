@@ -355,13 +355,13 @@ const useObjectVersion = (
       skip: key == null,
     }
   );
-  return {
+  return useMemo(() => ({
     loading: result.loading,
     result: {
       ...key,
       ...result.result?.find(obj => obj.versionHash === key?.versionHash),
     } as ObjectVersionSchema | null,
-  };
+  }), [key, result.loading, result.result]);
 };
 
 const useRootObjectVersions = makeTraceServerEndpointHook(
