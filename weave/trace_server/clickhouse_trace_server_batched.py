@@ -509,6 +509,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
+
+                # Recursively resolve refs
+                if isinstance(val, str) and val.startswith("weave://"):
+                    parsed_ref = refs.parse_uri(val)
+                    if isinstance(parsed_ref, refs.ObjectRef):
+                        val = read_ref(parsed_ref)
+
                 if op == refs.KEY_EDGE_TYPE:
                     val = val[arg]
                 elif op == refs.ATTRIBUTE_EDGE_TYPE:

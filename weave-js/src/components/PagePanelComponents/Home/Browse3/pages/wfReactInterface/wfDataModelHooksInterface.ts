@@ -119,7 +119,7 @@ export type ObjectVersionFilter = {
 };
 
 export type TableQuery = {
-  columns: string[];
+  columns?: string[];
   limit?: number;
 };
 

@@ -102,6 +102,21 @@ export type TraceRefsReadBatchRes = {
   vals: any[];
 };
 
+export type TraceTableQueryReq = {
+  project_id: string;
+  table_digest: string;
+  filter?: {
+    row_digests?: string[];
+  };
+};
+
+export type TraceTableQueryRes = {
+  rows: Array<{
+    digest: string;
+    val: any;
+  }>;
+};
+
 export class TraceServerClient {
   private baseUrl: string;
 
@@ -133,6 +148,14 @@ export class TraceServerClient {
     req => {
       return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
         '/refs/read_batch',
+        req
+      );
+    };
+
+  tableQuery: (req: TraceTableQueryReq) => Promise<TraceTableQueryRes> =
+    req => {
+      return this.makeRequest<TraceTableQueryReq, TraceTableQueryRes>(
+        '/table/query',
         req
       );
     };

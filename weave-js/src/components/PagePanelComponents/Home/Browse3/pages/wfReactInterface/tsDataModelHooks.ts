@@ -17,6 +17,7 @@ import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {
   opVersionRefOpCategory,
+  refUriToObjectVersionKey,
   refUriToOpVersionKey,
   typeNameToCategory,
 } from './utilities';
@@ -62,7 +63,8 @@ const makeTraceServerEndpointHook = <
   ) => Output
 ) => {
   const useTraceServerRequest = (
-    ...input: Input
+    input: Input,
+    opts?: {skip?: boolean}
   ): LoadableWithError<Output> => {
     input = useDeepMemo(input);
     const getTsClient = useGetTraceServerClientContext();
@@ -75,6 +77,10 @@ const makeTraceServerEndpointHook = <
 
     useEffect(() => {
       setState({loading: true, result: null, error: null});
+      if (opts?.skip) {
+        setState({loading: false, result: null, error: null});
+        return;
+      }
       const req = preprocessFn(...input);
       client[traceServerFnName](req as any)
         .then(res => {
@@ -276,7 +282,7 @@ const useOpVersion = (
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
   const result = useOpVersions(
-    key?.entity ?? '',
+    [key?.entity ?? '',
     key?.project ?? '',
     {
       opIds: [key?.opId ?? ''],
@@ -284,7 +290,7 @@ const useOpVersion = (
     undefined,
     {
       skip: key == null,
-    }
+    }]
   );
   return {
     loading: result.loading,
@@ -336,7 +342,7 @@ const useObjectVersion = (
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
   const result = useRootObjectVersions(
-    key?.entity ?? '',
+    [key?.entity ?? '',
     key?.project ?? '',
     {
       objectIds: [key?.objectId ?? ''],
@@ -344,7 +350,7 @@ const useObjectVersion = (
     undefined,
     {
       skip: key == null,
-    }
+    }]
   );
   return {
     loading: result.loading,
@@ -412,7 +418,21 @@ const useRefsReadBatch = makeTraceServerEndpointHook(
   (refs: string[]) => ({
     refs,
   }),
-  (res): any[] => res.vals
+  res => res.vals
+);
+
+const useTableQuery = makeTraceServerEndpointHook(
+  'tableQuery',
+  (
+    projectId: traceServerClient.TraceTableQueryReq['project_id'],
+    tableDigest: traceServerClient.TraceTableQueryReq['table_digest'],
+    filter: traceServerClient.TraceTableQueryReq['filter']
+  ) => ({
+    project_id: projectId,
+    table_digest: tableDigest,
+    filter,
+  }),
+  res => res.rows
 );
 
 const useChildCallsForCompare = (
@@ -488,7 +508,41 @@ const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
-  const valsResult = useRefsReadBatch(refUris);
+  const [simpleUris, tableUris] = useMemo(() => {
+    const sUris: Array<{ndx: number; uri: string; ref: ObjectVersionKey}> = [];
+    const tUris: Array<{ndx: number; uri: string; ref: ObjectVersionKey}> = [];
+    refUris
+      .map(uri => ({uri, ref: refUriToObjectVersionKey(uri)}))
+      .forEach(({uri, ref}, ndx) => {
+        if (ref.scheme === 'weave' && ref.weaveKind === 'table') {
+          tUris.push({ndx, uri, ref});
+        } else {
+          sUris.push({ndx, uri, ref});
+        }
+      });
+    return [sUris, tUris];
+  }, [refUris]);
+  const simpleValsResult = useRefsReadBatch([simpleUris.map(({uri}) => uri)], {skip: simpleUris.length === 0});
+  let tableUriProjectId = '';
+  let tableUriDigest = '';
+  if (tableUris.length > 1) {
+    throw new Error('Multiple table refs not supported');
+  } else if (tableUris.length === 1) {
+    tableUriProjectId =
+      tableUris[0].ref.entity + '/' + tableUris[0].ref.project;
+    // console.log(tableUris[0].ref)
+    tableUriDigest = tableUris[0].ref.objectId;
+  }
+  const tableQueryFilter = useMemo(() => {
+    // TODO: tableQuery
+    return {};
+  }, []);
+  const tableValsResult = useTableQuery(
+    [tableUriProjectId,
+    tableUriDigest,
+    tableQueryFilter], {skip: tableUris.length === 0}
+  );
+  // console.log(tableValsResult);
   return useMemo(() => {
     if (refUris.length === 0) {
       return {
@@ -497,8 +551,43 @@ const useRefsData = (
         error: null,
       };
     }
-    return valsResult;
-  }, [refUris.length, valsResult]);
+    if (simpleValsResult.loading || tableValsResult.loading) {
+      return {
+        loading: true,
+        result: null,
+        error: null,
+      };
+    }
+    const sRes = simpleValsResult.result;
+    const tRes = tableValsResult.result;
+    // if (sRes == null || tRes == null) {
+    //   return {
+    //     loading: false,
+    //     result: null,
+    //     error: 'Missing result',
+    //   };
+    // }
+    const valsResult = Array(refUris.length);
+    simpleUris.forEach(({ndx}, i) => {
+      valsResult[ndx] = sRes?.[i];
+    });
+    tableUris.forEach(({ndx}, i) => {
+      valsResult[ndx] = tRes
+    });
+    return {
+      loading: false,
+      result: valsResult,
+      error: null,
+    };
+  }, [
+    refUris.length,
+    simpleUris,
+    simpleValsResult.loading,
+    simpleValsResult.result,
+    tableUris,
+    tableValsResult.loading,
+    tableValsResult.result,
+  ]);
 };
 
 const useApplyMutationsToRef = (): ((

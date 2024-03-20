@@ -16,10 +16,12 @@ import {GridColDef, useGridApiRef} from '@mui/x-data-grid-pro';
 import {
   isAssignableTo,
   isTypedDict,
+  list,
   listObjectType,
   maybe,
   ObjectType,
   Type,
+  typedDict,
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
 import {
@@ -44,6 +46,7 @@ import React, {
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
+import {toWeaveType} from '../../../Panel2/toWeaveType';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
@@ -54,6 +57,7 @@ import {
   DICT_KEY_EDGE_TYPE,
   LIST_INDEX_EDGE_TYPE,
   OBJECT_ATTRIBUTE_EDGE_TYPE,
+  TABLE_ID_EDGE_TYPE,
 } from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {TableQuery} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
@@ -402,13 +406,13 @@ const WeaveEditorField: FC<{
     );
   }
   if (isAssignableTo(refWithType.type, maybe({type: 'OpDef'}))) {
-    return <WeaveViewSmallRef refWithType={refWithType} />;
+    return <WeaveViewSmallRef refWithType={refWithType} path={path} />;
   }
   if (isAssignableTo(refWithType.type, maybe({type: 'WandbArtifactRef'}))) {
-    return <WeaveViewSmallRef refWithType={refWithType} />;
+    return <WeaveViewSmallRef refWithType={refWithType} path={path} />;
   }
   if (isAssignableTo(refWithType.type, maybe({type: 'Ref'}))) {
-    return <WeaveViewSmallRef refWithType={refWithType} />;
+    return <WeaveViewSmallRef refWithType={refWithType} path={path} />;
   }
   // Instead of displaying "no editor", just display the stringified value.
   // This could be risky if we have a large object, but it's fine for now.
@@ -764,8 +768,8 @@ const typeToDataGridColumnSpec = (
       return valTypeCols.map(col => ({
         ...col,
         maxWidth,
-        field: `${key}.${col.field}`,
-        headerName: `${key}.${col.field}`,
+        // field: `${key}.${col.field}`,
+        // headerName: `${key}.${col.field}`,
       }));
     });
   }
@@ -906,15 +910,120 @@ export const WeaveEditorTable: FC<{
 };
 
 export const WeaveCHTable: FC<{
-  objRef: WeaveObjectRef;
-  // path: WeaveEditorPathEl[];
+  refUri: string;
+  path: WeaveEditorPathEl[];
 }> = props => {
-  return <>TODO: Display a hot new table for {JSON.stringify(props.objRef)}</>;
+  const apiRef = useGridApiRef();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+
+  const makeLinkPath = useObjectVersionLinkPathForPath();
+  const fetchQuery = useValueOfRefUri(props.refUri, {
+    limit: MAX_ROWS + 1,
+  });
+  const [isTruncated, setIsTruncated] = useState(false);
+  const [sourceRows, setSourceRows] = useState<any[] | undefined>();
+  useEffect(() => {
+    if (sourceRows != null) {
+      return;
+    }
+    if (fetchQuery.loading) {
+      return;
+    }
+    setIsTruncated((fetchQuery.result ?? []).length > MAX_ROWS);
+    setSourceRows((fetchQuery.result ?? []).slice(0, MAX_ROWS));
+  }, [sourceRows, fetchQuery]);
+
+  const gridRows = useMemo(
+    () =>
+      (sourceRows ?? []).map((row: {[key: string]: any}, i: number) => ({
+        _table_row_digest: row.digest,
+        id: i,
+        ...flattenObject(row.val),
+      })),
+    [sourceRows]
+  );
+
+  // Autosize when rows change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      apiRef.current.autosizeColumns({
+        includeHeaders: true,
+        includeOutliers: true,
+      });
+    }, 0);
+    return () => {
+      clearInterval(timeoutId);
+    };
+  }, [gridRows, apiRef]);
+
+  const objectType = useMemo(() => {
+    if (fetchQuery.result == null) {
+      return list(typedDict({}));
+    }
+    return typedDictPropertyTypes(
+      listObjectType(toWeaveType(fetchQuery.result))
+    ).val;
+  }, [fetchQuery.result]);
+  console.log('gridRows', gridRows, objectType);
+
+  const columnSpec: GridColDef[] = useMemo(() => {
+    return [
+      {
+        field: '_table_row_digest',
+        headerName: '',
+        width: 50,
+        renderCell: params => (
+          <Link
+            to={makeLinkPath([
+              ...weaveEditorPathUrlPathPart(props.path),
+              TABLE_ID_EDGE_TYPE,
+              params.row._table_row_digest,
+            ])}>
+            <LinkIcon />
+          </Link>
+        ),
+      },
+      ...typeToDataGridColumnSpec(objectType, isPeeking, true),
+    ];
+  }, [objectType, isPeeking, makeLinkPath, props.path]);
+  return (
+    <>
+      {isTruncated && (
+        <Alert severity="warning">
+          Showing {MAX_ROWS.toLocaleString()} rows only.
+        </Alert>
+      )}
+      <Box
+        sx={{
+          height: 460,
+          width: '100%',
+        }}>
+        <StyledDataGrid
+          keepBorders
+          apiRef={apiRef}
+          density="compact"
+          experimentalFeatures={{columnGrouping: true}}
+          rows={gridRows}
+          columns={columnSpec}
+          initialState={{
+            pagination: {
+              paginationModel: {
+                pageSize: 10,
+              },
+            },
+          }}
+          loading={fetchQuery.loading}
+          disableRowSelectionOnClick
+        />
+      </Box>
+    </>
+  );
 };
 
-export const WeaveViewSmallRef: FC<{
+const WeaveViewSmallRef: FC<{
   refWithType: RefWithType;
-}> = ({refWithType}) => {
+  path: WeaveEditorPathEl[];
+}> = ({refWithType, path}) => {
   const opDefQuery = useValueOfRefUri(refWithType.refUri);
   const opDefRef = useMemo(
     () => parseRefMaybe(opDefQuery.result ?? ''),
@@ -924,7 +1033,7 @@ export const WeaveViewSmallRef: FC<{
     return <div>loading</div>;
   } else if (opDefRef != null) {
     if (opDefRef.scheme === 'weave' && opDefRef.weaveKind === 'table') {
-      return <WeaveCHTable objRef={opDefRef} />;
+      return <WeaveCHTable refUri={opDefQuery.result} path={path} />;
     }
     return <SmallRef objRef={opDefRef} />;
   } else {

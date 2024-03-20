@@ -5,6 +5,7 @@
  * the context.
  */
 
+import { WANDB_ARTIFACT_SCHEME } from '../../../common';
 import {
   OBJECT_CATEGORIES,
   OP_CATEGORIES,
@@ -81,7 +82,9 @@ export const refUriToObjectVersionKey = (refUri: RefUri): ObjectVersionKey => {
         .join('/'),
     };
   } else {
-    throw new Error('Invalid scheme: ' + refDict.scheme);
+    throw new Error(
+      'Invalid scheme: ' + refDict.scheme + ' for uri: ' + refUri
+    );
   }
 };
 
@@ -124,11 +127,11 @@ export const refStringToRefDict = (uri: string): WFNaiveRefDict => {
 };
 
 const wandbArtifactRefStringToRefDict = (uri: string): WFNaiveRefDict => {
-  const scheme = WANDB_ARTIFACT_REF_PREFIX;
-  if (!uri.startsWith(scheme)) {
+  const scheme = WANDB_ARTIFACT_SCHEME;
+  if (!uri.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
     throw new Error('Invalid uri: ' + uri);
   }
-  const uriWithoutScheme = uri.slice(scheme.length);
+  const uriWithoutScheme = uri.slice(WANDB_ARTIFACT_REF_PREFIX.length);
   let uriParts = uriWithoutScheme;
   let refExtraPath = '';
   const refExtraTuples = [];
@@ -164,11 +167,11 @@ const wandbArtifactRefStringToRefDict = (uri: string): WFNaiveRefDict => {
 };
 
 const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
-  const scheme = WEAVE_REF_PREFIX;
-  if (!uri.startsWith(scheme)) {
+  const scheme = WEAVE_REF_SCHEME;
+  if (!uri.startsWith(WEAVE_REF_PREFIX)) {
     throw new Error('Invalid uri: ' + uri);
   }
-  const uriWithoutScheme = uri.slice(scheme.length);
+  const uriWithoutScheme = uri.slice(WEAVE_REF_PREFIX.length);
   let uriParts = uriWithoutScheme;
   // let refExtraPath = '';
   // const refExtraTuples = [];
