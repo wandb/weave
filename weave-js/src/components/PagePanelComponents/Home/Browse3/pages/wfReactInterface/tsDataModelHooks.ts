@@ -54,9 +54,10 @@ const makeTraceServerEndpointHook = <
   Output
 >(
   traceServerFnName: FN,
-  preprocessFn: (
-    ...input: Input
-  ) => Parameters<traceServerClient.TraceServerClient[FN]>[0],
+  preprocessFn: (...input: Input) => {
+    params: Parameters<traceServerClient.TraceServerClient[FN]>[0];
+    skip?: boolean;
+  },
   postprocessFn: (
     res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>,
     ...input: Input
@@ -76,12 +77,12 @@ const makeTraceServerEndpointHook = <
 
     useEffect(() => {
       setState({loading: true, result: null, error: null});
-      // if (opts?.skip) {
-      //   setState({loading: false, result: null, error: null});
-      //   return;
-      // }
       const req = preprocessFn(...input);
-      client[traceServerFnName](req as any)
+      if (req.skip) {
+        setState({loading: false, result: null, error: null});
+        return;
+      }
+      client[traceServerFnName](req.params as any)
         .then(res => {
           const output = postprocessFn(res as any, ...input);
           setState({loading: false, result: output, error: null});
@@ -308,14 +309,17 @@ const useOpVersions = makeTraceServerEndpointHook(
     limit?: number,
     opts?: {skip?: boolean}
   ) => ({
-    project_id: projectIdFromParts({entity, project}),
-    // entity,
-    // project,
-    filter: {
-      object_names: filter.opIds,
-      latest_only: filter.latestOnly,
-      is_op: true,
+    params: {
+      project_id: projectIdFromParts({entity, project}),
+      // entity,
+      // project,
+      filter: {
+        object_names: filter.opIds,
+        latest_only: filter.latestOnly,
+        is_op: true,
+      },
     },
+    skip: opts?.skip,
   }),
   (res): OpVersionSchema[] =>
     res.objs.map(obj => {
@@ -369,12 +373,15 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     limit?: number,
     opts?: {skip?: boolean}
   ) => ({
-    project_id: projectIdFromParts({entity, project}),
-    filter: {
-      object_names: filter.objectIds,
-      latest_only: filter.latestOnly,
-      is_op: false,
+    params: {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        object_names: filter.objectIds,
+        latest_only: filter.latestOnly,
+        is_op: false,
+      },
     },
+    skip: opts?.skip,
   }),
   (
     res,
@@ -413,8 +420,11 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
 
 const useRefsReadBatch = makeTraceServerEndpointHook(
   'readBatch',
-  (refs: string[]) => ({
-    refs,
+  (refs: string[], opts?: {skip?: boolean}) => ({
+    params: {
+      refs,
+    },
+    skip: opts?.skip,
   }),
   res => res.vals
 );
@@ -424,11 +434,15 @@ const useTableQuery = makeTraceServerEndpointHook(
   (
     projectId: traceServerClient.TraceTableQueryReq['project_id'],
     tableDigest: traceServerClient.TraceTableQueryReq['table_digest'],
-    filter: traceServerClient.TraceTableQueryReq['filter']
+    filter: traceServerClient.TraceTableQueryReq['filter'],
+    opts?: {skip?: boolean}
   ) => ({
-    project_id: projectId,
-    table_digest: tableDigest,
-    filter,
+    params: {
+      project_id: projectId,
+      table_digest: tableDigest,
+      filter,
+    },
+    skip: opts?.skip,
   }),
   res => res.rows
 );
@@ -520,7 +534,12 @@ const useRefsData = (
       });
     return [sUris, tUris];
   }, [refUris]);
-  const simpleValsResult = useRefsReadBatch(simpleUris.map(({uri}) => uri));
+  const simpleValsResult = useRefsReadBatch(
+    simpleUris.map(({uri}) => uri),
+    {
+      skip: simpleUris.length === 0,
+    }
+  );
   let tableUriProjectId = '';
   let tableUriDigest = '';
   if (tableUris.length > 1) {
@@ -538,7 +557,8 @@ const useRefsData = (
   const tableValsResult = useTableQuery(
     tableUriProjectId,
     tableUriDigest,
-    tableQueryFilter
+    tableQueryFilter,
+    {skip: tableUris.length === 0}
   );
   // console.log(tableValsResult);
   return useMemo(() => {

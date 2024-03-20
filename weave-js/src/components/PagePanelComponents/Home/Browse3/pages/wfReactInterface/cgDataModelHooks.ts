@@ -766,13 +766,13 @@ const useOpVersionsNode = (
 };
 
 const applyTableQuery = (node: Node, tableQuery: TableQuery): Node => {
-  if (tableQuery.columns.length > 0) {
+  if ((tableQuery.columns ?? []).length > 0) {
     node = opMap({
       arr: node,
       mapFn: constFunction({row: listObjectType(node.type)}, ({row}) =>
         opDict(
           _.fromPairs(
-            tableQuery.columns.map(key => [
+            (tableQuery.columns ?? []).map(key => [
               key,
               opPick({obj: row, key: constString(key)}),
             ])
