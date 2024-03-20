@@ -233,23 +233,18 @@ class TraceTable(Tracable):
                 )
             )
             row = response.rows[key]
-        else:
-            filter = self.filter.model_copy()
-            filter.row_digests = [key]
-            response = self.server.table_query(
-                TableQueryReq(
-                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
-                    table_digest=self.table_ref.digest,
-                    filter=_TableRowFilter(row_digests=[key]),
-                )
+            return make_trace_obj(
+                row.val,
+                self.ref.with_item(row.digest),
+                self.server,
+                self.root,
             )
-            row = response.rows[0]
-        return make_trace_obj(
-            row.val,
-            self.ref.with_item(row.digest),
-            self.server,
-            self.root,
-        )
+        else:
+            for row in self:
+                if row.ref.extra[-1] == key:
+                    return row
+            else:
+                raise KeyError(f"Row ID not found: {key}")
 
     def __iter__(self):
         page_index = 0

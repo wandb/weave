@@ -1,12 +1,11 @@
 # Sqlite Trace Server
 
+from typing import cast, Optional, Any
+
 import datetime
 import json
-import typing
 import hashlib
 import sqlite3
-
-from pydantic import BaseModel
 
 
 from .trace_server_interface_util import extract_refs_from_values
@@ -22,20 +21,7 @@ class NotFoundError(Exception):
     pass
 
 
-class SelectableCHObjSchema(BaseModel):
-    entity: str
-    project: str
-    name: str
-    created_at: datetime.datetime
-    refs: typing.List[str]
-    val: str
-    type: str
-    digest: str
-    version_index: int
-    is_latest: int
-
-
-def val_digest(json_val: str):
+def val_digest(json_val: str) -> str:
     hasher = hashlib.sha256()
     hasher.update(json_val.encode())
     return hasher.hexdigest()
@@ -111,6 +97,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        if req.start.trace_id is None:
+            raise ValueError("trace_id is required")
+        if req.start.id is None:
+            raise ValueError("id is required")
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -173,7 +163,35 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        self.cursor.execute("SELECT * FROM calls")
+        conds = []
+        filter = req.filter
+        if filter:
+            if filter.op_version_refs:
+                in_expr = ", ".join((f"'{x}'" for x in filter.op_version_refs))
+                conds += [f"name IN ({', '.join({in_expr})})"]
+            if filter.input_object_version_refs:
+                raise NotImplementedError("input_object_version_refs not implemented")
+            if filter.output_object_version_refs:
+                raise NotImplementedError("output_object_version_refs not implemented")
+            if filter.parent_ids:
+                in_expr = ", ".join((f"'{x}'" for x in filter.parent_ids))
+                conds += [f"parent_id IN ({in_expr})"]
+            if filter.trace_ids:
+                raise NotImplementedError("trace_ids filter not implemented")
+            if filter.call_ids:
+                in_expr = ", ".join((f"'{x}'" for x in filter.call_ids))
+                conds += [f"id IN ({in_expr})"]
+            if filter.trace_roots_only:
+                raise NotImplementedError("trace_roots_only filter not implemented")
+
+        predicate = " AND ".join(conds)
+
+        query = f"SELECT * FROM calls WHERE project_id = '{req.project_id}'"
+        if predicate:
+            query += f" AND {predicate}"
+
+        self.cursor.execute(query)
+
         query_result = self.cursor.fetchall()
         return tsi.CallsQueryRes(
             calls=[
@@ -263,7 +281,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
 
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
+        return tsi.ObjReadRes(obj=objs[0])
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
@@ -286,7 +304,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conditions=conds,
         )
 
-        return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+        return tsi.ObjQueryRes(objs=objs)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         entity, project = req.table.project_id.split("/")
@@ -321,23 +339,81 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         entity, project = req.project_id.split("/")
         conds = []
         if req.filter:
-            if req.filter.row_digests:
-                in_list = ", ".join([f"'{rd}'" for rd in req.filter.row_digests])
-                conds.append(f"tr.digest IN ({in_list})")
+            raise NotImplementedError("Table filter not implemented")
         else:
             conds.append("1 = 1")
         rows = self._table_query(entity, project, req.table_digest, conditions=conds)
+
         return tsi.TableQueryRes(rows=rows)
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        # TODO: This reads one ref at a time, it should read them in batches
+        # where it can. Like it should group by object that we need to read.
+        # And it should also batch into table refs (like when we are reading a bunch
+        # of rows from a single Dataset)
+        if len(req.refs) > 1000:
+            raise ValueError("Too many refs")
+
+        parsed_refs = [refs.parse_uri(r) for r in req.refs]
+        if any(isinstance(r, refs.TableRef) for r in parsed_refs):
+            raise ValueError("Table refs not supported")
+        parsed_obj_refs = cast(list[refs.ObjectRef], parsed_refs)
+
+        def read_ref(r: refs.ObjectRef) -> Any:
+            conds = [
+                f"name = '{r.name}'",
+                f"digest = '{r.version}'",
+            ]
+            objs = self._select_objs_query(
+                r.entity,
+                r.project,
+                conditions=conds,
+            )
+            if len(objs) == 0:
+                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
+            obj = objs[0]
+            val = obj.val
+            extra = r.extra
+            for extra_index in range(0, len(extra), 2):
+                op, arg = extra[extra_index], extra[extra_index + 1]
+                if op == "key":
+                    val = val[arg]
+                elif op == "atr":
+                    val = val[arg]
+                elif op == "ndx":
+                    val = val[int(arg)]
+                elif op == "id":
+                    if isinstance(val, str) and val.startswith("weave://"):
+                        table_ref = refs.parse_uri(val)
+                        if not isinstance(table_ref, refs.TableRef):
+                            raise ValueError(
+                                "invalid data layout encountered, expected TableRef when resolving id"
+                            )
+                        row = self._table_row_read(
+                            entity=table_ref.entity,
+                            project=table_ref.project,
+                            row_digest=arg,
+                        )
+                        val = row.val
+                    else:
+                        raise ValueError(
+                            "invalid data layout encountered, expected TableRef when resolving id"
+                        )
+                else:
+                    raise ValueError(f"Unknown ref type: {extra[extra_index]}")
+            return val
+
+        return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_obj_refs])
 
     def _table_query(
         self,
         entity: str,
         project: str,
         table_digest: str,
-        conditions: typing.Optional[typing.List[str]] = None,
-        limit: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[tsi.TableRowSchema]:
+        conditions: Optional[list[str]] = None,
+        limit: Optional[int] = None,
+        parameters: Optional[dict[str, Any]] = None,
+    ) -> list[tsi.TableRowSchema]:
         conds = ["entity = {entity: String}", "project = {project: String}"]
         if conditions:
             conds.extend(conditions)
@@ -370,121 +446,56 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             tsi.TableRowSchema(digest=r[0], val=json.loads(r[1])) for r in query_result
         ]
 
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        # TODO: This reads one ref at a time, it should read them in batches
-        # where it can. Like it should group by object that we need to read.
-        # And it should also batch into table refs (like when we are reading a bunch
-        # of rows from a single Dataset)
-        if len(req.refs) > 1000:
-            raise ValueError("Too many refs")
-
-        parsed_refs = [refs.parse_uri(r) for r in req.refs]
-        if any(isinstance(r, refs.TableRef) for r in parsed_refs):
-            raise ValueError("Table refs not supported")
-        parsed_refs = typing.cast(typing.List[refs.ObjectRef], parsed_refs)
-
-        def read_ref(r: refs.ObjectRef) -> typing.Any:
-            conds = [
-                f"name = '{r.name}'",
-                f"digest = '{r.version}'",
-            ]
-            objs = self._select_objs_query(
-                r.entity,
-                r.project,
-                conditions=conds,
-            )
-            if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
-            obj = objs[0]
-            val = json.loads(obj.val)
-            extra = r.extra
-            for extra_index in range(0, len(extra), 2):
-                op, arg = extra[extra_index], extra[extra_index + 1]
-                if op == "key":
-                    val = val[arg]
-                elif op == "attr":
-                    val = val[arg]
-                elif op == "index":
-                    val = val[int(arg)]
-                elif op == "id":
-                    if isinstance(val, str) and val.startswith("weave://"):
-                        table_ref = refs.parse_uri(val)
-                        if not isinstance(table_ref, refs.TableRef):
-                            raise ValueError(
-                                "invalid data layout encountered, expected TableRef when resolving id"
-                            )
-                        rows = self._table_query(
-                            entity=table_ref.entity,
-                            project=table_ref.project,
-                            table_digest=table_ref.digest,
-                            conditions=["digest = {digest: String}"],
-                            limit=1,
-                            parameters={"digest": arg},
-                        )
-                        if len(rows) == 0:
-                            raise NotFoundError(f"Row {val} not found")
-                        val = rows[0].val
-                    else:
-                        raise ValueError(
-                            "invalid data layout encountered, expected TableRef when resolving id"
-                        )
-                else:
-                    raise ValueError(f"Unknown ref type: {extra[extra_index]}")
-            return val
-
-        return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_refs])
+    def _table_row_read(
+        self, entity: str, project: str, row_digest: str
+    ) -> tsi.TableRowSchema:
+        # Now get the rows
+        self.cursor.execute(
+            f"""
+            SELECT digest, val FROM table_rows
+            WHERE entity = ? AND project = ? AND digest = ?
+            """,
+            [entity, project, row_digest],
+        )
+        query_result = self.cursor.fetchone()
+        if query_result is None:
+            raise NotFoundError(f"Row {row_digest} not found")
+        return tsi.TableRowSchema(
+            digest=query_result[0], val=json.loads(query_result[1])
+        )
 
     def _select_objs_query(
         self,
         entity: str,
         project: str,
-        conditions: typing.Optional[typing.List[str]] = None,
-        limit: typing.Optional[int] = None,
-    ) -> typing.List[SelectableCHObjSchema]:
+        conditions: Optional[list[str]] = None,
+        limit: Optional[int] = None,
+    ) -> list[tsi.ObjSchema]:
         pred = " AND ".join(conditions or ["1 = 1"])
         self.cursor.execute(
             """SELECT * FROM objects WHERE entity = ? AND project = ? AND """ + pred,
             (entity, project),
         )
         query_result = self.cursor.fetchall()
-        result: typing.List[SelectableCHObjSchema] = []
+        result: list[tsi.ObjSchema] = []
         for row in query_result:
             result.append(
-                SelectableCHObjSchema.model_validate(
-                    {
-                        "entity": row[0],
-                        "project": row[1],
-                        "name": row[2],
-                        "created_at": row[3],
-                        "type": row[4],
-                        "refs": json.loads(row[5]),
-                        "val": row[6],
-                        "digest": row[7],
-                        "version_index": row[8],
-                        "is_latest": 1,
-                    }
+                tsi.ObjSchema(
+                    project_id=f"{row[0]}/{row[1]}",
+                    name=row[2],
+                    created_at=row[3],
+                    type=row[4],
+                    val=json.loads(row[6]),
+                    digest=row[7],
+                    version_index=row[8],
+                    is_latest=1,
                 )
             )
 
         return result
 
 
-def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
-    return tsi.ObjSchema(
-        # entity=ch_obj.entity,
-        # project=ch_obj.project,
-        project_id=f"{ch_obj.entity}/{ch_obj.project}",
-        name=ch_obj.name,
-        created_at=ch_obj.created_at,
-        version_index=ch_obj.version_index,
-        is_latest=ch_obj.is_latest,
-        digest=ch_obj.digest,
-        type=ch_obj.type,
-        val=json.loads(ch_obj.val),
-    )
-
-
-def get_type(val):
+def get_type(val: Any) -> str:
     if val == None:
         return "none"
     elif isinstance(val, dict):
