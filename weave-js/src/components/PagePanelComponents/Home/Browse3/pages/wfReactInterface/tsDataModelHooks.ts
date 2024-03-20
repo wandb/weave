@@ -442,7 +442,7 @@ const useTableQuery = makeTraceServerEndpointHook(
       project_id: projectId,
       table_digest: tableDigest,
       filter,
-      limit: limit,
+      limit,
     },
     skip: opts?.skip,
   }),

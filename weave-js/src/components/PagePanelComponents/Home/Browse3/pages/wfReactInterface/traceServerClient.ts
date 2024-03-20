@@ -13,6 +13,7 @@
  */
 
 import fetch from 'isomorphic-unfetch';
+import _ from 'lodash';
 
 export type KeyedDictType = {
   [key: string]: any;
@@ -118,11 +119,19 @@ export type TraceTableQueryRes = {
   }>;
 };
 
+const DEFAULT_BATCH_INTERVAL = 150;
+
 export class TraceServerClient {
   private baseUrl: string;
+  private readBatchCollectors: Array<{
+    req: TraceRefsReadBatchReq;
+    resolvePromise: (res: TraceRefsReadBatchRes) => void;
+    rejectPromise: (err: any) => void;
+  }> = [];
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+    this.scheduleReadBatch();
   }
 
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
@@ -147,10 +156,7 @@ export class TraceServerClient {
 
   readBatch: (req: TraceRefsReadBatchReq) => Promise<TraceRefsReadBatchRes> =
     req => {
-      return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
-        '/refs/read_batch',
-        req
-      );
+      return this.requestReadBatch(req);
     };
 
   tableQuery: (req: TraceTableQueryReq) => Promise<TraceTableQueryRes> =
@@ -176,12 +182,58 @@ export class TraceServerClient {
         // This is a dummy auth header, the trace server requires
         // that we send a basic auth header, but it uses cookies for
         // authentication.
-        'Authorization': 'Basic ' + btoa(':'),
+        Authorization: 'Basic ' + btoa(':'),
       },
       body: JSON.stringify(req),
     });
     const res = await response.json();
     return res;
+  };
+
+  private requestReadBatch: (
+    req: TraceRefsReadBatchReq
+  ) => Promise<TraceRefsReadBatchRes> = req => {
+    return new Promise<TraceRefsReadBatchRes>((resolve, reject) => {
+      this.readBatchCollectors.push({
+        req,
+        resolvePromise: resolve,
+        rejectPromise: reject,
+      });
+    });
+  };
+
+  private doReadBatch = async () => {
+    if (this.readBatchCollectors.length === 0) {
+      return;
+    }
+    const collectors = [...this.readBatchCollectors];
+    this.readBatchCollectors = [];
+    const refs = _.uniq(collectors.map(c => c.req.refs).flat());
+    const res = await this.readBatchDirect({refs});
+    const vals = res.vals;
+    const valMap = new Map<string, any>();
+    for (let i = 0; i < refs.length; i++) {
+      valMap.set(refs[i], vals[i]);
+    }
+    collectors.forEach(collector => {
+      const req = collector.req;
+      const refVals = req.refs.map(ref => valMap.get(ref));
+      collector.resolvePromise({vals: refVals});
+    });
+  };
+
+  private scheduleReadBatch = async () => {
+    await this.doReadBatch();
+    setTimeout(this.scheduleReadBatch, DEFAULT_BATCH_INTERVAL);
+  };
+
+  private readBatchDirect: (
+    req: TraceRefsReadBatchReq
+  ) => Promise<TraceRefsReadBatchRes> = req => {
+    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
+      '/refs/read_batch',
+      req
+    );
   };
 }
 
