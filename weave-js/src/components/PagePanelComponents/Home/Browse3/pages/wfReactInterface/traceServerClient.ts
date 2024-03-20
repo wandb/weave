@@ -108,6 +108,7 @@ export type TraceTableQueryReq = {
   filter?: {
     row_digests?: string[];
   };
+  limit?: number;
 };
 
 export type TraceTableQueryRes = {

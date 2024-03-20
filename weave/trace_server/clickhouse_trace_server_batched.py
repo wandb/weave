@@ -433,7 +433,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append(f"tr.digest IN ({in_list})")
         else:
             conds.append("1 = 1")
-        rows = self._table_query(entity, project, req.table_digest, conditions=conds)
+        rows = self._table_query(entity, project, req.table_digest, conditions=conds, limit=req.limit)
         return tsi.TableQueryRes(rows=rows)
 
     def _table_query(

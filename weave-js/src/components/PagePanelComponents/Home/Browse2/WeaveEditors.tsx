@@ -964,7 +964,6 @@ export const WeaveCHTable: FC<{
       listObjectType(toWeaveType(fetchQuery.result))
     ).val;
   }, [fetchQuery.result]);
-  console.log('gridRows', gridRows, objectType);
 
   const columnSpec: GridColDef[] = useMemo(() => {
     return [

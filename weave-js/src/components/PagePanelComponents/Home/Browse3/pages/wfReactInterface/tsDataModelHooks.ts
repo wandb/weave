@@ -435,12 +435,14 @@ const useTableQuery = makeTraceServerEndpointHook(
     projectId: traceServerClient.TraceTableQueryReq['project_id'],
     tableDigest: traceServerClient.TraceTableQueryReq['table_digest'],
     filter: traceServerClient.TraceTableQueryReq['filter'],
+    limit: traceServerClient.TraceTableQueryReq['limit'],
     opts?: {skip?: boolean}
   ) => ({
     params: {
       project_id: projectId,
       table_digest: tableDigest,
       filter,
+      limit: limit,
     },
     skip: opts?.skip,
   }),
@@ -558,6 +560,7 @@ const useRefsData = (
     tableUriProjectId,
     tableUriDigest,
     tableQueryFilter,
+    tableQuery?.limit,
     {skip: tableUris.length === 0}
   );
   // console.log(tableValsResult);
