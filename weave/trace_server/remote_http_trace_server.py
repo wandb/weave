@@ -177,3 +177,22 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/refs/read_batch", req, tsi.TableQueryReq, tsi.TableQueryRes
         )
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        r = requests.post(
+            self.trace_server_url + "/files/create",
+            auth=self._auth,
+            data={"project_id": req.project_id},
+            files={"file": (req.name, req.content)},
+        )
+        r.raise_for_status()
+        return tsi.FileCreateRes.model_validate(r.json())
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        r = requests.post(
+            self.trace_server_url + "/files/content",
+            json={"project_id": req.project_id, "digest": req.digest},
+            auth=self._auth,
+        )
+        r.raise_for_status()
+        return tsi.FileContentReadRes.model_validate(r.json())
