@@ -8,7 +8,7 @@ from . import trace_server_interface as tsi
 
 TRACE_REF_SCHEME = "wandb-trace"
 ARTIFACT_REF_SCHEME = "wandb-artifact"
-WILDCARD_ARTIFACT_VERSION_AND_PATH = ":*/obj"
+WILDCARD_ARTIFACT_VERSION_AND_PATH = ":*"
 
 
 def generate_id() -> str:

@@ -47,7 +47,7 @@ export const refUriToOpVersionKey = (refUri: RefUri): OpVersionKey => {
 };
 
 export const opVersionKeyToRefUri = (key: OpVersionKey): RefUri => {
-  return `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/object/${key.opId}:${key.versionHash}`;
+  return `${WEAVE_REF_PREFIX}${key.entity}/${key.project}/op/${key.opId}:${key.versionHash}`;
   // return `${WANDB_ARTIFACT_REF_PREFIX}${key.entity}/${key.project}/${key.opId}:${key.versionHash}/obj`;
 };
 
