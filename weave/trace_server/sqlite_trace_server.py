@@ -270,9 +270,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
-                    conds.append(f"type = 'OpDef'")
+                    conds.append("type = 'OpDef'")
                 else:
-                    conds.append(f"type != 'OpDef'")
+                    conds.append("type != 'OpDef'")
             if req.filter.object_names:
                 in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
                 conds.append(f"name IN ({in_list})")
@@ -345,7 +345,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         predicate = " AND ".join(conds)
         # First get the row IDs by querying tables
         self.cursor.execute(
-            f"""
+            """
             SELECT digest, row_digests FROM tables
             WHERE entity = ? AND project = ? AND digest = ?
             """,

@@ -5,7 +5,7 @@
  * the context.
  */
 
-import { WANDB_ARTIFACT_SCHEME } from '../../../common';
+import {WANDB_ARTIFACT_SCHEME} from '../../../common';
 import {
   OBJECT_CATEGORIES,
   OP_CATEGORIES,
