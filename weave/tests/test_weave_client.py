@@ -22,6 +22,7 @@ from weave.trace_server import (
 from weave.trace_server import clickhouse_trace_server_batched, sqlite_trace_server
 
 from weave.trace import refs
+from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
@@ -194,14 +195,26 @@ def test_obj_with_table(client):
 
 
 def test_pydantic(client):
-    class PydanticObj(pydantic.BaseModel):
+    class A(pydantic.BaseModel):
         a: int
+
+    class B(A):
         b: str
 
-    val = PydanticObj(a=5, b="x")
+    val = B(a=5, b="x")
     ref = client.save_object(val, "my-pydantic-obj")
     val2 = client.get(ref)
     assert val == val2
+
+    assert weave_isinstance(val, B)
+    assert weave_isinstance(val, A)
+    assert weave_isinstance(val, pydantic.BaseModel)
+    assert not weave_isinstance(val, int)
+
+    assert weave_isinstance(val2, B)
+    assert weave_isinstance(val2, A)
+    assert weave_isinstance(val2, pydantic.BaseModel)
+    assert not weave_isinstance(val2, int)
 
 
 def test_call_create(client):

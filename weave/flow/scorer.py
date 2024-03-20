@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Union, Callable, Optional, Tuple, Any
+import weave
 from weave.trace.isinstance import weave_isinstance
 from weave.flow import Object
 from weave import op_def, WeaveList
@@ -100,6 +101,7 @@ def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:
 class MulticlassF1Score(Scorer):
     class_names: list[str]
 
+    @weave.op()
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
         # Compute f1, precision, recall
         result = {}
@@ -120,6 +122,7 @@ class MulticlassF1Score(Scorer):
             result[class_name] = {"f1": f1, "precision": precision, "recall": recall}
         return result
 
+    @weave.op()
     def score(self, target: dict, prediction: Optional[dict]) -> dict:
         result = {}
         for class_name in self.class_names:

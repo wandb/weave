@@ -50,5 +50,4 @@ def pydantic_object_record(obj: pydantic.BaseModel) -> ObjectRecord:
         attrs[k] = v
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
-    print("ATTRS", attrs)
     return ObjectRecord(attrs)
