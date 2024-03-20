@@ -173,6 +173,10 @@ export class TraceServerClient {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        // This is a dummy auth header, the trace server requires
+        // that we send a basic auth header, but it uses cookies for
+        // authentication.
+        'Authorization': 'Basic ' + btoa(':'),
       },
       body: JSON.stringify(req),
     });
