@@ -414,6 +414,9 @@ const WeaveEditorField: FC<{
   if (isAssignableTo(refWithType.type, maybe({type: 'Ref'}))) {
     return <WeaveViewSmallRef refWithType={refWithType} path={path} />;
   }
+  if (isAssignableTo(refWithType.type, maybe(list({type: 'Ref'})))) {
+    return <WeaveViewSmallRefs refWithType={refWithType} path={path} />;
+  }
   // Instead of displaying "no editor", just display the stringified value.
   // This could be risky if we have a large object, but it's fine for now.
   return (
@@ -1038,4 +1041,39 @@ const WeaveViewSmallRef: FC<{
   } else {
     return <div>invalid ref: {opDefQuery.result}</div>;
   }
+};
+
+const WeaveViewSmallRefs: FC<{
+  refWithType: RefWithType;
+  path: WeaveEditorPathEl[];
+}> = ({refWithType, path}) => {
+  const opDefQuery = useValueOfRefUri(refWithType.refUri);
+  const opDefRef = useMemo(
+    () =>
+      ((opDefQuery.result ?? []) as string[]).map(r => parseRefMaybe(r ?? '')),
+    [opDefQuery.result]
+  );
+  if (opDefQuery.loading) {
+    return <div>loading</div>;
+  }
+
+  return (
+    <ul>
+      {opDefRef.map((ref, i) => {
+        if (ref != null) {
+          return (
+            <li>
+              <SmallRef objRef={ref} />
+            </li>
+          );
+        } else {
+          return (
+            <li>
+              <div>invalid ref: {opDefQuery.result}</div>
+            </li>
+          );
+        }
+      })}
+    </ul>
+  );
 };
