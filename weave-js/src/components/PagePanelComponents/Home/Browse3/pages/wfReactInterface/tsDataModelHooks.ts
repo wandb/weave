@@ -63,8 +63,7 @@ const makeTraceServerEndpointHook = <
   ) => Output
 ) => {
   const useTraceServerRequest = (
-    input: Input,
-    opts?: {skip?: boolean}
+    ...input: Input
   ): LoadableWithError<Output> => {
     input = useDeepMemo(input);
     const getTsClient = useGetTraceServerClientContext();
@@ -77,10 +76,10 @@ const makeTraceServerEndpointHook = <
 
     useEffect(() => {
       setState({loading: true, result: null, error: null});
-      if (opts?.skip) {
-        setState({loading: false, result: null, error: null});
-        return;
-      }
+      // if (opts?.skip) {
+      //   setState({loading: false, result: null, error: null});
+      //   return;
+      // }
       const req = preprocessFn(...input);
       client[traceServerFnName](req as any)
         .then(res => {
@@ -282,7 +281,7 @@ const useOpVersion = (
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
   const result = useOpVersions(
-    [key?.entity ?? '',
+    key?.entity ?? '',
     key?.project ?? '',
     {
       opIds: [key?.opId ?? ''],
@@ -290,7 +289,7 @@ const useOpVersion = (
     undefined,
     {
       skip: key == null,
-    }]
+    }
   );
   return {
     loading: result.loading,
@@ -342,7 +341,7 @@ const useObjectVersion = (
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
   const result = useRootObjectVersions(
-    [key?.entity ?? '',
+    key?.entity ?? '',
     key?.project ?? '',
     {
       objectIds: [key?.objectId ?? ''],
@@ -350,7 +349,7 @@ const useObjectVersion = (
     undefined,
     {
       skip: key == null,
-    }]
+    }
   );
   return {
     loading: result.loading,
@@ -399,16 +398,15 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
           name: obj.name,
           path: 'obj',
           createdAtMs: convertISOToDate(obj.created_at).getTime(),
-          category: null,
+          category: typeNameToCategory(obj.type),
           versionIndex: obj.version_index,
           val: obj.val,
         };
       })
       .filter(obj => {
-        const objCat = typeNameToCategory(obj.typeName);
         return (
           filter.category == null ||
-          (objCat != null && filter.category.includes(objCat))
+          (obj.category != null && filter.category.includes(obj.category))
         );
       })
 );
@@ -522,7 +520,7 @@ const useRefsData = (
       });
     return [sUris, tUris];
   }, [refUris]);
-  const simpleValsResult = useRefsReadBatch([simpleUris.map(({uri}) => uri)], {skip: simpleUris.length === 0});
+  const simpleValsResult = useRefsReadBatch(simpleUris.map(({uri}) => uri));
   let tableUriProjectId = '';
   let tableUriDigest = '';
   if (tableUris.length > 1) {
@@ -538,9 +536,9 @@ const useRefsData = (
     return {};
   }, []);
   const tableValsResult = useTableQuery(
-    [tableUriProjectId,
+    tableUriProjectId,
     tableUriDigest,
-    tableQueryFilter], {skip: tableUris.length === 0}
+    tableQueryFilter
   );
   // console.log(tableValsResult);
   return useMemo(() => {
@@ -572,7 +570,7 @@ const useRefsData = (
       valsResult[ndx] = sRes?.[i];
     });
     tableUris.forEach(({ndx}, i) => {
-      valsResult[ndx] = tRes
+      valsResult[ndx] = tRes;
     });
     return {
       loading: false,
