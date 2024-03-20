@@ -69,8 +69,7 @@ def init_chobj() -> InitializedClient:
 def init_weave(project_name: str) -> InitializedClient:
     from . import wandb_api
 
-    # entity_name, project_name = get_entity_project_from_project_name(project_name)
-    entity_name, project_name = project_name.split("/", 1)
+    entity_name, project_name = get_entity_project_from_project_name(project_name)
 
     remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
