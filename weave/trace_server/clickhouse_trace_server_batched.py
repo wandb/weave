@@ -29,6 +29,8 @@ from weave.trace import refs
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
 
+FILE_CHUNK_SIZE = 100000
+
 
 class NotFoundError(Exception):
     pass
@@ -132,9 +134,15 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
-def val_digest(json_val: str):
+def str_digest(json_val: str) -> str:
     hasher = hashlib.sha256()
     hasher.update(json_val.encode())
+    return hasher.hexdigest()
+
+
+def bytes_digest(json_val: bytes) -> str:
+    hasher = hashlib.sha256()
+    hasher.update(json_val)
     return hasher.hexdigest()
 
 
@@ -335,7 +343,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         json_val = json.dumps(req.obj.val)
-        digest = val_digest(json_val)
+        digest = str_digest(json_val)
 
         req_obj = req.obj
         entity, project = req_obj.project_id.split("/")
@@ -401,7 +409,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not isinstance(r, dict):
                 raise ValueError("All rows must be dictionaries")
             row_json = json.dumps(r)
-            row_digest = val_digest(row_json)
+            row_digest = str_digest(row_json)
             insert_rows.append((entity, project, row_digest, row_json))
 
         self.ch_client.insert(
@@ -433,7 +441,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append(f"tr.digest IN ({in_list})")
         else:
             conds.append("1 = 1")
-        rows = self._table_query(entity, project, req.table_digest, conditions=conds, limit=req.limit)
+        rows = self._table_query(
+            entity, project, req.table_digest, conditions=conds, limit=req.limit
+        )
         return tsi.TableQueryRes(rows=rows)
 
     def _table_query(
@@ -549,6 +559,48 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return val
 
         return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_refs])
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        digest = bytes_digest(req.content)
+        chunks = [
+            req.content[i : i + FILE_CHUNK_SIZE]
+            for i in range(0, len(req.content), FILE_CHUNK_SIZE)
+        ]
+        self.ch_client.insert(
+            "files",
+            data=[
+                (
+                    req.project_id,
+                    digest,
+                    i,
+                    len(chunks),
+                    req.name,
+                    chunk,
+                )
+                for i, chunk in enumerate(chunks)
+            ],
+            column_names=[
+                "project_id",
+                "digest",
+                "chunk_index",
+                "n_chunks",
+                "name",
+                "val",
+            ],
+        )
+        return tsi.FileCreateRes(digest=digest)
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        query_result = self.ch_client.query(
+            "SELECT n_chunks, val FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
+            parameters={"project_id": req.project_id, "digest": req.digest},
+            column_formats={"val": "bytes"},
+        )
+        n_chunks = query_result.result_rows[0][0]
+        chunks = [r[1] for r in query_result.result_rows]
+        if len(chunks) != n_chunks:
+            raise ValueError("Missing chunks")
+        return tsi.FileContentReadRes(content=b"".join(chunks))
 
     # Private Methods
     def _mint_client(self) -> CHClient:
@@ -729,10 +781,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
-            columns=all_obj_select_columns,
             conditions=conditions,
             limit=1,
-            parameters={"name": req.name, "version_digest": req.version_digest},
+            # parameters={"name": req.name, "version_digest": req.version_digest},
         )
 
         # If the obj is not found, raise a NotFoundError
