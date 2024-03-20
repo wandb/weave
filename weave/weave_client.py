@@ -12,7 +12,6 @@ from weave import op_def
 from weave.trace.object_record import ObjectRecord, pydantic_object_record
 from weave.trace.serialize import to_json, from_json
 from weave import graph_client_context
-from weave.chobj import custom_objs
 from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     ObjCreateReq,
@@ -144,6 +143,14 @@ class CallsIter:
         self.server = server
         self.project_id = project_id
         self.filter = filter
+
+    def __getitem__(self, key: Union[slice, int]):
+        if isinstance(key, slice):
+            raise NotImplementedError("Slicing not supported")
+        for i, call in enumerate(self):
+            if i == key:
+                return call
+        raise IndexError(f"Index {key} out of range")
 
     def __iter__(self):
         page_index = 0

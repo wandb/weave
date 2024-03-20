@@ -55,7 +55,7 @@ def client() -> Generator[weave_client.WeaveClient, None, None]:
     # server._run_migrations()
 
     # Uncomment to test against sqlite
-    server = sqlite_trace_server.SqliteTraceServer(":memory:")
+    server = sqlite_trace_server.SqliteTraceServer("file::memory:?cache=shared")
     server.drop_tables()
     server.setup_tables()
 

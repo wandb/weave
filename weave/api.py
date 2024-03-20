@@ -31,9 +31,7 @@ from . import context as _context
 from . import context_state as _context_state
 from . import run as _run
 from . import weave_init as _weave_init
-from . import graph_client as _graph_client
-from . import graph_client_local as _graph_client_local
-from . import graph_client_wandb_art_st as _graph_client_wandb_art_st
+from . import weave_client as _weave_client
 from . import graph_client_context as _graph_client_context
 from weave.monitoring import monitor as _monitor
 
@@ -136,7 +134,7 @@ def from_pandas(df):
 #### Newer API below
 
 
-def init(project_name: str) -> _graph_client.GraphClient:
+def init(project_name: str) -> _weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
@@ -159,8 +157,8 @@ def init(project_name: str) -> _graph_client.GraphClient:
 
 
 @contextlib.contextmanager
-def wandb_client(project_name: str) -> typing.Iterator[_graph_client.GraphClient]:
-    inited_client = _weave_init.init_wandb(project_name)
+def client(project_name) -> typing.Iterator[_weave_init.weave_client.WeaveClient]:
+    inited_client = _weave_init.init_weave(project_name)
     try:
         yield inited_client.client
     finally:
@@ -168,43 +166,13 @@ def wandb_client(project_name: str) -> typing.Iterator[_graph_client.GraphClient
 
 
 # This is currently an internal interface. We'll expose something like it though ("offline" mode)
-def init_local_client() -> _graph_client.GraphClient:
+def init_local_client() -> _weave_client.WeaveClient:
     return _weave_init.init_local().client
 
 
 @contextlib.contextmanager
-def local_client() -> typing.Iterator[_graph_client.GraphClient]:
+def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
     inited_client = _weave_init.init_local()
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
-
-
-def init_trace_client(project_name: str) -> _graph_client.GraphClient:
-    return _weave_init.init_trace_remote(project_name).client
-
-
-def init_chobj() -> _weave_init.chobj.ObjectClient:
-    return _weave_init.init_chobj().client
-
-
-@contextlib.contextmanager
-def chobj_client() -> typing.Iterator[_weave_init.chobj.ObjectClient]:
-    inited_client = _weave_init.init_chobj()
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
-
-
-def init_weave(project_name: str) -> _weave_init.chobj.ObjectClient:
-    return _weave_init.init_weave(project_name).client
-
-
-@contextlib.contextmanager
-def client(project_name) -> typing.Iterator[_weave_init.weave_client.WeaveClient]:
-    inited_client = _weave_init.init_weave(project_name)
     try:
         yield inited_client.client
     finally:
@@ -238,7 +206,9 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
 
     ref = client.save_object(obj, save_name, "latest")
 
-    print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
+    # print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
+    # print(f"Published to {ref.ui_url}")
+    print("Published")
 
     # Have to manually put the ref on the obj, this is supposed to happen at
     # a lower level, but we use a mapper in _direct_publish that I think changes

@@ -2,6 +2,8 @@
 
 from typing import cast, Optional, Any
 
+import contextvars
+import contextlib
 import datetime
 import json
 import hashlib
@@ -33,22 +35,38 @@ def bytes_digest(json_val: bytes) -> str:
     return hasher.hexdigest()
 
 
+_conn_cursor: contextvars.ContextVar[
+    Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
+] = contextvars.ContextVar("conn_cursor", default=None)
+
+
+def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
+    # conn_cursor = _conn_cursor.get()
+    conn_cursor = None
+    if conn_cursor is None:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        conn_cursor = (conn, cursor)
+        _conn_cursor.set(conn_cursor)
+    return conn_cursor
+
+
 class SqliteTraceServer(tsi.TraceServerInterface):
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.conn = sqlite3.connect(db_path)
-        self.cursor = self.conn.cursor()
 
     def drop_tables(self) -> None:
-        self.cursor.execute("DROP TABLE IF EXISTS calls")
-        self.cursor.execute("DROP TABLE IF EXISTS objects")
-        self.cursor.execute("DROP TABLE IF EXISTS tables")
-        self.cursor.execute("DROP TABLE IF EXISTS table_rows")
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute("DROP TABLE IF EXISTS calls")
+        cursor.execute("DROP TABLE IF EXISTS objects")
+        cursor.execute("DROP TABLE IF EXISTS tables")
+        cursor.execute("DROP TABLE IF EXISTS table_rows")
 
     def setup_tables(self) -> None:
-        self.cursor.execute(
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
             """
-            CREATE TABLE calls (
+            CREATE TABLE IF NOT EXISTS calls (
                 project_id TEXT,
                 id TEXT PRIMARY KEY,
                 trace_id TEXT,
@@ -67,9 +85,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
         """
         )
-        self.cursor.execute(
+        cursor.execute(
             """
-            CREATE TABLE objects (
+            CREATE TABLE IF NOT EXISTS objects (
                 entity TEXT,
                 project TEXT,
                 name TEXT,
@@ -82,36 +100,37 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
         """
         )
-        self.cursor.execute(
+        cursor.execute(
             """
-            CREATE TABLE tables (
+            CREATE TABLE IF NOT EXISTS tables (
                 entity TEXT,
                 project TEXT,
                 digest TEXT UNIQUE,
                 row_digests STRING)
             """
         )
-        self.cursor.execute(
+        cursor.execute(
             """
-            CREATE TABLE table_rows (
+            CREATE TABLE IF NOT EXISTS table_rows (
                 entity TEXT,
                 project TEXT,
-                digest TEXT,
+                digest TEXT UNIQUE,
                 val TEXT)
             """
         )
-        self.cursor.execute(
+        cursor.execute(
             """
-            CREATE TABLE files (
+            CREATE TABLE IF NOT EXISTS files (
                 entity TEXT,
                 project TEXT,
-                digest TEXT,
+                digest TEXT UNIQUE,
                 val BLOB)
             """
         )
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        conn, cursor = get_conn_cursor(self.db_path)
         if req.start.trace_id is None:
             raise ValueError("trace_id is required")
         if req.start.id is None:
@@ -119,7 +138,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        self.cursor.execute(
+        cursor.execute(
             """INSERT INTO calls (
                 project_id,
                 id,
@@ -147,7 +166,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 req.start.wb_run_id,
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
         # Returns the id of the newly created call
         return tsi.CallStartRes(
@@ -156,7 +175,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        self.cursor.execute(
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
             """UPDATE calls SET
                 end_datetime = ?,
                 exception = ?,
@@ -171,13 +191,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 req.end.id,
             ),
         )
-        self.conn.commit()
+        conn.commit()
         return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         raise NotImplementedError()
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        conn, cursor = get_conn_cursor(self.db_path)
         conds = []
         filter = req.filter
         if filter:
@@ -205,9 +226,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if predicate:
             query += f" AND {predicate}"
 
-        self.cursor.execute(query)
+        cursor.execute(query)
 
-        query_result = self.cursor.fetchall()
+        query_result = cursor.fetchall()
         return tsi.CallsQueryRes(
             calls=[
                 tsi.CallSchema(
@@ -239,48 +260,46 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        conn, cursor = get_conn_cursor(self.db_path)
         json_val = json.dumps(req.obj.val)
         digest = str_digest(json_val)
 
         req_obj = req.obj
         entity, project = req_obj.project_id.split("/")
-        try:
-            # TODO: version index isn't right here, what if we delete stuff?
-            self.cursor.execute("BEGIN TRANSACTION")
-            # first get version count
-            self.cursor.execute(
-                """SELECT COUNT(*) FROM objects WHERE entity = ? AND project = ? AND name = ?""",
-                (entity, project, req_obj.name),
-            )
-            version_index = self.cursor.fetchone()[0]
+        # TODO: version index isn't right here, what if we delete stuff?
+        cursor.execute("BEGIN TRANSACTION")
+        # first get version count
+        cursor.execute(
+            """SELECT COUNT(*) FROM objects WHERE entity = ? AND project = ? AND name = ?""",
+            (entity, project, req_obj.name),
+        )
+        version_index = cursor.fetchone()[0]
 
-            self.cursor.execute(
-                """INSERT INTO objects (
-                    entity,
-                    project,
-                    name,
-                    created_at,
-                    type,
-                    refs,
-                    val,
-                    digest,
-                    version_index
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    entity,
-                    project,
-                    req_obj.name,
-                    datetime.datetime.now().isoformat(),
-                    get_type(req_obj.val),
-                    json.dumps([]),
-                    json_val,
-                    digest,
-                    version_index,
-                ),
-            )
-            self.conn.commit()
-        except sqlite3.IntegrityError:
-            self.conn.rollback()
+        cursor.execute(
+            """INSERT OR IGNORE INTO objects (
+                entity,
+                project,
+                name,
+                created_at,
+                type,
+                refs,
+                val,
+                digest,
+                version_index
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                entity,
+                project,
+                req_obj.name,
+                datetime.datetime.now().isoformat(),
+                get_type(req_obj.val),
+                json.dumps([]),
+                json_val,
+                digest,
+                version_index,
+            ),
+        )
+        conn.commit()
         return tsi.ObjCreateRes(version_digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
@@ -321,6 +340,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        conn, cursor = get_conn_cursor(self.db_path)
         entity, project = req.table.project_id.split("/")
         insert_rows = []
         for r in req.table.rows:
@@ -329,8 +349,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
             insert_rows.append((entity, project, row_digest, row_json))
-        self.cursor.executemany(
-            "INSERT INTO table_rows (entity, project, digest, val) VALUES (?, ?, ?, ?)",
+        cursor.executemany(
+            "INSERT OR IGNORE INTO table_rows (entity, project, digest, val) VALUES (?, ?, ?, ?)",
             insert_rows,
         )
 
@@ -341,11 +361,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             table_hasher.update(row_digest.encode())
         table_digest = table_hasher.hexdigest()
 
-        self.cursor.execute(
-            "INSERT INTO tables (entity, project, digest, row_digests) VALUES (?, ?, ?, ?)",
+        cursor.execute(
+            "INSERT OR IGNORE INTO tables (entity, project, digest, row_digests) VALUES (?, ?, ?, ?)",
             (entity, project, table_digest, json.dumps(row_digests)),
         )
-        self.conn.commit()
+        conn.commit()
 
         return tsi.TableCreateRes(digest=table_digest)
 
@@ -420,9 +440,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_obj_refs])
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        conn, cursor = get_conn_cursor(self.db_path)
         digest = bytes_digest(req.content)
-        self.cursor.execute(
-            "INSERT INTO files (entity, project, digest, val) VALUES (?, ?, ?, ?)",
+        cursor.execute(
+            "INSERT OR IGNORE INTO files (entity, project, digest, val) VALUES (?, ?, ?, ?)",
             (
                 req.project_id.split("/")[0],
                 req.project_id.split("/")[1],
@@ -430,15 +451,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 req.content,
             ),
         )
-        self.conn.commit()
+        conn.commit()
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        self.cursor.execute(
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
             "SELECT val FROM files WHERE entity = ? AND project = ? AND digest = ?",
             (req.project_id.split("/")[0], req.project_id.split("/")[1], req.digest),
         )
-        query_result = self.cursor.fetchone()
+        query_result = cursor.fetchone()
         if query_result is None:
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
@@ -452,34 +474,38 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         limit: Optional[int] = None,
         parameters: Optional[dict[str, Any]] = None,
     ) -> list[tsi.TableRowSchema]:
+        conn, cursor = get_conn_cursor(self.db_path)
         conds = ["entity = {entity: String}", "project = {project: String}"]
         if conditions:
             conds.extend(conditions)
 
         predicate = " AND ".join(conds)
         # First get the row IDs by querying tables
-        self.cursor.execute(
+        cursor.execute(
             """
-            SELECT digest, row_digests FROM tables
-            WHERE entity = ? AND project = ? AND digest = ?
+            WITH OrderedDigests AS (
+                SELECT
+                    json_each.value AS digest
+                FROM
+                    tables,
+                    json_each(tables.row_digests)
+                WHERE
+                    tables.entity = ? AND
+                    tables.project = ? AND
+                    tables.digest = ?
+                ORDER BY
+                    json_each.id
+            )
+            SELECT
+                table_rows.digest,
+                table_rows.val
+            FROM
+                OrderedDigests
+                JOIN table_rows ON OrderedDigests.digest = table_rows.digest
             """,
             (entity, project, table_digest),
         )
-        query_result = self.cursor.fetchone()
-        if query_result is None:
-            raise NotFoundError(f"Table {table_digest} not found")
-        row_digests = json.loads(query_result[1])
-
-        # Now get the rows
-        row_digests_pred = ", ".join(["?"] * len(row_digests))
-        self.cursor.execute(
-            f"""
-            SELECT digest, val FROM table_rows
-            WHERE entity = ? AND project = ? AND digest IN ({row_digests_pred})
-            """,
-            [entity, project, *row_digests],
-        )
-        query_result = self.cursor.fetchall()
+        query_result = cursor.fetchall()
         return [
             tsi.TableRowSchema(digest=r[0], val=json.loads(r[1])) for r in query_result
         ]
@@ -487,15 +513,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def _table_row_read(
         self, entity: str, project: str, row_digest: str
     ) -> tsi.TableRowSchema:
+        conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
-        self.cursor.execute(
+        cursor.execute(
             """
             SELECT digest, val FROM table_rows
             WHERE entity = ? AND project = ? AND digest = ?
             """,
             [entity, project, row_digest],
         )
-        query_result = self.cursor.fetchone()
+        query_result = cursor.fetchone()
         if query_result is None:
             raise NotFoundError(f"Row {row_digest} not found")
         return tsi.TableRowSchema(
@@ -509,12 +536,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
     ) -> list[tsi.ObjSchema]:
+        conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
-        self.cursor.execute(
+        cursor.execute(
             """SELECT * FROM objects WHERE entity = ? AND project = ? AND """ + pred,
             (entity, project),
         )
-        query_result = self.cursor.fetchall()
+        query_result = cursor.fetchall()
         result: list[tsi.ObjSchema] = []
         for row in query_result:
             result.append(

@@ -19,72 +19,17 @@ def print_run_link(run):
     print(f"🍩 {run.ui_url}")
 
 
-# def _deref_all(obj: typing.Any):
-#     if isinstance(obj, dict):
-#         return {k: _deref_all(v) for k, v in obj.items()}
-#     elif isinstance(obj, list):
-#         return [_deref_all(v) for v in obj]
-#     elif isinstance(obj, ref_base.Ref):
-#         return obj.get()
-#     return obj
-
-
-# def _auto_publish(obj: typing.Any, output_refs: typing.List[ref_base.Ref]):
-#     import numpy as np
-
-#     ref = storage.get_ref(obj)
-#     if ref:
-#         output_refs.append(ref)
-#         return ref
-
-#     if isinstance(obj, dict):
-#         return {k: _auto_publish(v, output_refs) for k, v in obj.items()}
-#     elif isinstance(obj, list):
-#         return [_auto_publish(v, output_refs) for v in obj]
-#     weave_type = types.TypeRegistry.type_of(obj)
-#     if weave_type == types.UnknownType():
-#         return f"<UnknownType: {type(obj)}>"
-#     if not (
-#         types.is_custom_type(weave_type) or isinstance(weave_type, types.ObjectType)
-#     ):
-#         return obj
-
-#     client = graph_client_context.require_graph_client()
-#     if not ref:
-#         name = getattr(obj, "name", None)
-#         if name == None:
-#             name = f"{obj.__class__.__name__}"
-#         if not isinstance(name, str):
-#             raise ValueError(f"Object's name attribute is not a string: {name}")
-#         ref = client.save_object(obj, name, "latest")
-
-#     output_refs.append(ref)
-#     return ref
-
-
-# def auto_publish(obj: typing.Any) -> typing.Tuple[typing.Any, list]:
-#     refs: typing.List[ref_base.Ref] = []
-#     return _auto_publish(obj, refs), refs
-
-
 def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
     client = graph_client_context.get_graph_client()
     if client is not None and context_state.eager_mode():
         parent_run = run_context.get_current_run()
-        # op_def_ref = storage._get_ref(op_def)
-        # if not client.ref_is_own(op_def_ref):
-        #     op_def_ref = client.save_object(op_def, f"{op_def.name}", "latest")
-        # mon_span_inputs, refs = auto_publish(inputs)
         trackable_inputs = client.save_nested_objects(inputs)
-        # mon_span_inputs, refs = client.save_nested_objects(inputs), []
 
         # Memoization disabled for now.
         # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
         # if found_run:
         #     return found_run.output
 
-        # if not parent_run:
-        #     print("Running ", op_def.name)
         run = client.create_call(op_def, parent_run, trackable_inputs)
         try:
             with run_context.current_run(run):
@@ -130,17 +75,9 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
 
             return _run_async()
         else:
-            # output, output_refs = auto_publish(res)
-            output, output_refs = res, []
-            # TODO: boxing enables full ref-tracking of run outputs
-            # to other run inputs, but its not working yet.
-            # output = box.box(output)
-
-            client.finish_call(run, output)
+            client.finish_call(run, res)
             if not parent_run:
                 print_run_link(run)
-            res = output
-            # res = _deref_all(output)
 
     else:
         res = op_def.resolve_fn(**inputs)
