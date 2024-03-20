@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Union, Callable, Optional, Tuple, Any
+from weave.trace.isinstance import weave_isinstance
 from weave.flow import Object
 from weave import op_def, WeaveList
 
@@ -64,22 +65,21 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
 def get_scorer_attributes(
     scorer: Union[Callable, op_def.OpDef, Scorer]
 ) -> Tuple[str, Callable, Callable]:
-    if isinstance(scorer, Scorer):
+    if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
         if scorer_name == None:
             scorer_name = scorer.__class__.__name__
         score_fn = scorer.score
         summarize_fn = scorer.summarize  # type: ignore
-    else:
+    elif callable(scorer):
         if isinstance(scorer, op_def.OpDef):
             scorer_name = scorer.common_name
         else:
-            try:
-                scorer_name = scorer.__name__
-            except AttributeError:
-                scorer_name = scorer._class_name
+            scorer_name = scorer.__name__
         score_fn = scorer
         summarize_fn = auto_summarize  # type: ignore
+    else:
+        raise ValueError(f"Unknown scorer type: {scorer}")
     return (scorer_name, score_fn, summarize_fn)  # type: ignore
 
 
