@@ -11,7 +11,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 // import {refStringToRefDict} from '../wfInterface/naive';
-import {callCache} from './cache';
+import {callCache, refDataCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -522,35 +522,51 @@ const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
-  const [simpleUris, tableUris] = useMemo(() => {
-    const sUris: Array<{ndx: number; uri: string; ref: ObjectVersionKey}> = [];
-    const tUris: Array<{ndx: number; uri: string; ref: ObjectVersionKey}> = [];
+  const [nonTableRefUris, tableRefUris] = useMemo(() => {
+    const sUris: Array<string> = [];
+    const tUris: Array<string> = [];
     refUris
       .map(uri => ({uri, ref: refUriToObjectVersionKey(uri)}))
       .forEach(({uri, ref}, ndx) => {
         if (ref.scheme === 'weave' && ref.weaveKind === 'table') {
-          tUris.push({ndx, uri, ref});
+          tUris.push(uri);
         } else {
-          sUris.push({ndx, uri, ref});
+          sUris.push(uri);
         }
       });
     return [sUris, tUris];
   }, [refUris]);
+
+  const [neededSimpleUris, cachedSimpleUriResults] = useMemo(() => {
+    const needed: string[] = [];
+    const cached: Record<string, any> = {};
+    nonTableRefUris.forEach((sUri) => {
+      const res = refDataCache.get(sUri);
+      if (res == null) {
+        needed.push(sUri);
+      } else {
+        cached[sUri] = res;
+      }
+    });
+    return [needed, cached];
+  }, [nonTableRefUris])
+
   const simpleValsResult = useRefsReadBatch(
-    simpleUris.map(({uri}) => uri),
+    neededSimpleUris,
     {
-      skip: simpleUris.length === 0,
+      skip: neededSimpleUris.length === 0,
     }
   );
   let tableUriProjectId = '';
   let tableUriDigest = '';
-  if (tableUris.length > 1) {
+  if (tableRefUris.length > 1) {
     throw new Error('Multiple table refs not supported');
-  } else if (tableUris.length === 1) {
+  } else if (tableRefUris.length === 1) {
+    const tableRef = refUriToObjectVersionKey(tableRefUris[0]);
     tableUriProjectId =
-      tableUris[0].ref.entity + '/' + tableUris[0].ref.project;
+      tableRef.entity + '/' + tableRef.project;
     // console.log(tableUris[0].ref)
-    tableUriDigest = tableUris[0].ref.objectId;
+    tableUriDigest = tableRef.objectId;
   }
   const tableQueryFilter = useMemo(() => {
     // TODO: tableQuery
@@ -561,7 +577,7 @@ const useRefsData = (
     tableUriDigest,
     tableQueryFilter,
     tableQuery?.limit,
-    {skip: tableUris.length === 0}
+    {skip: tableRefUris.length === 0}
   );
   // console.log(tableValsResult);
   return useMemo(() => {
@@ -581,34 +597,31 @@ const useRefsData = (
     }
     const sRes = simpleValsResult.result;
     const tRes = tableValsResult.result;
-    // if (sRes == null || tRes == null) {
-    //   return {
-    //     loading: false,
-    //     result: null,
-    //     error: 'Missing result',
-    //   };
-    // }
-    const valsResult = Array(refUris.length);
-    simpleUris.forEach(({ndx}, i) => {
-      valsResult[ndx] = sRes?.[i];
-    });
-    tableUris.forEach(({ndx}, i) => {
-      valsResult[ndx] = tRes;
-    });
+
+    const valueMap = new Map<string, any>();
+    if (sRes != null) {
+      sRes.forEach((val, i) => {
+        valueMap.set(neededSimpleUris[i], val);
+        refDataCache.set(neededSimpleUris[i], val);
+      })
+    }
+    if (tRes != null) {
+
+        valueMap.set(tableRefUris[0], tRes);
+        // Don't cache table results (since there could be a filter)
+
+    }
+    Object.entries(cachedSimpleUriResults).forEach(([uri, val]) => {
+      valueMap.set(uri, val);
+    })
+    const valsResult = refUris.map(uri => valueMap.get(uri));
+
     return {
       loading: false,
       result: valsResult,
       error: null,
     };
-  }, [
-    refUris.length,
-    simpleUris,
-    simpleValsResult.loading,
-    simpleValsResult.result,
-    tableUris,
-    tableValsResult.loading,
-    tableValsResult.result,
-  ]);
+  }, [refUris, simpleValsResult.loading, simpleValsResult.result, tableValsResult.loading, tableValsResult.result, cachedSimpleUriResults, neededSimpleUris, tableRefUris]);
 };
 
 const useApplyMutationsToRef = (): ((
@@ -630,8 +643,24 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
     if (refUris.length === 0) {
       return [];
     }
-    const objVersionsResult = await readBatch(refUris);
-    return objVersionsResult.map(weaveTypeOf);
+    const needed: string[] = [];
+    const refToData: Record<string, any> = {};
+    refUris.forEach((uri) => {
+      const res = refDataCache.get(uri);
+      if (res == null) {
+        needed.push(uri);
+      } else {
+        refToData[uri] = res;
+      }
+    });
+    if (needed.length !== 0) {
+      const readBatchResults = await readBatch(refUris);
+      readBatchResults.forEach((res, i) => {
+        refToData[needed[i]] = res;
+        refDataCache.set(needed[i], res);
+      });
+    }
+    return refUris.map(uri => weaveTypeOf(refToData[uri]));
   };
 };
 
