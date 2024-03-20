@@ -76,32 +76,33 @@ labels = [
     {'fruit': 'glowls', 'color': 'pale orange', 'flavor': 'sour and bitter'}
 ]
 examples = [
-    {'id': '0', 'sentence': sentences[0], 'extracted': labels[0]},
-    {'id': '1', 'sentence': sentences[1], 'extracted': labels[1]},
-    {'id': '2', 'sentence': sentences[2], 'extracted': labels[2]}
+    {'id': '0', 'sentence': sentences[0], 'target': labels[0]},
+    {'id': '1', 'sentence': sentences[1], 'target': labels[1]},
+    {'id': '2', 'sentence': sentences[2], 'target': labels[2]}
 ]
 ```
 
 ### Evaluate a `Model`
 
 `Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions.
-Each scoring function takes an example row and the resulting prediction and return a dictionary of scores for that example.
 
-Here, we'll use a default scoring function `MulticlassF1Score` and we'll also define our own `fruit_name_score`.
+Here, we'll use a default scoring function `MulticlassF1Score` and we'll also define our own `fruit_name_score`. 
+
+Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. 
 
 ```python
-from weave.weaveflow import evaluate
+from weave import evaluate
 import weave
 from weave.flow.scorer import MulticlassF1Score
 
 @weave.op()
-def fruit_name_score(example: dict, prediction: dict) -> dict:
-    return {'correct': example['extracted']['fruit'] == prediction['fruit']}
+def fruit_name_score(target: dict, prediction: dict) -> dict:
+    return {'correct': target['fruit'] == prediction['fruit']}
 
 # highlight-next-line
 evaluation = evaluate.Evaluation(
     # highlight-next-line
-    dataset, scores=[MulticlassF1Score(class_names=["name", "shares"]), fruit_name_score],
+    dataset, scores=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
 # highlight-next-line
 )
 # highlight-next-line
@@ -173,8 +174,8 @@ examples = [
 
 # We define a scoring functions to compare our model predictions with a ground truth label.
 @weave.op()
-def fruit_name_score(example: dict, prediction: dict) -> dict:
-    return {'correct': example['target']['fruit'] == prediction['fruit']}
+def fruit_name_score(target: dict, prediction: dict) -> dict:
+    return {'correct': target['fruit'] == prediction['fruit']}
 
 # Finally, we run an evaluation of this model. 
 # This will generate a prediction for each input example, and then score it with each scoring function.

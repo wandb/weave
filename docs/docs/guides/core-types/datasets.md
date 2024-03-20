@@ -17,7 +17,7 @@ This guide will show you how to:
 
 ```python
 import weave
-from weave.weaveflow import Dataset
+from weave import Dataset
 # Initialize Weave
 weave.init('intro-example')
 
