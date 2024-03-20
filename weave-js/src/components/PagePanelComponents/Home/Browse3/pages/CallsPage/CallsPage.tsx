@@ -238,6 +238,13 @@ export const CallsTable: FC<{
     traceRootOptions.length <= 1 ||
     Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly');
 
+  const callsKey = useMemo(() => {
+    if (calls.loading || calls.result == null) {
+      return null;
+    }
+    return Math.random();
+  }, [calls.loading, calls.result]);
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -407,6 +414,7 @@ export const CallsTable: FC<{
         />
       ) : (
         <RunsTable
+          key={callsKey}
           loading={calls.loading}
           spans={calls.result ?? []}
           clearFilters={clearFilters}
@@ -494,17 +502,19 @@ const useOpVersionOptions = (
       });
     });
 
-    _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
-      ov => {
-        const ref = opVersionKeyToRefUri(ov);
-        result.push({
-          title: opNiceName(ov.opId) + ':v' + ov.versionIndex,
-          ref,
-          group: `Versions of ${opNiceName(currentOpId!)}`,
-          objectVersion: ov,
-        });
-      }
-    );
+    if (currentOpId) {
+      _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
+        ov => {
+          const ref = opVersionKeyToRefUri(ov);
+          result.push({
+            title: opNiceName(ov.opId) + ':v' + ov.versionIndex,
+            ref,
+            group: `Versions of ${opNiceName(currentOpId)}`,
+            objectVersion: ov,
+          });
+        }
+      );
+    }
 
     return _.fromPairs(result.map(r => [r.ref, r]));
   }, [currentOpId, currentVersions.result, latestVersions.result]);
