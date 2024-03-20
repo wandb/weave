@@ -294,8 +294,7 @@ def make_trace_obj(
                 version_digest=val.version,
             )
         )
-        val = from_json(read_res.obj.val)
-        # val = server._resolve_object(val.name, "latest")
+        val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
 
     if isinstance(val, TableRef):
         extra = val.extra

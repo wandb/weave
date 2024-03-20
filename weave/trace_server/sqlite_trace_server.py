@@ -311,7 +311,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
-        print(req.project_id)
         entity, project = req.project_id.split("/")
         objs = self._select_objs_query(
             entity,

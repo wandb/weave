@@ -13,7 +13,7 @@ from weave.trace_server.trace_server_interface_util import (
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
     temp_read_dir: Optional[str]
-    path_contents: dict[str, Union[str, bytes]]
+    path_contents: dict[str, bytes]
 
     def __init__(
         self,
@@ -60,10 +60,6 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
                 f = io.BytesIO(val)
             else:
                 val = self.path_contents[path]
-                if not isinstance(val, bytes):
-                    raise ValueError(
-                        f"Expected string file, but got binary for path {path}"
-                    )
                 f = io.StringIO(val.decode("utf-8"))
         except KeyError:
             raise FileNotFoundError(path)
@@ -96,12 +92,10 @@ def encode_custom_obj(obj):
     art = MemTraceFilesArtifact()
     weave_type.save_instance(obj, art, "obj")
 
-    encoded_path_contents = encode_bytes_as_b64(
-        {
-            k: (v.encode("utf-8") if isinstance(v, str) else v)
-            for k, v in art.path_contents.items()
-        }
-    )
+    encoded_path_contents = {
+        k: (v.encode("utf-8") if isinstance(v, str) else v)
+        for k, v in art.path_contents.items()
+    }
     return {
         "_type": "CustomWeaveType",
         "weave_type": weave_type.to_dict(),
@@ -111,7 +105,7 @@ def encode_custom_obj(obj):
 
 def decode_custom_obj(weave_type, encoded_path_contents):
     art = MemTraceFilesArtifact(
-        decode_b64_to_bytes(encoded_path_contents),
+        encoded_path_contents,
         metadata={},
     )
     wb_type = types.TypeRegistry.type_from_dict(weave_type)

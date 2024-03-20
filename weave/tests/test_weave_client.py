@@ -614,7 +614,7 @@ def test_large_files(client):
 
         def save_instance(self, obj, artifact, name):
             with artifact.new_file(name) as f:
-                f.write(obj.a * 10000000)
+                f.write(obj.a * 10000005)
 
         def load_instance(self, artifact, name, extra=None):
             with artifact.open(name) as f:
@@ -622,7 +622,7 @@ def test_large_files(client):
 
     ref = client.save_object(CoolCustomThing("x"), "my-obj")
     res = client.get(ref)
-    assert len(res.a) == 10000000
+    assert len(res.a) == 10000005
 
 
 def test_server_file(client):

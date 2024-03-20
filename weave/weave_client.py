@@ -179,7 +179,7 @@ def make_client_call(server_call: CallSchema, server: TraceServerInterface):
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
         id=server_call.id,
-        inputs=from_json(server_call.inputs),
+        inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
     )
     return TraceObject(call, CallRef(call.id), server, call)
@@ -213,10 +213,11 @@ class WeaveClient:
         return self._save_object(val, name, branch)
 
     def _save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
+        is_opdef = isinstance(val, op_def.OpDef)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
-        json_val = to_json(val)
+        json_val = to_json(val, self._project_id(), self.server)
 
         response = self.server.obj_create(
             ObjCreateReq(
@@ -225,7 +226,7 @@ class WeaveClient:
                 )
             )
         )
-        if isinstance(val, op_def.OpDef):
+        if is_opdef:
             ref = OpRef(self.entity, self.project, name, response.version_digest)
         else:
             ref = ObjectRef(self.entity, self.project, name, response.version_digest)
@@ -246,7 +247,7 @@ class WeaveClient:
                 version_digest=ref.version,
             )
         )
-        val = from_json(read_res.obj.val)
+        val = from_json(read_res.obj.val, self._project_id(), self.server)
         return make_trace_obj(val, ref, self.server, None)
 
     def save_table(self, table: Table) -> TableRef:
@@ -341,7 +342,7 @@ class WeaveClient:
             trace_id=trace_id,
             start_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
-            inputs=to_json(inputs_with_refs),
+            inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes={},
             wb_run_id=current_wb_run_id,
         )
@@ -363,7 +364,7 @@ class WeaveClient:
                         "project_id": self._project_id(),
                         "id": call.id,
                         "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
-                        "outputs": to_json(output),
+                        "outputs": to_json(output, self._project_id(), self.server),
                         "summary": {},
                     },
                 }
