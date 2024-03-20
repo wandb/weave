@@ -128,8 +128,20 @@ export class TraceServerClient {
     resolvePromise: (res: TraceRefsReadBatchRes) => void;
     rejectPromise: (err: any) => void;
   }> = [];
+  private inFlightFetchesRequests: Record<
+    string,
+    Record<
+      string,
+      Array<{
+        resolve: (res: any) => void;
+        reject: (err: any) => void;
+      }>
+    >
+  > = {};
 
   constructor(baseUrl: string) {
+    this.readBatchCollectors = [];
+    this.inFlightFetchesRequests = {};
     this.baseUrl = baseUrl;
     this.scheduleReadBatch();
   }
@@ -172,9 +184,26 @@ export class TraceServerClient {
     req: QT
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
+    const reqBody = JSON.stringify(req);
+    let needsFetch = false;
+    if (!this.inFlightFetchesRequests[endpoint]) {
+      this.inFlightFetchesRequests[endpoint] = {};
+    }
+    if (!this.inFlightFetchesRequests[endpoint][reqBody]) {
+      this.inFlightFetchesRequests[endpoint][reqBody] = [];
+      needsFetch = true;
+    }
+
+    const prom = new Promise<ST>((resolve, reject) => {
+      this.inFlightFetchesRequests[endpoint][reqBody].push({resolve, reject});
+    });
+
+    if (!needsFetch) {
+      return prom;
+    }
 
     // eslint-disable-next-line wandb/no-unprefixed-urls
-    const response = await fetch(url, {
+    fetch(url, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -184,10 +213,43 @@ export class TraceServerClient {
         // authentication.
         Authorization: 'Basic ' + btoa(':'),
       },
-      body: JSON.stringify(req),
-    });
-    const res = await response.json();
-    return res;
+      body: reqBody,
+    })
+      .then(response => {
+        return response.json();
+      })
+      .then(res => {
+        try {
+          const inFlightRequest = [
+            ...this.inFlightFetchesRequests[endpoint]?.[reqBody],
+          ];
+          delete this.inFlightFetchesRequests[endpoint][reqBody];
+          if (inFlightRequest) {
+            inFlightRequest.forEach(({resolve}) => {
+              resolve(res);
+            });
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      })
+      .catch(err => {
+        try {
+          const inFlightRequest = [
+            ...this.inFlightFetchesRequests[endpoint]?.[reqBody],
+          ];
+          delete this.inFlightFetchesRequests[endpoint][reqBody];
+          if (inFlightRequest) {
+            inFlightRequest.forEach(({reject}) => {
+              reject(err);
+            });
+          }
+        } catch (err2) {
+          console.error(err2);
+        }
+      });
+
+    return prom;
   };
 
   private requestReadBatch: (

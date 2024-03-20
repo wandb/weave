@@ -11,7 +11,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 // import {refStringToRefDict} from '../wfInterface/naive';
-import {callCache, refDataCache} from './cache';
+import {callCache, objectVersionCache, refDataCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -344,6 +344,12 @@ const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
+  const cached = useMemo(() => {
+    if (key == null) {
+      return null;
+    }
+    return objectVersionCache.get(key);
+  }, [key]);
   const result = useRootObjectVersions(
     key?.entity ?? '',
     key?.project ?? '',
@@ -352,16 +358,38 @@ const useObjectVersion = (
     },
     undefined,
     {
-      skip: key == null,
+      skip: key == null || cached != null,
     }
   );
-  return useMemo(() => ({
-    loading: result.loading,
-    result: {
+  return useMemo(() => {
+    if (key == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+    if (cached != null) {
+      return {
+        loading: false,
+        result: cached,
+      };
+    }
+    if (result.loading || result.result == null) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+    const cachableResult = {
       ...key,
-      ...result.result?.find(obj => obj.versionHash === key?.versionHash),
-    } as ObjectVersionSchema | null,
-  }), [key, result.loading, result.result]);
+      ...result.result.find(obj => obj.versionHash === key?.versionHash),
+    } as ObjectVersionSchema;
+    objectVersionCache.set(key, cachableResult);
+    return {
+      loading: result.loading,
+      result: cachableResult,
+    };
+  }, [cached, key, result.loading, result.result]);
 };
 
 const useRootObjectVersions = makeTraceServerEndpointHook(
@@ -523,8 +551,8 @@ const useRefsData = (
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
   const [nonTableRefUris, tableRefUris] = useMemo(() => {
-    const sUris: Array<string> = [];
-    const tUris: Array<string> = [];
+    const sUris: string[] = [];
+    const tUris: string[] = [];
     refUris
       .map(uri => ({uri, ref: refUriToObjectVersionKey(uri)}))
       .forEach(({uri, ref}, ndx) => {
@@ -540,7 +568,7 @@ const useRefsData = (
   const [neededSimpleUris, cachedSimpleUriResults] = useMemo(() => {
     const needed: string[] = [];
     const cached: Record<string, any> = {};
-    nonTableRefUris.forEach((sUri) => {
+    nonTableRefUris.forEach(sUri => {
       const res = refDataCache.get(sUri);
       if (res == null) {
         needed.push(sUri);
@@ -549,22 +577,18 @@ const useRefsData = (
       }
     });
     return [needed, cached];
-  }, [nonTableRefUris])
+  }, [nonTableRefUris]);
 
-  const simpleValsResult = useRefsReadBatch(
-    neededSimpleUris,
-    {
-      skip: neededSimpleUris.length === 0,
-    }
-  );
+  const simpleValsResult = useRefsReadBatch(neededSimpleUris, {
+    skip: neededSimpleUris.length === 0,
+  });
   let tableUriProjectId = '';
   let tableUriDigest = '';
   if (tableRefUris.length > 1) {
     throw new Error('Multiple table refs not supported');
   } else if (tableRefUris.length === 1) {
     const tableRef = refUriToObjectVersionKey(tableRefUris[0]);
-    tableUriProjectId =
-      tableRef.entity + '/' + tableRef.project;
+    tableUriProjectId = tableRef.entity + '/' + tableRef.project;
     // console.log(tableUris[0].ref)
     tableUriDigest = tableRef.objectId;
   }
@@ -603,17 +627,15 @@ const useRefsData = (
       sRes.forEach((val, i) => {
         valueMap.set(neededSimpleUris[i], val);
         refDataCache.set(neededSimpleUris[i], val);
-      })
+      });
     }
     if (tRes != null) {
-
-        valueMap.set(tableRefUris[0], tRes);
-        // Don't cache table results (since there could be a filter)
-
+      valueMap.set(tableRefUris[0], tRes);
+      // Don't cache table results (since there could be a filter)
     }
     Object.entries(cachedSimpleUriResults).forEach(([uri, val]) => {
       valueMap.set(uri, val);
-    })
+    });
     const valsResult = refUris.map(uri => valueMap.get(uri));
 
     return {
@@ -621,7 +643,16 @@ const useRefsData = (
       result: valsResult,
       error: null,
     };
-  }, [refUris, simpleValsResult.loading, simpleValsResult.result, tableValsResult.loading, tableValsResult.result, cachedSimpleUriResults, neededSimpleUris, tableRefUris]);
+  }, [
+    refUris,
+    simpleValsResult.loading,
+    simpleValsResult.result,
+    tableValsResult.loading,
+    tableValsResult.result,
+    cachedSimpleUriResults,
+    neededSimpleUris,
+    tableRefUris,
+  ]);
 };
 
 const useApplyMutationsToRef = (): ((
@@ -645,7 +676,7 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
     }
     const needed: string[] = [];
     const refToData: Record<string, any> = {};
-    refUris.forEach((uri) => {
+    refUris.forEach(uri => {
       const res = refDataCache.get(uri);
       if (res == null) {
         needed.push(uri);
