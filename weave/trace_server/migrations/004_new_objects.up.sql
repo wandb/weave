@@ -72,3 +72,25 @@ FROM (
     FROM tables
 ) WHERE rn = 1
 ORDER BY entity, project, digest;
+
+
+CREATE TABLE files
+(
+    project_id String,
+    digest String,
+    chunk_index UInt32,
+    n_chunks UInt32,
+    name String,
+    val String,
+) 
+ENGINE = MergeTree() 
+ORDER BY (project_id, digest, chunk_index);
+
+CREATE VIEW files_deduped AS
+SELECT *
+FROM (
+    SELECT *,
+           row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
+    FROM files
+) WHERE rn = 1
+ORDER BY project_id, digest, chunk_index;

@@ -21,9 +21,15 @@ class NotFoundError(Exception):
     pass
 
 
-def val_digest(json_val: str) -> str:
+def str_digest(json_val: str) -> str:
     hasher = hashlib.sha256()
     hasher.update(json_val.encode())
+    return hasher.hexdigest()
+
+
+def bytes_digest(json_val: bytes) -> str:
+    hasher = hashlib.sha256()
+    hasher.update(json_val)
     return hasher.hexdigest()
 
 
@@ -92,6 +98,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 project TEXT,
                 digest TEXT,
                 val TEXT)
+            """
+        )
+        self.cursor.execute(
+            """
+            CREATE TABLE files (
+                entity TEXT,
+                project TEXT,
+                digest TEXT,
+                val BLOB)
             """
         )
 
@@ -225,7 +240,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         json_val = json.dumps(req.obj.val)
-        digest = val_digest(json_val)
+        digest = str_digest(json_val)
 
         req_obj = req.obj
         entity, project = req_obj.project_id.split("/")
@@ -313,7 +328,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if not isinstance(r, dict):
                 raise ValueError("All rows must be dictionaries")
             row_json = json.dumps(r)
-            row_digest = val_digest(row_json)
+            row_digest = str_digest(row_json)
             insert_rows.append((entity, project, row_digest, row_json))
         self.cursor.executemany(
             "INSERT INTO table_rows (entity, project, digest, val) VALUES (?, ?, ?, ?)",
@@ -404,6 +419,30 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             return val
 
         return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_obj_refs])
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        digest = bytes_digest(req.content)
+        self.cursor.execute(
+            "INSERT INTO files (entity, project, digest, val) VALUES (?, ?, ?, ?)",
+            (
+                req.project_id.split("/")[0],
+                req.project_id.split("/")[1],
+                digest,
+                req.content,
+            ),
+        )
+        self.conn.commit()
+        return tsi.FileCreateRes(digest=digest)
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        self.cursor.execute(
+            "SELECT val FROM files WHERE entity = ? AND project = ? AND digest = ?",
+            (req.project_id.split("/")[0], req.project_id.split("/")[1], req.digest),
+        )
+        query_result = self.cursor.fetchone()
+        if query_result is None:
+            raise NotFoundError(f"File {req.digest} not found")
+        return tsi.FileContentReadRes(content=query_result[0])
 
     def _table_query(
         self,

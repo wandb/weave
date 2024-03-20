@@ -1,6 +1,7 @@
 from typing import Any, Generator
 import re
 import pytest
+import pathlib
 import pydantic
 import uuid
 import weave
@@ -10,6 +11,7 @@ from weave import op_def, Evaluation
 from weave import weave_init
 from weave import weave_client
 from weave.api import client as weave_api_client
+from weave.artifact_base import ArtifactRef
 from weave.trace.refs import (
     ATTRIBUTE_EDGE_TYPE,
     ID_EDGE_TYPE,
@@ -28,6 +30,8 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TableQueryReq,
     RefsReadBatchReq,
+    FileCreateReq,
+    FileContentReadReq,
 )
 
 
@@ -596,6 +600,41 @@ def test_refs_read_batch_dataset_rows(client):
     assert len(res.vals) == 2
     assert res.vals[0] == 5
     assert res.vals[1] == 6
+
+
+def test_large_files(client):
+    class CoolCustomThing:
+        a: str
+
+        def __init__(self, a):
+            self.a = a
+
+    class CoolCustomThingType(weave.types.Type):
+        instance_classes = CoolCustomThing
+
+        def save_instance(self, obj, artifact, name):
+            with artifact.new_file(name) as f:
+                f.write(obj.a * 10000000)
+
+        def load_instance(self, artifact, name, extra=None):
+            with artifact.open(name) as f:
+                return CoolCustomThing(f.read())
+
+    ref = client.save_object(CoolCustomThing("x"), "my-obj")
+    res = client.get(ref)
+    assert len(res.a) == 10000000
+
+
+def test_server_file(client):
+    f_bytes = b"0" * 10000005
+    res = client.server.file_create(
+        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
+    )
+
+    read_res = client.server.file_content_read(
+        FileContentReadReq(project_id="shawn/test-project", digest=res.digest)
+    )
+    assert f_bytes == read_res.content
 
 
 # def test_publish_big_list(server):
