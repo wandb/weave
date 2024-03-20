@@ -502,20 +502,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise ValueError("Table refs not supported")
         parsed_refs = typing.cast(typing.List[refs.ObjectRef], parsed_refs)
 
+        root_val_cache: typing.Dict[str, typing.Any] = {}
+
+        def get_object_ref_root_val(r: refs.ObjectRef) -> typing.Any:
+            cache_key = f"{r.entity}/{r.project}/{r.name}/{r.version}"
+            if cache_key in root_val_cache:
+                val = root_val_cache[cache_key]
+            else:
+                conds = [
+                    f"name = '{r.name}'",
+                    f"digest = '{r.version}'",
+                ]
+                objs = self._select_objs_query(
+                    r.entity,
+                    r.project,
+                    conditions=conds,
+                )
+                if len(objs) == 0:
+                    raise NotFoundError(f"Obj {r.name}:{r.version} not found")
+                obj = objs[0]
+                val = json.loads(obj.val)
+                root_val_cache[cache_key] = val
+            return val
+
         def read_ref(r: refs.ObjectRef) -> typing.Any:
-            conds = [
-                f"name = '{r.name}'",
-                f"digest = '{r.version}'",
-            ]
-            objs = self._select_objs_query(
-                r.entity,
-                r.project,
-                conditions=conds,
-            )
-            if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
-            obj = objs[0]
-            val = json.loads(obj.val)
+            val = get_object_ref_root_val(r)
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
