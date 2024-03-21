@@ -32,10 +32,10 @@ from .language_features.tagging import (
 from . import language_autocall
 from . import op_def_type
 
-from . import weave_client
 
 if typing.TYPE_CHECKING:
     from .run_streamtable_span import RunStreamTableSpan
+    from . import weave_client
 
 
 _no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(
@@ -611,12 +611,12 @@ class OpDef:
     def op_def_is_auto_tag_handling_arrow_op(self) -> bool:
         return isinstance(self, AutoTagHandlingArrowOpDef)
 
-    def runs(self) -> Sequence[weave_client.Call]:
+    def runs(self) -> Sequence["weave_client.Call"]:
         client = graph_client_context.require_graph_client()
         return client.op_runs(self)
 
     # TODO: Use Call type instead of Run
-    def calls(self) -> weave_client.CallsIter:
+    def calls(self) -> "weave_client.CallsIter":
         client = graph_client_context.require_graph_client()
         return client.op_calls(self)
 
