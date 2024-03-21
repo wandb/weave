@@ -320,12 +320,10 @@ class WeaveClient:
         )
         return response.objs
 
-    def _save_op(self, op: op_def.OpDef) -> OpRef:
+    def _save_op(self, op: op_def.OpDef) -> Ref:
         if isinstance(op, op_def.BoundOpDef):
             op = op.op_def
         op_def_ref = self._save_object(op, op.name)
-        if not isinstance(op_def_ref, OpRef):
-            raise ValueError(f"Expected OpRef, got {op_def_ref}")
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
 
