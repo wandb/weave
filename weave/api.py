@@ -313,7 +313,7 @@ def serve(
     print(f"Serving {model_ref}")
     print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
     print()
-    os.environ["PROJECT_NAME"] = f"{client.entity_name}/{client.project_name}"
+    os.environ["PROJECT_NAME"] = f"{client.entity}/{client.project}"
     os.environ["MODEL_REF"] = str(model_ref)
 
     wandb_api_ctx = _wandb_api.get_wandb_api_context()
