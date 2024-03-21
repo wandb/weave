@@ -30,6 +30,9 @@ class Ref:
 
     def with_item(self, item_digest: str) -> "Ref":
         return self.with_extra([ID_EDGE_TYPE, f"{item_digest}"])
+    
+    def __str__(self) -> str:
+        return self.uri()
 
 
 @dataclasses.dataclass

@@ -160,13 +160,14 @@ def refs_to_str(val: typing.Any) -> typing.Any:
     else:
         return val
 
+TRACE_V0_REF_SCHEME = "wandb-trace"
 
 # `wandb-trace:///[entity]/[project]/call/[ID]`
 # `wandb-trace:///[entity]/[project]/op/[name]:[CONTENT_HASH]`
 # `wandb-trace:///[entity]/[project]/obj/[name]:[CONTENT_HASH]/[PATH]#[EXTRA]`
 @dataclasses.dataclass
 class TraceURI(uris.WeaveURI):
-    SCHEME = TRACE_REF_SCHEME
+    SCHEME = TRACE_V0_REF_SCHEME
     version: str
     entity: str
     project: str

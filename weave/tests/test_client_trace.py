@@ -313,7 +313,7 @@ def simple_line_call_bootstrap() -> OpCallSpec:
 def ref_str(op):
     legacy_ref = weave.obj_ref(op)
     trace_ref = weave_client.get_ref(op)
-    ref = trace_ref.uri() if trace_ref else legacy_ref
+    ref = trace_ref if trace_ref else legacy_ref
     return str(ref)
 
 
