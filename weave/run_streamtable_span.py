@@ -32,8 +32,9 @@ class RunStreamTableSpan:
 
     @property
     def ui_url(self) -> str:
-        gc = graph_client_context.require_graph_client()
-        return gc.run_ui_url(self)
+        raise NotImplementedError("ui_url not implemented")
+        # gc = graph_client_context.require_graph_client()
+        # return gc.run_ui_url(self)
 
     @property
     def op_ref(self) -> typing.Optional[artifact_wandb.WandbArtifactRef]:
@@ -92,7 +93,8 @@ class RunStreamTableSpan:
         return client.run_feedback(self.id)
 
     def parent(self) -> typing.Optional["Run"]:
-        client = graph_client_context.require_graph_client()
-        if self.parent_id is None:
-            return None
-        return client.run(self.parent_id)
+        raise NotImplementedError("parent not implemented")
+        # client = graph_client_context.require_graph_client()
+        # if self.parent_id is None:
+        #     return None
+        # return client.run(self.parent_id)
