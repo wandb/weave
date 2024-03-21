@@ -369,7 +369,6 @@ def test_op_versioning_exception(strict_op_saving):
 
 
 def test_op_versioning_2ops(strict_op_saving, client):
-
     @weave.op()
     def dog():
         print("hello from dog()")
@@ -422,7 +421,6 @@ def some_d(v: int) -> SomeDict:
 
 
 def test_op_return_typeddict_annotation(client):
-
     class SomeDict(typing.TypedDict):
         val: int
 

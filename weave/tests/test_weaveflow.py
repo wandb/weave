@@ -57,7 +57,6 @@ def test_digestrefs():
 
 
 def test_output_of(client):
-
     @weave.op()
     def add_5(v: int) -> int:
         return v + 5
@@ -87,7 +86,6 @@ def test_output_of(client):
 
 
 def test_weaveflow_op_wandb(client):
-
     @weave.op()
     def custom_adder(a: int, b: int) -> int:
         return a + b
