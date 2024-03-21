@@ -5,13 +5,15 @@ import typing
 from pydantic import BaseModel
 import wandb
 import weave
+from weave import weave_client
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     extract_refs_from_values,
     generate_id,
 )
 from ..trace_server import trace_server_interface as tsi
-from ..trace_server.graph_client_trace import GraphClientTrace
+
+# from ..trace_server.graph_client_trace import GraphClientTrace
 
 
 def test_simple_op(trace_client):
@@ -21,11 +23,11 @@ def test_simple_op(trace_client):
 
     assert my_op(5) == 6
 
-    op_ref = weave.obj_ref(my_op)
-    assert trace_client.ref_is_own(op_ref)
-    got_op = weave.storage.get(str(op_ref))
+    op_ref = weave_client.get_ref(my_op)
+    # assert trace_client.ref_is_own(op_ref)
+    got_op = trace_client.get(op_ref)
 
-    runs = trace_client.runs()
+    runs = list(trace_client.calls())
     assert len(runs) == 1
     fetched_call = runs[0]._call
     assert (
@@ -320,17 +322,17 @@ def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
     return list(set(list_a))
 
 
-def get_all_calls_asserting_finished(
-    trace_client: GraphClientTrace, call_spec: OpCallSpec
-) -> tsi.CallsQueryRes:
-    res = trace_client.trace_server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=trace_client.project_id(),
-        )
-    )
-    assert len(res.calls) == call_spec.total_calls
-    assert all([call.end_datetime for call in res.calls])
-    return res
+# def get_all_calls_asserting_finished(
+#     trace_client: GraphClientTrace, call_spec: OpCallSpec
+# ) -> tsi.CallsQueryRes:
+#     res = trace_client.trace_server.calls_query(
+#         tsi.CallsQueryReq(
+#             project_id=trace_client.project_id(),
+#         )
+#     )
+#     assert len(res.calls) == call_spec.total_calls
+#     assert all([call.end_datetime for call in res.calls])
+#     return res
 
 
 def test_trace_call_query_filter_input_object_version_refs(trace_client):

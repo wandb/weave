@@ -12,7 +12,6 @@ from weave import op_def
 from weave.trace.object_record import ObjectRecord, pydantic_object_record
 from weave.trace.serialize import to_json, from_json
 from weave import graph_client_context
-from weave.chobj import custom_objs
 from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     ObjCreateReq,
@@ -145,6 +144,14 @@ class CallsIter:
         self.project_id = project_id
         self.filter = filter
 
+    def __getitem__(self, key: Union[slice, int]):
+        if isinstance(key, slice):
+            raise NotImplementedError("Slicing not supported")
+        for i, call in enumerate(self):
+            if i == key:
+                return call
+        raise IndexError(f"Index {key} out of range")
+
     def __iter__(self):
         page_index = 0
         page_size = 10
@@ -193,12 +200,7 @@ class WeaveClient:
         self.project = project
         self.server = server
 
-        # Maybe this should happen on the first write event? For now, let's just ensure
-        # the project exists when the client is initialized. For production, we can move
-        # this to the service layer which will: a) save a round trip, and b) reduce the amount
-        # of client-side logic to duplicate to TS in the future. We already do auth checks
-        # in the service layer, so this is just a matter of convenience.
-        project_creator.ensure_project_exists(entity, project)
+        self.server.ensure_project_exists(entity, project)
 
     def ref_is_own(self, ref):
         return isinstance(ref, Ref)

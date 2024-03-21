@@ -17,7 +17,6 @@ from .. import errors
 from .. import graph
 from .. import stream_data_interfaces
 from .. import graph_client_context
-from .. import graph_client_wandb_art_st
 from .. import run_context
 from .. import run_streamtable_span
 
@@ -25,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 _global_monitor: typing.Optional["Monitor"] = None
 
-_attributes: contextvars.ContextVar[
-    typing.Dict[str, typing.Any]
-] = contextvars.ContextVar("_attributes", default={})
+_attributes: contextvars.ContextVar[typing.Dict[str, typing.Any]] = (
+    contextvars.ContextVar("_attributes", default={})
+)
 
 
 # Matches OpenTelemetry

@@ -7,40 +7,40 @@ from .. import derive_op
 import numpy as np
 import typing
 
+from weave.trace_server.trace_server_interface import ObjReadReq, FileContentReadReq
 
-def test_op_versioning_saveload(eager_mode):
-    with weave.local_client():
 
-        @weave.op()
-        def versioned_op(a: int, b: int) -> int:
-            return a + b
+def test_op_versioning_saveload(client):
+    # with weave.local_client():
 
-        assert versioned_op(1, 2) == 3
+    @weave.op()
+    def versioned_op(a: int, b: int) -> int:
+        return a + b
 
-        @weave.op()
-        def versioned_op(a: int, b: int) -> int:
-            return a - b
+    assert versioned_op(1, 2) == 3
 
-        # Because it is a new version with different code, this
-        # should not hit memoized cache.
-        assert versioned_op(1, 2) == -1
+    @weave.op()
+    def versioned_op(a: int, b: int) -> int:
+        return a - b
 
-        v0_ref = weave.versions(versioned_op)[0]
-        v0 = v0_ref.get()
-        assert v0(1, 2) == 3
+    # Because it is a new version with different code, this
+    # should not hit memoized cache.
+    assert versioned_op(1, 2) == -1
 
-        # This should refer to v1, even though we just loaded v0
-        v_latest = weave.ref("local-artifact:///op-versioned_op:latest/obj").get()
-        assert v_latest(4, 20) == -16
+    v0_ref = weave.versions(versioned_op)[0]
+    v0 = v0_ref.get()
+    assert v0(1, 2) == 3
 
-        v1_ref = weave.versions(versioned_op)[1]
-        v1 = v1_ref.get()
-        assert v1(1, 2) == -1
+    # This should refer to v1, even though we just loaded v0
+    v_latest = weave.ref("local-artifact:///op-versioned_op:latest/obj").get()
+    assert v_latest(4, 20) == -16
 
-        v0_again = weave.ref(
-            f"local-artifact:///op-versioned_op:{v0.version}/obj"
-        ).get()
-        assert v0_again(5, 6) == 11
+    v1_ref = weave.versions(versioned_op)[1]
+    v1 = v1_ref.get()
+    assert v1(1, 2) == -1
+
+    v0_again = weave.ref(f"local-artifact:///op-versioned_op:{v0.version}/obj").get()
+    assert v0_again(5, 6) == 11
 
 
 EXPECTED_SOLO_OP_CODE = """import weave
@@ -53,15 +53,27 @@ def solo_versioned_op(a: int) -> float:
 """
 
 
-def test_solo_op_versioning(strict_op_saving):
+def test_solo_op_versioning(strict_op_saving, client):
     from . import op_versioning_solo
 
-    with weave.local_client():
-        ref = weave.publish(op_versioning_solo.solo_versioned_op)
-    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    ref = weave.publish(op_versioning_solo.solo_versioned_op)
 
-    with ref.artifact.open("obj.py") as f:
-        saved_code = f.read()
+    # TODO: Fix the other tests like this!
+    resp = client.server.obj_read(
+        ObjReadReq(
+            entity=ref.entity,
+            project=ref.project,
+            name=ref.name,
+            version_digest=ref.version,
+        )
+    )
+    files = resp.obj.val["files"]
+    file_read_resp = client.server.file_content_read(
+        FileContentReadReq(
+            project_id=ref.entity + "/" + ref.project, digest=files["obj.py"]
+        )
+    )
+    saved_code = file_read_resp.content.decode()
 
     print("SAVED_CODE")
     print(saved_code)
