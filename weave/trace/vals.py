@@ -103,7 +103,8 @@ class Tracable:
 
         mutations = self.mutations
         self.mutations = None
-        return self.server.mutate(self.ref, mutations)
+        raise NotImplementedError("Traceable.save not implemented")
+        # return self.server.mutate(self.ref, mutations)
 
 
 class TraceObject(Tracable):
