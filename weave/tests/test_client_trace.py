@@ -9,6 +9,7 @@ from weave import weave_client
 from weave.trace.vals import TraceObject
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
     generate_id,
 )
@@ -221,23 +222,26 @@ class OpCallSpec(BaseModel):
 
 
 def simple_line_call_bootstrap() -> OpCallSpec:
-    @weave.type()
-    class Number:
+    # @weave.type()
+    # class Number:
+    #     value: int
+
+    class Number(BaseModel):
         value: int
 
     @weave.op()
     def adder(a: Number) -> Number:
-        return Number(a.value + a.value)
+        return Number(value=a.value + a.value)
 
     adder_v0 = adder
 
     @weave.op()
     def adder(a: Number, b) -> Number:
-        return Number(a.value + b)
+        return Number(value=a.value + b)
 
     @weave.op()
     def subtractor(a: Number, b) -> Number:
-        return Number(a.value - b)
+        return Number(value=a.value - b)
 
     @weave.op()
     def multiplier(
@@ -249,7 +253,7 @@ def simple_line_call_bootstrap() -> OpCallSpec:
 
     @weave.op()
     def liner(m: Number, b, x) -> Number:
-        return adder(Number(multiplier(m, x)), b)
+        return adder(Number(value=multiplier(m, x)), b)
 
     result: typing.Dict[str, OpCallSummary] = {}
     result["adder_v0"] = OpCallSummary(op=adder_v0)
@@ -262,25 +266,25 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     # Call each op a distinct number of time (allows for easier assertions later)
     num_calls = 1
     for i in range(num_calls):
-        adder_v0(Number(i))
+        adder_v0(Number(value=i))
     result["adder_v0"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 2
     for i in range(num_calls):
-        adder(Number(i), i)
+        adder(Number(value=i), i)
     result["adder"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 3
     for i in range(num_calls):
-        subtractor(Number(i), i)
+        subtractor(Number(value=i), i)
     result["subtractor"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 4
     for i in range(num_calls):
-        multiplier(Number(i), i)
+        multiplier(Number(value=i), i)
     result["multiplier"].num_calls += num_calls
     root_calls += num_calls
 
@@ -288,7 +292,7 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     run_calls = 0
     run = wandb.init()
     for i in range(num_calls):
-        liner(Number(i), i, i)
+        liner(Number(value=i), i, i)
     run.finish()
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
@@ -307,7 +311,10 @@ def simple_line_call_bootstrap() -> OpCallSpec:
 
 
 def ref_str(op):
-    return str(weave.obj_ref(op))
+    legacy_ref = weave.obj_ref(op)
+    trace_ref = weave_client.get_ref(op)
+    ref = trace_ref.uri() if trace_ref else legacy_ref
+    return str(ref)
 
 
 def test_trace_call_query_filter_op_version_refs(trace_client):
@@ -320,7 +327,7 @@ def test_trace_call_query_filter_op_version_refs(trace_client):
     assert ref_str(call_summaries["adder"].op).startswith(
         f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-adder:"
     )
-    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-adder:*/obj"
+    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
 
     for op_version_refs, exp_count in [
         # Test the None case
