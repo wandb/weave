@@ -185,6 +185,7 @@ export const CallTraceView: FC<{
   const sx: DataGridProProps['sx'] = useMemo(
     () => ({
       border: 0,
+      fontFamily: 'Source Sans Pro',
       '&>.MuiDataGrid-main': {
         '& div div div div >.MuiDataGrid-cell': {
           borderBottom: 'none',
