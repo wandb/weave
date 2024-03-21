@@ -799,6 +799,7 @@ export const RunsTable: FC<{
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
         columnGroupingModel={columns.colGroupingModel}
+        hideFooterSelectedRowCount
         slots={{
           noRowsOverlay: () => {
             return (
