@@ -30,6 +30,8 @@ export const StyledDataGrid = styled(
 )(({keepBorders}) => ({
   ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
 
+  fontFamily: 'Source Sans Pro',
+
   '& .MuiDataGrid-columnHeaders': {
     backgroundColor: MOON_50,
     color: '#979a9e',

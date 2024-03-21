@@ -387,7 +387,7 @@ export const CallsTable: FC<{
                   traceRootsOnly: !effectiveFilter.traceRootsOnly,
                 });
               }}>
-              <ListItemText primary="Roots Only" />
+              <ListItemText primary="Roots only" />
             </ListItemButton>
           </ListItem>
         </>
