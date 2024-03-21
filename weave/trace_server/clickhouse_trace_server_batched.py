@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+import threading
 from contextlib import contextmanager
 import datetime
 import json
@@ -134,8 +135,6 @@ required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
-    ch_client: CHClient
-
     def __init__(
         self,
         *,
@@ -147,12 +146,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         use_async_insert: bool = False,
     ):
         super().__init__()
+        self._thread_local = threading.local()
         self._host = host
         self._port = port
         self._user = user
         self._password = password
         self._database = database
-        self.ch_client = self._mint_client()
         self._flush_immediately = True
         self._call_batch: typing.List[typing.List[typing.Any]] = []
         self._use_async_insert = use_async_insert
@@ -607,7 +606,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.FileContentReadRes(content=b"".join(chunks))
 
     # Private Methods
-    def _mint_client(self) -> CHClient:
+    @property
+    def ch_client(self) -> CHClient:
+        if not hasattr(self._thread_local, "ch_client"):
+            self._thread_local.ch_client = self._mint_client()
+        return self._thread_local.ch_client
+
+    def _mint_client(self):
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
@@ -619,8 +624,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.database = self._database
         return client
 
-    def __del__(self) -> None:
-        self.ch_client.close()
+    # def __del__(self) -> None:
+    #     self.ch_client.close()
 
     def _insert_call_batch(self, batch: typing.List) -> None:
         if batch:

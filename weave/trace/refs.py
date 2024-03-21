@@ -67,7 +67,6 @@ class ObjectRef(Ref):
 
     def get(self) -> Any:
         gc = require_graph_client()
-        print("SELF", self)
         return gc.get(self)
 
 
