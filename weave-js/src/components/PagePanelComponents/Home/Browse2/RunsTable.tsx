@@ -155,6 +155,17 @@ const getExtraColumns = (result: any): string[] => {
   return Array.from(cols);
 };
 
+// Get the tail of the peekPath (ignore query params)
+const getPeekId = (peekPath: string | null): string | null => {
+  if (!peekPath) {
+    return null;
+  }
+  const baseUrl = `${window.location.protocol}//${window.location.host}`;
+  const url = new URL(peekPath, baseUrl);
+  const {pathname} = url;
+  return pathname.split('/').pop() ?? null;
+};
+
 export const RunsTable: FC<{
   loading: boolean;
   spans: CallSchema[];
@@ -318,7 +329,7 @@ export const RunsTable: FC<{
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
-  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const peekId = getPeekId(peekPath);
   const rowIds = useMemo(() => {
     return tableData.map(row => row.id);
   }, [tableData]);
