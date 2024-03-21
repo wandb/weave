@@ -38,7 +38,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         else:
             f = io.StringIO()
         yield f
-        self.path_contents[path] = f.getvalue()
+        self.path_contents[path] = f.getvalue()  # type: ignore
         f.close()
 
     @property
@@ -93,7 +93,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     weave_type.save_instance(obj, art, "obj")
 
     encoded_path_contents = {
-        k: (v.encode("utf-8") if isinstance(v, str) else v)
+        k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
         for k, v in art.path_contents.items()
     }
     return {
