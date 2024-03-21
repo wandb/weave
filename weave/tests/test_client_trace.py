@@ -31,16 +31,6 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
     return client._project_id()
 
 
-def get_client_runs(
-    client: weave_client.WeaveClient,
-) -> typing.List[TraceObject]:
-    return list(client.calls())
-
-
-def get_call_from_client_run(resObj: TraceObject) -> tsi.CallSchema:
-    return resObj.val._server_call
-
-
 ## End hacky interface compatibility helpers
 
 
@@ -55,30 +45,22 @@ def test_simple_op(client):
     # assert client.ref_is_own(op_ref)
     got_op = client.get(op_ref)
 
-    runs = get_client_runs(client)
-    assert len(runs) == 1
-    fetched_call = get_call_from_client_run(runs[0])
-    if isinstance(client, GraphClientTrace):
-        digest = "873a064f5e172ac4dfd1b869028d749b"
-    else:
-        digest = "35e46ba0597f4b9763d930378f63a0a3b51f6c187b8be105829c8b4d16963643"
+    calls = list(client.calls())
+    assert len(calls) == 1
+    fetched_call = calls[0]
+    digest = "XjAs9gjGsScTF6zuze3rK310QupiPWIu6Yj7FhPY8Rs"
     expected_name = (
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-my_op:{digest}"
     )
-    assert fetched_call.name == expected_name
-    assert fetched_call == tsi.CallSchema(
+    assert fetched_call == weave_client.Call(
+        op_name=expected_name,
         project_id=f"{client.entity}/{client.project}",
-        id=fetched_call.id,
-        name=expected_name,
         trace_id=fetched_call.trace_id,
         parent_id=None,
-        start_datetime=fetched_call.start_datetime,
-        end_datetime=fetched_call.end_datetime,
-        exception=None,
-        attributes={},
+        id=fetched_call.id,
         inputs={"a": 5},
-        outputs={"_result": 6},
-        summary={},
+        exception=None,
+        output=6,
     )
 
 
@@ -180,13 +162,11 @@ def test_graph_call_ordering(client):
     for i in range(10):
         my_op(i)
 
-    runs = get_client_runs(client)
-    assert len(runs) == 10
+    calls = list(client.calls())
+    assert len(calls) == 10
 
     # We want to preserve insert order
-    assert [get_call_from_client_run(run).inputs["a"] for run in runs] == list(
-        range(10)
-    )
+    assert [call.inputs["a"] for call in calls] == list(range(10))
 
 
 class OpCallSummary(BaseModel):
@@ -201,7 +181,7 @@ class OpCallSpec(BaseModel):
     run_calls: int
 
 
-def simple_line_call_bootstrap() -> OpCallSpec:
+def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     # @weave.type()
     # class Number:
     #     value: int
@@ -270,10 +250,12 @@ def simple_line_call_bootstrap() -> OpCallSpec:
 
     num_calls = 5
     run_calls = 0
-    # run = wandb.init()
+    if init_wandb:
+        run = wandb.init()
     for i in range(num_calls):
         liner(Number(value=i), i, i)
-    # run.finish()
+    if init_wandb:
+        run.finish()
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls
@@ -481,7 +463,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
             ),
         ),
     ]:
-        _res = get_client_trace_server(client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(
@@ -604,8 +586,8 @@ def test_trace_call_query_filter_trace_roots_only(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_run_ids(client):
-    call_spec = simple_line_call_bootstrap()
+def test_trace_call_query_filter_wb_run_ids(client, user_by_api_key_in_env):
+    call_spec = simple_line_call_bootstrap(init_wandb=True)
 
     res = get_all_calls_asserting_finished(client, call_spec)
 

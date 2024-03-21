@@ -120,6 +120,7 @@ class Call:
     inputs: dict
     id: Optional[str] = None
     output: Any = None
+    exception: Optional[str] = None
 
     @property
     def ui_url(self) -> str:
@@ -364,21 +365,8 @@ class WeaveClient:
             attributes={},
             wb_run_id=current_wb_run_id,
         )
-        call._server_call = CallSchema(
-            project_id=start.project_id,
-            id=start.id,
-            name=start.name,
-            trace_id=start.trace_id,
-            parent_id=start.parent_id,
-            start_datetime=start.start_datetime,
-            attributes=start.attributes,
-            inputs=start.inputs,
-            wb_user_id=start.wb_user_id,
-            wb_run_id=start.wb_run_id,
-        )
         self.server.call_start(CallStartReq(start=start))
         return call
-        # return CallSchemaRun(start)
 
     def finish_call(self, call: Call, output: Any) -> None:
         # TODO: not saving finished call yet

@@ -301,7 +301,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        print("OBJ CREATE REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
         json_val = json.dumps(req.obj.val)
         digest = str_digest(json_val)
