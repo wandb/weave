@@ -15,16 +15,16 @@ def generate_id() -> str:
     return str(uuid.uuid4())
 
 
-# This is a quick solution but needs more thought
-def version_hash_for_object(obj: tsi.ObjSchemaForInsert) -> str:
-    hasher = hashlib.md5()
+def bytes_digest(json_val: bytes) -> str:
+    hasher = hashlib.sha256()
+    hasher.update(json_val)
+    hash_bytes = hasher.digest()
+    base64_encoded_hash = base64.urlsafe_b64encode(hash_bytes).decode("utf-8")
+    return base64_encoded_hash.replace("-", "X").replace("_", "Y").rstrip("=")
 
-    hasher.update(json.dumps(_order_dict(obj.type_dict)).encode())
-    # until updates are supported, we need to hash the metadata_dict
-    hasher.update(json.dumps(_order_dict(obj.metadata_dict)).encode())
-    hasher.update(json.dumps(_order_dict(obj.b64_file_map)).encode())
 
-    return hasher.hexdigest()
+def str_digest(json_val: str) -> str:
+    return bytes_digest(json_val.encode())
 
 
 def _order_dict(dictionary: typing.Dict) -> typing.Dict:

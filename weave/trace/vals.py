@@ -115,7 +115,7 @@ class TraceObject(Tracable):
         server: TraceServerInterface,
         root: typing.Optional[Tracable],
     ) -> None:
-        self.val = val
+        self._val = val
         self.ref = ref
         self.server = server
         if root is None:
@@ -127,7 +127,7 @@ class TraceObject(Tracable):
             return object.__getattribute__(self, __name)
         except AttributeError:
             pass
-        val_attr_val = object.__getattribute__(self.val, __name)
+        val_attr_val = object.__getattribute__(self._val, __name)
         # Not ideal, what about properties?
         if callable(val_attr_val):
             return val_attr_val
@@ -142,7 +142,7 @@ class TraceObject(Tracable):
         )
 
     def __setattr__(self, __name: str, __value: Any) -> None:
-        if __name in ["val", "ref", "server", "root", "mutations"]:
+        if __name in ["_val", "ref", "server", "root", "mutations"]:
             return object.__setattr__(self, __name, __value)
         else:
             if not isinstance(self.ref, ObjectRef):
@@ -150,13 +150,13 @@ class TraceObject(Tracable):
             object.__getattribute__(self, "root").add_mutation(
                 self.ref.extra, "setattr", __name, __value
             )
-            return object.__setattr__(self.val, __name, __value)
+            return object.__setattr__(self._val, __name, __value)
 
     def __repr__(self) -> str:
-        return f"TraceObject({self.val})"
+        return f"TraceObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
-        return self.val == other
+        return self._val == other
 
 
 class TraceTable(Tracable):

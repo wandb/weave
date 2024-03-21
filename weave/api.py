@@ -157,7 +157,9 @@ def init(project_name: str) -> _weave_client.WeaveClient:
 
 
 @contextlib.contextmanager
-def client(project_name) -> typing.Iterator[_weave_init.weave_client.WeaveClient]:
+def remote_client(
+    project_name,
+) -> typing.Iterator[_weave_init.weave_client.WeaveClient]:
     inited_client = _weave_init.init_weave(project_name)
     try:
         yield inited_client.client
@@ -181,7 +183,7 @@ def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
 
 def publish(
     obj: typing.Any, name: Optional[str] = None
-) -> _weave_client.Ref:  #  _ref_base.Ref:
+) -> _weave_client.ObjectRef:  #  _ref_base.Ref:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -219,7 +221,7 @@ def publish(
     return ref
 
 
-def ref(location: str) -> _ref_base.Ref:
+def ref(location: str) -> _weave_client.ObjectRef:
     """Construct a Ref to a Weave object.
 
     TODO: what happens if obj does not exist
@@ -244,11 +246,11 @@ def ref(location: str) -> _ref_base.Ref:
             name, version = location.split(":")
         location = str(client.ref_uri(name, version, "obj"))
 
-    return _ref_base.Ref.from_str(location)
+    return _weave_client.parse_uri(location)
 
 
 def obj_ref(obj: typing.Any) -> typing.Optional[_ref_base.Ref]:
-    return _ref_base.get_ref(obj)
+    return _weave_client.get_ref(obj)
 
 
 def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:

@@ -318,7 +318,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
-        tsi
+        tsi = ch_server
 
     client = weave_client.WeaveClient("shawn", "test-project", tsi)
     inited_client = weave_init.InitializedClient(client)

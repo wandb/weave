@@ -1,6 +1,7 @@
 # Sqlite Trace Server
 
-from typing import cast, Optional, Any
+from typing import cast, Optional, Any, Union
+import threading
 
 import contextvars
 import contextlib
@@ -10,10 +11,17 @@ import hashlib
 import sqlite3
 
 
-from .trace_server_interface_util import extract_refs_from_values
+from .trace_server_interface_util import (
+    extract_refs_from_values,
+    str_digest,
+    bytes_digest,
+)
 from . import trace_server_interface as tsi
 
 from weave.trace import refs
+from weave.trace_server.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -21,18 +29,6 @@ MAX_FLUSH_AGE = 15
 
 class NotFoundError(Exception):
     pass
-
-
-def str_digest(json_val: str) -> str:
-    hasher = hashlib.sha256()
-    hasher.update(json_val.encode())
-    return hasher.hexdigest()
-
-
-def bytes_digest(json_val: bytes) -> str:
-    hasher = hashlib.sha256()
-    hasher.update(json_val)
-    return hasher.hexdigest()
 
 
 _conn_cursor: contextvars.ContextVar[
@@ -53,6 +49,7 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
 
 class SqliteTraceServer(tsi.TraceServerInterface):
     def __init__(self, db_path: str):
+        self.lock = threading.Lock()
         self.db_path = db_path
 
     def drop_tables(self) -> None:
@@ -135,38 +132,41 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise ValueError("trace_id is required")
         if req.start.id is None:
             raise ValueError("id is required")
-        # Converts the user-provided call details into a clickhouse schema.
-        # This does validation and conversion of the input data as well
-        # as enforcing business rules and defaults
-        cursor.execute(
-            """INSERT INTO calls (
-                project_id,
-                id,
-                trace_id,
-                parent_id,
-                name,
-                start_datetime,
-                attributes,
-                inputs,
-                input_refs,
-                wb_user_id,
-                wb_run_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                req.start.project_id,
-                req.start.id,
-                req.start.trace_id,
-                req.start.parent_id,
-                req.start.name,
-                req.start.start_datetime.isoformat(),
-                json.dumps(req.start.attributes),
-                json.dumps(req.start.inputs),
-                json.dumps(extract_refs_from_values(list(req.start.inputs.values()))),
-                req.start.wb_user_id,
-                req.start.wb_run_id,
-            ),
-        )
-        conn.commit()
+        with self.lock:
+            # Converts the user-provided call details into a clickhouse schema.
+            # This does validation and conversion of the input data as well
+            # as enforcing business rules and defaults
+            cursor.execute(
+                """INSERT INTO calls (
+                    project_id,
+                    id,
+                    trace_id,
+                    parent_id,
+                    name,
+                    start_datetime,
+                    attributes,
+                    inputs,
+                    input_refs,
+                    wb_user_id,
+                    wb_run_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    req.start.project_id,
+                    req.start.id,
+                    req.start.trace_id,
+                    req.start.parent_id,
+                    req.start.name,
+                    req.start.start_datetime.isoformat(),
+                    json.dumps(req.start.attributes),
+                    json.dumps(req.start.inputs),
+                    json.dumps(
+                        extract_refs_from_values(list(req.start.inputs.values()))
+                    ),
+                    req.start.wb_user_id,
+                    req.start.wb_run_id,
+                ),
+            )
+            conn.commit()
 
         # Returns the id of the newly created call
         return tsi.CallStartRes(
@@ -176,55 +176,96 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(
-            """UPDATE calls SET
-                end_datetime = ?,
-                exception = ?,
-                outputs = ?,
-                output_refs = ?
-            WHERE id = ?""",
-            (
-                req.end.end_datetime.isoformat(),
-                req.end.exception,
-                json.dumps(req.end.outputs),
-                json.dumps(extract_refs_from_values(list(req.end.outputs.values()))),
-                req.end.id,
-            ),
-        )
-        conn.commit()
+        with self.lock:
+            cursor.execute(
+                """UPDATE calls SET
+                    end_datetime = ?,
+                    exception = ?,
+                    outputs = ?,
+                    output_refs = ?
+                WHERE id = ?""",
+                (
+                    req.end.end_datetime.isoformat(),
+                    req.end.exception,
+                    json.dumps(req.end.outputs),
+                    json.dumps(
+                        extract_refs_from_values(list(req.end.outputs.values()))
+                    ),
+                    req.end.id,
+                ),
+            )
+            conn.commit()
         return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         raise NotImplementedError()
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        print("REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
         conds = []
         filter = req.filter
         if filter:
             if filter.op_version_refs:
-                in_expr = ", ".join((f"'{x}'" for x in filter.op_version_refs))
-                conds += [f"name IN ({', '.join({in_expr})})"]
+                or_conditions: list[str] = []
+
+                non_wildcarded_names: list[str] = []
+                wildcarded_names: list[str] = []
+                for name in filter.op_version_refs:
+                    if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                        wildcarded_names.append(name)
+                    else:
+                        non_wildcarded_names.append(name)
+
+                if non_wildcarded_names:
+                    in_expr = ", ".join((f"'{x}'" for x in non_wildcarded_names))
+                    or_conditions += [f"name IN ({', '.join({in_expr})})"]
+
+                for name_ndx, name in enumerate(wildcarded_names):
+                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
+                    or_conditions.append(f"name LIKE '{like_name}'")
+
+                if or_conditions:
+                    conds.append("(" + " OR ".join(or_conditions) + ")")
+
             if filter.input_object_version_refs:
-                raise NotImplementedError("input_object_version_refs not implemented")
+                or_conditions = []
+                for ref in filter.input_object_version_refs:
+                    or_conditions.append(f"input_refs LIKE '%{ref}%'")
+                conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.output_object_version_refs:
-                raise NotImplementedError("output_object_version_refs not implemented")
+                or_conditions = []
+                for ref in filter.output_object_version_refs:
+                    or_conditions.append(f"output_refs LIKE '%{ref}%'")
+                conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
                 in_expr = ", ".join((f"'{x}'" for x in filter.parent_ids))
                 conds += [f"parent_id IN ({in_expr})"]
             if filter.trace_ids:
-                raise NotImplementedError("trace_ids filter not implemented")
+                in_expr = ", ".join((f"'{x}'" for x in filter.trace_ids))
+                conds += [f"trace_id IN ({in_expr})"]
             if filter.call_ids:
                 in_expr = ", ".join((f"'{x}'" for x in filter.call_ids))
                 conds += [f"id IN ({in_expr})"]
             if filter.trace_roots_only:
-                raise NotImplementedError("trace_roots_only filter not implemented")
-
-        predicate = " AND ".join(conds)
+                conds.append("parent_id IS NULL")
+            if filter.wb_run_ids:
+                in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
+                conds += [f"wb_run_id IN ({in_expr})"]
 
         query = f"SELECT * FROM calls WHERE project_id = '{req.project_id}'"
-        if predicate:
-            query += f" AND {predicate}"
+
+        conditions_part = " AND ".join(conds)
+
+        if conditions_part:
+            query += f" AND {conditions_part}"
+
+        limit = req.limit or -1
+        if limit:
+            query += f" LIMIT {limit}"
+        if req.offset:
+            query += f" OFFSET {req.offset}"
+        print("QUERY", query)
 
         cursor.execute(query)
 
@@ -260,6 +301,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        print("OBJ CREATE REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
         json_val = json.dumps(req.obj.val)
         digest = str_digest(json_val)
@@ -267,39 +309,40 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         req_obj = req.obj
         entity, project = req_obj.project_id.split("/")
         # TODO: version index isn't right here, what if we delete stuff?
-        cursor.execute("BEGIN TRANSACTION")
-        # first get version count
-        cursor.execute(
-            """SELECT COUNT(*) FROM objects WHERE entity = ? AND project = ? AND name = ?""",
-            (entity, project, req_obj.name),
-        )
-        version_index = cursor.fetchone()[0]
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            # first get version count
+            cursor.execute(
+                """SELECT COUNT(*) FROM objects WHERE entity = ? AND project = ? AND name = ?""",
+                (entity, project, req_obj.name),
+            )
+            version_index = cursor.fetchone()[0]
 
-        cursor.execute(
-            """INSERT OR IGNORE INTO objects (
-                entity,
-                project,
-                name,
-                created_at,
-                type,
-                refs,
-                val,
-                digest,
-                version_index
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                entity,
-                project,
-                req_obj.name,
-                datetime.datetime.now().isoformat(),
-                get_type(req_obj.val),
-                json.dumps([]),
-                json_val,
-                digest,
-                version_index,
-            ),
-        )
-        conn.commit()
+            cursor.execute(
+                """INSERT OR IGNORE INTO objects (
+                    entity,
+                    project,
+                    name,
+                    created_at,
+                    type,
+                    refs,
+                    val,
+                    digest,
+                    version_index
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    entity,
+                    project,
+                    req_obj.name,
+                    datetime.datetime.now().isoformat(),
+                    get_type(req_obj.val),
+                    json.dumps([]),
+                    json_val,
+                    digest,
+                    version_index,
+                ),
+            )
+            conn.commit()
         return tsi.ObjCreateRes(version_digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
@@ -349,23 +392,24 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
             insert_rows.append((entity, project, row_digest, row_json))
-        cursor.executemany(
-            "INSERT OR IGNORE INTO table_rows (entity, project, digest, val) VALUES (?, ?, ?, ?)",
-            insert_rows,
-        )
+        with self.lock:
+            cursor.executemany(
+                "INSERT OR IGNORE INTO table_rows (entity, project, digest, val) VALUES (?, ?, ?, ?)",
+                insert_rows,
+            )
 
-        row_digests = [r[2] for r in insert_rows]
+            row_digests = [r[2] for r in insert_rows]
 
-        table_hasher = hashlib.sha256()
-        for row_digest in row_digests:
-            table_hasher.update(row_digest.encode())
-        table_digest = table_hasher.hexdigest()
+            table_hasher = hashlib.sha256()
+            for row_digest in row_digests:
+                table_hasher.update(row_digest.encode())
+            table_digest = table_hasher.hexdigest()
 
-        cursor.execute(
-            "INSERT OR IGNORE INTO tables (entity, project, digest, row_digests) VALUES (?, ?, ?, ?)",
-            (entity, project, table_digest, json.dumps(row_digests)),
-        )
-        conn.commit()
+            cursor.execute(
+                "INSERT OR IGNORE INTO tables (entity, project, digest, row_digests) VALUES (?, ?, ?, ?)",
+                (entity, project, table_digest, json.dumps(row_digests)),
+            )
+            conn.commit()
 
         return tsi.TableCreateRes(digest=table_digest)
 
@@ -442,16 +486,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         digest = bytes_digest(req.content)
-        cursor.execute(
-            "INSERT OR IGNORE INTO files (entity, project, digest, val) VALUES (?, ?, ?, ?)",
-            (
-                req.project_id.split("/")[0],
-                req.project_id.split("/")[1],
-                digest,
-                req.content,
-            ),
-        )
-        conn.commit()
+        with self.lock:
+            cursor.execute(
+                "INSERT OR IGNORE INTO files (entity, project, digest, val) VALUES (?, ?, ?, ?)",
+                (
+                    req.project_id.split("/")[0],
+                    req.project_id.split("/")[1],
+                    digest,
+                    req.content,
+                ),
+            )
+            conn.commit()
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:

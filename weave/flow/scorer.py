@@ -10,6 +10,7 @@ class Scorer(Object):
     def score(self, target: Any, prediction: Any) -> Any:
         raise NotImplementedError
 
+    @weave.op()
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
         return auto_summarize(score_rows)
 
@@ -69,9 +70,14 @@ def get_scorer_attributes(
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
         if scorer_name == None:
-            scorer_name = scorer.__class__.__name__
-        score_fn = scorer.score
-        summarize_fn = scorer.summarize  # type: ignore
+            scorer_name = scorer._class_name
+        try:
+            score_fn = scorer.score
+            summarize_fn = scorer.summarize  # type: ignore
+        except AttributeError:
+            raise ValueError(
+                f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
+            )
     elif callable(scorer):
         if isinstance(scorer, op_def.OpDef):
             scorer_name = scorer.common_name

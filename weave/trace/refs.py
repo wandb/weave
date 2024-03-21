@@ -1,5 +1,7 @@
-from typing import Union
+from typing import Union, Any
 import dataclasses
+
+from weave.graph_client_context import require_graph_client
 
 KEY_EDGE_TYPE = "key"
 INDEX_EDGE_TYPE = "ndx"
@@ -30,7 +32,7 @@ class Ref:
 
     def with_item(self, item_digest: str) -> "Ref":
         return self.with_extra([ID_EDGE_TYPE, f"{item_digest}"])
-    
+
     def __str__(self) -> str:
         return self.uri()
 
@@ -62,6 +64,11 @@ class ObjectRef(Ref):
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
+
+    def get(self) -> Any:
+        gc = require_graph_client()
+        print("SELF", self)
+        return gc.get(self)
 
 
 @dataclasses.dataclass

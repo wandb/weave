@@ -1,27 +1,17 @@
-from typing import Any, Generator
 import re
 import pytest
-import pathlib
 import pydantic
-import uuid
 import weave
 import asyncio
 from weave import op_def, Evaluation
 
-from weave import weave_init
 from weave import weave_client
-from weave.api import client as weave_api_client
-from weave.artifact_base import ArtifactRef
 from weave.trace.refs import (
     ATTRIBUTE_EDGE_TYPE,
     ID_EDGE_TYPE,
     INDEX_EDGE_TYPE,
     KEY_EDGE_TYPE,
 )
-from weave.trace_server import (
-    clickhouse_trace_server_batched,
-)
-from weave.trace_server import clickhouse_trace_server_batched, sqlite_trace_server
 
 from weave.trace import refs
 from weave.trace.isinstance import weave_isinstance
@@ -200,6 +190,7 @@ def test_call_create(client):
     call = client.create_call("x", None, {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.call(call.id)
+    print("RESULT", result)
     assert result == weave_client.Call(
         op_name="x",
         project_id="shawn/test-project",
@@ -432,7 +423,7 @@ def test_evaluate(client):
     assert child0.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
 
     eval_obj = child0.inputs["self"]
-    eval_obj_val = eval_obj.val  # non-trace version so we don't automatically deref
+    eval_obj_val = eval_obj._val  # non-trace version so we don't automatically deref
     assert eval_obj_val._class_name == "Evaluation"
     assert eval_obj_val.name == "my-eval"
     assert eval_obj_val.description == None
@@ -491,7 +482,7 @@ def test_evaluate(client):
     # second child is another predict_and_score call
     child1 = eval_call_children[1]
     assert child1.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
-    assert child0.inputs["self"].val == child1.inputs["self"].val
+    assert child0.inputs["self"]._val == child1.inputs["self"]._val
 
     # TODO: these are not directly equal, we end up loading the same thing
     # multiple times

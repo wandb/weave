@@ -120,7 +120,6 @@ class Call:
     inputs: dict
     id: Optional[str] = None
     output: Any = None
-    _server_call: Optional[CallSchema] = None
 
     @property
     def ui_url(self) -> str:
@@ -199,7 +198,6 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
-        _server_call=server_call,
     )
     if call.id is None:
         raise ValueError("Call ID is None")

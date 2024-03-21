@@ -15,58 +15,36 @@ from ..trace_server.trace_server_interface_util import (
 )
 from ..trace_server import trace_server_interface as tsi
 
-from ..trace_server.graph_client_trace import CallSchemaRun, GraphClientTrace
-
 
 ## Hacky interface compatibility helpers
 
-ClientType = typing.Union[weave_client.WeaveClient, GraphClientTrace]
+ClientType = weave_client.WeaveClient
 
 
-def get_client_trace_server(client: ClientType) -> tsi.TraceServerInterface:
-    if isinstance(client, weave_client.WeaveClient):
-        return client.server
-    elif isinstance(client, GraphClientTrace):
-        return client.trace_server
-    else:
-        raise ValueError(f"Unknown client type {client}")
+def get_client_trace_server(
+    client: weave_client.WeaveClient,
+) -> tsi.TraceServerInterface:
+    return client.server
 
 
-def get_client_project_id(client: ClientType) -> tsi.TraceServerInterface:
-    if isinstance(client, weave_client.WeaveClient):
-        return client._project_id()
-    elif isinstance(client, GraphClientTrace):
-        return client.project_id()
-    else:
-        raise ValueError(f"Unknown client type {client}")
+def get_client_project_id(client: weave_client.WeaveClient) -> str:
+    return client._project_id()
 
 
 def get_client_runs(
-    client: ClientType,
-) -> typing.List[typing.Union[CallSchemaRun, TraceObject]]:
-    if isinstance(client, weave_client.WeaveClient):
-        return list(client.calls())
-    elif isinstance(client, GraphClientTrace):
-        return client.runs()
-    else:
-        raise ValueError(f"Unknown client type {client}")
+    client: weave_client.WeaveClient,
+) -> typing.List[TraceObject]:
+    return list(client.calls())
 
 
-def get_call_from_client_run(
-    resObj: typing.Union[TraceObject, CallSchemaRun]
-) -> tsi.CallSchema:
-    if isinstance(resObj, CallSchemaRun):
-        return resObj._call
-    elif isinstance(resObj, TraceObject):
-        return resObj.val._server_call
-    else:
-        raise ValueError(f"Unknown client type {resObj}")
+def get_call_from_client_run(resObj: TraceObject) -> tsi.CallSchema:
+    return resObj.val._server_call
 
 
 ## End hacky interface compatibility helpers
 
 
-def test_simple_op(trace_client):
+def test_simple_op(client):
     @weave.op()
     def my_op(a: int) -> int:
         return a + 1
@@ -74,20 +52,22 @@ def test_simple_op(trace_client):
     assert my_op(5) == 6
 
     op_ref = weave_client.get_ref(my_op)
-    # assert trace_client.ref_is_own(op_ref)
-    got_op = trace_client.get(op_ref)
+    # assert client.ref_is_own(op_ref)
+    got_op = client.get(op_ref)
 
-    runs = get_client_runs(trace_client)
+    runs = get_client_runs(client)
     assert len(runs) == 1
     fetched_call = get_call_from_client_run(runs[0])
-    if isinstance(trace_client, GraphClientTrace):
+    if isinstance(client, GraphClientTrace):
         digest = "873a064f5e172ac4dfd1b869028d749b"
     else:
         digest = "35e46ba0597f4b9763d930378f63a0a3b51f6c187b8be105829c8b4d16963643"
-    expected_name = f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-my_op:{digest}"
+    expected_name = (
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-my_op:{digest}"
+    )
     assert fetched_call.name == expected_name
     assert fetched_call == tsi.CallSchema(
-        project_id=f"{trace_client.entity}/{trace_client.project}",
+        project_id=f"{client.entity}/{client.project}",
         id=fetched_call.id,
         name=expected_name,
         trace_id=fetched_call.trace_id,
@@ -102,7 +82,7 @@ def test_simple_op(trace_client):
     )
 
 
-def test_dataset(trace_client):
+def test_dataset(client):
     from weave.weaveflow import Dataset
 
     d = Dataset([{"a": 5, "b": 6}, {"a": 7, "b": 10}])
@@ -192,7 +172,7 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
     }
 
 
-def test_graph_call_ordering(trace_client):
+def test_graph_call_ordering(client):
     @weave.op()
     def my_op(a: int) -> int:
         return a + 1
@@ -200,7 +180,7 @@ def test_graph_call_ordering(trace_client):
     for i in range(10):
         my_op(i)
 
-    runs = get_client_runs(trace_client)
+    runs = get_client_runs(client)
     assert len(runs) == 10
 
     # We want to preserve insert order
@@ -290,10 +270,10 @@ def simple_line_call_bootstrap() -> OpCallSpec:
 
     num_calls = 5
     run_calls = 0
-    run = wandb.init()
+    # run = wandb.init()
     for i in range(num_calls):
         liner(Number(value=i), i, i)
-    run.finish()
+    # run.finish()
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls
@@ -317,7 +297,7 @@ def ref_str(op):
     return str(ref)
 
 
-def test_trace_call_query_filter_op_version_refs(trace_client):
+def test_trace_call_query_filter_op_version_refs(client):
     call_spec = simple_line_call_bootstrap()
     call_summaries = call_spec.call_summaries
 
@@ -325,9 +305,9 @@ def test_trace_call_query_filter_op_version_refs(trace_client):
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
     assert ref_str(call_summaries["adder"].op).startswith(
-        f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-adder:"
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-adder:"
     )
-    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
+    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
 
     for op_version_refs, exp_count in [
         # Test the None case
@@ -362,9 +342,9 @@ def test_trace_call_query_filter_op_version_refs(trace_client):
             + call_summaries["subtractor"].num_calls,
         ),
     ]:
-        res = get_client_trace_server(trace_client).calls_query(
+        res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(op_version_refs=op_version_refs),
             )
         )
@@ -381,11 +361,11 @@ def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
 
 
 def get_all_calls_asserting_finished(
-    trace_client: ClientType, call_spec: OpCallSpec
+    client: ClientType, call_spec: OpCallSpec
 ) -> tsi.CallsQueryRes:
-    res = get_client_trace_server(trace_client).calls_query(
+    res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
-            project_id=get_client_project_id(trace_client),
+            project_id=get_client_project_id(client),
         )
     )
     assert len(res.calls) == call_spec.total_calls
@@ -393,10 +373,10 @@ def get_all_calls_asserting_finished(
     return res
 
 
-def test_trace_call_query_filter_input_object_version_refs(trace_client):
+def test_trace_call_query_filter_input_object_version_refs(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     input_object_version_refs = unique_vals(
         [
@@ -441,9 +421,9 @@ def test_trace_call_query_filter_input_object_version_refs(trace_client):
             ),
         ),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(
                     input_object_version_refs=input_object_version_refs
                 ),
@@ -453,10 +433,10 @@ def test_trace_call_query_filter_input_object_version_refs(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_output_object_version_refs(trace_client):
+def test_trace_call_query_filter_output_object_version_refs(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     output_object_version_refs = unique_vals(
         [
@@ -501,9 +481,9 @@ def test_trace_call_query_filter_output_object_version_refs(trace_client):
             ),
         ),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        _res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(
                     output_object_version_refs=output_object_version_refs
                 ),
@@ -513,10 +493,10 @@ def test_trace_call_query_filter_output_object_version_refs(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_parent_ids(trace_client):
+def test_trace_call_query_filter_parent_ids(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     parent_ids = unique_vals(
         [call.parent_id for call in res.calls if call.parent_id is not None]
@@ -539,9 +519,9 @@ def test_trace_call_query_filter_parent_ids(trace_client):
             len([call for call in res.calls if call.parent_id in parent_ids[:3]]),
         ),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(parent_ids=parent_ids),
             )
         )
@@ -549,10 +529,10 @@ def test_trace_call_query_filter_parent_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_trace_ids(trace_client):
+def test_trace_call_query_filter_trace_ids(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     trace_ids = [call.trace_id for call in res.calls]
 
@@ -566,9 +546,9 @@ def test_trace_call_query_filter_trace_ids(trace_client):
         # Test multiple
         (trace_ids[:3], 3),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(trace_ids=trace_ids),
             )
         )
@@ -576,10 +556,10 @@ def test_trace_call_query_filter_trace_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_call_ids(trace_client):
+def test_trace_call_query_filter_call_ids(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     call_ids = [call.id for call in res.calls]
 
@@ -593,9 +573,9 @@ def test_trace_call_query_filter_call_ids(trace_client):
         # Test multiple
         (call_ids[:3], 3),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(call_ids=call_ids),
             )
         )
@@ -603,7 +583,7 @@ def test_trace_call_query_filter_call_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_trace_roots_only(trace_client):
+def test_trace_call_query_filter_trace_roots_only(client):
     call_spec = simple_line_call_bootstrap()
 
     for trace_roots_only, exp_count in [
@@ -614,9 +594,9 @@ def test_trace_call_query_filter_trace_roots_only(trace_client):
         # Test the False
         (False, call_spec.total_calls),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(trace_roots_only=trace_roots_only),
             )
         )
@@ -624,10 +604,10 @@ def test_trace_call_query_filter_trace_roots_only(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_run_ids(trace_client):
+def test_trace_call_query_filter_wb_run_ids(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     wb_run_ids = list(set([call.wb_run_id for call in res.calls]) - set([None]))
 
@@ -639,9 +619,9 @@ def test_trace_call_query_filter_wb_run_ids(trace_client):
         # Test List (of 1)
         (wb_run_ids, call_spec.run_calls),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(wb_run_ids=wb_run_ids),
             )
         )
@@ -649,7 +629,7 @@ def test_trace_call_query_filter_wb_run_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_limit(trace_client):
+def test_trace_call_query_limit(client):
     call_spec = simple_line_call_bootstrap()
 
     for limit, exp_count in [
@@ -660,9 +640,9 @@ def test_trace_call_query_limit(trace_client):
         # Test limit of 10
         (10, 10),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 limit=limit,
             )
         )
@@ -670,7 +650,7 @@ def test_trace_call_query_limit(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_offset(trace_client):
+def test_trace_call_query_offset(client):
     call_spec = simple_line_call_bootstrap()
 
     for offset, exp_count in [
@@ -681,9 +661,9 @@ def test_trace_call_query_offset(trace_client):
         # Test offset of 10
         (10, call_spec.total_calls - 10),
     ]:
-        inner_res = get_client_trace_server(trace_client).calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=get_client_project_id(trace_client),
+                project_id=get_client_project_id(client),
                 offset=offset,
             )
         )

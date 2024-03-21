@@ -43,6 +43,24 @@ def test_op_versioning_saveload(client):
     assert v0_again(5, 6) == 11
 
 
+def get_saved_code(client, ref):
+    resp = client.server.obj_read(
+        ObjReadReq(
+            entity=ref.entity,
+            project=ref.project,
+            name=ref.name,
+            version_digest=ref.version,
+        )
+    )
+    files = resp.obj.val["files"]
+    file_read_resp = client.server.file_content_read(
+        FileContentReadReq(
+            project_id=ref.entity + "/" + ref.project, digest=files["obj.py"]
+        )
+    )
+    return file_read_resp.content.decode()
+
+
 EXPECTED_SOLO_OP_CODE = """import weave
 import numpy as np
 
@@ -58,22 +76,7 @@ def test_solo_op_versioning(strict_op_saving, client):
 
     ref = weave.publish(op_versioning_solo.solo_versioned_op)
 
-    # TODO: Fix the other tests like this!
-    resp = client.server.obj_read(
-        ObjReadReq(
-            entity=ref.entity,
-            project=ref.project,
-            name=ref.name,
-            version_digest=ref.version,
-        )
-    )
-    files = resp.obj.val["files"]
-    file_read_resp = client.server.file_content_read(
-        FileContentReadReq(
-            project_id=ref.entity + "/" + ref.project, digest=files["obj.py"]
-        )
-    )
-    saved_code = file_read_resp.content.decode()
+    saved_code = get_saved_code(client, ref)
 
     print("SAVED_CODE")
     print(saved_code)
@@ -91,18 +94,15 @@ def versioned_op(self, a: int) -> float:
 """
 
 
-def test_object_op_versioning(strict_op_saving):
+def test_object_op_versioning(strict_op_saving, client):
     from . import op_versioning_obj
 
-    with weave.local_client():
-        obj = op_versioning_obj.MyTestObjWithOp(5)
-        # Call it to publish
-        obj.versioned_op(5)
-        ref = weave.obj_ref(obj.versioned_op)
-    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    obj = op_versioning_obj.MyTestObjWithOp(val=5)
+    # Call it to publish
+    obj.versioned_op(5)
+    ref = weave.obj_ref(obj.versioned_op)
 
-    with ref.artifact.open("obj.py") as f:
-        saved_code = f.read()
+    saved_code = get_saved_code(client, ref)
     print("SAVED_CODE")
     print(saved_code)
 
@@ -118,15 +118,11 @@ def versioned_op_importfrom(a: int) -> float:
 """
 
 
-def test_op_versioning_importfrom(strict_op_saving):
+def test_op_versioning_importfrom(strict_op_saving, client):
     from . import op_versioning_importfrom
 
-    with weave.local_client():
-        ref = weave.publish(op_versioning_importfrom.versioned_op_importfrom)
-    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
-
-    with ref.artifact.open("obj.py") as f:
-        saved_code = f.read()
+    ref = weave.publish(op_versioning_importfrom.versioned_op_importfrom)
+    saved_code = get_saved_code(client, ref)
     print("SAVE_CODE")
     print(saved_code)
 
@@ -150,7 +146,7 @@ def test_op_versioning_higherlevel_function(strict_op_saving):
     derive_op.MappedDeriveOpHandler.make_derived_op(versioned_op_lowerlevel)
 
 
-def test_op_versioning_inline_import(strict_op_saving):
+def test_op_versioning_inline_import(strict_op_saving, client):
     from . import op_versioning_inlineimport
 
 
@@ -176,20 +172,16 @@ def versioned_op_closure_constant(a: int) -> float:
 """
 
 
-def test_op_versioning_closure_contant(strict_op_saving):
+def test_op_versioning_closure_constant(strict_op_saving, client):
     x = 10
 
     @weave.op()
     def versioned_op_closure_constant(a: int) -> float:
         return a + x
 
-    ref = weave.obj_ref(versioned_op_closure_constant)
-    with weave.local_client():
-        ref = weave.publish(versioned_op_closure_constant)
-    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    ref = weave.publish(versioned_op_closure_constant)
 
-    with ref.artifact.open("obj.py") as f:
-        saved_code = f.read()
+    saved_code = get_saved_code(client, ref)
     print("SAVED_CODE")
     print(saved_code)
 
@@ -209,19 +201,16 @@ def versioned_op_closure_constant(a: int) -> float:
 """
 
 
-def test_op_versioning_closure_dict_simple(strict_op_saving):
+def test_op_versioning_closure_dict_simple(strict_op_saving, client):
     x = {"a": 5, "b": 10}
 
     @weave.op()
     def versioned_op_closure_constant(a: int) -> float:
         return a + x["a"]
 
-    with weave.local_client():
-        ref = weave.publish(versioned_op_closure_constant)
-    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    ref = weave.publish(versioned_op_closure_constant)
 
-    with ref.artifact.open("obj.py") as f:
-        saved_code = f.read()
+    saved_code = get_saved_code(client, ref)
 
     print("SAVED CODE")
     print(saved_code)
@@ -242,19 +231,16 @@ def versioned_op_closure_constant(a: int) -> float:
 """
 
 
-def test_op_versioning_closure_dict_np(strict_op_saving, eager_mode):
+def test_op_versioning_closure_dict_np(strict_op_saving, client):
     x = {"a": 5, "b": np.array([1, 2, 3])}
 
     @weave.op()
     def versioned_op_closure_constant(a: int) -> float:
         return a + x["b"].mean() + x["a"]
 
-    with weave.local_client():
-        ref = weave.publish(versioned_op_closure_constant)
-    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    ref = weave.publish(versioned_op_closure_constant)
 
-    with ref.artifact.open("obj.py") as f:
-        saved_code = f.read()
+    saved_code = get_saved_code(client, ref)
 
     print("SAVED CODE")
     print(saved_code)
@@ -282,41 +268,37 @@ def pony(v: int):
 """
 
 
-def test_op_versioning_closure_dict_ops(strict_op_saving, eager_mode):
-    with weave.local_client():
+def test_op_versioning_closure_dict_ops(strict_op_saving, eager_mode, client):
+    @weave.op()
+    def cat(v: int):
+        print("hello from cat()")
+        return v + 1
 
-        @weave.op()
-        def cat(v: int):
-            print("hello from cat()")
-            return v + 1
+    @weave.op()
+    def dog(v: int):
+        print("hello from dog()")
+        return v - 1
 
-        @weave.op()
-        def dog(v: int):
-            print("hello from dog()")
-            return v - 1
+    x = {"a": cat, "b": dog, "c": dog}
 
-        x = {"a": cat, "b": dog, "c": dog}
+    @weave.op()
+    def pony(v: int):
+        v = x["a"](v)
+        v = x["b"](v)
+        v = x["c"](v)
+        print("hello from pony()")
+        return v + 99
 
-        @weave.op()
-        def pony(v: int):
-            v = x["a"](v)
-            v = x["b"](v)
-            v = x["c"](v)
-            print("hello from pony()")
-            return v + 99
+    ref = weave.publish(pony)
 
-        ref = weave.publish(pony)
-        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    saved_code = get_saved_code(client, ref)
 
-        with ref.artifact.open("obj.py") as f:
-            saved_code = f.read()
+    print("SAVED CODE")
+    print(saved_code)
 
-        print("SAVED CODE")
-        print(saved_code)
-
-        assert saved_code == EXPECTED_CLOSURE_CONTANT_DICT_OPS_OP_CODE
-        op2 = weave.ref(str(ref)).get()
-        assert op2(1) == 99
+    assert saved_code == EXPECTED_CLOSURE_CONTANT_DICT_OPS_OP_CODE
+    op2 = weave.ref(str(ref)).get()
+    assert op2(1) == 99
 
 
 EXPECTED_MIXED_OP_CODE = """import weave
@@ -340,43 +322,38 @@ def pony(v: int):
 """
 
 
-def test_op_versioning_mixed(strict_op_saving, eager_mode):
-    with weave.local_client():
+def test_op_versioning_mixed(strict_op_saving, eager_mode, client):
+    @weave.op()
+    def cat(v: int):
+        print("hello from cat()")
+        return v + 1
 
-        @weave.op()
-        def cat(v: int):
-            print("hello from cat()")
-            return v + 1
+    @weave.op()
+    def dog(v: int):
+        print("hello from dog()")
+        return v - 1
 
-        @weave.op()
-        def dog(v: int):
-            print("hello from dog()")
-            return v - 1
+    x = {"a": cat, "b": np.array([1, 2, 3])}
 
-        x = {"a": cat, "b": np.array([1, 2, 3])}
+    @weave.op()
+    def pony(v: int):
+        v = dog(v)
+        v = x["a"](v) + x["b"].mean()
+        v = np.array([v, v, v]).mean()
 
-        @weave.op()
-        def pony(v: int):
-            v = dog(v)
-            v = x["a"](v) + x["b"].mean()
-            v = np.array([v, v, v]).mean()
+        print("hello from pony()")
+        return v + 99
 
-            print("hello from pony()")
-            return v + 99
+    ref = weave.publish(pony)
 
-        ref = weave.publish(pony)
-        print("REF", ref)
-        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    saved_code = get_saved_code(client, ref)
 
-        with ref.artifact.open("obj.py") as f:
-            saved_code = f.read()
+    print("SAVED CODE")
+    print(saved_code)
 
-        print("SAVED CODE")
-        print(saved_code)
-
-        assert saved_code == EXPECTED_MIXED_OP_CODE
-        op2 = weave.ref(str(ref)).get()
-        assert op2(1) == 102.0
+    assert saved_code == EXPECTED_MIXED_OP_CODE
+    op2 = weave.ref(str(ref)).get()
+    assert op2(1) == 102.0
 
 
 def test_op_versioning_exception(strict_op_saving):
@@ -391,26 +368,23 @@ def test_op_versioning_exception(strict_op_saving):
         return x
 
 
-def test_op_versioning_2ops(strict_op_saving):
-    with weave.local_client():
+def test_op_versioning_2ops(strict_op_saving, client):
 
-        @weave.op()
-        def dog():
-            print("hello from dog()")
+    @weave.op()
+    def dog():
+        print("hello from dog()")
 
-        @weave.op()
-        def cat():
-            print("hello from cat()")
-            dog()
-            dog()
+    @weave.op()
+    def cat():
+        print("hello from cat()")
+        dog()
+        dog()
 
-        cat()
+    cat()
 
-        ref = weave.obj_ref(cat)
-        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    ref = weave.obj_ref(cat)
 
-        with ref.artifact.open("obj.py") as f:
-            saved_code = f.read()
+    saved_code = get_saved_code(client, ref)
 
 
 @pytest.mark.skip("not working yet")
@@ -447,27 +421,24 @@ def some_d(v: int) -> SomeDict:
 """
 
 
-def test_op_return_typeddict_annotation():
-    with weave.local_client():
+def test_op_return_typeddict_annotation(client):
 
-        class SomeDict(typing.TypedDict):
-            val: int
+    class SomeDict(typing.TypedDict):
+        val: int
 
-        @weave.op()
-        def some_d(v: int) -> SomeDict:
-            return SomeDict(val=v)
+    @weave.op()
+    def some_d(v: int) -> SomeDict:
+        return SomeDict(val=v)
 
-        assert some_d(1) == {"val": 1}
+    assert some_d(1) == {"val": 1}
 
-        ref = weave.obj_ref(some_d)
-        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
+    ref = weave.obj_ref(some_d)
 
-        with ref.artifact.open("obj.py") as f:
-            saved_code = f.read()
-        print("SAVED_CODE")
-        print(saved_code)
+    saved_code = get_saved_code(client, ref)
+    print("SAVED_CODE")
+    print(saved_code)
 
-        assert saved_code == EXPECTED_TYPEDICT_ANNO_CODE
+    assert saved_code == EXPECTED_TYPEDICT_ANNO_CODE
 
-        op2 = weave.ref(str(ref)).get()
-        assert op2(2) == {"val": 2}
+    op2 = weave.ref(str(ref)).get()
+    assert op2(2) == {"val": 2}

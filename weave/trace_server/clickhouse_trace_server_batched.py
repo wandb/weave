@@ -16,10 +16,9 @@ from . import clickhouse_trace_server_migrator as wf_migrator
 
 from .trace_server_interface_util import (
     extract_refs_from_values,
-    decode_b64_to_bytes,
-    encode_bytes_as_b64,
     generate_id,
-    version_hash_for_object,
+    str_digest,
+    bytes_digest,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
@@ -132,18 +131,6 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
-
-
-def str_digest(json_val: str) -> str:
-    hasher = hashlib.sha256()
-    hasher.update(json_val.encode())
-    return hasher.hexdigest()
-
-
-def bytes_digest(json_val: bytes) -> str:
-    hasher = hashlib.sha256()
-    hasher.update(json_val)
-    return hasher.hexdigest()
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
