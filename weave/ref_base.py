@@ -20,6 +20,7 @@ REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 if typing.TYPE_CHECKING:
     from . import weave_types as types
     from . import run
+    from . import weave_client
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
@@ -156,15 +157,15 @@ class Ref:
     def __str__(self) -> str:
         return str(self.uri)
 
-    def input_to(self) -> Sequence["run.Run"]:
+    def input_to(self) -> Sequence["weave_client.Call"]:
         client = graph_client_context.require_graph_client()
         return client.ref_input_to(self)
 
-    def value_input_to(self) -> Sequence["run.Run"]:
+    def value_input_to(self) -> Sequence["weave_client.Call"]:
         client = graph_client_context.require_graph_client()
         return client.ref_value_input_to(self)
 
-    def output_of(self) -> Optional["run.Run"]:
+    def output_of(self) -> Optional["weave_client.Call"]:
         client = graph_client_context.require_graph_client()
         return client.ref_output_of(self)
 

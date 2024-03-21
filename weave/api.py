@@ -251,7 +251,7 @@ def obj_ref(obj: typing.Any) -> typing.Optional[_ref_base.Ref]:
     return _ref_base.get_ref(obj)
 
 
-def output_of(obj: typing.Any) -> typing.Optional[_run.Run]:
+def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
     client = _graph_client_context.require_graph_client()
 
     ref = obj_ref(obj)
