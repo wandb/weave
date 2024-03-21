@@ -303,10 +303,10 @@ def serve(
     from .serve_fastapi import object_method_app
 
     client = _graph_client_context.require_graph_client()
-    if not isinstance(
-        client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-    ):
-        raise ValueError("serve currently only supports wandb client")
+    # if not isinstance(
+    #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+    # ):
+    #     raise ValueError("serve currently only supports wandb client")
 
     print(f"Serving {model_ref}")
     print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
