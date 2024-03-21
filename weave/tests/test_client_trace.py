@@ -65,12 +65,12 @@ def test_simple_op(client):
 
 
 def test_dataset(client):
-    from weave.weaveflow import Dataset
+    from weave.flow import Dataset
 
-    d = Dataset([{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
-    d2 = weave.storage.get(str(ref))
-    assert d2.rows == d2.rows
+    d2 = weave.ref(ref.uri()).get()
+    assert list(d2.rows) == list(d2.rows)
 
 
 def test_trace_server_call_start_and_end(clickhouse_trace_server):
