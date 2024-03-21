@@ -405,9 +405,16 @@ const useObjectVersion = (
         result: null,
       };
     }
+    const found = result.result.find(obj => obj.versionHash === key?.versionHash)
+    if (!found) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
     const cachableResult = {
       ...key,
-      ...result.result.find(obj => obj.versionHash === key?.versionHash),
+      ...found,
     } as ObjectVersionSchema;
     objectVersionCache.set(key, cachableResult);
     return {
