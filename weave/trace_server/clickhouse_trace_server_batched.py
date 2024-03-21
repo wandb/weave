@@ -304,9 +304,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
-        self._insert_obj(ch_obj)
-        return tsi.OpCreateRes(version_hash=str(ch_obj.id))
+        raise NotImplementedError()
+        # ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
+        # self._insert_obj(ch_obj)
+        # return tsi.OpCreateRes(version_hash=str(ch_obj.id))
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         conds = [
@@ -496,10 +497,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_refs = [refs.parse_uri(r) for r in req.refs]
-        if any(isinstance(r, refs.TableRef) for r in parsed_refs):
+        parsed_raw_refs = [refs.parse_uri(r) for r in req.refs]
+        if any(isinstance(r, refs.TableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
-        parsed_refs = typing.cast(typing.List[refs.ObjectRef], parsed_refs)
+        parsed_refs = typing.cast(typing.List[refs.ObjectRef], parsed_raw_refs)
 
         root_val_cache: typing.Dict[str, typing.Any] = {}
 
@@ -1061,7 +1062,7 @@ def _process_parameters(
 #     )
 
 
-def get_type(val):
+def get_type(val: typing.Any) -> str:
     if val == None:
         return "none"
     elif isinstance(val, dict):
