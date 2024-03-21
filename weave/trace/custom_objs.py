@@ -104,7 +104,7 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
 
 
 def decode_custom_obj(
-    weave_type: Dict, encoded_path_contents: Mapping[str, str | bytes]
+    weave_type: Dict, encoded_path_contents: Mapping[str, Union[str, bytes]]
 ) -> Any:
     art = MemTraceFilesArtifact(
         encoded_path_contents,
