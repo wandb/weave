@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import wandb
 import weave
 from weave import weave_client
+from weave.trace.vals import TraceObject
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     extract_refs_from_values,
@@ -13,7 +14,10 @@ from ..trace_server.trace_server_interface_util import (
 )
 from ..trace_server import trace_server_interface as tsi
 
-from ..trace_server.graph_client_trace import GraphClientTrace
+from ..trace_server.graph_client_trace import CallSchemaRun, GraphClientTrace
+
+
+## Hacky interface compatibility helpers
 
 ClientType = typing.Union[weave_client.WeaveClient, GraphClientTrace]
 
@@ -36,6 +40,31 @@ def get_client_project_id(client: ClientType) -> tsi.TraceServerInterface:
         raise ValueError(f"Unknown client type {client}")
 
 
+def get_client_runs(
+    client: ClientType,
+) -> typing.List[typing.Union[CallSchemaRun, TraceObject]]:
+    if isinstance(client, weave_client.WeaveClient):
+        return list(client.calls())
+    elif isinstance(client, GraphClientTrace):
+        return client.runs()
+    else:
+        raise ValueError(f"Unknown client type {client}")
+
+
+def get_call_from_client_run(
+    resObj: typing.Union[TraceObject, CallSchemaRun]
+) -> tsi.CallSchema:
+    if isinstance(resObj, CallSchemaRun):
+        return resObj._call
+    elif isinstance(resObj, TraceObject):
+        return resObj.val._server_call
+    else:
+        raise ValueError(f"Unknown client type {resObj}")
+
+
+## End hacky interface compatibility helpers
+
+
 def test_simple_op(trace_client):
     @weave.op()
     def my_op(a: int) -> int:
@@ -47,25 +76,27 @@ def test_simple_op(trace_client):
     # assert trace_client.ref_is_own(op_ref)
     got_op = trace_client.get(op_ref)
 
-    runs = list(trace_client.calls())
+    runs = get_client_runs(trace_client)
     assert len(runs) == 1
-    fetched_call = runs[0]._call
-    assert (
-        fetched_call.name
-        == f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
-    )
+    fetched_call = get_call_from_client_run(runs[0])
+    if isinstance(trace_client, GraphClientTrace):
+        digest = "873a064f5e172ac4dfd1b869028d749b"
+    else:
+        digest = "35e46ba0597f4b9763d930378f63a0a3b51f6c187b8be105829c8b4d16963643"
+    expected_name = f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-my_op:{digest}"
+    assert fetched_call.name == expected_name
     assert fetched_call == tsi.CallSchema(
         project_id=f"{trace_client.entity}/{trace_client.project}",
         id=fetched_call.id,
-        name=fetched_call.name,
+        name=expected_name,
         trace_id=fetched_call.trace_id,
         parent_id=None,
         start_datetime=fetched_call.start_datetime,
         end_datetime=fetched_call.end_datetime,
         exception=None,
         attributes={},
-        inputs={"a": 5, "_keys": ["a"]},
-        outputs={"_result": 6, "_keys": ["_result"]},
+        inputs={"a": 5},
+        outputs={"_result": 6},
         summary={},
     )
 
@@ -114,8 +145,8 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
         "start_datetime": exp_start_datetime,
         "end_datetime": None,
         "exception": None,
-        "attributes": {"_keys": ["a"], "a": 5},
-        "inputs": {"_keys": ["b"], "b": 5},
+        "attributes": {"a": 5},
+        "inputs": {"b": 5},
         "outputs": None,
         "summary": None,
         "wb_user_id": None,
@@ -151,10 +182,10 @@ def test_trace_server_call_start_and_end(clickhouse_trace_server):
         "start_datetime": exp_start_datetime,
         "end_datetime": exp_end_datetime,
         "exception": None,
-        "attributes": {"_keys": ["a"], "a": 5},
-        "inputs": {"_keys": ["b"], "b": 5},
-        "outputs": {"_keys": ["d"], "d": 5},
-        "summary": {"_keys": ["c"], "c": 5},
+        "attributes": {"a": 5},
+        "inputs": {"b": 5},
+        "outputs": {"d": 5},
+        "summary": {"c": 5},
         "wb_user_id": None,
         "wb_run_id": None,
     }
@@ -168,11 +199,13 @@ def test_graph_call_ordering(trace_client):
     for i in range(10):
         my_op(i)
 
-    runs = trace_client.runs()
+    runs = get_client_runs(trace_client)
     assert len(runs) == 10
 
     # We want to preserve insert order
-    assert [run._call.inputs["a"] for run in runs] == list(range(10))
+    assert [get_call_from_client_run(run).inputs["a"] for run in runs] == list(
+        range(10)
+    )
 
 
 class OpCallSummary(BaseModel):
@@ -285,11 +318,9 @@ def test_trace_call_query_filter_op_version_refs(trace_client):
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
     assert ref_str(call_summaries["adder"].op).startswith(
-        f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:"
+        f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-adder:"
     )
-    wildcard_adder_ref_str = (
-        f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:*/obj"
-    )
+    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-adder:*/obj"
 
     for op_version_refs, exp_count in [
         # Test the None case
@@ -340,18 +371,6 @@ def has_any(list_a: typing.List[str], list_b: typing.List[str]) -> bool:
 
 def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
     return list(set(list_a))
-
-
-# def get_all_calls_asserting_finished(
-#     trace_client: GraphClientTrace, call_spec: OpCallSpec
-# ) -> tsi.CallsQueryRes:
-#     res = trace_client.calls(
-
-#     )
-#     all_calls = list(res)
-#     assert len(all_calls) == call_spec.total_calls
-#     assert all([call.end_datetime for call in all_calls])
-#     return res
 
 
 def get_all_calls_asserting_finished(

@@ -120,6 +120,7 @@ class Call:
     inputs: dict
     id: Optional[str] = None
     output: Any = None
+    _server_call: Optional[CallSchema] = None
 
     @property
     def ui_url(self) -> str:
@@ -199,6 +200,7 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
+        _server_call=server_call,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -364,6 +366,18 @@ class WeaveClient:
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes={},
             wb_run_id=current_wb_run_id,
+        )
+        call._server_call = CallSchema(
+            project_id=start.project_id,
+            id=start.id,
+            name=start.name,
+            trace_id=start.trace_id,
+            parent_id=start.parent_id,
+            start_datetime=start.start_datetime,
+            attributes=start.attributes,
+            inputs=start.inputs,
+            wb_user_id=start.wb_user_id,
+            wb_run_id=start.wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
         return call
