@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 _global_monitor: typing.Optional["Monitor"] = None
 
-_attributes: contextvars.ContextVar[typing.Dict[str, typing.Any]] = (
-    contextvars.ContextVar("_attributes", default={})
-)
+_attributes: contextvars.ContextVar[
+    typing.Dict[str, typing.Any]
+] = contextvars.ContextVar("_attributes", default={})
 
 
 # Matches OpenTelemetry

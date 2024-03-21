@@ -9,7 +9,7 @@ from .. import errors
 from .. import storage
 from .. import registry_mem
 from .. import weave_internal
-from .. import trace
+from .. import trace_legacy
 from .. import ref_base
 from .. import uris
 from .. import graph
@@ -60,7 +60,7 @@ class RefNodeMethods:
 def created_by(self) -> typing.Optional[runs.Run]:
     # TODO: engine derefences blindly before passing in, but we expect ref! Hack
     # here by just getting ._ref
-    return trace.get_obj_creator(self._ref)
+    return trace_legacy.get_obj_creator(self._ref)
 
 
 # Hmm... This returns the same obj, not a ref anymore
@@ -155,7 +155,7 @@ def used_by(obj: typing.Any, op_name: str):
     ref = storage.get_ref(obj)
     if ref is None:
         return []
-    res = trace.used_by(ref, op_name)
+    res = trace_legacy.used_by(ref, op_name)
     return res
 
 
