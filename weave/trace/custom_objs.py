@@ -1,7 +1,7 @@
 import contextlib
 import io
 import os
-from typing import Optional, Union, Mapping, Iterator
+from typing import Any, Dict, Optional, Union, Mapping, Iterator
 from weave import weave_types as types
 from weave import artifact_fs
 from weave.trace_server.trace_server_interface_util import (
@@ -83,7 +83,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
 
 
-def encode_custom_obj(obj):
+def encode_custom_obj(obj: Any) -> Optional[dict]:
     weave_type = types.type_of(obj)
     if weave_type == types.UnknownType():
         # We silently return None right now. We could warn here. This object
@@ -103,7 +103,9 @@ def encode_custom_obj(obj):
     }
 
 
-def decode_custom_obj(weave_type, encoded_path_contents):
+def decode_custom_obj(
+    weave_type: Dict, encoded_path_contents: Mapping[str, str | bytes]
+) -> Any:
     art = MemTraceFilesArtifact(
         encoded_path_contents,
         metadata={},
