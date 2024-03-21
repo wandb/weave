@@ -133,8 +133,6 @@ class TraceObject(Tracable):
             return val_attr_val
 
         new_ref = self.ref.with_attr(__name)
-        if not isinstance(new_ref, ObjectRef):
-            raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
 
         return make_trace_obj(
             val_attr_val,
@@ -167,7 +165,7 @@ class TraceTable(Tracable):
     def __init__(
         self,
         table_ref: TableRef,
-        ref: ObjectRef,
+        ref: Ref,
         server: TraceServerInterface,
         filter: _TableRowFilter,
         root: typing.Optional[Tracable],
@@ -192,8 +190,6 @@ class TraceTable(Tracable):
             )
             row = response.rows[key]
             new_ref = self.ref.with_item(row.digest)
-            if not isinstance(new_ref, ObjectRef):
-                raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
 
             return make_trace_obj(
                 row.val,
@@ -230,8 +226,6 @@ class TraceTable(Tracable):
             )
             for item in response.rows:
                 new_ref = self.ref.with_item(item.digest)
-                if not isinstance(new_ref, ObjectRef):
-                    raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
                 yield make_trace_obj(
                     item.val,
                     new_ref,
@@ -253,7 +247,7 @@ class TraceList(Tracable):
     def __init__(
         self,
         val: Any,
-        ref: ObjectRef,
+        ref: Ref,
         server: TraceServerInterface,
         root: typing.Optional[Tracable],
     ):
@@ -268,8 +262,6 @@ class TraceList(Tracable):
         if isinstance(i, slice):
             raise ValueError("Slices not yet supported")
         new_ref = self.ref.with_index(i)
-        if not isinstance(new_ref, ObjectRef):
-            raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
         return make_trace_obj(self.val[i], new_ref, self.server, self.root)
 
     def __eq__(self, other: Any) -> bool:
@@ -280,7 +272,7 @@ class TraceDict(Tracable, dict):
     def __init__(
         self,
         val: dict,
-        ref: ObjectRef,
+        ref: Ref,
         server: TraceServerInterface,
         root: typing.Optional[Tracable],
     ) -> None:
@@ -293,8 +285,6 @@ class TraceDict(Tracable, dict):
 
     def __getitem__(self, key: str) -> Any:
         new_ref = self.ref.with_key(key)
-        if not isinstance(new_ref, ObjectRef):
-            raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
         return make_trace_obj(self.val[key], new_ref, self.server, self.root)
 
     def __setitem__(self, key: str, value: Any) -> None:
@@ -324,7 +314,7 @@ class TraceDict(Tracable, dict):
 
 
 def make_trace_obj(
-    val: Any, new_ref: ObjectRef, server: TraceServerInterface, root: Optional[Tracable]
+    val: Any, new_ref: Ref, server: TraceServerInterface, root: Optional[Tracable]
 ) -> Any:
     if isinstance(val, Tracable):
         # If val is a TraceTable, we want to refer to it via the outer object
