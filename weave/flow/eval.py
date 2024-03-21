@@ -117,7 +117,7 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: weave.WeaveList) -> dict:
+    async def summarize(self, eval_table: typing.Union[weave.WeaveList, list]) -> dict:
         summary = {}
         if not isinstance(eval_table, weave.WeaveList):
             eval_table = weave.WeaveList(eval_table)
