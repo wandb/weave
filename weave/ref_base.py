@@ -13,7 +13,6 @@ from . import weave_types as types
 from . import object_context
 from . import context_state
 from .language_features.tagging import tag_store
-from . import weave_client as _weave_client
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
@@ -188,7 +187,7 @@ def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
 # So for now we never call it on tagged objects. But this probably
 # breaks some behaviors (like automatic cross-artifact references
 # for tagged objects)
-def _put_ref(obj: typing.Any, ref: typing.Union[_weave_client.Ref, Ref]) -> None:
+def _put_ref(obj: typing.Any, ref: Ref) -> None:
     try:
         obj._ref = ref
     except (AttributeError, ValueError):
