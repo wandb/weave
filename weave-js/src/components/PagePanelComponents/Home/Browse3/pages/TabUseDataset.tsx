@@ -1,8 +1,9 @@
-import {Alert, Box} from '@mui/material';
+import {Box} from '@mui/material';
 import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
 import {parseRef} from '../../../../../react';
+import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
 import {
@@ -43,7 +44,7 @@ ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
 
   return (
     <Box m={2}>
-      <Alert severity="info" variant="outlined">
+      <Alert icon="lightbulb-info">
         See{' '}
         <DocLink
           path="guides/tracking/objects#getting-an-object-back"
