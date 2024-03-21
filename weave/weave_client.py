@@ -399,7 +399,7 @@ class WeaveClient:
     def finish_run(self, run: Call, output: Any, refs: Any) -> None:
         self.finish_call(run, output)
 
-    def fail_run(self, run: Call, exception: Exception) -> None:
+    def fail_run(self, run: Call, exception: BaseException) -> None:
         self.finish_call(run, str(exception))
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
