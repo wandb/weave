@@ -2,6 +2,8 @@ import typing
 from typing import Mapping
 import inspect
 
+from weave.weave_client import Call
+
 from . import graph_client_context
 from . import context_state
 from . import run_context
@@ -29,6 +31,8 @@ def execute_op(op_def: "OpDef", inputs: Mapping[str, typing.Any]):
         # found_run = client.find_op_run(str(op_def_ref), mon_span_inputs)
         # if found_run:
         #     return found_run.output
+        if not isinstance(parent_run, Call):
+            raise ValueError("parent_run must be a Call")
 
         run = client.create_call(op_def, parent_run, trackable_inputs)
         try:
