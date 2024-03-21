@@ -463,8 +463,8 @@ class WeaveClient:
     def op_runs(self, op_def: op_def.OpDef) -> Sequence[Call]:
         raise NotImplementedError()
 
-    def ref_uri(self, name: str, version: str, path: str) -> uris.WeaveURI:
-        raise NotImplementedError()
+    def ref_uri(self, name: str, version: str, path: str) -> str:
+        return ObjectRef(self.entity, self.project, name, version).uri()
 
 
 def safe_current_wb_run_id() -> Optional[str]:
