@@ -1,5 +1,6 @@
 from typing import Any, Union, Optional, TypedDict
 import dataclasses
+import typing
 import uuid
 import pydantic
 import inspect
@@ -13,6 +14,7 @@ from weave.trace.object_record import ObjectRecord, pydantic_object_record
 from weave.trace.serialize import to_json, from_json
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
+    ObjSchema,
     TraceServerInterface,
     ObjCreateReq,
     ObjSchemaForInsert,
@@ -54,7 +56,7 @@ class ValueFilter(TypedDict, total=False):
     val: dict
 
 
-def dataclasses_asdict_one_level(obj):
+def dataclasses_asdict_one_level(obj: Any) -> typing.Dict[str, Any]:
     # dataclasses.asdict is recursive. We don't want that when json encoding
     return {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
 
@@ -62,7 +64,7 @@ def dataclasses_asdict_one_level(obj):
 # TODO: unused
 
 
-def get_obj_name(val):
+def get_obj_name(val: Any) -> str:
     name = getattr(val, "name", None)
     if name == None:
         if isinstance(val, ObjectRecord):
@@ -74,7 +76,7 @@ def get_obj_name(val):
     return name
 
 
-def get_ref(obj: Any) -> Optional[ObjectRef]:
+def get_ref(obj: Any) -> Optional[Ref]:
     if isinstance(obj, TraceTable):
         # TODO: this path is odd. We want to use table_ref when serializing
         # which is the direct ref to the table. But .ref on TraceTable is
@@ -117,14 +119,16 @@ class Call:
     output: Any = None
 
     @property
-    def ui_url(self):
+    def ui_url(self) -> str:
         project_parts = self.project_id.split("/")
         if len(project_parts) != 2:
             raise ValueError(f"Invalid project_id: {self.project_id}")
         entity, project = project_parts
+        if not self.id:
+            raise ValueError("Can't get URL for call without ID")
         return urls.call_path_as_peek(entity, project, self.id)
 
-    def children(self):
+    def children(self) -> "CallsIter":
         client = graph_client_context.require_graph_client()
         if not self.id:
             raise ValueError("Can't get children of call without ID")
@@ -139,12 +143,14 @@ class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
 
-    def __init__(self, server, project_id: str, filter: _CallsFilter):
+    def __init__(
+        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+    ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
 
-    def __getitem__(self, key: Union[slice, int]):
+    def __getitem__(self, key: Union[slice, int]) -> TraceObject:
         if isinstance(key, slice):
             raise NotImplementedError("Slicing not supported")
         for i, call in enumerate(self):
@@ -152,7 +158,7 @@ class CallsIter:
                 return call
         raise IndexError(f"Index {key} out of range")
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[TraceObject]:
         page_index = 0
         page_size = 10
         while True:
@@ -176,7 +182,9 @@ class CallsIter:
             page_index += 1
 
 
-def make_client_call(server_call: CallSchema, server: TraceServerInterface):
+def make_client_call(
+    server_call: CallSchema, server: TraceServerInterface
+) -> TraceObject:
     output = server_call.outputs
     if isinstance(output, dict) and "_result" in output:
         output = output["_result"]
@@ -189,6 +197,8 @@ def make_client_call(server_call: CallSchema, server: TraceServerInterface):
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
     )
+    if call.id is None:
+        raise ValueError("Call ID is None")
     return TraceObject(call, CallRef(call.id), server, call)
 
 
@@ -202,7 +212,7 @@ class WeaveClient:
 
         self.server.ensure_project_exists(entity, project)
 
-    def ref_is_own(self, ref):
+    def ref_is_own(self, ref: Ref) -> bool:
         return isinstance(ref, Ref)
 
     def _project_id(self) -> str:
@@ -210,11 +220,11 @@ class WeaveClient:
 
     # This is used by tests and op_execute still, but the save() interface
     # is nicer for clients I think?
-    def save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
+    def save_object(self, val: Any, name: str, branch: str = "latest") -> Ref:
         val = self.save_nested_objects(val, name=name)
         return self._save_object(val, name, branch)
 
-    def _save_object(self, val, name: str, branch: str = "latest") -> ObjectRef:
+    def _save_object(self, val: Any, name: str, branch: str = "latest") -> Ref:
         is_opdef = isinstance(val, op_def.OpDef)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
@@ -228,6 +238,7 @@ class WeaveClient:
                 )
             )
         )
+        ref: Ref
         if is_opdef:
             ref = OpRef(self.entity, self.project, name, response.version_digest)
         else:
@@ -236,8 +247,10 @@ class WeaveClient:
         # save instead?
         return ref
 
-    def save(self, val, name: str, branch: str = "latest") -> Any:
+    def save(self, val: Any, name: str, branch: str = "latest") -> Any:
         ref = self.save_object(val, name, branch)
+        if not isinstance(ref, ObjectRef):
+            raise ValueError(f"Expected ObjectRef, got {ref}")
         return self.get(ref)
 
     def get(self, ref: ObjectRef) -> Any:
@@ -264,7 +277,7 @@ class WeaveClient:
             entity=self.entity, project=self.project, digest=response.digest
         )
 
-    def calls(self, filter: Optional[_CallsFilter] = None):
+    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
 
@@ -288,11 +301,12 @@ class WeaveClient:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
         return self.calls(_CallsFilter(op_version_refs=[op_ref.uri()]))
 
-    def objects(self, filter: Optional[_ObjectVersionFilter] = None):
+    def objects(self, filter: Optional[_ObjectVersionFilter] = None) -> list[ObjSchema]:
         if not filter:
             filter = _ObjectVersionFilter()
         else:
             filter = filter.model_copy()
+        filter = typing.cast(_ObjectVersionFilter, filter)
         filter.is_op = False
 
         response = self.server.objs_query(
@@ -303,16 +317,18 @@ class WeaveClient:
         )
         return response.objs
 
-    def _save_op(self, op: op_def.OpDef) -> ObjectRef:
+    def _save_op(self, op: op_def.OpDef) -> OpRef:
         if isinstance(op, op_def.BoundOpDef):
             op = op.op_def
         op_def_ref = self._save_object(op, op.name)
-        op.ref = op_def_ref
+        if not isinstance(op_def_ref, OpRef):
+            raise ValueError(f"Expected OpRef, got {op_def_ref}")
+        op.ref = op_def_ref  # type: ignore
         return op_def_ref
 
     def create_call(
         self, op: Union[str, op_def.OpDef], parent: Optional[Call], inputs: dict
-    ):
+    ) -> Call:
         if isinstance(op, op_def.OpDef):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
@@ -352,7 +368,7 @@ class WeaveClient:
         return call
         # return CallSchemaRun(start)
 
-    def finish_call(self, call: Call, output: Any):
+    def finish_call(self, call: Call, output: Any) -> None:
         # TODO: not saving finished call yet
         output = self.save_nested_objects(output)
         output = map_to_refs(output)
@@ -375,13 +391,15 @@ class WeaveClient:
 
     # These are the old client interface terms, op_execute still relies
     # on them.
-    def create_run(self, op_name: str, parent_run, inputs, refs):
+    def create_run(
+        self, op_name: str, parent_run: typing.Optional[Call], inputs: dict, refs: Any
+    ) -> Call:
         return self.create_call(op_name, parent_run, inputs)
 
-    def finish_run(self, run, output, refs):
+    def finish_run(self, run: Call, output: Any, refs: Any) -> None:
         self.finish_call(run, output)
 
-    def fail_run(self, run, exception):
+    def fail_run(self, run: Call, exception: Exception) -> None:
         self.finish_call(run, str(exception))
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
@@ -392,6 +410,8 @@ class WeaveClient:
                 return obj._trace_object
             obj_rec = pydantic_object_record(obj).map_values(self.save_nested_objects)
             ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
+            if not isinstance(ref, ObjectRef):
+                raise ValueError(f"Expected ObjectRef, got {ref}")
             # return make_trace_obj(obj_rec, ref, client.server, None)
             trace_obj = make_trace_obj(obj_rec, ref, self.server, None)
             obj._trace_object = trace_obj

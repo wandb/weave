@@ -110,7 +110,7 @@ class TraceObject(Tracable):
     def __init__(
         self,
         val: Any,
-        ref: ObjectRef,
+        ref: Ref,
         server: TraceServerInterface,
         root: typing.Optional[Tracable],
     ) -> None:
