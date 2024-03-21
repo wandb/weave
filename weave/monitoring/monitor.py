@@ -217,13 +217,13 @@ class Monitor:
         # one.
         client = graph_client_context.get_graph_client()
         if client:
-            if isinstance(
-                client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-            ):
-                self._streamtable = client.runs_st
-            else:
-                # TODO: we need to refactor monitor to make use of graph_client
-                print("Low-level tracing only works with wandb client currently")
+            # if isinstance(
+            #     client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+            # ):
+            #     self._streamtable = client.runs_st
+            # else:
+            # TODO: we need to refactor monitor to make use of graph_client
+            print("Low-level tracing only works with wandb client currently")
         return self._streamtable
 
     @contextlib.contextmanager
@@ -367,12 +367,12 @@ def default_monitor() -> Monitor:
 def _get_global_monitor() -> typing.Optional[Monitor]:
     client = graph_client_context.get_graph_client()
     if client is not None:
-        if not isinstance(
-            client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-        ):
-            raise ValueError(
-                "monitor logging (via openai patch for example) is only supported with wandb client currently"
-            )
+        # if not isinstance(
+        #     client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+        # ):
+        raise ValueError(
+            "monitor logging (via openai patch for example) is only supported with wandb client currently"
+        )
         return Monitor(client.runs_st)
     return _global_monitor
 

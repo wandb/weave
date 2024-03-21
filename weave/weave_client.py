@@ -43,7 +43,7 @@ from weave.trace.refs import (
 from weave.trace.vals import TraceObject, TraceTable, Tracable, make_trace_obj
 
 
-def generate_id():
+def generate_id() -> str:
     return str(uuid.uuid4())
 
 
