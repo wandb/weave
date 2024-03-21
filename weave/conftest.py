@@ -13,7 +13,7 @@ import weave
 from . import context_state
 from .tests import fixture_fakewandb
 from . import serialize
-from . import client
+from . import client as client_legacy
 from .language_features.tagging.tag_store import isolated_tagging_context
 from . import logs
 from . import io_service
@@ -26,7 +26,7 @@ from flask.testing import FlaskClient
 from .tests.wandb_system_tests_conftest import *
 from .tests.trace_server_clickhouse_conftest import *
 
-from weave.trace_server import sqlite_trace_server
+from weave.trace_server import sqlite_trace_server, trace_server_interface
 from weave import weave_init
 
 logs.configure_logger()
@@ -241,7 +241,7 @@ def http_server_test_client(app):
 
 @pytest.fixture()
 def weave_test_client(http_server_test_client):
-    return client.Client(http_server_test_client)
+    return client_legacy.Client(http_server_test_client)
 
 
 @pytest.fixture()
@@ -303,19 +303,24 @@ def strict_op_saving():
 @pytest.fixture
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     server_type = request.config.getoption("--weave-server")
+    tsi: trace_server_interface.TraceServerInterface
     if server_type == "sqlite":
-        server = sqlite_trace_server.SqliteTraceServer("file::memory:?cache=shared")
-        server.drop_tables()
-        server.setup_tables()
+        sql_lite_server = sqlite_trace_server.SqliteTraceServer(
+            "file::memory:?cache=shared"
+        )
+        sql_lite_server.drop_tables()
+        sql_lite_server.setup_tables()
+        tsi = sql_lite_server
     elif server_type == "clickhouse":
-        server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
             use_async_insert=False
         )
-        server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        server.ch_client.command("DROP DATABASE IF EXISTS default")
-        server._run_migrations()
+        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
+        ch_server._run_migrations()
+        tsi
 
-    client = weave_client.WeaveClient("shawn", "test-project", server)
+    client = weave_client.WeaveClient("shawn", "test-project", tsi)
     inited_client = weave_init.InitializedClient(client)
     try:
         yield inited_client.client
