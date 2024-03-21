@@ -10,6 +10,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 // import {refStringToRefDict} from '../wfInterface/naive';
 import {callCache, objectVersionCache, refDataCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
@@ -405,7 +406,9 @@ const useObjectVersion = (
         result: null,
       };
     }
-    const found = result.result.find(obj => obj.versionHash === key?.versionHash)
+    const found = result.result.find(
+      obj => obj.versionHash === key?.versionHash
+    );
     if (!found) {
       return {
         loading: false,
@@ -741,6 +744,32 @@ const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
   };
 };
 
+const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
+  const query = useRefsData([opVersionRef]);
+  const fileSpec = useMemo(() => {
+    if (query.result == null) {
+      return null;
+    }
+    const result = query.result[0];
+    const ref = parseRef(opVersionRef);
+    if (isWeaveObjectRef(ref)) {
+      return {
+        digest: result.files['obj.py'],
+        entity: ref.entityName,
+        project: ref.projectName,
+      };
+    }
+    return null;
+  }, [opVersionRef, query.result]);
+  const text = useFileContent(
+    fileSpec?.entity ?? '',
+    fileSpec?.project ?? '',
+    fileSpec?.digest ?? '',
+    {skip: fileSpec == null}
+  );
+  return text;
+};
+
 const mergeTypes = (a: Types.Type, b: Types.Type): Types.Type => {
   // TODO: this should match the python merge_types implementation.
   if (_.isEqual(a, b)) {
@@ -935,5 +964,6 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
     useChildCallsForCompare,
     useGetRefsType,
     useRefsType,
+    useCodeForOpRef,
   },
 };

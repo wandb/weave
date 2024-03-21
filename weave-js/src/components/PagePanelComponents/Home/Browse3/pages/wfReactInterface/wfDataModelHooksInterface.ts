@@ -203,6 +203,7 @@ export type WFDataModelHooksInterface = {
     useGetRefsType: () => (refUris: string[]) => Promise<Types.Type[]>;
     // `useRefsType` is in beta while we integrate Shawn's new Object DB
     useRefsType: (refUris: string[]) => Loadable<Types.Type[]>;
+    useCodeForOpRef: (opVersionRef: string) => Loadable<string>;
   };
 };
 

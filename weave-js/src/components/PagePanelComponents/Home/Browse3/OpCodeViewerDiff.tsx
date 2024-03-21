@@ -1,8 +1,7 @@
 import {DiffEditor, Monaco} from '@monaco-editor/react';
-import {useNodeValue} from '@wandb/weave/react';
-import React, {useMemo} from 'react';
+import React from 'react';
 
-import {opDefCodeNode} from '../Browse2/dataModel';
+import {useWFHooks} from './pages/wfReactInterface/context';
 
 type OpCodeViewerDiffProps = {
   left: string;
@@ -16,20 +15,13 @@ export const OpCodeViewerDiff = ({
   right,
   onSplitResize,
 }: OpCodeViewerDiffProps) => {
-  const opPyContentsLeft = useMemo(() => {
-    return opDefCodeNode(left);
-  }, [left]);
-  const opPyContentsRight = useMemo(() => {
-    return opDefCodeNode(right);
-  }, [right]);
-  const opPyContentsQueryLeft = useNodeValue(opPyContentsLeft);
-  const opPyContentsQueryRight = useNodeValue(opPyContentsRight);
-  const textLeft = opPyContentsQueryLeft.loading
-    ? ''
-    : opPyContentsQueryLeft.result;
-  const textRight = opPyContentsQueryRight.loading
-    ? ''
-    : opPyContentsQueryRight.result;
+  const {
+    derived: {useCodeForOpRef},
+  } = useWFHooks();
+  const opPyContentsQueryLeft = useCodeForOpRef(left);
+  const opPyContentsQueryRight = useCodeForOpRef(right);
+  const textLeft = opPyContentsQueryLeft.result ?? '';
+  const textRight = opPyContentsQueryRight.result ?? '';
   const loading =
     opPyContentsQueryLeft.loading || opPyContentsQueryRight.loading;
 

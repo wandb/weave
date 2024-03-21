@@ -49,9 +49,6 @@ const VersionHeader = styled.div`
 `;
 VersionHeader.displayName = 'S.VersionHeader';
 
-// TODO: Work with Jamie (:
-const DIFF_TOOL_ENABLED_FOR_NEW_CH_SERVER = false;
-
 export const OpCodeViewer = ({
   entity,
   project,
@@ -62,8 +59,7 @@ export const OpCodeViewer = ({
   const routerContext = useWeaveflowCurrentRouteContext();
   const history = useHistory();
 
-  const isDiffAvailable =
-    DIFF_TOOL_ENABLED_FOR_NEW_CH_SERVER && opVersions.length > 1;
+  const isDiffAvailable = opVersions.length > 1;
   const [diffState, setDiffState] = useState<DiffState>({
     left: null,
     right: null,

@@ -24,12 +24,14 @@ import {
   opArtifactTypeArtifacts,
   opArtifactVersionArtifactSequence,
   opArtifactVersionCreatedAt,
+  opArtifactVersionFile,
   opArtifactVersionHash,
   opArtifactVersionIsWeaveObject,
   opArtifactVersionMetadata,
   opArtifactVersions,
   opArtifactVersionVersionId,
   opDict,
+  opFileContents,
   opFilter,
   opFlatten,
   opGet,
@@ -49,6 +51,7 @@ import {
 } from '../../../../../../core';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {
+  isWandbArtifactRef,
   parseRef,
   useNodeValue,
   WandbArtifactRef,
@@ -973,6 +976,26 @@ const useRefsType = (refUris: string[]): Loadable<Type[]> => {
   };
 };
 
+export const opDisplayName = (opName: string) => {
+  if (opName.startsWith('wandb-artifact:')) {
+    const ref = parseRef(opName);
+    if (isWandbArtifactRef(ref)) {
+      let refOpName = ref.artifactName;
+      if (refOpName.startsWith('op-')) {
+        refOpName = refOpName.slice(3);
+      }
+      return refOpName + ':' + ref.artifactVersion;
+    }
+  }
+  return opName;
+};
+
+const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
+  return useNodeValue(
+    useMemo(() => opDefCodeNode(opVersionRef), [opVersionRef])
+  );
+};
+
 // Converters //
 const spanToCallSchema = (
   entity: string,
@@ -1044,6 +1067,31 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   }
 };
 
+const refUnderlyingArtifactNode = (uri: string) => {
+  const ref = parseRef(uri);
+  if (!isWandbArtifactRef(ref)) {
+    throw new Error(`Expected wandb artifact ref, got ${ref}`);
+  }
+  const projNode = opRootProject({
+    entityName: constString(ref.entityName),
+    projectName: constString(ref.projectName),
+  });
+  return opProjectArtifactVersion({
+    project: projNode,
+    artifactName: constString(ref.artifactName),
+    artifactVersionAlias: constString(ref.artifactVersion),
+  });
+};
+
+const opDefCodeNode = (uri: string) => {
+  const artifactVersionNode = refUnderlyingArtifactNode(uri);
+  const objPyFileNode = opArtifactVersionFile({
+    artifactVersin: artifactVersionNode,
+    path: constString('obj.py'),
+  });
+  return opFileContents({file: objPyFileNode});
+};
+
 const useFileContent = (
   entity: string,
   project: string,
@@ -1063,5 +1111,10 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useRefsData,
   useApplyMutationsToRef,
   useFileContent,
-  derived: {useChildCallsForCompare, useGetRefsType, useRefsType},
+  derived: {
+    useChildCallsForCompare,
+    useGetRefsType,
+    useRefsType,
+    useCodeForOpRef,
+  },
 };
