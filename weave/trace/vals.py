@@ -287,6 +287,12 @@ class TraceDict(Tracable, dict):
         new_ref = self.ref.with_key(key)
         return make_trace_obj(self.val[key], new_ref, self.server, self.root)
 
+    def get(self, key: str, default: Any = None) -> Any:
+        new_ref = self.ref.with_key(key)
+        return make_trace_obj(
+            self.val.get(key, default), new_ref, self.server, self.root
+        )
+
     def __setitem__(self, key: str, value: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
             raise ValueError("Can only set items on object refs")
