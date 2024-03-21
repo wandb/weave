@@ -26,6 +26,9 @@ from flask.testing import FlaskClient
 from .tests.wandb_system_tests_conftest import *
 from .tests.trace_server_clickhouse_conftest import *
 
+from weave.trace_server import sqlite_trace_server
+from weave import weave_init
+
 logs.configure_logger()
 
 # Lazy mode was the default for a long time. Eager is now the default for the user API.
@@ -284,3 +287,37 @@ def ref_tracking():
 def strict_op_saving():
     with context_state.strict_op_saving(True):
         yield
+
+
+# we already were doing pytest_addoption in wandb_system_tests_conftest so
+# the weave flag is there as well
+# def pytest_addoption(parser):
+#     parser.addoption(
+#         "--weave-server",
+#         action="store",
+#         default="sqlite",
+#         help="Specify the client object to use: sqlite or clickhouse",
+#     )
+
+
+@pytest.fixture
+def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+    server_type = request.config.getoption("--weave-server")
+    if server_type == "sqlite":
+        server = sqlite_trace_server.SqliteTraceServer("file::memory:?cache=shared")
+        server.drop_tables()
+        server.setup_tables()
+    elif server_type == "clickhouse":
+        server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
+            use_async_insert=False
+        )
+        server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+        server.ch_client.command("DROP DATABASE IF EXISTS default")
+        server._run_migrations()
+
+    client = weave_client.WeaveClient("shawn", "test-project", server)
+    inited_client = weave_init.InitializedClient(client)
+    try:
+        yield inited_client.client
+    finally:
+        inited_client.reset()
