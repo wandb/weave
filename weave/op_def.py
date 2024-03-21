@@ -3,7 +3,7 @@ import copy
 import contextvars
 import contextlib
 import typing
-from typing import Sequence
+from typing import Sequence, Iterator
 import inspect
 
 from weave.weavejs_fixes import fixup_node
@@ -31,6 +31,8 @@ from .language_features.tagging import (
 )
 from . import language_autocall
 from . import op_def_type
+
+from . import weave_client
 
 if typing.TYPE_CHECKING:
     from .run_streamtable_span import RunStreamTableSpan
@@ -611,10 +613,11 @@ class OpDef:
 
     def runs(self) -> Sequence[Run]:
         client = graph_client_context.require_graph_client()
-        return client.op_runs(self)
+        raise NotImplementedError("OpDef.runs not implemented with new graph client")
+        # return client.op_runs(self)
 
     # TODO: Use Call type instead of Run
-    def calls(self) -> Sequence[Run]:
+    def calls(self) -> weave_client.CallsIter:
         client = graph_client_context.require_graph_client()
         return client.op_calls(self)
 

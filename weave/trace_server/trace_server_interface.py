@@ -340,7 +340,7 @@ class TraceServerInterface:
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def refs_read(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
+    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
         raise NotImplementedError()
 
     @abc.abstractmethod
