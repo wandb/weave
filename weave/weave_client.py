@@ -1,4 +1,4 @@
-from typing import Any, Union, Optional, TypedDict
+from typing import Any, Sequence, Union, Optional, TypedDict
 import dataclasses
 import typing
 import uuid
@@ -6,7 +6,7 @@ import pydantic
 import inspect
 import datetime
 
-from weave import box
+from weave import box, uris
 from weave.table import Table
 from weave import urls
 from weave import op_def
@@ -43,6 +43,9 @@ from weave.trace.refs import (
     OpRef,
 )
 from weave.trace.vals import TraceObject, TraceTable, Tracable, make_trace_obj
+
+if typing.TYPE_CHECKING:
+    from . import ref_base
 
 
 def generate_id() -> str:
@@ -432,6 +435,27 @@ class WeaveClient:
         # time user code interacts with them since they are always leaves
         # and we don't do ref-tracking inside them.
         return obj
+
+    def ref_input_to(self, ref: ref_base.Ref) -> Sequence[Call]:
+        raise NotImplementedError()
+
+    def ref_value_input_to(self, ref: ref_base.Ref) -> list[Call]:
+        raise NotImplementedError()
+
+    def ref_output_of(self, ref: ref_base.Ref) -> typing.Optional[Call]:
+        raise NotImplementedError()
+
+    def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
+        raise NotImplementedError()
+
+    def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
+        raise NotImplementedError()
+
+    def op_runs(self, op_def: op_def.OpDef) -> Sequence[Call]:
+        raise NotImplementedError()
+
+    def ref_uri(self, name: str, version: str, path: str) -> uris.WeaveURI:
+        raise NotImplementedError()
 
 
 def safe_current_wb_run_id() -> Optional[str]:
