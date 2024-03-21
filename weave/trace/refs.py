@@ -14,7 +14,7 @@ class Ref:
 
     def with_extra(self, extra: list[str]) -> "Ref":
         params = dataclasses.asdict(self)
-        params["extra"] = self.extra + extra
+        params["extra"] = self.extra + extra  # type: ignore
         return self.__class__(**params)
 
     def with_key(self, key: str) -> "Ref":
