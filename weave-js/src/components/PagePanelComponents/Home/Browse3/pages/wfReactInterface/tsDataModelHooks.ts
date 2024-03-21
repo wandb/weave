@@ -300,7 +300,11 @@ const useOpVersion = (
   };
 };
 
-const useOpVersions = makeTraceServerEndpointHook(
+const useOpVersions = makeTraceServerEndpointHook<
+  'objsQuery',
+  [string, string, OpVersionFilter, number?, {skip?: boolean}?],
+  OpVersionSchema[]
+>(
   'objsQuery',
   (
     entity: string,
@@ -340,7 +344,11 @@ const useOpVersions = makeTraceServerEndpointHook(
     })
 );
 
-const useFileContent = makeTraceServerEndpointHook(
+const useFileContent = makeTraceServerEndpointHook<
+  'fileContent',
+  [string, string, string, {skip?: boolean}?],
+  string
+>(
   'fileContent',
   (
     entity: string,
@@ -463,7 +471,11 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       })
 );
 
-const useRefsReadBatch = makeTraceServerEndpointHook(
+const useRefsReadBatch = makeTraceServerEndpointHook<
+  'readBatch',
+  [string[], {skip?: boolean}?],
+  any[]
+>(
   'readBatch',
   (refs: string[], opts?: {skip?: boolean}) => ({
     params: {
@@ -474,7 +486,17 @@ const useRefsReadBatch = makeTraceServerEndpointHook(
   res => res.vals
 );
 
-const useTableQuery = makeTraceServerEndpointHook(
+const useTableQuery = makeTraceServerEndpointHook<
+  'tableQuery',
+  [
+    string,
+    string,
+    traceServerClient.TraceTableQueryReq['filter'],
+    traceServerClient.TraceTableQueryReq['limit'],
+    {skip?: boolean}?
+  ],
+  any[]
+>(
   'tableQuery',
   (
     projectId: traceServerClient.TraceTableQueryReq['project_id'],
@@ -764,7 +786,7 @@ const weaveTypeOf = (o: any): Types.Type => {
   } else if (_.isObject(o)) {
     if ('_type' in o) {
       return {
-        type: o._type,
+        type: (o as any)._type,
         _base_type: {type: 'Object'},
         _is_object: true,
         ..._.mapValues(_.omit(o, ['_type']), weaveTypeOf),
