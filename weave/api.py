@@ -179,7 +179,9 @@ def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
         inited_client.reset()
 
 
-def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
+def publish(
+    obj: typing.Any, name: Optional[str] = None
+) -> _weave_client.Ref:  #  _ref_base.Ref:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
