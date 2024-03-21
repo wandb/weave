@@ -613,8 +613,7 @@ class OpDef:
 
     def runs(self) -> Sequence[Run]:
         client = graph_client_context.require_graph_client()
-        raise NotImplementedError("OpDef.runs not implemented with new graph client")
-        # return client.op_runs(self)
+        return client.op_runs(self)
 
     # TODO: Use Call type instead of Run
     def calls(self) -> weave_client.CallsIter:

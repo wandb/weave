@@ -1,5 +1,15 @@
-from typing import Literal, Any, Union, Optional, TypedDict, Generator, Sequence
+from typing import (
+    Iterator,
+    Literal,
+    Any,
+    Union,
+    Optional,
+    TypedDict,
+    Generator,
+    Sequence,
+)
 import dataclasses
+import typing
 
 from weave.trace.refs import (
     Ref,
@@ -47,13 +57,22 @@ MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["appen
 
 
 def make_mutation(
-    path: list[str], operation: MutationOperation, args: tuple[Any]
+    path: list[str], operation: MutationOperation, args: tuple[Any, ...]
 ) -> Mutation:
     if operation == "setitem":
+        if len(args) != 2 or not isinstance(args[0], str):
+            raise ValueError("setitem mutation requires 2 args")
+        args = typing.cast(tuple[str, Any], args)
         return MutationSetitem(path, operation, args)
     elif operation == "setattr":
+        if len(args) != 2 or not isinstance(args[0], str):
+            raise ValueError("setattr mutation requires 2 args")
+        args = typing.cast(tuple[str, Any], args)
         return MutationSetattr(path, operation, args)
     elif operation == "append":
+        if len(args) != 1:
+            raise ValueError("append mutation requires 1 arg")
+        args = typing.cast(tuple[Any], args)
         return MutationAppend(path, operation, args)
     else:
         raise ValueError(f"Unknown operation: {operation}")
@@ -89,14 +108,18 @@ class Tracable:
 
 class TraceObject(Tracable):
     def __init__(
-        self, val: Any, ref: ObjectRef, server: TraceServerInterface, root: Tracable
+        self,
+        val: Any,
+        ref: ObjectRef,
+        server: TraceServerInterface,
+        root: typing.Optional[Tracable],
     ) -> None:
         self.val = val
         self.ref = ref
         self.server = server
+        if root is None:
+            root = self
         self.root = root
-        if self.root is None:
-            self.root = self
 
     def __getattribute__(self, __name: str) -> Any:
         try:
@@ -107,9 +130,14 @@ class TraceObject(Tracable):
         # Not ideal, what about properties?
         if callable(val_attr_val):
             return val_attr_val
+
+        new_ref = self.ref.with_attr(__name)
+        if not isinstance(new_ref, ObjectRef):
+            raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
+
         return make_trace_obj(
             val_attr_val,
-            self.ref.with_attr(__name),
+            new_ref,
             self.server,
             self.root,
         )
@@ -118,6 +146,8 @@ class TraceObject(Tracable):
         if __name in ["val", "ref", "server", "root", "mutations"]:
             return object.__setattr__(self, __name, __value)
         else:
+            if not isinstance(self.ref, ObjectRef):
+                raise ValueError("Can only set attributes on object refs")
             object.__getattribute__(self, "root").add_mutation(
                 self.ref.extra, "setattr", __name, __value
             )
@@ -139,15 +169,15 @@ class TraceTable(Tracable):
         ref: ObjectRef,
         server: TraceServerInterface,
         filter: _TableRowFilter,
-        root: Tracable,
+        root: typing.Optional[Tracable],
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
         self.ref = ref
         self.server: TraceServerInterface = server
+        if root is None:
+            root = self
         self.root = root
-        if self.root is None:
-            self.root = self
 
     def __getitem__(self, key: Union[int, slice, str]) -> Any:
         if isinstance(key, slice):
@@ -160,9 +190,13 @@ class TraceTable(Tracable):
                 )
             )
             row = response.rows[key]
+            new_ref = self.ref.with_item(row.digest)
+            if not isinstance(new_ref, ObjectRef):
+                raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
+
             return make_trace_obj(
                 row.val,
-                self.ref.with_item(row.digest),
+                new_ref,
                 self.server,
                 self.root,
             )
@@ -194,9 +228,12 @@ class TraceTable(Tracable):
                 )
             )
             for item in response.rows:
+                new_ref = self.ref.with_item(item.digest)
+                if not isinstance(new_ref, ObjectRef):
+                    raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
                 yield make_trace_obj(
                     item.val,
-                    self.ref.with_item(item.digest),
+                    new_ref,
                     self.server,
                     self.root,
                 )
@@ -206,26 +243,33 @@ class TraceTable(Tracable):
             page_index += 1
 
     def append(self, val: Any) -> None:
+        if not isinstance(self.ref, ObjectRef):
+            raise ValueError("Can only append to object refs")
         self.root.add_mutation(self.ref.extra, "append", val)
 
 
 class TraceList(Tracable):
     def __init__(
-        self, val: Any, ref: ObjectRef, server: TraceServerInterface, root: Tracable
+        self,
+        val: Any,
+        ref: ObjectRef,
+        server: TraceServerInterface,
+        root: typing.Optional[Tracable],
     ):
         self.val = val
         self.ref = ref
         self.server: TraceServerInterface = server
+        if root is None:
+            root = self
         self.root = root
-        if self.root is None:
-            self.root = self
 
     def __getitem__(self, i: Union[int, slice]) -> Any:
         if isinstance(i, slice):
             raise ValueError("Slices not yet supported")
-        return make_trace_obj(
-            self.val[i], self.ref.with_index(i), self.server, self.root
-        )
+        new_ref = self.ref.with_index(i)
+        if not isinstance(new_ref, ObjectRef):
+            raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
+        return make_trace_obj(self.val[i], new_ref, self.server, self.root)
 
     def __eq__(self, other: Any) -> bool:
         return self.val == other
@@ -233,35 +277,42 @@ class TraceList(Tracable):
 
 class TraceDict(Tracable, dict):
     def __init__(
-        self, val: dict, ref: ObjectRef, server: TraceServerInterface, root: Tracable
+        self,
+        val: dict,
+        ref: ObjectRef,
+        server: TraceServerInterface,
+        root: typing.Optional[Tracable],
     ) -> None:
         self.val = val
         self.ref = ref
         self.server = server
+        if root is None:
+            root = self
         self.root = root
-        if self.root is None:
-            self.root = self
 
     def __getitem__(self, key: str) -> Any:
-        return make_trace_obj(
-            self.val[key], self.ref.with_key(key), self.server, self.root
-        )
+        new_ref = self.ref.with_key(key)
+        if not isinstance(new_ref, ObjectRef):
+            raise ValueError(f"Expected ObjectRef, found {type(new_ref)}")
+        return make_trace_obj(self.val[key], new_ref, self.server, self.root)
 
     def __setitem__(self, key: str, value: Any) -> None:
+        if not isinstance(self.ref, ObjectRef):
+            raise ValueError("Can only set items on object refs")
         self.val[key] = value
         self.root.add_mutation(self.ref.extra, "setitem", key, value)
 
-    def keys(self):
+    def keys(self):  # type: ignore
         return self.val.keys()
 
-    def values(self):
+    def values(self):  # type: ignore
         return self.val.values()
 
-    def items(self):
+    def items(self):  # type: ignore
         for k in self.keys():
             yield k, self[k]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return iter(self.val)
 
     def __repr__(self) -> str:

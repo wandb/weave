@@ -14,7 +14,9 @@ class Ref:
 
     def with_extra(self, extra: list[str]) -> "Ref":
         params = dataclasses.asdict(self)
-        params["extra"] = self.extra + extra  # type: ignore
+        if not hasattr(self, "extra"):
+            raise ValueError(f"Ref {self} does not have an extra field")
+        params["extra"] = self.extra + extra
         return self.__class__(**params)
 
     def with_key(self, key: str) -> "Ref":
