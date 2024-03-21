@@ -13,7 +13,27 @@ from ..trace_server.trace_server_interface_util import (
 )
 from ..trace_server import trace_server_interface as tsi
 
-# from ..trace_server.graph_client_trace import GraphClientTrace
+from ..trace_server.graph_client_trace import GraphClientTrace
+
+ClientType = typing.Union[weave_client.WeaveClient, GraphClientTrace]
+
+
+def get_client_trace_server(client: ClientType) -> tsi.TraceServerInterface:
+    if isinstance(client, weave_client.WeaveClient):
+        return client.server
+    elif isinstance(client, GraphClientTrace):
+        return client.trace_server
+    else:
+        raise ValueError(f"Unknown client type {client}")
+
+
+def get_client_project_id(client: ClientType) -> tsi.TraceServerInterface:
+    if isinstance(client, weave_client.WeaveClient):
+        return client._project_id()
+    elif isinstance(client, GraphClientTrace):
+        return client.project_id()
+    else:
+        raise ValueError(f"Unknown client type {client}")
 
 
 def test_simple_op(trace_client):
@@ -304,9 +324,9 @@ def test_trace_call_query_filter_op_version_refs(trace_client):
             + call_summaries["subtractor"].num_calls,
         ),
     ]:
-        res = trace_client.trace_server.calls_query(
+        res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 filter=tsi._CallsFilter(op_version_refs=op_version_refs),
             )
         )
@@ -325,14 +345,26 @@ def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
 # def get_all_calls_asserting_finished(
 #     trace_client: GraphClientTrace, call_spec: OpCallSpec
 # ) -> tsi.CallsQueryRes:
-#     res = trace_client.trace_server.calls_query(
-#         tsi.CallsQueryReq(
-#             project_id=trace_client.project_id(),
-#         )
+#     res = trace_client.calls(
+
 #     )
-#     assert len(res.calls) == call_spec.total_calls
-#     assert all([call.end_datetime for call in res.calls])
+#     all_calls = list(res)
+#     assert len(all_calls) == call_spec.total_calls
+#     assert all([call.end_datetime for call in all_calls])
 #     return res
+
+
+def get_all_calls_asserting_finished(
+    trace_client: ClientType, call_spec: OpCallSpec
+) -> tsi.CallsQueryRes:
+    res = get_client_trace_server(trace_client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(trace_client),
+        )
+    )
+    assert len(res.calls) == call_spec.total_calls
+    assert all([call.end_datetime for call in res.calls])
+    return res
 
 
 def test_trace_call_query_filter_input_object_version_refs(trace_client):
@@ -383,9 +415,9 @@ def test_trace_call_query_filter_input_object_version_refs(trace_client):
             ),
         ),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 filter=tsi._CallsFilter(
                     input_object_version_refs=input_object_version_refs
                 ),
@@ -443,9 +475,9 @@ def test_trace_call_query_filter_output_object_version_refs(trace_client):
             ),
         ),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 filter=tsi._CallsFilter(
                     output_object_version_refs=output_object_version_refs
                 ),
@@ -481,9 +513,9 @@ def test_trace_call_query_filter_parent_ids(trace_client):
             len([call for call in res.calls if call.parent_id in parent_ids[:3]]),
         ),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 filter=tsi._CallsFilter(parent_ids=parent_ids),
             )
         )
@@ -508,9 +540,9 @@ def test_trace_call_query_filter_trace_ids(trace_client):
         # Test multiple
         (trace_ids[:3], 3),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 filter=tsi._CallsFilter(trace_ids=trace_ids),
             )
         )
@@ -535,9 +567,9 @@ def test_trace_call_query_filter_call_ids(trace_client):
         # Test multiple
         (call_ids[:3], 3),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 filter=tsi._CallsFilter(call_ids=call_ids),
             )
         )
@@ -556,9 +588,9 @@ def test_trace_call_query_filter_trace_roots_only(trace_client):
         # Test the False
         (False, call_spec.total_calls),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 filter=tsi._CallsFilter(trace_roots_only=trace_roots_only),
             )
         )
@@ -581,9 +613,9 @@ def test_trace_call_query_filter_wb_run_ids(trace_client):
         # Test List (of 1)
         (wb_run_ids, call_spec.run_calls),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 filter=tsi._CallsFilter(wb_run_ids=wb_run_ids),
             )
         )
@@ -602,9 +634,9 @@ def test_trace_call_query_limit(trace_client):
         # Test limit of 10
         (10, 10),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 limit=limit,
             )
         )
@@ -623,9 +655,9 @@ def test_trace_call_query_offset(trace_client):
         # Test offset of 10
         (10, call_spec.total_calls - 10),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(trace_client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(trace_client),
                 offset=offset,
             )
         )

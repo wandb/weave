@@ -170,7 +170,7 @@ class CallsIter:
                     project_id=self.project_id,
                     filter=self.filter,
                     # TODO: server doesn't implement offset yet.
-                    # offset=page_index * page_size,
+                    offset=page_index * page_size,
                     limit=page_size,
                 )
             )

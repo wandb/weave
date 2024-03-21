@@ -9,7 +9,7 @@ from typing import Sequence, Sequence
 
 # from weave.graph_client_sql import MemFilesArtifact
 
-from ..graph_client import GraphClient
+# from ..graph_client import GraphClient
 from ..op_def import OpDef
 from ..ref_base import Ref
 from .. import artifact_fs
@@ -459,7 +459,7 @@ def _run_from_call(call: tsi.CallSchema) -> CallSchemaRun:
 
 
 @dataclasses.dataclass
-class GraphClientTrace(GraphClient[CallSchemaRun]):
+class GraphClientTrace:  # GraphClient[CallSchemaRun]):
     def __init__(
         self, entity: str, project: str, trace_server: tsi.TraceServerInterface
     ):
