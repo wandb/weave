@@ -1,4 +1,5 @@
 from typing import Any
+import typing
 
 from weave import box
 from weave.trace import custom_objs
@@ -47,8 +48,8 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 
 def _load_custom_obj_files(
     project_id: str, server: TraceServerInterface, file_digests: dict
-):
-    loaded_files = {}
+) -> typing.Dict[str, bytes]:
+    loaded_files: typing.Dict[str, bytes] = {}
     for name, digest in file_digests.items():
         file_response = server.file_content_read(
             FileContentReadReq(project_id=project_id, digest=digest)
