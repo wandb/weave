@@ -1,6 +1,7 @@
 import contextlib
 import io
 import os
+import tempfile
 from typing import Any, Dict, Optional, Union, Mapping, Iterator
 from weave import weave_types as types
 from weave import artifact_fs
@@ -12,7 +13,7 @@ from weave.trace_server.trace_server_interface_util import (
 
 class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     RefClass = artifact_fs.FilesystemArtifactRef
-    temp_read_dir: Optional[str]
+    temp_read_dir: Optional[tempfile.TemporaryDirectory]
     path_contents: dict[str, bytes]
 
     def __init__(
@@ -69,13 +70,11 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     def path(self, path: str) -> str:
         if path not in self.path_contents:
             raise FileNotFoundError(path)
-        import tempfile
 
-        if self.temp_read_dir is None:
-            self.temp_read_dir = tempfile.mkdtemp()
-        write_path = os.path.join(self.temp_read_dir, path)
+        self.temp_read_dir = tempfile.TemporaryDirectory()
+        write_path = os.path.join(self.temp_read_dir.name, path)
         with open(write_path, "wb") as f:
-            f.write(self.path_contents[path])  # type: ignore
+            f.write(self.path_contents[path])
         return write_path
 
     @property
