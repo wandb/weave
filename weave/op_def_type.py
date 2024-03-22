@@ -476,7 +476,9 @@ class OpDefType(types.Type):
         sys.path.insert(0, os.path.abspath(module_dir))
         with context_state.no_op_register():
             try:
+                print(f"Loading {import_name} from {module_dir}")
                 mod = __import__(import_name, fromlist=[module_dir])
+                print(f"Loaded {import_name} from {module_dir}")
             except Exception as e:
                 print("Op loading exception. This might be fine!", e)
                 import traceback
