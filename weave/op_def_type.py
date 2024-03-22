@@ -476,33 +476,6 @@ class OpDefType(types.Type):
         sys.path.insert(0, os.path.abspath(module_dir))
         with context_state.no_op_register():
             try:
-                # A bunch of test logging:
-                print(f"---")
-                print(f"Attempting to load {import_name} from {module_dir}")
-                if not os.path.exists(module_dir):
-                    print(f"Module dir does not exist: {module_dir}")
-                import_name_parts = import_name.split(".")
-                curr_dir = module_dir
-                i = 0
-                while i < len(import_name_parts):
-                    j = i
-                    while j < len(import_name_parts):
-                        j += 1
-                        dir_parts = import_name_parts[i:j]
-                        candidate_path = os.path.join(curr_dir, *dir_parts)
-                        if os.path.exists(candidate_path):
-                            print(f"Found {candidate_path}")
-                            curr_dir = candidate_path
-                            i = j
-                            break
-                    else:
-                        # Final possibility is that the import is a file
-                        candidate_file = os.path.join(curr_dir, ".".join(import_name_parts[i:]) + ".py")
-                        if os.path.exists(candidate_file):
-                            print(f"Found {candidate_file}")
-                            print(f"FILE contents: {open(candidate_file, 'r').read()}")
-                            break
-                    i += 1
                 mod = __import__(import_name, fromlist=[module_dir])
             except Exception as e:
                 print("Op loading exception. This might be fine!", e)

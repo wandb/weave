@@ -335,7 +335,7 @@ def test_opdef(client):
     assert len(list(client.calls())) == 1
 
 
-# @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
+@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_saveload_customtype(client):
     @weave.op()
     def add2(x, y):
@@ -389,7 +389,7 @@ def test_dataset_rows_ref(client):
     assert saved.rows.ref.extra == [ATTRIBUTE_EDGE_TYPE, "rows"]
 
 
-# @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
+@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_evaluate(client):
     @weave.op()
     async def model_predict(input) -> str:
