@@ -354,8 +354,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [
             f"name = '{req.name}'",
-            f"digest = '{req.version_digest}'",
         ]
+        if req.version_digest == "latest":
+            conds.append("is_latest = 1")
+        else:
+            conds.append(f"digest = '{req.version_digest}'")
         objs = self._select_objs_query(
             req.entity,
             req.project,

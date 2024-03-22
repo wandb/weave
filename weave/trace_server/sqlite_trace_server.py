@@ -93,7 +93,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 refs TEXT,
                 val TEXT,
                 digest TEXT UNIQUE,
-                version_index INTEGER
+                version_index INTEGER,
+                is_latest INTEGER
             )
         """
         )
@@ -327,8 +328,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     refs,
                     val,
                     digest,
-                    version_index
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    version_index,
+                    is_latest
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     entity,
                     project,
@@ -339,6 +341,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     json_val,
                     digest,
                     version_index,
+                    1,
                 ),
             )
             conn.commit()
@@ -347,8 +350,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [
             f"name = '{req.name}'",
-            f"digest = '{req.version_digest}'",
         ]
+        if req.version_digest == "latest":
+            conds.append("is_latest = 1")
+        else:
+            conds.append(f"digest = '{req.version_digest}'")
         objs = self._select_objs_query(
             req.entity,
             req.project,
@@ -598,7 +604,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     val=json.loads(row[6]),
                     digest=row[7],
                     version_index=row[8],
-                    is_latest=1,
+                    is_latest=row[9],
                 )
             )
 
