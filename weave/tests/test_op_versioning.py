@@ -441,3 +441,16 @@ def test_op_return_typeddict_annotation(client):
 
     op2 = weave.ref(str(ref)).get()
     assert op2(2) == {"val": 2}
+
+
+def test_op_basic_execution(client):
+    @weave.op()
+    def adder(v: int) -> int:
+        return v + 1
+
+    assert adder(1) == 2
+
+    ref = weave.obj_ref(adder)
+
+    op2 = weave.ref(str(ref)).get()
+    assert op2(2) == 3
