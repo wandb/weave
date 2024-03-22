@@ -356,7 +356,7 @@ def test_reconstruct_completion(
 def test_log_to_span_basic(
     user_by_api_key_in_env, mocked_create, teardown, reassembled_chat_completion_message
 ):
-    with weave.local_client() as client:
+    with weave.local_client("test_log_to_span_basic.db") as client:
         stream_name = "monitoring"
         project = "openai"
         entity = user_by_api_key_in_env.username
@@ -372,9 +372,9 @@ def test_log_to_span_basic(
         result = chat_completions.create(**create_input)
         streamtable.finish()
 
-        run = client.runs()[0]
+        run = client.calls()[0]
         inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-        outputs = {k: v for k, v in run.output.get().items() if not k.startswith("_")}
+        outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
 
         inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
         assert inputs == inputs_expected
@@ -389,7 +389,7 @@ def test_log_to_span_streaming(
     teardown,
     reassembled_chat_completion_message,
 ):
-    with weave.local_client() as client:
+    with weave.local_client("test_log_to_span_streaming.db") as client:
         chat_completions = weave.monitoring.openai.openai.ChatCompletions(
             mocked_streaming_create
         )
@@ -402,9 +402,9 @@ def test_log_to_span_streaming(
         for x in stream:
             ...
 
-        run = client.runs()[0]
+        run = client.calls()[0]
         inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-        outputs = {k: v for k, v in run.output.get().items() if not k.startswith("_")}
+        outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
 
         inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
         assert inputs == inputs_expected
