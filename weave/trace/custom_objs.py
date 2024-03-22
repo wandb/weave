@@ -75,6 +75,8 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         write_path = os.path.join(self.temp_read_dir.name, path)
         with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
+            f.flush()
+            os.fsync(f.fileno())
         return write_path
 
     @property
