@@ -32,7 +32,7 @@ class TextExtractModel(weave.Model):
 
 
 def main():
-    weave.init_weave("shawn/chobj-text-extract1")
+    weave.init("chobj-text-extract1")
 
     dataset_rows = []
     raw_labels = json.load(open(os.path.join("example_data", "labels.json")))
