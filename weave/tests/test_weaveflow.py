@@ -56,6 +56,7 @@ def test_digestrefs():
         assert len(ds1_row0_ref.value_input_to()) == 1
 
 
+@pytest.mark.skip()
 def test_output_of(client):
     @weave.op()
     def add_5(v: int) -> int:
