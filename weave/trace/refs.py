@@ -14,23 +14,34 @@ class Ref:
     def uri(self) -> str:
         raise NotImplementedError
 
-    def with_extra(self, extra: list[str]) -> "Ref":
+
+@dataclasses.dataclass
+class TableRef(Ref):
+    entity: str
+    project: str
+    digest: str
+
+    def uri(self) -> str:
+        return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
+
+
+@dataclasses.dataclass
+class RefWithExtra(Ref):
+    def with_extra(self, extra: list[str]) -> "RefWithExtra":
         params = dataclasses.asdict(self)
-        if not hasattr(self, "extra"):
-            raise ValueError(f"Ref {self} does not have an extra field")
-        params["extra"] = self.extra + extra
+        params["extra"] = self.extra + extra  # type: ignore
         return self.__class__(**params)
 
-    def with_key(self, key: str) -> "Ref":
+    def with_key(self, key: str) -> "RefWithExtra":
         return self.with_extra([KEY_EDGE_TYPE, key])
 
-    def with_attr(self, attr: str) -> "Ref":
+    def with_attr(self, attr: str) -> "RefWithExtra":
         return self.with_extra([ATTRIBUTE_EDGE_TYPE, attr])
 
-    def with_index(self, index: int) -> "Ref":
+    def with_index(self, index: int) -> "RefWithExtra":
         return self.with_extra([INDEX_EDGE_TYPE, str(index)])
 
-    def with_item(self, item_digest: str) -> "Ref":
+    def with_item(self, item_digest: str) -> "RefWithExtra":
         return self.with_extra([ID_EDGE_TYPE, f"{item_digest}"])
 
     def __str__(self) -> str:
@@ -38,21 +49,7 @@ class Ref:
 
 
 @dataclasses.dataclass
-class TableRef(Ref):
-    entity: str
-    project: str
-    digest: str
-    extra: list[str] = dataclasses.field(default_factory=list)
-
-    def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/table/{self.digest}"
-        if self.extra:
-            u += "/" + "/".join(self.extra)
-        return u
-
-
-@dataclasses.dataclass
-class ObjectRef(Ref):
+class ObjectRef(RefWithExtra):
     entity: str
     project: str
     name: str
@@ -79,6 +76,20 @@ class OpRef(ObjectRef):
         return u
 
 
+@dataclasses.dataclass
+class CallRef(RefWithExtra):
+    entity: str
+    project: str
+    id: str
+    extra: list[str] = dataclasses.field(default_factory=list)
+
+    def uri(self) -> str:
+        u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
+        if self.extra:
+            u += "/" + "/".join(self.extra)
+        return u
+
+
 def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
     if not uri.startswith("weave:///"):
         raise ValueError(f"Invalid URI: {uri}")
@@ -89,9 +100,7 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
     entity, project, kind = parts[:3]
     remaining = parts[3:]
     if kind == "table":
-        return TableRef(
-            entity=entity, project=project, digest=remaining[0], extra=remaining[1:]
-        )
+        return TableRef(entity=entity, project=project, digest=remaining[0])
     elif kind == "object":
         name, version = remaining[0].split(":")
         return ObjectRef(
@@ -112,15 +121,3 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
         )
     else:
         raise ValueError(f"Unknown ref kind: {kind}")
-
-
-@dataclasses.dataclass
-class CallRef(Ref):
-    id: str
-    extra: list[str] = dataclasses.field(default_factory=list)
-
-    def uri(self) -> str:
-        u = f"weave:///call/{self.id}"
-        if self.extra:
-            u += "/" + "/".join(self.extra)
-        return u
