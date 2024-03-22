@@ -12,7 +12,7 @@ import dataclasses
 import typing
 
 from weave.trace.refs import (
-    Ref,
+    RefWithExtra,
     ObjectRef,
     TableRef,
     KEY_EDGE_TYPE,
@@ -80,7 +80,7 @@ def make_mutation(
 
 class Tracable:
     mutated_value: Any = None
-    ref: Ref
+    ref: RefWithExtra
     list_mutations: Optional[list] = None
     mutations: Optional[list[Mutation]] = None
     root: "Tracable"
@@ -111,7 +111,7 @@ class TraceObject(Tracable):
     def __init__(
         self,
         val: Any,
-        ref: Ref,
+        ref: RefWithExtra,
         server: TraceServerInterface,
         root: typing.Optional[Tracable],
     ) -> None:
@@ -165,14 +165,14 @@ class TraceTable(Tracable):
     def __init__(
         self,
         table_ref: TableRef,
-        ref: Ref,
+        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
         filter: _TableRowFilter,
         root: typing.Optional[Tracable],
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
-        self.ref = ref
+        self.ref = ref  # type: ignore
         self.server: TraceServerInterface = server
         if root is None:
             root = self
@@ -247,7 +247,7 @@ class TraceList(Tracable):
     def __init__(
         self,
         val: Any,
-        ref: Ref,
+        ref: RefWithExtra,
         server: TraceServerInterface,
         root: typing.Optional[Tracable],
     ):
@@ -272,7 +272,7 @@ class TraceDict(Tracable, dict):
     def __init__(
         self,
         val: dict,
-        ref: Ref,
+        ref: RefWithExtra,
         server: TraceServerInterface,
         root: typing.Optional[Tracable],
     ) -> None:
@@ -320,7 +320,10 @@ class TraceDict(Tracable, dict):
 
 
 def make_trace_obj(
-    val: Any, new_ref: Ref, server: TraceServerInterface, root: Optional[Tracable]
+    val: Any,
+    new_ref: RefWithExtra,
+    server: TraceServerInterface,
+    root: Optional[Tracable],
 ) -> Any:
     if isinstance(val, Tracable):
         # If val is a TraceTable, we want to refer to it via the outer object
@@ -345,7 +348,6 @@ def make_trace_obj(
         val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
 
     if isinstance(val, TableRef):
-        extra = val.extra
         val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
 
     if extra:

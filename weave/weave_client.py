@@ -169,6 +169,7 @@ class CallsIter:
     def __iter__(self) -> typing.Iterator[TraceObject]:
         page_index = 0
         page_size = 10
+        entity, project = self.project_id.split("/")
         while True:
             response = self.server.calls_query(
                 CallsQueryReq(
@@ -182,7 +183,7 @@ class CallsIter:
             for call in page_data:
                 # TODO: if we want to be able to refer to call outputs
                 # we need to yield a ref-tracking call here.
-                yield make_client_call(call, self.server)
+                yield make_client_call(entity, project, call, self.server)
                 # yield make_trace_obj(call, ValRef(call.id), self.server, None)
             if len(page_data) < page_size:
                 break
@@ -190,7 +191,7 @@ class CallsIter:
 
 
 def make_client_call(
-    server_call: CallSchema, server: TraceServerInterface
+    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> TraceObject:
     output = server_call.outputs
     if isinstance(output, dict) and "_result" in output:
@@ -206,7 +207,7 @@ def make_client_call(
     )
     if call.id is None:
         raise ValueError("Call ID is None")
-    return TraceObject(call, CallRef(call.id), server, call)
+    return TraceObject(call, CallRef(entity, project, call.id), server, None)
 
 
 class WeaveClient:
@@ -300,7 +301,7 @@ class WeaveClient:
         if not response.calls:
             raise ValueError(f"Call not found: {call_id}")
         response_call = response.calls[0]
-        return make_client_call(response_call, self.server)
+        return make_client_call(self.entity, self.project, response_call, self.server)
 
     def op_calls(self, op: op_def.OpDef) -> CallsIter:
         op_ref = get_ref(op)
@@ -422,6 +423,10 @@ class WeaveClient:
             return trace_obj
         elif isinstance(obj, Table):
             table_ref = self.save_table(obj)
+            # Construct TraceTable with a None ref argument here. Tables must always be
+            # stored within objects. We don't want to ever expose users to TableRef.
+            # When this TraceTable is access via an outer object, it will have a ref
+            # rooted at that object.
             return TraceTable(table_ref, None, self.server, _TableRowFilter(), None)
         elif isinstance(obj, list):
             return [self.save_nested_objects(v) for v in obj]
