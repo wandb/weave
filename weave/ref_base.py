@@ -165,10 +165,6 @@ class Ref:
         client = graph_client_context.require_graph_client()
         return client.ref_value_input_to(self)
 
-    def output_of(self) -> Optional["weave_client.Call"]:
-        client = graph_client_context.require_graph_client()
-        return client.ref_output_of(self)
-
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:
     if isinstance(obj, Ref):

@@ -612,7 +612,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
 
-    def _mint_client(self):
+    def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,

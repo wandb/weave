@@ -79,7 +79,11 @@ def get_obj_name(val: Any) -> str:
     return name
 
 
-def get_ref(obj: Any) -> Optional[Ref]:
+def get_ref(obj: Any) -> Optional[ObjectRef]:
+    return getattr(obj, "ref", None)
+
+
+def _get_direct_ref(obj: Any) -> Optional[Ref]:
     if isinstance(obj, TraceTable):
         # TODO: this path is odd. We want to use table_ref when serializing
         # which is the direct ref to the table. But .ref on TraceTable is
@@ -90,7 +94,7 @@ def get_ref(obj: Any) -> Optional[Ref]:
 
 
 def map_to_refs(obj: Any) -> Any:
-    ref = get_ref(obj)
+    ref = _get_direct_ref(obj)
     if ref:
         return ref
     if isinstance(obj, ObjectRecord):
@@ -223,11 +227,11 @@ class WeaveClient:
 
     # This is used by tests and op_execute still, but the save() interface
     # is nicer for clients I think?
-    def save_object(self, val: Any, name: str, branch: str = "latest") -> Ref:
+    def save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
         val = self.save_nested_objects(val, name=name)
         return self._save_object(val, name, branch)
 
-    def _save_object(self, val: Any, name: str, branch: str = "latest") -> Ref:
+    def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
         is_opdef = isinstance(val, op_def.OpDef)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
@@ -439,7 +443,7 @@ class WeaveClient:
     def ref_value_input_to(self, ref: "ref_base.Ref") -> list[Call]:
         raise NotImplementedError()
 
-    def ref_output_of(self, ref: "ref_base.Ref") -> typing.Optional[Call]:
+    def ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
         raise NotImplementedError()
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:

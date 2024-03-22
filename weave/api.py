@@ -181,9 +181,7 @@ def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
         inited_client.reset()
 
 
-def publish(
-    obj: typing.Any, name: Optional[str] = None
-) -> _weave_client.ObjectRef:  #  _ref_base.Ref:
+def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -214,10 +212,6 @@ def publish(
     # print(f"Published to {ref.ui_url}")
     print("Published")
 
-    # Have to manually put the ref on the obj, this is supposed to happen at
-    # a lower level, but we use a mapper in _direct_publish that I think changes
-    # the object identity
-    _ref_base._put_ref(obj, ref)
     return ref
 
 
@@ -246,10 +240,13 @@ def ref(location: str) -> _weave_client.ObjectRef:
             name, version = location.split(":")
         location = str(client.ref_uri(name, version, "obj"))
 
-    return _weave_client.parse_uri(location)
+    uri = _weave_client.parse_uri(location)
+    if not isinstance(uri, _weave_client.ObjectRef):
+        raise ValueError("Expected an object ref")
+    return uri
 
 
-def obj_ref(obj: typing.Any) -> typing.Optional[_ref_base.Ref]:
+def obj_ref(obj: typing.Any) -> typing.Optional[_weave_client.ObjectRef]:
     return _weave_client.get_ref(obj)
 
 
