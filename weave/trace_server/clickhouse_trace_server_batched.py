@@ -587,6 +587,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             or any(r.remaining_extra for r in extra_results)
         ):
             # Resolve any unresolved object refs
+            # TODO: this part could be sped up, it resolves one object at a time,
+            # but should be able to easily load all objects in one query now.
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_obj_ref is not None:
                     obj_root = get_object_ref_root_val(extra_result.unresolved_obj_ref)
