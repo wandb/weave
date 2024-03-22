@@ -106,9 +106,11 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
 def decode_custom_obj(
     weave_type: Dict, encoded_path_contents: Mapping[str, Union[str, bytes]]
 ) -> Any:
+    from .. import artifact_fs
     art = MemTraceFilesArtifact(
         encoded_path_contents,
         metadata={},
     )
     wb_type = types.TypeRegistry.type_from_dict(weave_type)
-    return wb_type.load_instance(art, "obj")
+    with artifact_fs.loading_artifact(art):
+        return wb_type.load_instance(art, "obj")
