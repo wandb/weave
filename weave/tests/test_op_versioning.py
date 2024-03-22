@@ -14,8 +14,6 @@ from weave.trace_server.trace_server_interface import ObjReadReq, FileContentRea
     "weave.versions no longer supported, but there are other ways to do this now..."
 )
 def test_op_versioning_saveload(client):
-    # with weave.local_client():
-
     @weave.op()
     def versioned_op(a: int, b: int) -> int:
         return a + b
@@ -390,25 +388,23 @@ def test_op_versioning_2ops(strict_op_saving, client):
 
 
 @pytest.mark.skip("not working yet")
-def test_op_return_weave_obj(strict_op_saving):
-    with weave.local_client():
+def test_op_return_weave_obj(strict_op_saving, client):
+    @weave.type()
+    class SomeObj:
+        val: int
 
-        @weave.type()
-        class SomeObj:
-            val: int
+    @weave.op()
+    def some_obj(v: int):
+        return SomeObj(v)
 
-        @weave.op()
-        def some_obj(v: int):
-            return SomeObj(v)
+    ref = weave.obj_ref(some_obj)
+    assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
 
-        ref = weave.obj_ref(some_obj)
-        assert isinstance(ref, artifact_fs.FilesystemArtifactRef)
-
-        with ref.artifact.open("obj.py") as f:
-            saved_code = f.read()
-        print("SAVED_CODE")
-        print(saved_code)
-        breakpoint()
+    with ref.artifact.open("obj.py") as f:
+        saved_code = f.read()
+    print("SAVED_CODE")
+    print(saved_code)
+    breakpoint()
 
 
 EXPECTED_TYPEDICT_ANNO_CODE = """import weave

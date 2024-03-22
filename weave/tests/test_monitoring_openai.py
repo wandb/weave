@@ -354,33 +354,36 @@ def test_reconstruct_completion(
 
 
 def test_log_to_span_basic(
-    user_by_api_key_in_env, mocked_create, teardown, reassembled_chat_completion_message
+    user_by_api_key_in_env,
+    mocked_create,
+    teardown,
+    reassembled_chat_completion_message,
+    client,
 ):
-    with weave.local_client("test_log_to_span_basic.db") as client:
-        stream_name = "monitoring"
-        project = "openai"
-        entity = user_by_api_key_in_env.username
+    stream_name = "monitoring"
+    project = "openai"
+    entity = user_by_api_key_in_env.username
 
-        streamtable = make_stream_table(
-            stream_name, project_name=project, entity_name=entity
-        )
-        chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_create)
-        create_input = dict(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": "Tell me a joke"}],
-        )
-        result = chat_completions.create(**create_input)
-        streamtable.finish()
+    streamtable = make_stream_table(
+        stream_name, project_name=project, entity_name=entity
+    )
+    chat_completions = weave.monitoring.openai.openai.ChatCompletions(mocked_create)
+    create_input = dict(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": "Tell me a joke"}],
+    )
+    result = chat_completions.create(**create_input)
+    streamtable.finish()
 
-        run = client.calls()[0]
-        inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-        outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+    run = client.calls()[0]
+    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
 
-        inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
-        assert inputs == inputs_expected
+    inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
+    assert inputs == inputs_expected
 
-        outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)
-        assert outputs == outputs_expected
+    outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)
+    assert outputs == outputs_expected
 
 
 def test_log_to_span_streaming(
@@ -388,29 +391,29 @@ def test_log_to_span_streaming(
     mocked_streaming_create,
     teardown,
     reassembled_chat_completion_message,
+    client,
 ):
-    with weave.local_client("test_log_to_span_streaming.db") as client:
-        chat_completions = weave.monitoring.openai.openai.ChatCompletions(
-            mocked_streaming_create
-        )
-        create_input = dict(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": "Tell me a joke"}],
-            stream=True,
-        )
-        stream = chat_completions.create(**create_input)
-        for x in stream:
-            ...
+    chat_completions = weave.monitoring.openai.openai.ChatCompletions(
+        mocked_streaming_create
+    )
+    create_input = dict(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": "Tell me a joke"}],
+        stream=True,
+    )
+    stream = chat_completions.create(**create_input)
+    for x in stream:
+        ...
 
-        run = client.calls()[0]
-        inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
-        outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+    run = client.calls()[0]
+    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
 
-        inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
-        assert inputs == inputs_expected
+    inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
+    assert inputs == inputs_expected
 
-        outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)
-        assert outputs == outputs_expected
+    outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)
+    assert outputs == outputs_expected
 
 
 @contextlib.contextmanager

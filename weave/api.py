@@ -173,10 +173,8 @@ def init_local_client() -> _weave_client.WeaveClient:
 
 
 @contextlib.contextmanager
-def local_client(
-    db_name: typing.Optional[str] = None,
-) -> typing.Iterator[_weave_client.WeaveClient]:
-    inited_client = _weave_init.init_local(db_name)
+def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
+    inited_client = _weave_init.init_local()
     try:
         yield inited_client.client
     finally:

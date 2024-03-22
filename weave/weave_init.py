@@ -80,10 +80,8 @@ def init_weave(project_name: str) -> InitializedClient:
     return init_client
 
 
-def init_local(db_name: typing.Optional[str] = None) -> InitializedClient:
-    if db_name is None:
-        db_name = "weave.db"
-    server = sqlite_trace_server.SqliteTraceServer(db_name)
+def init_local() -> InitializedClient:
+    server = sqlite_trace_server.SqliteTraceServer("weave.db")
     server.setup_tables()
     client = weave_client.WeaveClient("none", "none", server)
     return InitializedClient(client)
