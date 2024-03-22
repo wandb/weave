@@ -10,6 +10,9 @@ import typing
 from weave.trace_server.trace_server_interface import ObjReadReq, FileContentReadReq
 
 
+@pytest.mark.skip(
+    "weave.versions no longer supported, but there are other ways to do this now..."
+)
 def test_op_versioning_saveload(client):
     # with weave.local_client():
 
