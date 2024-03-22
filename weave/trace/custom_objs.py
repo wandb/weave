@@ -71,11 +71,12 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
         if path not in self.path_contents:
             raise FileNotFoundError(path)
 
-        self.temp_read_dir = tempfile.TemporaryDirectory()
-        write_path = os.path.join(self.temp_read_dir.name, path)
-        with open(write_path, "wb") as f:
-            f.write(self.path_contents[path])
-        return write_path
+        tf = tempfile.NamedTemporaryFile(suffix=os.path.splitext(path)[1])
+        self.tf = tf
+        tf.write(self.path_contents[path])
+        tf.flush()
+        tf.seek(0)
+        return tf.name
 
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
