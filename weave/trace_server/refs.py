@@ -65,6 +65,7 @@ class ObjectRef(RefWithExtra):
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
         from weave.graph_client_context import require_graph_client
+
         gc = require_graph_client()
         return gc.get(self)
 
