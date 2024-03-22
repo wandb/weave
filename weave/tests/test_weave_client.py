@@ -444,8 +444,7 @@ def test_evaluate(client):
     # assert isinstance(eval_obj.summarize, op_def.OpDef)
 
     model_obj = child0.inputs["model"]
-    # Disabled because of test ordering issue, if test_evaluate.py runs first, this fails
-    # assert isinstance(model_obj, op_def.OpDef)
+    assert isinstance(model_obj, op_def.OpDef)
     assert (
         weave_client.get_ref(model_obj).uri()
         == weave_client.get_ref(model_predict).uri()
