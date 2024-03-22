@@ -256,9 +256,9 @@ def test_op_versioning_closure_dict_np(strict_op_saving, client):
 EXPECTED_CLOSURE_CONTANT_DICT_OPS_OP_CODE = """import weave
 
 x = {
-    "a": weave.ref('local-artifact:///op-cat:5588512188219faae386/obj').get(),
-    "b": weave.ref('local-artifact:///op-dog:b8e5d369eea85c8d0852/obj').get(),
-    "c": weave.ref('local-artifact:///op-dog:b8e5d369eea85c8d0852/obj').get()
+    "a": weave.ref('weave:///shawn/test-project/op/op-cat:nLZYziGZnZ1yH6rlCrDPUifoFwvqRo5oTDcN1xMFVD4').get(),
+    "b": weave.ref('weave:///shawn/test-project/op/op-dog:BGOgiFNzkGvtqGmdbRHcpcZnOuZp5ISyjesyJHCl9oI').get(),
+    "c": weave.ref('weave:///shawn/test-project/op/op-dog:BGOgiFNzkGvtqGmdbRHcpcZnOuZp5ISyjesyJHCl9oI').get()
 }
 
 @weave.op()
@@ -307,10 +307,10 @@ def test_op_versioning_closure_dict_ops(strict_op_saving, eager_mode, client):
 EXPECTED_MIXED_OP_CODE = """import weave
 import numpy as np
 
-dog = weave.ref('local-artifact:///op-dog:b8e5d369eea85c8d0852/obj').get()
+dog = weave.ref('weave:///shawn/test-project/op/op-dog:BGOgiFNzkGvtqGmdbRHcpcZnOuZp5ISyjesyJHCl9oI').get()
 
 x = {
-    "a": weave.ref('local-artifact:///op-cat:5588512188219faae386/obj').get(),
+    "a": weave.ref('weave:///shawn/test-project/op/op-cat:nLZYziGZnZ1yH6rlCrDPUifoFwvqRo5oTDcN1xMFVD4').get(),
     "b": weave.storage.artifact_path_ref('x/b').get()
 }
 
