@@ -6,6 +6,8 @@ import datetime
 import json
 import typing
 import hashlib
+import dataclasses
+
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
@@ -514,21 +516,41 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 root_val_cache[cache_key] = val
             return val
 
-        def read_ref(r: refs.ObjectRef) -> typing.Any:
-            val = get_object_ref_root_val(r)
-            extra = r.extra
+        # Represents work left to do for resolving a ref
+        @dataclasses.dataclass
+        class PartialRefResult:
+            remaining_extra: list[str]
+            # unresolved_obj_ref and unresolved_table_ref are mutually exclusive
+            unresolved_obj_ref: typing.Optional[refs.ObjectRef]
+            unresolved_table_ref: typing.Optional[refs.TableRef]
+            val: typing.Any
+
+        def resolve_extra(extra: list[str], val: typing.Any) -> typing.Any:
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-
-                # Recursively resolve refs
                 if isinstance(val, str) and val.startswith("weave://"):
                     parsed_ref = refs.parse_uri(val)
                     if isinstance(parsed_ref, refs.ObjectRef):
-                        val = read_ref(parsed_ref)
-
+                        return PartialRefResult(
+                            remaining_extra=extra[extra_index:],
+                            unresolved_obj_ref=parsed_ref,
+                            unresolved_table_ref=None,
+                            val=val,
+                        )
+                    elif isinstance(parsed_ref, refs.TableRef):
+                        return PartialRefResult(
+                            remaining_extra=extra[extra_index:],
+                            unresolved_obj_ref=None,
+                            unresolved_table_ref=parsed_ref,
+                            val=val,
+                        )
                 if val is None:
-                    return None
-
+                    return PartialRefResult(
+                        remaining_extra=[],
+                        unresolved_obj_ref=None,
+                        unresolved_table_ref=None,
+                        val=None,
+                    )
                 if op == refs.KEY_EDGE_TYPE:
                     val = val.get(arg)
                 elif op == refs.ATTRIBUTE_EDGE_TYPE:
@@ -538,33 +560,90 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     if index >= len(val):
                         return None
                     val = val[index]
-                elif op == refs.ID_EDGE_TYPE:
-                    if isinstance(val, str) and val.startswith("weave://"):
-                        table_ref = refs.parse_uri(val)
-                        if not isinstance(table_ref, refs.TableRef):
-                            raise ValueError(
-                                "invalid data layout encountered, expected TableRef when resolving id"
-                            )
-                        rows = self._table_query(
-                            entity=table_ref.entity,
-                            project=table_ref.project,
-                            table_digest=table_ref.digest,
-                            conditions=["digest = {digest: String}"],
-                            limit=1,
-                            parameters={"digest": arg},
-                        )
-                        if len(rows) == 0:
-                            raise NotFoundError(f"Row {val} not found")
-                        val = rows[0].val
-                    else:
-                        raise ValueError(
-                            "invalid data layout encountered, expected TableRef when resolving id"
-                        )
                 else:
                     raise ValueError(f"Unknown ref type: {extra[extra_index]}")
-            return val
+            return PartialRefResult(
+                remaining_extra=[],
+                unresolved_obj_ref=None,
+                unresolved_table_ref=None,
+                val=val,
+            )
 
-        return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_refs])
+        # Initialize the results with the parsed refs
+        extra_results = [
+            PartialRefResult(
+                remaining_extra=[],
+                unresolved_obj_ref=ref,
+                unresolved_table_ref=None,
+                val=None,
+            )
+            for ref in parsed_refs
+        ]
+
+        # Loop until there is nothing left to resolve
+        while (
+            any(r.unresolved_obj_ref is not None for r in extra_results)
+            or any(r.unresolved_table_ref is not None for r in extra_results)
+            or any(r.remaining_extra for r in extra_results)
+        ):
+            # Resolve any unresolved object refs
+            for i, extra_result in enumerate(extra_results):
+                if extra_result.unresolved_obj_ref is not None:
+                    obj_root = get_object_ref_root_val(extra_result.unresolved_obj_ref)
+                    extra_results[i] = PartialRefResult(
+                        remaining_extra=extra_result.unresolved_obj_ref.extra,
+                        val=obj_root,
+                        unresolved_obj_ref=None,
+                        unresolved_table_ref=None,
+                    )
+
+            # Resolve any unresolved table refs
+            # First batch the table queries by entity, project, and table digest
+            table_queries: dict[
+                typing.Tuple[str, str, str], list[typing.Tuple[int, str]]
+            ] = {}
+            for i, extra_result in enumerate(extra_results):
+                if extra_result.unresolved_table_ref is not None:
+                    table_ref = extra_result.unresolved_table_ref
+                    if not extra_result.remaining_extra:
+                        raise ValueError("Table refs must have id extra")
+                    op, row_digest = (
+                        extra_result.remaining_extra[0],
+                        extra_result.remaining_extra[1],
+                    )
+                    if op != refs.ID_EDGE_TYPE:
+                        raise ValueError("Table refs must have id extra")
+                    table_queries.setdefault(
+                        (table_ref.entity, table_ref.project, table_ref.digest), []
+                    ).append((i, row_digest))
+            # Make the queries
+            for (entity, project, digest), index_digests in table_queries.items():
+                row_digests = [d for i, d in index_digests]
+                rows = self._table_query(
+                    entity=entity,
+                    project=project,
+                    table_digest=digest,
+                    conditions=["digest IN {digests: Array(String)}"],
+                    parameters={"digests": row_digests},
+                )
+                # Unpack the results into the target rows
+                row_digest_vals = {r.digest: r.val for r in rows}
+                for index, row_digest in index_digests:
+                    extra_results[index] = PartialRefResult(
+                        remaining_extra=extra_results[index].remaining_extra[2:],
+                        val=row_digest_vals[row_digest],
+                        unresolved_obj_ref=None,
+                        unresolved_table_ref=None,
+                    )
+
+            # Resolve any remaining extras, possibly producing more unresolved refs
+            for i, extra_result in enumerate(extra_results):
+                if extra_result.remaining_extra:
+                    extra_results[i] = resolve_extra(
+                        extra_result.remaining_extra, extra_result.val
+                    )
+
+        return tsi.RefsReadBatchRes(vals=[r.val for r in extra_results])
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
