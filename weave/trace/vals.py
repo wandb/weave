@@ -11,7 +11,7 @@ from typing import (
 import dataclasses
 import typing
 
-from weave.trace.refs import (
+from weave.trace_server.refs import (
     RefWithExtra,
     ObjectRef,
     TableRef,

@@ -18,7 +18,7 @@ from .trace_server_interface_util import (
 )
 from . import trace_server_interface as tsi
 
-from weave.trace import refs
+from weave.trace_server import refs
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )

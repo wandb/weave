@@ -1,8 +1,6 @@
 from typing import Union, Any
 import dataclasses
 
-from weave.graph_client_context import require_graph_client
-
 KEY_EDGE_TYPE = "key"
 INDEX_EDGE_TYPE = "ndx"
 ATTRIBUTE_EDGE_TYPE = "atr"
@@ -63,6 +61,10 @@ class ObjectRef(RefWithExtra):
         return u
 
     def get(self) -> Any:
+        # Move import here so that it only happens when the function is called.
+        # This import is invalid in the trace server and represents a dependency
+        # that should be removed.
+        from weave.graph_client_context import require_graph_client
         gc = require_graph_client()
         return gc.get(self)
 
