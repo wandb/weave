@@ -455,25 +455,23 @@ class OpDefType(types.Type):
         file_name = f"{name}.py"
         module_path = artifact.path(file_name)
 
-        module_dir = os.path.dirname(module_path)
-        import_name = os.path.splitext(os.path.basename(module_path))[0]
-        # if is_wandb_artifact:
-        #     module_dir = os.path.dirname(module_path)
-        #     import_name = os.path.splitext(os.path.basename(module_path))[0]
-        # else:
-        #     # Python import caching means we can't just import "obj.py" here
-        #     # because serialized ops would be cached at the "obj" key. We include
-        #     # the version in the module name to avoid this. Since version names
-        #     # are content hashes, this is correct.
-        #     #
-        #     art_and_version_dir = module_path[: -(1 + len(file_name))]
-        #     art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
-        #     module_dir = art_dir
-        #     import_name = (
-        #         version_subdir
-        #         + "."
-        #         + ".".join(os.path.splitext(file_name)[0].split("/"))
-        #     )
+        if is_wandb_artifact:
+            module_dir = os.path.dirname(module_path)
+            import_name = os.path.splitext(os.path.basename(module_path))[0]
+        else:
+            # Python import caching means we can't just import "obj.py" here
+            # because serialized ops would be cached at the "obj" key. We include
+            # the version in the module name to avoid this. Since version names
+            # are content hashes, this is correct.
+            #
+            art_and_version_dir = module_path[: -(1 + len(file_name))]
+            art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
+            module_dir = art_dir
+            import_name = (
+                version_subdir
+                + "."
+                + ".".join(os.path.splitext(file_name)[0].split("/"))
+            )
 
         sys.path.insert(0, os.path.abspath(module_dir))
         with context_state.no_op_register():
