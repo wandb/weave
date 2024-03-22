@@ -240,7 +240,9 @@ def test_saveloop_idempotent_with_refs(user_by_api_key_in_env):
 
 
 def test_subobj_ref_passing(client):
-    dataset = weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}])
+    dataset = client.save(
+        weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
+    )
 
     @weave.op()
     def get_item(row):
