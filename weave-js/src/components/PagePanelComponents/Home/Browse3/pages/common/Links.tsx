@@ -21,6 +21,7 @@ import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
 import {truncateID} from '../util';
+import {isEvaluateOp} from './heuristics';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -267,8 +268,7 @@ export const CallLink: React.FC<{
   const existingPath = peekParams.get(PATH_PARAM) ?? '';
   // Don't show trace tree by default for Evaluation-evaluate when not already open
   const tracetree =
-    props.tracetree ??
-    (existingTraceTreeOpen || opName !== 'Evaluation-evaluate');
+    props.tracetree ?? (existingTraceTreeOpen || !isEvaluateOp(opName));
   // Preserve the path only when showing trace tree
   const path = props.preservePath && tracetree ? existingPath : null;
 

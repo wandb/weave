@@ -24,23 +24,36 @@ import {useWeaveContext} from '../../../../context';
 import {
   isObjectTypeLike,
   isTypedDictLike,
+  Type,
   typedDictPropertyTypes,
 } from '../../../../core';
 import {useDeepMemo} from '../../../../hookUtils';
-import {parseRef} from '../../../../react';
+import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
+  parseRef,
+} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
+import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
 import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
+import {
+  DICT_KEY_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+} from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {
   opVersionRefOpCategory,
   opVersionRefOpName,
 } from '../Browse3/pages/wfReactInterface/utilities';
-import {CallSchema} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallSchema,
+  ObjectVersionKey,
+} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {CellValue} from './CellValue';
@@ -120,39 +133,79 @@ type OpVersionIndexTextProps = {
 const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
   const {useObjectVersion} = useWFHooks();
   const ref = parseRef(opVersionRef);
-  const objVersionKey =
-    'entityName' in ref
-      ? {
-          entity: ref.entityName,
-          project: ref.projectName,
-          objectId: ref.artifactName,
-          versionHash: ref.artifactVersion,
-          path: ref.artifactPath,
-          refExtra: ref.artifactRefExtra,
-        }
-      : null;
+  let objVersionKey: ObjectVersionKey | null = null;
+  if (isWandbArtifactRef(ref)) {
+    objVersionKey = {
+      scheme: 'wandb-artifact',
+      entity: ref.entityName,
+      project: ref.projectName,
+      objectId: ref.artifactName,
+      versionHash: ref.artifactVersion,
+      path: ref.artifactPath,
+      refExtra: ref.artifactRefExtra,
+    };
+  } else if (isWeaveObjectRef(ref)) {
+    objVersionKey = {
+      scheme: 'weave',
+      entity: ref.entityName,
+      project: ref.projectName,
+      weaveKind: ref.weaveKind,
+      objectId: ref.artifactName,
+      versionHash: ref.artifactVersion,
+      path: '',
+      refExtra: ref.artifactRefExtra,
+    };
+  }
   const objVersion = useObjectVersion(objVersionKey);
   return objVersion.result ? (
     <span>v{objVersion.result.versionIndex}</span>
   ) : null;
 };
 
-type ExtraColumns = Record<string, string[]>;
+type ExtraColumns = Record<string, Array<{label: string; path: string}>>;
 
-const getExtraColumns = (result: any): string[] => {
-  const cols: Set<string> = new Set();
+const isExpandableType = (type: Type): boolean => {
+  return isObjectTypeLike(type) || isTypedDictLike(type);
+};
+
+const getExtraColumns = (
+  result: Type[]
+): Array<{label: string; path: string}> => {
+  const cols: {[label: string]: string} = {};
   for (const refInfo of result) {
     if (isObjectTypeLike(refInfo)) {
       const keys = Object.keys(refInfo).filter(
         k => k !== 'type' && !k.startsWith('_')
       );
-      keys.forEach(k => cols.add(k));
+      keys.forEach(k => {
+        const innerType = (refInfo as any)[k] as Type;
+        if (isExpandableType(innerType)) {
+          const subKeys = getExtraColumns([innerType]);
+          subKeys.forEach(sk => {
+            cols[k + '.' + sk.label] =
+              k + `/${OBJECT_ATTRIBUTE_EDGE_TYPE}/` + sk.path;
+          });
+        } else {
+          cols[k] = k;
+        }
+      });
     } else if (isTypedDictLike(refInfo)) {
-      const keys = Object.keys(typedDictPropertyTypes(refInfo));
-      keys.forEach(k => cols.add(k));
+      const propTypes = typedDictPropertyTypes(refInfo);
+      const keys = Object.keys(propTypes);
+      keys.forEach(k => {
+        const innerType = propTypes[k] as Type;
+        if (isExpandableType(innerType)) {
+          const subKeys = getExtraColumns([innerType]);
+          subKeys.forEach(sk => {
+            cols[k + '.' + sk.label] = k + `/${DICT_KEY_EDGE_TYPE}/` + sk.path;
+          });
+        } else {
+          cols[k] = k;
+        }
+      });
     }
   }
-  return Array.from(cols);
+  return Object.entries(cols).map(([label, path]) => ({label, path}));
 };
 
 // Get the tail of the peekPath (ignore query params)
@@ -356,7 +409,7 @@ export const RunsTable: FC<{
   const preservePath = useMemo(() => {
     return (
       uniqueSpanNames.length === 1 &&
-      opNiceName(uniqueSpanNames[0]) === 'Evaluation-predict_and_score'
+      isPredictAndScoreOp(opNiceName(uniqueSpanNames[0]))
     );
   }, [uniqueSpanNames]);
 
@@ -571,13 +624,19 @@ export const RunsTable: FC<{
         const inputGroupChildren = [{field}];
         const expandCols = expandedColInfo[field] ?? [];
         for (const col of expandCols) {
-          const expandField = field + '.' + col;
+          const expandField = field + '.' + col.label;
           cols.push({
             flex: 1,
             field: expandField,
-            renderHeader: headerParams => (
-              <CustomGroupedColumnHeader field={headerParams.field} />
-            ),
+            renderHeader: headerParams => {
+              return (
+                <CustomGroupedColumnHeader
+                  field={headerParams.field}
+                  // TODO: after merging object store stuff - re-write expansion logic. This should be grouped.
+                  titleOverride={col.label}
+                />
+              );
+            },
             renderCell: cellParams => {
               const weaveRef = (cellParams.row as any)[field];
               if (weaveRef === undefined) {
@@ -585,7 +644,7 @@ export const RunsTable: FC<{
               }
               return (
                 <ErrorBoundary>
-                  <RefValue weaveRef={weaveRef} attribute={col} />
+                  <RefValue weaveRef={weaveRef} attribute={col.path} />
                 </ErrorBoundary>
               );
             },

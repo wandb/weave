@@ -31,7 +31,7 @@ def test_save_load_pydantic():
     assert recovered.a == 1
 
 
-def test_pydantic_saveload():
+def test_pydantic_saveload(client):
     class Object(pydantic.BaseModel):
         name: Optional[str] = "hello"
         description: Optional[str] = None
@@ -47,13 +47,12 @@ def test_pydantic_saveload():
     a_type = weave.type_of(a)
     assert a_type.root_type_class().__name__ == "A"
 
-    with weave.local_client():
-        weave.publish(a, name="my-a")
+    weave.publish(a, name="my-a")
 
-        a2 = weave.ref("my-a").get()
-        assert a2.name == "my-a"
-        assert a2.description == None
-        assert a2.model_name == "my-model"
+    a2 = weave.ref("my-a").get()
+    assert a2.name == "my-a"
+    assert a2.description == None
+    assert a2.model_name == "my-model"
 
 
 def test_pydantic_nested_type():

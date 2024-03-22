@@ -49,7 +49,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
 
     const refValues: RefValues = {};
     for (const [r, v] of _.zip(refs, resolvedRefData)) {
-      if (!r) {
+      if (!r || !v) {
         // Shouldn't be possible
         continue;
       }

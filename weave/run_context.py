@@ -4,17 +4,18 @@ import typing
 import copy
 
 if typing.TYPE_CHECKING:
-    from .run import Run
+    # from .run import Run
+    from .weave_client import Call
 
-_run_stack: contextvars.ContextVar[list["Run"]] = contextvars.ContextVar(
+_run_stack: contextvars.ContextVar[list["Call"]] = contextvars.ContextVar(
     "run", default=[]
 )
 
 
 @contextlib.contextmanager
 def current_run(
-    run: "Run",
-) -> typing.Iterator[list["Run"]]:
+    run: "Call",
+) -> typing.Iterator[list["Call"]]:
     new_stack = copy.copy(_run_stack.get())
     new_stack.append(run)
 
@@ -25,18 +26,18 @@ def current_run(
         _run_stack.reset(token)
 
 
-def get_current_run() -> typing.Optional["Run"]:
+def get_current_run() -> typing.Optional["Call"]:
     return _run_stack.get()[-1] if _run_stack.get() else None
 
 
-def get_run_stack() -> list["Run"]:
+def get_run_stack() -> list["Call"]:
     return _run_stack.get()
 
 
 @contextlib.contextmanager
 def set_run_stack(
-    stack: list["Run"],
-) -> typing.Iterator[list["Run"]]:
+    stack: list["Call"],
+) -> typing.Iterator[list["Call"]]:
     token = _run_stack.set(stack)
     try:
         yield stack

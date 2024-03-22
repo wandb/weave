@@ -16,7 +16,7 @@ import {tsWFDataModelHooks} from './tsDataModelHooks';
 import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
 //  Set this to `true` once the trace server supports objects
-const TRACE_SERVER_SUPPORTS_OBJECTS = false;
+const TRACE_SERVER_SUPPORTS_OBJECTS = true;
 
 const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
   null
@@ -57,11 +57,13 @@ const WFDataModelFromTraceServerCallsOnlyProvider: FC = ({children}) => {
       useRootObjectVersions: cgWFDataModelHooks.useRootObjectVersions,
       useRefsData: cgWFDataModelHooks.useRefsData,
       useApplyMutationsToRef: cgWFDataModelHooks.useApplyMutationsToRef,
+      useFileContent: cgWFDataModelHooks.useFileContent,
       derived: {
         useChildCallsForCompare:
           tsWFDataModelHooks.derived.useChildCallsForCompare,
         useGetRefsType: cgWFDataModelHooks.derived.useGetRefsType,
         useRefsType: cgWFDataModelHooks.derived.useRefsType,
+        useCodeForOpRef: cgWFDataModelHooks.derived.useCodeForOpRef,
       },
     };
   }, []);
@@ -76,7 +78,8 @@ export const WFDataModelAutoProvider: FC<{
   entityName: string;
   projectName: string;
 }> = ({entityName, projectName, children}) => {
-  const hasTSData = useProjectHasTraceServerCalls(entityName, projectName);
+  // const hasTSData = useProjectHasTraceServerCalls(entityName, projectName);
+  const hasTSData = true;
 
   if (hasTSData) {
     if (TRACE_SERVER_SUPPORTS_OBJECTS) {

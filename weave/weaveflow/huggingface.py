@@ -23,7 +23,7 @@ def publish_huggingface_dataset(
     random.seed(seed)
     indexes = random.sample(range(len(split)), sample_size)
     sample = split.select(indexes)
-    return weave.publish(
+    return weave.publish(  # type: ignore
         Dataset(list(sample)),
         name=f"{hf_dataset_name}-{split_name}-{sample_size}-{seed}",
     )

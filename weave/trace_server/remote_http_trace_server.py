@@ -5,6 +5,7 @@ import requests
 from weave.trace_server import environment as wf_env
 
 
+from weave.wandb_interface import project_creator
 from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
 
@@ -34,6 +35,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
         self._auth: t.Optional[t.Tuple[str, str]] = None
+
+    def ensure_project_exists(self, entity: str, project: str) -> None:
+        # TODO: This should happen in the wandb backend, not here, and its slow
+        # (hundres of ms)
+        project_creator.ensure_project_exists(entity, project)
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
@@ -156,3 +162,43 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/objs/query", req, tsi.ObjQueryReq, tsi.ObjQueryRes
         )
+
+    def table_create(
+        self, req: t.Union[tsi.TableCreateReq, t.Dict[str, t.Any]]
+    ) -> tsi.TableCreateRes:
+        return self._generic_request(
+            "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
+        )
+
+    def table_query(
+        self, req: t.Union[tsi.TableQueryReq, t.Dict[str, t.Any]]
+    ) -> tsi.TableQueryRes:
+        return self._generic_request(
+            "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
+        )
+
+    def refs_read_batch(
+        self, req: t.Union[tsi.RefsReadBatchReq, t.Dict[str, t.Any]]
+    ) -> tsi.RefsReadBatchRes:
+        return self._generic_request(
+            "/refs/read_batch", req, tsi.TableQueryReq, tsi.TableQueryRes
+        )
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        r = requests.post(
+            self.trace_server_url + "/files/create",
+            auth=self._auth,
+            data={"project_id": req.project_id},
+            files={"file": (req.name, req.content)},
+        )
+        r.raise_for_status()
+        return tsi.FileCreateRes.model_validate(r.json())
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        r = requests.post(
+            self.trace_server_url + "/files/content",
+            json={"project_id": req.project_id, "digest": req.digest},
+            auth=self._auth,
+        )
+        r.raise_for_status()
+        return tsi.FileContentReadRes.model_validate(r.json())

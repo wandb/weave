@@ -1,9 +1,13 @@
 # Clickhouse Trace Server
 
+import threading
 from contextlib import contextmanager
 import datetime
 import json
 import typing
+import hashlib
+import dataclasses
+
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
@@ -15,17 +19,19 @@ from . import clickhouse_trace_server_migrator as wf_migrator
 
 from .trace_server_interface_util import (
     extract_refs_from_values,
-    decode_b64_to_bytes,
-    encode_bytes_as_b64,
     generate_id,
-    version_hash_for_object,
+    str_digest,
+    bytes_digest,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
 
+from weave.trace import refs
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
+
+FILE_CHUNK_SIZE = 100000
 
 
 class NotFoundError(Exception):
@@ -103,28 +109,24 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 class ObjCHInsertable(BaseModel):
     entity: str
     project: str
-    is_op: bool
+    type: str
     name: str
-    version_hash: str
-    created_datetime: datetime.datetime
-
-    type_dict_dump: str
-    bytes_file_map: typing.Dict[str, bytes]
-    metadata_dict_dump: str
+    refs: typing.List[str]
+    val: str
+    digest: str
 
 
 class SelectableCHObjSchema(BaseModel):
     entity: str
     project: str
-    is_op: bool
     name: str
-    version_hash: str
-    created_datetime: datetime.datetime
+    created_at: datetime.datetime
+    refs: typing.List[str]
+    val: str
+    type: str
+    digest: str
     version_index: int
-
-    type_dict_dump: str
-    bytes_file_map: typing.Dict[str, bytes]
-    metadata_dict_dump: str
+    is_latest: int
 
 
 all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
@@ -135,8 +137,6 @@ required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
-    ch_client: CHClient
-
     def __init__(
         self,
         *,
@@ -148,12 +148,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         use_async_insert: bool = False,
     ):
         super().__init__()
+        self._thread_local = threading.local()
         self._host = host
         self._port = port
         self._user = user
         self._password = password
         self._database = database
-        self.ch_client = self._mint_client()
         self._flush_immediately = True
         self._call_batch: typing.List[typing.List[typing.Any]] = []
         self._use_async_insert = use_async_insert
@@ -292,64 +292,410 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryRes(calls=calls)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj, is_op=True)
-        self._insert_obj(ch_obj)
-        return tsi.OpCreateRes(version_hash=ch_obj.version_hash)
+        raise NotImplementedError()
+        # ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
+        # self._insert_obj(ch_obj)
+        # return tsi.OpCreateRes(version_hash=str(ch_obj.id))
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        return tsi.OpReadRes(
-            op_obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=True))
+        conds = [
+            f"name = '{req.name}'",
+            f"digest = '{req.version_hash}'",
+            "is_op = 1",
+        ]
+        objs = self._select_objs_query(
+            req.entity,
+            req.project,
+            conditions=conds,
         )
+        if len(objs) == 0:
+            raise NotFoundError(f"Obj {req.name}:{req.version_hash} not found")
+
+        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        conditions: typing.List[str] = []
-        parameters: typing.Dict[str, typing.Any] = {}
+        conds: typing.List[str] = ["is_op = 1"]
         if req.filter:
             if req.filter.op_names:
-                raise NotImplementedError()
+                in_list = ", ".join([f"'{n}'" for n in req.filter.op_names])
+                conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
-                raise NotImplementedError()
-        conditions.append("is_op == 1")
+                conds.append("is_latest = 1")
 
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
-            conditions=conditions,
-            parameters=parameters,
+            conditions=conds,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        ch_obj = _partial_obj_schema_to_ch_obj(req.obj, is_op=False)
-        self._insert_obj(ch_obj)
-        return tsi.ObjCreateRes(version_hash=ch_obj.version_hash)
+        json_val = json.dumps(req.obj.val)
+        digest = str_digest(json_val)
+
+        req_obj = req.obj
+        entity, project = req_obj.project_id.split("/")
+        ch_obj = ObjCHInsertable(
+            entity=entity,
+            project=project,
+            name=req_obj.name,
+            type=get_type(req.obj.val),
+            refs=[],
+            val=json_val,
+            digest=digest,
+        )
+
+        self.ch_client.insert(
+            "objects",
+            data=[list(ch_obj.model_dump().values())],
+            column_names=list(ch_obj.model_fields.keys()),
+        )
+        return tsi.ObjCreateRes(version_digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        return tsi.ObjReadRes(
-            obj=_ch_obj_to_obj_schema(self._obj_read(req, op_only=False))
-        )
-
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        conditions: typing.List[str] = []
-        parameters: typing.Dict[str, typing.Any] = {}
-        if req.filter:
-            if req.filter.object_names:
-                raise NotImplementedError()
-            if req.filter.latest_only:
-                raise NotImplementedError()
-        conditions.append("is_op == 0")
-
-        ch_objs = self._select_objs_query(
+        conds = [
+            f"name = '{req.name}'",
+        ]
+        if req.version_digest == "latest":
+            conds.append("is_latest = 1")
+        else:
+            conds.append(f"digest = '{req.version_digest}'")
+        objs = self._select_objs_query(
             req.entity,
             req.project,
-            conditions=conditions,
-            parameters=parameters,
+            conditions=conds,
         )
-        objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
-        return tsi.ObjQueryRes(objs=objs)
+        if len(objs) == 0:
+            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
+
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
+
+    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+        conds: list[str] = []
+        if req.filter:
+            if req.filter.is_op is not None:
+                if req.filter.is_op:
+                    conds.append("is_op = 1")
+                else:
+                    conds.append("is_op = 0")
+            if req.filter.object_names:
+                in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
+                conds.append(f"name IN ({in_list})")
+            if req.filter.latest_only:
+                conds.append("is_latest = 1")
+        entity, project = req.project_id.split("/")
+        objs = self._select_objs_query(
+            entity,
+            project,
+            conditions=conds,
+        )
+
+        return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        entity, project = req.table.project_id.split("/")
+        insert_rows = []
+        for r in req.table.rows:
+            if not isinstance(r, dict):
+                raise ValueError("All rows must be dictionaries")
+            row_json = json.dumps(r)
+            row_digest = str_digest(row_json)
+            insert_rows.append((entity, project, row_digest, row_json))
+
+        self.ch_client.insert(
+            "table_rows",
+            data=insert_rows,
+            column_names=["entity", "project", "digest", "val"],
+        )
+
+        row_digests = [r[2] for r in insert_rows]
+
+        table_hasher = hashlib.sha256()
+        for row_digest in row_digests:
+            table_hasher.update(row_digest.encode())
+        table_digest = table_hasher.hexdigest()
+
+        self.ch_client.insert(
+            "tables",
+            data=[(entity, project, table_digest, row_digests)],
+            column_names=["entity", "project", "digest", "row_digests"],
+        )
+        return tsi.TableCreateRes(digest=table_digest)
+
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        entity, project = req.project_id.split("/")
+        conds = []
+        if req.filter:
+            if req.filter.row_digests:
+                in_list = ", ".join([f"'{rd}'" for rd in req.filter.row_digests])
+                conds.append(f"tr.digest IN ({in_list})")
+        else:
+            conds.append("1 = 1")
+        rows = self._table_query(
+            entity, project, req.table_digest, conditions=conds, limit=req.limit
+        )
+        return tsi.TableQueryRes(rows=rows)
+
+    def _table_query(
+        self,
+        entity: str,
+        project: str,
+        table_digest: str,
+        conditions: typing.Optional[typing.List[str]] = None,
+        limit: typing.Optional[int] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> typing.List[tsi.TableRowSchema]:
+        conds = ["entity = {entity: String}", "project = {project: String}"]
+        if conditions:
+            conds.extend(conditions)
+
+        predicate = " AND ".join(conds)
+        query = f"""
+                SELECT tr.digest, tr.val
+                FROM (
+                    SELECT entity, project, row_digest
+                    FROM tables_deduped
+                    ARRAY JOIN row_digests AS row_digest
+                    WHERE digest = {{table_digest:String}}
+                ) AS t
+                JOIN table_rows_deduped tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
+                WHERE {predicate}
+            """
+        if limit:
+            query += f" LIMIT {limit}"
+
+        query_result = self.ch_client.query(
+            query,
+            parameters={
+                "entity": entity,
+                "project": project,
+                "table_digest": table_digest,
+                **(parameters or {}),
+            },
+        )
+
+        return [
+            tsi.TableRowSchema(digest=r[0], val=json.loads(r[1]))
+            for r in query_result.result_rows
+        ]
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        # TODO: This reads one ref at a time, it should read them in batches
+        # where it can. Like it should group by object that we need to read.
+        # And it should also batch into table refs (like when we are reading a bunch
+        # of rows from a single Dataset)
+        if len(req.refs) > 1000:
+            raise ValueError("Too many refs")
+
+        parsed_raw_refs = [refs.parse_uri(r) for r in req.refs]
+        if any(isinstance(r, refs.TableRef) for r in parsed_raw_refs):
+            raise ValueError("Table refs not supported")
+        parsed_refs = typing.cast(typing.List[refs.ObjectRef], parsed_raw_refs)
+
+        root_val_cache: typing.Dict[str, typing.Any] = {}
+
+        def get_object_ref_root_val(r: refs.ObjectRef) -> typing.Any:
+            cache_key = f"{r.entity}/{r.project}/{r.name}/{r.version}"
+            if cache_key in root_val_cache:
+                val = root_val_cache[cache_key]
+            else:
+                conds = [
+                    f"name = '{r.name}'",
+                    f"digest = '{r.version}'",
+                ]
+                objs = self._select_objs_query(
+                    r.entity,
+                    r.project,
+                    conditions=conds,
+                )
+                if len(objs) == 0:
+                    raise NotFoundError(f"Obj {r.name}:{r.version} not found")
+                obj = objs[0]
+                val = json.loads(obj.val)
+                root_val_cache[cache_key] = val
+            return val
+
+        # Represents work left to do for resolving a ref
+        @dataclasses.dataclass
+        class PartialRefResult:
+            remaining_extra: list[str]
+            # unresolved_obj_ref and unresolved_table_ref are mutually exclusive
+            unresolved_obj_ref: typing.Optional[refs.ObjectRef]
+            unresolved_table_ref: typing.Optional[refs.TableRef]
+            val: typing.Any
+
+        def resolve_extra(extra: list[str], val: typing.Any) -> typing.Any:
+            for extra_index in range(0, len(extra), 2):
+                op, arg = extra[extra_index], extra[extra_index + 1]
+                if isinstance(val, str) and val.startswith("weave://"):
+                    parsed_ref = refs.parse_uri(val)
+                    if isinstance(parsed_ref, refs.ObjectRef):
+                        return PartialRefResult(
+                            remaining_extra=extra[extra_index:],
+                            unresolved_obj_ref=parsed_ref,
+                            unresolved_table_ref=None,
+                            val=val,
+                        )
+                    elif isinstance(parsed_ref, refs.TableRef):
+                        return PartialRefResult(
+                            remaining_extra=extra[extra_index:],
+                            unresolved_obj_ref=None,
+                            unresolved_table_ref=parsed_ref,
+                            val=val,
+                        )
+                if val is None:
+                    return PartialRefResult(
+                        remaining_extra=[],
+                        unresolved_obj_ref=None,
+                        unresolved_table_ref=None,
+                        val=None,
+                    )
+                if op == refs.KEY_EDGE_TYPE:
+                    val = val.get(arg)
+                elif op == refs.ATTRIBUTE_EDGE_TYPE:
+                    val = val.get(arg)
+                elif op == refs.INDEX_EDGE_TYPE:
+                    index = int(arg)
+                    if index >= len(val):
+                        return None
+                    val = val[index]
+                else:
+                    raise ValueError(f"Unknown ref type: {extra[extra_index]}")
+            return PartialRefResult(
+                remaining_extra=[],
+                unresolved_obj_ref=None,
+                unresolved_table_ref=None,
+                val=val,
+            )
+
+        # Initialize the results with the parsed refs
+        extra_results = [
+            PartialRefResult(
+                remaining_extra=[],
+                unresolved_obj_ref=ref,
+                unresolved_table_ref=None,
+                val=None,
+            )
+            for ref in parsed_refs
+        ]
+
+        # Loop until there is nothing left to resolve
+        while (
+            any(r.unresolved_obj_ref is not None for r in extra_results)
+            or any(r.unresolved_table_ref is not None for r in extra_results)
+            or any(r.remaining_extra for r in extra_results)
+        ):
+            # Resolve any unresolved object refs
+            # TODO: this part could be sped up, it resolves one object at a time,
+            # but should be able to easily load all objects in one query now.
+            for i, extra_result in enumerate(extra_results):
+                if extra_result.unresolved_obj_ref is not None:
+                    obj_root = get_object_ref_root_val(extra_result.unresolved_obj_ref)
+                    extra_results[i] = PartialRefResult(
+                        remaining_extra=extra_result.unresolved_obj_ref.extra,
+                        val=obj_root,
+                        unresolved_obj_ref=None,
+                        unresolved_table_ref=None,
+                    )
+
+            # Resolve any unresolved table refs
+            # First batch the table queries by entity, project, and table digest
+            table_queries: dict[
+                typing.Tuple[str, str, str], list[typing.Tuple[int, str]]
+            ] = {}
+            for i, extra_result in enumerate(extra_results):
+                if extra_result.unresolved_table_ref is not None:
+                    table_ref = extra_result.unresolved_table_ref
+                    if not extra_result.remaining_extra:
+                        raise ValueError("Table refs must have id extra")
+                    op, row_digest = (
+                        extra_result.remaining_extra[0],
+                        extra_result.remaining_extra[1],
+                    )
+                    if op != refs.ID_EDGE_TYPE:
+                        raise ValueError("Table refs must have id extra")
+                    table_queries.setdefault(
+                        (table_ref.entity, table_ref.project, table_ref.digest), []
+                    ).append((i, row_digest))
+            # Make the queries
+            for (entity, project, digest), index_digests in table_queries.items():
+                row_digests = [d for i, d in index_digests]
+                rows = self._table_query(
+                    entity=entity,
+                    project=project,
+                    table_digest=digest,
+                    conditions=["digest IN {digests: Array(String)}"],
+                    parameters={"digests": row_digests},
+                )
+                # Unpack the results into the target rows
+                row_digest_vals = {r.digest: r.val for r in rows}
+                for index, row_digest in index_digests:
+                    extra_results[index] = PartialRefResult(
+                        remaining_extra=extra_results[index].remaining_extra[2:],
+                        val=row_digest_vals[row_digest],
+                        unresolved_obj_ref=None,
+                        unresolved_table_ref=None,
+                    )
+
+            # Resolve any remaining extras, possibly producing more unresolved refs
+            for i, extra_result in enumerate(extra_results):
+                if extra_result.remaining_extra:
+                    extra_results[i] = resolve_extra(
+                        extra_result.remaining_extra, extra_result.val
+                    )
+
+        return tsi.RefsReadBatchRes(vals=[r.val for r in extra_results])
+
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        digest = bytes_digest(req.content)
+        chunks = [
+            req.content[i : i + FILE_CHUNK_SIZE]
+            for i in range(0, len(req.content), FILE_CHUNK_SIZE)
+        ]
+        self.ch_client.insert(
+            "files",
+            data=[
+                (
+                    req.project_id,
+                    digest,
+                    i,
+                    len(chunks),
+                    req.name,
+                    chunk,
+                )
+                for i, chunk in enumerate(chunks)
+            ],
+            column_names=[
+                "project_id",
+                "digest",
+                "chunk_index",
+                "n_chunks",
+                "name",
+                "val",
+            ],
+        )
+        return tsi.FileCreateRes(digest=digest)
+
+    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        query_result = self.ch_client.query(
+            "SELECT n_chunks, val FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
+            parameters={"project_id": req.project_id, "digest": req.digest},
+            column_formats={"val": "bytes"},
+        )
+        n_chunks = query_result.result_rows[0][0]
+        chunks = [r[1] for r in query_result.result_rows]
+        if len(chunks) != n_chunks:
+            raise ValueError("Missing chunks")
+        return tsi.FileContentReadRes(content=b"".join(chunks))
 
     # Private Methods
+    @property
+    def ch_client(self) -> CHClient:
+        if not hasattr(self._thread_local, "ch_client"):
+            self._thread_local.ch_client = self._mint_client()
+        return self._thread_local.ch_client
+
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
             host=self._host,
@@ -362,8 +708,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.database = self._database
         return client
 
-    def __del__(self) -> None:
-        self.ch_client.close()
+    # def __del__(self) -> None:
+    #     self.ch_client.close()
 
     def _insert_call_batch(self, batch: typing.List) -> None:
         if batch:
@@ -515,25 +861,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return dicts
 
     def _obj_read(self, req: tsi.ObjReadReq, op_only: bool) -> SelectableCHObjSchema:
-        conditions = ["name = {name: String}", "version_hash = {version_hash: String}"]
+        conditions = [
+            "name = {name: String}",
+            "version_digest = {version_hash: String}",
+        ]
 
-        if op_only:
-            conditions.append("is_op == 1")
-        else:
-            conditions.append("is_op == 0")
+        # if op_only:
+        #     conditions.append("is_op == 1")
+        # else:
+        #     conditions.append("is_op == 0")
 
         ch_objs = self._select_objs_query(
             req.entity,
             req.project,
-            columns=all_obj_select_columns,
             conditions=conditions,
             limit=1,
-            parameters={"name": req.name, "version_hash": req.version_hash},
+            # parameters={"name": req.name, "version_digest": req.version_digest},
         )
 
         # If the obj is not found, raise a NotFoundError
         if not ch_objs:
-            raise NotFoundError(f"Obj with id {req.id} not found")
+            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
 
         return ch_objs[0]
 
@@ -541,30 +889,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         entity: str,
         project: str,
-        columns: typing.Optional[typing.List[str]] = None,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHObjSchema]:
-
-        if not parameters:
-            parameters = {}
-        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
-
-        parameters["entity_scope"] = entity
-        parameters["project_scope"] = project
-        if columns == None:
-            columns = all_obj_select_columns
-        columns = typing.cast(typing.List[str], columns)
-
-        remaining_columns = set(columns) - set(required_obj_select_columns)
-        columns = required_obj_select_columns + list(remaining_columns)
-        # # Stop injection
-        assert (
-            set(columns) - set(all_obj_select_columns) == set()
-        ), f"Invalid columns: {columns}"
-        select_columns_part = ", ".join(columns)
-
         if not conditions:
             conditions = ["1 = 1"]
 
@@ -574,22 +901,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if limit != None:
             limit_part = f"LIMIT {limit}"
 
-        raw_res = self._query(
+        query_result = self._query(
             f"""
-            SELECT {select_columns_part}
-            FROM objects_versioned
-            WHERE entity = {{entity_scope: String}} AND project = {{project_scope: String}}
+            SELECT *
+            FROM objects_deduped
+            WHERE entity = {{entity: String}} AND project = {{project: String}}
             AND {conditions_part}
             {limit_part}
         """,
-            parameters,
-            column_formats={"bytes_file_map": {"string": "bytes"}},
+            {"entity": entity, "project": project},
         )
+        result: typing.List[SelectableCHObjSchema] = []
+        for row in query_result.result_rows:
+            result.append(
+                SelectableCHObjSchema.model_validate(
+                    dict(zip(query_result.column_names, row))
+                )
+            )
 
-        objs = []
-        for row in raw_res.result_rows:
-            objs.append(_raw_obj_dict_to_ch_obj(dict(zip(columns, row))))
-        return objs
+        return result
 
     def _run_migrations(self) -> None:
         print("Running migrations")
@@ -635,10 +965,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 def _dict_value_to_dump(
     value: dict,
 ) -> str:
+    return json.dumps(value)
     cpy = value.copy()
     if cpy:
         keys = list(cpy.keys())
-        cpy["_keys"] = keys
+        # cpy["_keys"] = keys
     return json.dumps(cpy)
 
 
@@ -726,15 +1057,16 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
 
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
-        entity=ch_obj.entity,
-        project=ch_obj.project,
+        # entity=ch_obj.entity,
+        # project=ch_obj.project,
+        project_id=f"{ch_obj.entity}/{ch_obj.project}",
         name=ch_obj.name,
-        version_hash=ch_obj.version_hash,
-        type_dict=_dict_dump_to_dict(ch_obj.type_dict_dump),
-        b64_file_map=encode_bytes_as_b64(ch_obj.bytes_file_map),
-        metadata_dict=_dict_dump_to_dict(ch_obj.metadata_dict_dump),
-        created_datetime=_ensure_datetimes_have_tz(ch_obj.created_datetime),
+        created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
         version_index=ch_obj.version_index,
+        is_latest=ch_obj.is_latest,
+        digest=ch_obj.digest,
+        type=ch_obj.type,
+        val=json.loads(ch_obj.val),
     )
 
 
@@ -790,20 +1122,31 @@ def _process_parameters(
     return parameters
 
 
-def _partial_obj_schema_to_ch_obj(
-    partial_obj: tsi.ObjSchemaForInsert,
-    is_op: bool,
-) -> ObjCHInsertable:
-    version_hash = version_hash_for_object(partial_obj)
+# def _partial_obj_schema_to_ch_obj(
+#     partial_obj: tsi.ObjSchemaForInsert,
+# ) -> ObjCHInsertable:
+#     version_hash = version_hash_for_object(partial_obj)
 
-    return ObjCHInsertable(
-        entity=partial_obj.entity,
-        project=partial_obj.project,
-        name=partial_obj.name,
-        version_hash=version_hash,
-        is_op=is_op,
-        type_dict_dump=_dict_value_to_dump(partial_obj.type_dict),
-        bytes_file_map=decode_b64_to_bytes(partial_obj.b64_file_map or {}),
-        metadata_dict_dump=_dict_value_to_dump(partial_obj.metadata_dict),
-        created_datetime=partial_obj.created_datetime,
-    )
+#     return ObjCHInsertable(
+#         id=uuid.uuid4(),
+#         entity=partial_obj.entity,
+#         project=partial_obj.project,
+#         name=partial_obj.name,
+#         type="unknown",
+#         refs=[],
+#         val=json.dumps(partial_obj.val),
+#     )
+
+
+def get_type(val: typing.Any) -> str:
+    if val == None:
+        return "none"
+    elif isinstance(val, dict):
+        if "_type" in val:
+            if "weave_type" in val:
+                return val["weave_type"]["type"]
+            return val["_type"]
+        return "dict"
+    elif isinstance(val, list):
+        return "list"
+    return "unknown"

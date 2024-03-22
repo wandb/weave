@@ -32,7 +32,7 @@ class ObjectMeta(ModelMetaclass):
         return original_class
 
 
-class Object(pydantic.BaseModel, metaclass=ObjectMeta):
+class Object(pydantic.BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
@@ -75,13 +75,13 @@ class Object(pydantic.BaseModel, metaclass=ObjectMeta):
 
 # We don't define this directly in the class definition so that VSCode
 # doesn't try to navigate to it instead of the target attribute
-def _object_getattribute(self: Object, name: str) -> Any:
-    attribute = object.__getattribute__(self, name)
-    if name not in object.__getattribute__(self, "model_fields"):
-        return attribute
-    return ref_util.val_with_relative_ref(
-        self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
-    )
+# def _object_getattribute(self: Object, name: str) -> Any:
+#     attribute = object.__getattribute__(self, name)
+#     if name not in object.__getattribute__(self, "model_fields"):
+#         return attribute
+#     return ref_util.val_with_relative_ref(
+#         self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
+#     )
 
 
-Object.__getattribute__ = _object_getattribute  # type: ignore
+# Object.__getattribute__ = _object_getattribute  # type: ignore

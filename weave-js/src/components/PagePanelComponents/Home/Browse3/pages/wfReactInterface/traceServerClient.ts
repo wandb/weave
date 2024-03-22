@@ -13,6 +13,7 @@
  */
 
 import fetch from 'isomorphic-unfetch';
+import _ from 'lodash';
 
 export type KeyedDictType = {
   [key: string]: any;
@@ -68,11 +69,90 @@ export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
 };
 
+interface TraceObjectsFilter {
+  object_names?: string[];
+  is_op?: boolean;
+  latest_only?: boolean;
+}
+
+type TraceObjQueryReq = {
+  project_id: string;
+  filter?: TraceObjectsFilter;
+};
+
+export interface TraceObjSchema {
+  project_id: string;
+  name: string;
+  created_at: string;
+  digest: string;
+  version_index: number;
+  is_latest: number;
+  type: string;
+  val: any;
+}
+
+type TraceObjQueryRes = {
+  objs: TraceObjSchema[];
+};
+
+export type TraceRefsReadBatchReq = {
+  refs: string[];
+};
+
+export type TraceRefsReadBatchRes = {
+  vals: any[];
+};
+
+export type TraceTableQueryReq = {
+  project_id: string;
+  table_digest: string;
+  filter?: {
+    row_digests?: string[];
+  };
+  limit?: number;
+};
+
+export type TraceTableQueryRes = {
+  rows: Array<{
+    digest: string;
+    val: any;
+  }>;
+};
+
+export type TraceFileContentReadReq = {
+  project_id: string;
+  digest: string;
+};
+
+export type TraceFileContentReadRes = {
+  content: string;
+};
+
+const DEFAULT_BATCH_INTERVAL = 150;
+
 export class TraceServerClient {
   private baseUrl: string;
+  private readBatchCollectors: Array<{
+    req: TraceRefsReadBatchReq;
+    resolvePromise: (res: TraceRefsReadBatchRes) => void;
+    rejectPromise: (err: any) => void;
+  }> = [];
+  private inFlightFetchesRequests: Record<
+    string,
+    Record<
+      string,
+      Array<{
+        resolve: (res: any) => void;
+        reject: (err: any) => void;
+      }>
+    >
+  > = {};
 
   constructor(baseUrl: string) {
+    this.readBatchCollectors = [];
+    this.inFlightFetchesRequests = {};
     this.baseUrl = baseUrl;
+    this.scheduleReadBatch();
   }
 
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
@@ -88,24 +168,152 @@ export class TraceServerClient {
       req
     );
   };
+  objsQuery: (req: TraceObjQueryReq) => Promise<TraceObjQueryRes> = req => {
+    return this.makeRequest<TraceObjQueryReq, TraceObjQueryRes>(
+      '/objs/query',
+      req
+    );
+  };
+
+  readBatch: (req: TraceRefsReadBatchReq) => Promise<TraceRefsReadBatchRes> =
+    req => {
+      return this.requestReadBatch(req);
+    };
+
+  tableQuery: (req: TraceTableQueryReq) => Promise<TraceTableQueryRes> =
+    req => {
+      return this.makeRequest<TraceTableQueryReq, TraceTableQueryRes>(
+        '/table/query',
+        req
+      );
+    };
+
+  fileContent: (
+    req: TraceFileContentReadReq
+  ) => Promise<TraceFileContentReadRes> = req => {
+    return this.makeRequest<TraceFileContentReadReq, TraceFileContentReadRes>(
+      '/files/content',
+      req
+    );
+  };
 
   private makeRequest = async <QT, ST>(
     endpoint: string,
     req: QT
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
+    const reqBody = JSON.stringify(req);
+    let needsFetch = false;
+    if (!this.inFlightFetchesRequests[endpoint]) {
+      this.inFlightFetchesRequests[endpoint] = {};
+    }
+    if (!this.inFlightFetchesRequests[endpoint][reqBody]) {
+      this.inFlightFetchesRequests[endpoint][reqBody] = [];
+      needsFetch = true;
+    }
+
+    const prom = new Promise<ST>((resolve, reject) => {
+      this.inFlightFetchesRequests[endpoint][reqBody].push({resolve, reject});
+    });
+
+    if (!needsFetch) {
+      return prom;
+    }
 
     // eslint-disable-next-line wandb/no-unprefixed-urls
-    const response = await fetch(url, {
+    fetch(url, {
       method: 'POST',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        // This is a dummy auth header, the trace server requires
+        // that we send a basic auth header, but it uses cookies for
+        // authentication.
+        Authorization: 'Basic ' + btoa(':'),
       },
-      body: JSON.stringify(req),
+      body: reqBody,
+    })
+      .then(response => {
+        return response.json();
+      })
+      .then(res => {
+        try {
+          const inFlightRequest = [
+            ...this.inFlightFetchesRequests[endpoint]?.[reqBody],
+          ];
+          delete this.inFlightFetchesRequests[endpoint][reqBody];
+          if (inFlightRequest) {
+            inFlightRequest.forEach(({resolve}) => {
+              resolve(res);
+            });
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      })
+      .catch(err => {
+        try {
+          const inFlightRequest = [
+            ...this.inFlightFetchesRequests[endpoint]?.[reqBody],
+          ];
+          delete this.inFlightFetchesRequests[endpoint][reqBody];
+          if (inFlightRequest) {
+            inFlightRequest.forEach(({reject}) => {
+              reject(err);
+            });
+          }
+        } catch (err2) {
+          console.error(err2);
+        }
+      });
+
+    return prom;
+  };
+
+  private requestReadBatch: (
+    req: TraceRefsReadBatchReq
+  ) => Promise<TraceRefsReadBatchRes> = req => {
+    return new Promise<TraceRefsReadBatchRes>((resolve, reject) => {
+      this.readBatchCollectors.push({
+        req,
+        resolvePromise: resolve,
+        rejectPromise: reject,
+      });
     });
-    const res = await response.json();
-    return res;
+  };
+
+  private doReadBatch = async () => {
+    if (this.readBatchCollectors.length === 0) {
+      return;
+    }
+    const collectors = [...this.readBatchCollectors];
+    this.readBatchCollectors = [];
+    const refs = _.uniq(collectors.map(c => c.req.refs).flat());
+    const res = await this.readBatchDirect({refs});
+    const vals = res.vals;
+    const valMap = new Map<string, any>();
+    for (let i = 0; i < refs.length; i++) {
+      valMap.set(refs[i], vals[i]);
+    }
+    collectors.forEach(collector => {
+      const req = collector.req;
+      const refVals = req.refs.map(ref => valMap.get(ref));
+      collector.resolvePromise({vals: refVals});
+    });
+  };
+
+  private scheduleReadBatch = async () => {
+    await this.doReadBatch();
+    setTimeout(this.scheduleReadBatch, DEFAULT_BATCH_INTERVAL);
+  };
+
+  private readBatchDirect: (
+    req: TraceRefsReadBatchReq
+  ) => Promise<TraceRefsReadBatchRes> = req => {
+    return this.makeRequest<TraceRefsReadBatchReq, TraceRefsReadBatchRes>(
+      '/refs/read_batch',
+      req
+    );
   };
 }
 

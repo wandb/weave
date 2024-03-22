@@ -187,7 +187,7 @@ class RefJSONEncoder(json.JSONEncoder):
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
     def default(self, o):
-        from .trace_server.graph_client_trace import TraceRef
+        from .weave_client import ObjectRef
 
         ref_code = None
         if isinstance(o, artifact_fs.FilesystemArtifactRef):
@@ -195,7 +195,7 @@ class RefJSONEncoder(json.JSONEncoder):
                 ref_code = f"weave.storage.artifact_path_ref('{o.local_ref_str()}')"
             else:
                 ref_code = f"weave.ref('{str(o)}')"
-        elif isinstance(o, TraceRef):
+        elif isinstance(o, (ObjectRef)):
             ref_code = f"weave.ref('{str(o)}')"
 
         if ref_code is not None:
@@ -504,8 +504,11 @@ class OpDefType(types.Type):
 
         od: "OpDef" = getattr(mod, last_op_function.name)
 
-        location = artifact.uri_obj.with_path(name)
-        registry_mem.memory_registry.register_op(od, location=location)
+        try:
+            location = artifact.uri_obj.with_path(name)
+            registry_mem.memory_registry.register_op(od, location=location)
+        except NotImplementedError:
+            pass
 
         return od
 

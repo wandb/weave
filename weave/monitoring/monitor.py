@@ -17,7 +17,6 @@ from .. import errors
 from .. import graph
 from .. import stream_data_interfaces
 from .. import graph_client_context
-from .. import graph_client_wandb_art_st
 from .. import run_context
 from .. import run_streamtable_span
 
@@ -218,40 +217,41 @@ class Monitor:
         # one.
         client = graph_client_context.get_graph_client()
         if client:
-            if isinstance(
-                client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-            ):
-                self._streamtable = client.runs_st
-            else:
-                # TODO: we need to refactor monitor to make use of graph_client
-                print("Low-level tracing only works with wandb client currently")
+            # if isinstance(
+            #     client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+            # ):
+            #     self._streamtable = client.runs_st
+            # else:
+            # TODO: we need to refactor monitor to make use of graph_client
+            print("Low-level tracing only works with wandb client currently")
         return self._streamtable
 
     @contextlib.contextmanager
     def span(self, name: str) -> typing.Iterator[Span]:
-        if not self._showed_not_logging_warning and self.streamtable is None:
-            self._showed_not_logging_warning = True
-            print(
-                "WARNING: Not logging spans.  Call weave.monitor.init_monitor() to enable logging."
-            )
+        raise NotImplementedError("Monitor.span is not implemented")
+        # if not self._showed_not_logging_warning and self.streamtable is None:
+        #     self._showed_not_logging_warning = True
+        #     print(
+        #         "WARNING: Not logging spans.  Call weave.monitor.init_monitor() to enable logging."
+        #     )
 
-        # A song and dance to switch between span/run semantics. Will be cleaned
-        # up as we switch entirely to the run interface.
+        # # A song and dance to switch between span/run semantics. Will be cleaned
+        # # up as we switch entirely to the run interface.
 
-        parent_run = run_context.get_current_run()
-        trace_id = None
-        if parent_run is not None:
-            parent_id = parent_run.id
-            trace_id = parent_run.trace_id
-        else:
-            parent_id = None
-        span = Span(name, self.streamtable, parent_id, trace_id, _attributes.get())
-        run = run_streamtable_span.RunStreamTableSpan(span.asdict_unsafe())
-        with run_context.current_run(run):
-            try:
-                yield span
-            finally:
-                span.autoclose()
+        # parent_run = run_context.get_current_run()
+        # trace_id = None
+        # if parent_run is not None:
+        #     parent_id = parent_run.id
+        #     trace_id = parent_run.trace_id
+        # else:
+        #     parent_id = None
+        # span = Span(name, self.streamtable, parent_id, trace_id, _attributes.get())
+        # run = run_streamtable_span.RunStreamTableSpan(span.asdict_unsafe())
+        # with run_context.current_run(run):
+        #     try:
+        #         yield span
+        #     finally:
+        #         span.autoclose()
 
     @contextlib.contextmanager
     def attributes(self, attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
@@ -368,12 +368,12 @@ def default_monitor() -> Monitor:
 def _get_global_monitor() -> typing.Optional[Monitor]:
     client = graph_client_context.get_graph_client()
     if client is not None:
-        if not isinstance(
-            client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-        ):
-            raise ValueError(
-                "monitor logging (via openai patch for example) is only supported with wandb client currently"
-            )
+        # if not isinstance(
+        #     client, graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+        # ):
+        raise ValueError(
+            "monitor logging (via openai patch for example) is only supported with wandb client currently"
+        )
         return Monitor(client.runs_st)
     return _global_monitor
 

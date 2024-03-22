@@ -1,12 +1,12 @@
-import typing
+from typing import Union, Any
 import weave
 
 from weave.flow.obj import Object
 
 
 class Dataset(Object):
-    rows: list[typing.Any]
+    rows: Union[weave.Table, list[Any]]
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.rows, weave.WeaveList):
-            self.__dict__["rows"] = weave.WeaveList(self.rows)
+    def model_post_init(self, __context: Any) -> None:
+        if not isinstance(self.rows, weave.Table):
+            self.__dict__["rows"] = weave.Table(self.rows)
