@@ -274,10 +274,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
 
 
 def ref_str(op):
-    legacy_ref = weave.obj_ref(op)
-    trace_ref = weave_client.get_ref(op)
-    ref = trace_ref if trace_ref else legacy_ref
-    return str(ref)
+    return str(weave_client.get_ref(op))
 
 
 def test_trace_call_query_filter_op_version_refs(client):

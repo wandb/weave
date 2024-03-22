@@ -298,7 +298,7 @@ def reassembled_chat_completion_message():
 
 
 @pytest.fixture
-def client():
+def openai_client():
     c = Mock(spec=openai.OpenAI)
     c.chat = Mock()
     c.chat.completions = Mock()
@@ -307,11 +307,11 @@ def client():
 
 
 @pytest.fixture
-def streaming_client(client, streaming_chat_completion_messages):
-    client.chat.completions.create.return_value = iter(
+def streaming_client(openai_client, streaming_chat_completion_messages):
+    openai_client.chat.completions.create.return_value = iter(
         streaming_chat_completion_messages
     )
-    return client
+    return openai_client
 
 
 @pytest.fixture

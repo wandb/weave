@@ -300,7 +300,7 @@ def strict_op_saving():
 #     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     server_type = request.config.getoption("--weave-server")
     tsi: trace_server_interface.TraceServerInterface
