@@ -107,6 +107,7 @@ def decode_custom_obj(
     weave_type: Dict, encoded_path_contents: Mapping[str, Union[str, bytes]]
 ) -> Any:
     from .. import artifact_fs
+
     art = MemTraceFilesArtifact(
         encoded_path_contents,
         metadata={},
