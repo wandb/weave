@@ -479,6 +479,9 @@ class OpDefType(types.Type):
                 mod = __import__(import_name, fromlist=[module_dir])
             except Exception as e:
                 print("Op loading exception. This might be fine!", e)
+                print("Module path:", module_path)
+                print("Module dir:", module_dir)
+                print(os.listdir(module_dir))
                 import traceback
 
                 traceback.print_exc()
