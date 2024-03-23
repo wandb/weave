@@ -41,7 +41,9 @@ def _file_path(uri: artifact_wandb.WeaveWBArtifactURI, md5_hex: str) -> str:
 def _local_path_and_download_url(
     art_uri: artifact_wandb.WeaveWBArtifactURI,
     manifest: artifact_wandb.WandbArtifactManifest,
+    entity_name: typing.Optional[str] = None,
 ) -> typing.Optional[typing.Tuple[str, str]]:
+    print(f"\n\nlogging inside download url: entity name {entity_name}\n\n", flush=True)
     path = art_uri.path
     if path is None:
         raise errors.WeaveInternalError(
@@ -56,7 +58,10 @@ def _local_path_and_download_url(
     file_path = _file_path(art_uri, md5_hex)
     if manifest.storage_layout == artifact_wandb.WandbArtifactManifest.StorageLayout.V1:
         return file_path, "{}/artifacts/{}/{}/{}".format(
-            base_url, art_uri.entity_name, md5_hex, urllib.parse.quote(file_name)
+            base_url,
+            entity_name or art_uri.entity_name,
+            md5_hex,
+            urllib.parse.quote(file_name),
         )
     else:
         # TODO: storage_region
@@ -106,9 +111,16 @@ class WandbFileManagerAsync:
         except FileNotFoundError:
             pass
         # Download
-        manifest_url = await self.wandb_api.artifact_manifest_url(
-            art_id,
-        )
+        if art_id == "":
+            manifest_url = await self.wandb_api.artifact_manifest_url(
+                art_uri.entity_name,
+                art_uri.project_name,
+                art_uri.name + ":" + art_uri.version,
+            )
+        else:
+            manifest_url = await self.wandb_api.artifact_manifest_url_from_id(
+                art_id=art_id,
+            )
         if manifest_url is None:
             return None
         await self.http.download_file(
@@ -132,20 +144,23 @@ class WandbFileManagerAsync:
             return manifest
 
     async def local_path_and_download_url(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI
+        self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
             raise errors.WeaveInternalError(
                 "Artifact URI has no path in call to local_path_and_download_url"
             )
-        manifest = await self.manifest(art_uri)
+        manifest = await self.manifest(art_id, art_uri)
         if manifest is None:
             return None
-        return _local_path_and_download_url(art_uri, manifest)
+        entity_name = self.wandb_api.artifact_path_info(
+            artifact_id=art_id,
+        )
+        return _local_path_and_download_url(art_uri, manifest, entity_name)
 
     async def ensure_file(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI
+        self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
         path = art_uri.path
         if path is None:
@@ -154,7 +169,7 @@ class WandbFileManagerAsync:
             )
         with tracer.trace("wandb_file_manager.ensure_file") as span:
             span.set_tag("uri", str(art_uri))
-            res = await self.local_path_and_download_url(art_uri)
+            res = await self.local_path_and_download_url(art_id, art_uri)
             if res is None:
                 return None
             file_path, download_url = res
@@ -217,7 +232,7 @@ class WandbFileManagerAsync:
             return file_path
 
     async def direct_url(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI
+        self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
         path = art_uri.path
         if path is None:
@@ -226,7 +241,7 @@ class WandbFileManagerAsync:
             )
         with tracer.trace("wandb_file_manager.direct_url") as span:
             span.set_tag("uri", str(art_uri))
-            res = await self.local_path_and_download_url(art_uri)
+            res = await self.local_path_and_download_url(art_id, art_uri)
             if res is None:
                 return None
             return res[1]
@@ -267,9 +282,16 @@ class WandbFileManager:
         except FileNotFoundError:
             pass
         # Download
-        manifest_url = self.wandb_api.artifact_manifest_url(
-            artifact_id=art_id,
-        )
+        if art_id == "":
+            manifest_url = self.wandb_api.artifact_manifest_url(
+                art_uri.entity_name,
+                art_uri.project_name,
+                art_uri.name + ":" + art_uri.version,
+            )
+        else:
+            manifest_url = self.wandb_api.artifact_manifest_url_from_id(
+                art_id=art_id,
+            )
         if manifest_url is None:
             return None
         self.http.download_file(
@@ -303,7 +325,14 @@ class WandbFileManager:
         manifest = self.manifest(art_id, art_uri)
         if manifest is None:
             return None
-        return _local_path_and_download_url(art_uri, manifest)
+        entity_name = self.wandb_api.artifact_path_info(
+            artifact_id=art_id,
+        )
+        print(
+            f"\n\nlogging before download url: entity name {entity_name}\n\n",
+            flush=True,
+        )
+        return _local_path_and_download_url(art_uri, manifest, entity_name)
 
     def ensure_file_downloaded(
         self,
@@ -340,7 +369,7 @@ class WandbFileManager:
             return file_path
 
     def ensure_file(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI
+        self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
         path = art_uri.path
         if path is None:
@@ -349,7 +378,7 @@ class WandbFileManager:
             )
         with tracer.trace("wandb_file_manager.ensure_file") as span:
             span.set_tag("uri", str(art_uri))
-            res = self.local_path_and_download_url(art_uri)
+            res = self.local_path_and_download_url(art_id, art_uri)
             if res is None:
                 return None
             file_path, download_url = res
@@ -370,7 +399,7 @@ class WandbFileManager:
             return file_path
 
     def direct_url(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI
+        self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
         path = art_uri.path
         if path is None:
@@ -379,7 +408,7 @@ class WandbFileManager:
             )
         with tracer.trace("wandb_file_manager.direct_url") as span:
             span.set_tag("uri", str(art_uri))
-            res = self.local_path_and_download_url(art_uri)
+            res = self.local_path_and_download_url(art_id, art_uri)
             if res is None:
                 return None
             return res[1]

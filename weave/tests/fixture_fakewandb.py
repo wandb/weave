@@ -340,6 +340,7 @@ class SetupResponse:
         self.fake_io.add_artifact(artifact, artifact_uri)
         res = weave.save(
             WandbArtifact(
+                "",
                 "test_name",
                 None,
                 artifact_uri,

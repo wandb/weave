@@ -156,6 +156,53 @@ class WandbApiAsync:
     ARTIFACT_MANIFEST_QUERY = gql.gql(
         """
         query ArtifactManifest(
+            $entityName: String!,
+            $projectName: String!,
+            $name: String!
+        ) {
+            project(name: $projectName, entityName: $entityName) {
+                artifact(name: $name) {
+                    currentManifest {
+                        id
+                        file {
+                            directUrl
+                        }
+                    }
+                }
+            }
+        }
+        """
+    )
+
+    async def artifact_manifest_url(
+        self, entity_name: str, project_name: str, name: str
+    ) -> typing.Optional[str]:
+        try:
+            result = await self.query(
+                self.ARTIFACT_MANIFEST_QUERY,
+                entityName=entity_name,
+                projectName=project_name,
+                name=name,
+            )
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        project = result["project"]
+        if project is None:
+            return None
+        artifact = result["artifact"]
+        if artifact is None:
+            return None
+        current_manifest = artifact["currentManifest"]
+        if current_manifest is None:
+            return None
+        file = current_manifest["file"]
+        if file is None:
+            return None
+        return file["directUrl"]
+
+    ARTIFACT_MANIFEST_FROM_ID_QUERY = gql.gql(
+        """
+        query ArtifactManifestFromID(
             $artifactID: ID!
         ) {
             artifact(id: $artifactID) {
@@ -170,11 +217,10 @@ class WandbApiAsync:
         """
     )
 
-    async def artifact_manifest_url(self, art_id: str) -> typing.Optional[str]:
+    async def artifact_manifest_url_from_id(self, art_id: str) -> typing.Optional[str]:
         try:
             result = await self.query(
-                self.ARTIFACT_MANIFEST_QUERY,
-                artifactID=art_id,
+                self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id
             )
         except gql.transport.exceptions.TransportQueryError as e:
             return None
@@ -188,6 +234,44 @@ class WandbApiAsync:
         if file is None:
             return None
         return file["directUrl"]
+
+    ARTIFACT_PATH_INFO_QUERY = gql.gql(
+        """
+        query ArtifactPathInfo($artifactId: ID!) {
+            artifact(id: $artifactId) {
+              id
+              artifactType {
+                id
+                name
+                project {
+                  id
+                  name
+                  entityName
+                }
+              }
+            }
+          }
+        """
+    )
+
+    def artifact_path_info(self, artifact_id: str) -> typing.Optional[str]:
+        try:
+            result = self.query(
+                self.ARTIFACT_PATH_INFO_QUERY,
+                artifactID=artifact_id,
+            )
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        artifact = result["artifact"]
+        if artifact is None:
+            return None
+        artifact_type = artifact["artifactType"]
+        if artifact_type is None:
+            return None
+        project = artifact_type["project"]
+        if project is None:
+            return None
+        return project["entityName"]
 
     VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
         """
@@ -276,9 +360,56 @@ class WandbApi:
     ARTIFACT_MANIFEST_QUERY = gql.gql(
         """
         query ArtifactManifest(
+            $entityName: String!,
+            $projectName: String!,
+            $name: String!
+        ) {
+            project(name: $projectName, entityName: $entityName) {
+                artifact(name: $name) {
+                    currentManifest {
+                        id
+                        file {
+                            directUrl
+                        }
+                    }
+                }
+            }
+        }
+        """
+    )
+
+    def artifact_manifest_url(
+        self, entity_name: str, project_name: str, name: str
+    ) -> typing.Optional[str]:
+        try:
+            result = self.query(
+                self.ARTIFACT_MANIFEST_QUERY,
+                entityName=entity_name,
+                projectName=project_name,
+                name=name,
+            )
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+        project = result["project"]
+        if project is None:
+            return None
+        artifact = result["artifact"]
+        if artifact is None:
+            return None
+        current_manifest = artifact["currentManifest"]
+        if current_manifest is None:
+            return None
+        file = current_manifest["file"]
+        if file is None:
+            return None
+        return file["directUrl"]
+
+    ARTIFACT_MANIFEST_FROM_ID_QUERY = gql.gql(
+        """
+        query ArtifactManifestFromID(
             $artifactID: ID!
         ) {
-        artifact(id: $artifactID) {
+            artifact(id: $artifactID) {
                 currentManifest {
                     id
                     file {
@@ -290,11 +421,10 @@ class WandbApi:
         """
     )
 
-    def artifact_manifest_url(self, artifact_id: str) -> typing.Optional[str]:
+    async def artifact_manifest_url_from_id(self, art_id: str) -> typing.Optional[str]:
         try:
-            result = self.query(
-                self.ARTIFACT_MANIFEST_QUERY,
-                artifactID=artifact_id,
+            result = await self.query(
+                self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id
             )
         except gql.transport.exceptions.TransportQueryError as e:
             return None
@@ -308,6 +438,45 @@ class WandbApi:
         if file is None:
             return None
         return file["directUrl"]
+
+    ARTIFACT_PATH_INFO_QUERY = gql.gql(
+        """
+        query ArtifactPathInfo($artifactId: ID!) {
+            artifact(id: $artifactId) {
+              id
+              artifactType {
+                id
+                name
+                project {
+                  id
+                  name
+                  entityName
+                }
+              }
+            }
+          }
+        """
+    )
+
+    def artifact_path_info(self, artifact_id: str) -> typing.Optional[str]:
+        try:
+            result = self.query(
+                self.ARTIFACT_PATH_INFO_QUERY,
+                artifactID=artifact_id,
+            )
+        except gql.transport.exceptions.TransportQueryError as e:
+            print("\n\nlogging error in artifact path info query\n\n")
+            return None
+        artifact = result["artifact"]
+        if artifact is None:
+            return None
+        artifact_type = artifact["artifactType"]
+        if artifact_type is None:
+            return None
+        project = artifact_type["project"]
+        if project is None:
+            return None
+        return project["entityName"]
 
     VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
         """

@@ -402,18 +402,22 @@ class Server:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         return await self.wandb_file_manager.manifest(artifact_id, uri)
 
-    async def handle_ensure_file(self, artifact_uri: str) -> typing.Optional[str]:
+    async def handle_ensure_file(
+        self, artifact_id: str, artifact_uri: str
+    ) -> typing.Optional[str]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        return await self.wandb_file_manager.ensure_file(uri)
+        return await self.wandb_file_manager.ensure_file(artifact_id, uri)
 
     async def handle_ensure_file_downloaded(
         self, download_url: str
     ) -> typing.Optional[str]:
         return await self.wandb_file_manager.ensure_file_downloaded(download_url)
 
-    async def handle_direct_url(self, artifact_uri: str) -> typing.Optional[str]:
+    async def handle_direct_url(
+        self, artifact_id: str, artifact_uri: str
+    ) -> typing.Optional[str]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        return await self.wandb_file_manager.direct_url(uri)
+        return await self.wandb_file_manager.direct_url(artifact_id, uri)
 
     async def handle_sleep(self, seconds: float) -> float:
         # used for testing to simulate long running processes
@@ -615,17 +619,17 @@ class SyncClient:
         return manifest
 
     def ensure_file(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
-        return self.request("ensure_file", str(artifact_uri))
+        return self.request("ensure_file", artifact_id, str(artifact_uri))
 
     def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
         return self.request("ensure_file_downloaded", download_url)
 
     def direct_url(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
-        return self.request("direct_url", str(artifact_uri))
+        return self.request("direct_url", artifact_id, str(artifact_uri))
 
     def sleep(self, seconds: float) -> None:
         return self.request("sleep", seconds)
