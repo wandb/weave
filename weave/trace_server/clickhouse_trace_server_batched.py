@@ -26,7 +26,7 @@ from .trace_server_interface_util import (
 )
 from . import trace_server_interface as tsi
 
-from weave.trace import refs
+from . import refs
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15

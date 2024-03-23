@@ -34,7 +34,7 @@ from weave.trace_server.trace_server_interface import (
     _ObjectVersionFilter,
 )
 from weave.wandb_interface import project_creator
-from weave.trace.refs import (
+from weave.trace_server.refs import (
     Ref,
     ObjectRef,
     TableRef,
