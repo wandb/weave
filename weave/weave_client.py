@@ -9,7 +9,7 @@ import datetime
 from weave import box, uris
 from weave.table import Table
 from weave import urls
-from weave import op_def
+from weave.trace.op import Op
 from weave.trace.object_record import ObjectRecord, pydantic_object_record
 from weave.trace.serialize import to_json, from_json
 from weave import graph_client_context
@@ -233,7 +233,7 @@ class WeaveClient:
         return self._save_object(val, name, branch)
 
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        is_opdef = isinstance(val, op_def.OpDef)
+        is_opdef = isinstance(val, Op)
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
             return val
@@ -303,7 +303,7 @@ class WeaveClient:
         response_call = response.calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
 
-    def op_calls(self, op: op_def.OpDef) -> CallsIter:
+    def op_calls(self, op: Op) -> CallsIter:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
@@ -325,17 +325,17 @@ class WeaveClient:
         )
         return response.objs
 
-    def _save_op(self, op: op_def.OpDef) -> Ref:
-        if isinstance(op, op_def.BoundOpDef):
-            op = op.op_def
+    def _save_op(self, op: Op) -> Ref:
+        # if isinstance(op, Op):
+        #     op = op.op_def
         op_def_ref = self._save_object(op, op.name)
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
 
     def create_call(
-        self, op: Union[str, op_def.OpDef], parent: Optional[Call], inputs: dict
+        self, op: Union[str, Op], parent: Optional[Call], inputs: dict
     ) -> Call:
-        if isinstance(op, op_def.OpDef):
+        if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
@@ -433,7 +433,7 @@ class WeaveClient:
         elif isinstance(obj, dict):
             return {k: self.save_nested_objects(v) for k, v in obj.items()}
 
-        if isinstance(obj, op_def.OpDef):
+        if isinstance(obj, Op):
             self._save_op(obj)
             return obj
 
@@ -457,7 +457,7 @@ class WeaveClient:
     def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError()
 
-    def op_runs(self, op_def: op_def.OpDef) -> Sequence[Call]:
+    def op_runs(self, op_def: Op) -> Sequence[Call]:
         raise NotImplementedError()
 
     def ref_uri(self, name: str, version: str, path: str) -> str:
