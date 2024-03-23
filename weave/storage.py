@@ -181,7 +181,7 @@ def _direct_publish(
     # Validate entity name once we have them
 
     obj = box.box(obj)
-    artifact = artifact_wandb.WandbArtifact(name, type=wb_artifact_type_name)
+    artifact = artifact_wandb.WandbArtifact("", name, type=wb_artifact_type_name)
     artifact.metadata.update(metadata or {})
 
     # Use context to ensure any recursively published objects go to the same project

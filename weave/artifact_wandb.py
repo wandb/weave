@@ -395,7 +395,7 @@ def get_wandb_read_client_artifact(art_id: str) -> typing.Optional["WandbArtifac
         if res.is_deleted:
             return None
         return WandbArtifact(
-            res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
+            art_id, res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
         )
 
 
@@ -571,14 +571,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
                 'cannot get direct url for unsaved artifact"'
             )
         uri = self._read_artifact_uri.with_path(path)
-        return self.io_service.direct_url(uri)
+        return self.io_service.direct_url(self.artifact_id, uri)
 
     def path(self, name: str) -> str:
         if not self.is_saved or not self._read_artifact_uri:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
         uri = self._read_artifact_uri.with_path(name)
-        fs_path = self.io_service.ensure_file(uri)
+        fs_path = self.io_service.ensure_file(self.artifact_id, uri)
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
@@ -831,7 +831,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
             )
         # TODO: potentially need to pass full entity/project/name instead
         return cls(
-            WandbArtifact(uri.name, uri=uri),
+            WandbArtifact("", uri.name, uri=uri),
             path=uri.path,
             extra=uri.extra,
         )

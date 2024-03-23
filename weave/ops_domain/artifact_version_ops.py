@@ -23,6 +23,7 @@ from .. import input_provider
 
 
 static_art_file_gql = """
+            id
             commitHash
             artifactSequence {
                 id
