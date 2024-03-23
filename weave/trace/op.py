@@ -53,11 +53,7 @@ class Op:
                 try:
                     awaited_res = res
                     with run_context.current_run(run):
-                        # Need to do this in a loop for some reason to handle
-                        # async streaming openai. Like we get two co-routines
-                        # in a row.
-                        while inspect.iscoroutine(awaited_res):
-                            output = await awaited_res
+                        output = await awaited_res
                     client.finish_call(run, output)
                     if not parent_run:
                         print_run_link(run)
@@ -92,9 +88,11 @@ class BoundOp(Op):
     arg0: Any
 
     def __init__(self, arg0: Any, op: Op) -> None:
+        self.arg0 = arg0
         self.op = op
         self.name = arg0.__class__.__name__ + "." + op.resolve_fn.__name__
         self.signature = inspect.signature(op.resolve_fn)
+        self.resolve_fn = op.resolve_fn
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.op(self.arg0, *args, **kwargs)

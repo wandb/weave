@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, Union
 import numpy as np
 
 import weave
-from weave import op_def
+from weave.trace.op import Op
 from weave.flow import Object, Dataset, Model
 from weave.flow.model import get_infer_method
 from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
@@ -20,11 +20,11 @@ console = Console()
 
 
 def async_call(
-    func: typing.Union[Callable, op_def.OpDef], *args: Any, **kwargs: Any
+    func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
 ) -> typing.Coroutine:
     is_async = False
-    if isinstance(func, op_def.OpDef):
-        is_async = inspect.iscoroutinefunction(func.raw_resolve_fn)
+    if isinstance(func, Op):
+        is_async = inspect.iscoroutinefunction(func.resolve_fn)
     else:
         is_async = inspect.iscoroutinefunction(func)
     if is_async:
@@ -34,7 +34,7 @@ def async_call(
 
 class Evaluation(Object):
     dataset: Union[Dataset, list]
-    scorers: Optional[list[Union[Callable, op_def.OpDef, Scorer]]] = None
+    scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
 
     def model_post_init(self, __context: Any) -> None:
@@ -42,9 +42,9 @@ class Evaluation(Object):
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
-            elif callable(scorer) and not isinstance(scorer, op_def.OpDef):
+            elif callable(scorer) and not isinstance(scorer, Op):
                 scorer = weave.op()(scorer)
-            elif isinstance(scorer, op_def.OpDef):
+            elif isinstance(scorer, Op):
                 pass
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
@@ -70,7 +70,10 @@ class Evaluation(Object):
             model_predict = model
         else:
             model_predict = get_infer_method(model)
-        predict_signature = inspect.signature(model_predict)
+        if isinstance(model_predict, Op):
+            predict_signature = model_predict.signature
+        else:
+            predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
         if isinstance(model_input, dict):
             model_predict_args = {
@@ -92,10 +95,13 @@ class Evaluation(Object):
             prediction = None
 
         scores = {}
-        scorers = typing.cast(list[Union[op_def.OpDef, Scorer]], self.scorers or [])
+        scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
-            score_signature = inspect.signature(score_fn)
+            if isinstance(score_fn, Op):
+                score_signature = score_fn.signature
+            else:
+                score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
             if isinstance(example, dict):
                 score_args = {k: v for k, v in example.items() if k in score_arg_names}
@@ -182,6 +188,6 @@ def evaluate(
     preprocess_model_input: Optional[Callable] = None,
 ) -> dict:
     eval = Evaluation(
-        dataset=dataset, scores=scores, preprocess_model_input=preprocess_model_input
+        dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
     return asyncio.run(eval.evaluate(model))
