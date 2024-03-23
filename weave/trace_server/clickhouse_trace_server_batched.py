@@ -299,14 +299,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         conds = [
-            f"name = '{req.name}'",
-            f"digest = '{req.version_hash}'",
+            "name = {name: String}",
+            "digest = {version_hash: String}",
             "is_op = 1",
         ]
+        parameters = {"name": req.name, "digest": req.version_hash}
         objs = self._select_objs_query(
-            req.entity,
-            req.project,
-            conditions=conds,
+            req.entity, req.project, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.version_hash} not found")
@@ -314,11 +313,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
+        parameters = {}
         conds: typing.List[str] = ["is_op = 1"]
         if req.filter:
             if req.filter.op_names:
-                in_list = ", ".join([f"'{n}'" for n in req.filter.op_names])
-                conds.append(f"name IN ({in_list})")
+                conds.append("name IN {op_names: Array(String)}")
+                parameters["op_names"] = req.filter.op_names
+
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
 
@@ -354,17 +355,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(version_digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = [
-            f"name = '{req.name}'",
-        ]
+        conds = ["name = {name: String}"]
+        parameters = {"name": req.name}
         if req.version_digest == "latest":
             conds.append("is_latest = 1")
         else:
-            conds.append(f"digest = '{req.version_digest}'")
+            conds.append("digest = {version_digest: String}")
+            parameters["version_digest"] = req.version_digest
         objs = self._select_objs_query(
-            req.entity,
-            req.project,
-            conditions=conds,
+            req.entity, req.project, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
@@ -373,6 +372,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         conds: list[str] = []
+        parameters = {}
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
@@ -380,8 +380,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 else:
                     conds.append("is_op = 0")
             if req.filter.object_names:
-                in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
-                conds.append(f"name IN ({in_list})")
+                conds.append("name IN {object_names: Array(String)}")
+                parameters["object_names"] = req.filter.object_names
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
         entity, project = req.project_id.split("/")
@@ -389,6 +389,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             entity,
             project,
             conditions=conds,
+            parameters=parameters,
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
@@ -426,10 +427,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         entity, project = req.project_id.split("/")
         conds = []
+        parameters = {}
         if req.filter:
             if req.filter.row_digests:
-                in_list = ", ".join([f"'{rd}'" for rd in req.filter.row_digests])
-                conds.append(f"tr.digest IN ({in_list})")
+                conds.append("tr.digest IN {row_digets: Array(String)}")
+                parameters["row_digests"] = req.filter.row_digests
         else:
             conds.append("1 = 1")
         rows = self._table_query(
@@ -462,8 +464,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 JOIN table_rows_deduped tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
                 WHERE {predicate}
             """
+        if parameters is None:
+            parameters = {}
         if limit:
-            query += f" LIMIT {limit}"
+            query += " LIMIT {limit: UInt64}"
+            parameters["limit"] = limit
 
         query_result = self.ch_client.query(
             query,
@@ -471,7 +476,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "entity": entity,
                 "project": project,
                 "table_digest": table_digest,
-                **(parameters or {}),
+                **parameters,
             },
         )
 
@@ -501,13 +506,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 val = root_val_cache[cache_key]
             else:
                 conds = [
-                    f"name = '{r.name}'",
-                    f"digest = '{r.version}'",
+                    "name = {name: String}",
+                    "digest = {version: String}",
                 ]
+                parameters = {
+                    "name": r.name,
+                    "version": r.version,
+                }
                 objs = self._select_objs_query(
-                    r.entity,
-                    r.project,
-                    conditions=conds,
+                    r.entity, r.project, conditions=conds, parameters=parameters
                 )
                 if len(objs) == 0:
                     raise NotFoundError(f"Obj {r.name}:{r.version} not found")
@@ -835,11 +842,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         offset_part = ""
         if offset != None:
-            offset_part = f"OFFSET {offset}"
+            offset_part = "OFFSET {offset: Int64}"
+            parameters["offset"] = offset
 
         limit_part = ""
         if limit != None:
-            limit_part = f"LIMIT {limit}"
+            limit_part = "LIMIT {limit: Int64}"
+            parameters["limit"] = limit
 
         raw_res = self._query(
             f"""
@@ -860,37 +869,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             dicts.append(dict(zip(columns, row)))
         return dicts
 
-    def _obj_read(self, req: tsi.ObjReadReq, op_only: bool) -> SelectableCHObjSchema:
-        conditions = [
-            "name = {name: String}",
-            "version_digest = {version_hash: String}",
-        ]
-
-        # if op_only:
-        #     conditions.append("is_op == 1")
-        # else:
-        #     conditions.append("is_op == 0")
-
-        ch_objs = self._select_objs_query(
-            req.entity,
-            req.project,
-            conditions=conditions,
-            limit=1,
-            # parameters={"name": req.name, "version_digest": req.version_digest},
-        )
-
-        # If the obj is not found, raise a NotFoundError
-        if not ch_objs:
-            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
-
-        return ch_objs[0]
-
     def _select_objs_query(
         self,
         entity: str,
         project: str,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHObjSchema]:
         if not conditions:
             conditions = ["1 = 1"]
@@ -901,6 +886,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if limit != None:
             limit_part = f"LIMIT {limit}"
 
+        if parameters is None:
+            parameters = {}
         query_result = self._query(
             f"""
             SELECT *
@@ -909,7 +896,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             AND {conditions_part}
             {limit_part}
         """,
-            {"entity": entity, "project": project},
+            {"entity": entity, "project": project, **parameters},
         )
         result: typing.List[SelectableCHObjSchema] = []
         for row in query_result.result_rows:
