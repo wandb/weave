@@ -397,10 +397,10 @@ class Server:
             del self.client_response_queues[client.client_id]
 
     async def handle_ensure_manifest(
-        self, artifact_uri: str
+        self, artifact_id: str, artifact_uri: str
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        return await self.wandb_file_manager.manifest(uri)
+        return await self.wandb_file_manager.manifest(artifact_id, uri)
 
     async def handle_ensure_file(self, artifact_uri: str) -> typing.Optional[str]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
@@ -518,11 +518,11 @@ class AsyncConnection:
         return server_resp.value
 
     async def manifest(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         manifest: typing.Optional[
             artifact_wandb.WandbArtifactManifest
-        ] = await self.request("ensure_manifest", str(artifact_uri))
+        ] = await self.request("ensure_manifest", artifact_id, str(artifact_uri))
         return manifest
 
     async def ensure_file(
@@ -607,10 +607,10 @@ class SyncClient:
         return server_resp.value
 
     def manifest(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request(
-            "ensure_manifest", str(artifact_uri)
+            "ensure_manifest", artifact_id, str(artifact_uri)
         )
         return manifest
 

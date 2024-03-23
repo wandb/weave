@@ -43,6 +43,7 @@ static_art_file_gql = """
         """
 
 static_art_file_gql_no_entity = """
+            id
             commitHash
             artifactSequence {
                 id
@@ -557,20 +558,19 @@ def history_metrics(
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
-    entity_name = ""
-    project_name = ""
-    if "project" in artifactVersion["artifactSequence"]["defaultArtifactType"]:
-        entity_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"]["entity"]["name"]
-        project_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["project"]["name"]
-
+    print(
+        f"\n\nlogging in helper function ====> {artifactVersion['artifactSequence']}\n\n"
+    )
+    artifact_id = artifactVersion["id"]
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
     commit_hash = artifactVersion["commitHash"]
     return artifact_wandb.WandbArtifact(
+        artifact_id=artifact_id,
         name=home_sequence_name,
         type=type_name,
         uri=artifact_wandb.WeaveWBArtifactURI(
-            home_sequence_name, commit_hash, entity_name, project_name
+            home_sequence_name, commit_hash, "_", "_"
         ),
     )
 
@@ -579,10 +579,11 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     name="artifactVersion-_file_refine_output_type",
     hidden=True,
     output_type=types.TypeType(),
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql_no_entity),
 )
 def _file_refine_output_type(artifactVersion: wdt.ArtifactVersion, path: str):
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
+    print("\n\nHELLO WORLD2\n\n", flush=True)
     return types.TypeRegistry.type_of(art_local.path_info(path))
 
 
@@ -594,7 +595,7 @@ def _file_refine_output_type(artifactVersion: wdt.ArtifactVersion, path: str):
 @op(
     name="artifactVersion-file",
     refine_output_type=_file_refine_output_type,
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql_no_entity),
 )
 def file_(
     artifactVersion: wdt.ArtifactVersion, path: str
@@ -602,6 +603,8 @@ def file_(
     None, artifact_fs.FilesystemArtifactFile  # , artifact_fs.FilesystemArtifactDir
 ]:
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
+    print("\n\nHELLO WORLD1\n\n", flush=True)
+    print(f"\n\nartifact in file_()===> {art_local} ", flush=True)
     return art_local.path_info(path)  # type: ignore
 
 
@@ -613,4 +616,5 @@ def files(
     artifactVersion: wdt.ArtifactVersion,
 ) -> list[artifact_fs.FilesystemArtifactFile]:
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
+    print("\n\nHELLO WORLD\n\n", flush=True)
     return artifact_wandb.FilesystemArtifactFileIterator(art_local)

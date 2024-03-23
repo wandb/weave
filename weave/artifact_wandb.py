@@ -407,6 +407,7 @@ class WandbArtifactType(artifact_fs.FilesystemArtifactType):
 class WandbArtifact(artifact_fs.FilesystemArtifact):
     def __init__(
         self,
+        artifact_id,
         name,
         type=None,
         uri: typing.Optional[
@@ -417,6 +418,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
 
         self.io_service = io_service.get_sync_client()
         self.name = name
+        self.artifact_id = artifact_id
 
         # original uri passed, if any. this can include aliases such as latest or best, which do not
         # correspond to specific versions or may change versions.
@@ -696,7 +698,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             raise errors.WeaveInternalError(
                 'cannot get path info for unsaved artifact"'
             )
-        return self.io_service.manifest(self._read_artifact_uri)
+        return self.io_service.manifest(self.artifact_id, self._read_artifact_uri)
 
     def digest(self, path: str) -> typing.Optional[str]:
         manifest_entry = self._manifest_entry(path)
