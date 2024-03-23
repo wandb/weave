@@ -156,17 +156,13 @@ class WandbApiAsync:
     ARTIFACT_MANIFEST_QUERY = gql.gql(
         """
         query ArtifactManifest(
-            $entityName: String!,
-            $projectName: String!,
-            $name: String!
+            $artifactID: ID!
         ) {
-            project(name: $projectName, entityName: $entityName) {
-                artifact(name: $name) {
-                    currentManifest {
-                        id
-                        file {
-                            directUrl
-                        }
+            artifact(id: $artifactID) {
+                currentManifest {
+                    id
+                    file {
+                        directUrl
                     }
                 }
             }
@@ -174,22 +170,15 @@ class WandbApiAsync:
         """
     )
 
-    async def artifact_manifest_url(
-        self, entity_name: str, project_name: str, name: str
-    ) -> typing.Optional[str]:
+    async def artifact_manifest_url(self, art_id: str) -> typing.Optional[str]:
         try:
             result = await self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
-                entityName=entity_name,
-                projectName=project_name,
-                name=name,
+                artifactID=art_id,
             )
         except gql.transport.exceptions.TransportQueryError as e:
             return None
-        project = result["project"]
-        if project is None:
-            return None
-        artifact = project["artifact"]
+        artifact = result["artifact"]
         if artifact is None:
             return None
         current_manifest = artifact["currentManifest"]
@@ -287,17 +276,13 @@ class WandbApi:
     ARTIFACT_MANIFEST_QUERY = gql.gql(
         """
         query ArtifactManifest(
-            $entityName: String!,
-            $projectName: String!,
-            $name: String!
+            $artifactID: ID!
         ) {
-            project(name: $projectName, entityName: $entityName) {
-                artifact(name: $name) {
-                    currentManifest {
-                        id
-                        file {
-                            directUrl
-                        }
+        artifact(id: $artifactID) {
+                currentManifest {
+                    id
+                    file {
+                        directUrl
                     }
                 }
             }
@@ -305,22 +290,15 @@ class WandbApi:
         """
     )
 
-    def artifact_manifest_url(
-        self, entity_name: str, project_name: str, name: str
-    ) -> typing.Optional[str]:
+    def artifact_manifest_url(self, artifact_id: str) -> typing.Optional[str]:
         try:
             result = self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
-                entityName=entity_name,
-                projectName=project_name,
-                name=name,
+                artifactID=artifact_id,
             )
         except gql.transport.exceptions.TransportQueryError as e:
             return None
-        project = result["project"]
-        if project is None:
-            return None
-        artifact = project["artifact"]
+        artifact = result["artifact"]
         if artifact is None:
             return None
         current_manifest = artifact["currentManifest"]

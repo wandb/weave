@@ -90,7 +90,10 @@ class WandbFileManagerAsync:
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     async def _manifest(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI, manifest_path: str
+        self,
+        art_id: str,
+        art_uri: artifact_wandb.WeaveWBArtifactURI,
+        manifest_path: str,
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         if art_uri.version is None:
             raise errors.WeaveInternalError(
@@ -104,9 +107,7 @@ class WandbFileManagerAsync:
             pass
         # Download
         manifest_url = await self.wandb_api.artifact_manifest_url(
-            art_uri.entity_name,
-            art_uri.project_name,
-            art_uri.name + ":" + art_uri.version,
+            art_id,
         )
         if manifest_url is None:
             return None
@@ -118,7 +119,7 @@ class WandbFileManagerAsync:
             return artifact_wandb.WandbArtifactManifest(json.loads(await f.read()))
 
     async def manifest(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI
+        self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         with tracer.trace("wandb_file_manager.manifest") as span:
             assert art_uri.version is not None
@@ -126,7 +127,7 @@ class WandbFileManagerAsync:
             manifest = self._manifests.get(manifest_path)
             if not isinstance(manifest, cache.LruTimeWindowCache.NotFound):
                 return manifest
-            manifest = await self._manifest(art_uri, manifest_path)
+            manifest = await self._manifest(art_id, art_uri, manifest_path)
             self._manifests.set(manifest_path, manifest)
             return manifest
 
@@ -250,7 +251,10 @@ class WandbFileManager:
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     def _manifest(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI, manifest_path: str
+        self,
+        art_id: str,
+        art_uri: artifact_wandb.WeaveWBArtifactURI,
+        manifest_path: str,
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         if art_uri.version is None:
             raise errors.WeaveInternalError(
@@ -264,9 +268,7 @@ class WandbFileManager:
             pass
         # Download
         manifest_url = self.wandb_api.artifact_manifest_url(
-            art_uri.entity_name,
-            art_uri.project_name,
-            art_uri.name + ":" + art_uri.version,
+            artifact_id=art_id,
         )
         if manifest_url is None:
             return None
@@ -278,7 +280,7 @@ class WandbFileManager:
             return artifact_wandb.WandbArtifactManifest(json.loads(f.read()))
 
     def manifest(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI
+        self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         with tracer.trace("wandb_file_manager.manifest") as span:
             assert art_uri.version is not None
@@ -286,19 +288,19 @@ class WandbFileManager:
             manifest = self._manifests.get(manifest_path)
             if not isinstance(manifest, cache.LruTimeWindowCache.NotFound):
                 return manifest
-            manifest = self._manifest(art_uri, manifest_path)
+            manifest = self._manifest(art_id, art_uri, manifest_path)
             self._manifests.set(manifest_path, manifest)
             return manifest
 
     def local_path_and_download_url(
-        self, art_uri: artifact_wandb.WeaveWBArtifactURI
+        self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
             raise errors.WeaveInternalError(
                 "Artifact URI has no path in call to local_path_and_download_url"
             )
-        manifest = self.manifest(art_uri)
+        manifest = self.manifest(art_id, art_uri)
         if manifest is None:
             return None
         return _local_path_and_download_url(art_uri, manifest)
