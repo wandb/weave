@@ -1,11 +1,14 @@
 from typing import Callable, Any, Optional
 import inspect
 
-from weave import op_def_type
 from weave.trace_server.refs import ObjectRef
 from weave import graph_client_context
 from weave import run_context
 from weave import box
+
+from weave import context_state
+
+from weave.trace.op_type import OpType
 
 
 def print_run_link(run):
@@ -82,6 +85,9 @@ class Op:
         self._ref = ref
 
 
+OpType.instance_classes = Op
+
+
 class BoundOp(Op):
     arg0: Any
 
@@ -103,9 +109,13 @@ class BoundOp(Op):
 
 
 # The decorator!
-def op(fn):
-    return Op(fn)
+def op(*args, **kwargs):
+    if context_state.get_loading_built_ins():
+        from weave.decorator_op import op
 
+        return op(*args, **kwargs)
 
-# TODO: This overrides the default, which will break weave engine. FIXME
-op_def_type.OpDefType.instance_classes = Op
+    def wrap(fn):
+        return Op(fn)
+
+    return wrap

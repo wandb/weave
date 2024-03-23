@@ -3,10 +3,8 @@ import dataclasses
 import typing
 import uuid
 import pydantic
-import inspect
 import datetime
 
-from weave import box, uris
 from weave.table import Table
 from weave import urls
 from weave.trace.op import Op
@@ -33,7 +31,6 @@ from weave.trace_server.trace_server_interface import (
     _CallsFilter,
     _ObjectVersionFilter,
 )
-from weave.wandb_interface import project_creator
 from weave.trace_server.refs import (
     Ref,
     ObjectRef,

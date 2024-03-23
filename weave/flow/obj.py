@@ -8,28 +8,10 @@ from pydantic import (
 )
 from pydantic._internal._model_construction import ModelMetaclass
 import pydantic
-import inspect
 
-from weave.op_def import OpDef, BoundOpDef
-from .. import ref_util
+from weave.trace.op import Op
 from .. import box
 from .. import ref_base
-
-
-class ObjectMeta(ModelMetaclass):
-    def __new__(
-        cls: Type["ObjectMeta"], name: str, bases: Tuple[type, ...], dct: Dict[str, Any]
-    ) -> "ObjectMeta":
-        # Modify an OpDef names to include the class name.
-        original_class = super(ObjectMeta, cls).__new__(cls, name, bases, dct)
-        for attr, bound_op_def in inspect.getmembers(
-            original_class, lambda x: isinstance(x, BoundOpDef)
-        ):
-            bound_op_def = typing.cast(BoundOpDef, bound_op_def)
-            unbound_op_def = bound_op_def.op_def
-            if unbound_op_def.name.startswith("op-"):
-                unbound_op_def.name = f"{name}-{unbound_op_def.name[3:]}"
-        return original_class
 
 
 class Object(pydantic.BaseModel):
@@ -38,7 +20,7 @@ class Object(pydantic.BaseModel):
 
     # Allow OpDef attributes
     model_config = ConfigDict(
-        ignored_types=(OpDef,),
+        ignored_types=(Op,),
         arbitrary_types_allowed=True,
         protected_namespaces=(),
         extra="forbid",

@@ -49,9 +49,9 @@ def test_simple_op(client):
     calls = list(client.calls())
     assert len(calls) == 1
     fetched_call = calls[0]
-    digest = "XjAs9gjGsScTF6zuze3rK310QupiPWIu6Yj7FhPY8Rs"
+    digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
     expected_name = (
-        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-my_op:{digest}"
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
     assert fetched_call == weave_client.Call(
         op_name=expected_name,
