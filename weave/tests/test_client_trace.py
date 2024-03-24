@@ -66,7 +66,7 @@ def test_simple_op(client):
 
 
 def test_dataset(client):
-    from weave.flow import Dataset
+    from weave.flow.dataset import Dataset
 
     d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
