@@ -15,12 +15,12 @@ from typing import Any, Callable, Union, Optional
 from .. import errors
 from .. import context_state
 from .. import weave_types as types
-from .. import registry_mem
 from .. import errors
 from .. import environment
-from .. import storage
-from .. import artifact_fs
-from .. import infer_types
+
+# from .. import storage
+# from .. import artifact_fs
+# from .. import infer_types
 
 
 from weave.trace_server.refs import ObjectRef
@@ -215,9 +215,7 @@ class GetCodeDepsResult(typing.TypedDict):
     warnings: list[str]
 
 
-def get_code_deps(
-    fn: typing.Callable, artifact: artifact_fs.FilesystemArtifact
-) -> GetCodeDepsResult:
+def get_code_deps(fn: typing.Callable, artifact: Any) -> GetCodeDepsResult:
     """Given a python function, return source code that contains the dependencies of that function.
 
     This will:
@@ -388,9 +386,7 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 
 class OpType(types.Type):
-    def save_instance(
-        self, obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
-    ) -> None:
+    def save_instance(self, obj: "Op", artifact: Any, name: str) -> None:
         # Type annotations are not well handled at the moment.
         # Get import statements for any annotations
         # code += (
@@ -435,7 +431,7 @@ class OpType(types.Type):
 
     def load_instance(
         self,
-        artifact: artifact_fs.FilesystemArtifact,
+        artifact: Any,
         name: str,
         extra: Optional[list[str]] = None,
     ) -> Optional["Op"]:

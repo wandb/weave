@@ -4,15 +4,12 @@ import os
 import tempfile
 from typing import Any, Dict, Optional, Union, Mapping, Iterator
 from weave import weave_types as types
-from weave import artifact_fs
-from weave.trace_server.trace_server_interface_util import (
-    encode_bytes_as_b64,
-    decode_b64_to_bytes,
-)
+
+# from weave import artifact_fs
 
 
-class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
-    RefClass = artifact_fs.FilesystemArtifactRef
+class MemTraceFilesArtifact:
+    # RefClass = artifact_fs.FilesystemArtifactRef
     temp_read_dir: Optional[tempfile.TemporaryDirectory]
     path_contents: dict[str, bytes]
 
@@ -79,9 +76,9 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
             os.fsync(f.fileno())
         return write_path
 
-    @property
-    def metadata(self) -> artifact_fs.ArtifactMetadata:
-        return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
+    # @property
+    # def metadata(self) -> artifact_fs.ArtifactMetadata:
+    #     return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
 
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:
@@ -107,12 +104,11 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
 def decode_custom_obj(
     weave_type: Dict, encoded_path_contents: Mapping[str, Union[str, bytes]]
 ) -> Any:
-    from .. import artifact_fs
 
     art = MemTraceFilesArtifact(
         encoded_path_contents,
         metadata={},
     )
     wb_type = types.TypeRegistry.type_from_dict(weave_type)
-    with artifact_fs.loading_artifact(art):
-        return wb_type.load_instance(art, "obj")
+    # with artifact_fs.loading_artifact(art):
+    return wb_type.load_instance(art, "obj")

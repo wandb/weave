@@ -5,7 +5,7 @@ import requests
 from weave.trace_server import environment as wf_env
 
 
-from weave.wandb_interface import project_creator
+# from weave.wandb_interface import project_creator
 from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
 

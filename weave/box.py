@@ -1,7 +1,8 @@
 import typing
 import random
 import datetime
-import numpy as np
+
+# import numpy as np
 
 from . import context_state
 from . import ref_util
@@ -134,14 +135,14 @@ def cannot_have_weakref(obj: typing.Any):
 
 
 # See https://numpy.org/doc/stable/user/basics.subclassing.html
-class BoxedNDArray(np.ndarray):
-    def __new__(cls, input_array):
-        obj = np.asarray(input_array).view(cls)
-        return obj
+# class BoxedNDArray(np.ndarray):
+#     def __new__(cls, input_array):
+#         obj = np.asarray(input_array).view(cls)
+#         return obj
 
-    def __array_finalize__(self, obj):
-        if obj is None:
-            return
+#     def __array_finalize__(self, obj):
+#         if obj is None:
+#             return
 
 
 T = typing.TypeVar("T")
@@ -157,7 +158,7 @@ def box(
     BoxedBool,
     BoxedDict,
     BoxedList,
-    BoxedNDArray,
+    # BoxedNDArray,
     BoxedNone,
     BoxedDatetime,
     BoxedTimedelta,
@@ -174,8 +175,8 @@ def box(
         return BoxedDict(obj)
     elif type(obj) == list:
         return BoxedList(obj)
-    elif type(obj) == np.ndarray:
-        return BoxedNDArray(obj)
+    # elif type(obj) == np.ndarray:
+    # return BoxedNDArray(obj)
     elif type(obj) == datetime.datetime:
         return BoxedDatetime.fromtimestamp(obj.timestamp(), tz=datetime.timezone.utc)
     elif type(obj) == datetime.timedelta:
@@ -195,7 +196,7 @@ def unbox(
     bool,
     dict,
     list,
-    np.ndarray,
+    # np.ndarray,
     datetime.datetime,
     datetime.timedelta,
     None,

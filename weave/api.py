@@ -11,125 +11,20 @@ from typing import Any
 
 from . import urls
 
-from . import graph as _graph
-from .graph import Node
 
-# If this is not imported, serialization of Weave Nodes is incorrect!
-from . import graph_mapper as _graph_mapper
+# from . import util as _util
 
-from . import storage as _storage
-from . import ref_base as _ref_base
-from . import artifact_wandb as _artifact_wandb
-from . import wandb_api as _wandb_api
-
-from . import weave_internal as _weave_internal
-from . import errors as _errors
-
-from . import util as _util
-
-from . import context as _context
-from . import context_state as _context_state
-from . import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
 from . import graph_client_context as _graph_client_context
-from weave.monitoring import monitor as _monitor
 
-# exposed as part of api
-from . import weave_types as types
+# from weave.monitoring import monitor as _monitor
 
-# needed to enable automatic numpy serialization
-from . import types_numpy as _types_numpy
 
-from . import errors
-from .decorators import weave_class, mutation, type
-from weave.trace.op import op
+from weave.trace.op import op, Op
 
-from weave.trace.op import Op
-from . import usage_analytics
-from .context import (
-    use_fixed_server_port,
-    use_frontend_devmode,
-    # eager_execution,
-    use_lazy_execution,
-)
 
-from .panel import Panel
-
-from .arrow.list_ import ArrowWeaveList as WeaveList
 from .table import Table
-
-
-def save(node_or_obj, name=None):
-    from .ops_primitives.weave_api import save, get
-
-    if isinstance(node_or_obj, _graph.Node):
-        return save(node_or_obj, name=name)
-    else:
-        # If the user does not provide a branch, then we explicitly set it to
-        # the default branch, "latest".
-        branch = None
-        name_contains_branch = name is not None and ":" in name
-        if not name_contains_branch:
-            branch = "latest"
-        ref = _storage.save(node_or_obj, name=name, branch=branch)
-        if name is None:
-            # if the user didn't provide a name, the returned reference
-            # will be to the specific version
-            uri = ref.uri
-        else:
-            # otherwise the reference will be to whatever branch was provided
-            # or the "latest" branch if only a name was provided.
-            uri = ref.branch_uri
-        return get(str(uri))
-
-
-def get(ref_str):
-    obj = _storage.get(ref_str)
-    ref = typing.cast(_ref_base.Ref, _storage._get_ref(obj))
-    return _weave_internal.make_const_node(ref.type, obj)
-
-
-def use(nodes, client=None):
-    usage_analytics.use_called()
-    if client is None:
-        client = _context.get_client()
-    return _weave_internal.use(nodes, client)
-
-
-def _get_ref(obj):
-    if isinstance(obj, _storage.Ref):
-        return obj
-    ref = _storage.get_ref(obj)
-    if ref is None:
-        raise _errors.WeaveApiError("obj is not a weave object: %s" % obj)
-    return ref
-
-
-def versions(obj):
-    if isinstance(obj, _graph.ConstNode):
-        obj = obj.val
-    elif isinstance(obj, _graph.OutputNode):
-        obj = use(obj)
-    ref = _get_ref(obj)
-    return ref.versions()  # type: ignore
-
-
-def expr(obj):
-    ref = _get_ref(obj)
-    return _trace.get_obj_expr(ref)
-
-
-def type_of(obj: typing.Any) -> types.Type:
-    return types.TypeRegistry.type_of(obj)
-
-
-# def weave(obj: typing.Any) -> RuntimeConstNode:
-#     return _weave_internal.make_const_node(type_of(obj), obj)  # type: ignore
-
-
-def from_pandas(df):
-    return _ops.pandas_to_awl(df)
 
 
 #### Newer API below
@@ -294,49 +189,49 @@ def attributes(attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
         _monitor._attributes.reset(token)
 
 
-def serve(
-    model_ref: _artifact_wandb.WandbArtifactRef,
-    method_name: typing.Optional[str] = None,
-    auth_entity: typing.Optional[str] = None,
-    port: int = 9996,
-    thread: bool = False,
-) -> typing.Optional[str]:
-    import uvicorn
-    from .serve_fastapi import object_method_app
+# def serve(
+#     model_ref: _artifact_wandb.WandbArtifactRef,
+#     method_name: typing.Optional[str] = None,
+#     auth_entity: typing.Optional[str] = None,
+#     port: int = 9996,
+#     thread: bool = False,
+# ) -> typing.Optional[str]:
+#     import uvicorn
+#     from .serve_fastapi import object_method_app
 
-    client = _graph_client_context.require_graph_client()
-    # if not isinstance(
-    #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-    # ):
-    #     raise ValueError("serve currently only supports wandb client")
+#     client = _graph_client_context.require_graph_client()
+#     # if not isinstance(
+#     #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+#     # ):
+#     #     raise ValueError("serve currently only supports wandb client")
 
-    print(f"Serving {model_ref}")
-    print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
-    print()
-    os.environ["PROJECT_NAME"] = f"{client.entity}/{client.project}"
-    os.environ["MODEL_REF"] = str(model_ref)
+#     print(f"Serving {model_ref}")
+#     print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
+#     print()
+#     os.environ["PROJECT_NAME"] = f"{client.entity}/{client.project}"
+#     os.environ["MODEL_REF"] = str(model_ref)
 
-    wandb_api_ctx = _wandb_api.get_wandb_api_context()
-    app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
-    trace_attrs = _monitor._attributes.get()
+#     wandb_api_ctx = _wandb_api.get_wandb_api_context()
+#     app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
+#     trace_attrs = _monitor._attributes.get()
 
-    def run():
-        with _wandb_api.wandb_api_context(wandb_api_ctx):
-            with attributes(trace_attrs):
-                uvicorn.run(app, host="0.0.0.0", port=port)
+#     def run():
+#         with _wandb_api.wandb_api_context(wandb_api_ctx):
+#             with attributes(trace_attrs):
+#                 uvicorn.run(app, host="0.0.0.0", port=port)
 
-    if _util.is_notebook():
-        thread = True
-    if thread:
-        from threading import Thread
+#     if _util.is_notebook():
+#         thread = True
+#     if thread:
+#         from threading import Thread
 
-        t = Thread(target=run, daemon=True)
-        t.start()
-        time.sleep(1)
-        return "http://localhost:%d" % port
-    else:
-        run()
-    return None
+#         t = Thread(target=run, daemon=True)
+#         t.start()
+#         time.sleep(1)
+#         return "http://localhost:%d" % port
+#     else:
+#         run()
+#     return None
 
 
 __docspec__ = [init, publish, ref]

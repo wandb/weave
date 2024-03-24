@@ -4,7 +4,6 @@ import inspect
 import traceback
 import typing
 from typing import Any, Callable, Optional, Union
-import numpy as np
 
 import weave
 from weave.trace.op import Op
@@ -123,10 +122,10 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: typing.Union[weave.WeaveList, list]) -> dict:
+    async def summarize(self, eval_table: list) -> dict:
         summary = {}
-        if not isinstance(eval_table, weave.WeaveList):
-            eval_table = weave.WeaveList(eval_table)
+        # if not isinstance(eval_table, weave.WeaveList):
+        #     eval_table = weave.WeaveList(eval_table)
         prediction_summary = auto_summarize(eval_table.column("prediction"))
         if prediction_summary:
             summary["prediction"] = prediction_summary

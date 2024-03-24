@@ -1,10 +1,10 @@
-import numpy as np
 from typing import Union, Callable, Optional, Tuple, Any
 import weave
 from weave.trace.isinstance import weave_isinstance
 from weave.flow import Object
 from weave.trace.op import Op
-from weave import WeaveList
+
+# from weave import WeaveList
 
 
 class Scorer(Object):
@@ -12,11 +12,11 @@ class Scorer(Object):
         raise NotImplementedError
 
     @weave.op()
-    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+    def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 
 
-def auto_summarize(data: WeaveList) -> Optional[dict]:
+def auto_summarize(data: list) -> Optional[dict]:
     """Automatically summarize a WeaveList of (potentially nested) dicts.
 
     Will compute min/p25/avg/p75/max for all numeric columns.
@@ -28,8 +28,8 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
     Returns:
       dict of summary stats, with structure matching input dict structure.
     """
-    if not isinstance(data, WeaveList):
-        data = WeaveList(data)
+    # if not isinstance(data, list):
+    # data = WeaveList(data)
     if data.is_number():
         valid_data = [x for x in data if x is not None]
         if not valid_data:
@@ -109,7 +109,7 @@ class MulticlassF1Score(Scorer):
     class_names: list[str]
 
     @weave.op()
-    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+    def summarize(self, score_rows: list) -> Optional[dict]:
         # Compute f1, precision, recall
         result = {}
         for class_name in self.class_names:
