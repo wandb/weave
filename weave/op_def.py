@@ -611,15 +611,6 @@ class OpDef:
     def op_def_is_auto_tag_handling_arrow_op(self) -> bool:
         return isinstance(self, AutoTagHandlingArrowOpDef)
 
-    def runs(self) -> Sequence["weave_client.Call"]:
-        client = graph_client_context.require_graph_client()
-        return client.op_runs(self)
-
-    # TODO: Use Call type instead of Run
-    def calls(self) -> "weave_client.CallsIter":
-        client = graph_client_context.require_graph_client()
-        return client.op_calls(self)
-
 
 class AutoTagHandlingArrowOpDef(OpDef):
     pass

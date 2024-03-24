@@ -42,9 +42,10 @@ from . import weave_types as types
 from . import types_numpy as _types_numpy
 
 from . import errors
-from .decorators import weave_class, op, mutation, type
+from .decorators import weave_class, mutation, type
+from weave.trace.op import op
 
-from .op_def import OpDef
+from weave.trace.op import Op
 from . import usage_analytics
 from .context import (
     use_fixed_server_port,
@@ -260,10 +261,10 @@ def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
     return client.ref_output_of(ref)
 
 
-def as_op_def(fn: typing.Callable) -> OpDef:
-    """Given a @weave.op() decorated function, return its OpDef.
+def as_op(fn: typing.Callable) -> Op:
+    """Given a @weave.op() decorated function, return its Op.
 
-    @weave.op() decorated functions are instances of OpDef already, so this
+    @weave.op() decorated functions are instances of Op already, so this
     function should be a no-op at runtime. But you can use it to satisfy type checkers
     if you need to access OpDef attributes in a typesafe way.
 
@@ -271,9 +272,9 @@ def as_op_def(fn: typing.Callable) -> OpDef:
         fn: A weave.op() decorated function.
 
     Returns:
-        The OpDef of the function.
+        The Op of the function.
     """
-    if not isinstance(fn, OpDef):
+    if not isinstance(fn, Op):
         raise ValueError("fn must be a weave.op() decorated function")
     return fn
 

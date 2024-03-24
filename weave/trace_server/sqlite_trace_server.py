@@ -370,9 +370,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
-                    conds.append("type = 'OpDef'")
+                    conds.append("type = 'Op'")
                 else:
-                    conds.append("type != 'OpDef'")
+                    conds.append("type != 'Op'")
             if req.filter.object_names:
                 in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
                 conds.append(f"name IN ({in_list})")
