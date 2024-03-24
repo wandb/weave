@@ -287,48 +287,52 @@ def test_trace_call_query_filter_op_version_refs(client):
     assert ref_str(call_summaries["adder"].op).startswith(
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder:"
     )
-    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
+    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
 
-    for op_version_refs, exp_count in [
-        # Test the None case
-        (None, call_spec.total_calls),
-        # Test the empty list case
-        ([], call_spec.total_calls),
-        # Base case of most recent version of adder
-        ([ref_str(call_summaries["adder"].op)], call_summaries["adder"].num_calls),
-        # Base case of non-recent version of adder
-        (
-            [ref_str(call_summaries["adder_v0"].op)],
-            call_summaries["adder_v0"].num_calls,
-        ),
-        # more than one op
-        (
-            [
-                ref_str(call_summaries["adder"].op),
-                ref_str(call_summaries["subtractor"].op),
-            ],
-            call_summaries["adder"].num_calls + call_summaries["subtractor"].num_calls,
-        ),
-        # Test the wildcard case
-        (
-            [wildcard_adder_ref_str],
-            call_summaries["adder"].num_calls + call_summaries["adder_v0"].num_calls,
-        ),
-        # Test the wildcard case and specific case
-        (
-            [wildcard_adder_ref_str, ref_str(call_summaries["subtractor"].op)],
-            call_summaries["adder"].num_calls
-            + call_summaries["adder_v0"].num_calls
-            + call_summaries["subtractor"].num_calls,
-        ),
-    ]:
+    for i, (op_version_refs, exp_count) in enumerate(
+        [
+            # Test the None case
+            (None, call_spec.total_calls),
+            # Test the empty list case
+            ([], call_spec.total_calls),
+            # Base case of most recent version of adder
+            ([ref_str(call_summaries["adder"].op)], call_summaries["adder"].num_calls),
+            # Base case of non-recent version of adder
+            (
+                [ref_str(call_summaries["adder_v0"].op)],
+                call_summaries["adder_v0"].num_calls,
+            ),
+            # more than one op
+            (
+                [
+                    ref_str(call_summaries["adder"].op),
+                    ref_str(call_summaries["subtractor"].op),
+                ],
+                call_summaries["adder"].num_calls
+                + call_summaries["subtractor"].num_calls,
+            ),
+            # Test the wildcard case
+            (
+                [wildcard_adder_ref_str],
+                call_summaries["adder"].num_calls
+                + call_summaries["adder_v0"].num_calls,
+            ),
+            # Test the wildcard case and specific case
+            (
+                [wildcard_adder_ref_str, ref_str(call_summaries["subtractor"].op)],
+                call_summaries["adder"].num_calls
+                + call_summaries["adder_v0"].num_calls
+                + call_summaries["subtractor"].num_calls,
+            ),
+        ]
+    ):
         res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(op_version_refs=op_version_refs),
             )
         )
-        print("OP", op_version_refs, exp_count)
+        print(f"TEST CASE [{i}]", op_version_refs, exp_count)
 
         assert len(res.calls) == exp_count
 

@@ -24,7 +24,8 @@ def print_call_link(call: "Call") -> None:
 
 class Op:
     resolve_fn: Callable
-    _ref: Optional[ObjectRef] = None
+    # double-underscore to avoid conflict with old Weave refs
+    __ref: Optional[ObjectRef] = None
 
     def __init__(self, resolve_fn: Callable) -> None:
         self.resolve_fn = resolve_fn
@@ -85,11 +86,11 @@ class Op:
 
     @property
     def ref(self) -> Optional[ObjectRef]:
-        return self._ref
+        return self.__ref
 
     @ref.setter
     def ref(self, ref: ObjectRef) -> None:
-        self._ref = ref
+        self.__ref = ref
 
     def calls(self) -> "CallsIter":
         client = graph_client_context.require_graph_client()
@@ -101,6 +102,7 @@ OpType.instance_classes = Op
 
 class BoundOp(Op):
     arg0: Any
+    op: Op
 
     def __init__(self, arg0: Any, op: Op) -> None:
         self.arg0 = arg0
@@ -114,11 +116,11 @@ class BoundOp(Op):
 
     @property
     def ref(self) -> Optional[ObjectRef]:
-        return self.op._ref
+        return self.op.__ref
 
     @ref.setter
     def ref(self, ref: ObjectRef) -> None:
-        self.op._ref = ref
+        self.op.__ref = ref
 
 
 P = ParamSpec("P")

@@ -323,8 +323,6 @@ class WeaveClient:
         return response.objs
 
     def _save_op(self, op: Op) -> Ref:
-        # if isinstance(op, Op):
-        #     op = op.op_def
         op_def_ref = self._save_object(op, op.name)
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
