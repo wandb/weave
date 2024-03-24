@@ -6,6 +6,7 @@ import asyncio
 from weave import op_def, Evaluation
 
 from weave import weave_client
+from weave.trace.op import Op
 from weave.trace_server.refs import (
     ATTRIBUTE_EDGE_TYPE,
     ID_EDGE_TYPE,
@@ -389,7 +390,7 @@ def test_dataset_rows_ref(client):
     assert saved.rows.ref.extra == [ATTRIBUTE_EDGE_TYPE, "rows"]
 
 
-@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
+# @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_evaluate(client):
     @weave.op()
     async def model_predict(input) -> str:
@@ -433,7 +434,7 @@ def test_evaluate(client):
     assert eval_obj.dataset._class_name == "Dataset"
     assert len(eval_obj_val.scorers) == 1
     assert isinstance(eval_obj_val.scorers[0], weave_client.ObjectRef)
-    assert isinstance(eval_obj.scorers[0], op_def.OpDef)
+    assert isinstance(eval_obj.scorers[0], Op)
     # WARNING: test ordering issue. Because we attach the ref to ops directly,
     # the ref may be incorrect if we've blown away the database between tests.
     # Running a different evaluation test before this check will cause a failure
@@ -446,7 +447,7 @@ def test_evaluate(client):
     # assert isinstance(eval_obj.summarize, op_def.OpDef)
 
     model_obj = child0.inputs["model"]
-    assert isinstance(model_obj, op_def.OpDef)
+    assert isinstance(model_obj, Op)
     assert (
         weave_client.get_ref(model_obj).uri()
         == weave_client.get_ref(model_predict).uri()

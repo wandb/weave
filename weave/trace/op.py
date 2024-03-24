@@ -117,7 +117,7 @@ class BoundOp(Op):
         self.resolve_fn = op.resolve_fn
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.op(self.arg0, *args, **kwargs)
+        return Op.__call__(self, self.arg0, *args, **kwargs)
 
     @property
     def ref(self) -> Optional[ObjectRef]:
