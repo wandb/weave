@@ -1,13 +1,13 @@
 import weave
 import asyncio
-from weave.weaveflow import Model, Evaluation, Dataset
+from weave import Model, Evaluation, Dataset
 import json
 from openai import OpenAI
 
 def do_jack_extract():
     # We create a model class with one predict function. 
     # All inputs, predictions and parameters are automatically captured for easy inspection.
-    @weave.type()
+    # @weave.type()
     class ExtractFinancialDetailsModel(Model):
         system_message: str
         model_name: str = "gpt-3.5-turbo-1106"
@@ -38,7 +38,7 @@ def do_jack_extract():
     weave.init('devdebug-bodcleanrun-1')
 
     # We create our model with our system prompt.
-    model = ExtractFinancialDetailsModel("You will be provided with financial news and your task is to parse it one JSON dictionary with company ticker, company name, document sentiment, and summary as keys. The summary should be a two sentance summary of the news.")
+    model = ExtractFinancialDetailsModel(system_message="You will be provided with financial news and your task is to parse it one JSON dictionary with company ticker, company name, document sentiment, and summary as keys. The summary should be a two sentance summary of the news.")
 
     # CNBC News Articles
     articles = ["Novo Nordisk and Eli Lilly rival soars 32 percent after promising weight loss drug results Shares of Denmarks Zealand Pharma shot 32 percent higher in morning trade, after results showed success in its liver disease treatment survodutide, which is also on trial as a drug to treat obesity. The trial “tells us that the 6mg dose is safe, which is the top dose used in the ongoing [Phase 3] obesity trial too,” one analyst said in a note. The results come amid feverish investor interest in drugs that can be used for weight loss.",
@@ -61,7 +61,7 @@ def do_jack_extract():
     ]
 
     # Create the evaluation dataset
-    dataset = Dataset([
+    dataset = Dataset(rows=[
         {'id': '0', 'article': articles[0], 'extracted': labels[0]},
         {'id': '1', 'article': articles[1], 'extracted': labels[1]},
         {'id': '2', 'article': articles[2], 'extracted': labels[2]},
@@ -74,7 +74,7 @@ def do_jack_extract():
 
 
     #define the hallucination model
-    @weave.type()
+    # @weave.type()
     class DetermineHallucinationModel(Model):
         system_message: str
         model_name: str = "gpt-3.5-turbo-1106"
@@ -118,7 +118,7 @@ def do_jack_extract():
 
     @weave.op()
     def hallucination_score(example: dict, prediction: dict) -> dict:
-        hallucination_calculation_model = DetermineHallucinationModel("You are in charge of determining if the text submitted is the result of LLM hallucination or not. Your task is to respond with a JSON dictionary including a single hallucanation score. The hallucination score should be a float from 0 to 100, where 100 is more likely and 0 is less likely that the text is hallucination or not.")
+        hallucination_calculation_model = DetermineHallucinationModel(system_message="You are in charge of determining if the text submitted is the result of LLM hallucination or not. Your task is to respond with a JSON dictionary including a single hallucanation score. The hallucination score should be a float from 0 to 100, where 100 is more likely and 0 is less likely that the text is hallucination or not.")
         return hallucination_calculation_model.predict(prediction['summary'])
 
     @weave.op()
@@ -129,10 +129,10 @@ def do_jack_extract():
     # Finally, we run an evaluation of this model. 
     # This will generate a prediction for each input example, and then score it with each scoring function.
     evaluation = Evaluation(
-        dataset, scores=[name_score, ticker_score, sentiment_score, hallucination_score], example_to_model_input=example_to_model_input
+        dataset=dataset, scorers=[name_score, ticker_score, sentiment_score, hallucination_score], preprocess_model_input=example_to_model_input
     )
 
-    for i in range(0,10):
+    for i in range(0,1):
         print(asyncio.run(evaluation.evaluate(model)))
 
 
@@ -170,7 +170,7 @@ def do_jack_extract():
         return docs[most_relevant_doc_index]
 
     #define the Morgan Stanley Research RAG Model
-    @weave.type()
+    # @weave.type()
     class MSResearchRAGModel(Model):
         system_message: str
         model_name: str = "gpt-3.5-turbo-1106"
@@ -213,7 +213,7 @@ def do_jack_extract():
             extracted = response.choices[0].message.content
             return extracted
 
-    model = MSResearchRAGModel("You are an expert in finance and answer questions related to finance, financial services, and financial markets. When responding based on provided information, be sure to cite the source.")
+    model = MSResearchRAGModel(system_message="You are an expert in finance and answer questions related to finance, financial services, and financial markets. When responding based on provided information, be sure to cite the source.")
 
     contexts = [f"""Morgan Stanley has moved in new market managers on the East and West Coasts as part of changes that sent some of other management veterans into new roles, according to two sources.
 
