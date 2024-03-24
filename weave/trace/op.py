@@ -1,5 +1,8 @@
 from typing import Callable, Any, Optional
 import inspect
+import functools
+from typing import TypeVar, Callable, Optional
+from typing_extensions import ParamSpec
 
 from weave.trace_server.refs import ObjectRef
 from weave import graph_client_context
@@ -106,14 +109,20 @@ class BoundOp(Op):
         self.op._ref = ref
 
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
 # The decorator!
-def op(*args, **kwargs):
+def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     if context_state.get_loading_built_ins():
         from weave.decorator_op import op
 
         return op(*args, **kwargs)
 
-    def wrap(fn):
-        return Op(fn)
+    def wrap(f: Callable[P, R]) -> Callable[P, R]:
+        op = Op(f)
+        functools.update_wrapper(op, f)
+        return op  # type: ignore
 
     return wrap
