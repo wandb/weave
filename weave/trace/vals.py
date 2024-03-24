@@ -238,33 +238,28 @@ class TraceTable(Tracable):
 class TraceList(Tracable, list):
     def __init__(
         self,
-        val: Any,
-        ref: RefWithExtra,
-        server: TraceServerInterface,
-        root: typing.Optional[Tracable],
+        *args: Any,
+        **kwargs: Any,
     ):
-        self.val = val
-        self.ref = ref
-        self.server: TraceServerInterface = server
+        self.ref: RefWithExtra = kwargs.pop("ref")
+        self.server: TraceServerInterface = kwargs.pop("server")
+        root: Optional[Tracable] = kwargs.pop("root", None)
         if root is None:
             root = self
         self.root = root
-
-    def __len__(self) -> int:
-        return len(self.val)
-
-    def __add__(self, other: Any) -> Any:
-        return self.val + other
+        super().__init__(*args, **kwargs)
 
     def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
         if isinstance(i, slice):
             raise ValueError("Slices not yet supported")
         index = operator.index(i)
         new_ref = self.ref.with_index(index)
-        return make_trace_obj(self.val[index], new_ref, self.server, self.root)
+        index_val = super().__getitem__(index)
+        return make_trace_obj(index_val, new_ref, self.server, self.root)
 
-    def __eq__(self, other: Any) -> bool:
-        return self.val == other
+    def __iter__(self) -> Iterator[Any]:
+        for i in range(len(self)):
+            yield self[i]
 
 
 class TraceDict(Tracable, dict):
@@ -372,7 +367,7 @@ def make_trace_obj(
         if isinstance(val, ObjectRecord):
             return TraceObject(val, new_ref, server, root)
         elif isinstance(val, list):
-            return TraceList(val, new_ref, server, root)
+            return TraceList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
             return TraceDict(val, new_ref, server, root)
     box_val = box.box(val)

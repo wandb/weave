@@ -263,3 +263,19 @@ def test_op_method_name(client):
 
     assert model.predict.name == "MyModel.predict"
     assert MyModel.predict.name == "MyModel.predict"
+
+
+def test_agent_has_tools(client):
+    @weave.op()
+    def get_weather(city: str) -> str:
+        return f"weather in {city} is sunny"
+
+    agent = weave.Agent(
+        model_name="gpt-3.5-turbo",
+        temperature=0.7,
+        system_message="hello",
+        tools=[get_weather],
+    )
+    saved = client.save(agent, "agent")
+
+    assert len(saved.tools) == 1
