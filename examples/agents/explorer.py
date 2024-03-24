@@ -4,7 +4,7 @@ from rich import print
 
 
 import weave
-from weave.flow import Agent, AgentState
+from weave.flow.agent import Agent, AgentState
 
 SYSTEM_MESSAGE = """Assistant is an automonmous agent.
 Agent likes to explore it's world, using any means necessary.

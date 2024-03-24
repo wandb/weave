@@ -3,7 +3,8 @@ import openai
 import subprocess
 import textwrap
 import weave
-from weave.flow import Agent, AgentState, Object
+from weave.flow.obj import Object
+from weave.flow.agent import Agent, AgentState
 from weave.flow.chat_util import OpenAIStream
 from weave.flow.console import LogEvents
 
