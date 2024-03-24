@@ -8,7 +8,9 @@ import numpy as np
 
 import weave
 from weave.trace.op import Op
-from weave.flow import Object, Dataset, Model
+from weave.flow.obj import Object
+from weave.flow.dataset import Dataset
+from weave.flow.model import Model
 from weave.flow.model import get_infer_method
 from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
 from weave.flow import util

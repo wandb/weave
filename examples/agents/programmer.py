@@ -5,7 +5,7 @@ import sys
 
 
 import weave
-from weave.flow import Agent, AgentState
+from weave.flow.agent import Agent, AgentState
 
 WELCOME = """
 Welcome to programmer.
