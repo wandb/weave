@@ -11,7 +11,7 @@ from weave.trace.op import Op
 from weave.flow import Object, Dataset, Model
 from weave.flow.model import get_infer_method
 from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
-from weave.weaveflow import util
+from weave.flow import util
 
 from rich.console import Console
 from rich import print
