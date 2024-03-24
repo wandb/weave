@@ -21,9 +21,9 @@ from .wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
 
 from .artifact_wandb import WandbArtifactRef
 
-key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
-    cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
-)
+key_cache: cache.LruTimeWindowCache[
+    str, typing.Optional[bool]
+] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
 api: Optional[WandbApiAsync] = None
 
