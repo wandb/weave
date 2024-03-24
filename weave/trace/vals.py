@@ -306,7 +306,7 @@ class TraceDict(Tracable, dict):
         for k in self.keys():
             yield k, self[k]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         # Simply define this to so that d = TraceDict({'a': 1, 'b': 2})); d2 = dict(d)
         # works. The dict(d) constructor works differently if __iter__ is not defined
         # on d.
