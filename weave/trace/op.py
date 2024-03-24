@@ -1,7 +1,8 @@
 from typing import Callable, Any, Optional
 import inspect
 import functools
-from typing import TypeVar, Callable, Optional
+import typing
+from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine
 from typing_extensions import ParamSpec
 
 from weave.trace_server.refs import ObjectRef
@@ -13,9 +14,12 @@ from weave import context_state
 
 from weave.trace.op_type import OpType
 
+if TYPE_CHECKING:
+    from weave.weave_client import Call, WeaveClient, CallsIter
 
-def print_run_link(run):
-    print(f"🍩 {run.ui_url}")
+
+def print_call_link(call: "Call") -> None:
+    print(f"🍩 {call.ui_url}")
 
 
 class Op:
@@ -27,13 +31,17 @@ class Op:
         self.name = resolve_fn.__name__
         self.signature = inspect.signature(resolve_fn)
 
-    def __get__(self, obj, objtype=None):
+    def __get__(
+        self, obj: Optional[object], objtype: Optional[type[object]] = None
+    ) -> "BoundOp":
         return BoundOp(obj, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        client = graph_client_context.get_graph_client()
-        if not client:
+        maybe_client = graph_client_context.get_graph_client()
+        if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
+        client = typing.cast("WeaveClient", maybe_client)
+
         inputs = self.signature.bind(*args, **kwargs).arguments
         parent_run = run_context.get_current_run()
         trackable_inputs = client.save_nested_objects(inputs)
@@ -46,44 +54,44 @@ class Op:
         except BaseException as e:
             client.fail_run(run, e)
             if not parent_run:
-                print_run_link(run)
+                print_call_link(run)
             raise
         if isinstance(res, box.BoxedNone):
             res = None
         if inspect.iscoroutine(res):
 
-            async def _run_async():
+            async def _run_async() -> Coroutine[Any, Any, Any]:
                 try:
                     awaited_res = res
                     with run_context.current_run(run):
                         output = await awaited_res
                     client.finish_call(run, output)
                     if not parent_run:
-                        print_run_link(run)
+                        print_call_link(run)
                     return output
                 except BaseException as e:
                     client.fail_run(run, e)
                     if not parent_run:
-                        print_run_link(run)
+                        print_call_link(run)
                     raise
 
             return _run_async()
         else:
             client.finish_call(run, res)
             if not parent_run:
-                print_run_link(run)
+                print_call_link(run)
 
         return res
 
     @property
-    def ref(self):
+    def ref(self) -> Optional[ObjectRef]:
         return self._ref
 
     @ref.setter
-    def ref(self, ref):
+    def ref(self, ref: ObjectRef) -> None:
         self._ref = ref
 
-    def calls(self):
+    def calls(self) -> "CallsIter":
         client = graph_client_context.require_graph_client()
         return client.op_calls(self)
 
@@ -105,11 +113,11 @@ class BoundOp(Op):
         return self.op(self.arg0, *args, **kwargs)
 
     @property
-    def ref(self):
+    def ref(self) -> Optional[ObjectRef]:
         return self.op._ref
 
     @ref.setter
-    def ref(self, ref):
+    def ref(self, ref: ObjectRef) -> None:
         self.op._ref = ref
 
 

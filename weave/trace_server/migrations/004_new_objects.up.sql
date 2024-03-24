@@ -22,7 +22,7 @@ SELECT
     refs,
     val,
     digest,
-    if (type = 'OpDef', 1, 0) AS is_op,
+    if (type = 'Op', 1, 0) AS is_op,
     row_number() OVER (PARTITION BY entity, project, type, name ORDER BY created_at ASC) AS _version_index_plus_1,
     _version_index_plus_1 - 1 AS version_index,
     count(*) OVER (PARTITION BY entity, project, type, name) as version_count,

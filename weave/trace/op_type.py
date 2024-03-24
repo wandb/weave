@@ -10,7 +10,7 @@ import os
 import sys
 import ast
 import builtins
-from typing import Any
+from typing import Any, Callable, Union, Optional
 
 from .. import errors
 from .. import context_state
@@ -30,7 +30,7 @@ if typing.TYPE_CHECKING:
     from .op import Op
 
 
-def type_code(type_):
+def type_code(type_: Any) -> str:
     if isinstance(type_, py_types.GenericAlias) or isinstance(
         type_, typing._GenericAlias  # type: ignore
     ):
@@ -47,7 +47,7 @@ def type_code(type_):
         return type_.__name__
 
 
-def generate_referenced_type_code(type_):
+def generate_referenced_type_code(type_: Any) -> Optional[str]:
     # Given a function that may have type annotations, generate non-redundant
     # code that declares any referenced types and their referenced types and
     # so on.
@@ -56,7 +56,7 @@ def generate_referenced_type_code(type_):
     # way, its linear, so it'll only produce one TypedDict if there are many.
     # Using this to get the versioned object notebook working.
     if infer_types.is_typed_dict_like(type_):
-        result = f"class {type_.__name__}(typing.TypedDict):\n"
+        result = f"class {type_.__name__}(typing.TypedDict):\n"  # type: ignore
         for k in type_.__annotations__:
             result += f"    {k}: {type_code(type_.__annotations__[k])}\n"
         return result
@@ -64,9 +64,10 @@ def generate_referenced_type_code(type_):
         type_, typing._GenericAlias  # type: ignore
     ):
         return generate_referenced_type_code(type_.__args__[0])
+    return None
 
 
-def arg_names(args: ast.arguments):
+def arg_names(args: ast.arguments) -> set[str]:
     arg_names = set()
     for arg in args.args:
         arg_names.add(arg.arg)
@@ -92,19 +93,19 @@ class ExternalVariableFinder(ast.NodeVisitor):
     external.
     """
 
-    def __init__(self):
-        self.external_vars = {}
-        self.scope_stack = [set()]  # Start with a global scope
+    def __init__(self) -> None:
+        self.external_vars: dict[str, bool] = {}
+        self.scope_stack: list[set[str]] = [set()]  # Start with a global scope
 
-    def visit_Import(self, node):
+    def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             self.scope_stack[-1].add(alias.asname or alias.name)
 
-    def visit_ImportFrom(self, node):
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         for alias in node.names:
             self.scope_stack[-1].add(alias.asname or alias.name)
 
-    def visit_FunctionDef(self, node):
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         # Add function name to the current scope
         self.scope_stack[-1].add(node.name)
         # Add function arguments to new scope
@@ -112,40 +113,40 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_AsyncFunctionDef(self, node) -> Any:
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self.scope_stack[-1].add(node.name)
         self.scope_stack.append(arg_names(node.args))
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_Lambda(self, node):
+    def visit_Lambda(self, node: ast.Lambda) -> None:
         # Add function arguments to the current scope
         self.scope_stack.append(arg_names(node.args))
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_ListComp(self, node) -> Any:
+    def visit_ListComp(self, node: ast.ListComp) -> None:
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_SetComp(self, node) -> Any:
+    def visit_SetComp(self, node: ast.SetComp) -> Any:
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_GeneratorExp(self, node) -> Any:
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_DictComp(self, node) -> Any:
+    def visit_DictComp(self, node: ast.DictComp) -> None:
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
@@ -153,11 +154,13 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.visit(node.key)
         self.visit(node.value)
 
-    def visit_ExceptHandler(self, node: ExceptHandler) -> Any:
+    def visit_ExceptHandler(self, node: ExceptHandler) -> None:
+        if node.name is None:
+            raise NotImplementedError("ExceptHandler with no name")
         self.scope_stack[-1].add(node.name)
         self.generic_visit(node)
 
-    def visit_Name(self, node):
+    def visit_Name(self, node: ast.Name) -> None:
         # print("  VISIT NAME", node.id, node.ctx)
         # If a variable is used (loaded) but not defined in any scope in the stack, and not builtin it's external
         # TODO: we don't capture python version, but builtins can change from version to version!
@@ -169,7 +172,7 @@ class ExternalVariableFinder(ast.NodeVisitor):
             self.external_vars[node.id] = True
 
 
-def resolve_var(fn: typing.Callable, var_name: str):
+def resolve_var(fn: typing.Callable, var_name: str) -> Any:
     """Given a python function, resolve a non-local variable name."""
     # First to see if the variable is in the closure
     if fn.__closure__:
@@ -189,7 +192,7 @@ class RefJSONEncoder(json.JSONEncoder):
 
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
-    def default(self, o):
+    def default(self, o: Any) -> Any:
         if isinstance(o, artifact_fs.FilesystemArtifactRef):
             if o.serialize_as_path_ref:
                 ref_code = f"weave.storage.artifact_path_ref('{o.local_ref_str()}')"
@@ -330,7 +333,7 @@ def get_code_deps(
     return {"import_code": import_code, "code": code, "warnings": warnings}
 
 
-def get_import_statements_for_annotations(func) -> list[str]:
+def get_import_statements_for_annotations(func: Callable) -> list[str]:
     """Ensures we have imports for all the types used in the function annotations."""
     annotations = func.__annotations__
     imports_needed = set()
@@ -345,7 +348,9 @@ def get_import_statements_for_annotations(func) -> list[str]:
     return list(imports_needed)
 
 
-def find_last_weave_op_function(source_code: str):
+def find_last_weave_op_function(
+    source_code: str,
+) -> Union[ast.FunctionDef, ast.AsyncFunctionDef, None]:
     """Given a string of python source code, find the last function that is decorated with 'weave.op'."""
     tree = ast.parse(source_code)
 
@@ -383,7 +388,9 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 
 
 class OpType(types.Type):
-    def save_instance(self, obj: "Op", artifact, name):
+    def save_instance(
+        self, obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
+    ) -> None:
         # Type annotations are not well handled at the moment.
         # Get import statements for any annotations
         # code += (
@@ -426,18 +433,16 @@ class OpType(types.Type):
             code_block = "\n".join(code)
             f.write(f"{import_block}\n\n{code_block}")
 
-    def load_instance(self, artifact, name, extra=None):
+    def load_instance(
+        self,
+        artifact: artifact_fs.FilesystemArtifact,
+        name: str,
+        extra: Optional[list[str]] = None,
+    ) -> Optional["Op"]:
         if environment.wandb_production():
             # Returning None here instead of erroring allows the Weaveflow app
             # to reference op defs without crashing.
             return None
-        try:
-            with artifact.open(f"{name}.json") as f:
-                op_spec = json.load(f)
-
-            return registry_mem.memory_registry._ops[op_spec["name"]]
-        except FileNotFoundError:
-            pass
 
         file_name = f"{name}.py"
         module_path = artifact.path(file_name)
@@ -488,7 +493,7 @@ class OpType(types.Type):
         return od
 
 
-def fully_qualified_opname(wrap_fn):
+def fully_qualified_opname(wrap_fn: Callable) -> str:
     op_module_file = os.path.abspath(inspect.getfile(wrap_fn))
     if op_module_file.endswith(".py"):
         op_module_file = op_module_file[:-3]
