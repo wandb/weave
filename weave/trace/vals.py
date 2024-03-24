@@ -1,12 +1,6 @@
-from typing import (
-    Iterator,
-    Literal,
-    Any,
-    Union,
-    Optional,
-    Generator,
-)
+from typing import Iterator, Literal, Any, Union, Optional, Generator, SupportsIndex
 import dataclasses
+import operator
 import typing
 
 from weave.trace_server.refs import (
@@ -241,7 +235,7 @@ class TraceTable(Tracable):
         self.root.add_mutation(self.ref.extra, "append", val)
 
 
-class TraceList(Tracable):
+class TraceList(Tracable, list):
     def __init__(
         self,
         val: Any,
@@ -256,11 +250,18 @@ class TraceList(Tracable):
             root = self
         self.root = root
 
-    def __getitem__(self, i: Union[int, slice]) -> Any:
+    def __len__(self) -> int:
+        return len(self.val)
+
+    def __add__(self, other: Any) -> Any:
+        return self.val + other
+
+    def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
         if isinstance(i, slice):
             raise ValueError("Slices not yet supported")
-        new_ref = self.ref.with_index(i)
-        return make_trace_obj(self.val[i], new_ref, self.server, self.root)
+        index = operator.index(i)
+        new_ref = self.ref.with_index(index)
+        return make_trace_obj(self.val[index], new_ref, self.server, self.root)
 
     def __eq__(self, other: Any) -> bool:
         return self.val == other
