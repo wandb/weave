@@ -106,7 +106,7 @@ class BoundOp(Op):
 
     def __init__(self, arg0: Any, op: Op) -> None:
         self.arg0 = arg0
-        self.op = op
+        self.op = op  # type: ignore
         self.name = arg0.__class__.__name__ + "." + op.resolve_fn.__name__
         self.signature = inspect.signature(op.resolve_fn)
         self.resolve_fn = op.resolve_fn
