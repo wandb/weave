@@ -4,7 +4,6 @@ import typing
 import numpy as np
 
 from .. import ref_base
-from weave import weaveflow
 
 
 @pytest.mark.skip("failing in ci")
