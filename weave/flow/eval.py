@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, Union
 import numpy as np
 
 import weave
-from weave.trace.op import Op
+from weave.trace.op import BoundOp, Op
 from weave.flow import Object, Dataset, Model
 from weave.flow.model import get_infer_method
 from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
@@ -75,18 +75,14 @@ class Evaluation(Object):
         else:
             predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
-        if isinstance(model_input, dict):
-            model_predict_args = {
-                k: v for k, v in model_input.items() if k in model_predict_arg_names
-            }
-        else:
-            if len(model_predict_arg_names) == 1:
-                model_predict_args = {model_predict_arg_names[0]: model_input}
-            else:
-                raise ValueError(
-                    f"{model_predict} expects arguments: {model_predict_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
-                )
-
+        # If the op is a `BoundOp`, then the first arg is automatically added at
+        # call time and we should exclude it from the args required from the
+        # user.
+        if isinstance(model_predict, BoundOp):
+            model_predict_arg_names = model_predict_arg_names[1:]
+        if len(model_predict_arg_names) != 1:
+            raise ValueError()
+        model_predict_args = {model_predict_arg_names[0]: model_input}
         try:
             prediction = await async_call(model_predict, **model_predict_args)
         except Exception as e:
@@ -103,17 +99,14 @@ class Evaluation(Object):
             else:
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
-            if isinstance(example, dict):
-                score_args = {k: v for k, v in example.items() if k in score_arg_names}
-            else:
-                if len(score_arg_names) == 2:
-                    score_args = {score_arg_names[0]: example}
-                else:
-                    raise ValueError(
-                        f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
-                    )
-            score_args["prediction"] = prediction
-
+            # If the op is a `BoundOp`, then the first arg is automatically added at
+            # call time and we should exclude it from the args required from the
+            # user.
+            if isinstance(score_arg_names, BoundOp):
+                score_arg_names = score_arg_names[1:]
+            if len(score_arg_names) != 2:
+                raise ValueError()
+            score_args = {score_arg_names[0]: example, "prediction": prediction}
             result = await async_call(score_fn, **score_args)
             scores[scorer_name] = result
 
