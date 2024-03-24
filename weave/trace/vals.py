@@ -261,56 +261,59 @@ class TraceList(Tracable, list):
         for i in range(len(self)):
             yield self[i]
 
+    def __repr__(self) -> str:
+        return f"TraceList({super().__repr__()})"
+
 
 class TraceDict(Tracable, dict):
     def __init__(
         self,
-        val: dict,
-        ref: RefWithExtra,
-        server: TraceServerInterface,
-        root: typing.Optional[Tracable],
-    ) -> None:
-        self.val = val
-        self.ref = ref
-        self.server = server
+        *args: Any,
+        **kwargs: Any,
+    ):
+        self.ref: RefWithExtra = kwargs.pop("ref")
+        self.server: TraceServerInterface = kwargs.pop("server")
+        root: Optional[Tracable] = kwargs.pop("root", None)
         if root is None:
             root = self
         self.root = root
+        super().__init__(*args, **kwargs)
 
     def __getitem__(self, key: str) -> Any:
         new_ref = self.ref.with_key(key)
-        return make_trace_obj(self.val[key], new_ref, self.server, self.root)
+        return make_trace_obj(super().__getitem__(key), new_ref, self.server, self.root)
 
     def get(self, key: str, default: Any = None) -> Any:
         new_ref = self.ref.with_key(key)
         return make_trace_obj(
-            self.val.get(key, default), new_ref, self.server, self.root
+            super().get(key, default), new_ref, self.server, self.root
         )
 
     def __setitem__(self, key: str, value: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
             raise ValueError("Can only set items on object refs")
-        self.val[key] = value
+        super().__setitem__(key, value)
         self.root.add_mutation(self.ref.extra, "setitem", key, value)
 
     def keys(self):  # type: ignore
-        return self.val.keys()
+        return super().keys()
 
     def values(self):  # type: ignore
-        return self.val.values()
+        for k in self.keys():
+            yield self[k]
 
     def items(self):  # type: ignore
         for k in self.keys():
             yield k, self[k]
 
-    def __iter__(self) -> Iterator[Any]:
-        return iter(self.val)
+    def __iter__(self):
+        # Simply define this to so that d = TraceDict({'a': 1, 'b': 2})); d2 = dict(d)
+        # works. The dict(d) constructor works differently if __iter__ is not defined
+        # on d.
+        return super().__iter__()
 
     def __repr__(self) -> str:
-        return f"TraceDict({self.val})"
-
-    def __eq__(self, other: Any) -> bool:
-        return self.val == other
+        return f"TraceDict({super().__repr__()})"
 
 
 def make_trace_obj(
@@ -369,7 +372,7 @@ def make_trace_obj(
         elif isinstance(val, list):
             return TraceList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
-            return TraceDict(val, new_ref, server, root)
+            return TraceDict(val, ref=new_ref, server=server, root=root)
     box_val = box.box(val)
     setattr(box_val, "ref", new_ref)
     return box_val
