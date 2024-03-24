@@ -390,7 +390,7 @@ def test_dataset_rows_ref(client):
     assert saved.rows.ref.extra == [ATTRIBUTE_EDGE_TYPE, "rows"]
 
 
-# @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
+@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_evaluate(client):
     @weave.op()
     async def model_predict(input) -> str:
