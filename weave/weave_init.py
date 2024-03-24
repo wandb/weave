@@ -1,5 +1,3 @@
-import os
-import typing
 from .trace_server import remote_http_trace_server, sqlite_trace_server
 from . import context_state
 from . import errors

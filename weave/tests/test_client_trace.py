@@ -49,9 +49,9 @@ def test_simple_op(client):
     calls = list(client.calls())
     assert len(calls) == 1
     fetched_call = calls[0]
-    digest = "XjAs9gjGsScTF6zuze3rK310QupiPWIu6Yj7FhPY8Rs"
+    digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
     expected_name = (
-        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-my_op:{digest}"
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
     assert fetched_call == weave_client.Call(
         op_name=expected_name,
@@ -285,49 +285,54 @@ def test_trace_call_query_filter_op_version_refs(client):
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
     assert ref_str(call_summaries["adder"].op).startswith(
-        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-adder:"
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder:"
     )
-    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
+    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
 
-    for op_version_refs, exp_count in [
-        # Test the None case
-        (None, call_spec.total_calls),
-        # Test the empty list case
-        ([], call_spec.total_calls),
-        # Base case of most recent version of adder
-        ([ref_str(call_summaries["adder"].op)], call_summaries["adder"].num_calls),
-        # Base case of non-recent version of adder
-        (
-            [ref_str(call_summaries["adder_v0"].op)],
-            call_summaries["adder_v0"].num_calls,
-        ),
-        # more than one op
-        (
-            [
-                ref_str(call_summaries["adder"].op),
-                ref_str(call_summaries["subtractor"].op),
-            ],
-            call_summaries["adder"].num_calls + call_summaries["subtractor"].num_calls,
-        ),
-        # Test the wildcard case
-        (
-            [wildcard_adder_ref_str],
-            call_summaries["adder"].num_calls + call_summaries["adder_v0"].num_calls,
-        ),
-        # Test the wildcard case and specific case
-        (
-            [wildcard_adder_ref_str, ref_str(call_summaries["subtractor"].op)],
-            call_summaries["adder"].num_calls
-            + call_summaries["adder_v0"].num_calls
-            + call_summaries["subtractor"].num_calls,
-        ),
-    ]:
+    for i, (op_version_refs, exp_count) in enumerate(
+        [
+            # Test the None case
+            (None, call_spec.total_calls),
+            # Test the empty list case
+            ([], call_spec.total_calls),
+            # Base case of most recent version of adder
+            ([ref_str(call_summaries["adder"].op)], call_summaries["adder"].num_calls),
+            # Base case of non-recent version of adder
+            (
+                [ref_str(call_summaries["adder_v0"].op)],
+                call_summaries["adder_v0"].num_calls,
+            ),
+            # more than one op
+            (
+                [
+                    ref_str(call_summaries["adder"].op),
+                    ref_str(call_summaries["subtractor"].op),
+                ],
+                call_summaries["adder"].num_calls
+                + call_summaries["subtractor"].num_calls,
+            ),
+            # Test the wildcard case
+            (
+                [wildcard_adder_ref_str],
+                call_summaries["adder"].num_calls
+                + call_summaries["adder_v0"].num_calls,
+            ),
+            # Test the wildcard case and specific case
+            (
+                [wildcard_adder_ref_str, ref_str(call_summaries["subtractor"].op)],
+                call_summaries["adder"].num_calls
+                + call_summaries["adder_v0"].num_calls
+                + call_summaries["subtractor"].num_calls,
+            ),
+        ]
+    ):
         res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(op_version_refs=op_version_refs),
             )
         )
+        print(f"TEST CASE [{i}]", op_version_refs, exp_count)
 
         assert len(res.calls) == exp_count
 

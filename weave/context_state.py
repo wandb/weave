@@ -62,9 +62,9 @@ _no_op_register: contextvars.ContextVar[typing.Optional[bool]] = contextvars.Con
 
 # Set to true if we're in the process of loading builtin functions
 # this prevents us from storing the op as an artifact
-_loading_built_ins: contextvars.ContextVar[
-    typing.Optional[bool]
-] = contextvars.ContextVar("loading_built_ins", default=False)
+_loading_built_ins: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "loading_built_ins", default=False
+)
 
 
 @contextlib.contextmanager
@@ -97,7 +97,7 @@ def clear_loading_built_ins(token) -> None:
     _loading_built_ins.reset(token)
 
 
-def get_loading_built_ins():
+def get_loading_built_ins() -> bool:
     return _loading_built_ins.get()
 
 

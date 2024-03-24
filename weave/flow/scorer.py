@@ -3,7 +3,8 @@ from typing import Union, Callable, Optional, Tuple, Any
 import weave
 from weave.trace.isinstance import weave_isinstance
 from weave.flow import Object
-from weave import op_def, WeaveList
+from weave.trace.op import Op
+from weave import WeaveList
 
 
 class Scorer(Object):
@@ -65,7 +66,7 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
 
 
 def get_scorer_attributes(
-    scorer: Union[Callable, op_def.OpDef, Scorer]
+    scorer: Union[Callable, Op, Scorer]
 ) -> Tuple[str, Callable, Callable]:
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
@@ -79,8 +80,8 @@ def get_scorer_attributes(
                 f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
             )
     elif callable(scorer):
-        if isinstance(scorer, op_def.OpDef):
-            scorer_name = scorer.common_name
+        if isinstance(scorer, Op):
+            scorer_name = scorer.name
         else:
             scorer_name = scorer.__name__
         score_fn = scorer
