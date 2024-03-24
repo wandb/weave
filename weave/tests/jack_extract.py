@@ -35,7 +35,7 @@ def do_jack_extract():
             return json.loads(extracted)
 
     # We call init to begin capturing data in the project, intro-example.
-    weave.init('bodcleanrun')
+    weave.init('devdebug-bodcleanrun-1')
 
     # We create our model with our system prompt.
     model = ExtractFinancialDetailsModel("You will be provided with financial news and your task is to parse it one JSON dictionary with company ticker, company name, document sentiment, and summary as keys. The summary should be a two sentance summary of the news.")
