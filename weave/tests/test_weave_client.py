@@ -413,7 +413,7 @@ def test_evaluate(client):
     }
     assert result == expected_eval_result
 
-    evaluate_calls = list(weave.as_op_def(evaluation.evaluate).calls())
+    evaluate_calls = list(weave.as_op(evaluation.evaluate).calls())
     assert len(evaluate_calls) == 1
     eval_call = evaluate_calls[0]
     eval_call_children = list(eval_call.children())

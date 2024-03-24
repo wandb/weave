@@ -35,7 +35,7 @@ class Op:
     def __get__(
         self, obj: Optional[object], objtype: Optional[type[object]] = None
     ) -> "BoundOp":
-        return BoundOp(obj, self)
+        return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         maybe_client = graph_client_context.get_graph_client()
@@ -104,10 +104,15 @@ class BoundOp(Op):
     arg0: Any
     op: Op
 
-    def __init__(self, arg0: Any, op: Op) -> None:
+    def __init__(
+        self, arg0: object, arg0_class: Optional[type[object]], op: Op
+    ) -> None:
         self.arg0 = arg0
         self.op = op  # type: ignore
-        self.name = arg0.__class__.__name__ + "." + op.resolve_fn.__name__
+        if arg0_class is None:
+            self.name = op.resolve_fn.__name__
+        else:
+            self.name = arg0_class.__name__ + "." + op.resolve_fn.__name__
         self.signature = inspect.signature(op.resolve_fn)
         self.resolve_fn = op.resolve_fn
 
