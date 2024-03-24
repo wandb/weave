@@ -285,7 +285,7 @@ def test_trace_call_query_filter_op_version_refs(client):
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
     assert ref_str(call_summaries["adder"].op).startswith(
-        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-adder:"
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder:"
     )
     wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/op-adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
 
@@ -328,6 +328,7 @@ def test_trace_call_query_filter_op_version_refs(client):
                 filter=tsi._CallsFilter(op_version_refs=op_version_refs),
             )
         )
+        print("OP", op_version_refs, exp_count)
 
         assert len(res.calls) == exp_count
 

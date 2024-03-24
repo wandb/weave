@@ -83,6 +83,10 @@ class Op:
     def ref(self, ref):
         self._ref = ref
 
+    def calls(self):
+        client = graph_client_context.require_graph_client()
+        return client.op_calls(self)
+
 
 OpType.instance_classes = Op
 
