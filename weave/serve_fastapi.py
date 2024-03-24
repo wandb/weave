@@ -21,9 +21,9 @@ from .wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
 
 from .artifact_wandb import WandbArtifactRef
 
-key_cache: cache.LruTimeWindowCache[
-    str, typing.Optional[bool]
-] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
+key_cache: cache.LruTimeWindowCache[str, typing.Optional[bool]] = (
+    cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
+)
 
 api: Optional[WandbApiAsync] = None
 
@@ -81,10 +81,6 @@ def object_method_app(
     method_name: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
 ) -> FastAPI:
-    # Import weaveflow to trigger eager mode and ensure we have weaveflow weave
-    # types loaded.
-    from weave import weaveflow
-
     obj = obj_ref.get()
     obj_weave_type = types.TypeRegistry.type_of(obj)
     if not isinstance(obj_weave_type, types.ObjectType):
