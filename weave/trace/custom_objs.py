@@ -82,7 +82,7 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
         return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
-    
+
     @contextlib.contextmanager
     def writeable_file_path(self, path):
         with tempfile.TemporaryDirectory() as tmpdir:

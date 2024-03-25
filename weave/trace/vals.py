@@ -1,4 +1,3 @@
-import traceback
 from typing import Iterator, Literal, Any, Union, Optional, Generator, SupportsIndex
 import dataclasses
 import operator
@@ -182,7 +181,7 @@ class TraceTable(Tracable):
         # so this is still better.
         if self._loaded_rows == None:
             self._loaded_rows = [row for row in self._remote_iter()]
-        
+
         return self._loaded_rows
 
     def _remote_iter(self) -> Generator[typing.Dict, None, None]:
@@ -227,7 +226,7 @@ class TraceTable(Tracable):
 
     def __iter__(self) -> Generator[Any, None, None]:
         for row in self._all_rows():
-            yield   row
+            yield row
 
     def append(self, val: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
