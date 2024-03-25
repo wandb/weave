@@ -435,7 +435,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             conds.append("1 = 1")
         rows = self._table_query(
-            entity, project, req.table_digest, conditions=conds, limit=req.limit
+            entity,
+            project,
+            req.table_digest,
+            conditions=conds,
+            limit=req.limit,
+            offset=req.offset,
         )
         return tsi.TableQueryRes(rows=rows)
 
@@ -446,6 +451,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         table_digest: str,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[tsi.TableRowSchema]:
         conds = ["entity = {entity: String}", "project = {project: String}"]
@@ -469,6 +475,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if limit:
             query += " LIMIT {limit: UInt64}"
             parameters["limit"] = limit
+        if offset:
+            query += " OFFSET {offset: UInt64}"
+            parameters["offset"] = offset
 
         query_result = self.ch_client.query(
             query,
