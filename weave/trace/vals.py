@@ -213,6 +213,8 @@ class TraceTable(Tracable):
                     table_digest=self.table_ref.digest,
                     # TODO: must do paging or this will infinite loop
                     # if table is larger than page_size!
+                    offset=page_index * page_size,
+                    limit=page_size,
                     # filter=self.filter,
                 )
             )
