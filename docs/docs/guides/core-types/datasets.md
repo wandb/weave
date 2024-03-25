@@ -22,7 +22,7 @@ from weave import Dataset
 weave.init('intro-example')
 
 # Create a dataset
-dataset = Dataset([
+dataset = Dataset(rows=[
     {'id': '0', 'sentence': "He no likes ice cream.", 'correction': "He doesn't like ice cream."},
     {'id': '1', 'sentence': "She goed to the store.", 'correction': "She went to the store."},
     {'id': '2', 'sentence': "They plays video games all day.", 'correction': "They play video games all day."}
