@@ -279,3 +279,13 @@ def test_agent_has_tools(client):
     saved = client.save(agent, "agent")
 
     assert len(saved.tools) == 1
+
+
+def test_construct_eval_with_dataset_get(client):
+    dataset = client.save(
+        weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
+    )
+    ref = weave.obj_ref(dataset)
+    assert ref is not None
+    dataset2 = weave.ref(ref.uri()).get()
+    weave.Evaluation(dataset=dataset2)
