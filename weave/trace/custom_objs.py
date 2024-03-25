@@ -82,6 +82,15 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
         return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
+    
+    @contextlib.contextmanager
+    def writeable_file_path(self, path):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            full_path = os.path.join(tmpdir, path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            yield full_path
+            with open(full_path, "rb") as fp:
+                self.path_contents[path] = fp.read()
 
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:
