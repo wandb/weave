@@ -169,7 +169,7 @@ class TraceTable(Tracable):
         if root is None:
             root = self
         self.root = root
-        self._loaded_rows = None
+        self._loaded_rows: typing.Optional[typing.List[typing.Dict]] = None
 
     def __len__(self) -> int:
         return len(self._all_rows())
@@ -182,7 +182,7 @@ class TraceTable(Tracable):
         if self._loaded_rows == None:
             self._loaded_rows = [row for row in self._remote_iter()]
 
-        return self._loaded_rows
+        return typing.cast(typing.List[typing.Dict], self._loaded_rows)
 
     def _remote_iter(self) -> Generator[typing.Dict, None, None]:
         page_index = 0
@@ -219,7 +219,7 @@ class TraceTable(Tracable):
             return rows[key]
         else:
             for row in rows:
-                if row.ref.extra[-1] == key:
+                if row.ref.extra[-1] == key:  # type: ignore
                     return row
             else:
                 raise KeyError(f"Row ID not found: {key}")

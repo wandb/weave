@@ -172,7 +172,7 @@ class Evaluation(Object):
                 n_complete += 1
                 duration = time.time() - start_time
                 status.update(
-                    f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"
+                    f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
                 )
                 if eval_row == None:
                     eval_row = {"prediction": None, "scores": {}}
