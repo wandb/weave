@@ -111,15 +111,16 @@ class WandbFileManagerAsync:
         except FileNotFoundError:
             pass
         # Download
-        if art_id == "":
+        print("download manifest via id", flush=True)
+        manifest_url = await self.wandb_api.artifact_manifest_url_from_id(
+            art_id=art_id,
+        )
+        if manifest_url is None:
+            print("download manifest via id is None, downloading via name", flush=True)
             manifest_url = await self.wandb_api.artifact_manifest_url(
                 art_uri.entity_name,
                 art_uri.project_name,
                 art_uri.name + ":" + art_uri.version,
-            )
-        else:
-            manifest_url = await self.wandb_api.artifact_manifest_url_from_id(
-                art_id=art_id,
             )
         if manifest_url is None:
             return None
@@ -282,16 +283,17 @@ class WandbFileManager:
         except FileNotFoundError:
             pass
         # Download
-        if art_id == "":
+        print("download manifest via id", flush=True)
+        manifest_url = self.wandb_api.artifact_manifest_url_from_id(
+            art_id=art_id,
+        )
+        if manifest_url is None:
+            print("download manifest via id is None, downloading via name", flush=True)
             manifest_url = self.wandb_api.artifact_manifest_url(
                 art_uri.entity_name,
                 art_uri.project_name,
                 art_uri.name + ":" + art_uri.version,
-            )
-        else:
-            manifest_url = self.wandb_api.artifact_manifest_url_from_id(
-                art_id=art_id,
-            )
+                )
         if manifest_url is None:
             return None
         self.http.download_file(
@@ -304,6 +306,7 @@ class WandbFileManager:
     def manifest(
         self, art_id: str, art_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        print("inside sync manifest", flush=True)
         with tracer.trace("wandb_file_manager.manifest") as span:
             assert art_uri.version is not None
             manifest_path = self.manifest_path(art_uri)
