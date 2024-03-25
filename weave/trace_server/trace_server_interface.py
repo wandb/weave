@@ -251,6 +251,7 @@ class TableQueryReq(BaseModel):
     table_digest: str
     filter: typing.Optional[_TableRowFilter] = None
     limit: typing.Optional[int] = None
+    offset: typing.Optional[int] = None
 
 
 class TableQueryRes(BaseModel):
