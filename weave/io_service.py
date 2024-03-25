@@ -540,9 +540,9 @@ class AsyncConnection:
         return res
 
     async def direct_url(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
-        res = await self.request("direct_url", str(artifact_uri))
+        res = await self.request("direct_url", artifact_id, str(artifact_uri))
         return res
 
     async def sleep(self, seconds: float) -> float:
@@ -658,9 +658,9 @@ class ServerlessClient:
         return self.wandb_file_manager.ensure_file_downloaded(download_url)
 
     def direct_url(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
-        return self.wandb_file_manager.direct_url(artifact_uri)
+        return self.wandb_file_manager.direct_url(artifact_id, artifact_uri)
 
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
