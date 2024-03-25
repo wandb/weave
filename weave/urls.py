@@ -1,4 +1,4 @@
-from wandb import util as wb_util
+# from wandb import util as wb_util
 
 from . import environment
 from . import context_state
@@ -7,8 +7,8 @@ BROWSE3_PATH = "browse3"
 WORKSPACE_SLUG = "weave"
 
 
-def remote_project_root_url(entity_name: str, project_name: str) -> str:
-    return f"{wb_util.app_url(environment.wandb_base_url())}/{entity_name}/{project_name}/{WORKSPACE_SLUG}"
+# def remote_project_root_url(entity_name: str, project_name: str) -> str:
+#     return f"{wb_util.app_url(environment.wandb_base_url())}/{entity_name}/{project_name}/{WORKSPACE_SLUG}"
 
 
 def local_project_root_url(entity_name: str, project_name: str) -> str:

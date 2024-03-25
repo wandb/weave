@@ -10,24 +10,24 @@ from . import context_state as _context_state
 
 _loading_builtins_token = _context_state.set_loading_built_ins()
 
-from . import weave_types as types
-from . import storage
+# from . import weave_types as types
+# from . import storage
 
 from .api import *
 
 
-from .errors import *
+# from .errors import *
 
-from . import mappers_python_def
+# from . import mappers_python_def
 
-from . import wandb_api as _wandb_api
+# from . import wandb_api as _wandb_api
 
 from . import version
 
-_wandb_api.init()
+# _wandb_api.init()
 
 # Ensure there is a client available for eager mode
-from . import context as _context
+# from . import context as _context
 
 _context_state.clear_loading_built_ins(_loading_builtins_token)
 
