@@ -73,6 +73,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=req.model_dump_json().encode("utf-8"),
             auth=self._auth,
         )
+        if r.status_code == 413 and "obj/create" in url:
+            raise requests.HTTPError(
+                "413 Client Error. Request too large. Try using a weave.Dataset() object."
+            )
         r.raise_for_status()
         return res_model.model_validate(r.json())
 
