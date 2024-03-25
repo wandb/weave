@@ -2,7 +2,7 @@ import numpy as np
 from typing import Union, Callable, Optional, Tuple, Any
 import weave
 from weave.trace.isinstance import weave_isinstance
-from weave.flow import Object
+from weave.flow.obj import Object
 from weave.trace.op import Op
 from weave import WeaveList
 

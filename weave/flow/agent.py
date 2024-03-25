@@ -8,7 +8,7 @@ from openai.types.chat import (
 )
 
 import weave
-from weave.flow import Object
+from weave.flow.obj import Object
 from weave.flow.tools import chat_call_tool_params, perform_tool_calls
 from weave.flow.console import LogEvents
 from weave.flow.chat_util import OpenAIStream

@@ -112,9 +112,8 @@ def test_dataset_refs(client):
     for row in ref.rows:
         new_table_rows.append({"a_ref": row["v"], "b": row["v"] + 42})
     ref2 = client.save(new_table_rows, "my-dataset2")
-    ref2_list = list(ref2)
 
-    row0 = ref2_list[0]
+    row0 = ref2[0]
     ref0_aref = row0["a_ref"]
     assert ref0_aref == 1
     assert weave_client.get_ref(ref0_aref) == weave_client.ObjectRef(
@@ -132,7 +131,7 @@ def test_dataset_refs(client):
         ],
     )
 
-    row1 = ref2_list[1]
+    row1 = ref2[1]
     ref1_aref = row1["a_ref"]
     assert ref1_aref == 2
     assert weave_client.get_ref(ref0_aref) == weave_client.ObjectRef(

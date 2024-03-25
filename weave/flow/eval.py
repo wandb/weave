@@ -7,11 +7,13 @@ from typing import Any, Callable, Optional, Union
 import numpy as np
 
 import weave
-from weave.trace.op import BoundOp, Op
-from weave.flow import Object, Dataset, Model
+from weave.trace.op import Op, BoundOp
+from weave.flow.obj import Object
+from weave.flow.dataset import Dataset
+from weave.flow.model import Model
 from weave.flow.model import get_infer_method
 from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
-from weave.weaveflow import util
+from weave.flow import util
 
 from rich.console import Console
 from rich import print

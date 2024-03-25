@@ -1,11 +1,21 @@
-from typing import Optional
-from pydantic import ConfigDict
-import pydantic
+from typing import Optional, Any
+from pydantic import (
+    ConfigDict,
+    model_validator,
+    ValidatorFunctionWrapHandler,
+    ValidationInfo,
+    BaseModel,
+)
 
+# import pydantic
+
+from weave import box
 from weave.trace.op import Op
+from weave.weave_client import get_ref
+from weave.trace.vals import ObjectRecord, TraceObject
 
 
-class Object(pydantic.BaseModel):
+class Object(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
@@ -17,7 +27,42 @@ class Object(pydantic.BaseModel):
         extra="forbid",
     )
 
-    __str__ = pydantic.BaseModel.__repr__
+    __str__ = BaseModel.__repr__
+
+    # This is a "wrap" validator meaning we can run our own logic before
+    # and after the standard pydantic validation.
+    @model_validator(mode="wrap")
+    @classmethod
+    def handle_relocatable_object(
+        cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
+    ) -> Any:
+        if isinstance(v, TraceObject):
+            # This is a relocated object, so destructure it into a dictionary
+            # so pydantic can validate it.
+            keys = v._val.__dict__.keys()
+            fields = {}
+            for k in keys:
+                if k.startswith("_"):
+                    continue
+                val = getattr(v, k)
+                if isinstance(val, box.BoxedNone):
+                    val = None
+                fields[k] = val
+            # pydantic validation will construct a new pydantic object
+            new_obj = handler(fields)
+
+            # transfer ref to new object
+            # We can't attach a ref directly to pydantic objects yet.
+            # TODO: fix this. I think dedupe may make it so the user data ends up
+            #    working fine, but not setting a ref here will cause the client
+            #    to do extra work.
+            # if isinstance(v, TraceObject):
+            #     ref = get_ref(v)
+            #     new_obj
+            # return new_obj
+
+            return new_obj
+        return handler(v)
 
 
 # We don't define this directly in the class definition so that VSCode
