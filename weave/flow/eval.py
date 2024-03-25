@@ -1,6 +1,7 @@
 import asyncio
 import time
 import inspect
+import textwrap
 import traceback
 import typing
 from typing import Any, Callable, Optional, Union
@@ -8,6 +9,7 @@ import numpy as np
 
 import weave
 from weave.trace.op import Op, BoundOp
+from weave.trace.errors import OpCallError
 from weave.flow.obj import Object
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
@@ -72,6 +74,13 @@ class Evaluation(Object):
             model_predict = model
         else:
             model_predict = get_infer_method(model)
+
+        model_predict_fn_name = (
+            model_predict.name
+            if isinstance(model_predict, Op)
+            else model_predict.__name__
+        )
+
         if isinstance(model_predict, Op):
             predict_signature = model_predict.signature
         else:
@@ -96,6 +105,30 @@ class Evaluation(Object):
                 )
         try:
             prediction = await async_call(model_predict, **model_predict_args)
+        except OpCallError as e:
+            dataset_column_names = list(model_input.keys())
+            dataset_column_names_str = ", ".join(dataset_column_names[:3])
+            if len(dataset_column_names) > 3:
+                dataset_column_names_str += ", ..."
+            required_arg_names = [
+                param.name
+                for param in predict_signature.parameters.values()
+                if param.default == inspect.Parameter.empty
+            ]
+            if isinstance(model_predict, BoundOp):
+                required_arg_names = required_arg_names[1:]
+
+            message = textwrap.dedent(
+                f"""
+                Call error: {e}
+
+                Options for resolving:
+                a. change {model_predict_fn_name} argument names to match a subset of dataset column names: {dataset_column_names_str}
+                b. change dataset column names to match expected {model_predict_fn_name} argument names: {required_arg_names}
+                c. construct Evaluation with a preprocess_model_input function that accepts a dataset example and returns a dict with keys expected by {model_predict_fn_name}
+                """
+            )
+            raise OpCallError(message)
         except Exception as e:
             print("Prediction failed")
             traceback.print_exc()
@@ -110,11 +143,19 @@ class Evaluation(Object):
             else:
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
+
             # If the op is a `BoundOp`, then the first arg is automatically added at
             # call time and we should exclude it from the args required from the
             # user.
             if isinstance(score_arg_names, BoundOp):
                 score_arg_names = score_arg_names[1:]
+
+            if "prediction" not in score_arg_names:
+                raise OpCallError(
+                    f"Scorer {scorer_name} must have a 'prediction' argument, to receive the output of the model function."
+                )
+
+
             if isinstance(example, dict):
                 score_args = {k: v for k, v in example.items() if k in score_arg_names}
             else:
@@ -126,7 +167,32 @@ class Evaluation(Object):
                     )
             score_args["prediction"] = prediction
 
-            result = await async_call(score_fn, **score_args)
+            try:
+                result = await async_call(score_fn, **score_args)
+            except OpCallError as e:
+                dataset_column_names = list(example.keys())
+                dataset_column_names_str = ", ".join(dataset_column_names[:3])
+                if len(dataset_column_names) > 3:
+                    dataset_column_names_str += ", ..."
+                required_arg_names = [
+                    param.name
+                    for param in score_signature.parameters.values()
+                    if param.default == inspect.Parameter.empty
+                ]
+                if isinstance(score_fn, BoundOp):
+                    required_arg_names = required_arg_names[1:]
+                required_arg_names.remove("prediction")
+
+                message = textwrap.dedent(
+                    f"""
+                    Call error: {e}
+
+                    Options for resolving:
+                    a. change {scorer_name} argument names to match a subset of dataset column names ({dataset_column_names_str})
+                    b. change dataset column names to match expected {scorer_name} argument names: {required_arg_names}
+                    """
+                )
+                raise OpCallError(message)
             scores[scorer_name] = result
 
         return {
@@ -158,6 +224,8 @@ class Evaluation(Object):
         async def eval_example(example: dict) -> dict:
             try:
                 eval_row = await self.predict_and_score(example, model)
+            except OpCallError as e:
+                raise e
             except Exception as e:
                 print("Predict and score failed")
                 traceback.print_exc()

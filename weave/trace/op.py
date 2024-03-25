@@ -5,6 +5,7 @@ import typing
 from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine
 from typing_extensions import ParamSpec
 
+from weave.trace.errors import OpCallError
 from weave.trace_server.refs import ObjectRef
 from weave import graph_client_context
 from weave import run_context
@@ -13,13 +14,14 @@ from weave import box
 from weave import context_state
 
 from weave.trace.op_type import OpType
+from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
     from weave.weave_client import Call, WeaveClient, CallsIter
 
 
 def print_call_link(call: "Call") -> None:
-    print(f"🍩 {call.ui_url}")
+    print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 class Op:
@@ -43,7 +45,10 @@ class Op:
             return self.resolve_fn(*args, **kwargs)
         client = typing.cast("WeaveClient", maybe_client)
 
-        inputs = self.signature.bind(*args, **kwargs).arguments
+        try:
+            inputs = self.signature.bind(*args, **kwargs).arguments
+        except TypeError as e:
+            raise OpCallError(f"Error calling {self.name}: {e}")
         parent_run = run_context.get_current_run()
         trackable_inputs = client.save_nested_objects(inputs)
         run = client.create_call(self, parent_run, trackable_inputs)
@@ -83,6 +88,9 @@ class Op:
                 print_call_link(run)
 
         return res
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.name})"
 
     @property
     def ref(self) -> Optional[ObjectRef]:
