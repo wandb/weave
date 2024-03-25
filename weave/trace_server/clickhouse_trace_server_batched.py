@@ -514,14 +514,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if cache_key in root_val_cache:
                 val = root_val_cache[cache_key]
             else:
-                conds = [
-                    "name = {name: String}",
-                    "digest = {version: String}",
-                ]
-                parameters = {
-                    "name": r.name,
-                    "version": r.version,
-                }
+                if r.version == "latest":
+                    conds = [
+                        "name = {name: String}",
+                        "is_latest = 1",
+                    ]
+                    parameters = {
+                        "name": r.name,
+                    }
+                else:
+                    conds = [
+                        "name = {name: String}",
+                        "digest = {version: String}",
+                    ]
+                    parameters = {
+                        "name": r.name,
+                        "version": r.version,
+                    }
                 objs = self._select_objs_query(
                     r.entity, r.project, conditions=conds, parameters=parameters
                 )
