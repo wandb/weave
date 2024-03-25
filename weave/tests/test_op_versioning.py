@@ -433,6 +433,7 @@ def test_op_return_typeddict_annotation(client):
     assert some_d(1) == {"val": 1}
 
     ref = weave.obj_ref(some_d)
+    assert ref is not None
 
     saved_code = get_saved_code(client, ref)
     print("SAVED_CODE")
@@ -440,7 +441,7 @@ def test_op_return_typeddict_annotation(client):
 
     assert saved_code == EXPECTED_TYPEDICT_ANNO_CODE
 
-    op2 = weave.ref(str(ref)).get()
+    op2 = weave.ref(ref.uri()).get()
     assert op2(2) == {"val": 2}
 
 
@@ -452,6 +453,7 @@ def test_op_basic_execution(client):
     assert adder(1) == 2
 
     ref = weave.obj_ref(adder)
+    assert ref is not None
 
-    op2 = weave.ref(str(ref)).get()
+    op2 = weave.ref(ref.uri()).get()
     assert op2(2) == 3

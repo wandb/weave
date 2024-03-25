@@ -131,30 +131,8 @@ def run_command(command: str) -> str:
     return result
 
 
-if __name__ == "__main__":
-    console.rule("[bold blue]Programmer")
-    console.print(WELCOME)
-
-    agent = Agent(
-        model_name="gpt-4-0125-preview",
-        system_message=SYSTEM_MESSAGE,
-        tools=[list_files, write_to_file, read_from_file, run_command],
-    )
-
-    # initial_prompt = input("Initial prompt: ")
-
-    initial_prompt = " ".join(sys.argv[1:])
-    print("Initial prompt:", initial_prompt)
-
-    state = AgentState(
-        history=[
-            {
-                "role": "user",
-                "content": initial_prompt,
-            },
-        ]
-    )
-
+@weave.op()
+def run(state: AgentState):
     while True:
         state = agent.step(state)
         last_message = state.history[-1]
@@ -169,3 +147,32 @@ if __name__ == "__main__":
                     }
                 ]
             )
+
+
+if __name__ == "__main__":
+    weave.init("wfchobj-programmer2")
+    console.rule("[bold blue]Programmer")
+    console.print(WELCOME)
+
+    agent = Agent(
+        model_name="gpt-4-0125-preview",
+        system_message=SYSTEM_MESSAGE,
+        tools=[list_files, write_to_file, read_from_file, run_command],
+    )
+
+    if len(sys.argv) < 2:
+        initial_prompt = input("Initial prompt: ")
+    else:
+        initial_prompt = " ".join(sys.argv[1:])
+        print("Initial prompt:", initial_prompt)
+
+    state = AgentState(
+        history=[
+            {
+                "role": "user",
+                "content": initial_prompt,
+            },
+        ]
+    )
+
+    run(state)

@@ -42,9 +42,6 @@ class RefWithExtra(Ref):
     def with_item(self, item_digest: str) -> "RefWithExtra":
         return self.with_extra([ID_EDGE_TYPE, f"{item_digest}"])
 
-    def __str__(self) -> str:
-        return self.uri()
-
 
 @dataclasses.dataclass
 class ObjectRef(RefWithExtra):
@@ -68,6 +65,22 @@ class ObjectRef(RefWithExtra):
 
         gc = require_graph_client()
         return gc.get(self)
+
+    def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
+        if self.entity != potential_ancestor.entity:
+            return False
+        if self.project != potential_ancestor.project:
+            return False
+        if self.name != potential_ancestor.name:
+            return False
+        if self.version != potential_ancestor.version:
+            return False
+        if len(self.extra) <= len(potential_ancestor.extra):
+            return False
+        return all(
+            self.extra[i] == potential_ancestor.extra[i]
+            for i in range(len(potential_ancestor.extra))
+        )
 
 
 @dataclasses.dataclass

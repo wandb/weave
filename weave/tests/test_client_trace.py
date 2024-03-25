@@ -274,7 +274,7 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
 
 
 def ref_str(op):
-    return str(weave_client.get_ref(op))
+    return weave_client.get_ref(op).uri()
 
 
 def test_trace_call_query_filter_op_version_refs(client):
