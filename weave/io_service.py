@@ -530,9 +530,9 @@ class AsyncConnection:
         return manifest
 
     async def ensure_file(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
-        res = await self.request("ensure_file", str(artifact_uri))
+        res = await self.request("ensure_file", artifact_id, str(artifact_uri))
         return res
 
     async def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
@@ -645,14 +645,14 @@ class ServerlessClient:
         )
 
     def manifest(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        return self.wandb_file_manager.manifest(artifact_uri)
+        return self.wandb_file_manager.manifest(artifact_id, artifact_uri)
 
     def ensure_file(
-        self, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[str]:
-        return self.wandb_file_manager.ensure_file(artifact_uri)
+        return self.wandb_file_manager.ensure_file(artifact_id, artifact_uri)
 
     def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
         return self.wandb_file_manager.ensure_file_downloaded(download_url)
