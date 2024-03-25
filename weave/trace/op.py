@@ -13,13 +13,14 @@ from weave import box
 from weave import context_state
 
 from weave.trace.op_type import OpType
+from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
     from weave.weave_client import Call, WeaveClient, CallsIter
 
 
 def print_call_link(call: "Call") -> None:
-    print(f"🍩 {call.ui_url}")
+    print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 class Op:

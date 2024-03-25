@@ -34,6 +34,7 @@ from . import weave_init as _weave_init
 from . import weave_client as _weave_client
 from . import graph_client_context as _graph_client_context
 from weave.monitoring import monitor as _monitor
+from .trace.constants import TRACE_OBJECT_EMOJI
 
 # exposed as part of api
 from . import weave_types as types
@@ -209,9 +210,14 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
 
     ref = client.save_object(obj, save_name, "latest")
 
-    # print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
-    # print(f"Published to {ref.ui_url}")
-    print("Published")
+    if isinstance(ref, _weave_client.ObjectRef):
+        url = urls.object_version_path(
+            ref.entity,
+            ref.project,
+            ref.name,
+            ref.version,
+        )
+        print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
 
     return ref
 
