@@ -155,7 +155,6 @@ class Evaluation(Object):
                     f"Scorer {scorer_name} must have a 'prediction' argument, to receive the output of the model function."
                 )
 
-
             if isinstance(example, dict):
                 score_args = {k: v for k, v in example.items() if k in score_arg_names}
             else:
