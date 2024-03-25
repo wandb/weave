@@ -685,12 +685,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        query_result = self.ch_client.query(
-            "SELECT n_chunks, val FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
-            parameters={"project_id": req.project_id, "digest": req.digest},
-            column_formats={"val": "bytes"},
-        )
-        n_chunks = query_result.result_rows[0][0]
+        def do_query(limit: typing.Optional[int]=None):
+            query = "SELECT n_chunks, val FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}"
+            if limit:
+                query += " LIMIT=" + str(limit)
+            
+            query_result = self.ch_client.query(
+                query,
+                parameters={"project_id": req.project_id, "digest": req.digest},
+                column_formats={"val": "bytes"},
+            )
+            return query_result
+        limited_query_result = do_query(1)
+        n_chunks = limited_query_result.result_rows[0][0]
+
+
+
         chunks = [r[1] for r in query_result.result_rows]
         if len(chunks) != n_chunks:
             raise ValueError("Missing chunks")
