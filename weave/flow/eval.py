@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, Union
 import numpy as np
 
 import weave
-from weave.trace.op import Op
+from weave.trace.op import Op, BoundOp
 from weave.flow.obj import Object
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
@@ -77,6 +77,12 @@ class Evaluation(Object):
         else:
             predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
+        # If the op is a `BoundOp`, then the first arg is automatically added at
+        # call time and we should exclude it from the args required from the
+        # user.
+        if isinstance(model_predict, BoundOp):
+            model_predict_arg_names = model_predict_arg_names[1:]
+
         if isinstance(model_input, dict):
             model_predict_args = {
                 k: v for k, v in model_input.items() if k in model_predict_arg_names
@@ -105,6 +111,11 @@ class Evaluation(Object):
             else:
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
+            # If the op is a `BoundOp`, then the first arg is automatically added at
+            # call time and we should exclude it from the args required from the
+            # user.
+            if isinstance(score_arg_names, BoundOp):
+                score_arg_names = score_arg_names[1:]
             if isinstance(example, dict):
                 score_args = {k: v for k, v in example.items() if k in score_arg_names}
             else:
