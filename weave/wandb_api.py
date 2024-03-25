@@ -189,7 +189,7 @@ class WandbApiAsync:
         project = result["project"]
         if project is None:
             return None
-        artifact = result["artifact"]
+        artifact = project["artifact"]
         if artifact is None:
             return None
         current_manifest = artifact["currentManifest"]
@@ -237,8 +237,8 @@ class WandbApiAsync:
 
     ARTIFACT_PATH_INFO_QUERY = gql.gql(
         """
-        query ArtifactPathInfo($artifactId: ID!) {
-            artifact(id: $artifactId) {
+        query ArtifactPathInfo($artifactID: ID!) {
+            artifact(id: $artifactID) {
               id
               artifactType {
                 id
@@ -254,9 +254,9 @@ class WandbApiAsync:
         """
     )
 
-    def artifact_path_info(self, artifact_id: str) -> typing.Optional[str]:
+    async def artifact_path_info(self, artifact_id: str) -> typing.Optional[str]:
         try:
-            result = self.query(
+            result = await self.query(
                 self.ARTIFACT_PATH_INFO_QUERY,
                 artifactID=artifact_id,
             )
@@ -393,7 +393,7 @@ class WandbApi:
         project = result["project"]
         if project is None:
             return None
-        artifact = result["artifact"]
+        artifact = project["artifact"]
         if artifact is None:
             return None
         current_manifest = artifact["currentManifest"]
@@ -421,9 +421,9 @@ class WandbApi:
         """
     )
 
-    async def artifact_manifest_url_from_id(self, art_id: str) -> typing.Optional[str]:
+    def artifact_manifest_url_from_id(self, art_id: str) -> typing.Optional[str]:
         try:
-            result = await self.query(
+            result = self.query(
                 self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id
             )
         except gql.transport.exceptions.TransportQueryError as e:
@@ -441,8 +441,8 @@ class WandbApi:
 
     ARTIFACT_PATH_INFO_QUERY = gql.gql(
         """
-        query ArtifactPathInfo($artifactId: ID!) {
-            artifact(id: $artifactId) {
+        query ArtifactPathInfo($artifactID: ID!) {
+            artifact(id: $artifactID) {
               id
               artifactType {
                 id

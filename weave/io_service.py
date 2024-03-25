@@ -399,6 +399,7 @@ class Server:
     async def handle_ensure_manifest(
         self, artifact_id: str, artifact_uri: str
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        print("inside io_service, ensure manifest()")
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         return await self.wandb_file_manager.manifest(artifact_id, uri)
 
@@ -524,6 +525,7 @@ class AsyncConnection:
     async def manifest(
         self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        print("inside async manifest in io_service.py", flush=True)
         manifest: typing.Optional[
             artifact_wandb.WandbArtifactManifest
         ] = await self.request("ensure_manifest", artifact_id, str(artifact_uri))
@@ -613,6 +615,7 @@ class SyncClient:
     def manifest(
         self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        print("inside manifest in io_service.py", flush=True)
         manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request(
             "ensure_manifest", artifact_id, str(artifact_uri)
         )
@@ -647,6 +650,7 @@ class ServerlessClient:
     def manifest(
         self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
+        print("serverless client inside manifest in io_service.py", flush=True)
         return self.wandb_file_manager.manifest(artifact_id, artifact_uri)
 
     def ensure_file(

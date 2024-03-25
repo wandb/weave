@@ -1761,6 +1761,7 @@ def test_artifact_path_character_escaping():
 
 
 def _do_test_gql_artifact_dir_path(node):
+    print(node, flush=True)
     dir_node = node.file("")
     dir_type_node = dir_node.pathReturnType("")
     dir_file_type_node = dir_node.pathReturnType("test_results.table.json")
