@@ -691,7 +691,6 @@ def _get_table_like_awl_from_file(
     ],
     num_parts: int = 1,
 ) -> _TableLikeAWLFromFileResult:
-    print("in here", flush=True)
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     data = _get_table_data_from_file(file)
