@@ -324,7 +324,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     digest,
                     version_index,
                     is_latest
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req_obj.project_id,
                     req_obj.name,
@@ -389,7 +389,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             insert_rows.append((req.table.project_id, row_digest, row_json))
         with self.lock:
             cursor.executemany(
-                "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
                 insert_rows,
             )
 
@@ -401,7 +401,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             table_digest = table_hasher.hexdigest()
 
             cursor.execute(
-                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
                 (req.table.project_id, table_digest, json.dumps(row_digests)),
             )
             conn.commit()
@@ -482,7 +482,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         digest = bytes_digest(req.content)
         with self.lock:
             cursor.execute(
-                "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",
                 (
                     req.project_id,
                     digest,
@@ -573,21 +573,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         pred = " AND ".join(conditions or ["1 = 1"])
         cursor.execute(
             """SELECT * FROM objects WHERE project_id = ? AND """ + pred,
-            (project_id),
+            (project_id,),
         )
         query_result = cursor.fetchall()
         result: list[tsi.ObjSchema] = []
         for row in query_result:
             result.append(
                 tsi.ObjSchema(
-                    project_id=f"{row[0]}/{row[1]}",
-                    name=row[2],
-                    created_at=row[3],
-                    type=row[4],
-                    val=json.loads(row[6]),
-                    digest=row[7],
-                    version_index=row[8],
-                    is_latest=row[9],
+                    project_id=f"{row[0]}",
+                    name=row[1],
+                    created_at=row[2],
+                    type=row[3],
+                    val=json.loads(row[5]),
+                    digest=row[6],
+                    version_index=row[7],
+                    is_latest=row[8],
                 )
             )
 
