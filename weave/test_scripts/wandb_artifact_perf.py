@@ -12,6 +12,7 @@
 import asyncio
 import time
 import cProfile
+import functools
 
 from .. import engine_trace
 from .. import wandb_api
@@ -56,7 +57,7 @@ async def gql_test() -> None:
             for p in paths
         ]
         result_paths = await async_map.map_with_parallel_workers(
-            uris, file_man.ensure_file, max_parallel=200
+            uris, functools.partial(file_man.ensure_file, art_id="_"), max_parallel=200
         )
     total_time = time.time() - start_time
     total_size = 0

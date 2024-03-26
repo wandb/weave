@@ -130,10 +130,12 @@ class FakeArtifactManifest:
 
 class FakePath:
     def __init__(self, path):
+        print(f"mock path in FakePath download: {path}", flush=True)
         self.path = path
 
     def download(self, root=None):
         # copy file to root
+        print(f"mock root in FakePath download: {root}", flush=True)
         if root is not None:
             os.makedirs(root, exist_ok=True)
             shutil.copy2(self.path, root)
@@ -173,6 +175,7 @@ class FakeArtifact:
 
 class FakeRunFile:
     def __init__(self, name):
+        print(f"mock name in FakeRunFile init: {name}", flush=True)
         self.name = name
 
     def download(self, root, replace=False):
@@ -297,6 +300,7 @@ class FakeIoServiceClient:
 
     def ensure_file(self, artifact_id, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
+        print(self.mocked_artifacts)
         if uri_str in self.mocked_artifacts:
             entry = self.mocked_artifacts[uri_str].artifact.manifest.entries.get(
                 artifact_uri.path
@@ -332,7 +336,7 @@ class SetupResponse:
         },
     ):
         artifact_uri = WeaveWBArtifactURI.parse(
-            f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:{artifact.commit_hash}"
+            f"wandb-artifact:///_/_/{artifact.name}:{artifact.commit_hash}"
         )
 
         self.fake_io.add_artifact(artifact, artifact_uri)
