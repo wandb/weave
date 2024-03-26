@@ -78,7 +78,7 @@ export const WFDataModelAutoProvider: FC<{
   entityName: string;
   projectName: string;
 }> = ({entityName, projectName, children}) => {
-  // const hasTSData = useProjectHasTraceServerCalls(entityName, projectName);
+  // const { result: hasTSData } = useProjectHasTraceServerCalls(entityName, projectName);
   const hasTSData = true;
 
   if (hasTSData) {
@@ -115,7 +115,8 @@ export const useProjectHasTraceServerCalls = (
     skip: !hasTraceServer,
   });
 
-  return (calls.result ?? []).length > 0;
+  const loading = calls.loading;
+  return {loading, result: (calls.result ?? []).length > 0};
 };
 
 /**
@@ -137,7 +138,8 @@ export const useProjectHasTraceServerObjects = (
     }
   );
 
-  return (objs.result ?? []).length > 0;
+  const loading = objs.loading;
+  return {loading, result: (objs.result ?? []).length > 0};
 };
 
 /**
@@ -162,6 +164,9 @@ export const useProjectHasTraceServerData = (
   const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
     skip: !hasTraceServer,
   });
-
-  return (objs.result ?? []).length > 0 || (calls.result ?? []).length > 0;
+  const loading = objs.loading || calls.loading;
+  return {
+    loading,
+    result: (objs.result ?? []).length > 0 || (calls.result ?? []).length > 0,
+  };
 };
