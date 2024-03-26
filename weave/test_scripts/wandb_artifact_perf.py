@@ -31,12 +31,13 @@ async def gql_test() -> None:
     net = weave_http.HttpAsync(fs)
     file_man = wandb_file_manager.WandbFileManagerAsync(fs, net, api)
     man = await file_man.manifest(
+        "_",
         artifact_wandb.WeaveWBArtifactURI(
             "raw_data",
             "v4",
             entity_name="shawn",
             project_name="dsviz_demo",
-        )
+        ),
     )
     if man is None:
         raise Exception("Manifest is None")

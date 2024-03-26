@@ -294,7 +294,7 @@ class WandbFileManager:
                 art_uri.entity_name,
                 art_uri.project_name,
                 art_uri.name + ":" + art_uri.version,
-                )
+            )
         if manifest_url is None:
             return None
         self.http.download_file(

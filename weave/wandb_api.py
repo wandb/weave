@@ -423,9 +423,7 @@ class WandbApi:
 
     def artifact_manifest_url_from_id(self, art_id: str) -> typing.Optional[str]:
         try:
-            result = self.query(
-                self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id
-            )
+            result = self.query(self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id)
         except gql.transport.exceptions.TransportQueryError as e:
             return None
         artifact = result["artifact"]
