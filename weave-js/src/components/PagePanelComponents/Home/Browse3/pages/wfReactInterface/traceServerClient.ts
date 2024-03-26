@@ -12,7 +12,7 @@
  * several other endpoints that we should implement.
  */
 
-import { getCookie } from '@wandb/weave/common/util/cookie';
+import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
@@ -239,7 +239,7 @@ export class TraceServerClient {
       // that we send a basic auth header, but it uses cookies for
       // authentication.
       Authorization: 'Basic ' + btoa(':'),
-    }
+    };
     const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
     if (useAdminPrivileges) {
       headers['use-admin-privileges'] = 'true';
