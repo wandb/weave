@@ -499,7 +499,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_raw_refs = [refs_internal.parse_uri(r) for r in req.refs]
+        parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
         if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
         parsed_refs = typing.cast(
@@ -556,7 +556,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if isinstance(val, str) and val.startswith(
                     refs_internal.WEAVE_INTERNAL_SCHEME + "://"
                 ):
-                    parsed_ref = refs_internal.parse_uri(val)
+                    parsed_ref = refs_internal.parse_internal_uri(val)
                     if isinstance(parsed_ref, refs_internal.InternalObjectRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
@@ -629,7 +629,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Resolve any unresolved table refs
             # First batch the table queries by project_id and table digest
             table_queries: dict[
-                typing.Tuple[str, str, str], list[typing.Tuple[int, str]]
+                typing.Tuple[str, str], list[typing.Tuple[int, str]]
             ] = {}
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_table_ref is not None:

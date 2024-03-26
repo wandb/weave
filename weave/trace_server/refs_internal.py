@@ -40,7 +40,7 @@ class InternalObjectRef:
 
 
 @dataclasses.dataclass
-class InternalOpRef(ObjectRef):
+class InternalOpRef(InternalObjectRef):
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/op/{self.name}:{self.version}"
         if self.extra:

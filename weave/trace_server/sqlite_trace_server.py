@@ -427,9 +427,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise ValueError("Too many refs")
 
         parsed_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
-        if any(
-            isinstance(r, refs_internal.InternalTableRefTableRef) for r in parsed_refs
-        ):
+        if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
         parsed_obj_refs = cast(list[refs_internal.InternalObjectRef], parsed_refs)
 
