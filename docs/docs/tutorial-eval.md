@@ -102,7 +102,7 @@ def fruit_name_score(target: dict, prediction: dict) -> dict:
 # highlight-next-line
 evaluation = evaluate.Evaluation(
     # highlight-next-line
-    dataset, scores=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
+    dataset=dataset, scorers=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
 # highlight-next-line
 )
 # highlight-next-line

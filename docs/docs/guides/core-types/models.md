@@ -32,7 +32,7 @@ You can call the model as usual with:
 import weave
 weave.init('project-name')
 
-model = YourModel('hello', 5)
+model = YourModel(attribute1='hello', attribute2=5)
 model.predict('world')
 ```
 
@@ -48,7 +48,7 @@ For example, here we create a new model:
 import weave
 weave.init('project-name')
 
-model = YourModel('howdy', 10)
+model = YourModel(attribute1='howdy', attribute2=10)
 model.predict('world')
 ```
 

@@ -11,7 +11,7 @@ Evaluation-driven development helps you reliably iterate on an application. The 
 from weave import Evaluation
 
 evaluation = Evaluation(
-    dataset, scores=[score]
+    dataset=dataset, scorers=[score]
 )
 evaluation.evaluate(model)
 ```
