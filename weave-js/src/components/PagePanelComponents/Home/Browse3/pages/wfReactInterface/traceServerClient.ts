@@ -192,15 +192,24 @@ export class TraceServerClient {
   fileContent: (
     req: TraceFileContentReadReq
   ) => Promise<TraceFileContentReadRes> = req => {
-    return this.makeRequest<TraceFileContentReadReq, TraceFileContentReadRes>(
+    const res = this.makeRequest<TraceFileContentReadReq, string>(
       '/files/content',
-      req
+      req,
+      true,
     );
+    return new Promise((resolve, reject) => {
+      res.then((content) => {
+        resolve({content})
+      }).catch((err) => {
+        reject(err)
+      })
+    })
   };
 
   private makeRequest = async <QT, ST>(
     endpoint: string,
-    req: QT
+    req: QT,
+    returnText?: boolean
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
     const reqBody = JSON.stringify(req);
@@ -235,6 +244,9 @@ export class TraceServerClient {
       body: reqBody,
     })
       .then(response => {
+        if (returnText) {
+          return response.text();
+        }
         return response.json();
       })
       .then(res => {
