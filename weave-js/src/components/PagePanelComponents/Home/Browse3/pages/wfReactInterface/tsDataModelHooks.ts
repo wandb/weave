@@ -800,7 +800,8 @@ const mergeTypes = (a: Types.Type, b: Types.Type): Types.Type => {
         objectType: mergeTypes(a.objectType, b.objectType),
       };
     } else {
-      console.warn('unhandled type merge ' + a.type + ' ' + b.type);
+      // This gets very noisy, so commenting out for now.
+      // console.warn('unhandled type merge ' + a.type + ' ' + b.type);
     }
   }
   return union([a, b]);

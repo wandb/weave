@@ -86,8 +86,12 @@ class Evaluation(Object):
         else:
             predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
+        # If the op is a `BoundOp`, then the first arg is automatically added at
+        # call time and we should exclude it from the args required from the
+        # user.
         if isinstance(model_predict, BoundOp):
             model_predict_arg_names = model_predict_arg_names[1:]
+
         if isinstance(model_input, dict):
             model_predict_args = {
                 k: v for k, v in model_input.items() if k in model_predict_arg_names
@@ -99,11 +103,10 @@ class Evaluation(Object):
                 raise ValueError(
                     f"{model_predict} expects arguments: {model_predict_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                 )
-
         try:
             prediction = await async_call(model_predict, **model_predict_args)
         except OpCallError as e:
-            dataset_column_names = list(model_input.keys())
+            dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
             if len(dataset_column_names) > 3:
                 dataset_column_names_str += ", ..."
@@ -140,6 +143,13 @@ class Evaluation(Object):
             else:
                 score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
+
+            # If the op is a `BoundOp`, then the first arg is automatically added at
+            # call time and we should exclude it from the args required from the
+            # user.
+            if isinstance(score_arg_names, BoundOp):
+                score_arg_names = score_arg_names[1:]
+
             if "prediction" not in score_arg_names:
                 raise OpCallError(
                     f"Scorer {scorer_name} must have a 'prediction' argument, to receive the output of the model function."
@@ -229,7 +239,7 @@ class Evaluation(Object):
             n_complete += 1
             duration = time.time() - start_time
             # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"
+            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
             if eval_row == None:
                 eval_row = {"prediction": None, "scores": {}}

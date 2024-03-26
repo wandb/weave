@@ -129,6 +129,7 @@ export type TraceFileContentReadRes = {
 };
 
 const DEFAULT_BATCH_INTERVAL = 150;
+const MAX_REFS_PER_BATCH = 1000;
 
 export class TraceServerClient {
   private baseUrl: string;
@@ -191,15 +192,26 @@ export class TraceServerClient {
   fileContent: (
     req: TraceFileContentReadReq
   ) => Promise<TraceFileContentReadRes> = req => {
-    return this.makeRequest<TraceFileContentReadReq, TraceFileContentReadRes>(
+    const res = this.makeRequest<TraceFileContentReadReq, string>(
       '/files/content',
-      req
+      req,
+      true
     );
+    return new Promise((resolve, reject) => {
+      res
+        .then(content => {
+          resolve({content});
+        })
+        .catch(err => {
+          reject(err);
+        });
+    });
   };
 
   private makeRequest = async <QT, ST>(
     endpoint: string,
-    req: QT
+    req: QT,
+    returnText?: boolean
   ): Promise<ST> => {
     const url = `${this.baseUrl}${endpoint}`;
     const reqBody = JSON.stringify(req);
@@ -234,6 +246,9 @@ export class TraceServerClient {
       body: reqBody,
     })
       .then(response => {
+        if (returnText) {
+          return response.text();
+        }
         return response.json();
       })
       .then(res => {
@@ -289,11 +304,14 @@ export class TraceServerClient {
     const collectors = [...this.readBatchCollectors];
     this.readBatchCollectors = [];
     const refs = _.uniq(collectors.map(c => c.req.refs).flat());
-    const res = await this.readBatchDirect({refs});
-    const vals = res.vals;
     const valMap = new Map<string, any>();
-    for (let i = 0; i < refs.length; i++) {
-      valMap.set(refs[i], vals[i]);
+    while (refs.length > 0) {
+      const refsForBatch = refs.splice(0, MAX_REFS_PER_BATCH);
+      const res = await this.readBatchDirect({refs: refsForBatch});
+      const vals = res.vals;
+      for (let i = 0; i < refsForBatch.length; i++) {
+        valMap.set(refsForBatch[i], vals[i]);
+      }
     }
     collectors.forEach(collector => {
       const req = collector.req;

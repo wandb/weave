@@ -1,3 +1,4 @@
+import io
 import typing as t
 from pydantic import BaseModel
 import requests
@@ -205,4 +206,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             auth=self._auth,
         )
         r.raise_for_status()
-        return tsi.FileContentReadRes.model_validate(r.json())
+        # TODO: Should stream to disk rather than to memory
+        bytes = io.BytesIO()
+        bytes.writelines(r.iter_content())
+        bytes.seek(0)
+        return tsi.FileContentReadRes(content=bytes.read())

@@ -267,6 +267,9 @@ class WeaveClient:
                 version_digest=ref.version,
             )
         )
+        # Probably bad form to mutate the ref here
+        if ref.version == "latest":
+            ref.version = read_res.obj.digest
         val = from_json(read_res.obj.val, self._project_id(), self.server)
         return make_trace_obj(val, ref, self.server, None)
 

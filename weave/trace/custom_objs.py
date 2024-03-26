@@ -2,7 +2,7 @@ import contextlib
 import io
 import os
 import tempfile
-from typing import Any, Dict, Optional, Union, Mapping, Iterator
+from typing import Any, Dict, Optional, Union, Mapping, Iterator, Generator
 from weave import weave_types as types
 from weave import artifact_fs
 from weave.trace_server.trace_server_interface_util import (
@@ -82,6 +82,15 @@ class MemTraceFilesArtifact(artifact_fs.FilesystemArtifact):
     @property
     def metadata(self) -> artifact_fs.ArtifactMetadata:
         return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
+
+    @contextlib.contextmanager
+    def writeable_file_path(self, path: str) -> Generator[str, None, None]:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            full_path = os.path.join(tmpdir, path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            yield full_path
+            with open(full_path, "rb") as fp:
+                self.path_contents[path] = fp.read()
 
 
 def encode_custom_obj(obj: Any) -> Optional[dict]:

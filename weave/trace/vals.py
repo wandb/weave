@@ -169,50 +169,30 @@ class TraceTable(Tracable):
         if root is None:
             root = self
         self.root = root
+        self._loaded_rows: typing.Optional[typing.List[typing.Dict]] = None
 
-    def __getitem__(self, key: Union[int, slice, str]) -> Any:
-        if isinstance(key, slice):
-            raise ValueError("Slices not yet supported")
-        elif isinstance(key, int):
-            response = self.server.table_query(
-                TableQueryReq(
-                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
-                    table_digest=self.table_ref.digest,
-                )
-            )
-            row = response.rows[key]
-            new_ref = self.ref.with_item(row.digest)
+    def __len__(self) -> int:
+        return len(self._all_rows())
 
-            return make_trace_obj(
-                row.val,
-                new_ref,
-                self.server,
-                self.root,
-            )
-        else:
-            for row in self:
-                if row.ref.extra[-1] == key:
-                    return row
-            else:
-                raise KeyError(f"Row ID not found: {key}")
+    def _all_rows(self) -> typing.List[typing.Dict]:
+        # TODO: This is not an efficient way to do this - we essentially
+        # load the entire set of rows the first time we need anything. However
+        # the previous implementation loaded the entire set of rows for every action
+        # so this is still better.
+        if self._loaded_rows == None:
+            self._loaded_rows = [row for row in self._remote_iter()]
 
-    def __iter__(self) -> Generator[Any, None, None]:
+        return typing.cast(typing.List[typing.Dict], self._loaded_rows)
+
+    def _remote_iter(self) -> Generator[typing.Dict, None, None]:
         page_index = 0
         page_size = 1000
         i = 0
         while True:
-            # page_data = self.server.table_query(
-            #     self.table_ref,
-            #     self.filter,
-            #     offset=page_index * page_size,
-            #     limit=page_size,
-            # )
             response = self.server.table_query(
                 TableQueryReq(
                     project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
                     table_digest=self.table_ref.digest,
-                    # TODO: must do paging or this will infinite loop
-                    # if table is larger than page_size!
                     offset=page_index * page_size,
                     limit=page_size,
                     # filter=self.filter,
@@ -230,6 +210,23 @@ class TraceTable(Tracable):
             if len(response.rows) < page_size:
                 break
             page_index += 1
+
+    def __getitem__(self, key: Union[int, slice, str]) -> Any:
+        rows = self._all_rows()
+        if isinstance(key, slice):
+            return rows[key]
+        elif isinstance(key, int):
+            return rows[key]
+        else:
+            for row in rows:
+                if row.ref.extra[-1] == key:  # type: ignore
+                    return row
+            else:
+                raise KeyError(f"Row ID not found: {key}")
+
+    def __iter__(self) -> Generator[Any, None, None]:
+        for row in self._all_rows():
+            yield row
 
     def append(self, val: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
