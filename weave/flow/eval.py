@@ -106,7 +106,7 @@ class Evaluation(Object):
         try:
             prediction = await async_call(model_predict, **model_predict_args)
         except OpCallError as e:
-            dataset_column_names = list(model_input.keys())
+            dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
             if len(dataset_column_names) > 3:
                 dataset_column_names_str += ", ..."
@@ -232,24 +232,24 @@ class Evaluation(Object):
             return eval_row
 
         n_complete = 0
-        with console.status("Evaluating...") as status:
-            dataset = typing.cast(Dataset, self.dataset)
-            _rows = dataset.rows
-            async for example, eval_row in util.async_foreach(_rows, eval_example, 30):
-                n_complete += 1
-                duration = time.time() - start_time
-                status.update(
-                    f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-                )
-                if eval_row == None:
-                    eval_row = {"prediction": None, "scores": {}}
-                if eval_row["scores"] == None:
-                    eval_row["scores"] = {}
-                for scorer in self.scorers or []:
-                    scorer_name, _, _ = get_scorer_attributes(scorer)
-                    if scorer_name not in eval_row["scores"]:
-                        eval_row["scores"][scorer_name] = {}
-                eval_rows.append(eval_row)
+        # with console.status("Evaluating...") as status:
+        dataset = typing.cast(Dataset, self.dataset)
+        _rows = dataset.rows
+        async for example, eval_row in util.async_foreach(_rows, eval_example, 30):
+            n_complete += 1
+            duration = time.time() - start_time
+            # status.update(
+            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
+            # )
+            if eval_row == None:
+                eval_row = {"prediction": None, "scores": {}}
+            if eval_row["scores"] == None:
+                eval_row["scores"] = {}
+            for scorer in self.scorers or []:
+                scorer_name, _, _ = get_scorer_attributes(scorer)
+                if scorer_name not in eval_row["scores"]:
+                    eval_row["scores"][scorer_name] = {}
+            eval_rows.append(eval_row)
 
         # eval_table: weave.WeaveList = weave.WeaveList(eval_rows)
 
