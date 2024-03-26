@@ -676,9 +676,12 @@ def _get_table_data_from_file(file: artifact_fs.FilesystemArtifactFile) -> dict:
     tracer = engine_trace.tracer()
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
+    print("before open", flush=True)
     with file.open() as f:
+        print("after open", flush=True)
         with tracer.trace("get_table:jsonload"):
             data = json.load(f)
+    print(f"data ====> {data}", flush=True)
     return data
 
 
@@ -688,6 +691,7 @@ def _get_table_like_awl_from_file(
     ],
     num_parts: int = 1,
 ) -> _TableLikeAWLFromFileResult:
+    print("in here", flush=True)
     if file is None or isinstance(file, artifact_fs.FilesystemArtifactDir):
         raise errors.WeaveInternalError("File is None or a directory")
     data = _get_table_data_from_file(file)
@@ -696,6 +700,7 @@ def _get_table_like_awl_from_file(
     elif file.path.endswith(".partitioned-table.json"):
         awl = _get_partitioned_table_awl_from_file(data, file)
     elif file.path.endswith(".table.json"):
+        print("in if branch - ends with table.json", flush=True)
         awl = _get_table_awl_from_file(data, file, num_parts)
     else:
         raise errors.WeaveInternalError(
@@ -850,8 +855,13 @@ def file_table(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Tabl
     # a file from run summary since it is constructed from a hard-coded artifact
     # URL. This path is only used when fetching tables.
     try:
+        print(
+            f"\n\nlogging inside file_table\n\n",
+            flush=True,
+        )
         return Table(_get_table_like_awl_from_file(file).awl)
     except FileNotFoundError as e:
+        print(f"file_table exception: {e}",flush=True)
         return None
 
 

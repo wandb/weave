@@ -269,20 +269,13 @@ class FakeIoServiceClient:
 
     def add_artifact(self, artifact, artifact_uri):
         ma = MockedArtifact(artifact)
-
         self.mocked_artifacts[str(artifact_uri)] = ma
 
     def manifest(self, artifact_id, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
         if uri_str in self.mocked_artifacts:
             return FakeArtifactManifest(self.mocked_artifacts[uri_str].artifact)
-        if artifact_id in self.mocked_artifacts:
-            return FakeArtifactManifest(self.mocked_artifacts[artifact_id].artifact)
-            # return FakeFilesystemManifest(self.mocked_artifacts[uri_str].local_path.name)
-        if artifact_uri.entity_name == "_":
-            requested_path = artifact_id
-        else:
-            requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
+        requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
         target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
         return FakeFilesystemManifest(target)
 
