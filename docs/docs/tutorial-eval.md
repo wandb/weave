@@ -43,8 +43,8 @@ class ExtractFruitsModel(weave.Model):
             ],
         )
         result = response.choices[0].message.content
-            if result is None:
-                raise ValueError("No response from model")
+        if result is None:
+            raise ValueError("No response from model")
         parsed = json.loads(result)
         return parsed
 ```
@@ -56,7 +56,8 @@ model = ExtractFruitsModel(model_name='gpt-3.5-turbo-1106',
                           prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor": <str>) from the following text, as json: {sentence}')
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
 print(asyncio.run(model.predict(sentence))) 
-# note: you can also call `await model.predict(sentence)` within async functions
+# if you're in a Jupyter Notebook, run:
+# await model.predict(sentence)
 ```
 
 :::note
@@ -101,11 +102,13 @@ def fruit_name_score(target: dict, prediction: dict) -> dict:
 # highlight-next-line
 evaluation = weave.Evaluation(
     # highlight-next-line
-    dataset=dataset, scorers=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
+    dataset=examples, scorers=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
 # highlight-next-line
 )
 # highlight-next-line
 print(asyncio.run(evaluation.evaluate(model)))
+# if you're in a Jupyter Notebook, run:
+# await evaluation.evaluate(model)
 ```
 
 ## Pulling it all together
