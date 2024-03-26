@@ -43,14 +43,6 @@ class Agent(Object):
         ]
         messages += state.history
 
-        # TODO: have to strip Nones, because reading list back from
-        # Weave object injects them, due to type merging.
-        # It's also odd that we're even reading back at all, I think that's
-        # the auto-publish path, it doesn't put obj into created refs, so when
-        # we go to deref in auth-publish, we don't get the original object.
-        # This will incur significant API overhead.
-        messages = [{k: v for k, v in m.items() if v is not None} for m in messages]  # type: ignore
-
         # make type checkers happy by passing NotGiven instead of None
         tools = NotGiven()
         if self.tools:
@@ -76,6 +68,8 @@ class Agent(Object):
             LogEvents.chat_response_complete(response_message.content)
 
         new_messages = []
+        # TODO: need this to work around the fact that Weave replaces pydantic
+        # objects before they get to openai. Fix Weave!
         new_messages.append(response_message.model_dump(exclude_none=True))
         if response_message.tool_calls:
             new_messages.extend(
