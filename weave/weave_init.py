@@ -55,6 +55,9 @@ def init_weave(project_name: str) -> InitializedClient:
     remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
+    # Must init to read ensure we've read auth from the environment, in
+    # case we're on a new thread.
+    wandb_api.init()
     wandb_context = wandb_api.get_wandb_api_context()
     if wandb_context is not None and wandb_context.api_key is not None:
         remote_server.set_auth(("api", wandb_context.api_key))
