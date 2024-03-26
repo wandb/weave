@@ -7,7 +7,7 @@ from weave import op_def, Evaluation
 
 from weave import weave_client
 from weave.trace.op import Op
-from weave.trace_server.refs import (
+from weave.trace.refs import (
     ATTRIBUTE_EDGE_TYPE,
     ID_EDGE_TYPE,
     INDEX_EDGE_TYPE,
