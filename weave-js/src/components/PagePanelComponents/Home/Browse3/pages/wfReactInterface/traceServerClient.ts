@@ -12,6 +12,7 @@
  * several other endpoints that we should implement.
  */
 
+import { getCookie } from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
@@ -232,17 +233,22 @@ export class TraceServerClient {
       return prom;
     }
 
+    const headers: {[key: string]: string} = {
+      'Content-Type': 'application/json',
+      // This is a dummy auth header, the trace server requires
+      // that we send a basic auth header, but it uses cookies for
+      // authentication.
+      Authorization: 'Basic ' + btoa(':'),
+    }
+    const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
+    if (useAdminPrivileges) {
+      headers['use-admin-privileges'] = 'true';
+    }
     // eslint-disable-next-line wandb/no-unprefixed-urls
     fetch(url, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        // This is a dummy auth header, the trace server requires
-        // that we send a basic auth header, but it uses cookies for
-        // authentication.
-        Authorization: 'Basic ' + btoa(':'),
-      },
+      headers,
       body: reqBody,
     })
       .then(response => {
