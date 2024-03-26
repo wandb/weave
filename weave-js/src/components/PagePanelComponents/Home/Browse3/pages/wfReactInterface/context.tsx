@@ -104,6 +104,25 @@ export const WFDataModelAutoProvider: FC<{
 
 /**
  * Returns true if the client can connect to trace server and the project has
+ * calls.
+ */
+export const useProjectHasTraceServerCalls = (
+  entity: string,
+  project: string
+) => {
+  const hasTraceServer = useHasTraceServerClientContext();
+  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
+    skip: !hasTraceServer,
+  });
+  const loading = calls.loading;
+  return {
+    loading,
+    result: (calls.result ?? []).length > 0,
+  };
+};
+
+/**
+ * Returns true if the client can connect to trace server and the project has
  * objects or calls.
  */
 export const useProjectHasTraceServerData = (
