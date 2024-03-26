@@ -78,7 +78,7 @@ export const WFDataModelAutoProvider: FC<{
   entityName: string;
   projectName: string;
 }> = ({entityName, projectName, children}) => {
-  // const { result: hasTSData } = useProjectHasTraceServerCalls(entityName, projectName);
+  // const { result: hasTSData } = useProjectHasTraceServerData(entityName, projectName);
   const hasTSData = true;
 
   if (hasTSData) {
@@ -100,46 +100,6 @@ export const WFDataModelAutoProvider: FC<{
       {children}
     </WFDataModelFromComputeGraphProvider>
   );
-};
-
-/**
- * Returns true if the client can connect to trace server and the project has
- * data in the trace server.
- */
-export const useProjectHasTraceServerCalls = (
-  entity: string,
-  project: string
-) => {
-  const hasTraceServer = useHasTraceServerClientContext();
-  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
-    skip: !hasTraceServer,
-  });
-
-  const loading = calls.loading;
-  return {loading, result: (calls.result ?? []).length > 0};
-};
-
-/**
- * Returns true if the client can connect to trace server and the project has
- * objects.
- */
-export const useProjectHasTraceServerObjects = (
-  entity: string,
-  project: string
-) => {
-  const hasTraceServer = useHasTraceServerClientContext();
-  const objs = tsWFDataModelHooks.useRootObjectVersions(
-    entity,
-    project,
-    {},
-    1,
-    {
-      skip: !hasTraceServer,
-    }
-  );
-
-  const loading = objs.loading;
-  return {loading, result: (objs.result ?? []).length > 0};
 };
 
 /**
