@@ -24,7 +24,6 @@ class Object(BaseModel):
         ignored_types=(Op,),
         arbitrary_types_allowed=True,
         protected_namespaces=(),
-        # TODO: Don't check this in... something needs fixing.
         extra="forbid",
     )
 
@@ -50,7 +49,14 @@ class Object(BaseModel):
                     val = None
                 fields[k] = val
             # pydantic validation will construct a new pydantic object
-            new_obj = handler(fields)
+            def is_ignored_type(v: type) -> bool:
+                return isinstance(v, cls.model_config["ignored_types"])
+
+            allowed_fields = {k: v for k, v in fields.items() if not is_ignored_type(v)}
+            new_obj = handler(allowed_fields)
+            for k, v in fields.items():
+                if is_ignored_type(v):
+                    new_obj.__dict__[k] = v
 
             # transfer ref to new object
             # We can't attach a ref directly to pydantic objects yet.
