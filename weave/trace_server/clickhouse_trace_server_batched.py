@@ -411,7 +411,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             column_names=["project_id", "digest", "val"],
         )
 
-        row_digests = [r[2] for r in insert_rows]
+        row_digests = [r[1] for r in insert_rows]
 
         table_hasher = hashlib.sha256()
         for row_digest in row_digests:
@@ -435,7 +435,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             conds.append("1 = 1")
         rows = self._table_query(
-            req.table.project_id,
+            req.project_id,
             req.table_digest,
             conditions=conds,
             limit=req.limit,
