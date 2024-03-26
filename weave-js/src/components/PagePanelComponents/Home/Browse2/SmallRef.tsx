@@ -14,7 +14,10 @@ import {Icon, IconName, IconNames} from '../../../Icon';
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {Link} from '../Browse3/pages/common/Links';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
-import {ObjectVersionKey} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  ObjectVersionKey,
+  OpVersionKey,
+} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -80,12 +83,17 @@ export const SmallRef: FC<{
 }> = ({objRef, wfTable, iconOnly = false}) => {
   const {
     useObjectVersion,
+    useOpVersion,
     derived: {useRefsType},
   } = useWFHooks();
 
   let objVersionKey: ObjectVersionKey | null = null;
+  let opVersionKey: OpVersionKey | null = null;
 
-  if (isWandbArtifactRef(objRef)) {
+  const isArtifactRef = isWandbArtifactRef(objRef);
+  const isWeaveObjRef = isWeaveObjectRef(objRef);
+
+  if (isArtifactRef) {
     objVersionKey = {
       scheme: 'wandb-artifact',
       entity: objRef.entityName,
@@ -95,20 +103,31 @@ export const SmallRef: FC<{
       path: objRef.artifactPath,
       refExtra: objRef.artifactRefExtra,
     };
-  } else if (isWeaveObjectRef(objRef)) {
-    objVersionKey = {
-      scheme: 'weave',
-      entity: objRef.entityName,
-      project: objRef.projectName,
-      weaveKind: objRef.weaveKind,
-      objectId: objRef.artifactName,
-      versionHash: objRef.artifactVersion,
-      path: '',
-      refExtra: objRef.artifactRefExtra,
-    };
+  } else if (isWeaveObjRef) {
+    if (objRef.weaveKind === 'op') {
+      opVersionKey = {
+        entity: objRef.entityName,
+        project: objRef.projectName,
+        opId: objRef.artifactName,
+        versionHash: objRef.artifactVersion,
+      };
+    } else {
+      objVersionKey = {
+        scheme: 'weave',
+        entity: objRef.entityName,
+        project: objRef.projectName,
+        weaveKind: objRef.weaveKind,
+        objectId: objRef.artifactName,
+        versionHash: objRef.artifactVersion,
+        path: '',
+        refExtra: objRef.artifactRefExtra,
+      };
+    }
   }
   const objectVersion = useObjectVersion(objVersionKey);
-  const versionIndex = objectVersion.result?.versionIndex;
+  const opVersion = useOpVersion(opVersionKey);
+  const versionIndex =
+    objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
 
   const {peekingRouter} = useWeaveflowRouteContext();
   const refTypeQuery = useRefsType([refUri(objRef)]);
@@ -168,7 +187,7 @@ export const SmallRef: FC<{
   if (refTypeQuery.loading) {
     return Item;
   }
-  if (!isWandbArtifactRef(objRef) && !isWeaveObjectRef(objRef)) {
+  if (!isArtifactRef && !isWeaveObjRef) {
     return <div>[Error: non wandb ref]</div>;
   }
   return (
