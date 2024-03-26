@@ -362,8 +362,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.version_digest == "latest":
             conds.append("is_latest = 1")
         else:
-            conds.append("digest = {version_digest: String}")
-            parameters["version_digest"] = req.version_digest
+            (is_version, version_index) = _digest_is_version_like(req.version_digest)
+            if is_version:
+                conds.append("version_index = {version_index: UInt64}")
+                parameters["version_index"] = version_index
+            else:
+                conds.append("digest = {version_digest: String}")
+                parameters["version_digest"] = req.version_digest
         objs = self._select_objs_query(
             req.entity, req.project, conditions=conds, parameters=parameters
         )
@@ -517,13 +522,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 val = root_val_cache[cache_key]
             else:
                 if r.version == "latest":
-                    conds = [
-                        "name = {name: String}",
-                        "is_latest = 1",
-                    ]
-                    parameters = {
-                        "name": r.name,
-                    }
+                    raise NotFoundError(f"Reading refs with `latest` is not supported")
+                    # conds = [
+                    #     "name = {name: String}",
+                    #     "is_latest = 1",
+                    # ]
+                    # parameters = {
+                    #     "name": r.name,
+                    # }
                 else:
                     conds = [
                         "name = {name: String}",
@@ -1179,3 +1185,11 @@ def get_type(val: typing.Any) -> str:
     elif isinstance(val, list):
         return "list"
     return "unknown"
+
+def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
+    if not digest.startswith("v"):
+        return False
+    try:
+        return (True, int(digest[1:]))
+    except ValueError:
+        return (False, -1)
