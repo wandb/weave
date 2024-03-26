@@ -129,6 +129,7 @@ export type TraceFileContentReadRes = {
 };
 
 const DEFAULT_BATCH_INTERVAL = 150;
+const MAX_REFS_PER_BATCH = 1000;
 
 export class TraceServerClient {
   private baseUrl: string;
@@ -288,12 +289,15 @@ export class TraceServerClient {
     }
     const collectors = [...this.readBatchCollectors];
     this.readBatchCollectors = [];
-    const refs = _.uniq(collectors.map(c => c.req.refs).flat());
-    const res = await this.readBatchDirect({refs});
-    const vals = res.vals;
+    let refs = _.uniq(collectors.map(c => c.req.refs).flat());
     const valMap = new Map<string, any>();
-    for (let i = 0; i < refs.length; i++) {
-      valMap.set(refs[i], vals[i]);
+    while (refs.length > 0) {
+      let refsForBatch = refs.splice(0, MAX_REFS_PER_BATCH);
+      const res = await this.readBatchDirect({refs: refsForBatch});
+      const vals = res.vals;
+      for (let i = 0; i < refsForBatch.length; i++) {
+        valMap.set(refsForBatch[i], vals[i]);
+      }
     }
     collectors.forEach(collector => {
       const req = collector.req;
