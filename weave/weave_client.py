@@ -31,7 +31,7 @@ from weave.trace_server.trace_server_interface import (
     _CallsFilter,
     _ObjectVersionFilter,
 )
-from weave.trace_server.refs import (
+from weave.trace.refs import (
     Ref,
     ObjectRef,
     TableRef,
@@ -261,8 +261,7 @@ class WeaveClient:
     def get(self, ref: ObjectRef) -> Any:
         read_res = self.server.obj_read(
             ObjReadReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self._project_id(),
                 name=ref.name,
                 version_digest=ref.version,
             )

@@ -1,7 +1,6 @@
 CREATE TABLE objects
 (
-    entity String,
-    project String,
+    project_id String,
     name String,
     created_at DateTime64 DEFAULT now64(),
     type String,
@@ -10,12 +9,11 @@ CREATE TABLE objects
     digest String
 ) 
 ENGINE = ReplacingMergeTree() 
-ORDER BY (entity, project, type, name, digest);
+ORDER BY (project_id, type, name, digest);
 
 CREATE VIEW objects_deduped AS
 SELECT
-    entity,
-    project,
+    project_id,
     name,
     created_at,
     type,
@@ -23,55 +21,53 @@ SELECT
     val,
     digest,
     if (type = 'Op', 1, 0) AS is_op,
-    row_number() OVER (PARTITION BY entity, project, type, name ORDER BY created_at ASC) AS _version_index_plus_1,
+    row_number() OVER (PARTITION BY project_id, type, name ORDER BY created_at ASC) AS _version_index_plus_1,
     _version_index_plus_1 - 1 AS version_index,
-    count(*) OVER (PARTITION BY entity, project, type, name) as version_count,
+    count(*) OVER (PARTITION BY project_id, type, name) as version_count,
     if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
 FROM (
     SELECT *,
-           row_number() OVER (PARTITION BY entity, project, type, name, digest ORDER BY created_at ASC) AS rn
+           row_number() OVER (PARTITION BY project_id, type, name, digest ORDER BY created_at ASC) AS rn
     FROM objects
 ) WHERE rn = 1
-WINDOW w AS (PARTITION BY entity, project, type, name ORDER BY created_at ASC)
-ORDER BY entity, project, type, name, created_at;
+WINDOW w AS (PARTITION BY project_id, type, name ORDER BY created_at ASC)
+ORDER BY project_id, type, name, created_at;
 
 CREATE TABLE table_rows
 (
-    entity String,
-    project String,
+    project_id String,
     digest String,
     val String,
 ) 
 ENGINE = ReplacingMergeTree() 
-ORDER BY (entity, project, digest);
+ORDER BY (project_id, digest);
 
 CREATE VIEW table_rows_deduped AS
 SELECT *
 FROM (
     SELECT *,
-           row_number() OVER (PARTITION BY entity, project, digest) AS rn
+           row_number() OVER (PARTITION BY project_id, digest) AS rn
     FROM table_rows
 ) WHERE rn = 1
-ORDER BY entity, project, digest;
+ORDER BY project_id, digest;
 
 CREATE TABLE tables
 (
-    entity String,
-    project String,
+    project_id String,
     digest String,
     row_digests Array(String),
 ) 
 ENGINE = ReplacingMergeTree() 
-ORDER BY (entity, project, digest);
+ORDER BY (project_id, digest);
 
 CREATE VIEW tables_deduped AS
 SELECT *
 FROM (
     SELECT *,
-           row_number() OVER (PARTITION BY entity, project, digest) AS rn
+           row_number() OVER (PARTITION BY project_id, digest) AS rn
     FROM tables
 ) WHERE rn = 1
-ORDER BY entity, project, digest;
+ORDER BY project_id, digest;
 
 
 CREATE TABLE files
