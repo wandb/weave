@@ -44,6 +44,7 @@ def _local_path_and_download_url(
     entity_name: typing.Optional[str] = None,
 ) -> typing.Optional[typing.Tuple[str, str]]:
     print(f"\n\nlogging inside download url: entity name {entity_name}\n\n", flush=True)
+    entity_name = entity_name or "_"
     path = art_uri.path
     if path is None:
         raise errors.WeaveInternalError(
@@ -155,7 +156,7 @@ class WandbFileManagerAsync:
         manifest = await self.manifest(art_id, art_uri)
         if manifest is None:
             return None
-        entity_name = self.wandb_api.artifact_path_info(
+        entity_name = await self.wandb_api.artifact_path_info(
             artifact_id=art_id,
         )
         return _local_path_and_download_url(art_uri, manifest, entity_name)
