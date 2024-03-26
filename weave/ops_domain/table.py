@@ -861,12 +861,12 @@ def file_table(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Tabl
     # URL. This path is only used when fetching tables.
     try:
         print(
-            f"\n\nlogging inside file_table\n\n",
+            "\n\nlogging inside file_table\n\n",
             flush=True,
         )
         return Table(_get_table_like_awl_from_file(file).awl)
     except FileNotFoundError as e:
-        print(f"file_table exception: {e}",flush=True)
+        print(f"file_table exception: {e}", flush=True)
         return None
 
 
