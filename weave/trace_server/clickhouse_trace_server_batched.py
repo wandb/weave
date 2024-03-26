@@ -358,7 +358,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = ["name = {name: String}"]
-        parameters = {"name": req.name}
+        parameters: typing.Dict[str, typing.Union[str, int]] = {"name": req.name}
         if req.version_digest == "latest":
             conds.append("is_latest = 1")
         else:
@@ -522,7 +522,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 val = root_val_cache[cache_key]
             else:
                 if r.version == "latest":
-                    raise NotFoundError(f"Reading refs with `latest` is not supported")
+                    raise NotFoundError("Reading refs with `latest` is not supported")
                     # conds = [
                     #     "name = {name: String}",
                     #     "is_latest = 1",
@@ -1186,9 +1186,10 @@ def get_type(val: typing.Any) -> str:
         return "list"
     return "unknown"
 
+
 def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
     if not digest.startswith("v"):
-        return False
+        return (False, -1)
     try:
         return (True, int(digest[1:]))
     except ValueError:
