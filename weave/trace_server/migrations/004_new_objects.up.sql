@@ -9,8 +9,8 @@ CREATE TABLE objects
     val String,
     digest String
 ) 
-ENGINE = MergeTree() 
-ORDER BY (entity, project, type, name, created_at);
+ENGINE = ReplacingMergeTree() 
+ORDER BY (entity, project, type, name, digest);
 
 CREATE VIEW objects_deduped AS
 SELECT
@@ -42,7 +42,7 @@ CREATE TABLE table_rows
     digest String,
     val String,
 ) 
-ENGINE = MergeTree() 
+ENGINE = ReplacingMergeTree() 
 ORDER BY (entity, project, digest);
 
 CREATE VIEW table_rows_deduped AS
@@ -61,7 +61,7 @@ CREATE TABLE tables
     digest String,
     row_digests Array(String),
 ) 
-ENGINE = MergeTree() 
+ENGINE = ReplacingMergeTree() 
 ORDER BY (entity, project, digest);
 
 CREATE VIEW tables_deduped AS
@@ -83,7 +83,7 @@ CREATE TABLE files
     name String,
     val String,
 ) 
-ENGINE = MergeTree() 
+ENGINE = ReplacingMergeTree() 
 ORDER BY (project_id, digest, chunk_index);
 
 CREATE VIEW files_deduped AS
