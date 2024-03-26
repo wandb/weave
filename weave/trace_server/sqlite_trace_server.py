@@ -386,7 +386,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 raise ValueError("All rows must be dictionaries")
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
-            insert_rows.append(( req.table.project_id, row_digest, row_json))
+            insert_rows.append((req.table.project_id, row_digest, row_json))
         with self.lock:
             cursor.executemany(
                 "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?, ?)",
@@ -427,7 +427,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise ValueError("Too many refs")
 
         parsed_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
-        if any(isinstance(r, refs_internal.InternalTableRefTableRef) for r in parsed_refs):
+        if any(
+            isinstance(r, refs_internal.InternalTableRefTableRef) for r in parsed_refs
+        ):
             raise ValueError("Table refs not supported")
         parsed_obj_refs = cast(list[refs_internal.InternalObjectRef], parsed_refs)
 
@@ -454,7 +456,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 elif op == "ndx":
                     val = val[int(arg)]
                 elif op == "id":
-                    if isinstance(val, str) and val.startswith(refs_internal.WEAVE_INTERNAL_SCHEME + "://"):
+                    if isinstance(val, str) and val.startswith(
+                        refs_internal.WEAVE_INTERNAL_SCHEME + "://"
+                    ):
                         table_ref = refs_internal.parse_internal_uri(val)
                         if not isinstance(table_ref, refs_internal.InternalTableRef):
                             raise ValueError(
@@ -544,9 +548,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             tsi.TableRowSchema(digest=r[0], val=json.loads(r[1])) for r in query_result
         ]
 
-    def _table_row_read(
-        self, project_id: str, row_digest: str
-    ) -> tsi.TableRowSchema:
+    def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
         cursor.execute(

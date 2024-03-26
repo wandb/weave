@@ -502,7 +502,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parsed_raw_refs = [refs_internal.parse_uri(r) for r in req.refs]
         if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
-        parsed_refs = typing.cast(typing.List[refs_internal.InternalObjectRef], parsed_raw_refs)
+        parsed_refs = typing.cast(
+            typing.List[refs_internal.InternalObjectRef], parsed_raw_refs
+        )
 
         root_val_cache: typing.Dict[str, typing.Any] = {}
 
@@ -551,7 +553,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         def resolve_extra(extra: list[str], val: typing.Any) -> typing.Any:
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-                if isinstance(val, str) and val.startswith(refs_internal.WEAVE_INTERNAL_SCHEME + "://"):
+                if isinstance(val, str) and val.startswith(
+                    refs_internal.WEAVE_INTERNAL_SCHEME + "://"
+                ):
                     parsed_ref = refs_internal.parse_uri(val)
                     if isinstance(parsed_ref, refs_internal.InternalObjectRef):
                         return PartialRefResult(

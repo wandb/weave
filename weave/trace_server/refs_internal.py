@@ -1,4 +1,4 @@
-# This file contains the definition for "Internal" weave refs. These should never be 
+# This file contains the definition for "Internal" weave refs. These should never be
 # exposed to the user and should only be used internally by the weave-trace service.
 # Specifically, the user-space operates on plain-text `entity/project` scopes. While
 # internally, we operate on internal `project_id`s scopes. At rest, and in the database,
@@ -14,6 +14,7 @@ KEY_EDGE_TYPE = "key"
 INDEX_EDGE_TYPE = "ndx"
 ATTRIBUTE_EDGE_TYPE = "atr"
 ID_EDGE_TYPE = "id"
+
 
 @dataclasses.dataclass
 class InternalTableRef:
