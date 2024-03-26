@@ -9,6 +9,7 @@ from typing import Union
 import dataclasses
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
+WEAVE_SCHEME = "weave"
 
 KEY_EDGE_TYPE = "key"
 INDEX_EDGE_TYPE = "ndx"
