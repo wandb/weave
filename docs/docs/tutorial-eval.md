@@ -91,7 +91,6 @@ Here, we'll use a default scoring function `MulticlassF1Score` and we'll also de
 Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. 
 
 ```python
-from weave import evaluate
 import weave
 from weave.flow.scorer import MulticlassF1Score
 
@@ -100,7 +99,7 @@ def fruit_name_score(target: dict, prediction: dict) -> dict:
     return {'correct': target['fruit'] == prediction['fruit']}
 
 # highlight-next-line
-evaluation = evaluate.Evaluation(
+evaluation = weave.Evaluation(
     # highlight-next-line
     dataset=dataset, scorers=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
 # highlight-next-line
@@ -114,8 +113,6 @@ print(asyncio.run(evaluation.evaluate(model)))
 ```python
 import json
 import asyncio
-# highlight-next-line
-from weave import evaluate
 # highlight-next-line
 import weave
 # highlight-next-line
