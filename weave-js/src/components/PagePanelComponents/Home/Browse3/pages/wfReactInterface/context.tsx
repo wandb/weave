@@ -117,3 +117,51 @@ export const useProjectHasTraceServerCalls = (
 
   return (calls.result ?? []).length > 0;
 };
+
+/**
+ * Returns true if the client can connect to trace server and the project has
+ * objects.
+ */
+export const useProjectHasTraceServerObjects = (
+  entity: string,
+  project: string
+) => {
+  const hasTraceServer = useHasTraceServerClientContext();
+  const objs = tsWFDataModelHooks.useRootObjectVersions(
+    entity,
+    project,
+    {},
+    1,
+    {
+      skip: !hasTraceServer,
+    }
+  );
+
+  return (objs.result ?? []).length > 0;
+};
+
+/**
+ * Returns true if the client can connect to trace server and the project has
+ * objects or calls.
+ */
+export const useProjectHasTraceServerData = (
+  entity: string,
+  project: string
+) => {
+  const hasTraceServer = useHasTraceServerClientContext();
+  const objs = tsWFDataModelHooks.useRootObjectVersions(
+    entity,
+    project,
+    {},
+    1,
+    {
+      skip: !hasTraceServer,
+    }
+  );
+
+  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
+    skip: !hasTraceServer,
+  });
+
+  return (objs.result ?? []).length > 0 || (calls.result ?? []).length > 0;
+};
