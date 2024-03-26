@@ -129,11 +129,13 @@ class BoundOp(Op):
 
     @property
     def ref(self) -> Optional[ObjectRef]:
-        return self.op.__ref
+        # return self.op.__ref
+        return self.op.ref
 
     @ref.setter
     def ref(self, ref: ObjectRef) -> None:
-        self.op.__ref = ref
+        # self.op.__ref = ref
+        self.op.ref = ref
 
 
 P = ParamSpec("P")
