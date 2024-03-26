@@ -8,14 +8,16 @@ import typing
 import hashlib
 import dataclasses
 
-
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
+from clickhouse_connect.driver.summary import QuerySummary
+
 import clickhouse_connect
 from pydantic import BaseModel
 
 from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
+from .errors import RequestTooLarge
 
 from .trace_server_interface_util import (
     extract_refs_from_values,
@@ -347,7 +349,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             digest=digest,
         )
 
-        self.ch_client.insert(
+        self._insert(
             "objects",
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
@@ -404,7 +406,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             row_digest = str_digest(row_json)
             insert_rows.append((entity, project, row_digest, row_json))
 
-        self.ch_client.insert(
+        self._insert(
             "table_rows",
             data=insert_rows,
             column_names=["entity", "project", "digest", "val"],
@@ -417,7 +419,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             table_hasher.update(row_digest.encode())
         table_digest = table_hasher.hexdigest()
 
-        self.ch_client.insert(
+        self._insert(
             "tables",
             data=[(entity, project, table_digest, row_digests)],
             column_names=["entity", "project", "digest", "row_digests"],
@@ -678,7 +680,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.content[i : i + FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), FILE_CHUNK_SIZE)
         ]
-        self.ch_client.insert(
+        self._insert(
             "files",
             data=[
                 (
@@ -742,7 +744,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if self._use_async_insert:
                 settings["async_insert"] = 1
                 settings["wait_for_async_insert"] = 0
-            self.ch_client.insert(
+            self._insert(
                 "calls_raw",
                 data=batch,
                 column_names=all_call_insert_columns,
@@ -755,7 +757,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if self._use_async_insert:
                 settings["async_insert"] = 1
                 settings["wait_for_async_insert"] = 0
-            self.ch_client.insert(
+            self._insert(
                 "objects_raw",
                 data=batch,
                 column_names=all_obj_insert_columns,
@@ -944,6 +946,28 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         print("Summary: " + json.dumps(res.summary, indent=2))
         return res
+
+    def _insert(
+        self,
+        table: str,
+        data: typing.Sequence[typing.Sequence[typing.Any]],
+        column_names: typing.List[str],
+        settings: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> QuerySummary:
+        try:
+            return self.ch_client.insert(
+                table, data=data, column_names=column_names, settings=settings
+            )
+        except ValueError as e:
+            if "negative shift count" in str(e):
+                # clickhouse_connect raises a weird error message like
+                # File "/Users/shawn/.pyenv/versions/3.10.13/envs/weave-public-editable/lib/python3.10/site-packages/clickhouse_connect/driver/
+                # │insert.py", line 120, in _calc_block_size
+                # │    return 1 << (21 - int(log(row_size, 2)))
+                # │ValueError: negative shift count
+                # when we try to insert something that's too large.
+                raise RequestTooLarge("Could not insert record")
+            raise
 
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         parameters = ch_call.model_dump()
