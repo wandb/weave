@@ -14,7 +14,7 @@ from weave.trace.refs import (
     KEY_EDGE_TYPE,
 )
 
-from weave.trace_server import refs
+from weave.trace import refs
 from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
     TableCreateReq,
