@@ -195,15 +195,17 @@ export class TraceServerClient {
     const res = this.makeRequest<TraceFileContentReadReq, string>(
       '/files/content',
       req,
-      true,
+      true
     );
     return new Promise((resolve, reject) => {
-      res.then((content) => {
-        resolve({content})
-      }).catch((err) => {
-        reject(err)
-      })
-    })
+      res
+        .then(content => {
+          resolve({content});
+        })
+        .catch(err => {
+          reject(err);
+        });
+    });
   };
 
   private makeRequest = async <QT, ST>(
@@ -301,10 +303,10 @@ export class TraceServerClient {
     }
     const collectors = [...this.readBatchCollectors];
     this.readBatchCollectors = [];
-    let refs = _.uniq(collectors.map(c => c.req.refs).flat());
+    const refs = _.uniq(collectors.map(c => c.req.refs).flat());
     const valMap = new Map<string, any>();
     while (refs.length > 0) {
-      let refsForBatch = refs.splice(0, MAX_REFS_PER_BATCH);
+      const refsForBatch = refs.splice(0, MAX_REFS_PER_BATCH);
       const res = await this.readBatchDirect({refs: refsForBatch});
       const vals = res.vals;
       for (let i = 0; i < refsForBatch.length; i++) {
