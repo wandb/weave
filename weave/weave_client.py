@@ -395,7 +395,11 @@ class WeaveClient:
     # These are the old client interface terms, op_execute still relies
     # on them.
     def create_run(
-        self, op_name: str, parent_run: typing.Optional[Call], inputs: dict, refs: Any
+        self,
+        op_name: Union[str, Op],
+        parent_run: typing.Optional[Call],
+        inputs: dict,
+        refs: Any,
     ) -> Call:
         return self.create_call(op_name, parent_run, inputs)
 
