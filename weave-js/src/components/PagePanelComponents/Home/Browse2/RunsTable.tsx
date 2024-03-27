@@ -24,23 +24,36 @@ import {useWeaveContext} from '../../../../context';
 import {
   isObjectTypeLike,
   isTypedDictLike,
+  Type,
   typedDictPropertyTypes,
 } from '../../../../core';
 import {useDeepMemo} from '../../../../hookUtils';
-import {parseRef} from '../../../../react';
+import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
+  parseRef,
+} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
-import {CallLink} from '../Browse3/pages/common/Links';
+import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
+import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
+import {
+  DICT_KEY_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+} from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {
   opVersionRefOpCategory,
   opVersionRefOpName,
 } from '../Browse3/pages/wfReactInterface/utilities';
-import {CallSchema} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallSchema,
+  ObjectVersionKey,
+} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
 import {CellValue} from './CellValue';
@@ -120,39 +133,90 @@ type OpVersionIndexTextProps = {
 const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
   const {useObjectVersion} = useWFHooks();
   const ref = parseRef(opVersionRef);
-  const objVersionKey =
-    'entityName' in ref
-      ? {
-          entity: ref.entityName,
-          project: ref.projectName,
-          objectId: ref.artifactName,
-          versionHash: ref.artifactVersion,
-          path: ref.artifactPath,
-          refExtra: ref.artifactRefExtra,
-        }
-      : null;
+  let objVersionKey: ObjectVersionKey | null = null;
+  if (isWandbArtifactRef(ref)) {
+    objVersionKey = {
+      scheme: 'wandb-artifact',
+      entity: ref.entityName,
+      project: ref.projectName,
+      objectId: ref.artifactName,
+      versionHash: ref.artifactVersion,
+      path: ref.artifactPath,
+      refExtra: ref.artifactRefExtra,
+    };
+  } else if (isWeaveObjectRef(ref)) {
+    objVersionKey = {
+      scheme: 'weave',
+      entity: ref.entityName,
+      project: ref.projectName,
+      weaveKind: ref.weaveKind,
+      objectId: ref.artifactName,
+      versionHash: ref.artifactVersion,
+      path: '',
+      refExtra: ref.artifactRefExtra,
+    };
+  }
   const objVersion = useObjectVersion(objVersionKey);
   return objVersion.result ? (
     <span>v{objVersion.result.versionIndex}</span>
   ) : null;
 };
 
-type ExtraColumns = Record<string, string[]>;
+type ExtraColumns = Record<string, Array<{label: string; path: string}>>;
 
-const getExtraColumns = (result: any): string[] => {
-  const cols: Set<string> = new Set();
+const isExpandableType = (type: Type): boolean => {
+  return isObjectTypeLike(type) || isTypedDictLike(type);
+};
+
+const getExtraColumns = (
+  result: Type[]
+): Array<{label: string; path: string}> => {
+  const cols: {[label: string]: string} = {};
   for (const refInfo of result) {
     if (isObjectTypeLike(refInfo)) {
       const keys = Object.keys(refInfo).filter(
         k => k !== 'type' && !k.startsWith('_')
       );
-      keys.forEach(k => cols.add(k));
+      keys.forEach(k => {
+        const innerType = (refInfo as any)[k] as Type;
+        if (isExpandableType(innerType)) {
+          const subKeys = getExtraColumns([innerType]);
+          subKeys.forEach(sk => {
+            cols[k + '.' + sk.label] =
+              k + `/${OBJECT_ATTRIBUTE_EDGE_TYPE}/` + sk.path;
+          });
+        } else {
+          cols[k] = k;
+        }
+      });
     } else if (isTypedDictLike(refInfo)) {
-      const keys = Object.keys(typedDictPropertyTypes(refInfo));
-      keys.forEach(k => cols.add(k));
+      const propTypes = typedDictPropertyTypes(refInfo);
+      const keys = Object.keys(propTypes);
+      keys.forEach(k => {
+        const innerType = propTypes[k] as Type;
+        if (isExpandableType(innerType)) {
+          const subKeys = getExtraColumns([innerType]);
+          subKeys.forEach(sk => {
+            cols[k + '.' + sk.label] = k + `/${DICT_KEY_EDGE_TYPE}/` + sk.path;
+          });
+        } else {
+          cols[k] = k;
+        }
+      });
     }
   }
-  return Array.from(cols);
+  return Object.entries(cols).map(([label, path]) => ({label, path}));
+};
+
+// Get the tail of the peekPath (ignore query params)
+const getPeekId = (peekPath: string | null): string | null => {
+  if (!peekPath) {
+    return null;
+  }
+  const baseUrl = `${window.location.protocol}//${window.location.host}`;
+  const url = new URL(peekPath, baseUrl);
+  const {pathname} = url;
+  return pathname.split('/').pop() ?? null;
 };
 
 export const RunsTable: FC<{
@@ -169,7 +233,7 @@ export const RunsTable: FC<{
   } = useWFHooks();
   const {client} = weave;
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
-    new Set()
+    new Set<string>().add('input.example')
   );
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
@@ -187,9 +251,12 @@ export const RunsTable: FC<{
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
   }, [spans]);
-  const isSingleOp = useMemo(() => {
-    return _.uniq(spans.map(span => span.spanName)).length === 1;
+  const uniqueSpanNames = useMemo(() => {
+    return _.uniq(spans.map(span => span.spanName));
   }, [spans]);
+  const isSingleOp = useMemo(() => {
+    return uniqueSpanNames.length === 1;
+  }, [uniqueSpanNames]);
 
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
@@ -294,10 +361,12 @@ export const RunsTable: FC<{
           const refs = columnRefs(tableStats, col);
           const refTypes = await getRefsType(refs);
           const extraCols = getExtraColumns(refTypes);
-          setExpandedColInfo(prevState => ({
-            ...prevState,
-            [col]: extraCols,
-          }));
+          if (tableStats.rowCount !== 0) {
+            setExpandedColInfo(prevState => ({
+              ...prevState,
+              [col]: extraCols,
+            }));
+          }
         }
       }
     };
@@ -313,7 +382,7 @@ export const RunsTable: FC<{
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
-  const peekId = peekPath ? peekPath.split('/').pop() : null;
+  const peekId = getPeekId(peekPath);
   const rowIds = useMemo(() => {
     return tableData.map(row => row.id);
   }, [tableData]);
@@ -336,6 +405,14 @@ export const RunsTable: FC<{
     }
   }, [rowIds, peekId]);
 
+  // Custom logic to control path preservation preference
+  const preservePath = useMemo(() => {
+    return (
+      uniqueSpanNames.length === 1 &&
+      isPredictAndScoreOp(opNiceName(uniqueSpanNames[0]))
+    );
+  }, [uniqueSpanNames]);
+
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
@@ -356,7 +433,7 @@ export const RunsTable: FC<{
               opName={opVersionRefOpName(opVersion)}
               callId={rowParams.row.id}
               fullWidth={true}
-              preservePath
+              preservePath={preservePath}
             />
           );
         },
@@ -515,8 +592,14 @@ export const RunsTable: FC<{
       const field = 'input.' + key;
       const isExpanded = expandedRefCols.has(field);
       cols.push({
-        flex: 1,
-        minWidth: 150,
+        ...(isExpanded
+          ? {
+              width: 100,
+            }
+          : {
+              flex: 1,
+              minWidth: 150,
+            }),
         field,
         renderHeader: () => {
           const hasExpand = columnHasRefs(tableStats, field);
@@ -532,7 +615,7 @@ export const RunsTable: FC<{
         renderCell: cellParams => {
           if (field in cellParams.row) {
             const value = (cellParams.row as any)[field];
-            return <CellValue value={value} />;
+            return <CellValue value={value} isExpanded={isExpanded} />;
           }
           return <NotApplicable />;
         },
@@ -541,12 +624,19 @@ export const RunsTable: FC<{
         const inputGroupChildren = [{field}];
         const expandCols = expandedColInfo[field] ?? [];
         for (const col of expandCols) {
-          const expandField = field + '.' + col;
+          const expandField = field + '.' + col.label;
           cols.push({
+            flex: 1,
             field: expandField,
-            renderHeader: headerParams => (
-              <CustomGroupedColumnHeader field={headerParams.field} />
-            ),
+            renderHeader: headerParams => {
+              return (
+                <CustomGroupedColumnHeader
+                  field={headerParams.field}
+                  // TODO: after merging object store stuff - re-write expansion logic. This should be grouped.
+                  titleOverride={col.label}
+                />
+              );
+            },
             renderCell: cellParams => {
               const weaveRef = (cellParams.row as any)[field];
               if (weaveRef === undefined) {
@@ -554,7 +644,7 @@ export const RunsTable: FC<{
               }
               return (
                 <ErrorBoundary>
-                  <RefValue weaveRef={weaveRef} attribute={col} />
+                  <RefValue weaveRef={weaveRef} attribute={col.path} />
                 </ErrorBoundary>
               );
             },
@@ -638,7 +728,7 @@ export const RunsTable: FC<{
           renderCell: cellParams => {
             if (field in cellParams.row) {
               const value = (cellParams.row as any)[field];
-              return <CellValue value={value} />;
+              return <CellValue value={value} isExpanded={isExpanded} />;
             }
             return <NotApplicable />;
           },
@@ -701,6 +791,7 @@ export const RunsTable: FC<{
     onlyOneOutputResult,
     params.entity,
     params.project,
+    preservePath,
     spans,
     tableStats,
   ]);
@@ -778,6 +869,7 @@ export const RunsTable: FC<{
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
         columnGroupingModel={columns.colGroupingModel}
+        hideFooterSelectedRowCount
         slots={{
           noRowsOverlay: () => {
             return (

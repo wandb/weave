@@ -79,7 +79,9 @@ const RefValueWithExtra = ({weaveRef, attribute}: RefValueProps) => {
 
   const refData = refValue.result[0];
 
-  if (isRef(refData)) {
+  if (refData === null) {
+    return <NotApplicable />;
+  } else if (isRef(refData)) {
     return <SmallRef objRef={parseRef(refData)} />;
   } else if (RENDER_DIRECTLY.has(typeof refData)) {
     return <CellValue value={refData} />;

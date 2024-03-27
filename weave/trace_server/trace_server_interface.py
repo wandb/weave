@@ -87,29 +87,25 @@ class EndedCallSchemaForInsert(BaseModel):
 
 
 class ObjSchema(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     name: str
-    version_hash: str
+    created_at: datetime.datetime
+    digest: str
     version_index: int
-
-    type_dict: typing.Dict[str, typing.Any]
-    b64_file_map: typing.Dict[str, str]
-    metadata_dict: typing.Dict[str, typing.Any]
-
-    created_datetime: datetime.datetime
+    is_latest: int
+    type: str
+    val: typing.Any
 
 
 class ObjSchemaForInsert(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     name: str
+    val: typing.Any
 
-    type_dict: typing.Dict[str, typing.Any]
-    b64_file_map: typing.Dict[str, str]
-    metadata_dict: typing.Dict[str, typing.Any]
 
-    created_datetime: datetime.datetime
+class TableSchemaForInsert(BaseModel):
+    project_id: str
+    rows: list[typing.Any]
 
 
 class CallStartReq(BaseModel):
@@ -202,14 +198,14 @@ class ObjCreateReq(BaseModel):
 
 
 class ObjCreateRes(BaseModel):
-    version_hash: str
+    version_digest: str
 
 
 class ObjReadReq(BaseModel):
     entity: str
     project: str
     name: str
-    version_hash: str
+    version_digest: str
 
 
 class ObjReadRes(BaseModel):
@@ -219,12 +215,12 @@ class ObjReadRes(BaseModel):
 class _ObjectVersionFilter(BaseModel):
     # object_categories: typing.Optional[typing.List[str]] = None
     object_names: typing.Optional[typing.List[str]] = None
+    is_op: typing.Optional[bool] = None
     latest_only: typing.Optional[bool] = None
 
 
 class ObjQueryReq(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     filter: typing.Optional[_ObjectVersionFilter] = None
 
 
@@ -232,7 +228,67 @@ class ObjQueryRes(BaseModel):
     objs: typing.List[ObjSchema]
 
 
+class TableCreateReq(BaseModel):
+    table: TableSchemaForInsert
+
+
+class TableRowSchema(BaseModel):
+    digest: str
+    val: typing.Any
+
+
+class TableCreateRes(BaseModel):
+    digest: str
+
+
+class _TableRowFilter(BaseModel):
+    # object_categories: typing.Optional[typing.List[str]] = None
+    row_digests: typing.Optional[typing.List[str]] = None
+
+
+class TableQueryReq(BaseModel):
+    project_id: str
+    table_digest: str
+    filter: typing.Optional[_TableRowFilter] = None
+    limit: typing.Optional[int] = None
+    offset: typing.Optional[int] = None
+
+
+class TableQueryRes(BaseModel):
+    rows: typing.List[TableRowSchema]
+
+
+class RefsReadBatchReq(BaseModel):
+    refs: typing.List[str]
+
+
+class RefsReadBatchRes(BaseModel):
+    vals: typing.List[typing.Any]
+
+
+class FileCreateReq(BaseModel):
+    project_id: str
+    name: str
+    content: bytes
+
+
+class FileCreateRes(BaseModel):
+    digest: str
+
+
+class FileContentReadReq(BaseModel):
+    project_id: str
+    digest: str
+
+
+class FileContentReadRes(BaseModel):
+    content: bytes
+
+
 class TraceServerInterface:
+    def ensure_project_exists(self, entity: str, project: str) -> None:
+        pass
+
     # Call API
     @abc.abstractmethod
     def call_start(self, req: CallStartReq) -> CallStartRes:
@@ -275,3 +331,23 @@ class TraceServerInterface:
     @abc.abstractmethod
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
         ...
+
+    @abc.abstractmethod
+    def table_create(self, req: TableCreateReq) -> TableCreateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def table_query(self, req: TableQueryReq) -> TableQueryRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def file_create(self, req: FileCreateReq) -> FileCreateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
+        raise NotImplementedError()

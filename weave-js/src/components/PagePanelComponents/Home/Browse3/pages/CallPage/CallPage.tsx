@@ -1,15 +1,11 @@
 import {Box} from '@material-ui/core';
-import React, {FC} from 'react';
+import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {
-  queryGetBoolean,
-  queryGetString,
-  queryToggleBoolean,
-} from '../../urlQueryUtil';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -23,6 +19,8 @@ export const CallPage: FC<{
   entity: string;
   project: string;
   callId: string;
+  showTraceTree?: boolean;
+  path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
 
@@ -61,32 +59,50 @@ const useCallTabs = (call: CallSchema) => {
   ];
 };
 
-// Setting to true is prohibitively slow for large traces and blocks
-// the UI from rendering the data. We need a different approach to
-// handle this. Making a flag for now to avoid the issue.
-const MAINTAIN_SELECTED_PATH = false;
-
 const CallPageInnerVertical: FC<{
   call: CallSchema;
-}> = ({call}) => {
+  showTraceTree?: boolean;
+  path?: string;
+}> = ({call, showTraceTree, path}) => {
   const history = useHistory();
-  const showTraceTree = queryGetBoolean(history, 'tracetree', true);
-  const onToggleTraceTree = () => {
-    queryToggleBoolean(history, 'tracetree', true);
-  };
+  const currentRouter = useWeaveflowCurrentRouteContext();
 
-  const path = queryGetString(history, 'path');
-  const tree = useCallFlattenedTraceTree(call, path);
+  const onToggleTraceTree = useCallback(() => {
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        !showTraceTree
+      )
+    );
+  }, [
+    call.callId,
+    call.entity,
+    call.project,
+    call.traceId,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+  ]);
+
+  const tree = useCallFlattenedTraceTree(call, path ?? null);
   const {rows, expandKeys, loading} = tree;
   let {selectedCall} = tree;
 
-  if (!MAINTAIN_SELECTED_PATH) {
+  const assumeCallIsSelectedCall = path == null || path === '';
+
+  if (assumeCallIsSelectedCall) {
+    // Allows us to bypass the loading state when the call is already selected.
     selectedCall = call;
   }
 
   const callTabs = useCallTabs(selectedCall);
 
-  if (loading && MAINTAIN_SELECTED_PATH) {
+  if (loading && !assumeCallIsSelectedCall) {
     return <Loader active />;
   }
 
@@ -117,6 +133,7 @@ const CallPageInnerVertical: FC<{
             selectedCall={selectedCall}
             rows={rows}
             forcedExpandKeys={expandKeys}
+            path={path}
           />
         )
       }

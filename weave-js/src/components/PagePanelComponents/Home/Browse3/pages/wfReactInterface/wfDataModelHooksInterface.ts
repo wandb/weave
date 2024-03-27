@@ -20,6 +20,12 @@ export type Loadable<T> = {
   result: T | null;
 };
 
+export type LoadableWithError<T> = {
+  loading: boolean;
+  result: T | null;
+  error: Error | null;
+};
+
 export type CallKey = {
   entity: string;
   project: string;
@@ -74,7 +80,7 @@ export type OpVersionFilter = {
   latestOnly?: boolean;
 };
 
-export type ObjectVersionKey = {
+type CommonObjectVersionKey = {
   entity: string;
   project: string;
   objectId: string;
@@ -83,12 +89,26 @@ export type ObjectVersionKey = {
   refExtra?: string;
 };
 
+type WandbArtifactObjectVersionKey = {
+  scheme: 'wandb-artifact';
+} & CommonObjectVersionKey;
+
+type WeaveObjectVersionKey = {
+  scheme: 'weave';
+  weaveKind: 'object' | 'table' | 'op';
+} & CommonObjectVersionKey;
+
+export type ObjectVersionKey =
+  | WandbArtifactObjectVersionKey
+  | WeaveObjectVersionKey;
+
 export type ObjectVersionSchema = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   typeName: string;
   category: ObjectCategory | null;
   createdAtMs: number;
+  val: any;
 };
 
 export type ObjectVersionFilter = {
@@ -99,7 +119,7 @@ export type ObjectVersionFilter = {
 };
 
 export type TableQuery = {
-  columns: string[];
+  columns?: string[];
   limit?: number;
 };
 
@@ -165,6 +185,12 @@ export type WFDataModelHooksInterface = {
   // Derived are under a subkey because they are not directly from the data model
   // and the logic should be pushed into the core APIs. This is a temporary solution
   // during the transition period.
+  useFileContent: (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<string>;
   derived: {
     useChildCallsForCompare: (
       entity: string,
@@ -177,6 +203,7 @@ export type WFDataModelHooksInterface = {
     useGetRefsType: () => (refUris: string[]) => Promise<Types.Type[]>;
     // `useRefsType` is in beta while we integrate Shawn's new Object DB
     useRefsType: (refUris: string[]) => Loadable<Types.Type[]>;
+    useCodeForOpRef: (opVersionRef: string) => Loadable<string>;
   };
 };
 

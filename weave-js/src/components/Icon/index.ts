@@ -216,6 +216,7 @@ export {
   IconWandb,
   IconWarning,
   IconWarningAlt,
+  IconWeaveGroupBoard,
   IconWebhook,
   IconXAxiAlt,
   IconXAxis,

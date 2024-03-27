@@ -1,13 +1,17 @@
 import numpy as np
 from typing import Union, Callable, Optional, Tuple, Any
-from weave.flow import Object
-from weave import op_def, WeaveList
+import weave
+from weave.trace.isinstance import weave_isinstance
+from weave.flow.obj import Object
+from weave.trace.op import Op
+from weave import WeaveList
 
 
 class Scorer(Object):
     def score(self, target: Any, prediction: Any) -> Any:
         raise NotImplementedError
 
+    @weave.op()
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
         return auto_summarize(score_rows)
 
@@ -24,6 +28,8 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
     Returns:
       dict of summary stats, with structure matching input dict structure.
     """
+    if not isinstance(data, WeaveList):
+        data = WeaveList(data)
     if data.is_number():
         valid_data = [x for x in data if x is not None]
         if not valid_data:
@@ -60,21 +66,28 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
 
 
 def get_scorer_attributes(
-    scorer: Union[Callable, op_def.OpDef, Scorer]
+    scorer: Union[Callable, Op, Scorer]
 ) -> Tuple[str, Callable, Callable]:
-    if isinstance(scorer, Scorer):
+    if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
         if scorer_name == None:
-            scorer_name = scorer.__class__.__name__
-        score_fn = scorer.score
-        summarize_fn = scorer.summarize  # type: ignore
-    else:
-        if isinstance(scorer, op_def.OpDef):
-            scorer_name = scorer.common_name
+            scorer_name = scorer._class_name
+        try:
+            score_fn = scorer.score
+            summarize_fn = scorer.summarize  # type: ignore
+        except AttributeError:
+            raise ValueError(
+                f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
+            )
+    elif callable(scorer):
+        if isinstance(scorer, Op):
+            scorer_name = scorer.name
         else:
             scorer_name = scorer.__name__
         score_fn = scorer
         summarize_fn = auto_summarize  # type: ignore
+    else:
+        raise ValueError(f"Unknown scorer type: {scorer}")
     return (scorer_name, score_fn, summarize_fn)  # type: ignore
 
 
@@ -95,6 +108,7 @@ def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:
 class MulticlassF1Score(Scorer):
     class_names: list[str]
 
+    @weave.op()
     def summarize(self, score_rows: WeaveList) -> Optional[dict]:
         # Compute f1, precision, recall
         result = {}
@@ -115,6 +129,7 @@ class MulticlassF1Score(Scorer):
             result[class_name] = {"f1": f1, "precision": precision, "recall": recall}
         return result
 
+    @weave.op()
     def score(self, target: dict, prediction: Optional[dict]) -> dict:
         result = {}
         for class_name in self.class_names:

@@ -1,11 +1,9 @@
 import weave
-from weave import artifact_fs
 
 import numpy as np
 
 
-@weave.type()
-class MyTestObjWithOp:
+class MyTestObjWithOp(weave.Object):
     val: int
 
     @weave.op()

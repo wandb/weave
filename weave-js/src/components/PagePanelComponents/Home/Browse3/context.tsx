@@ -1,4 +1,9 @@
-import {ArtifactRef, isWandbArtifactRef, parseRef} from '@wandb/weave/react';
+import {
+  isWandbArtifactRef,
+  isWeaveObjectRef,
+  ObjectRef,
+  parseRef,
+} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {
   createContext,
@@ -71,7 +76,7 @@ type WFDBTableType =
 export const browse2Context = {
   refUIUrl: (
     rootTypeName: string,
-    objRef: ArtifactRef,
+    objRef: ObjectRef,
     wfTable?: WFDBTableType
   ) => {
     if (!isWandbArtifactRef(objRef)) {
@@ -89,7 +94,9 @@ export const browse2Context = {
     entityName: string,
     projectName: string,
     traceId: string,
-    callId: string
+    callId: string,
+    path?: string | null,
+    tracetree?: boolean
   ) => {
     return `/${entityName}/${projectName}/trace/${traceId}/${callId}`;
   },
@@ -202,10 +209,10 @@ const browse3ContextGen = (
   const browse3Context = {
     refUIUrl: (
       rootTypeName: string,
-      objRef: ArtifactRef,
+      objRef: ObjectRef,
       wfTable?: WFDBTableType
     ) => {
-      if (!isWandbArtifactRef(objRef)) {
+      if (!isWandbArtifactRef(objRef) && !isWeaveObjectRef(objRef)) {
         throw new Error('Not a wandb artifact ref: ' + JSON.stringify(objRef));
       }
       if (wfTable === 'OpVersion' || rootTypeName === 'OpDef') {
@@ -228,27 +235,41 @@ const browse3ContextGen = (
       // weave client before having landed and deployed
       // https://github.com/wandb/weave/pull/1169. Should be removed before the
       // public release.
-      if (objRef.artifactPath.endsWith('rows%2F0')) {
-        objRef.artifactPath = 'obj';
-        let newArtifactRefExtra = 'atr/rows';
-        objRef.artifactRefExtra?.split('/').forEach(part => {
-          if (isNaN(parseInt(part, 10))) {
-            newArtifactRefExtra += '/key/' + part;
-          } else {
-            newArtifactRefExtra += '/row/' + part;
-          }
-        });
-        objRef.artifactRefExtra = newArtifactRefExtra;
+      if (isWandbArtifactRef(objRef)) {
+        if (objRef.artifactPath.endsWith('rows%2F0')) {
+          objRef.artifactPath = 'obj';
+          let newArtifactRefExtra = 'atr/rows';
+          objRef.artifactRefExtra?.split('/').forEach(part => {
+            if (isNaN(parseInt(part, 10))) {
+              newArtifactRefExtra += '/key/' + part;
+            } else {
+              newArtifactRefExtra += '/row/' + part;
+            }
+          });
+          objRef.artifactRefExtra = newArtifactRefExtra;
+        }
       }
 
-      return browse3Context.objectVersionUIUrl(
-        objRef.entityName,
-        objRef.projectName,
-        objRef.artifactName,
-        objRef.artifactVersion,
-        objRef.artifactPath,
-        objRef.artifactRefExtra
-      );
+      if (isWandbArtifactRef(objRef)) {
+        return browse3Context.objectVersionUIUrl(
+          objRef.entityName,
+          objRef.projectName,
+          objRef.artifactName,
+          objRef.artifactVersion,
+          objRef.artifactPath,
+          objRef.artifactRefExtra
+        );
+      } else if (isWeaveObjectRef(objRef)) {
+        return browse3Context.objectVersionUIUrl(
+          objRef.entityName,
+          objRef.projectName,
+          objRef.artifactName,
+          objRef.artifactVersion,
+          undefined,
+          objRef.artifactRefExtra
+        );
+      }
+      throw new Error('Unknown ref type');
     },
     entityUrl: (entityName: string) => {
       return `/${entityName}`;
@@ -305,13 +326,13 @@ const browse3ContextGen = (
       filePath?: string,
       refExtra?: string
     ) => {
-      const path = filePath ? `?path=${encodeURIComponent(filePath)}` : '';
-      const extra =
-        path && refExtra ? `&extra=${encodeURIComponent(refExtra)}` : '';
+      const path = filePath ? `path=${encodeURIComponent(filePath)}` : '';
+      const extra = refExtra ? `extra=${encodeURIComponent(refExtra)}` : '';
+
       return `${projectRoot(
         entityName,
         projectName
-      )}/objects/${objectName}/versions/${objectVersionHash}${path}${extra}`;
+      )}/objects/${objectName}/versions/${objectVersionHash}?${path}&${extra}`;
     },
     opVersionsUIUrl: (
       entityName: string,
@@ -345,11 +366,19 @@ const browse3ContextGen = (
       projectName: string,
       traceId: string,
       callId: string,
-      path?: string | null
+      path?: string | null,
+      tracetree?: boolean
     ) => {
       let url = `${projectRoot(entityName, projectName)}/calls/${callId}`;
+      const params = new URLSearchParams();
       if (path) {
-        url += `?path=${encodeURIComponent(path)}`;
+        params.set(PATH_PARAM, path);
+      }
+      if (tracetree) {
+        params.set(TRACETREE_PARAM, '1');
+      }
+      if (params.toString()) {
+        url += '?' + params.toString();
       }
       return url;
     },
@@ -440,7 +469,7 @@ const browse3ContextGen = (
 type RouteType = {
   refUIUrl: (
     rootTypeName: string,
-    objRef: ArtifactRef,
+    objRef: ObjectRef,
     wfTable?: WFDBTableType
   ) => string;
   entityUrl: (entityName: string) => string;
@@ -548,30 +577,9 @@ const useSetSearchParam = () => {
   );
 };
 
-// Update multiple query params
-const useSetSearchParams = () => {
-  const location = useLocation();
-  return useCallback(
-    (pairs: Record<string, string | null>) => {
-      const searchParams = new URLSearchParams(location.search);
-      Object.entries(pairs).forEach(([key, value]) => {
-        if (value === null) {
-          searchParams.delete(key);
-        } else {
-          searchParams.set(key, value);
-        }
-      });
-      const newSearch = searchParams.toString();
-      const newUrl = `${location.pathname}?${newSearch}`;
-      return newUrl;
-    },
-    [location]
-  );
-};
-
-const TRACETREE_PARAM = 'tracetree';
-const PEAK_SEARCH_PARAM = 'peekPath';
-const PATH_PARAM = 'path';
+export const PEEK_PARAM = 'peekPath';
+export const TRACETREE_PARAM = 'tracetree';
+export const PATH_PARAM = 'path';
 
 export const baseContext = browse3ContextGen(
   (entityName: string, projectName: string) => {
@@ -581,137 +589,90 @@ export const baseContext = browse3ContextGen(
 
 const useMakePeekingRouter = (): RouteType => {
   const setSearchParam = useSetSearchParam();
-  const setSearchParams = useSetSearchParams();
 
   return {
     refUIUrl: (...args: Parameters<typeof baseContext.refUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.refUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.refUIUrl(...args));
     },
     entityUrl: (...args: Parameters<typeof baseContext.entityUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.entityUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.entityUrl(...args));
     },
     projectUrl: (...args: Parameters<typeof baseContext.projectUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.projectUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.projectUrl(...args));
     },
     typeUIUrl: (...args: Parameters<typeof baseContext.typeUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.typeUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.typeUIUrl(...args));
     },
     objectUIUrl: (...args: Parameters<typeof baseContext.objectUIUrl>) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.objectUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.objectUIUrl(...args));
     },
     opUIUrl: (...args: Parameters<typeof baseContext.opUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.opUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.opUIUrl(...args));
     },
     typeVersionUIUrl: (
       ...args: Parameters<typeof baseContext.typeVersionUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.typeVersionUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.typeVersionUIUrl(...args));
     },
     typeVersionsUIUrl: (
       ...args: Parameters<typeof baseContext.typeVersionsUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.typeVersionsUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.typeVersionsUIUrl(...args));
     },
     objectVersionUIUrl: (
       ...args: Parameters<typeof baseContext.objectVersionUIUrl>
     ) => {
       return setSearchParam(
-        PEAK_SEARCH_PARAM,
+        PEEK_PARAM,
         baseContext.objectVersionUIUrl(...args)
       );
     },
     opVersionsUIUrl: (
       ...args: Parameters<typeof baseContext.opVersionsUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.opVersionsUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.opVersionsUIUrl(...args));
     },
     opVersionUIUrl: (
       ...args: Parameters<typeof baseContext.opVersionUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.opVersionUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.opVersionUIUrl(...args));
     },
-    callUIUrl: (
-      entityName: string,
-      projectName: string,
-      traceId: string,
-      callId: string,
-      path?: string | null,
-      tracetree?: boolean
-    ) => {
-      const callUrl = baseContext.callUIUrl(
-        entityName,
-        projectName,
-        traceId,
-        callId,
-        path
-      );
-      const tt = tracetree ?? true;
-      const params: Record<string, string | null> = {
-        [PEAK_SEARCH_PARAM]: callUrl,
-        [TRACETREE_PARAM]: tt ? '1' : '0',
-      };
-      if (path !== undefined) {
-        params[PATH_PARAM] = path;
-      }
-      return setSearchParams(params);
+    callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.callUIUrl(...args));
     },
     callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.callsUIUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.callsUIUrl(...args));
     },
     objectVersionsUIUrl: (
       ...args: Parameters<typeof baseContext.objectVersionsUIUrl>
     ) => {
       return setSearchParam(
-        PEAK_SEARCH_PARAM,
+        PEEK_PARAM,
         baseContext.objectVersionsUIUrl(...args)
       );
     },
     opPageUrl: (...args: Parameters<typeof baseContext.opPageUrl>) => {
-      return setSearchParam(PEAK_SEARCH_PARAM, baseContext.opPageUrl(...args));
+      return setSearchParam(PEEK_PARAM, baseContext.opPageUrl(...args));
     },
     boardsUIUrl: (...args: Parameters<typeof baseContext.boardsUIUrl>) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.boardsUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.boardsUIUrl(...args));
     },
     tablesUIUrl: (...args: Parameters<typeof baseContext.tablesUIUrl>) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.tablesUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.tablesUIUrl(...args));
     },
     boardForExpressionUIUrl: (
       ...args: Parameters<typeof baseContext.boardForExpressionUIUrl>
     ) => {
       throw new Error('Not implemented');
       // return setSearchParam(
-      //   PEAK_SEARCH_PARAM,
+      //   PEEK_PARAM,
       //   baseContext.boardForExpressionUIUrl(...args)
       // );
     },
     compareCallsUIUrl: (
       ...args: Parameters<typeof baseContext.compareCallsUIUrl>
     ) => {
-      return setSearchParam(
-        PEAK_SEARCH_PARAM,
-        baseContext.compareCallsUIUrl(...args)
-      );
+      return setSearchParam(PEEK_PARAM, baseContext.compareCallsUIUrl(...args));
     },
   };
 };
@@ -734,8 +695,8 @@ export const useClosePeek = () => {
   const history = useHistory();
   return () => {
     const queryParams = new URLSearchParams(history.location.search);
-    if (queryParams.has('peekPath')) {
-      queryParams.delete('peekPath');
+    if (queryParams.has(PEEK_PARAM)) {
+      queryParams.delete(PEEK_PARAM);
       history.replace({
         search: queryParams.toString(),
       });

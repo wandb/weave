@@ -1,8 +1,8 @@
 import {Box} from '@mui/material';
 import {getTypeName, Type} from '@wandb/weave/core';
 import {
-  ArtifactRef,
   isWandbArtifactRef,
+  isWeaveObjectRef,
   ObjectRef,
   parseRef,
   refUri,
@@ -14,6 +14,10 @@ import {Icon, IconName, IconNames} from '../../../Icon';
 import {useWeaveflowRouteContext} from '../Browse3/context';
 import {Link} from '../Browse3/pages/common/Links';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
+import {
+  ObjectVersionKey,
+  OpVersionKey,
+} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 
 const getRootType = (t: Type): Type => {
   if (
@@ -39,48 +43,91 @@ export const objectRefDisplayName = (
   objRef: ObjectRef,
   versionIndex?: number
 ) => {
-  const versionStr =
-    versionIndex != null
-      ? `v${versionIndex}`
-      : objRef.artifactVersion.slice(0, 6);
-  let label = `${objRef.artifactName}:${versionStr}`;
-  if (objRef.artifactPath !== 'obj') {
-    label += '/' + objRef.artifactPath;
-  }
-  if (objRef.artifactRefExtra) {
-    // Remove every other extra part
-    const parts = objRef.artifactRefExtra.split('/');
-    const newParts = [];
-    for (let i = 1; i < parts.length; i += 2) {
-      newParts.push(parts[i]);
+  if (isWandbArtifactRef(objRef)) {
+    const versionStr =
+      versionIndex != null
+        ? `v${versionIndex}`
+        : objRef.artifactVersion.slice(0, 6);
+    let label = `${objRef.artifactName}:${versionStr}`;
+    if (objRef.artifactPath !== 'obj') {
+      label += '/' + objRef.artifactPath;
     }
-    label += '#' + newParts.join('/');
+    if (objRef.artifactRefExtra) {
+      // Remove every other extra part
+      const parts = objRef.artifactRefExtra.split('/');
+      const newParts = [];
+      for (let i = 1; i < parts.length; i += 2) {
+        newParts.push(parts[i]);
+      }
+      label += '#' + newParts.join('/');
+    }
+    return {label};
+  } else if (isWeaveObjectRef(objRef)) {
+    const versionStr =
+      versionIndex != null
+        ? `v${versionIndex}`
+        : objRef.artifactVersion.slice(0, 6);
+    let label = `${objRef.artifactName}:${versionStr}`;
+    if (objRef.artifactRefExtra) {
+      label += '/' + objRef.artifactRefExtra;
+    }
+    return {label};
   }
-  return {label};
+  throw new Error('Unknown ref type');
 };
 
-export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
-  objRef,
-  wfTable,
-}) => {
+export const SmallRef: FC<{
+  objRef: ObjectRef;
+  wfTable?: WFDBTableType;
+  iconOnly?: boolean;
+}> = ({objRef, wfTable, iconOnly = false}) => {
   const {
     useObjectVersion,
+    useOpVersion,
     derived: {useRefsType},
   } = useWFHooks();
 
-  const objVersionKey =
-    'entityName' in objRef
-      ? {
-          entity: objRef.entityName,
-          project: objRef.projectName,
-          objectId: objRef.artifactName,
-          versionHash: objRef.artifactVersion,
-          path: objRef.artifactPath,
-          refExtra: objRef.artifactRefExtra,
-        }
-      : null;
+  let objVersionKey: ObjectVersionKey | null = null;
+  let opVersionKey: OpVersionKey | null = null;
+
+  const isArtifactRef = isWandbArtifactRef(objRef);
+  const isWeaveObjRef = isWeaveObjectRef(objRef);
+
+  if (isArtifactRef) {
+    objVersionKey = {
+      scheme: 'wandb-artifact',
+      entity: objRef.entityName,
+      project: objRef.projectName,
+      objectId: objRef.artifactName,
+      versionHash: objRef.artifactVersion,
+      path: objRef.artifactPath,
+      refExtra: objRef.artifactRefExtra,
+    };
+  } else if (isWeaveObjRef) {
+    if (objRef.weaveKind === 'op') {
+      opVersionKey = {
+        entity: objRef.entityName,
+        project: objRef.projectName,
+        opId: objRef.artifactName,
+        versionHash: objRef.artifactVersion,
+      };
+    } else {
+      objVersionKey = {
+        scheme: 'weave',
+        entity: objRef.entityName,
+        project: objRef.projectName,
+        weaveKind: objRef.weaveKind,
+        objectId: objRef.artifactName,
+        versionHash: objRef.artifactVersion,
+        path: '',
+        refExtra: objRef.artifactRefExtra,
+      };
+    }
+  }
   const objectVersion = useObjectVersion(objVersionKey);
-  const versionIndex = objectVersion.result?.versionIndex;
+  const opVersion = useOpVersion(opVersionKey);
+  const versionIndex =
+    objectVersion.result?.versionIndex ?? opVersion.result?.versionIndex;
 
   const {peekingRouter} = useWeaveflowRouteContext();
   const refTypeQuery = useRefsType([refUri(objRef)]);
@@ -88,7 +135,11 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
     refTypeQuery.loading || refTypeQuery.result == null
       ? 'unknown'
       : refTypeQuery.result[0];
-  const rootType = getRootType(refType);
+  let rootType = getRootType(refType);
+  if (objRef.scheme === 'weave' && objRef.weaveKind === 'op') {
+    // TODO: Why is this necessary? The type is coming back as `objRef`
+    rootType = {type: 'OpDef'};
+  }
   const {label} = objectRefDisplayName(objRef, versionIndex);
 
   const rootTypeName = getTypeName(rootType);
@@ -118,23 +169,25 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
         }}>
         <Icon name={icon} width={14} height={14} />
       </Box>
-      <Box
-        sx={{
-          height: '22px',
-          flex: 1,
-          minWidth: 0,
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-          textOverflow: 'ellipsis',
-        }}>
-        {label}
-      </Box>
+      {!iconOnly && (
+        <Box
+          sx={{
+            height: '22px',
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+          }}>
+          {label}
+        </Box>
+      )}
     </Box>
   );
   if (refTypeQuery.loading) {
     return Item;
   }
-  if (!isWandbArtifactRef(objRef)) {
+  if (!isArtifactRef && !isWeaveObjRef) {
     return <div>[Error: non wandb ref]</div>;
   }
   return (
@@ -149,7 +202,7 @@ export const SmallRef: FC<{objRef: ObjectRef; wfTable?: WFDBTableType}> = ({
   );
 };
 
-export const parseRefMaybe = (s: string): ArtifactRef | null => {
+export const parseRefMaybe = (s: string): ObjectRef | null => {
   try {
     return parseRef(s);
   } catch (e) {

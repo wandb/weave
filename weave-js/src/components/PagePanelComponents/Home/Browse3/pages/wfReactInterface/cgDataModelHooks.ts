@@ -24,12 +24,14 @@ import {
   opArtifactTypeArtifacts,
   opArtifactVersionArtifactSequence,
   opArtifactVersionCreatedAt,
+  opArtifactVersionFile,
   opArtifactVersionHash,
   opArtifactVersionIsWeaveObject,
   opArtifactVersionMetadata,
   opArtifactVersions,
   opArtifactVersionVersionId,
   opDict,
+  opFileContents,
   opFilter,
   opFlatten,
   opGet,
@@ -49,6 +51,7 @@ import {
 } from '../../../../../../core';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {
+  isWandbArtifactRef,
   parseRef,
   useNodeValue,
   WandbArtifactRef,
@@ -73,7 +76,6 @@ import {
   DICT_KEY_EDGE_TYPE,
   LIST_INDEX_EDGE_TYPE,
   OBJECT_ATTRIBUTE_EDGE_TYPE,
-  OBJECT_CATEGORIES,
   PROJECT_CALL_STREAM_NAME,
   TABLE_COLUMN_EDGE_TYPE,
   TABLE_ROW_EDGE_TYPE,
@@ -83,13 +85,13 @@ import {
   opNameToCategory,
   opVersionRefOpCategory,
   refUriToOpVersionKey,
+  typeNameToCategory,
 } from './utilities';
 import {
   CallFilter,
   CallKey,
   CallSchema,
   Loadable,
-  ObjectCategory,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -393,6 +395,7 @@ const useObjectVersion = (
             typeName: dataValue.result.typeName as string,
             category: typeNameToCategory(dataValue.result.typeName as string),
             createdAtMs: dataValue.result.createdAtMs as number,
+            val: null,
           };
     if (dataValue.loading) {
       return {
@@ -463,6 +466,7 @@ const useRootObjectVersions = (
       result.forEach(obj => {
         objectVersionCache.set(
           {
+            scheme: 'wandb-artifact',
             entity,
             project,
             objectId: obj.objectId,
@@ -765,13 +769,13 @@ const useOpVersionsNode = (
 };
 
 const applyTableQuery = (node: Node, tableQuery: TableQuery): Node => {
-  if (tableQuery.columns.length > 0) {
+  if ((tableQuery.columns ?? []).length > 0) {
     node = opMap({
       arr: node,
       mapFn: constFunction({row: listObjectType(node.type)}, ({row}) =>
         opDict(
           _.fromPairs(
-            tableQuery.columns.map(key => [
+            (tableQuery.columns ?? []).map(key => [
               key,
               opPick({obj: row, key: constString(key)}),
             ])
@@ -972,6 +976,12 @@ const useRefsType = (refUris: string[]): Loadable<Type[]> => {
   };
 };
 
+const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
+  return useNodeValue(
+    useMemo(() => opDefCodeNode(opVersionRef), [opVersionRef])
+  );
+};
+
 // Converters //
 const spanToCallSchema = (
   entity: string,
@@ -1043,14 +1053,38 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   }
 };
 
-// Helpers //
-const typeNameToCategory = (typeName: string): ObjectCategory | null => {
-  for (const category of OBJECT_CATEGORIES) {
-    if (typeName.toLocaleLowerCase().includes(category)) {
-      return category as ObjectCategory;
-    }
+const refUnderlyingArtifactNode = (uri: string) => {
+  const ref = parseRef(uri);
+  if (!isWandbArtifactRef(ref)) {
+    throw new Error(`Expected wandb artifact ref, got ${ref}`);
   }
-  return null;
+  const projNode = opRootProject({
+    entityName: constString(ref.entityName),
+    projectName: constString(ref.projectName),
+  });
+  return opProjectArtifactVersion({
+    project: projNode,
+    artifactName: constString(ref.artifactName),
+    artifactVersionAlias: constString(ref.artifactVersion),
+  });
+};
+
+const opDefCodeNode = (uri: string) => {
+  const artifactVersionNode = refUnderlyingArtifactNode(uri);
+  const objPyFileNode = opArtifactVersionFile({
+    artifactVersin: artifactVersionNode,
+    path: constString('obj.py'),
+  });
+  return opFileContents({file: objPyFileNode});
+};
+
+const useFileContent = (
+  entity: string,
+  project: string,
+  digest: string,
+  opts?: {skip?: boolean}
+): Loadable<string> => {
+  throw new Error('Not implemented');
 };
 
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
@@ -1062,5 +1096,11 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
-  derived: {useChildCallsForCompare, useGetRefsType, useRefsType},
+  useFileContent,
+  derived: {
+    useChildCallsForCompare,
+    useGetRefsType,
+    useRefsType,
+    useCodeForOpRef,
+  },
 };

@@ -31,11 +31,10 @@ from . import context as _context
 from . import context_state as _context_state
 from . import run as _run
 from . import weave_init as _weave_init
-from . import graph_client as _graph_client
-from . import graph_client_local as _graph_client_local
-from . import graph_client_wandb_art_st as _graph_client_wandb_art_st
+from . import weave_client as _weave_client
 from . import graph_client_context as _graph_client_context
 from weave.monitoring import monitor as _monitor
+from .trace.constants import TRACE_OBJECT_EMOJI
 
 # exposed as part of api
 from . import weave_types as types
@@ -44,9 +43,10 @@ from . import weave_types as types
 from . import types_numpy as _types_numpy
 
 from . import errors
-from .decorators import weave_class, op, mutation, type
+from .decorators import weave_class, mutation, type
+from weave.trace.op import op
 
-from .op_def import OpDef
+from weave.trace.op import Op
 from . import usage_analytics
 from .context import (
     use_fixed_server_port,
@@ -58,6 +58,7 @@ from .context import (
 from .panel import Panel
 
 from .arrow.list_ import ArrowWeaveList as WeaveList
+from .table import Table
 
 
 def save(node_or_obj, name=None):
@@ -135,7 +136,7 @@ def from_pandas(df):
 #### Newer API below
 
 
-def init(project_name: str) -> _graph_client.GraphClient:
+def init(project_name: str) -> _weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
@@ -153,12 +154,15 @@ def init(project_name: str) -> _graph_client.GraphClient:
     # This is the stream-table backend. Disabling it in favor of the new
     # trace-server backend.
     # return _weave_init.init_wandb(project_name).client
-    return _weave_init.init_trace_remote(project_name).client
+    # return _weave_init.init_trace_remote(project_name).client
+    return _weave_init.init_weave(project_name).client
 
 
 @contextlib.contextmanager
-def wandb_client(project_name: str) -> typing.Iterator[_graph_client.GraphClient]:
-    inited_client = _weave_init.init_wandb(project_name)
+def remote_client(
+    project_name,
+) -> typing.Iterator[_weave_init.weave_client.WeaveClient]:
+    inited_client = _weave_init.init_weave(project_name)
     try:
         yield inited_client.client
     finally:
@@ -166,12 +170,12 @@ def wandb_client(project_name: str) -> typing.Iterator[_graph_client.GraphClient
 
 
 # This is currently an internal interface. We'll expose something like it though ("offline" mode)
-def init_local_client() -> _graph_client.GraphClient:
+def init_local_client() -> _weave_client.WeaveClient:
     return _weave_init.init_local().client
 
 
 @contextlib.contextmanager
-def local_client() -> typing.Iterator[_graph_client.GraphClient]:
+def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
     inited_client = _weave_init.init_local()
     try:
         yield inited_client.client
@@ -179,11 +183,7 @@ def local_client() -> typing.Iterator[_graph_client.GraphClient]:
         inited_client.reset()
 
 
-def init_trace_client(project_name: str) -> _graph_client.GraphClient:
-    return _weave_init.init_trace_remote(project_name).client
-
-
-def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
+def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -210,16 +210,19 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _ref_base.Ref:
 
     ref = client.save_object(obj, save_name, "latest")
 
-    print(f"Published {ref.type.root_type_class().name} to {ref.ui_url}")
+    if isinstance(ref, _weave_client.ObjectRef):
+        url = urls.object_version_path(
+            ref.entity,
+            ref.project,
+            ref.name,
+            ref.version,
+        )
+        print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
 
-    # Have to manually put the ref on the obj, this is supposed to happen at
-    # a lower level, but we use a mapper in _direct_publish that I think changes
-    # the object identity
-    _ref_base._put_ref(obj, ref)
     return ref
 
 
-def ref(location: str) -> _ref_base.Ref:
+def ref(location: str) -> _weave_client.ObjectRef:
     """Construct a Ref to a Weave object.
 
     TODO: what happens if obj does not exist
@@ -244,14 +247,17 @@ def ref(location: str) -> _ref_base.Ref:
             name, version = location.split(":")
         location = str(client.ref_uri(name, version, "obj"))
 
-    return _ref_base.Ref.from_str(location)
+    uri = _weave_client.parse_uri(location)
+    if not isinstance(uri, _weave_client.ObjectRef):
+        raise ValueError("Expected an object ref")
+    return uri
 
 
-def obj_ref(obj: typing.Any) -> typing.Optional[_ref_base.Ref]:
-    return _ref_base.get_ref(obj)
+def obj_ref(obj: typing.Any) -> typing.Optional[_weave_client.ObjectRef]:
+    return _weave_client.get_ref(obj)
 
 
-def output_of(obj: typing.Any) -> typing.Optional[_run.Run]:
+def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
     client = _graph_client_context.require_graph_client()
 
     ref = obj_ref(obj)
@@ -261,10 +267,10 @@ def output_of(obj: typing.Any) -> typing.Optional[_run.Run]:
     return client.ref_output_of(ref)
 
 
-def as_op_def(fn: typing.Callable) -> OpDef:
-    """Given a @weave.op() decorated function, return its OpDef.
+def as_op(fn: typing.Callable) -> Op:
+    """Given a @weave.op() decorated function, return its Op.
 
-    @weave.op() decorated functions are instances of OpDef already, so this
+    @weave.op() decorated functions are instances of Op already, so this
     function should be a no-op at runtime. But you can use it to satisfy type checkers
     if you need to access OpDef attributes in a typesafe way.
 
@@ -272,9 +278,9 @@ def as_op_def(fn: typing.Callable) -> OpDef:
         fn: A weave.op() decorated function.
 
     Returns:
-        The OpDef of the function.
+        The Op of the function.
     """
-    if not isinstance(fn, OpDef):
+    if not isinstance(fn, Op):
         raise ValueError("fn must be a weave.op() decorated function")
     return fn
 
@@ -305,15 +311,15 @@ def serve(
     from .serve_fastapi import object_method_app
 
     client = _graph_client_context.require_graph_client()
-    if not isinstance(
-        client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-    ):
-        raise ValueError("serve currently only supports wandb client")
+    # if not isinstance(
+    #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
+    # ):
+    #     raise ValueError("serve currently only supports wandb client")
 
     print(f"Serving {model_ref}")
     print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
     print()
-    os.environ["PROJECT_NAME"] = f"{client.entity_name}/{client.project_name}"
+    os.environ["PROJECT_NAME"] = f"{client.entity}/{client.project}"
     os.environ["MODEL_REF"] = str(model_ref)
 
     wandb_api_ctx = _wandb_api.get_wandb_api_context()

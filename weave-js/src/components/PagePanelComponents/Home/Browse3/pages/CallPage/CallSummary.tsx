@@ -40,7 +40,6 @@ export const CallSummary: React.FC<{
                 Latency: span.summary.latency_s.toFixed(3) + 's',
               }
             : {}),
-          ...(span.exception ? {Exception: span.exception} : {}),
           ...(Object.keys(attributes).length > 0
             ? {Attributes: attributes}
             : {}),

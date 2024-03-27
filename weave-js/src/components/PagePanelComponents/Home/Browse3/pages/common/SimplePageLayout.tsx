@@ -1,9 +1,10 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {Box, ListItemText, MenuList, Tab, Tabs} from '@mui/material';
+import {Box, ListItemText, MenuList} from '@mui/material';
 // import {Menu} from '@mui/base/Menu';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
   createContext,
@@ -11,7 +12,6 @@ import React, {
   FC,
   MouseEvent,
   ReactNode,
-  SyntheticEvent,
   useContext,
   useEffect,
   useMemo,
@@ -51,8 +51,8 @@ export const SimplePageLayout: FC<{
   const [tabId, setTabId] = useState(tabs[0].label);
   const idxSelected = tabs.findIndex(t => t.label === tabId);
   const tabValue = idxSelected !== -1 ? idxSelected : 0;
-  const handleTabChange = (event: SyntheticEvent, newValue: number) => {
-    setTabId(tabs[newValue].label);
+  const handleTabChange = (newValue: string) => {
+    setTabId(newValue);
   };
   useEffect(() => {
     if (idxSelected === -1) {
@@ -119,15 +119,17 @@ export const SimplePageLayout: FC<{
           {simplePageLayoutContextValue.headerSuffix}
         </Box>
         {(!props.hideTabsIfSingle || tabs.length > 1) && (
-          <Tabs
-            variant="scrollable"
-            scrollButtons="auto"
-            value={tabValue}
-            onChange={handleTabChange}>
-            {tabs.map(tab => (
-              <Tab key={tab.label} label={tab.label} />
-            ))}
-          </Tabs>
+          <Tabs.Root
+            value={tabs[tabValue].label}
+            onValueChange={handleTabChange}>
+            <Tabs.List>
+              {tabs.map(tab => (
+                <Tabs.Trigger key={tab.label} value={tab.label}>
+                  {tab.label}
+                </Tabs.Trigger>
+              ))}
+            </Tabs.List>
+          </Tabs.Root>
         )}
       </Box>
       <Box
@@ -188,8 +190,8 @@ export const SimplePageLayoutWithHeader: FC<{
   const [tabId, setTabId] = useState(tabs[0].label);
   const idxSelected = tabs.findIndex(t => t.label === tabId);
   const tabValue = idxSelected !== -1 ? idxSelected : 0;
-  const handleTabChange = (event: SyntheticEvent, newValue: number) => {
-    setTabId(tabs[newValue].label);
+  const handleTabChange = (newValue: string) => {
+    setTabId(newValue);
   };
   useEffect(() => {
     if (idxSelected === -1) {
@@ -274,19 +276,18 @@ export const SimplePageLayoutWithHeader: FC<{
                 {props.headerContent}
               </Box>
               {(!props.hideTabsIfSingle || tabs.length > 1) && (
-                <Tabs
-                  style={{
-                    borderBottom: '1px solid #e0e0e0',
-                  }}
-                  variant="scrollable"
-                  // These scroll buttons are not working
-                  scrollButtons={false}
-                  value={tabValue}
-                  onChange={handleTabChange}>
-                  {tabs.map(tab => (
-                    <Tab key={tab.label} label={tab.label} />
-                  ))}
-                </Tabs>
+                <Tabs.Root
+                  style={{margin: '12px 8px 0 8px'}}
+                  value={tabs[tabValue].label}
+                  onValueChange={handleTabChange}>
+                  <Tabs.List>
+                    {tabs.map(tab => (
+                      <Tabs.Trigger key={tab.label} value={tab.label}>
+                        {tab.label}
+                      </Tabs.Trigger>
+                    ))}
+                  </Tabs.List>
+                </Tabs.Root>
               )}
               <Box
                 sx={{

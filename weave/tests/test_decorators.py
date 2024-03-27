@@ -2,9 +2,11 @@ from .. import api as weave
 from .. import weave_types as types
 from .. import storage
 
+from weave.decorator_op import op
+
 
 def test_function_op_name():
-    @weave.op()
+    @op()
     def test_decorators_function_op(a: int, b: int) -> int:
         return a + b
 
@@ -17,7 +19,7 @@ def test_method_op_name():
 
     @weave.weave_class(weave_type=MyObjType)
     class MyObj:
-        @weave.op()
+        @op()
         def my_op(self: int, b: int) -> int:  # type: ignore
             return self + b
 

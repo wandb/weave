@@ -42,6 +42,9 @@ import {
   baseContext,
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
+  PATH_PARAM,
+  PEEK_PARAM,
+  TRACETREE_PARAM,
   useClosePeek,
   usePeekLocation,
   useWeaveflowCurrentRouteContext,
@@ -658,7 +661,7 @@ const useCallPeekRedirect = () => {
       });
       const searchParams = new URLSearchParams();
       searchParams.set(
-        'peekPath',
+        PEEK_PARAM,
         baseContext.callUIUrl(
           params.entity,
           params.project,
@@ -686,12 +689,15 @@ const useCallPeekRedirect = () => {
 const CallPageBinding = () => {
   useCallPeekRedirect();
   const params = useParams<Browse3TabItemParams>();
+  const query = useURLSearchParamsDict();
 
   return (
     <CallPage
       entity={params.entity}
       project={params.project}
       callId={params.itemName}
+      showTraceTree={query[TRACETREE_PARAM] === '1'}
+      path={query[PATH_PARAM]}
     />
   );
 };

@@ -215,6 +215,7 @@ export const IconNames = {
   Wandb: 'wandb',
   Warning: 'warning',
   WarningAlt: 'warning-alt',
+  WeaveGroupBoard: 'weave-group-board',
   Webhook: 'webhook',
   XAxiAlt: 'x-axi-alt',
   XAxis: 'x-axis',

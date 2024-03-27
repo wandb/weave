@@ -12,11 +12,13 @@ import {Tooltip} from '../../../Tooltip';
 
 type CustomGroupedColumnProps = {
   field: string;
+  titleOverride?: string;
 };
 
 export const CustomGroupedColumnHeader = ({
   field,
+  titleOverride,
 }: CustomGroupedColumnProps) => {
-  const tail = field.split('.').slice(-1)[0];
+  const tail = titleOverride ? titleOverride : field.split('.').slice(-1)[0];
   return <Tooltip trigger={<span>{tail}</span>} content={field} />;
 };
