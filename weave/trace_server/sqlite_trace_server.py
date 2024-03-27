@@ -393,7 +393,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 insert_rows,
             )
 
-            row_digests = [r[2] for r in insert_rows]
+            row_digests = [r[1] for r in insert_rows]
 
             table_hasher = hashlib.sha256()
             for row_digest in row_digests:
