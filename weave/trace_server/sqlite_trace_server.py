@@ -47,6 +47,46 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     return conn_cursor
 
 
+def parse_uri(
+    uri: str,
+) -> Union[refs_internal.InternalObjectRef, refs_internal.InternalTableRef]:
+    if uri.startswith(f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"):
+        return refs_internal.parse_internal_uri(uri)
+    elif uri.startswith(f"{refs_internal.WEAVE_SCHEME}:///"):
+        # This path should never be hit in production. This is only for testing.
+        path = uri[len(f"{refs_internal.WEAVE_SCHEME}:///") :]
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise ValueError(f"Invalid URI: {uri}")
+        entity, project, kind = parts[:3]
+        project_id = f"{entity}/{project}"
+        remaining = parts[3:]
+        if kind == "table":
+            return refs_internal.InternalTableRef(
+                project_id=project_id, digest=remaining[0]
+            )
+        elif kind == "object":
+            name, version = remaining[0].split(":")
+            return refs_internal.InternalObjectRef(
+                project_id=project_id,
+                name=name,
+                version=version,
+                extra=remaining[1:],
+            )
+        elif kind == "op":
+            name, version = remaining[0].split(":")
+            return refs_internal.InternalOpRef(
+                project_id=project_id,
+                name=name,
+                version=version,
+                extra=remaining[1:],
+            )
+        else:
+            raise ValueError(f"Unknown ref kind: {kind}")
+    else:
+        raise ValueError(f"Invalid URI: {uri}")
+
+
 class SqliteTraceServer(tsi.TraceServerInterface):
     def __init__(self, db_path: str):
         self.lock = threading.Lock()
@@ -426,7 +466,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
+        parsed_refs = [parse_uri(r) for r in req.refs]
         if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
         parsed_obj_refs = cast(list[refs_internal.InternalObjectRef], parsed_refs)
@@ -457,7 +497,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     if isinstance(val, str) and val.startswith(
                         refs_internal.WEAVE_INTERNAL_SCHEME + "://"
                     ):
-                        table_ref = refs_internal.parse_internal_uri(val)
+                        table_ref = parse_uri(val)
                         if not isinstance(table_ref, refs_internal.InternalTableRef):
                             raise ValueError(
                                 "invalid data layout encountered, expected TableRef when resolving id"
