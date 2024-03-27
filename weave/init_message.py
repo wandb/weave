@@ -1,13 +1,31 @@
 import typing
 
+if typing.TYPE_CHECKING:
+    import packaging.version  # type: ignore[import-not-found]
+
+REQUIRED_WANDB_VERSION = "0.16.4"
+
+
+def _parse_version(version: str) -> "packaging.version.Version":
+    """Parse a version string into a version object.
+
+    This function is a wrapper around the `packaging.version.parse` function, which
+    is used to parse version strings into version objects. If the `packaging` library
+    is not installed, it falls back to the `pkg_resources` library.
+    """
+    try:
+        from packaging.version import parse as parse_version  # type: ignore
+    except ImportError:
+        from pkg_resources import parse_version
+
+    return parse_version(version)
+
 
 def _print_version_check() -> None:
     import wandb
     import weave
 
-    required_wandb_version = "0.16.4"
-    parse_version = wandb.util.parse_version  # type: ignore
-    if parse_version(required_wandb_version) > parse_version(wandb.__version__):
+    if _parse_version(REQUIRED_WANDB_VERSION) > _parse_version(wandb.__version__):
         message = (
             "wandb version >= 0.16.4 is required.  To upgrade, please run:\n"
             " $ pip install wandb --upgrade"
