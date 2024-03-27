@@ -378,14 +378,14 @@ def test_save_model(client):
     ref = client.save_object(model, "my-model")
     model2 = client.get(ref)
     # TODO: wrong, have to manually pass self
-    assert model2.predict(model2, "x") == "input is: x"
+    assert model2.predict(model, "x") == "input is: x"
 
 
 def test_dataset_rows_ref(client):
     dataset = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
-    saved = client.save_nested_objects(dataset)
+    saved = client.save(dataset, "my-dataset")
     assert isinstance(saved.rows.ref, weave_client.ObjectRef)
-    assert saved.rows.ref.name == "Dataset"
+    assert saved.rows.ref.name == "my-dataset"
     assert saved.rows.ref.extra == [ATTRIBUTE_EDGE_TYPE, "rows"]
 
 
@@ -517,7 +517,7 @@ def test_nested_ref_is_inner(client):
         scorers=[score],
     )
 
-    saved = client.save_nested_objects(evaluation)
+    saved = client.save(evaluation, "my-eval")
     assert saved.dataset.ref.name == "Dataset"
     assert saved.dataset.rows.ref.name == "Dataset"
 

@@ -332,6 +332,8 @@ class WeaveClient:
         return response.objs
 
     def _save_op(self, op: Op) -> Ref:
+        if op.ref is not None:
+            return op.ref
         op_def_ref = self._save_object(op, op.name)
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
@@ -412,52 +414,25 @@ class WeaveClient:
         self.finish_call(run, str(exception))
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
-        if hasattr(obj, "ref"):
+        if get_ref(obj) is not None:
             return
-        # if isinstance(obj, Tracable):
-        #     return obj
         if isinstance(obj, pydantic.BaseModel):
-            for v in pydantic_asdict_one_level(obj).values():
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
                 self.save_nested_objects(v)
-            # # if hasattr(obj, 'ref')
-            # #     return obj.ref
-            # if not hasattr(obj, "ref"):
-            #     for v in pydantic_asdict_one_level(obj):
-
-            #     obj_rec = pydantic_object_record(obj).map_values(
-            #         self.save_nested_objects
-            #     )
-            #     ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
-            #     if not isinstance(ref, ObjectRef):
-            #         raise ValueError(f"Expected ObjectRef, got {ref}")
-            #     # return make_trace_obj(obj_rec, ref, client.server, None)
-            #     obj_rec.ref = ref
-            # trace_obj = make_trace_obj(obj_rec, ref, self.server, None)
-            # obj._trace_object = trace_obj
-            # return obj_rec
+            ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
+            obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
             table_ref = self.save_table(obj)
             obj.ref = table_ref
-            # Construct TraceTable with a None ref argument here. Tables must always be
-            # stored within objects. We don't want to ever expose users to TableRef.
-            # When this TraceTable is access via an outer object, it will have a ref
-            # rooted at that object.
-            # return TraceTable(table_ref, None, self.server, _TableRowFilter(), None)
         elif isinstance(obj, list):
             for v in obj:
                 self.save_nested_objects(v)
-            # return [self.save_nested_objects(v) for v in obj]
         elif isinstance(obj, dict):
             for v in obj.values():
                 self.save_nested_objects(v)
-            # return {k: self.save_nested_objects(v) for k, v in obj.items()}
         elif isinstance(obj, Op):
             self._save_op(obj)
-            # return obj
-
-        # Leave custom objects alone. They do not need to be saved by the
-        # time user code interacts with them since they are always leaves
-        # and we don't do ref-tracking inside them.
 
     def ref_input_to(self, ref: "ref_base.Ref") -> Sequence[Call]:
         raise NotImplementedError()
