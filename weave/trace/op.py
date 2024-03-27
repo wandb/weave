@@ -50,11 +50,11 @@ class Op:
         except TypeError as e:
             raise OpCallError(f"Error calling {self.name}: {e}")
         parent_run = run_context.get_current_run()
-        trackable_inputs = client.save_nested_objects(inputs)
-        run = client.create_call(self, parent_run, trackable_inputs)
+        client.save_nested_objects(inputs)
+        run = client.create_call(self, parent_run, inputs)
         try:
             with run_context.current_run(run):
-                res = self.resolve_fn(**trackable_inputs)
+                res = self.resolve_fn(**inputs)
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
