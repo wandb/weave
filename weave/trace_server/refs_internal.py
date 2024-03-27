@@ -63,14 +63,24 @@ class InternalCallRef:
 
 
 def parse_internal_uri(uri: str) -> Union[InternalObjectRef, InternalTableRef]:
-    if not uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
+    if uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
+        path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
+        parts = path.split("/")
+        if len(parts) < 2:
+            raise ValueError(f"Invalid URI: {uri}")
+        project_id, kind = parts[:2]
+        remaining = parts[2:]
+    elif uri.startswith(f"{WEAVE_SCHEME}:///"):
+        # This path should never be hit in production. This is only for testing.
+        path = uri[len(f"{WEAVE_SCHEME}:///") :]
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise ValueError(f"Invalid URI: {uri}")
+        entity, project, kind = parts[:3]
+        project_id = f"{entity}/{project}"
+        remaining = parts[3:]
+    else:
         raise ValueError(f"Invalid URI: {uri}")
-    path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
-    parts = path.split("/")
-    if len(parts) < 2:
-        raise ValueError(f"Invalid URI: {uri}")
-    project_id, kind = parts[:2]
-    remaining = parts[2:]
     if kind == "table":
         return InternalTableRef(project_id=project_id, digest=remaining[0])
     elif kind == "object":
