@@ -657,7 +657,7 @@ def test_trace_call_query_offset(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_unknown_input_and_output_types(trace_client):
+def test_unknown_input_and_output_types(client):
     class MyUnserializableClassA:
         a_val: int
 
@@ -677,11 +677,11 @@ def test_unknown_input_and_output_types(trace_client):
     assert op_with_unknown_types(MyUnserializableClassA(3), 0.14).b_val == 3.14
     
 
-    inner_res = trace_client.trace_server.calls_query(
+    inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=trace_client.project_id(),
+            project_id=client._project_id(),
         )
     )
 
     assert len(inner_res.calls) == 1
-    assert inner_res.calls[0].inputs == {"a": 1, "b": 10, "_keys": ["a", "b"]}
+    assert inner_res.calls[0].inputs == {"a": 1, "b": 0.14}
