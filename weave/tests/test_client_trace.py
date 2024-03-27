@@ -655,3 +655,30 @@ def test_trace_call_query_offset(client):
         )
 
         assert len(inner_res.calls) == exp_count
+
+
+def test_ops_with_default_params(trace_client):
+    @weave.op()
+    def op_with_default(a: int, b: int = 10) -> int:
+        return a + b
+
+    assert op_with_default(1) == 11
+    assert op_with_default(1, 5) == 6
+    assert op_with_default(1, b=5) == 6
+    assert op_with_default(a=1) == 11
+    assert op_with_default(a=1, b=5) == 6
+    assert op_with_default(b=5, a=1) == 6
+
+    inner_res = trace_client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=trace_client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 6
+    assert inner_res.calls[0].inputs == {"a": 1, "b": 10}
+    assert inner_res.calls[1].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[2].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[3].inputs == {"a": 1, "b": 10}
+    assert inner_res.calls[4].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[5].inputs == {"a": 1, "b": 5}
