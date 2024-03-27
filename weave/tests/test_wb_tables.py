@@ -98,7 +98,7 @@ def test_convert_optional_list_cell(fake_wandb):
         {
             "a": [
                 {
-                    "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
+                    "artifact": f"wandb-artifact:///_/_/test_name:{art.commit_hash}",
                     "path": "media/html/03ac15e611be692f058e.html",
                     "sha256": "d4935b7d4e8f30952d5869122ca6793114936be8bf156dd936b6794fb6715e02",
                 }
@@ -161,7 +161,7 @@ def test_join_table_with_images(fake_wandb):
                 "0": {
                     "name": "a",
                     "image": {
-                        "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
+                        "artifact": f"wandb-artifact:///_/_/test_name:{art.commit_hash}",
                         "path": "media/images/9d4f26b99a1d4d044b6c.png",
                         "format": "png",
                         "height": 32,
@@ -180,7 +180,7 @@ def test_join_table_with_images(fake_wandb):
                 "0": {
                     "name": "b",
                     "image": {
-                        "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{art.commit_hash}",
+                        "artifact": f"wandb-artifact:///_/_/test_name:{art.commit_hash}",
                         "path": "media/images/7fd26b0af1228fa077bb.png",
                         "format": "png",
                         "height": 32,
