@@ -276,7 +276,7 @@ def exp_raw_data(commit_hash: str):
         {
             "label": "a",
             "image": {
-                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "artifact": f"wandb-artifact:///_/_/test_name:{commit_hash}",
                 "path": "media/images/724389f96d933f4166db.png",
                 "format": "png",
                 "height": 128,
@@ -330,7 +330,7 @@ def exp_raw_data(commit_hash: str):
         {
             "label": "b",
             "image": {
-                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "artifact": f"wandb-artifact:///_/_/test_name:{commit_hash}",
                 "path": "media/images/724389f96d933f4166db.png",
                 "format": "png",
                 "height": 128,
@@ -384,7 +384,7 @@ def exp_raw_data(commit_hash: str):
         {
             "label": "c",
             "image": {
-                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "artifact": f"wandb-artifact:///_/_/test_name:{commit_hash}",
                 "path": "media/images/724389f96d933f4166db.png",
                 "format": "png",
                 "height": 128,
@@ -438,7 +438,7 @@ def exp_raw_data(commit_hash: str):
         {
             "label": "d",
             "image": {
-                "artifact": f"wandb-artifact:///test_entity/test_project/test_name:{commit_hash}",
+                "artifact": f"wandb-artifact:///_/_/test_name:{commit_hash}",
                 "path": "media/images/724389f96d933f4166db.png",
                 "format": "png",
                 "height": 128,
