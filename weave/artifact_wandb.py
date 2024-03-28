@@ -412,11 +412,13 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         uri: typing.Optional[
             typing.Union["WeaveWBArtifactURI", "WeaveWBLoggedArtifactURI"]
         ] = None,
+        artifact_id: typing.Optional[str] = None,
     ):
         from . import io_service
 
         self.io_service = io_service.get_sync_client()
         self.name = name
+        self.artifact_id = artifact_id
 
         # original uri passed, if any. this can include aliases such as latest or best, which do not
         # correspond to specific versions or may change versions.
@@ -569,14 +571,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
                 'cannot get direct url for unsaved artifact"'
             )
         uri = self._read_artifact_uri.with_path(path)
-        return self.io_service.direct_url(uri)
+        return self.io_service.direct_url(uri, self.artifact_id)
 
     def path(self, name: str) -> str:
         if not self.is_saved or not self._read_artifact_uri:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
         uri = self._read_artifact_uri.with_path(name)
-        fs_path = self.io_service.ensure_file(uri)
+        fs_path = self.io_service.ensure_file(uri, self.artifact_id)
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
@@ -696,7 +698,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             raise errors.WeaveInternalError(
                 'cannot get path info for unsaved artifact"'
             )
-        return self.io_service.manifest(self._read_artifact_uri)
+        return self.io_service.manifest(self._read_artifact_uri, self.artifact_id)
 
     def digest(self, path: str) -> typing.Optional[str]:
         manifest_entry = self._manifest_entry(path)

@@ -130,10 +130,12 @@ class FakeArtifactManifest:
 
 class FakePath:
     def __init__(self, path):
+        print(f"mock path in FakePath download: {path}", flush=True)
         self.path = path
 
     def download(self, root=None):
         # copy file to root
+        print(f"mock root in FakePath download: {root}", flush=True)
         if root is not None:
             os.makedirs(root, exist_ok=True)
             shutil.copy2(self.path, root)
@@ -173,6 +175,7 @@ class FakeArtifact:
 
 class FakeRunFile:
     def __init__(self, name):
+        print(f"mock name in FakeRunFile init: {name}", flush=True)
         self.name = name
 
     def download(self, root, replace=False):
@@ -269,14 +272,12 @@ class FakeIoServiceClient:
 
     def add_artifact(self, artifact, artifact_uri):
         ma = MockedArtifact(artifact)
-
         self.mocked_artifacts[str(artifact_uri)] = ma
 
-    def manifest(self, artifact_uri):
+    def manifest(self, artifact_id, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
         if uri_str in self.mocked_artifacts:
             return FakeArtifactManifest(self.mocked_artifacts[uri_str].artifact)
-            # return FakeFilesystemManifest(self.mocked_artifacts[uri_str].local_path.name)
         requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
         target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
         return FakeFilesystemManifest(target)
@@ -294,11 +295,12 @@ class FakeIoServiceClient:
 
         return FakeFs()
 
-    def direct_url(self, artifact_uri):
+    def direct_url(self, artifact_id, artifact_uri):
         return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
-    def ensure_file(self, artifact_uri):
+    def ensure_file(self, artifact_id, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
+        print(self.mocked_artifacts)
         if uri_str in self.mocked_artifacts:
             entry = self.mocked_artifacts[uri_str].artifact.manifest.entries.get(
                 artifact_uri.path
@@ -334,7 +336,7 @@ class SetupResponse:
         },
     ):
         artifact_uri = WeaveWBArtifactURI.parse(
-            f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:{artifact.commit_hash}"
+            f"wandb-artifact:///_/_/{artifact.name}:{artifact.commit_hash}"
         )
 
         self.fake_io.add_artifact(artifact, artifact_uri)
