@@ -32,7 +32,21 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
-        return None
+        rep = ""
+        try:
+            rep = repr(obj)
+        except Exception:
+            try:
+                rep = str(obj)
+            except Exception:
+                pass
+
+        return {
+            "_type": "UnknownUserType",
+            "type_name": type(obj).__name__,
+            "repr": rep,
+        }
+        # return None
     file_digests = {}
     for name, val in encoded["files"].items():
         file_response = server.file_create(

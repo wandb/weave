@@ -671,11 +671,14 @@ def test_unknown_input_and_output_types(client):
             self.b_val = b_val
 
     @weave.op()
-    def op_with_unknown_types(a: MyUnserializableClassA, b: int) -> MyUnserializableClassB:
+    def op_with_unknown_types(
+        a: MyUnserializableClassA, b: int
+    ) -> MyUnserializableClassB:
         return MyUnserializableClassB(a.a_val + b)
 
-    assert op_with_unknown_types(MyUnserializableClassA(3), 0.14).b_val == 3.14
-    
+    a = MyUnserializableClassA(3)
+    res = op_with_unknown_types(a, 0.14)
+    assert res.b_val == 3.14
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -684,4 +687,18 @@ def test_unknown_input_and_output_types(client):
     )
 
     assert len(inner_res.calls) == 1
-    assert inner_res.calls[0].inputs == {"a": 1, "b": 0.14}
+    assert inner_res.calls[0].inputs == {
+        "a": {
+            "_type": "UnknownUserType",
+            "type_name": "MyUnserializableClassA",
+            "repr": repr(a),
+        },
+        "b": 0.14,
+    }
+    assert inner_res.calls[0].outputs == {
+        "_result": {
+            "_type": "UnknownUserType",
+            "type_name": "MyUnserializableClassB",
+            "repr": repr(res),
+        }
+    }
