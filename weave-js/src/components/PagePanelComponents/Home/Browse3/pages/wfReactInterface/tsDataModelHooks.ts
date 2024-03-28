@@ -91,7 +91,7 @@ const makeTraceServerEndpointHook = <
         .catch(err => {
           setState({loading: false, result: null, error: err});
         });
-    }, [input]);
+    }, [getTsClient, input]);
 
     return state;
   };
