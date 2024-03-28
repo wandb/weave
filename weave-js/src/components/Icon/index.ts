@@ -116,6 +116,7 @@ export {
   IconMicrophoneAudio,
   IconMinimizeMode,
   IconModel,
+  IconModelOnDark,
   IconMusicAudio,
   IconNumber,
   IconOpenaiLogo,
