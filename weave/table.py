@@ -1,10 +1,10 @@
 from typing import Optional, Iterator
 
-from weave.trace_server.refs import Ref
+from weave.trace_server.refs import TableRef
 
 
 class Table:
-    ref: Optional[Ref]
+    ref: Optional[TableRef]
 
     def __init__(self, rows: list) -> None:
         self.rows = rows

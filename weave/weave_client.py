@@ -43,7 +43,7 @@ from weave.trace_server.refs import (
     parse_uri,
     OpRef,
 )
-from weave.trace.vals import TraceObject, TraceTable, Tracable, make_trace_obj
+from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 
 if typing.TYPE_CHECKING:
     from . import ref_base
