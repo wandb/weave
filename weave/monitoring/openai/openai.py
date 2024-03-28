@@ -20,7 +20,7 @@ old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
 
 
-def to_python(obj):
+def to_python(obj: Any) -> Any:
     if isinstance(obj, dict):
         return {k: to_python(v) for k, v in obj.items()}
     if isinstance(obj, list):
