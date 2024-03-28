@@ -36,7 +36,6 @@ import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
-  // opCategory?: HackyOpCategory | null;
   opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
@@ -260,34 +259,6 @@ export const CallsTable: FC<{
             }}>
             <PivotTableChart />
           </IconButton> */}
-
-          {/* <ListItem sx={{width: '190px', flex: '0 0 190px'}}>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={
-                  isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes(
-                    'opCategory'
-                  ) ||
-                  (effectiveFilter.opVersionRefs ?? []).length > 0
-                }
-                renderInput={params => {
-                  return <TextField {...params} label="Category" />;
-                }}
-                value={
-                  effectiveFilter.opCategory ?? opVersion?.category ?? null
-                }
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    opCategory: newValue,
-                  });
-                }}
-                options={opCategoryOptions}
-              />
-            </FormControl>
-          </ListItem> */}
           <ListItem sx={{minWidth: '190px'}}>
             <FormControl fullWidth>
               <Autocomplete

@@ -70,7 +70,6 @@ export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   createdAtMs: number;
-  // category: OpCategory | null;
 };
 
 export type OpVersionFilter = {
@@ -104,7 +103,6 @@ export type ObjectVersionKey =
 export type ObjectVersionSchema = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
-  // typeName: string;
   baseObjectClass: string | null;
   createdAtMs: number;
   val: any;

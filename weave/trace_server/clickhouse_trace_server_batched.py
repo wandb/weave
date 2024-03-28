@@ -390,7 +390,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:
-                conds.append("base_object_class IN {base_object_classes: Array(String)}")
+                conds.append(
+                    "base_object_class IN {base_object_classes: Array(String)}"
+                )
                 parameters["base_object_classes"] = req.filter.base_object_classes
 
         objs = self._select_objs_query(

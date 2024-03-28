@@ -51,11 +51,6 @@ const TypeVersionPageInner: React.FC<{
                       typeName={typeVersion.type().name()}
                     />
                   ),
-                  // Category: (
-                  //   <TypeVersionCategoryChip
-                  //     typeCategory={typeVersion.typeCategory()}
-                  //   />
-                  // ),
                   Version: typeVersion.version(),
                   'Property Types': (
                     <PropertyTypeTree

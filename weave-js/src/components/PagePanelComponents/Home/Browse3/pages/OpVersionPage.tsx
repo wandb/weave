@@ -98,11 +98,6 @@ const OpVersionPageInner: React.FC<{
               ) : (
                 <></>
               ),
-            // ...(category
-            //   ? {
-            //       Category: <CategoryChip value={category} />,
-            //     }
-            //   : {}),
           }}
         />
       }

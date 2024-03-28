@@ -32,19 +32,8 @@ Exception.displayName = 'S.Exception';
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
-  // const {useOpVersion} = useWFHooks();
-
   const opName = opNiceName(call.spanName);
   const truncatedId = call.callId.slice(-4);
-
-  // const opVersionKey = useMemo(() => {
-  //   if (call.opVersionRef) {
-  //     return refUriToOpVersionKey(call.opVersionRef);
-  //   }
-  //   return null;
-  // }, [call.opVersionRef]);
-  // const callOp = useOpVersion(opVersionKey);
-  // const opCategory = callOp.result?.category;
 
   const statusCode = call.rawSpan.status_code;
 
@@ -53,7 +42,6 @@ export const CallOverview: React.FC<{
       <Overview>
         <CallName>{opName}</CallName>
         <CallId>{truncatedId}</CallId>
-        {/* {opCategory && <CategoryChip value={opCategory} />} */}
         <StatusChip value={statusCode} iconOnly />
       </Overview>
       {call.rawSpan.exception && (
