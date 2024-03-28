@@ -94,7 +94,7 @@ class ObjSchema(BaseModel):
     version_index: int
     is_latest: int
     kind: str
-    root_obj_type: typing.Optional[str]
+    base_object_class: typing.Optional[str]
     val: typing.Any
 
 
@@ -209,7 +209,7 @@ class ObjReadRes(BaseModel):
 
 
 class _ObjectVersionFilter(BaseModel):
-    root_obj_types: typing.Optional[typing.List[str]] = None
+    base_object_classes: typing.Optional[typing.List[str]] = None
     object_names: typing.Optional[typing.List[str]] = None
     is_op: typing.Optional[bool] = None
     latest_only: typing.Optional[bool] = None

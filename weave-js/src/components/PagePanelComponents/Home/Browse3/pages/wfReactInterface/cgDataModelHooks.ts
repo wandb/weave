@@ -394,7 +394,7 @@ const useObjectVersion = (
             versionIndex: dataValue.result.versionIndex as number,
             typeName: dataValue.result.typeName as string,
             // category, // typeNameToCategory(dataValue.result.typeName as string),
-            rootObjectType: null,
+            baseObjectClass: null,
             createdAtMs: dataValue.result.createdAtMs as number,
             val: null,
           };

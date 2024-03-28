@@ -106,7 +106,7 @@ export type ObjectVersionSchema = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   // typeName: string;
-  rootObjectType: string | null;
+  baseObjectClass: string | null;
   createdAtMs: number;
   val: any;
 };

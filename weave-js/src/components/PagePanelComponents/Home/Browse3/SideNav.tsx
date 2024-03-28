@@ -39,7 +39,7 @@ export const SideNav = () => {
   }, [query.filter]);
   const filterCategory = useMemo(() => {
     const category = Object.keys(filters).find(key =>
-      key.includes('rootObjectType')
+      key.includes('baseObjectClass')
     );
     console.log(category);
     if (category === undefined) {
@@ -108,7 +108,7 @@ export const SideNav = () => {
         name: 'Models',
         iconName: IconNames.Model,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
-          rootObjectType: 'Model',
+          baseObjectClass: 'Model',
         }),
       },
       {
@@ -116,7 +116,7 @@ export const SideNav = () => {
         name: 'Datasets',
         iconName: IconNames.Table,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
-          rootObjectType: 'Dataset',
+          baseObjectClass: 'Dataset',
         }),
       },
     ],

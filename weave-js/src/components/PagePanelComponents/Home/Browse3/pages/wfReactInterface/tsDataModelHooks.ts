@@ -438,7 +438,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     params: {
       project_id: projectIdFromParts({entity, project}),
       filter: {
-        root_obj_types: filter.category,
+        base_object_classes: filter.category,
         object_names: filter.objectIds,
         latest_only: filter.latestOnly,
         is_op: false,
@@ -468,7 +468,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
           name: obj.name,
           path: 'obj',
           createdAtMs: convertISOToDate(obj.created_at).getTime(),
-          rootObjectType: obj.root_obj_type ?? null,
+          baseObjectClass: obj.base_object_class ?? null,
           versionIndex: obj.version_index,
           val: obj.val,
         };
@@ -476,8 +476,8 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       .filter(obj => {
         return (
           filter.category == null ||
-          (obj.rootObjectType != null &&
-            filter.category.includes(obj.rootObjectType as any))
+          (obj.baseObjectClass != null &&
+            filter.category.includes(obj.baseObjectClass as any))
         );
       })
 );

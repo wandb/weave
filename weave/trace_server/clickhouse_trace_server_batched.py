@@ -111,7 +111,7 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 class ObjCHInsertable(BaseModel):
     project_id: str
     kind: str
-    root_obj_type: typing.Optional[str]
+    base_object_class: typing.Optional[str]
     name: str
     refs: typing.List[str]
     val: str
@@ -125,7 +125,7 @@ class SelectableCHObjSchema(BaseModel):
     refs: typing.List[str]
     val: str
     kind: str
-    root_obj_type: typing.Optional[str]
+    base_object_class: typing.Optional[str]
     digest: str
     version_index: int
     is_latest: int
@@ -341,7 +341,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             project_id=req_obj.project_id,
             name=req_obj.name,
             kind=get_kind(req.obj.val),
-            root_obj_type=get_root_obj_type(req.obj.val),
+            base_object_class=get_base_object_class(req.obj.val),
             refs=[],
             val=json_val,
             digest=digest,
@@ -389,9 +389,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters["object_names"] = req.filter.object_names
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
-            if req.filter.root_obj_types:
-                conds.append("root_obj_type IN {root_obj_types: Array(String)}")
-                parameters["root_obj_types"] = req.filter.root_obj_types
+            if req.filter.base_object_classes:
+                conds.append("base_object_class IN {base_object_classes: Array(String)}")
+                parameters["base_object_classes"] = req.filter.base_object_classes
 
         objs = self._select_objs_query(
             req.project_id,
@@ -1099,7 +1099,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,
         kind=ch_obj.kind,
-        root_obj_type=ch_obj.root_obj_type,
+        base_object_class=ch_obj.base_object_class,
         val=json.loads(ch_obj.val),
     )
 
@@ -1192,7 +1192,7 @@ def get_kind(val: typing.Any) -> str:
     return "object"
 
 
-def get_root_obj_type(val: typing.Any) -> typing.Optional[str]:
+def get_base_object_class(val: typing.Any) -> typing.Optional[str]:
     if "_bases" in val:
         if isinstance(val["_bases"], list):
             if len(val["_bases"]) >= 2:

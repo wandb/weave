@@ -89,7 +89,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 name TEXT,
                 created_at TEXT,
                 kind TEXT,
-                root_obj_type TEXT,
+                base_object_class TEXT,
                 refs TEXT,
                 val TEXT,
                 digest TEXT UNIQUE,
@@ -320,7 +320,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     name,
                     created_at,
                     kind,
-                    root_obj_type,
+                    base_object_class,
                     refs,
                     val,
                     digest,
@@ -332,7 +332,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req_obj.name,
                     datetime.datetime.now().isoformat(),
                     get_kind(req_obj.val),
-                    get_root_obj_type(req_obj.val),
+                    get_base_object_class(req_obj.val),
                     json.dumps([]),
                     json_val,
                     digest,
@@ -373,9 +373,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
-            if req.filter.root_obj_types:
-                in_list = ", ".join([f"'{t}'" for t in req.filter.root_obj_types])
-                conds.append(f"root_obj_type IN ({in_list})")
+            if req.filter.base_object_classes:
+                in_list = ", ".join([f"'{t}'" for t in req.filter.base_object_classes])
+                conds.append(f"base_object_class IN ({in_list})")
 
         objs = self._select_objs_query(
             req.project_id,
@@ -588,7 +588,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     name=row[1],
                     created_at=row[2],
                     kind=row[3],
-                    root_obj_type=row[4],
+                    base_object_class=row[4],
                     val=json.loads(row[6]),
                     digest=row[7],
                     version_index=row[8],
@@ -620,7 +620,7 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
-def get_root_obj_type(val: Any) -> Optional[str]:
+def get_base_object_class(val: Any) -> Optional[str]:
     if "_bases" in val:
         if isinstance(val["_bases"], list):
             if len(val["_bases"]) >= 2:

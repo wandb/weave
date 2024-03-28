@@ -9,12 +9,12 @@ const colorMap: Record<ObjectCategory, TagColorName> = {
 };
 
 export const TypeVersionCategoryChip: React.FC<{
-  rootObjectType: ObjectCategory | null;
+  baseObjectClass: ObjectCategory | null;
 }> = props => {
-  if (props.rootObjectType == null) {
+  if (props.baseObjectClass == null) {
     return <></>;
   }
-  const label = props.rootObjectType;
-  const color = colorMap[props.rootObjectType] ?? 'moon';
+  const label = props.baseObjectClass;
+  const color = colorMap[props.baseObjectClass] ?? 'moon';
   return <Pill color={color} label={label} />;
 };
