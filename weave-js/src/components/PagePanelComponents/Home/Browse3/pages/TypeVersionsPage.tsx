@@ -410,41 +410,6 @@ export const FilterableTypeVersionsTable: React.FC<{
   );
 };
 
-const TypeCategoryFilterControlListItem: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelTypeVersionFilter;
-  filter: WFHighLevelTypeVersionFilter;
-  updateFilter: (update: Partial<WFHighLevelTypeVersionFilter>) => void;
-}> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection.typeCategories();
-  }, [orm.projectConnection]);
-  return (
-    <ListItem>
-      <FormControl fullWidth>
-        <Autocomplete
-          size={'small'}
-          disabled={Object.keys(props.frozenFilter ?? {}).includes(
-            'typeCategory'
-          )}
-          renderInput={params => (
-            <TextField {...params} label="Type Category" />
-          )}
-          value={props.filter.typeCategory ?? null}
-          onChange={(event, newValue) => {
-            props.updateFilter({
-              typeCategory: newValue,
-            });
-          }}
-          options={options}
-        />
-      </FormControl>
-    </ListItem>
-  );
-};
-
 const TypeNameFilterControlListItem: React.FC<{
   entity: string;
   project: string;

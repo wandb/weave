@@ -39,11 +39,11 @@ export const ObjectVersionsPage: React.FC<{
   const title = useMemo(() => {
     if (filter.objectName) {
       return 'Versions of ' + filter.objectName;
-    } else if (filter.typeCategory) {
-      return _.capitalize(filter.typeCategory) + 's';
+    } else if (filter.rootObjectType) {
+      return _.capitalize(filter.rootObjectType) + 's';
     }
     return 'All Objects';
-  }, [filter.objectName, filter.typeCategory]);
+  }, [filter.objectName, filter.rootObjectType]);
 
   return (
     <SimplePageLayout
@@ -67,7 +67,7 @@ export const ObjectVersionsPage: React.FC<{
 
 export type WFHighLevelObjectVersionFilter = {
   objectName?: string | null;
-  typeCategory?: ObjectCategory | null;
+  rootObjectType?: ObjectCategory | null;
 };
 
 export const FilterableObjectVersionsTable: React.FC<{
@@ -92,8 +92,8 @@ export const FilterableObjectVersionsTable: React.FC<{
     props.entity,
     props.project,
     {
-      category: effectiveFilter.typeCategory
-        ? [effectiveFilter.typeCategory]
+      category: effectiveFilter.rootObjectType
+        ? [effectiveFilter.rootObjectType]
         : undefined,
       objectIds: effectiveFilter.objectName
         ? [effectiveFilter.objectName]
@@ -150,11 +150,14 @@ const ObjectVersionsTable: React.FC<{
         );
       },
     }),
-    basicField('category', 'Category', {
+    basicField('rootObjectType', 'Category', {
       width: 100,
       renderCell: cellParams => {
         const category = cellParams.value;
-        return <TypeVersionCategoryChip typeCategory={category} />;
+        if (category === 'Model' || category === 'Dataset') {
+          return <TypeVersionCategoryChip rootObjectType={category} />;
+        }
+        return null;
       },
     }),
     basicField('createdAtMs', 'Created', {

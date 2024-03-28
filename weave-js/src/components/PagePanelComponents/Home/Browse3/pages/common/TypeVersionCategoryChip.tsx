@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import React from 'react';
 
 import {Pill, TagColorName} from '../../../../../Tag';
@@ -10,12 +9,12 @@ const colorMap: Record<ObjectCategory, TagColorName> = {
 };
 
 export const TypeVersionCategoryChip: React.FC<{
-  typeCategory: ObjectCategory | null;
+  rootObjectType: ObjectCategory | null;
 }> = props => {
-  if (props.typeCategory == null) {
+  if (props.rootObjectType == null) {
     return <></>;
   }
-  const label = _.capitalize(props.typeCategory);
-  const color = colorMap[props.typeCategory];
+  const label = props.rootObjectType;
+  const color = colorMap[props.rootObjectType] ?? 'moon';
   return <Pill color={color} label={label} />;
 };

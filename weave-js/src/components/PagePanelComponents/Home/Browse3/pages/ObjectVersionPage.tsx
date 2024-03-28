@@ -78,7 +78,7 @@ const ObjectVersionPageInner: React.FC<{
     objectIds: [objectName],
   });
   const objectVersionCount = (objectVersions.result ?? []).length;
-  const objectTypeCategory = useMemo(() => {
+  const rootObjectType = useMemo(() => {
     if (objectVersion.rootObjectType === 'Dataset') {
       return 'Dataset';
     }
@@ -119,12 +119,10 @@ const ObjectVersionPageInner: React.FC<{
               </>
             ),
             Version: <>{objectVersionIndex}</>,
-            ...(objectTypeCategory
+            ...(rootObjectType
               ? {
                   Category: (
-                    <TypeVersionCategoryChip
-                      typeCategory={objectTypeCategory}
-                    />
+                    <TypeVersionCategoryChip rootObjectType={rootObjectType} />
                   ),
                 }
               : {}),
@@ -224,13 +222,13 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Use',
           content:
-            objectTypeCategory === 'Dataset' ? (
+            rootObjectType === 'Dataset' ? (
               <TabUseDataset
                 name={objectName}
                 uri={refUri}
                 versionIndex={objectVersionIndex}
               />
-            ) : objectTypeCategory === 'Model' ? (
+            ) : rootObjectType === 'Model' ? (
               <TabUseModel
                 name={objectName}
                 uri={refUri}

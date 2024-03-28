@@ -623,8 +623,11 @@ def get_kind(val: Any) -> str:
 def get_root_obj_type(val: Any) -> Optional[str]:
     if "_bases" in val:
         if isinstance(val["_bases"], list):
-            if len(val["_bases"]) > 2:
+            if len(val["_bases"]) >= 2:
                 if val["_bases"][-1] == "BaseModel":
                     if val["_bases"][-2] == "Object":
-                        return val["_bases"][-3]
+                        if len(val["_bases"]) > 2:
+                            return val["_bases"][-3]
+                        elif "_class_name" in val:
+                            return val["_class_name"]
     return None

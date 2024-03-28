@@ -36,7 +36,7 @@ import {
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
-import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
+// import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
 import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
@@ -47,7 +47,7 @@ import {
 } from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {
-  opVersionRefOpCategory,
+  // opVersionRefOpCategory,
   opVersionRefOpName,
 } from '../Browse3/pages/wfReactInterface/utilities';
 import {
@@ -313,9 +313,9 @@ export const RunsTable: FC<{
         loading,
         opVersion: call.opVersionRef,
         isRoot: call.parentId == null,
-        opCategory: call.opVersionRef
-          ? opVersionRefOpCategory(call.opVersionRef)
-          : null,
+        // opCategory: call.opVersionRef
+        //   ? opVersionRefOpCategory(call.opVersionRef)
+        //   : null,
         trace_id: call.traceId,
         status_code: call.rawSpan.status_code,
         timestampMs: call.rawSpan.timestamp,
@@ -496,22 +496,22 @@ export const RunsTable: FC<{
           );
         },
       },
-      ...(!ioColumnsOnly
-        ? [
-            {
-              field: 'opCategory',
-              headerName: 'Category',
-              width: 100,
-              minWidth: 100,
-              maxWidth: 100,
-              renderCell: (cellParams: any) => {
-                return (
-                  cellParams.value && <CategoryChip value={cellParams.value} />
-                );
-              },
-            },
-          ]
-        : []),
+      // ...(!ioColumnsOnly
+      //   ? [
+      //       {
+      //         field: 'opCategory',
+      //         headerName: 'Category',
+      //         width: 100,
+      //         minWidth: 100,
+      //         maxWidth: 100,
+      //         renderCell: (cellParams: any) => {
+      //           return (
+      //             cellParams.value && <CategoryChip value={cellParams.value} />
+      //           );
+      //         },
+      //       },
+      //     ]
+      //   : []),
       ...(!ioColumnsOnly
         ? [
             {

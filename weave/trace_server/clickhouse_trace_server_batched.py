@@ -391,7 +391,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append("is_latest = 1")
             if req.filter.root_obj_types:
                 conds.append("root_obj_type IN {root_obj_types: Array(String)}")
-                parameters["object_names"] = req.filter.root_obj_types
+                parameters["root_obj_types"] = req.filter.root_obj_types
 
         objs = self._select_objs_query(
             req.project_id,
@@ -1195,10 +1195,13 @@ def get_kind(val: typing.Any) -> str:
 def get_root_obj_type(val: typing.Any) -> typing.Optional[str]:
     if "_bases" in val:
         if isinstance(val["_bases"], list):
-            if len(val["_bases"]) > 2:
+            if len(val["_bases"]) >= 2:
                 if val["_bases"][-1] == "BaseModel":
                     if val["_bases"][-2] == "Object":
-                        return val["_bases"][-3]
+                        if len(val["_bases"]) > 2:
+                            return val["_bases"][-3]
+                        elif "_class_name" in val:
+                            return val["_class_name"]
     return None
 
 

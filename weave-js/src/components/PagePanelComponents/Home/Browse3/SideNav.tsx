@@ -39,8 +39,9 @@ export const SideNav = () => {
   }, [query.filter]);
   const filterCategory = useMemo(() => {
     const category = Object.keys(filters).find(key =>
-      key.toLowerCase().includes('category')
+      key.includes('rootObjectType')
     );
+    console.log(category);
     if (category === undefined) {
       return undefined;
     }
@@ -51,9 +52,9 @@ export const SideNav = () => {
     if (params.tab === 'types' || params.tab === 'type-versions') {
       return 'types';
     } else if (params.tab === 'objects' || params.tab === 'object-versions') {
-      if (filterCategory === 'model') {
+      if (filterCategory === 'Model') {
         return 'models';
-      } else if (filterCategory === 'dataset') {
+      } else if (filterCategory === 'Dataset') {
         return 'datasets';
       }
       return 'objects';
@@ -107,7 +108,7 @@ export const SideNav = () => {
         name: 'Models',
         iconName: IconNames.Model,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
-          typeCategory: 'Model',
+          rootObjectType: 'Model',
         }),
       },
       {
@@ -115,7 +116,7 @@ export const SideNav = () => {
         name: 'Datasets',
         iconName: IconNames.Table,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
-          typeCategory: 'Dataset',
+          rootObjectType: 'Dataset',
         }),
       },
     ],
