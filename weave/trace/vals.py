@@ -119,25 +119,6 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
 
 
 def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> Any:
-    # This condition attempts to bind the current `self` to the attribute if
-    # it happens to be both an `Op` and have a `self` argument. This is a
-    # bit of a hack since we are not always sure that the current object is
-    # the correct object to bind. There are 3 cases:
-    # 1. The attribute is part of the instance methods and the binding is
-    #    correct
-    # 2. The attribute is assigned as a property and is not bound at
-    #    assignment time. In this case, it is "unlikely" that the args
-    #    contain a `self` argument - which is why we apply this heuristic.
-    # 3. The attribute is assigned as a property and is bound to another
-    #    object at the time of assignment. In this case, the binding is
-    #    incorrect. However, in our evaluation use case we do not have this
-    #    case. We are accepting the incorrect assignment here for the sake
-    #    of expediency, but should be fixed.
-    if isinstance(val_attr_val, Op) and inspect.signature(
-        val_attr_val.resolve_fn
-    ).parameters.get("self"):
-        val_attr_val = val_attr_val.__get__(self, type(self))
-
     # Not ideal, what about properties?
     if callable(val_attr_val):
         return val_attr_val
@@ -159,6 +140,7 @@ def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> 
         gc.server,
         None,  # TODO: not passing root, needed for mutate which is not implemented yet
         # self.root,
+        self,
     )
 
 
@@ -372,6 +354,7 @@ def make_trace_obj(
     new_ref: RefWithExtra,
     server: TraceServerInterface,
     root: Optional[Tracable],
+    parent: Any = None,
 ) -> Any:
     if isinstance(val, Tracable):
         # If val is a TraceTable, we want to refer to it via the outer object
@@ -432,6 +415,24 @@ def make_trace_obj(
             return TraceList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
             return TraceDict(val, ref=new_ref, server=server, root=root)
+    if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
+        # This condition attempts to bind the current `self` to the attribute if
+        # it happens to be both an `Op` and have a `self` argument. This is a
+        # bit of a hack since we are not always sure that the current object is
+        # the correct object to bind. There are 3 cases:
+        # 1. The attribute is part of the instance methods and the binding is
+        #    correct
+        # 2. The attribute is assigned as a property and is not bound at
+        #    assignment time. In this case, it is "unlikely" that the args
+        #    contain a `self` argument - which is why we apply this heuristic.
+        # 3. The attribute is assigned as a property and is bound to another
+        #    object at the time of assignment. In this case, the binding is
+        #    incorrect. However, in our evaluation use case we do not have this
+        #    case. We are accepting the incorrect assignment here for the sake
+        #    of expediency, but should be fixed.
+        if parent is None:
+            raise ValueError("Parent is required for Op")
+        val = val.__get__(parent, type(parent))
     box_val = box.box(val)
     setattr(box_val, "ref", new_ref)
     return box_val

@@ -378,8 +378,7 @@ def test_save_model(client):
     model = MyModel(prompt="input is: {input}")
     ref = client.save_object(model, "my-model")
     model2 = client.get(ref)
-    # TODO: wrong, have to manually pass self
-    assert model2.predict(model, "x") == "input is: x"
+    assert model2.predict("x") == "input is: x"
 
 
 def test_dataset_rows_ref(client):
