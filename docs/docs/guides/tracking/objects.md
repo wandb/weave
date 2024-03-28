@@ -5,7 +5,7 @@ hide_table_of_contents: true
 
 # Objects
 
-Weave's serialization layer saves and versions Python objects, backed by [W&B Artifacts](https://docs.wandb.ai/guides/artifacts).
+Weave's serialization layer saves and versions Python objects.
 
 ## Publishing an object
 
@@ -33,7 +33,7 @@ cat_names = weave.ref('cat-names').get()
 A fully qualified weave object ref uri looks like this:
 
 ```
-wandb-artifact://<entity>/<project>/<object_name>:<object_version>/obj
+weave:///<entity>/<project>/object/<object_name>:<object_version>
 ```
 
 - *entity*: wandb entity (username or team)
