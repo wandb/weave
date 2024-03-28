@@ -165,7 +165,10 @@ class TraceObject(Tracable):
         except AttributeError:
             pass
         val_attr_val = object.__getattribute__(self._val, __name)
-        return attribute_access_result(self, val_attr_val, __name)
+        result = attribute_access_result(self, val_attr_val, __name)
+        # Store the result on _val so we don't deref next time.
+        object.__setattr__(self._val, __name, result)
+        return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
         if __name in ["_val", "ref", "server", "root", "mutations"]:
