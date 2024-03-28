@@ -703,6 +703,7 @@ def _get_table_like_awl_from_file(
         )
     return _TableLikeAWLFromFileResult(awl, data)
 
+USE_RAW_DATA_WHEN_MIXED = False
 
 def _get_rows_and_object_type_awl_from_file(
     data: dict,
@@ -714,7 +715,7 @@ def _get_rows_and_object_type_awl_from_file(
     object_type = None
     with tracer.trace("get_table:get_rows_and_object_type"):
         sample_max_rows = max(1000 // num_parts, 1)
-        if _data_is_weave_file_with_mixed_type_settings(data):
+        if USE_RAW_DATA_WHEN_MIXED and _data_is_weave_file_with_mixed_type_settings(data):
             # `_data_is_weave_file_format` is known to be fallible, especially
             # with large datasets of heterogenous types. In this case, the user
             # explicitly told us that the types are mixed, so we will just
