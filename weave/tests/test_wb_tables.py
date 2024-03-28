@@ -32,6 +32,11 @@ def use_static_artifact_node(
                     "artifactSequence": {
                         "id": "c1",
                         "name": collection_name,
+                        "project": {
+                            "id": "p1",
+                            "name": project_name,
+                            "entity": {"id": "e1", "name": entity_name},
+                        },
                         "defaultArtifactType": {
                             "id": "at1",
                             "name": "art_type",
