@@ -764,11 +764,11 @@ const typeToDataGridColumnSpec = (
               headerName: innerKey,
               renderCell: params => {
                 return (
-                  <Typography>
-                    {params.row[innerKey] == null
-                      ? '-'
-                      : `[${params.row[innerKey].length} item list]`}
-                  </Typography>
+                  // <Typography>
+                  params.row[innerKey] == null
+                    ? '-'
+                    : `[${params.row[innerKey].length} item list]`
+                  // </Typography>
                 );
               },
             },
@@ -790,6 +790,7 @@ const typeToDataGridColumnSpec = (
       return valTypeCols.map(col => ({
         ...col,
         maxWidth,
+        flex: 1,
         // field: `${key}.${col.field}`,
         // headerName: `${key}.${col.field}`,
       }));
@@ -938,7 +939,7 @@ export const WeaveCHTable: FC<{
   const apiRef = useGridApiRef();
   const {isPeeking} = useContext(WeaveflowPeekContext);
 
-  const makeLinkPath = useObjectVersionLinkPathForPath();
+  // const makeLinkPath = useObjectVersionLinkPathForPath();
   const fetchQuery = useValueOfRefUri(props.refUri, {
     limit: MAX_ROWS + 1,
   });
@@ -989,24 +990,25 @@ export const WeaveCHTable: FC<{
 
   const columnSpec: GridColDef[] = useMemo(() => {
     return [
-      {
-        field: '_table_row_digest',
-        headerName: '',
-        width: 50,
-        renderCell: params => (
-          <Link
-            to={makeLinkPath([
-              ...weaveEditorPathUrlPathPart(props.path),
-              TABLE_ID_EDGE_TYPE,
-              params.row._table_row_digest,
-            ])}>
-            <LinkIcon />
-          </Link>
-        ),
-      },
+      // {
+      //   field: '_table_row_digest',
+      //   headerName: '',
+      //   width: 50,
+      //   renderCell: params => (
+      //     <Link
+      //       to={makeLinkPath([
+      //         ...weaveEditorPathUrlPathPart(props.path),
+      //         TABLE_ID_EDGE_TYPE,
+      //         params.row._table_row_digest,
+      //       ])}>
+      //       <LinkIcon />
+      //     </Link>
+      //   ),
+      // },
       ...typeToDataGridColumnSpec(objectType, isPeeking, true),
     ];
-  }, [objectType, isPeeking, makeLinkPath, props.path]);
+  }, [objectType, isPeeking]);
+  // }, [objectType, isPeeking, makeLinkPath, props.path]);
   return (
     <>
       {isTruncated && (
@@ -1034,6 +1036,105 @@ export const WeaveCHTable: FC<{
             },
           }}
           loading={fetchQuery.loading}
+          disableRowSelectionOnClick
+        />
+      </Box>
+    </>
+  );
+};
+
+export const WeaveDataTable: FC<{
+  data: Array<any>;
+  loading?: boolean;
+  isTruncated?: boolean;
+  onLinkClick?: (row: any) => void;
+}> = props => {
+  const data = useMemo(() => {
+    return props.data.map(row => {
+      if (row == null) {
+        return {};
+      } else if (typeof row === 'object') {
+        return row;
+      }
+      return {'   ': row};
+    });
+  }, [props.data]);
+  console.log({data});
+  const apiRef = useGridApiRef();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+
+  const gridRows = useMemo(
+    () =>
+      data.map((row: {[key: string]: any}, i: number) => ({
+        _table_row_digest: row.digest,
+        id: i,
+        ...flattenObject(row),
+      })),
+    [data]
+  );
+
+  // Autosize when rows change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      apiRef.current.autosizeColumns({
+        includeHeaders: true,
+        includeOutliers: true,
+      });
+    }, 0);
+    return () => {
+      clearInterval(timeoutId);
+    };
+  }, [gridRows, apiRef]);
+
+  const objectType = useMemo(() => {
+    if (data == null) {
+      return typedDict({});
+    }
+    return listObjectType(toWeaveType(data));
+  }, [data]);
+
+  const columnSpec: GridColDef[] = useMemo(() => {
+    let res: GridColDef[] = [];
+    if (props.onLinkClick) {
+      res.push({
+        field: '_table_row_digest',
+        headerName: '',
+        width: 50,
+        renderCell: params => <LinkIcon onClick={props.onLinkClick} />,
+      });
+    }
+    console.log({objectType});
+    return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
+  }, [props.onLinkClick, objectType, isPeeking]);
+  console.log(gridRows);
+  const height = 92 + 36 * Math.min(10, gridRows.length);
+  return (
+    <>
+      {props.isTruncated && (
+        <Alert severity="warning">
+          Showing {MAX_ROWS.toLocaleString()} rows only.
+        </Alert>
+      )}
+      <Box
+        sx={{
+          height: height,
+          width: '100%',
+        }}>
+        <StyledDataGrid
+          keepBorders={false}
+          apiRef={apiRef}
+          density="compact"
+          experimentalFeatures={{columnGrouping: true}}
+          rows={gridRows}
+          columns={columnSpec}
+          initialState={{
+            pagination: {
+              paginationModel: {
+                pageSize: 10,
+              },
+            },
+          }}
+          loading={props.loading}
           disableRowSelectionOnClick
         />
       </Box>

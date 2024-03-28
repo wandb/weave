@@ -279,14 +279,18 @@ const UNFILTERED = () => true;
 // filtered list of context objects.
 export const traversed = (
   data: any,
-  filter?: (context: TraverseContext) => boolean
-): TraverseContext[] => {
+  filter?: (context: TraverseContext) => boolean,
+  callback?: (context: TraverseContext) => CallbackResult
+  ): TraverseContext[] => {
   const matches: TraverseContext[] = [];
   const f = filter ?? UNFILTERED;
   traverse(data, context => {
     const result = f(context);
     if (result) {
       matches.push(context);
+    }
+    if (callback) {
+      return callback(context);
     }
   });
   return matches;

@@ -8,9 +8,12 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {useWeaveContext} from '../../../../../../context';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
+import {processGenericData} from './CallDetails';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
 import {mapObject, traverse, TraverseContext, traversed} from './traverse';
 import {ValueView} from './ValueView';
@@ -27,8 +30,13 @@ type ObjectViewerProps = {
 const getRefs = (data: Data): string[] => {
   const refs = new Set<string>();
   traverse(data, (context: TraverseContext) => {
-    if (isRef(context.value)) {
-      refs.add(context.value);
+    if (isRef(context.value) && context.path.tail() !== '_ref') {
+      const parsedRef = parseRef(context.value);
+      if (isWeaveObjectRef(parsedRef)) {
+        if (parsedRef.weaveKind === 'object') {
+          refs.add(context.value);
+        }
+      }
     }
   });
   return Array.from(refs);
@@ -53,6 +61,11 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         // Shouldn't be possible
         continue;
       }
+      // // Hack: make this general. Don't expand ops
+      // if (v.weave_type?.type === 'OpDef') {
+      //   refValues[r] = r;
+      //   continue;
+      // }
       let val = r;
       if (v == null) {
         console.error('Error resolving ref', r);
@@ -60,7 +73,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         val = v;
         if (typeof val === 'object' && val !== null) {
           val = {
-            ...v,
+            ...processGenericData(v),
             _ref: r,
           };
         }
@@ -68,7 +81,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       refValues[r] = val;
     }
     const resolved = mapObject(data, context => {
-      if (isRef(context.value)) {
+      if (isRef(context.value) && refValues[context.value]) {
         return refValues[context.value];
       }
       return context.value;
@@ -80,7 +93,11 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     const contexts = traversed(
       resolvedData,
       c =>
-        c.depth !== 0 && !c.path.endsWith('_ref') && !c.path.endsWith('_type')
+        c.depth !== 0 && !c.path.endsWith('_ref') && !c.path.endsWith('_type'),
+      c => {
+        if (c.valueType === 'array') return 'skip';
+        return undefined;
+      }
     );
     return contexts.map((c, id) => ({id, ...c}));
   }, [resolvedData]);
@@ -118,8 +135,11 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           if (
-            params.model.valueType === 'string' &&
-            !isRef(params.model.value)
+            (params.model.valueType === 'string' &&
+              isRef(params.model.value) &&
+              (parseRefMaybe(params.model.value) as any).weaveKind ===
+                'table') ||
+            params.model.valueType === 'array'
           ) {
             return 'auto';
           }
@@ -132,6 +152,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         sx={{
           '& .MuiDataGrid-row:hover': {
             backgroundColor: 'inherit',
+          },
+          '& > div > div > div > div > .MuiDataGrid-row > .MuiDataGrid-cell': {
+            paddingRight: '0px',
           },
         }}
       />

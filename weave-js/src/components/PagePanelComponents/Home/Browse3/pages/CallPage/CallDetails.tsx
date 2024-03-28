@@ -222,22 +222,31 @@ export const CallDetails: FC<{
   );
 };
 
-const getDisplayInputsAndOutput = (call: CallSchema) => {
-  const span = call.rawSpan;
-  const inputKeys =
-    span.inputs._keys ??
-    Object.entries(span.inputs)
+export const processGenericData = (inputs: any) => {
+  const callInput = inputs ?? {};
+  const inputKeys: string[] =
+    callInput._keys ??
+    Object.entries(callInput)
       .filter(([k, c]) => c != null && !k.startsWith('_'))
       .map(([k, c]) => k);
-  const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
+  return _.fromPairs(inputKeys.map(k => [k, callInput[k]]));
+};
 
-  const callOutput = span.output ?? {};
-  const outputKeys =
+const processOutput = (output: any) => {
+  const callOutput = output ?? {};
+  const outputKeys: string[] =
     callOutput._keys ??
     Object.entries(callOutput)
       .filter(([k, c]) => c != null && (k === '_result' || !k.startsWith('_')))
       .map(([k, c]) => k);
-  const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
+  return _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
+};
+
+const getDisplayInputsAndOutput = (call: CallSchema) => {
+  const span = call.rawSpan;
+  const inputs = processGenericData(span.inputs);
+  const output = processOutput(span.output);
+
   return {inputs, output};
 };
 

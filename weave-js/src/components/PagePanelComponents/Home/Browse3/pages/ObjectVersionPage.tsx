@@ -1,10 +1,10 @@
+import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {
-  WeaveEditor,
-  WeaveEditorSourceContext,
-} from '../../Browse2/WeaveEditors';
+import {WeaveEditorSourceContext} from '../../Browse2/WeaveEditors';
+import {processGenericData} from './CallPage/CallDetails';
+import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
 import {
   CallLink,
@@ -66,7 +66,7 @@ export const ObjectVersionPage: React.FC<{
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
-  const {useRootObjectVersions, useCalls} = useWFHooks();
+  const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const objectVersionHash = objectVersion.versionHash;
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -80,6 +80,10 @@ const ObjectVersionPageInner: React.FC<{
   const objectVersionCount = (objectVersions.result ?? []).length;
   const objectTypeCategory = objectVersion.category;
   const refUri = objectVersionKeyToRefUri(objectVersion);
+  const data = useRefsData([refUri]);
+  const viewerData = useMemo(() => {
+    return processGenericData(data.result?.[0] ?? {});
+  }, [data.result]);
 
   const producingCalls = useCalls(entityName, projectName, {
     outputObjectVersionRefs: [refUri],
@@ -204,11 +208,18 @@ const ObjectVersionPageInner: React.FC<{
                 refExtra: refExtra?.split('/'),
               }}>
               <ScrollableTabContent>
-                <WeaveEditor
+                <Box
+                  sx={{
+                    flex: '0 0 auto',
+                    p: 2,
+                  }}>
+                  <ObjectViewerSection title="" data={viewerData} />
+                </Box>
+                {/* <WeaveEditor
                   objType={objectName}
                   objectRefUri={refUri}
                   disableEdits
-                />
+                /> */}
               </ScrollableTabContent>
             </WeaveEditorSourceContext.Provider>
           ),

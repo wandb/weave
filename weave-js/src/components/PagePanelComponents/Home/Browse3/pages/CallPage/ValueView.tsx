@@ -1,7 +1,9 @@
-import React from 'react';
+import {Box} from '@material-ui/core';
+import React, {useMemo} from 'react';
 
 import {parseRef} from '../../../../../../react';
-import {SmallRef} from '../../../Browse2/SmallRef';
+import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {WeaveCHTable, WeaveDataTable} from '../../../Browse2/WeaveEditors';
 import {isRef} from '../common/util';
 import {ValueViewNumber} from './ValueViewNumber';
 import {ValueViewPrimitive} from './ValueViewPrimitive';
@@ -15,10 +17,25 @@ type ValueViewProps = {
 };
 
 export const ValueView = ({data, isExpanded}: ValueViewProps) => {
+  const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
     if (data.valueType === 'object' && '_ref' in data.value) {
       return <SmallRef objRef={parseRef(data.value._ref)} />;
     }
+    if (data.valueType === 'array') {
+      return (
+        // <Box
+        //   style={{
+        //     // minHeight: '400px',
+        //     // maxHeight: '400px',
+        //     width: '100%',
+        //     overflow: 'hidden',
+        //   }}>
+        <WeaveDataTable data={data.value} />
+        // </Box>
+      );
+    }
+    console.log(data);
     return null;
   }
 
@@ -29,6 +46,23 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
   if (isRef(data.value)) {
+    if (
+      opDefRef &&
+      opDefRef.scheme === 'weave' &&
+      opDefRef.weaveKind === 'table'
+    ) {
+      return (
+        <Box
+          style={{
+            minHeight: '400px',
+            maxHeight: '400px',
+            width: '100%',
+            overflow: 'hidden',
+          }}>
+          <WeaveCHTable refUri={data.value} path={[]} />
+        </Box>
+      );
+    }
     return <SmallRef objRef={parseRef(data.value)} />;
   }
 
