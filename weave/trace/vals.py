@@ -18,6 +18,7 @@ from weave.trace_server.refs import (
 from weave import box
 from weave.table import Table
 from weave.trace.serialize import from_json
+from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
 from weave.graph_client_context import require_graph_client
 from weave.trace_server.trace_server_interface import (
@@ -419,7 +420,7 @@ def make_trace_obj(
 
     if isinstance(val, Table):
         if val.ref is None:
-            raise ValueError("bla")
+            raise InternalError("Expected populated Table.ref")
         val = TraceTable(val.ref, new_ref, server, _TableRowFilter(), root)
     if isinstance(val, TableRef):
         val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
