@@ -1195,15 +1195,16 @@ def get_kind(val: typing.Any) -> str:
 
 
 def get_base_object_class(val: typing.Any) -> typing.Optional[str]:
-    if "_bases" in val:
-        if isinstance(val["_bases"], list):
-            if len(val["_bases"]) >= 2:
-                if val["_bases"][-1] == "BaseModel":
-                    if val["_bases"][-2] == "Object":
-                        if len(val["_bases"]) > 2:
-                            return val["_bases"][-3]
-                        elif "_class_name" in val:
-                            return val["_class_name"]
+    if isinstance(val, dict):
+        if "_bases" in val:
+            if isinstance(val["_bases"], list):
+                if len(val["_bases"]) >= 2:
+                    if val["_bases"][-1] == "BaseModel":
+                        if val["_bases"][-2] == "Object":
+                            if len(val["_bases"]) > 2:
+                                return val["_bases"][-3]
+                            elif "_class_name" in val:
+                                return val["_class_name"]
     return None
 
 
