@@ -66,6 +66,8 @@ class AsyncChatCompletions:
     async def _streaming_create(
         self, *args: Any, **kwargs: Any
     ) -> AsyncStream[ChatCompletionChunk]:
+        from weave.flow.chat_util import OpenAIStream
+
         named_args = bind_params(old_create, *args, **kwargs)
         messages = to_python(named_args["messages"])
         if not isinstance(messages, list):
@@ -76,16 +78,21 @@ class AsyncChatCompletions:
             # code until next() is called. But we want to create the run
             # as a child of whatever the parent is, at function call time,
             # not generator start time.
-            # TODO: need to fix this to use OpenAIStream instead of reconstruct_completion
-            # like the sync _stream_create below
             async def _stream_create_gen():  # type: ignore
                 chunks = []
                 stream = await self._base_create(*args, **kwargs)
                 async for chunk in stream:
                     chunks.append(chunk)
                     yield chunk
-                result = reconstruct_completion(messages, chunks)  # type: ignore
-                finish_run(result.model_dump(exclude_unset=True))
+                wrapped_stream = OpenAIStream(chunks)
+                list(wrapped_stream)
+
+                result = wrapped_stream.final_response()
+                result_with_usage = ChatCompletion(
+                    **result.model_dump(exclude_unset=True),
+                    usage=token_usage(messages, result.choices),
+                )
+                finish_run(result_with_usage.model_dump(exclude_unset=True))
 
         return _stream_create_gen()  # type: ignore
 

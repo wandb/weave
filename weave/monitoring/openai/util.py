@@ -45,58 +45,6 @@ def token_usage(
     )
 
 
-def reconstruct_completion(
-    input_messages: List[ChatCompletionMessage],
-    output_chunks: List[ChatCompletionChunk],
-) -> ChatCompletion:
-    combined_results: Dict[int, CombinedChoice] = {}
-
-    if not output_chunks:
-        raise Exception
-
-    for chunk in output_chunks:
-        for choice in chunk.choices:
-            index = choice.index
-            if index not in combined_results:
-                combined_results[index] = CombinedChoice()
-            combined_results[index] = update_combined_choice(
-                combined_results[index], choice
-            )
-
-    # Construct ChatCompletionChoice objects
-    combined_choices = [
-        Choice(
-            # logprobs included here because latest versions of pydantic require
-            # optional fields without default values to be included in the
-            # constructor
-            logprobs=None,
-            finish_reason=result.finish_reason,
-            index=index,
-            message=ChatCompletionMessage(
-                content=result.content,
-                role=result.role,
-                function_call=result.function_call,
-                tool_calls=result.tool_calls,
-            ),
-        )
-        for index, result in sorted(combined_results.items())
-    ]
-
-    # Assume all chunks belong to the same completion
-    first_chunk = output_chunks[0]
-
-    usage = token_usage(input_messages, combined_choices)
-
-    return ChatCompletion(
-        id=first_chunk.id,
-        choices=combined_choices,
-        created=first_chunk.created,
-        model=first_chunk.model,
-        object="chat.completion",
-        usage=usage,
-    )
-
-
 def num_tokens_from_messages(
     messages: List[dict], model: str = "gpt-3.5-turbo-0613"
 ) -> int:
