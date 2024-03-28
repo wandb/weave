@@ -395,7 +395,7 @@ def get_wandb_read_client_artifact(art_id: str) -> typing.Optional["WandbArtifac
         if res.is_deleted:
             return None
         return WandbArtifact(
-            art_id, res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
+            res.weave_art_uri.name, res.artifact_type_name, res.weave_art_uri
         )
 
 
@@ -407,12 +407,12 @@ class WandbArtifactType(artifact_fs.FilesystemArtifactType):
 class WandbArtifact(artifact_fs.FilesystemArtifact):
     def __init__(
         self,
-        artifact_id,
         name,
         type=None,
         uri: typing.Optional[
             typing.Union["WeaveWBArtifactURI", "WeaveWBLoggedArtifactURI"]
         ] = None,
+        artifact_id: typing.Optional[str] = None,
     ):
         from . import io_service
 
@@ -571,14 +571,14 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
                 'cannot get direct url for unsaved artifact"'
             )
         uri = self._read_artifact_uri.with_path(path)
-        return self.io_service.direct_url(self.artifact_id, uri)
+        return self.io_service.direct_url(uri, self.artifact_id)
 
     def path(self, name: str) -> str:
         if not self.is_saved or not self._read_artifact_uri:
             raise errors.WeaveInternalError("cannot download of an unsaved artifact")
 
         uri = self._read_artifact_uri.with_path(name)
-        fs_path = self.io_service.ensure_file(self.artifact_id, uri)
+        fs_path = self.io_service.ensure_file(uri, self.artifact_id)
         if fs_path is None:
             # Important to raise FileNotFoundError here, FileSystemArtifactRef.type
             # relies on this.
@@ -698,7 +698,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             raise errors.WeaveInternalError(
                 'cannot get path info for unsaved artifact"'
             )
-        return self.io_service.manifest(self.artifact_id, self._read_artifact_uri)
+        return self.io_service.manifest(self._read_artifact_uri, self.artifact_id)
 
     def digest(self, path: str) -> typing.Optional[str]:
         manifest_entry = self._manifest_entry(path)
@@ -831,7 +831,7 @@ class WandbArtifactRef(artifact_fs.FilesystemArtifactRef):
             )
         # TODO: potentially need to pass full entity/project/name instead
         return cls(
-            WandbArtifact("", uri.name, uri=uri),
+            WandbArtifact(uri.name, uri=uri),
             path=uri.path,
             extra=uri.extra,
         )

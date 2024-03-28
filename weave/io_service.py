@@ -397,17 +397,17 @@ class Server:
             del self.client_response_queues[client.client_id]
 
     async def handle_ensure_manifest(
-        self, artifact_id: str, artifact_uri: str
+        self, artifact_uri: str, artifact_id: typing.Optional[str] = None
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("inside io_service, ensure manifest()")
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        return await self.wandb_file_manager.manifest(artifact_id, uri)
+        return await self.wandb_file_manager.manifest(uri, artifact_id)
 
     async def handle_ensure_file(
-        self, artifact_id: str, artifact_uri: str
+        self, artifact_uri: str, artifact_id: typing.Optional[str] = None
     ) -> typing.Optional[str]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        return await self.wandb_file_manager.ensure_file(artifact_id, uri)
+        return await self.wandb_file_manager.ensure_file(uri, artifact_id)
 
     async def handle_ensure_file_downloaded(
         self, download_url: str
@@ -415,10 +415,10 @@ class Server:
         return await self.wandb_file_manager.ensure_file_downloaded(download_url)
 
     async def handle_direct_url(
-        self, artifact_id: str, artifact_uri: str
+        self, artifact_uri: str, artifact_id: typing.Optional[str] = None
     ) -> typing.Optional[str]:
         uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        return await self.wandb_file_manager.direct_url(artifact_id, uri)
+        return await self.wandb_file_manager.direct_url(uri, artifact_id)
 
     async def handle_sleep(self, seconds: float) -> float:
         # used for testing to simulate long running processes
@@ -523,18 +523,22 @@ class AsyncConnection:
         return server_resp.value
 
     async def manifest(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("inside async manifest in io_service.py", flush=True)
         manifest: typing.Optional[
             artifact_wandb.WandbArtifactManifest
-        ] = await self.request("ensure_manifest", artifact_id, str(artifact_uri))
+        ] = await self.request("ensure_manifest", str(artifact_uri), artifact_id)
         return manifest
 
     async def ensure_file(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[str]:
-        res = await self.request("ensure_file", artifact_id, str(artifact_uri))
+        res = await self.request("ensure_file", str(artifact_uri), artifact_id)
         return res
 
     async def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
@@ -542,9 +546,11 @@ class AsyncConnection:
         return res
 
     async def direct_url(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[str]:
-        res = await self.request("direct_url", artifact_id, str(artifact_uri))
+        res = await self.request("direct_url", str(artifact_uri), artifact_id)
         return res
 
     async def sleep(self, seconds: float) -> float:
@@ -613,26 +619,32 @@ class SyncClient:
         return server_resp.value
 
     def manifest(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("inside manifest in io_service.py", flush=True)
         manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request(
-            "ensure_manifest", artifact_id, str(artifact_uri)
+            "ensure_manifest", str(artifact_uri), artifact_id
         )
         return manifest
 
     def ensure_file(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[str]:
-        return self.request("ensure_file", artifact_id, str(artifact_uri))
+        return self.request("ensure_file", str(artifact_uri), artifact_id)
 
     def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
         return self.request("ensure_file_downloaded", download_url)
 
     def direct_url(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[str]:
-        return self.request("direct_url", artifact_id, str(artifact_uri))
+        return self.request("direct_url", str(artifact_uri), artifact_id)
 
     def sleep(self, seconds: float) -> None:
         return self.request("sleep", seconds)
@@ -648,23 +660,29 @@ class ServerlessClient:
         )
 
     def manifest(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("serverless client inside manifest in io_service.py", flush=True)
-        return self.wandb_file_manager.manifest(artifact_id, artifact_uri)
+        return self.wandb_file_manager.manifest(artifact_uri, artifact_id)
 
     def ensure_file(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[str]:
-        return self.wandb_file_manager.ensure_file(artifact_id, artifact_uri)
+        return self.wandb_file_manager.ensure_file(artifact_uri, artifact_id)
 
     def ensure_file_downloaded(self, download_url: str) -> typing.Optional[str]:
         return self.wandb_file_manager.ensure_file_downloaded(download_url)
 
     def direct_url(
-        self, artifact_id: str, artifact_uri: artifact_wandb.WeaveWBArtifactURI
+        self,
+        artifact_uri: artifact_wandb.WeaveWBArtifactURI,
+        artifact_id: typing.Optional[str] = None,
     ) -> typing.Optional[str]:
-        return self.wandb_file_manager.direct_url(artifact_id, artifact_uri)
+        return self.wandb_file_manager.direct_url(artifact_uri, artifact_id)
 
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
