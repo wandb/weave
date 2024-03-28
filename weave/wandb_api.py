@@ -235,44 +235,6 @@ class WandbApiAsync:
             return None
         return file["directUrl"]
 
-    ARTIFACT_PATH_INFO_QUERY = gql.gql(
-        """
-        query ArtifactPathInfo($artifactID: ID!) {
-            artifact(id: $artifactID) {
-              id
-              artifactType {
-                id
-                name
-                project {
-                  id
-                  name
-                  entityName
-                }
-              }
-            }
-          }
-        """
-    )
-
-    async def artifact_path_info(self, artifact_id: str) -> typing.Optional[str]:
-        try:
-            result = await self.query(
-                self.ARTIFACT_PATH_INFO_QUERY,
-                artifactID=artifact_id,
-            )
-        except gql.transport.exceptions.TransportQueryError as e:
-            return None
-        artifact = result["artifact"]
-        if artifact is None:
-            return None
-        artifact_type = artifact["artifactType"]
-        if artifact_type is None:
-            return None
-        project = artifact_type["project"]
-        if project is None:
-            return None
-        return project["entityName"]
-
     VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
         """
         query DefaultEntity {
@@ -436,45 +398,6 @@ class WandbApi:
         if file is None:
             return None
         return file["directUrl"]
-
-    ARTIFACT_PATH_INFO_QUERY = gql.gql(
-        """
-        query ArtifactPathInfo($artifactID: ID!) {
-            artifact(id: $artifactID) {
-              id
-              artifactType {
-                id
-                name
-                project {
-                  id
-                  name
-                  entityName
-                }
-              }
-            }
-          }
-        """
-    )
-
-    def artifact_path_info(self, artifact_id: str) -> typing.Optional[str]:
-        try:
-            result = self.query(
-                self.ARTIFACT_PATH_INFO_QUERY,
-                artifactID=artifact_id,
-            )
-        except gql.transport.exceptions.TransportQueryError as e:
-            print("\n\nlogging error in artifact path info query\n\n")
-            return None
-        artifact = result["artifact"]
-        if artifact is None:
-            return None
-        artifact_type = artifact["artifactType"]
-        if artifact_type is None:
-            return None
-        project = artifact_type["project"]
-        if project is None:
-            return None
-        return project["entityName"]
 
     VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
         """

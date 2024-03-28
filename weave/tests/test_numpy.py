@@ -148,7 +148,7 @@ def test_construct_numpy_type_from_table_file():
     # requires a filesystemartifactfile, but doesn't actually use it.
     # thus we can just use a dummy here.
 
-    art = artifact_wandb.WandbArtifact("", "test")
+    art = artifact_wandb.WandbArtifact("test")
     fs_artifact_file = artifact_fs.FilesystemArtifactFile(art, "test")
     _, object_type = table._get_rows_and_object_type_from_weave_format(
         data, fs_artifact_file

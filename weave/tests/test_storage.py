@@ -296,7 +296,6 @@ def test_to_conversion_uri_resolution(
 ):
     def make_art():
         return artifact_wandb.WandbArtifact(
-            "my-art-id",
             "my-art",
             "my-type",
             artifact_wandb.WeaveWBArtifactURI(

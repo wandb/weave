@@ -24,7 +24,7 @@ from urllib import parse
 from .. import io_service
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacits/test_res_1fwmcd3q:v0"
-ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
+ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspathabspath(TEST_TABLE_ARTIFACT_PATH)
 
 shared_artifact_dir = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "testdata", "shared_artifact_dir")
@@ -342,7 +342,6 @@ class SetupResponse:
         self.fake_io.add_artifact(artifact, artifact_uri)
         res = weave.save(
             WandbArtifact(
-                "",
                 "test_name",
                 None,
                 artifact_uri,

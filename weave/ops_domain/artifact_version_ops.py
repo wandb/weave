@@ -28,10 +28,7 @@ static_art_file_gql = """
             artifactSequence {
                 id
                 name
-                defaultArtifactType {
-                    id
-                    name
-                    project {
+                project {
                         id
                         name
                         entity {
@@ -39,6 +36,9 @@ static_art_file_gql = """
                             name
                         }
                     }
+                defaultArtifactType {
+                    id
+                    name
                 }
             }
         """
@@ -559,17 +559,26 @@ def history_metrics(
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
-    artifact_id = artifactVersion["id"]
+    artifact_id = None
+    if "id" in artifactVersion:
+        artifact_id = artifactVersion["id"]
+    entity_name = "_"
+    project_name = "_"
+    if artifactVersion["artifactSequence"]["project"] is not None:
+        entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
+        project_name = artifactVersion["artifactSequence"]["project"]["name"]
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
     commit_hash = artifactVersion["commitHash"]
     return artifact_wandb.WandbArtifact(
-        artifact_id=artifact_id,
         name=home_sequence_name,
         type=type_name,
         uri=artifact_wandb.WeaveWBArtifactURI(
-            home_sequence_name, commit_hash, "_", "_"
-        ),
+            home_sequence_name, commit_hash, entity_name, project_name
+        )
+        if entity_name != "_"
+        else None,
+        artifact_id=artifact_id,
     )
 
 
@@ -577,7 +586,7 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     name="artifactVersion-_file_refine_output_type",
     hidden=True,
     output_type=types.TypeType(),
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql_no_entity),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
 )
 def _file_refine_output_type(artifactVersion: wdt.ArtifactVersion, path: str):
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
@@ -592,7 +601,7 @@ def _file_refine_output_type(artifactVersion: wdt.ArtifactVersion, path: str):
 @op(
     name="artifactVersion-file",
     refine_output_type=_file_refine_output_type,
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql_no_entity),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
 )
 def file_(
     artifactVersion: wdt.ArtifactVersion, path: str
@@ -605,7 +614,7 @@ def file_(
 
 @op(
     name="artifactVersion-files",
-    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql_no_entity),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
 )
 def files(
     artifactVersion: wdt.ArtifactVersion,
