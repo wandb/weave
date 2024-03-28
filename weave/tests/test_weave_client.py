@@ -381,6 +381,42 @@ def test_save_model(client):
     assert model2.predict("x") == "input is: x"
 
 
+def test_saved_nested_modellike(client):
+    class A(weave.Object):
+        x: int
+
+        @weave.op()
+        async def call(self, input):
+            return self.x + input
+
+    class B(weave.Object):
+        a: A
+        y: int
+
+        @weave.op()
+        async def call(self, input):
+            return await self.a.call(input - self.y)
+
+    model = B(a=A(x=3), y=2)
+    ref = client.save_object(model, "my-model")
+    model2 = client.get(ref)
+
+    class C(weave.Object):
+        b: B
+        z: int
+
+        @weave.op()
+        async def call(self, input):
+            return await self.b.call(input - 2 * self.z)
+
+    @weave.op()
+    async def call_model(c, input):
+        return await c.call(input)
+
+    c = C(b=model2, z=1)
+    assert asyncio.run(call_model(c, 5)) == 4
+
+
 def test_dataset_rows_ref(client):
     dataset = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
     saved = client.save(dataset, "my-dataset")
