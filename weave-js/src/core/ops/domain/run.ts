@@ -689,3 +689,29 @@ export const opRunRuntime = makeRunOp({
     return run.computeSeconds;
   },
 });
+
+export const opStrRunlink = OpKinds.makeBasicOp({
+  name: 'constructor-wbRunLink',
+  hidden: true,
+  argTypes: {
+    entity_name: {
+      type: 'union' as const,
+      members: ['none' as const, 'string' as const],
+    },
+    project_name: {
+      type: 'union' as const,
+      members: ['none' as const, 'string' as const],
+    },
+    name: {
+      type: 'union' as const,
+      members: ['none' as const, 'string' as const],
+    },
+  },
+  description: `Returns a link to the ${docType('run')} overview`,
+  argDescriptions: {run: runArgDescriptions},
+  returnValueDescription: `The link to the ${docType('run')} overview`,
+  returnType: inputTypes => 'link',
+  resolver: ({entity_name, project_name, name}) => {
+    throw new Error('Attempting to use python-only op in js');
+  },
+});

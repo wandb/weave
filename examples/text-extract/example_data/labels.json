@@ -1,0 +1,56 @@
+{
+    "Articles_of_Incorporation_Real_Example_3": {
+        "name": "HealthFirst Solutions LLC",
+        "shares": 500000
+    },
+    "Articles_of_Incorporation_Real_Example_2": {
+        "name": "GreenLeaf LLC",
+        "shares": null
+    },
+    "Articles_of_Incorporation_Real_Example_1": {
+        "name": "TechBoost Corp"
+    },
+    "Highly_Varied_Article_of_Incorporation_10": {
+        "name": "Brown, Fernandez and Smith",
+        "shares": 41141
+    },
+    "Highly_Varied_Article_of_Incorporation_9": {
+        "shares": 31783
+    },
+    "Highly_Varied_Article_of_Incorporation_8": {
+        "name": "Gibson, Hunt and Davidson",
+        "shares": 96403
+    },
+    "Highly_Varied_Article_of_Incorporation_7": {
+        "name": "Boyd-Browning",
+        "shares": 41300
+    },
+    "Highly_Varied_Article_of_Incorporation_6": {
+        "name": "Newton, Moreno and Yang",
+        "shares": 73981
+    },
+    "Highly_Varied_Article_of_Incorporation_5": {
+        "name": "Matthews and Sons",
+        "shares": 98608
+    },
+    "Highly_Varied_Article_of_Incorporation_4": {
+        "name": "Moore LLC",
+        "shares": 5732
+    },
+    "Highly_Varied_Article_of_Incorporation_3": {
+        "name": "Mullen Inc",
+        "shares": 76197
+    },
+    "Highly_Varied_Article_of_Incorporation_2": {
+        "name": "Ellis and Sons",
+        "shares": 54183
+    },
+    "Highly_Varied_Article_of_Incorporation_1": {
+        "name": "French, Wyatt and Coleman",
+        "shares": 78821
+    },
+    "Another_Aoi1": {
+        "name": "Quantom Inovations Inc.",
+        "shares": 10000000
+    }
+}

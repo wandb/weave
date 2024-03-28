@@ -256,7 +256,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
         }
           ${mobile ? 'mobile' : ''}`}
         style={{
-          height: noPanels ? DEFAULT_PANEL_SIZE : pageHeight + paginationHeight,
+          height: DEFAULT_PANEL_SIZE,
         }}>
         <div
           // TODO: do we even still need this div?
@@ -271,7 +271,9 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
               style={{
                 height: (maxPage + 1) * pageHeight,
                 position: 'relative',
-                transform: `translateY(-${currentPage * pageHeight}px)`,
+                transform: `translateY(-${
+                  currentPage * pageHeight - currentPage * gutterWidth
+                }px)`,
                 transition: 'transform 0.5s',
               }}>
               {renderPanelRefs.map(panelRef => {

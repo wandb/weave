@@ -1,6 +1,7 @@
 import moment from 'moment';
 
 import {list, listObjectType, maybe, nonNullable} from '../../model';
+import {makeOp} from '../../opStore';
 import {docType} from '../../util/docs';
 import {makeBasicDimDownOp, makeStandardOp} from '../opKinds';
 
@@ -285,3 +286,15 @@ export const opDateRoundWeek = dateRounder('week');
 export const opDateRoundDay = dateRounder('day');
 export const opDateRoundHour = dateRounder('hour');
 export const opDateRoundMinute = dateRounder('minute');
+
+export const opDatetimeNow = makeOp({
+  hidden: true,
+  name: 'datetime-now',
+  argTypes: {},
+  description: `Returns the current time in milliseconds`,
+  returnValueDescription: `datetime.now()`,
+  returnType: 'number',
+  resolver: () => {
+    return moment.now();
+  },
+});

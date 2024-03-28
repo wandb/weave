@@ -11,6 +11,8 @@ from .. import server as _server
 from .. import context_state
 import time
 
+from weave.decorator_op import op
+
 import requests
 
 SERVER_TYPES = ["inprocess", "subprocess", "http"]
@@ -52,7 +54,7 @@ def test_type_returning_op(server_type, cereal_csv):
 def test_500_does_raise_jsondecode_error_from_http_server():
     with client("http") as wc:
 
-        @weave.op()
+        @op()
         def custom_op_that_should_return_500(x: str) -> str:
             if x == "abcd":
                 raise ValueError("returning 500")

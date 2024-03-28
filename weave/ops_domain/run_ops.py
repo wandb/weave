@@ -119,6 +119,21 @@ gql_prop_op(
     "createdAt",
     types.Timestamp(),
 )
+
+gql_prop_op(
+    "run-defaultColorIndex",
+    wdt.RunType,
+    "defaultColorIndex",
+    types.Number(),
+)
+
+# TODO: this should be an enum
+gql_prop_op(
+    "run-state",
+    wdt.RunType,
+    "state",
+    types.String(),
+)
 gql_prop_op(
     "run-updatedAt",
     wdt.RunType,
@@ -397,6 +412,21 @@ def link(run: wdt.Run) -> wdt.Link:
     return wdt.Link(
         run["displayName"],
         f'/{run["project"]["entity"]["name"]}/{run["project"]["name"]}/runs/{run["name"]}',
+    )
+
+
+@op(
+    name="constructor-wbRunLink",
+    input_type={
+        "entity_name": types.optional(types.String()),
+        "project_name": types.optional(types.String()),
+        "name": types.optional(types.String()),
+    },
+)
+def str_run_link(entity_name, project_name, name) -> wdt.Link:
+    return wdt.Link(
+        f"{entity_name}/{project_name}/{name}",
+        f"/{entity_name}/{project_name}/runs/{name}/overview",
     )
 
 

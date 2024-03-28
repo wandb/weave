@@ -227,7 +227,7 @@ class InMemoryLazyLiteRun:
                 description=artifact.description,
                 aliases=["latest"] + additional_aliases,
                 use_after_commit=False,
-            )
+            )  # type: ignore
         return res
 
     def upsert_project(self) -> None:

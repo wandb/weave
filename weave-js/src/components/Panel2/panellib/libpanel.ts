@@ -6,7 +6,9 @@ import {
   Weave,
 } from '@wandb/weave/core';
 
+import {IconName} from '../../Icon';
 import {ConfiguredTransform} from '../panel';
+import {PanelCategory} from './types';
 
 // Generic parameters:
 // Globals
@@ -57,6 +59,13 @@ export interface PanelSpec<X, C, T extends Type> {
   id: string;
   hidden?: boolean;
   displayName?: string;
+
+  // An icon that will be associated with this panel type.
+  // Used in panel type selector, outline, etc.
+  icon?: IconName;
+
+  category?: PanelCategory;
+
   // Provide initial config for panel. This is called once when the panel
   // is first created.
   initialize?: (

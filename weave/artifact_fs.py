@@ -1,4 +1,5 @@
 import contextlib
+import contextvars
 import dataclasses
 import typing
 import json
@@ -15,6 +16,9 @@ from . import file_base
 from . import object_context
 
 from .language_features.tagging import tag_store
+
+if typing.TYPE_CHECKING:
+    from . import graph
 
 
 class FilesystemArtifactType(types.Type):
@@ -85,6 +89,11 @@ class FilesystemArtifact(artifact_base.Artifact):
     def get(self, key: str, type_: types.Type) -> typing.Any:
         return self.ref_from_local_str(key, type_).get()
 
+    def as_node(self) -> "graph.Node":
+        from .ops_primitives.weave_api import get as op_get
+
+        return op_get(str(self))
+
     @property
     def is_saved(self) -> bool:
         raise NotImplementedError
@@ -101,7 +110,13 @@ class FilesystemArtifact(artifact_base.Artifact):
     ) -> typing.Generator[typing.IO, None, None]:
         raise NotImplementedError
 
-    def ref_from_local_str(self, s: str, type: "types.Type") -> "FilesystemArtifactRef":
+    @contextlib.contextmanager
+    def writeable_file_path(self, path: str) -> typing.Generator[str, None, None]:
+        raise NotImplementedError
+
+    def ref_from_local_str(
+        self, s: str, type: typing.Optional["types.Type"] = None
+    ) -> "FilesystemArtifactRef":
         path, extra = ref_util.parse_local_ref_str(s)
         return self.RefClass(self, path=path, extra=extra, type=type)
 
@@ -189,6 +204,25 @@ class FilesystemArtifact(artifact_base.Artifact):
 
 FilesystemArtifactType.instance_classes = FilesystemArtifact
 
+_loading_artifact: contextvars.ContextVar[
+    typing.Optional[FilesystemArtifact]
+] = contextvars.ContextVar("_loading_artifact", default=None)
+
+
+@contextlib.contextmanager
+def loading_artifact(
+    artifact: FilesystemArtifact,
+) -> typing.Generator[typing.Optional[FilesystemArtifact], None, None]:
+    token = _loading_artifact.set(artifact)
+    try:
+        yield _loading_artifact.get()
+    finally:
+        _loading_artifact.reset(token)
+
+
+def get_loading_artifact() -> typing.Optional[FilesystemArtifact]:
+    return _loading_artifact.get()
+
 
 class FilesystemArtifactRef(artifact_base.ArtifactRef):
     FileType: typing.ClassVar[typing.Type[types.Type]]
@@ -238,26 +272,50 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
 
         ot = self._outer_type
         if self.extra is not None:
-            # This is some hacking to make extra refs work (a ref that's a pointer to
-            # an item in a list)...
-            # Not a general solution!
-            # TODO: fix
             from . import types_numpy
 
-            if isinstance(ot, types.List):
-                self._type = ot.object_type
-            elif isinstance(ot, types_numpy.NumpyArrayType):
+            if not types.is_list_like(ot) and isinstance(
+                ot, types_numpy.NumpyArrayType
+            ):
                 # The Numpy type implementation is not consistent with how list extra refs
                 # work!
                 # TODO: fix
                 self._type = ot
             else:
-                print(
-                    "SELF TYPE",
-                )
-                raise errors.WeaveInternalError(
-                    f"Cannot get type of {self} with extra {self.extra}"
-                )
+                if len(self.extra) % 2 != 0:
+                    raise errors.WeaveInternalError(
+                        f"Cannot get type of {self} with extra {self.extra}"
+                    )
+                for i in range(0, len(self.extra), 2):
+                    extra_edge_type = self.extra[i]
+                    extra_edge_value = self.extra[i + 1]
+                    if extra_edge_type == ref_util.DICT_KEY_EDGE_TYPE:
+                        if not types.is_type_like(ot, types.TypedDict({})):
+                            raise errors.WeaveInternalError(
+                                f"Cannot get type of {self} with extra {self.extra}"
+                            )
+                        ot = ot.property_types[extra_edge_value]  # type: ignore
+                    elif extra_edge_type == ref_util.LIST_INDEX_EDGE_TYPE:
+                        if not types.is_list_like(ot):
+                            raise errors.WeaveInternalError(
+                                f"Cannot get type of {self} with extra {self.extra}"
+                            )
+                        ot = ot.object_type  # type: ignore
+                    elif extra_edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE:
+                        if not types.is_type_like(ot, types.ObjectType()):
+                            raise errors.WeaveInternalError(
+                                f"Cannot get type of {self} with extra {self.extra}"
+                            )
+                        ot = ot.property_types()[extra_edge_value]  # type: ignore
+                    elif extra_edge_type == ref_util.TABLE_ROW_EDGE_TYPE:
+                        ot = ot.object_type  # type: ignore
+                    elif extra_edge_type == ref_util.TABLE_COLUMN_EDGE_TYPE:
+                        ot = types.List(ot.object_type.property_types[extra_edge_value])  # type: ignore
+                    else:
+                        raise errors.WeaveInternalError(
+                            f"Cannot get type of {self} with extra {self.extra}"
+                        )
+                self._type = ot
         else:
             self._type = ot
         return self._type
@@ -327,9 +385,8 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
         # since they break idempotency. When we figure that out, we may
         # be able to remove this.
         with tag_store.isolated_tagging_context():
-            return self._outer_type.load_instance(
-                self.artifact, self.path, extra=self.extra
-            )
+            with loading_artifact(self.artifact):
+                return self._outer_type.load_instance(self.artifact, self.path)
 
     def local_ref_str(self) -> str:
         if self.path is None:

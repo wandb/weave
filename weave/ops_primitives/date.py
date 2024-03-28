@@ -46,10 +46,28 @@ def datetimetd_sub(lhs, rhs):
     },
     output_type=types.optional(types.Timestamp()),
 )
-def datetime_add(lhs, rhs):
+def datetime_addms(lhs, rhs):
     if rhs == None:
         return None
     return lhs + datetime.timedelta(milliseconds=rhs)
+
+
+@op(
+    name="datetime-add",
+    input_type={
+        "lhs": types.UnionType(types.Timestamp(), types.TimeDelta()),
+        "rhs": lambda input_types: types.optional(
+            types.Timestamp()
+            if types.TimeDelta().assign_type(input_types["lhs"])
+            else types.TimeDelta()
+        ),
+    },
+    output_type=types.optional(types.Timestamp()),
+)
+def datetime_add(lhs, rhs):
+    if rhs == None:
+        return None
+    return lhs + rhs
 
 
 AUTO_FORMAT_UNITS_AND_NUM_MS = (
@@ -318,3 +336,8 @@ def timestamp(timestampISO: str) -> typing.Optional[datetime.datetime]:
             return dateutil.parser.parse(timestampISO)
         except dateutil.parser.ParserError:
             return None
+
+
+@op(name="datetime-now", output_type=types.Number())
+def datetime_now():
+    return int(datetime.datetime.now().timestamp())

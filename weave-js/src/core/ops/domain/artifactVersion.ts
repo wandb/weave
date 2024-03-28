@@ -130,6 +130,22 @@ export const opArtifactVersionTTLDurationSeconds = makeArtifactVersionOp({
   resolver: ({artifactVersion}) => artifactVersion.ttlDurationSeconds,
 });
 
+export const opArtifactVersionTTLIsInherited = makeArtifactVersionOp({
+  name: 'artifactVersion-ttlIsInherited',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns if the artifact TTL is inherited ${docType(
+    'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns if the artifact TTL is inherited ${docType(
+    'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'boolean',
+  resolver: ({artifactVersion}) => artifactVersion.ttlIsInherited,
+});
+
 export const opArtifactVersionCreatedAt = makeArtifactVersionOp({
   name: 'artifactVersion-createdAt',
   argTypes: artifactVersionArgTypes,
@@ -144,6 +160,22 @@ export const opArtifactVersionCreatedAt = makeArtifactVersionOp({
   )} was created`,
   returnType: inputTypes => ({type: 'timestamp', unit: 'ms'}),
   resolver: ({artifactVersion}) => artifactVersion.createdAt,
+});
+
+export const opArtifactVersionFileCount = makeArtifactVersionOp({
+  name: 'artifactVersion-fileCount',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns the file count of the artifact ${docType(
+    'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns the file count of the artifact ${docType(
+    'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'number',
+  resolver: ({artifactVersion}) => artifactVersion.fileCount,
 });
 
 export const opArtifactVersionFiles = makeArtifactVersionOp({
@@ -190,6 +222,22 @@ export const opArtifactVersionFiles = makeArtifactVersionOp({
       return [];
     }
   },
+});
+
+export const opArtifactVersionIsGenerated = makeArtifactVersionOp({
+  name: 'artifactVersion-isGenerated',
+  argTypes: artifactVersionArgTypes,
+  description: `Returns if the artifact is system-generated ${docType(
+    'artifactVersion'
+  )}`,
+  argDescriptions: {
+    artifactVersion: artifactVersionArgDescription,
+  },
+  returnValueDescription: `Returns if the artifact is system-generated ${docType(
+    'artifactVersion'
+  )}`,
+  returnType: inputTypes => 'boolean',
+  resolver: ({artifactVersion}) => artifactVersion.isGenerated,
 });
 
 const mediaTypeExtensions = BASIC_MEDIA_TYPES.map(mediaType => mediaType.type);

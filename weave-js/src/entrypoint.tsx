@@ -6,7 +6,7 @@ import {
   updateUserInfo,
   useViewerUserInfo,
 } from '@wandb/weave/common/hooks/useViewerUserInfo';
-import React, {useEffect} from 'react';
+import React, {FC, useEffect} from 'react';
 import ReactDOM from 'react-dom';
 import useMousetrap from 'react-hook-mousetrap';
 import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
@@ -15,9 +15,13 @@ import {StateInspector} from 'reinspect';
 import {apolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
+import {Browse2} from './components/PagePanelComponents/Home/Browse2';
+import {Browse3} from './components/PagePanelComponents/Home/Browse3';
+import {OptionalTraceServerClientContextProvider} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
+import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
 import {WeaveMessage} from './components/Panel2/WeaveMessage';
-import getConfig from './config';
+import getConfig, {backendTraceBaseUrl} from './config';
 import {
   useIsAuthenticated,
   WeaveViewerContextProvider,
@@ -25,6 +29,8 @@ import {
 import {NotebookComputeGraphContextProvider} from './contextProviders';
 import {
   URL_BROWSE,
+  URL_BROWSE2,
+  URL_BROWSE3,
   URL_LOCAL,
   URL_RECENT,
   URL_TEMPLATES,
@@ -133,6 +139,27 @@ const Main = ({browserType}: MainProps) => {
   );
 };
 
+const BrowseWrapper: FC = props => (
+  <React.Suspense fallback="loading">
+    <ErrorBoundary>
+      <NotebookComputeGraphContextProvider>
+        <OptionalTraceServerClientContextProvider
+          baseUrl={backendTraceBaseUrl()}>
+          <StateInspector name="WeaveApp">
+            <PanelRootContextProvider>
+              <WeaveViewerContextProvider>
+                <PanelInteractContextProvider>
+                  {props.children}
+                </PanelInteractContextProvider>
+              </WeaveViewerContextProvider>
+            </PanelRootContextProvider>
+          </StateInspector>
+        </OptionalTraceServerClientContextProvider>
+      </NotebookComputeGraphContextProvider>
+    </ErrorBoundary>
+  </React.Suspense>
+);
+
 const basename = getConfig().PREFIX;
 ReactDOM.render(
   <ApolloProvider client={apolloClient}>
@@ -155,6 +182,20 @@ ReactDOM.render(
         </Route>
         <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
           <Main browserType={URL_LOCAL} />
+        </Route>
+        <Route path={`/${URL_BROWSE2}`}>
+          <BrowseWrapper>
+            <Browse2 basename={`/${URL_BROWSE2}`} />
+          </BrowseWrapper>
+        </Route>
+        <Route path={`/${URL_BROWSE3}`}>
+          <BrowseWrapper>
+            <Browse3
+              projectRoot={(entityName: string, projectName: string) => {
+                return `/${URL_BROWSE3}/${entityName}/${projectName}`;
+              }}
+            />
+          </BrowseWrapper>
         </Route>
         <Route path="/">
           <Main />

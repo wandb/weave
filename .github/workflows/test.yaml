@@ -44,8 +44,8 @@ jobs:
     timeout-minutes: 7
     needs:
       - build-container
-    runs-on: [self-hosted, gke-runner]
-    # runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-test:${{ github.sha }}
     steps:
       - uses: actions/checkout@v2
@@ -85,7 +85,8 @@ jobs:
     timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
     needs:
       - build-container
-    runs-on: [self-hosted, gke-runner]
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -107,6 +108,11 @@ jobs:
           - "8083:8083"
           - "9015:9015"
         options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+      weave_clickhouse:
+        image: clickhouse/clickhouse-server
+        ports:
+          - "8123:8123"
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       # - uses: datadog/agent-github-action@v1.3
       #   with:
@@ -119,7 +125,7 @@ jobs:
           DD_SERVICE: weave-python
           DD_ENV: ci
           # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
-        run: WB_SERVER_HOST=http://wandbservice WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 ./tests ./ops_arrow ./ecosystem  --ddtrace --durations=5
+        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 ./tests ./ops_arrow ./ecosystem --ddtrace --durations=5
 
   # nbmake:
   #   name: Run notebooks with nbmake
@@ -145,8 +151,8 @@ jobs:
       # - lint
       # - test
     if: always()
-    runs-on: [self-hosted, gke-runner]
-    # runs-on: ubuntu-latest
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
 
     container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
 
@@ -176,23 +182,20 @@ jobs:
         shell: bash
       - name: Cypress run
         # Use the following to run just a single test
-        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
-        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --record --parallel --browser chrome
-        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx ds run --record --parallel --browser chrome
+        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --browser replay-chromium --spec "cypress/e2e/notebooks/Ops that return images.cy.ts"
+        # run: export PYTHONPATH=$(pwd) && cd integration_test && npx cypress run --browser replay-chromium
+        run: export PYTHONPATH=$(pwd) && cd integration_test &&  npx cypress run --browser replay-chromium
         # uses: cypress-io/github-action@v4
         # with:
         #   working-directory: ./integration_testG
         #   record: true
         #   parallel: true
         env:
-          CYPRESS_DEPLOYSENTINEL_KEY: ${{ secrets.CYPRESS_DEPLOYSENTINEL_KEY }}
-          # pass the Dashboard record key as an environment variable
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          # pass GitHub token to allow accurately detecting a build vs a re-run build
-          GITHUB_TOKEN:
-            ${{ secrets.GITHUB_TOKEN }}
-            # - uses: actions/upload-artifact@v3
-          CYPRESS_DEPLOYSENTINEL_UPLOAD_ON_PASSES: true
+          REPLAY_API_KEY: ${{ secrets.REPLAY_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPLIT: ${{ strategy.job-total }}
+          SPLIT_INDEX: ${{ strategy.job-index }}
+          # - uses: actions/upload-artifact@v3
       - name: Upload logs
         uses: actions/upload-artifact@v3
         if: failure()

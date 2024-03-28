@@ -1,5 +1,6 @@
 include requirements.*
 include wb_schema.gql
+graft weave/arrow
 graft weave/frontend
 graft weave/language_features
 graft weave/ops_primitives
@@ -11,5 +12,10 @@ graft weave/wandb_interface
 graft weave/monitoring
 graft weave/panels_py
 graft weave/core_types
+graft weave/weaveflow
+graft weave/flow
+graft weave/deploy
+graft weave/trace_server
+graft weave/trace
 global-exclude */__pycache__/*
 global-exclude *.pyc

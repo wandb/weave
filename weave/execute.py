@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import contextlib
 import contextvars
@@ -9,7 +8,6 @@ import time
 import threading
 import typing
 import traceback
-
 
 # Configuration
 from . import wandb_api
@@ -44,11 +42,16 @@ from . import ref_base
 from . import object_context
 from . import memo
 from . import context_state
+from . import op_execute
 
 # Language Features
+from . import eager
 from . import language_nullability
 
 from . import parallelism
+
+if typing.TYPE_CHECKING:
+    from .graph_client import GraphClient
 
 TRACE_LOCAL = trace_local.TraceLocal()
 
@@ -224,6 +227,7 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                             ),
                         )
                     )
+
                     fg = forward_graph.ForwardGraph()
                     compile_results = compile_results.safe_apply(fg.add_node)
 
@@ -273,7 +277,11 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
         for op_name, group_iter in groups:
             group = list(group_iter)
             op_def = registry_mem.memory_registry.get_op(op_name)
-            if parallel_budget != 1 and op_policy.should_run_in_parallel(op_name):
+            if (
+                parallel_budget != 1
+                and len(group) > 1
+                and op_policy.should_run_in_parallel(op_name)
+            ):
                 # Parallel threaded case
                 num_threads = min(len(group), parallel_budget)
                 remaining_budget_per_thread = (
@@ -378,8 +386,10 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                             span.finish()
 
                     if span is not None:
-                        span.set_tag(
-                            "bytes_read_to_arrow", report["bytes_read_to_arrow"]
+                        span.set_metric(
+                            "bytes_read_to_arrow",
+                            report["bytes_read_to_arrow"],
+                            True,
                         )
 
                     stats.add_node(
@@ -422,13 +432,6 @@ def execute_async_op(
         args=(run_key, op_def.resolve_fn, inputs, wandb_api_ctx),
     )
     job.start()
-
-
-def execute_sync_op(
-    op_def: op_def.OpDef,
-    inputs: Mapping[str, typing.Any],
-):
-    return op_def.resolve_fn(**inputs)
 
 
 def is_run_op(op_call: graph.Op):
@@ -633,7 +636,7 @@ def execute_forward_node(
                         next(iter(inputs.values())), box.box(result)
                     )
             else:
-                result = execute_sync_op(op_def, inputs)
+                result = op_execute.execute_op(op_def, inputs)
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)

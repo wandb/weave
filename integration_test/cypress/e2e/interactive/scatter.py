@@ -1,5 +1,6 @@
 import random
 import weave
+from weave.show import show_url
 from weave.ecosystem import wandb
 
 weave.use_fixed_server_port()
@@ -33,4 +34,4 @@ panel: weave.panels.Group = weave.panels.Group(
     }
 )
 
-print(weave.show_url(panel))
+print(show_url(panel))

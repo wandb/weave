@@ -3,7 +3,7 @@ from .. import graph
 from .. import box
 from ..language_features.tagging.tagged_value_type import TaggedValueType
 from ..language_features.tagging import tag_store
-from ..language_features.tagging import make_tag_getter_op
+from .. import context_state as _context_state
 import weave
 
 
@@ -14,6 +14,8 @@ def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):
     global tag_adders
     tag_adders += 1
     name = f"_custom_tagger_{tag_adders}"
+
+    _loading_builtins_token = _context_state.set_loading_built_ins()
 
     @weave.op(
         name=name,
@@ -28,8 +30,12 @@ def op_add_tag(obj_node: graph.Node, tags: dict[str, str]):
             box.box(obj), {f"_ct_{k}": v for k, v in tags.items()}
         )
 
+    _context_state.clear_loading_built_ins(_loading_builtins_token)
+
     return custom_tagger(obj_node)
 
 
 def make_get_tag(tag_name: str):
+    from ..language_features.tagging import make_tag_getter_op
+
     return make_tag_getter_op.make_tag_getter_op(f"_ct_{tag_name}", types.String())

@@ -186,7 +186,11 @@ module.exports = {
         700: '#193C80',
       },
     },
-    extend: {},
+    extend: {
+      opacity: {
+        35: '.35',
+      },
+    },
   },
   plugins: [require('tailwindcss-radix')],
   corePlugins: {
@@ -202,4 +206,7 @@ module.exports = {
   /* we use this so tailwind styles all require that they have an element with the tw-style somewhere
      in their parent hierarchy */
   important: '.tw-style',
+  experimental: {
+    optimizeUniversalDefaults: true
+  },
 };

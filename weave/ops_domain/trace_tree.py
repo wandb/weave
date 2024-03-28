@@ -67,8 +67,7 @@ def _setattr_with_typeguard(obj: typing.Any, key: str, value: typing.Any) -> Non
 @weave.type()
 class Span:
     span_id: typing.Optional[str] = None
-    # TODO: had to change this, what does it break?
-    _name: typing.Optional[str] = None
+    name: typing.Optional[str] = None
     start_time_ms: typing.Optional[int] = None
     end_time_ms: typing.Optional[int] = None
     status_code: typing.Optional[str] = None
@@ -90,16 +89,16 @@ class Span:
     def from_dump(cls, dump_dict: dict) -> "Span":
         root_span = cls()
         for key in dump_dict:
-            if key == "name":
-                _setattr_with_typeguard(root_span, "_name", dump_dict[key])
-            elif key == "results":
+            if key == "results":
                 results = dump_dict[key]
                 _setattr_with_typeguard(
                     root_span,
                     key,
-                    [Result(**r) if r is not None else None for r in results]
-                    if results is not None
-                    else None,
+                    (
+                        [Result(**r) if r is not None else None for r in results]
+                        if results is not None
+                        else None
+                    ),
                 )
             else:
                 _setattr_with_typeguard(root_span, key, dump_dict[key])
@@ -189,7 +188,7 @@ def get_trace_output_str(span: Span) -> str:
 
 
 def get_chain_repr(span: Span) -> str:
-    basic_name: str = span._name or span.span_kind or "Unknown"
+    basic_name: str = span.name or span.span_kind or "Unknown"
     inner_calls = []
     for child in span.get_child_spans():
         inner_calls.append(get_chain_repr(child))  # type: ignore

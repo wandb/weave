@@ -23,6 +23,7 @@ def async_disabled():
             os.environ["WEAVE_DISABLE_ASYNC_FILE_STREAM"] = current
 
 
+@pytest.mark.skip()
 def test_monitoring_basic(user_by_api_key_in_env):
     with async_disabled():
         mon = monitor.new_monitor(

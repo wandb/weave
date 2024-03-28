@@ -91,7 +91,6 @@ js_op_exceptions = set(
         "number-roundHundredth",
         "op-non_none",
         "org-members",
-        "org-teams",
         "project-reports",
         "project-run",  # This is used in the demo compute graph... surprised nowhere else
         "report-name",

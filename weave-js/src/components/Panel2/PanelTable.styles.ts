@@ -4,7 +4,6 @@ import styled from 'styled-components';
 
 import {OBLIVION} from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/utils';
-import {IconButton} from '../IconButton';
 
 export const ColumnHeader = styled.div`
   display: flex;
@@ -226,13 +225,6 @@ export const CellWrapper = styled.div`
   }
 `;
 CellWrapper.displayName = 'S.CellWrapper';
-
-export const CloseIconButton = styled(IconButton)`
-  position: absolute;
-  right: 8px;
-  top: 12px;
-`;
-CloseIconButton.displayName = 'S.CloseIconButton';
 
 export const IndexCellCheckboxWrapper = styled.div<{isSelected: boolean}>`
   ${({isSelected}) => (isSelected ? '' : 'visibility: hidden;')}

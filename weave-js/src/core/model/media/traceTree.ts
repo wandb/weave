@@ -29,11 +29,11 @@ export type SpanType = {
 export interface FlatSpan {
   name: string;
   start_time_ms: number;
-  end_time_ms: number;
+  end_time_ms?: number;
   attributes: any;
   trace_id: string;
   span_id: string;
-  parent_id: string;
+  parent_id?: string;
 }
 
 export type WBTraceTree = {

@@ -3,6 +3,7 @@ import React, {ElementType, SVGProps} from 'react';
 import {ReactComponent as ImportAddNew} from '../../assets/icons/icon-add-new.svg';
 import {ReactComponent as ImportAdminShieldSafe} from '../../assets/icons/icon-admin-shield-safe.svg';
 import {ReactComponent as ImportAmazonSagemaker} from '../../assets/icons/icon-amazon-sagemaker.svg';
+import {ReactComponent as ImportArea} from '../../assets/icons/icon-area.svg';
 import {ReactComponent as ImportAudioVolume} from '../../assets/icons/icon-audio-volume.svg';
 import {ReactComponent as ImportAutomationRobotArm} from '../../assets/icons/icon-automation-robot-arm.svg';
 import {ReactComponent as ImportBack} from '../../assets/icons/icon-back.svg';
@@ -11,10 +12,12 @@ import {ReactComponent as ImportBenchmarkSquare} from '../../assets/icons/icon-b
 import {ReactComponent as ImportBlogReport} from '../../assets/icons/icon-blog-report.svg';
 import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-book-dictionary.svg';
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
+import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
 import {ReactComponent as ImportBug} from '../../assets/icons/icon-bug.svg';
 import {ReactComponent as ImportCategoryMultimodal} from '../../assets/icons/icon-category-multimodal.svg';
 import {ReactComponent as ImportChartHorizontalBars} from '../../assets/icons/icon-chart-horizontal-bars.svg';
 import {ReactComponent as ImportChartPie} from '../../assets/icons/icon-chart-pie.svg';
+import {ReactComponent as ImportChartScatterplot} from '../../assets/icons/icon-chart-scatterplot.svg';
 import {ReactComponent as ImportChartVerticalBars} from '../../assets/icons/icon-chart-vertical-bars.svg';
 import {ReactComponent as ImportCheckmark} from '../../assets/icons/icon-checkmark.svg';
 import {ReactComponent as ImportCheckmarkCircle} from '../../assets/icons/icon-checkmark-circle.svg';
@@ -22,6 +25,7 @@ import {ReactComponent as ImportChevronBack} from '../../assets/icons/icon-chevr
 import {ReactComponent as ImportChevronDown} from '../../assets/icons/icon-chevron-down.svg';
 import {ReactComponent as ImportChevronNext} from '../../assets/icons/icon-chevron-next.svg';
 import {ReactComponent as ImportChevronUp} from '../../assets/icons/icon-chevron-up.svg';
+import {ReactComponent as ImportCircle} from '../../assets/icons/icon-circle.svg';
 import {ReactComponent as ImportClose} from '../../assets/icons/icon-close.svg';
 import {ReactComponent as ImportCloud} from '../../assets/icons/icon-cloud.svg';
 import {ReactComponent as ImportCodeAlt} from '../../assets/icons/icon-code-alt.svg';
@@ -34,10 +38,13 @@ import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-conte
 import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-contract-left.svg';
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
+import {ReactComponent as ImportCross} from '../../assets/icons/icon-cross.svg';
+import {ReactComponent as ImportCrownPro} from '../../assets/icons/icon-crown-pro.svg';
 import {ReactComponent as ImportCubeContainer} from '../../assets/icons/icon-cube-container.svg';
 import {ReactComponent as ImportDashboardBlackboard} from '../../assets/icons/icon-dashboard-blackboard.svg';
 import {ReactComponent as ImportDate} from '../../assets/icons/icon-date.svg';
 import {ReactComponent as ImportDelete} from '../../assets/icons/icon-delete.svg';
+import {ReactComponent as ImportDiamond} from '../../assets/icons/icon-diamond.svg';
 import {ReactComponent as ImportDiscordSocial} from '../../assets/icons/icon-discord-social.svg';
 import {ReactComponent as ImportDockerWhale} from '../../assets/icons/icon-docker-whale.svg';
 import {ReactComponent as ImportDocument} from '../../assets/icons/icon-document.svg';
@@ -54,6 +61,7 @@ import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg
 import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
 import {ReactComponent as ImportFlashBolt} from '../../assets/icons/icon-flash-bolt.svg';
 import {ReactComponent as ImportFolderAlt} from '../../assets/icons/icon-folder-alt.svg';
+import {ReactComponent as ImportFolderFill} from '../../assets/icons/icon-folder-fill.svg';
 import {ReactComponent as ImportFolderProject} from '../../assets/icons/icon-folder-project.svg';
 import {ReactComponent as ImportFolderProjectMove} from '../../assets/icons/icon-folder-project-move.svg';
 import {ReactComponent as ImportForumChatBubble} from '../../assets/icons/icon-forum-chat-bubble.svg';
@@ -91,6 +99,7 @@ import {ReactComponent as ImportLayoutHorizontal} from '../../assets/icons/icon-
 import {ReactComponent as ImportLayoutTabs} from '../../assets/icons/icon-layout-tabs.svg';
 import {ReactComponent as ImportLayoutVertical} from '../../assets/icons/icon-layout-vertical.svg';
 import {ReactComponent as ImportLightbulbInfo} from '../../assets/icons/icon-lightbulb-info.svg';
+import {ReactComponent as ImportLinearScale} from '../../assets/icons/icon-linear-scale.svg';
 import {ReactComponent as ImportLinkAlt} from '../../assets/icons/icon-link-alt.svg';
 import {ReactComponent as ImportLinkedinSocial} from '../../assets/icons/icon-linkedin-social.svg';
 import {ReactComponent as ImportList} from '../../assets/icons/icon-list.svg';
@@ -118,12 +127,17 @@ import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/ico
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
+import {ReactComponent as ImportParentBackUp} from '../../assets/icons/icon-parent-back-up.svg';
 import {ReactComponent as ImportPause} from '../../assets/icons/icon-pause.svg';
 import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg';
 import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil-edit.svg';
 import {ReactComponent as ImportPhoto} from '../../assets/icons/icon-photo.svg';
 import {ReactComponent as ImportPin} from '../../assets/icons/icon-pin.svg';
 import {ReactComponent as ImportPlay} from '../../assets/icons/icon-play.svg';
+import {ReactComponent as ImportPriorityCritical} from '../../assets/icons/icon-priority-critical.svg';
+import {ReactComponent as ImportPriorityHigh} from '../../assets/icons/icon-priority-high.svg';
+import {ReactComponent as ImportPriorityLow} from '../../assets/icons/icon-priority-low.svg';
+import {ReactComponent as ImportPriorityNone} from '../../assets/icons/icon-priority-none.svg';
 import {ReactComponent as ImportPrivacyOpen} from '../../assets/icons/icon-privacy-open.svg';
 import {ReactComponent as ImportPythonLogo} from '../../assets/icons/icon-python-logo.svg';
 import {ReactComponent as ImportPytorchLightningLogo} from '../../assets/icons/icon-pytorch-lightning-logo.svg';
@@ -137,6 +151,7 @@ import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-redd
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
 import {ReactComponent as ImportRegex} from '../../assets/icons/icon-regex.svg';
 import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
+import {ReactComponent as ImportRemoveAlt} from '../../assets/icons/icon-remove-alt.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
 import {ReactComponent as ImportRetry} from '../../assets/icons/icon-retry.svg';
 import {ReactComponent as ImportRobotServiceMember} from '../../assets/icons/icon-robot-service-member.svg';
@@ -161,6 +176,7 @@ import {ReactComponent as ImportSort} from '../../assets/icons/icon-sort.svg';
 import {ReactComponent as ImportSortAscending} from '../../assets/icons/icon-sort-ascending.svg';
 import {ReactComponent as ImportSortDescending} from '../../assets/icons/icon-sort-descending.svg';
 import {ReactComponent as ImportSplit} from '../../assets/icons/icon-split.svg';
+import {ReactComponent as ImportSquare} from '../../assets/icons/icon-square.svg';
 import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
 import {ReactComponent as ImportStarFilled} from '../../assets/icons/icon-star-filled.svg';
 import {ReactComponent as ImportStop} from '../../assets/icons/icon-stop.svg';
@@ -179,6 +195,10 @@ import {ReactComponent as ImportTag} from '../../assets/icons/icon-tag.svg';
 import {ReactComponent as ImportTensorflowLogo} from '../../assets/icons/icon-tensorflow-logo.svg';
 import {ReactComponent as ImportTextLanguage} from '../../assets/icons/icon-text-language.svg';
 import {ReactComponent as ImportTextLanguageAlt} from '../../assets/icons/icon-text-language-alt.svg';
+import {ReactComponent as ImportTriangleDown} from '../../assets/icons/icon-triangle-down.svg';
+import {ReactComponent as ImportTriangleLeft} from '../../assets/icons/icon-triangle-left.svg';
+import {ReactComponent as ImportTriangleRight} from '../../assets/icons/icon-triangle-right.svg';
+import {ReactComponent as ImportTriangleUp} from '../../assets/icons/icon-triangle-up.svg';
 import {ReactComponent as ImportTriggerAlt} from '../../assets/icons/icon-trigger-alt.svg';
 import {ReactComponent as ImportTwitter} from '../../assets/icons/icon-twitter.svg';
 import {ReactComponent as ImportTypeBoolean} from '../../assets/icons/icon-type-boolean.svg';
@@ -187,14 +207,17 @@ import {ReactComponent as ImportTypeStringQuote} from '../../assets/icons/icon-t
 import {ReactComponent as ImportUndeterminateVisibility} from '../../assets/icons/icon-undeterminate-visibility.svg';
 import {ReactComponent as ImportUndo} from '../../assets/icons/icon-undo.svg';
 import {ReactComponent as ImportUnlockedUnconstrained} from '../../assets/icons/icon-unlocked-unconstrained.svg';
+import {ReactComponent as ImportUserAuthor} from '../../assets/icons/icon-user-author.svg';
 import {ReactComponent as ImportUserProfilePersonal} from '../../assets/icons/icon-user-profile-personal.svg';
 import {ReactComponent as ImportUsersTeam} from '../../assets/icons/icon-users-team.svg';
 import {ReactComponent as ImportVersionsLayers} from '../../assets/icons/icon-versions-layers.svg';
 import {ReactComponent as ImportVertexGCP} from '../../assets/icons/icon-vertex-gcp.svg';
 import {ReactComponent as ImportVideoPlay} from '../../assets/icons/icon-video-play.svg';
+import {ReactComponent as ImportViewGlasses} from '../../assets/icons/icon-view-glasses.svg';
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
+import {ReactComponent as ImportWeaveGroupBoard} from '../../assets/icons/icon-weave-group-board.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
 import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
@@ -223,6 +246,9 @@ export const IconAdminShieldSafe = (props: SVGIconProps) => (
 export const IconAmazonSagemaker = (props: SVGIconProps) => (
   <ImportAmazonSagemaker {...updateIconProps(props)} />
 );
+export const IconArea = (props: SVGIconProps) => (
+  <ImportArea {...updateIconProps(props)} />
+);
 export const IconAudioVolume = (props: SVGIconProps) => (
   <ImportAudioVolume {...updateIconProps(props)} />
 );
@@ -247,6 +273,9 @@ export const IconBookDictionary = (props: SVGIconProps) => (
 export const IconBoolean = (props: SVGIconProps) => (
   <ImportBoolean {...updateIconProps(props)} />
 );
+export const IconBoxPlot = (props: SVGIconProps) => (
+  <ImportBoxPlot {...updateIconProps(props)} />
+);
 export const IconBug = (props: SVGIconProps) => (
   <ImportBug {...updateIconProps(props)} />
 );
@@ -258,6 +287,9 @@ export const IconChartHorizontalBars = (props: SVGIconProps) => (
 );
 export const IconChartPie = (props: SVGIconProps) => (
   <ImportChartPie {...updateIconProps(props)} />
+);
+export const IconChartScatterplot = (props: SVGIconProps) => (
+  <ImportChartScatterplot {...updateIconProps(props)} />
 );
 export const IconChartVerticalBars = (props: SVGIconProps) => (
   <ImportChartVerticalBars {...updateIconProps(props)} />
@@ -279,6 +311,9 @@ export const IconChevronNext = (props: SVGIconProps) => (
 );
 export const IconChevronUp = (props: SVGIconProps) => (
   <ImportChevronUp {...updateIconProps(props)} />
+);
+export const IconCircle = (props: SVGIconProps) => (
+  <ImportCircle {...updateIconProps(props)} />
 );
 export const IconClose = (props: SVGIconProps) => (
   <ImportClose {...updateIconProps(props)} />
@@ -316,6 +351,12 @@ export const IconCopy = (props: SVGIconProps) => (
 export const IconCreditCardPayment = (props: SVGIconProps) => (
   <ImportCreditCardPayment {...updateIconProps(props)} />
 );
+export const IconCross = (props: SVGIconProps) => (
+  <ImportCross {...updateIconProps(props)} />
+);
+export const IconCrownPro = (props: SVGIconProps) => (
+  <ImportCrownPro {...updateIconProps(props)} />
+);
 export const IconCubeContainer = (props: SVGIconProps) => (
   <ImportCubeContainer {...updateIconProps(props)} />
 );
@@ -327,6 +368,9 @@ export const IconDate = (props: SVGIconProps) => (
 );
 export const IconDelete = (props: SVGIconProps) => (
   <ImportDelete {...updateIconProps(props)} />
+);
+export const IconDiamond = (props: SVGIconProps) => (
+  <ImportDiamond {...updateIconProps(props)} />
 );
 export const IconDiscordSocial = (props: SVGIconProps) => (
   <ImportDiscordSocial {...updateIconProps(props)} />
@@ -375,6 +419,9 @@ export const IconFlashBolt = (props: SVGIconProps) => (
 );
 export const IconFolderAlt = (props: SVGIconProps) => (
   <ImportFolderAlt {...updateIconProps(props)} />
+);
+export const IconFolderFill = (props: SVGIconProps) => (
+  <ImportFolderFill {...updateIconProps(props)} />
 );
 export const IconFolderProject = (props: SVGIconProps) => (
   <ImportFolderProject {...updateIconProps(props)} />
@@ -487,6 +534,9 @@ export const IconLayoutVertical = (props: SVGIconProps) => (
 export const IconLightbulbInfo = (props: SVGIconProps) => (
   <ImportLightbulbInfo {...updateIconProps(props)} />
 );
+export const IconLinearScale = (props: SVGIconProps) => (
+  <ImportLinearScale {...updateIconProps(props)} />
+);
 export const IconLinkAlt = (props: SVGIconProps) => (
   <ImportLinkAlt {...updateIconProps(props)} />
 );
@@ -568,6 +618,9 @@ export const IconPanTool1 = (props: SVGIconProps) => (
 export const IconPanel = (props: SVGIconProps) => (
   <ImportPanel {...updateIconProps(props)} />
 );
+export const IconParentBackUp = (props: SVGIconProps) => (
+  <ImportParentBackUp {...updateIconProps(props)} />
+);
 export const IconPause = (props: SVGIconProps) => (
   <ImportPause {...updateIconProps(props)} />
 );
@@ -585,6 +638,18 @@ export const IconPin = (props: SVGIconProps) => (
 );
 export const IconPlay = (props: SVGIconProps) => (
   <ImportPlay {...updateIconProps(props)} />
+);
+export const IconPriorityCritical = (props: SVGIconProps) => (
+  <ImportPriorityCritical {...updateIconProps(props)} />
+);
+export const IconPriorityHigh = (props: SVGIconProps) => (
+  <ImportPriorityHigh {...updateIconProps(props)} />
+);
+export const IconPriorityLow = (props: SVGIconProps) => (
+  <ImportPriorityLow {...updateIconProps(props)} />
+);
+export const IconPriorityNone = (props: SVGIconProps) => (
+  <ImportPriorityNone {...updateIconProps(props)} />
 );
 export const IconPrivacyOpen = (props: SVGIconProps) => (
   <ImportPrivacyOpen {...updateIconProps(props)} />
@@ -624,6 +689,9 @@ export const IconRegex = (props: SVGIconProps) => (
 );
 export const IconRemove = (props: SVGIconProps) => (
   <ImportRemove {...updateIconProps(props)} />
+);
+export const IconRemoveAlt = (props: SVGIconProps) => (
+  <ImportRemoveAlt {...updateIconProps(props)} />
 );
 export const IconReport = (props: SVGIconProps) => (
   <ImportReport {...updateIconProps(props)} />
@@ -697,6 +765,9 @@ export const IconSortDescending = (props: SVGIconProps) => (
 export const IconSplit = (props: SVGIconProps) => (
   <ImportSplit {...updateIconProps(props)} />
 );
+export const IconSquare = (props: SVGIconProps) => (
+  <ImportSquare {...updateIconProps(props)} />
+);
 export const IconStar = (props: SVGIconProps) => (
   <ImportStar {...updateIconProps(props)} />
 );
@@ -751,6 +822,18 @@ export const IconTextLanguage = (props: SVGIconProps) => (
 export const IconTextLanguageAlt = (props: SVGIconProps) => (
   <ImportTextLanguageAlt {...updateIconProps(props)} />
 );
+export const IconTriangleDown = (props: SVGIconProps) => (
+  <ImportTriangleDown {...updateIconProps(props)} />
+);
+export const IconTriangleLeft = (props: SVGIconProps) => (
+  <ImportTriangleLeft {...updateIconProps(props)} />
+);
+export const IconTriangleRight = (props: SVGIconProps) => (
+  <ImportTriangleRight {...updateIconProps(props)} />
+);
+export const IconTriangleUp = (props: SVGIconProps) => (
+  <ImportTriangleUp {...updateIconProps(props)} />
+);
 export const IconTriggerAlt = (props: SVGIconProps) => (
   <ImportTriggerAlt {...updateIconProps(props)} />
 );
@@ -775,6 +858,9 @@ export const IconUndo = (props: SVGIconProps) => (
 export const IconUnlockedUnconstrained = (props: SVGIconProps) => (
   <ImportUnlockedUnconstrained {...updateIconProps(props)} />
 );
+export const IconUserAuthor = (props: SVGIconProps) => (
+  <ImportUserAuthor {...updateIconProps(props)} />
+);
 export const IconUserProfilePersonal = (props: SVGIconProps) => (
   <ImportUserProfilePersonal {...updateIconProps(props)} />
 );
@@ -790,6 +876,9 @@ export const IconVertexGCP = (props: SVGIconProps) => (
 export const IconVideoPlay = (props: SVGIconProps) => (
   <ImportVideoPlay {...updateIconProps(props)} />
 );
+export const IconViewGlasses = (props: SVGIconProps) => (
+  <ImportViewGlasses {...updateIconProps(props)} />
+);
 export const IconWandb = (props: SVGIconProps) => (
   <ImportWandb {...updateIconProps(props)} />
 );
@@ -798,6 +887,9 @@ export const IconWarning = (props: SVGIconProps) => (
 );
 export const IconWarningAlt = (props: SVGIconProps) => (
   <ImportWarningAlt {...updateIconProps(props)} />
+);
+export const IconWeaveGroupBoard = (props: SVGIconProps) => (
+  <ImportWeaveGroupBoard {...updateIconProps(props)} />
 );
 export const IconWebhook = (props: SVGIconProps) => (
   <ImportWebhook {...updateIconProps(props)} />
@@ -819,6 +911,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'add-new': IconAddNew,
   'admin-shield-safe': IconAdminShieldSafe,
   'amazon-sagemaker': IconAmazonSagemaker,
+  area: IconArea,
   'audio-volume': IconAudioVolume,
   'automation-robot-arm': IconAutomationRobotArm,
   back: IconBack,
@@ -827,10 +920,12 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'blog-report': IconBlogReport,
   'book-dictionary': IconBookDictionary,
   boolean: IconBoolean,
+  'box-plot': IconBoxPlot,
   bug: IconBug,
   'category-multimodal': IconCategoryMultimodal,
   'chart-horizontal-bars': IconChartHorizontalBars,
   'chart-pie': IconChartPie,
+  'chart-scatterplot': IconChartScatterplot,
   'chart-vertical-bars': IconChartVerticalBars,
   checkmark: IconCheckmark,
   'checkmark-circle': IconCheckmarkCircle,
@@ -838,6 +933,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'chevron-down': IconChevronDown,
   'chevron-next': IconChevronNext,
   'chevron-up': IconChevronUp,
+  circle: IconCircle,
   close: IconClose,
   cloud: IconCloud,
   'code-alt': IconCodeAlt,
@@ -850,10 +946,13 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'contract-left': IconContractLeft,
   copy: IconCopy,
   'credit-card-payment': IconCreditCardPayment,
+  cross: IconCross,
+  'crown-pro': IconCrownPro,
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
   date: IconDate,
   delete: IconDelete,
+  diamond: IconDiamond,
   'discord-social': IconDiscordSocial,
   'docker-whale': IconDockerWhale,
   document: IconDocument,
@@ -870,6 +969,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'filter-alt': IconFilterAlt,
   'flash-bolt': IconFlashBolt,
   'folder-alt': IconFolderAlt,
+  'folder-fill': IconFolderFill,
   'folder-project': IconFolderProject,
   'folder-project-move': IconFolderProjectMove,
   'forum-chat-bubble': IconForumChatBubble,
@@ -907,6 +1007,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'layout-tabs': IconLayoutTabs,
   'layout-vertical': IconLayoutVertical,
   'lightbulb-info': IconLightbulbInfo,
+  'linear-scale': IconLinearScale,
   'link-alt': IconLinkAlt,
   'linkedin-social': IconLinkedinSocial,
   list: IconList,
@@ -934,12 +1035,17 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
+  'parent-back-up': IconParentBackUp,
   pause: IconPause,
   paused: IconPaused,
   'pencil-edit': IconPencilEdit,
   photo: IconPhoto,
   pin: IconPin,
   play: IconPlay,
+  'priority-critical': IconPriorityCritical,
+  'priority-high': IconPriorityHigh,
+  'priority-low': IconPriorityLow,
+  'priority-none': IconPriorityNone,
   'privacy-open': IconPrivacyOpen,
   'python-logo': IconPythonLogo,
   'pytorch-lightning-logo': IconPytorchLightningLogo,
@@ -953,6 +1059,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   redo: IconRedo,
   regex: IconRegex,
   remove: IconRemove,
+  'remove-alt': IconRemoveAlt,
   report: IconReport,
   retry: IconRetry,
   'robot-service-member': IconRobotServiceMember,
@@ -977,6 +1084,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'sort-ascending': IconSortAscending,
   'sort-descending': IconSortDescending,
   split: IconSplit,
+  square: IconSquare,
   star: IconStar,
   'star-filled': IconStarFilled,
   stop: IconStop,
@@ -995,6 +1103,10 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'tensorflow-logo': IconTensorflowLogo,
   'text-language': IconTextLanguage,
   'text-language-alt': IconTextLanguageAlt,
+  'triangle-down': IconTriangleDown,
+  'triangle-left': IconTriangleLeft,
+  'triangle-right': IconTriangleRight,
+  'triangle-up': IconTriangleUp,
   'trigger-alt': IconTriggerAlt,
   twitter: IconTwitter,
   'type-boolean': IconTypeBoolean,
@@ -1003,14 +1115,17 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'undeterminate-visibility': IconUndeterminateVisibility,
   undo: IconUndo,
   'unlocked-unconstrained': IconUnlockedUnconstrained,
+  'user-author': IconUserAuthor,
   'user-profile-personal': IconUserProfilePersonal,
   'users-team': IconUsersTeam,
   'versions-layers': IconVersionsLayers,
   'vertex-gcp': IconVertexGCP,
   'video-play': IconVideoPlay,
+  'view-glasses': IconViewGlasses,
   wandb: IconWandb,
   warning: IconWarning,
   'warning-alt': IconWarningAlt,
+  'weave-group-board': IconWeaveGroupBoard,
   webhook: IconWebhook,
   'x-axi-alt': IconXAxiAlt,
   'x-axis': IconXAxis,

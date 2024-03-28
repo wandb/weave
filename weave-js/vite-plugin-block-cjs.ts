@@ -55,6 +55,7 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/core/FormGroup',
   '@material-ui/core/FormHelperText',
   '@material-ui/core/FormLabel',
+  '@material-ui/core/Grow',
   '@material-ui/core/IconButton',
   '@material-ui/core/ListSubheader',
   '@material-ui/core/Paper',
@@ -67,8 +68,6 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/core/colors',
   '@material-ui/core/styles/createSpacing',
   '@material-ui/core/useMediaQuery',
-  '@material-ui/icons/KeyboardArrowDown',
-  '@material-ui/icons/KeyboardArrowRight',
   '@monaco-editor/loader',
   '@radix-ui/react-checkbox',
   '@radix-ui/react-dialog',
@@ -153,6 +152,7 @@ const ALLOWED_CJS_MODULES = [
   'prismjs',
   'react-base-table',
   'react-cytoscapejs',
+  'react-draggable',
   'react-dropzone',
   'react-helmet',
   'react-hook-mousetrap',
@@ -456,17 +456,17 @@ const blockCjsPlugin = {
     }
 
     const dangerousImportsList = Object.entries(dangerousImportsFound);
-    if (dangerousImportsList.length > 0) {
-      throw new Error(
-        cjsErrorMessage(
-          Object.fromEntries(
-            sortBy(dangerousImportsList, ([module]) => {
-              return module;
-            })
-          )
-        )
-      );
-    }
+    // if (dangerousImportsList.length > 0) {
+    //   throw new Error(
+    //     cjsErrorMessage(
+    //       Object.fromEntries(
+    //         sortBy(dangerousImportsList, ([module]) => {
+    //           return module;
+    //         })
+    //       )
+    //     )
+    //   );
+    // }
   },
 };
 

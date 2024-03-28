@@ -172,6 +172,17 @@ export const SuggestionPane = styled.div<{isBusy: boolean}>`
 `;
 SuggestionPane.displayName = 'S.SuggestionPane';
 
+export const SuggestionCategory = styled.li`
+  color: ${globals.MOON_800};
+  font-family: Source Sans Pro;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 20px;
+  padding: 8px 4px;
+`;
+SuggestionCategory.displayName = 'S.SuggestionCategory';
+
 export const StyledOpDoc = styled(OpDoc)`
   display: inline-block;
   max-width: 400px;

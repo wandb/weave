@@ -91,3 +91,18 @@ You can tell everything is working if the weave UI renders and you see your serv
 ## Environment variables
 
 Some ops require environment variables to be set, like OPENAI_API_KEY. You need to set these for the server environment and your Jupyter notebook.
+
+
+## Unit tests
+
+Some of the unit tests try to run a wandb server container, and will produce 403s if that container is out of date. The container is only accessible to wandb developers currently.
+
+For wandb developers, if you encounter 403s in unit tests do:
+
+```
+docker pull --platform linux/amd64 us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+```
+
+You may need to "gcloud auth login" first.
+
+And you may need to kill the running container by `docker ps` and then `docker kill`

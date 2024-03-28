@@ -1,3 +1,7 @@
+from .. import context_state as _context_state
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
+
 from ..panel import Panel
 
 # special
@@ -57,3 +61,5 @@ from .panel_legacy import *
 
 # top level board
 from .panel_board import Board, BoardPanel, BoardPanelLayout
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)

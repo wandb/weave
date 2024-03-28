@@ -792,6 +792,7 @@ export const PanelFilterEditor: React.FC<PanelFilterEditorProps> = props => {
 export const Spec: Panel2.PanelSpec = {
   hidden: true,
   id: 'FilterEditor',
+  icon: 'filter-alt',
   Component: PanelFilterEditor,
   inputType,
 };

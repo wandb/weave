@@ -5,6 +5,9 @@ import weave
 from weave.language_features.tagging import tagged_value_type
 from weave import box
 from ..language_features.tagging import make_tag_getter_op, tag_store, tagged_value_type
+from .. import context_state
+
+_loading_builtins_token = context_state.set_loading_built_ins()
 
 
 @weave.op(
@@ -33,6 +36,9 @@ def _test_op_refining_refine(x: typing.Any) -> weave.types.Type:
 @weave.op(refine_output_type=_test_op_refining_refine, hidden=True)
 def _test_op_refining(x: typing.Any) -> typing.Any:
     return x
+
+
+context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def test_none():

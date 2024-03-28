@@ -3,14 +3,14 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from .arrow import offsets_starting_at_zero
+from ..arrow.arrow import offsets_starting_at_zero
 
 from ..api import op
 from ..decorator_arrow_op import arrow_op
 from .. import weave_types as types
 
-from .list_ import ArrowWeaveList, ArrowWeaveListType
-from .arrow import ArrowWeaveListType
+from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from ..arrow.arrow import ArrowWeaveListType
 from . import util
 
 
@@ -181,7 +181,6 @@ def string_right_add(
     )
 
 
-# todo: remove this explicit name, it shouldn't be needed
 @arrow_op(
     name="ArrowWeaveListString-append",
     input_type=binary_input_type,
@@ -214,6 +213,14 @@ def prepend(self, other):
 )
 def split(self, pattern):
     if isinstance(pattern, str):
+        if isinstance(self._arrow_data, pa.DictionaryArray):
+            # If we have a dictionary array, we need to split the dictionary and
+            # then re-encode it as a dictionary array.
+            return ArrowWeaveList(
+                pc.split_pattern(self._arrow_data.dictionary, pattern),
+                types.optional(types.List(types.String())),
+                self._artifact,
+            )
         return ArrowWeaveList(
             pc.split_pattern(self._arrow_data, pattern),
             types.optional(types.List(types.String())),

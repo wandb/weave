@@ -22,6 +22,7 @@ const inputType = {
     'number' as const,
     'boolean' as const,
     'id' as const,
+    {type: 'WandbArtifactRef' as const},
   ],
 };
 
@@ -141,7 +142,7 @@ export const PanelStringConfig: React.FC<PanelStringProps> = props => {
 
 export const PanelString: React.FC<PanelStringProps> = props => {
   const config = props.config ?? defaultConfig();
-  const inputValue = CGReact.useNodeValue(props.input);
+  const inputValue = CGReact.useNodeValue(props.input as Node<'string'>);
   const compValue = CGReact.useNodeValue(config.diffComparand ?? props.input);
   const loading = inputValue.loading || compValue.loading;
   const {stringFormat} = useContext(WeaveFormatContext);
@@ -162,8 +163,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
         />
       );
       return (
-        <S.StringContainer spacing={spacing}>
-          <S.StringItem spacing={spacing}>
+        <S.StringContainer $spacing={spacing}>
+          <S.StringItem $spacing={spacing}>
             <TooltipTrigger
               copyableContent={fullStr}
               content={contentMarkdown}
@@ -203,8 +204,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
 
       return (
-        <S.StringContainer spacing={spacing}>
-          <S.StringItem spacing={spacing}>
+        <S.StringContainer $spacing={spacing}>
+          <S.StringItem $spacing={spacing}>
             <TooltipTrigger copyableContent={fullStr} content={contentDiff}>
               {contentDiff}
             </TooltipTrigger>
@@ -213,16 +214,35 @@ export const PanelString: React.FC<PanelStringProps> = props => {
       );
     }
 
-    const contentPlaintext = (
-      <S.PreformattedProportionalString>
-        {fullStr}
-      </S.PreformattedProportionalString>
-    );
+    let parsed: any;
+    const trimmedStr = fullStr.trim();
+    if (trimmedStr.startsWith('{') && trimmedStr.endsWith('}')) {
+      try {
+        parsed = JSON.parse(trimmedStr);
+      } catch (e) {
+        // ignore
+        console.error(e);
+      }
+    }
+    let contentPlaintext;
+    if (parsed) {
+      contentPlaintext = (
+        <S.PreformattedJSONString>
+          {JSON.stringify(parsed, null, 2)}
+        </S.PreformattedJSONString>
+      );
+    } else {
+      contentPlaintext = (
+        <S.PreformattedProportionalString>
+          {fullStr}
+        </S.PreformattedProportionalString>
+      );
+    }
 
     // plaintext
     return (
-      <S.StringContainer data-test-weave-id="string" spacing={spacing}>
-        <S.StringItem spacing={spacing}>
+      <S.StringContainer data-test-weave-id="string" $spacing={spacing}>
+        <S.StringItem $spacing={spacing}>
           <TooltipTrigger copyableContent={fullStr} content={contentPlaintext}>
             {contentPlaintext}
           </TooltipTrigger>
@@ -257,6 +277,8 @@ export const PanelString: React.FC<PanelStringProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   id: 'string',
+  icon: 'text-language-alt',
+  category: 'Primitive',
   canFullscreen: true,
   Component: PanelString,
   ConfigComponent: PanelStringConfig,

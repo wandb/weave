@@ -44,7 +44,7 @@ def test_sequence1():
     saved = weave.save(l)
 
     # PanelFacet GroupBy
-    groupby1_fn = weave.define_fn(
+    groupby1_fn = weave_internal.define_fn(
         {"row": types.TypeRegistry.type_of(l).object_type},
         lambda row: dict.dict_(
             **{
@@ -56,17 +56,17 @@ def test_sequence1():
     res = weavejs_ops.groupby(saved, groupby1_fn)
 
     # Input to PanelPlot
-    map1_fn = weave.define_fn({"row": res.type.object_type}, lambda row: row)
+    map1_fn = weave_internal.define_fn({"row": res.type.object_type}, lambda row: row)
     res = weavejs_ops.map(res, map1_fn)
 
-    inner_groupby_fn = weave.define_fn(
+    inner_groupby_fn = weave_internal.define_fn(
         {"row": res.type.object_type.object_type},
         lambda row: dict.dict_(**{"y": row["y"]}),
     )
-    map2_fn = weave.define_fn(
+    map2_fn = weave_internal.define_fn(
         {"row": res.type.object_type},
         lambda row: row.groupby(inner_groupby_fn).map(
-            weave.define_fn(
+            weave_internal.define_fn(
                 {
                     "row": tagged_value_type.TaggedValueType(
                         types.TypedDict(
@@ -87,10 +87,12 @@ def test_sequence1():
 
 def test_nested_functions():
     rows = weave.save([{"a": [1, 2]}])
-    map_fn = weave.define_fn(
+    map_fn = weave_internal.define_fn(
         {"row": types.TypedDict({"a": types.List(types.Int())})},
         lambda row: number.numbers_avg(
-            row["a"].map(weave.define_fn({"row": types.Int()}, lambda row: row + 1))
+            row["a"].map(
+                weave_internal.define_fn({"row": types.Int()}, lambda row: row + 1)
+            )
         ),
     )
     mapped = rows.map(map_fn)
@@ -207,7 +209,7 @@ def test_group_over_tagged():
     ]
     saved = weave.save(l)
 
-    groupby1_fn = weave.define_fn(
+    groupby1_fn = weave_internal.define_fn(
         {"row": types.TypeRegistry.type_of(l).object_type},
         lambda row: dict.dict_(
             **{

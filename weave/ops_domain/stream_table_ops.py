@@ -1,5 +1,5 @@
 from weave import weave_types
-from ..ops_arrow.arrow import ArrowWeaveListType
+from ..arrow.arrow import ArrowWeaveListType
 from ..core_types import StreamTableType
 from ..api import op
 from .project_ops import project
