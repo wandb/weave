@@ -1,7 +1,6 @@
 import re
 import pytest
 import pydantic
-from types import NoneType
 from pydantic import BaseModel
 import weave
 import asyncio
@@ -650,6 +649,6 @@ def test_isinstance_checks(client):
     assert y2.ref.is_descended_from(y.ref)
 
     y3 = y[3]
-    assert not isinstance(y2, NoneType)
+    assert not isinstance(y2, type(None))
     assert y3.ref is not None
     assert y3.ref.is_descended_from(y.ref)

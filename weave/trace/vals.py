@@ -185,24 +185,6 @@ class TraceObject(Tracable):
         val_attr_val = object.__getattribute__(self._val, __name)
         return attribute_access_result(self, val_attr_val, __name)
 
-        if isinstance(val_attr_val, Op) and inspect.signature(
-            val_attr_val.resolve_fn
-        ).parameters.get("self"):
-            val_attr_val = val_attr_val.__get__(self, type(self))
-
-        # Not ideal, what about properties?
-        if callable(val_attr_val):
-            return val_attr_val
-
-        new_ref = self.ref.with_attr(__name)
-
-        return make_trace_obj(
-            val_attr_val,
-            new_ref,
-            self.server,
-            self.root,
-        )
-
     def __setattr__(self, __name: str, __value: Any) -> None:
         if __name in ["_val", "ref", "server", "root", "mutations"]:
             return object.__setattr__(self, __name, __value)
