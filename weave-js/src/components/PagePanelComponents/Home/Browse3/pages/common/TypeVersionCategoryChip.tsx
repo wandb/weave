@@ -2,15 +2,15 @@ import _ from 'lodash';
 import React from 'react';
 
 import {Pill, TagColorName} from '../../../../../Tag';
-import {HackyTypeCategory} from '../wfInterface/types';
+import {ObjectCategory} from '../wfReactInterface/wfDataModelHooksInterface';
 
-const colorMap: Record<HackyTypeCategory, TagColorName> = {
-  model: 'blue',
-  dataset: 'green',
+const colorMap: Record<ObjectCategory, TagColorName> = {
+  Model: 'blue',
+  Dataset: 'green',
 };
 
 export const TypeVersionCategoryChip: React.FC<{
-  typeCategory: HackyTypeCategory | null;
+  typeCategory: ObjectCategory | null;
 }> = props => {
   if (props.typeCategory == null) {
     return <></>;

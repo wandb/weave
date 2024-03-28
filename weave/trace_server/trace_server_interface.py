@@ -136,7 +136,6 @@ class CallReadRes(BaseModel):
 
 
 class _CallsFilter(BaseModel):
-    # op_categories: typing.Optional[typing.List[str]] = None
     op_version_refs: typing.Optional[typing.List[str]] = None
     input_object_version_refs: typing.Optional[typing.List[str]] = None
     output_object_version_refs: typing.Optional[typing.List[str]] = None
@@ -178,7 +177,6 @@ class OpReadRes(BaseModel):
 
 
 class _OpVersionFilter(BaseModel):
-    # op_categories: typing.Optional[typing.List[str]] = None
     op_names: typing.Optional[typing.List[str]] = None
     latest_only: typing.Optional[bool] = None
 
@@ -211,7 +209,7 @@ class ObjReadRes(BaseModel):
 
 
 class _ObjectVersionFilter(BaseModel):
-    # object_categories: typing.Optional[typing.List[str]] = None
+    root_obj_types: typing.Optional[typing.List[str]] = None
     object_names: typing.Optional[typing.List[str]] = None
     is_op: typing.Optional[bool] = None
     latest_only: typing.Optional[bool] = None
@@ -240,7 +238,6 @@ class TableCreateRes(BaseModel):
 
 
 class _TableRowFilter(BaseModel):
-    # object_categories: typing.Optional[typing.List[str]] = None
     row_digests: typing.Optional[typing.List[str]] = None
 
 

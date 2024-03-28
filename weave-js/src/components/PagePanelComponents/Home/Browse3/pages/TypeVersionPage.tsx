@@ -8,7 +8,6 @@ import {
   SimpleKeyValueTable,
   SimplePageLayout,
 } from './common/SimplePageLayout';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {UnderConstruction} from './common/UnderConstruction';
 import {FilterableTypeVersionsTable} from './TypeVersionsPage';
 import {useWeaveflowORMContext} from './wfInterface/context';
@@ -52,11 +51,11 @@ const TypeVersionPageInner: React.FC<{
                       typeName={typeVersion.type().name()}
                     />
                   ),
-                  Category: (
-                    <TypeVersionCategoryChip
-                      typeCategory={typeVersion.typeCategory()}
-                    />
-                  ),
+                  // Category: (
+                  //   <TypeVersionCategoryChip
+                  //     typeCategory={typeVersion.typeCategory()}
+                  //   />
+                  // ),
                   Version: typeVersion.version(),
                   'Property Types': (
                     <PropertyTypeTree

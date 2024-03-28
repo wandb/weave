@@ -107,7 +107,7 @@ export const SideNav = () => {
         name: 'Models',
         iconName: IconNames.Model,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
-          typeCategory: 'model',
+          typeCategory: 'Model',
         }),
       },
       {
@@ -115,7 +115,7 @@ export const SideNav = () => {
         name: 'Datasets',
         iconName: IconNames.Table,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
-          typeCategory: 'dataset',
+          typeCategory: 'Dataset',
         }),
       },
     ],

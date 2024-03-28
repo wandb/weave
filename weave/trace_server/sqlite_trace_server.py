@@ -373,6 +373,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
+            if req.filter.root_obj_types:
+                in_list = ", ".join([f"'{t}'" for t in req.filter.root_obj_types])
+                conds.append(f"root_obj_type IN ({in_list})")
 
         objs = self._select_objs_query(
             req.project_id,

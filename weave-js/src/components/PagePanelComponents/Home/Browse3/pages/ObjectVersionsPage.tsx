@@ -16,10 +16,12 @@ import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
-import {HackyTypeCategory} from './wfInterface/types';
 import {useWFHooks} from './wfReactInterface/context';
 import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
-import {ObjectVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
+import {
+  ObjectCategory,
+  ObjectVersionSchema,
+} from './wfReactInterface/wfDataModelHooksInterface';
 
 export const ObjectVersionsPage: React.FC<{
   entity: string;
@@ -65,7 +67,7 @@ export const ObjectVersionsPage: React.FC<{
 
 export type WFHighLevelObjectVersionFilter = {
   objectName?: string | null;
-  typeCategory?: HackyTypeCategory | null;
+  typeCategory?: ObjectCategory | null;
 };
 
 export const FilterableObjectVersionsTable: React.FC<{

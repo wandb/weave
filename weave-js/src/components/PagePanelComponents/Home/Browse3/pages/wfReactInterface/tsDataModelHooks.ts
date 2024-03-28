@@ -20,7 +20,6 @@ import {
   opVersionRefOpCategory,
   refUriToObjectVersionKey,
   refUriToOpVersionKey,
-  typeNameToCategory,
 } from './utilities';
 import {
   CallFilter,
@@ -334,11 +333,11 @@ const useOpVersions = makeTraceServerEndpointHook<
         project,
         opId: obj.name,
         versionHash: obj.digest,
-        typeName: obj.type,
+        // typeName: obj.type,
         name: obj.name,
         path: 'obj',
         createdAtMs: convertISOToDate(obj.created_at).getTime(),
-        category: null,
+        // category: null,
         versionIndex: obj.version_index,
         value: obj.val,
       };
@@ -439,6 +438,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     params: {
       project_id: projectIdFromParts({entity, project}),
       filter: {
+        root_obj_types: filter.category,
         object_names: filter.objectIds,
         latest_only: filter.latestOnly,
         is_op: false,
@@ -464,11 +464,11 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
           weaveKind: 'object' as const,
           objectId: obj.name,
           versionHash: obj.digest,
-          typeName: obj.type,
+          // typeName: obj.type,
           name: obj.name,
           path: 'obj',
           createdAtMs: convertISOToDate(obj.created_at).getTime(),
-          category: typeNameToCategory(obj.type),
+          rootObjectType: obj.root_obj_type ?? null,
           versionIndex: obj.version_index,
           val: obj.val,
         };
@@ -476,7 +476,8 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       .filter(obj => {
         return (
           filter.category == null ||
-          (obj.category != null && filter.category.includes(obj.category))
+          (obj.rootObjectType != null &&
+            filter.category.includes(obj.rootObjectType as any))
         );
       })
 );

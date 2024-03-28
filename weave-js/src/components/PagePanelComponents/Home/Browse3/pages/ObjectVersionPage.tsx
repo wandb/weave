@@ -78,7 +78,15 @@ const ObjectVersionPageInner: React.FC<{
     objectIds: [objectName],
   });
   const objectVersionCount = (objectVersions.result ?? []).length;
-  const objectTypeCategory = objectVersion.category;
+  const objectTypeCategory = useMemo(() => {
+    if (objectVersion.rootObjectType === 'Dataset') {
+      return 'Dataset';
+    }
+    if (objectVersion.rootObjectType === 'Model') {
+      return 'Model';
+    }
+    return null;
+  }, [objectVersion.rootObjectType]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
   const producingCalls = useCalls(entityName, projectName, {
@@ -216,13 +224,13 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Use',
           content:
-            objectTypeCategory === 'dataset' ? (
+            objectTypeCategory === 'Dataset' ? (
               <TabUseDataset
                 name={objectName}
                 uri={refUri}
                 versionIndex={objectVersionIndex}
               />
-            ) : objectTypeCategory === 'model' ? (
+            ) : objectTypeCategory === 'Model' ? (
               <TabUseModel
                 name={objectName}
                 uri={refUri}

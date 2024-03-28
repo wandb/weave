@@ -1,7 +1,6 @@
 import React from 'react';
 
 import {OpCodeViewer} from '../OpCodeViewer';
-import {CategoryChip} from './common/CategoryChip';
 import {
   CallsLink,
   opNiceName,
@@ -45,7 +44,7 @@ const OpVersionPageInner: React.FC<{
 }> = ({opVersion}) => {
   const {useOpVersions, useCalls} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
-  const {entity, project, opId, versionIndex, category} = opVersion;
+  const {entity, project, opId, versionIndex} = opVersion;
 
   const opVersions = useOpVersions(entity, project, {
     opIds: [opId],
@@ -99,11 +98,11 @@ const OpVersionPageInner: React.FC<{
               ) : (
                 <></>
               ),
-            ...(category
-              ? {
-                  Category: <CategoryChip value={category} />,
-                }
-              : {}),
+            // ...(category
+            //   ? {
+            //       Category: <CategoryChip value={category} />,
+            //     }
+            //   : {}),
           }}
         />
       }

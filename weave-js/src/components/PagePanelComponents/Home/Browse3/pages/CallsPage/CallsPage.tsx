@@ -271,7 +271,7 @@ export const CallsTable: FC<{
             <PivotTableChart />
           </IconButton> */}
 
-          <ListItem sx={{width: '190px', flex: '0 0 190px'}}>
+          {/* <ListItem sx={{width: '190px', flex: '0 0 190px'}}>
             <FormControl fullWidth>
               <Autocomplete
                 size={'small'}
@@ -297,7 +297,7 @@ export const CallsTable: FC<{
                 options={opCategoryOptions}
               />
             </FormControl>
-          </ListItem>
+          </ListItem> */}
           <ListItem sx={{minWidth: '190px'}}>
             <FormControl fullWidth>
               <Autocomplete

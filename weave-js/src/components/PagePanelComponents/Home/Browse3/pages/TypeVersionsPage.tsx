@@ -8,7 +8,6 @@ import {
   WFHighLevelDataColumn,
 } from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {HackyTypeCategory, WFTypeVersion} from './wfInterface/types';
 
@@ -96,48 +95,48 @@ export const FilterableTypeVersionsTable: React.FC<{
         'version',
         WFHighLevelTypeVersionFilter
       >,
-      typeCategory: {
-        columnId: 'typeCategory',
-        gridDisplay: {
-          columnLabel: 'Type Category',
-          columnValue: ({obj}) => {
-            return obj.typeCategory();
-          },
-          gridColDefOptions: {
-            renderCell: params => {
-              return (
-                <TypeVersionCategoryChip
-                  typeCategory={params.row.obj.typeCategory()}
-                />
-              );
-            },
-          },
-        },
-        filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (filter.typeCategory == null) {
-              return true;
-            }
-            return obj.typeCategory() === filter.typeCategory;
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <TypeCategoryFilterControlListItem
-                entity={props.entity}
-                project={props.project}
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFTypeVersion},
-        string,
-        string,
-        'typeCategory',
-        WFHighLevelTypeVersionFilter
-      >,
+      // typeCategory: {
+      //   columnId: 'typeCategory',
+      //   gridDisplay: {
+      //     columnLabel: 'Type Category',
+      //     columnValue: ({obj}) => {
+      //       return obj.typeCategory();
+      //     },
+      //     gridColDefOptions: {
+      //       renderCell: params => {
+      //         return (
+      //           <TypeVersionCategoryChip
+      //             typeCategory={params.row.obj.typeCategory()}
+      //           />
+      //         );
+      //       },
+      //     },
+      //   },
+      //   filterControls: {
+      //     filterPredicate: ({obj}, filter) => {
+      //       if (filter.typeCategory == null) {
+      //         return true;
+      //       }
+      //       return obj.typeCategory() === filter.typeCategory;
+      //     },
+      //     filterControlListItem: cellProps => {
+      //       return (
+      //         <TypeCategoryFilterControlListItem
+      //           entity={props.entity}
+      //           project={props.project}
+      //           frozenFilter={props.frozenFilter}
+      //           {...cellProps}
+      //         />
+      //       );
+      //     },
+      //   },
+      // } as WFHighLevelDataColumn<
+      //   {obj: WFTypeVersion},
+      //   string,
+      //   string,
+      //   'typeCategory',
+      //   WFHighLevelTypeVersionFilter
+      // >,
       typeName: {
         columnId: 'typeName',
         gridDisplay: {
