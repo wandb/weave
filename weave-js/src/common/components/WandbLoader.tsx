@@ -58,31 +58,30 @@ export const TrackedWandbLoader = ({
   onStart,
   ...props
 }: TrackedWandbLoaderProps) => {
-  useLifecycleProfiling(
-    name,
-    (data: ProfileData) => {
-      try {
-        // log the lifecycle for each loader to segment
-        const additionalData = profilingCb ? profilingCb() : {};
-        const trackedData = {
-          componentId: data.id,
-          duration: data.duration,
-          ...additionalData,
-        };
-        if (onComplete) {
-          onComplete(name, trackedData);
-        }
-        const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
-        if (randomNum <= samplingRate * 100) {
-          track('wandb-loader-onscreen', trackedData);
-        }
-      } catch (e) {
-        // Tracking should be able to fail gracefully without breaking the app
-        captureException?.(e);
+
+  const trackFunction = (data: ProfileData) => {
+    try {
+      // log the lifecycle for each loader to segment
+      const additionalData = profilingCb ? profilingCb() : {};
+      const trackedData = {
+        componentId: data.id,
+        duration: data.duration,
+        ...additionalData,
+      };
+      
+      onComplete?.(name, trackedData);
+
+      const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
+      if (randomNum <= samplingRate * 100) {
+        track('wandb-loader-onscreen', trackedData);
       }
-    },
-    onStart
-  );
+    } catch (e) {
+      // Tracking should be able to fail gracefully without breaking the app
+      captureException?.(e);
+    }
+  };
+
+  useLifecycleProfiling(name, trackFunction, onStart);
 
   return <WandbLoader {...props} />;
 };

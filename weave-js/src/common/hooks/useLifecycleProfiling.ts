@@ -20,9 +20,7 @@ export function useLifecycleProfiling(
   useEffect(() => {
     const x = performance.now();
 
-    if (onStart) {
-      onStart(id);
-    }
+    onStart?.(id);
 
     return () => {
       const y = performance.now();
