@@ -1,9 +1,9 @@
-import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
 import {parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {WeaveCHTable, WeaveDataTable} from '../../../Browse2/WeaveEditors';
+import {WeaveCHTable} from '../../../Browse2/WeaveEditors';
+import {TableView} from '../../dataViews/TableView';
 import {isRef} from '../common/util';
 import {ValueViewNumber} from './ValueViewNumber';
 import {ValueViewPrimitive} from './ValueViewPrimitive';
@@ -32,7 +32,7 @@ export const ValueView = ({data, isExpanded, baseRef}: ValueViewProps) => {
         //     width: '100%',
         //     overflow: 'hidden',
         //   }}>
-        <WeaveDataTable data={data.value} />
+        <TableView data={data.value} />
         // </Box>
       );
     }
