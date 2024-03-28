@@ -16,7 +16,7 @@ const doDatadogRumInit = once(() => {
     clientToken: DATADOG_CLIENT_TOKEN,
     site: DATADOG_SITE,
     service: DATADOG_UI_SERVICE,
-    trackUserInteractions: true,
+    trackInteractions: true,
     trackLongTasks: true,
     trackResources: true,
     allowedTracingUrls: [
@@ -34,7 +34,7 @@ const doDatadogRumInit = once(() => {
       'https://weave.wandb.ai',
     ].map(url => ({match: url, propagatorTypes: ['b3multi']})),
     defaultPrivacyLevel: 'mask-user-input',
-    sessionSampleRate: 100,
+    sampleRate: 100,
     sessionReplaySampleRate: 20,
   });
 });

@@ -1,5 +1,5 @@
 import pytest
-from weave.trace_server.refs import ObjectRef
+from weave.trace.refs import ObjectRef
 
 
 def test_isdescended_from():

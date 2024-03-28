@@ -3,7 +3,7 @@ import typing
 
 from weave import box
 from weave.trace import custom_objs
-from weave.trace_server.refs import ObjectRef, TableRef, parse_uri
+from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.object_record import ObjectRecord
 from weave.trace_server.trace_server_interface import (
     TraceServerInterface,

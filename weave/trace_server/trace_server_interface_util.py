@@ -5,6 +5,7 @@ import typing
 import uuid
 
 from . import trace_server_interface as tsi
+from . import refs_internal
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"
@@ -54,7 +55,11 @@ def decode_b64_to_bytes(contents: typing.Dict[str, str]) -> typing.Dict[str, byt
     return res
 
 
-valid_schemes = [TRACE_REF_SCHEME, ARTIFACT_REF_SCHEME]
+valid_schemes = [
+    TRACE_REF_SCHEME,
+    ARTIFACT_REF_SCHEME,
+    refs_internal.WEAVE_INTERNAL_SCHEME,
+]
 
 
 def extract_refs_from_values(

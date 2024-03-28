@@ -10,6 +10,7 @@ import numpy as np
 import weave
 from weave.trace.op import Op, BoundOp
 from weave.trace.errors import OpCallError
+from weave.trace.env import get_weave_parallelism
 from weave.flow.obj import Object
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
@@ -235,7 +236,9 @@ class Evaluation(Object):
         # with console.status("Evaluating...") as status:
         dataset = typing.cast(Dataset, self.dataset)
         _rows = dataset.rows
-        async for example, eval_row in util.async_foreach(_rows, eval_example, 30):
+        async for example, eval_row in util.async_foreach(
+            _rows, eval_example, get_weave_parallelism()
+        ):
             n_complete += 1
             duration = time.time() - start_time
             # status.update(
