@@ -23,7 +23,6 @@ from .. import input_provider
 
 
 static_art_file_gql = """
-            id
             commitHash
             artifactSequence {
                 id
@@ -559,9 +558,8 @@ def history_metrics(
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
-    artifact_id = None
-    if "id" in artifactVersion:
-        artifact_id = artifactVersion["id"]
+    print(f"\n\nlogging version query result: ===> \n{artifactVersion}\n\n", flush=True)
+    artifact_id = artifactVersion["id"]
     entity_name = "_"
     project_name = "_"
     if artifactVersion["artifactSequence"]["project"] is not None:
