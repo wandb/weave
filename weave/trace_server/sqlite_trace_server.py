@@ -18,7 +18,7 @@ from .trace_server_interface_util import (
 )
 from . import trace_server_interface as tsi
 
-from weave.trace_server import refs_internal
+from weave.trace import refs
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -45,46 +45,6 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
         conn_cursor = (conn, cursor)
         _conn_cursor.set(conn_cursor)
     return conn_cursor
-
-
-def parse_uri(
-    uri: str,
-) -> Union[refs_internal.InternalObjectRef, refs_internal.InternalTableRef]:
-    if uri.startswith(f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"):
-        return refs_internal.parse_internal_uri(uri)
-    elif uri.startswith(f"{refs_internal.WEAVE_SCHEME}:///"):
-        # This path should never be hit in production. This is only for testing.
-        path = uri[len(f"{refs_internal.WEAVE_SCHEME}:///") :]
-        parts = path.split("/")
-        if len(parts) < 3:
-            raise ValueError(f"Invalid URI: {uri}")
-        entity, project, kind = parts[:3]
-        project_id = f"{entity}/{project}"
-        remaining = parts[3:]
-        if kind == "table":
-            return refs_internal.InternalTableRef(
-                project_id=project_id, digest=remaining[0]
-            )
-        elif kind == "object":
-            name, version = remaining[0].split(":")
-            return refs_internal.InternalObjectRef(
-                project_id=project_id,
-                name=name,
-                version=version,
-                extra=remaining[1:],
-            )
-        elif kind == "op":
-            name, version = remaining[0].split(":")
-            return refs_internal.InternalOpRef(
-                project_id=project_id,
-                name=name,
-                version=version,
-                extra=remaining[1:],
-            )
-        else:
-            raise ValueError(f"Unknown ref kind: {kind}")
-    else:
-        raise ValueError(f"Invalid URI: {uri}")
 
 
 class SqliteTraceServer(tsi.TraceServerInterface):
@@ -466,18 +426,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_refs = [parse_uri(r) for r in req.refs]
-        if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_refs):
+        parsed_refs = [refs.parse_uri(r) for r in req.refs]
+        if any(isinstance(r, refs.TableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
-        parsed_obj_refs = cast(list[refs_internal.InternalObjectRef], parsed_refs)
+        parsed_obj_refs = cast(list[refs.ObjectRef], parsed_refs)
 
-        def read_ref(r: refs_internal.InternalObjectRef) -> Any:
+        def read_ref(r: refs.ObjectRef) -> Any:
             conds = [
                 f"name = '{r.name}'",
                 f"digest = '{r.version}'",
             ]
             objs = self._select_objs_query(
-                r.project_id,
+                f"{r.entity}/{r.project}",
                 conditions=conds,
             )
             if len(objs) == 0:
@@ -494,16 +454,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 elif op == "ndx":
                     val = val[int(arg)]
                 elif op == "id":
-                    if isinstance(val, str) and val.startswith(
-                        refs_internal.WEAVE_INTERNAL_SCHEME + "://"
-                    ):
-                        table_ref = parse_uri(val)
-                        if not isinstance(table_ref, refs_internal.InternalTableRef):
+                    if isinstance(val, str) and val.startswith("weave://"):
+                        table_ref = refs.parse_uri(val)
+                        if not isinstance(table_ref, refs.TableRef):
                             raise ValueError(
                                 "invalid data layout encountered, expected TableRef when resolving id"
                             )
                         row = self._table_row_read(
-                            project_id=table_ref.project_id,
+                            project_id=f"{table_ref.entity}/{table_ref.project}",
                             row_digest=arg,
                         )
                         val = row.val
