@@ -933,14 +933,15 @@ export const WeaveEditorTable: FC<{
 };
 
 export const WeaveCHTable: FC<{
-  refUri: string;
+  tableRefUri: string;
   path: WeaveEditorPathEl[];
+  baseRef?: string;
 }> = props => {
   const apiRef = useGridApiRef();
   const {isPeeking} = useContext(WeaveflowPeekContext);
+  console.log({refUri: props.tableRefUri});
 
-  // const makeLinkPath = useObjectVersionLinkPathForPath();
-  const fetchQuery = useValueOfRefUri(props.refUri, {
+  const fetchQuery = useValueOfRefUri(props.tableRefUri, {
     limit: MAX_ROWS + 1,
   });
   const [isTruncated, setIsTruncated] = useState(false);
@@ -955,118 +956,75 @@ export const WeaveCHTable: FC<{
     setIsTruncated((fetchQuery.result ?? []).length > MAX_ROWS);
     setSourceRows((fetchQuery.result ?? []).slice(0, MAX_ROWS));
   }, [sourceRows, fetchQuery]);
+  const history = useHistory();
+  const onClickEnabled = props.baseRef != null;
+  const router = useWeaveflowCurrentRouteContext();
+  const onClick = useCallback(
+    val => {
+      const ref = parseRef(props.baseRef!);
+      if (isWeaveObjectRef(ref)) {
+        let extra = ref.artifactRefExtra ?? '';
+        if (extra !== '') {
+          extra += '/';
+        }
+        extra += 'atr/' + props.path.join('/atr/');
+        if (extra !== '') {
+          extra += '/';
+        }
+        extra += TABLE_ID_EDGE_TYPE + '/' + val.digest;
 
-  const gridRows = useMemo(
-    () =>
-      (sourceRows ?? []).map((row: {[key: string]: any}, i: number) => ({
-        _table_row_digest: row.digest,
-        id: i,
-        ...flattenObject(row.val),
-      })),
-    [sourceRows]
+        const target = router.objectVersionUIUrl(
+          ref.entityName,
+          ref.projectName,
+          ref.artifactName,
+          ref.artifactVersion,
+          'obj',
+          extra
+        );
+        console.log({target, ref, baseRef: props.baseRef, extra});
+
+        history.push(target);
+      }
+    },
+    [history, props.baseRef, props.path, router]
   );
-
-  // Autosize when rows change
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      apiRef.current.autosizeColumns({
-        includeHeaders: true,
-        includeOutliers: true,
-      });
-    }, 0);
-    return () => {
-      clearInterval(timeoutId);
-    };
-  }, [gridRows, apiRef]);
-
-  const objectType = useMemo(() => {
-    if (fetchQuery.result == null) {
-      return list(typedDict({}));
-    }
-    return typedDictPropertyTypes(
-      listObjectType(toWeaveType(fetchQuery.result))
-    ).val;
-  }, [fetchQuery.result]);
-
-  const columnSpec: GridColDef[] = useMemo(() => {
-    return [
-      // {
-      //   field: '_table_row_digest',
-      //   headerName: '',
-      //   width: 50,
-      //   renderCell: params => (
-      //     <Link
-      //       to={makeLinkPath([
-      //         ...weaveEditorPathUrlPathPart(props.path),
-      //         TABLE_ID_EDGE_TYPE,
-      //         params.row._table_row_digest,
-      //       ])}>
-      //       <LinkIcon />
-      //     </Link>
-      //   ),
-      // },
-      ...typeToDataGridColumnSpec(objectType, isPeeking, true),
-    ];
-  }, [objectType, isPeeking]);
-  // }, [objectType, isPeeking, makeLinkPath, props.path]);
   return (
-    <>
-      {isTruncated && (
-        <Alert severity="warning">
-          Showing {MAX_ROWS.toLocaleString()} rows only.
-        </Alert>
-      )}
-      <Box
-        sx={{
-          height: 460,
-          width: '100%',
-        }}>
-        <StyledDataGrid
-          keepBorders
-          apiRef={apiRef}
-          density="compact"
-          experimentalFeatures={{columnGrouping: true}}
-          rows={gridRows}
-          columns={columnSpec}
-          initialState={{
-            pagination: {
-              paginationModel: {
-                pageSize: 10,
-              },
-            },
-          }}
-          loading={fetchQuery.loading}
-          disableRowSelectionOnClick
-        />
-      </Box>
-    </>
+    <WeaveDataTable
+      data={sourceRows ?? []}
+      isTruncated={isTruncated}
+      displayKey="val"
+      onLinkClick={onClickEnabled ? onClick : undefined}
+    />
   );
 };
 
 export const WeaveDataTable: FC<{
   data: Array<any>;
+  displayKey?: string;
   loading?: boolean;
   isTruncated?: boolean;
   onLinkClick?: (row: any) => void;
 }> = props => {
   const data = useMemo(() => {
     return props.data.map(row => {
-      if (row == null) {
-        return {};
-      } else if (typeof row === 'object') {
-        return row;
+      let val = row;
+      if (props.displayKey) {
+        val = row[props.displayKey];
       }
-      return {'   ': row};
+      if (val == null) {
+        return {};
+      } else if (typeof val === 'object') {
+        return val;
+      }
+      return {'   ': val};
     });
-  }, [props.data]);
-  console.log({data});
+  }, [props.data, props.displayKey]);
   const apiRef = useGridApiRef();
   const {isPeeking} = useContext(WeaveflowPeekContext);
 
   const gridRows = useMemo(
     () =>
       data.map((row: {[key: string]: any}, i: number) => ({
-        _table_row_digest: row.digest,
         id: i,
         ...flattenObject(row),
       })),
@@ -1097,19 +1055,23 @@ export const WeaveDataTable: FC<{
     let res: GridColDef[] = [];
     if (props.onLinkClick) {
       res.push({
-        field: '_table_row_digest',
+        field: '_row_click',
         headerName: '',
         width: 50,
-        renderCell: params => <LinkIcon onClick={props.onLinkClick} />,
+        renderCell: params => (
+          <LinkIcon
+            onClick={() => props.onLinkClick!(props.data[params.id as number])}
+          />
+        ),
       });
     }
     console.log({objectType});
     return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
-  }, [props.onLinkClick, objectType, isPeeking]);
+  }, [props.onLinkClick, objectType, isPeeking, props.data]);
   console.log(gridRows);
   const height = 92 + 36 * Math.min(10, gridRows.length);
   return (
-    <>
+    <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
       {props.isTruncated && (
         <Alert severity="warning">
           Showing {MAX_ROWS.toLocaleString()} rows only.
@@ -1138,7 +1100,7 @@ export const WeaveDataTable: FC<{
           disableRowSelectionOnClick
         />
       </Box>
-    </>
+    </div>
   );
 };
 
@@ -1155,7 +1117,8 @@ const WeaveViewSmallRef: FC<{
     return <div>loading</div>;
   } else if (opDefRef != null) {
     if (opDefRef.scheme === 'weave' && opDefRef.weaveKind === 'table') {
-      return <WeaveCHTable refUri={opDefQuery.result} path={path} />;
+      return <></>;
+      // return <WeaveCHTable tableRefUri={opDefQuery.result} path={path} />;
     }
     return <SmallRef objRef={opDefRef} />;
   } else {

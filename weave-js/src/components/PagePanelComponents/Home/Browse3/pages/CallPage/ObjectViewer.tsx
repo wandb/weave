@@ -5,7 +5,7 @@ import {
   GridRowHeightParams,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useState} from 'react';
 
 import {useWeaveContext} from '../../../../../../context';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
@@ -15,6 +15,7 @@ import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {processGenericData} from './CallDetails';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
+import {ObjectViewerSectionContext} from './ObjectViewerSection';
 import {mapObject, traverse, TraverseContext, traversed} from './traverse';
 import {ValueView} from './ValueView';
 
@@ -101,18 +102,22 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     );
     return contexts.map((c, id) => ({id, ...c}));
   }, [resolvedData]);
-
-  const columns: GridColDef[] = [
-    {
-      field: 'value',
-      headerName: 'Value',
-      flex: 1,
-      sortable: false,
-      renderCell: ({row}) => {
-        return <ValueView data={row} isExpanded={isExpanded} />;
+  const baseRef = useContext(ObjectViewerSectionContext);
+  const columns: GridColDef[] = useMemo(() => {
+    return [
+      {
+        field: 'value',
+        headerName: 'Value',
+        flex: 1,
+        sortable: false,
+        renderCell: ({row}) => {
+          return (
+            <ValueView data={row} isExpanded={isExpanded} baseRef={baseRef} />
+          );
+        },
       },
-    },
-  ];
+    ];
+  }, [baseRef, isExpanded]);
 
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({

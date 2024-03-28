@@ -4,7 +4,10 @@ import React, {useMemo} from 'react';
 import {maybePluralizeWord} from '../../../../../core/util/string';
 import {WeaveEditorSourceContext} from '../../Browse2/WeaveEditors';
 import {processGenericData} from './CallPage/CallDetails';
-import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
+import {
+  ObjectViewerSection,
+  ObjectViewerSectionContext,
+} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
 import {
   CallLink,
@@ -213,7 +216,9 @@ const ObjectVersionPageInner: React.FC<{
                     flex: '0 0 auto',
                     p: 2,
                   }}>
-                  <ObjectViewerSection title="" data={viewerData} />
+                  <ObjectViewerSectionContext.Provider value={refUri}>
+                    <ObjectViewerSection title="" data={viewerData} />
+                  </ObjectViewerSectionContext.Provider>
                 </Box>
                 {/* <WeaveEditor
                   objType={objectName}
