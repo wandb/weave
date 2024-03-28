@@ -461,6 +461,9 @@ class WeaveClient:
     def ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
+    def __repr__(self) -> str:
+        return ""
+
 
 def safe_current_wb_run_id() -> Optional[str]:
     try:
