@@ -1,15 +1,15 @@
 import React from 'react';
 
 import {Pill, TagColorName} from '../../../../../Tag';
-import {ObjectCategory} from '../wfReactInterface/wfDataModelHooksInterface';
+import {KnownBaseObjectClassType} from '../wfReactInterface/wfDataModelHooksInterface';
 
-const colorMap: Record<ObjectCategory, TagColorName> = {
+const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
   Model: 'blue',
   Dataset: 'green',
 };
 
 export const TypeVersionCategoryChip: React.FC<{
-  baseObjectClass: ObjectCategory | null;
+  baseObjectClass: KnownBaseObjectClassType | null;
 }> = props => {
   if (props.baseObjectClass == null) {
     return <></>;

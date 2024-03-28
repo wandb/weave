@@ -243,15 +243,7 @@ const useCalls = (
       };
     }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
-    const result = allResults.filter((row: any) => {
-      return (
-        deepFilter.opCategory == null ||
-        (row.opVersionRef &&
-          deepFilter.opCategory.includes(
-            opVersionRefOpCategory(row.opVersionRef) as OpCategory
-          ))
-      );
-    });
+    const result = allResults;
 
     if (callRes == null || loadingRef.current) {
       return {
@@ -274,7 +266,7 @@ const useCalls = (
         result,
       };
     }
-  }, [callRes, deepFilter.opCategory, entity, project, opts?.skip]);
+  }, [callRes, entity, project, opts?.skip]);
 };
 
 const useOpVersion = (
@@ -438,7 +430,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     params: {
       project_id: projectIdFromParts({entity, project}),
       filter: {
-        base_object_classes: filter.category,
+        base_object_classes: filter.baseObjectClasses,
         object_names: filter.objectIds,
         latest_only: filter.latestOnly,
         is_op: false,
@@ -454,32 +446,24 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     limit,
     opts
   ): ObjectVersionSchema[] =>
-    res.objs
-      .map(obj => {
-        const [entity, project] = obj.project_id.split('/');
-        return {
-          scheme: 'weave' as const,
-          entity,
-          project,
-          weaveKind: 'object' as const,
-          objectId: obj.name,
-          versionHash: obj.digest,
-          // typeName: obj.type,
-          name: obj.name,
-          path: 'obj',
-          createdAtMs: convertISOToDate(obj.created_at).getTime(),
-          baseObjectClass: obj.base_object_class ?? null,
-          versionIndex: obj.version_index,
-          val: obj.val,
-        };
-      })
-      .filter(obj => {
-        return (
-          filter.category == null ||
-          (obj.baseObjectClass != null &&
-            filter.category.includes(obj.baseObjectClass as any))
-        );
-      })
+    res.objs.map(obj => {
+      const [entity, project] = obj.project_id.split('/');
+      return {
+        scheme: 'weave' as const,
+        entity,
+        project,
+        weaveKind: 'object' as const,
+        objectId: obj.name,
+        versionHash: obj.digest,
+        // typeName: obj.type,
+        name: obj.name,
+        path: 'obj',
+        createdAtMs: convertISOToDate(obj.created_at).getTime(),
+        baseObjectClass: obj.base_object_class ?? null,
+        versionIndex: obj.version_index,
+        val: obj.val,
+      };
+    })
 );
 
 const useRefsReadBatch = makeTraceServerEndpointHook<

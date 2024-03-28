@@ -190,15 +190,7 @@ const useCalls = (
       'callId'
     );
     // Unfortunately, we can't filter by category in the query level yet
-    const result = allResults.filter((row: any) => {
-      return (
-        filter.opCategory == null ||
-        (row.opVersionRef &&
-          filter.opCategory.includes(
-            opVersionRefOpCategory(row.opVersionRef) as OpCategory
-          ))
-      );
-    });
+    const result = allResults;
 
     if (calls.loading) {
       return {
@@ -221,7 +213,7 @@ const useCalls = (
         result,
       };
     }
-  }, [calls.result, calls.loading, entity, project, filter.opCategory]);
+  }, [calls.result, calls.loading, entity, project]);
 };
 
 const useOpVersion = (
@@ -302,24 +294,18 @@ const useOpVersions = (
         result: [],
       };
     }
-    const result = (dataValue.result ?? [])
-      .map((row: any) => ({
-        entity,
-        project,
-        opId: row.opId as string,
-        versionHash: row.versionHash as string,
-        path: 'obj',
-        refExtra: null,
-        versionIndex: row.dataDict.versionIndex as number,
-        typeName: row.dataDict.typeName as string,
-        category: opNameToCategory(row.opId as string),
-        createdAtMs: row.dataDict.createdAtMs as number,
-      }))
-      .filter((row: any) => {
-        return (
-          filter.category == null || filter.category.includes(row.category)
-        );
-      }) as OpVersionSchema[];
+    const result = (dataValue.result ?? []).map((row: any) => ({
+      entity,
+      project,
+      opId: row.opId as string,
+      versionHash: row.versionHash as string,
+      path: 'obj',
+      refExtra: null,
+      versionIndex: row.dataDict.versionIndex as number,
+      typeName: row.dataDict.typeName as string,
+      category: opNameToCategory(row.opId as string),
+      createdAtMs: row.dataDict.createdAtMs as number,
+    })) as OpVersionSchema[];
 
     if (dataValue.loading) {
       return {
@@ -343,14 +329,7 @@ const useOpVersions = (
         result,
       };
     }
-  }, [
-    dataValue.loading,
-    dataValue.result,
-    entity,
-    filter.category,
-    opts?.skip,
-    project,
-  ]);
+  }, [dataValue.loading, dataValue.result, entity, opts?.skip, project]);
 };
 
 const useObjectVersion = (
@@ -450,7 +429,8 @@ const useRootObjectVersions = (
       }))
       .filter((row: any) => {
         return (
-          filter.category == null || filter.category.includes(row.category)
+          filter.baseObjectClasses == null ||
+          filter.baseObjectClasses.includes(row.category)
         );
       })
       // TODO: Move this to the weave filters?
@@ -487,7 +467,7 @@ const useRootObjectVersions = (
     dataValue.loading,
     dataValue.result,
     entity,
-    filter.category,
+    filter.baseObjectClasses,
     opts?.skip,
     project,
   ]);

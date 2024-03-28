@@ -19,7 +19,7 @@ import {useInitializingFilter, useURLSearchParamsDict} from './util';
 import {useWFHooks} from './wfReactInterface/context';
 import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {
-  ObjectCategory,
+  KnownBaseObjectClassType,
   ObjectVersionSchema,
 } from './wfReactInterface/wfDataModelHooksInterface';
 
@@ -67,7 +67,7 @@ export const ObjectVersionsPage: React.FC<{
 
 export type WFHighLevelObjectVersionFilter = {
   objectName?: string | null;
-  baseObjectClass?: ObjectCategory | null;
+  baseObjectClass?: KnownBaseObjectClassType | null;
 };
 
 export const FilterableObjectVersionsTable: React.FC<{
@@ -92,7 +92,7 @@ export const FilterableObjectVersionsTable: React.FC<{
     props.entity,
     props.project,
     {
-      category: effectiveFilter.baseObjectClass
+      baseObjectClasses: effectiveFilter.baseObjectClass
         ? [effectiveFilter.baseObjectClass]
         : undefined,
       objectIds: effectiveFilter.objectName

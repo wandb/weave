@@ -10,10 +10,11 @@
  */
 
 import * as Types from '../../../../../../core/model/types';
-import {OBJECT_CATEGORIES, OP_CATEGORIES} from './constants';
+import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
-export type ObjectCategory = (typeof OBJECT_CATEGORIES)[number];
+export type KnownBaseObjectClassType =
+  (typeof KNOWN_BASE_OBJECT_CLASSES)[number];
 
 export type Loadable<T> = {
   loading: boolean;
@@ -54,7 +55,6 @@ export type CallFilter = {
   traceId?: string;
   callIds?: string[];
   traceRootsOnly?: boolean;
-  opCategory?: OpCategory[];
   runIds?: string[];
   userIds?: string[];
 };
@@ -75,7 +75,6 @@ export type OpVersionSchema = OpVersionKey & {
 
 export type OpVersionFilter = {
   // Filters are ANDed across the fields and ORed within the fields
-  category?: OpCategory[];
   opIds?: string[];
   latestOnly?: boolean;
 };
@@ -113,7 +112,7 @@ export type ObjectVersionSchema = ObjectVersionKey & {
 
 export type ObjectVersionFilter = {
   // Filters are ANDed across the fields and ORed within the fields
-  category?: ObjectCategory[];
+  baseObjectClasses?: KnownBaseObjectClassType[];
   objectIds?: string[];
   latestOnly?: boolean;
 };

@@ -7,7 +7,7 @@
 
 import {WANDB_ARTIFACT_SCHEME} from '../../../common';
 import {
-  OBJECT_CATEGORIES,
+  KNOWN_BASE_OBJECT_CLASSES,
   OP_CATEGORIES,
   WANDB_ARTIFACT_REF_PREFIX,
   WANDB_ARTIFACT_REF_SCHEME,
@@ -16,7 +16,7 @@ import {
 } from './constants';
 import {useWFHooks} from './context';
 import {
-  ObjectCategory,
+  KnownBaseObjectClassType,
   ObjectVersionKey,
   ObjectVersionSchema,
   OpCategory,
@@ -251,10 +251,12 @@ export const opNameToCategory = (opName: string): OpCategory | null => {
   return null;
 };
 
-export const typeNameToCategory = (typeName: string): ObjectCategory | null => {
-  for (const category of OBJECT_CATEGORIES) {
+export const typeNameToCategory = (
+  typeName: string
+): KnownBaseObjectClassType | null => {
+  for (const category of KNOWN_BASE_OBJECT_CLASSES) {
     if (typeName.toLocaleLowerCase().includes(category)) {
-      return category as ObjectCategory;
+      return category as KnownBaseObjectClassType;
     }
   }
   return null;
