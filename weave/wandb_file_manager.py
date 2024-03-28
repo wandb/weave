@@ -114,7 +114,7 @@ class WandbFileManagerAsync:
             manifest_url = await self.wandb_api.artifact_manifest_url_from_id(
                 art_id=art_id,
             )
-        else:
+        if manifest_url is None:
             print("download manifest via id is None, downloading via name", flush=True)
             manifest_url = await self.wandb_api.artifact_manifest_url(
                 art_uri.entity_name,
@@ -292,7 +292,7 @@ class WandbFileManager:
             manifest_url = self.wandb_api.artifact_manifest_url_from_id(
                 art_id=art_id,
             )
-        else:
+        if manifest_url is None:
             print("download manifest via id is None, downloading via name", flush=True)
             manifest_url = self.wandb_api.artifact_manifest_url(
                 art_uri.entity_name,
