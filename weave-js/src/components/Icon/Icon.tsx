@@ -107,6 +107,7 @@ import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
 import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-minimize-mode.svg';
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
+import {ReactComponent as ImportModelFilled} from '../../assets/icons/icon-model-filled.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
@@ -534,6 +535,9 @@ export const IconMinimizeMode = (props: SVGIconProps) => (
 export const IconModel = (props: SVGIconProps) => (
   <ImportModel {...updateIconProps(props)} />
 );
+export const IconModelFilled = (props: SVGIconProps) => (
+  <ImportModelFilled {...updateIconProps(props)} />
+);
 export const IconMusicAudio = (props: SVGIconProps) => (
   <ImportMusicAudio {...updateIconProps(props)} />
 );
@@ -919,6 +923,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'microphone-audio': IconMicrophoneAudio,
   'minimize-mode': IconMinimizeMode,
   model: IconModel,
+  'model-filled': IconModelFilled,
   'music-audio': IconMusicAudio,
   number: IconNumber,
   'open-new-tab': IconOpenNewTab,
