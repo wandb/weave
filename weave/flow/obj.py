@@ -11,6 +11,7 @@ from pydantic import (
 
 from weave import box
 from weave.trace.op import Op
+from weave.trace.vals import pydantic_getattribute
 from weave.weave_client import get_ref
 from weave.trace.vals import ObjectRecord, TraceObject
 
@@ -48,6 +49,7 @@ class Object(BaseModel):
                 if isinstance(val, box.BoxedNone):
                     val = None
                 fields[k] = val
+
             # pydantic validation will construct a new pydantic object
             def is_ignored_type(v: type) -> bool:
                 return isinstance(v, cls.model_config["ignored_types"])
@@ -72,15 +74,6 @@ class Object(BaseModel):
         return handler(v)
 
 
-# We don't define this directly in the class definition so that VSCode
-# doesn't try to navigate to it instead of the target attribute
-# def _object_getattribute(self: Object, name: str) -> Any:
-#     attribute = object.__getattribute__(self, name)
-#     if name not in object.__getattribute__(self, "model_fields"):
-#         return attribute
-#     return ref_util.val_with_relative_ref(
-#         self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
-#     )
-
-
-# Object.__getattribute__ = _object_getattribute  # type: ignore
+# This enables Weave ref-tracking for all pydantic objects, not just
+# Object
+BaseModel.__getattribute__ = pydantic_getattribute
