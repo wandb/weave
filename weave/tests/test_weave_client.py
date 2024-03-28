@@ -1,4 +1,5 @@
 import re
+import typing
 import pytest
 import pydantic
 import weave
@@ -620,3 +621,56 @@ def test_server_file(client):
 #     res = server.get(ref)
 #     print("get", time.time() - t)
 #     assert res == {"a": big_list}
+
+
+def test_inter_object_ops(client):
+    @weave.op()
+    def simple_op(val: int) -> int:
+        return val + 1
+
+    class CustomClassWithOp(weave.Object):
+        val_a: int
+
+        @weave.op()
+        def method_a(self, other_val: int) -> int:
+            return self.val_a + other_val
+
+    class CustomClassWithManyOps(weave.Object):
+        val_b: int
+        methods: typing.List[typing.Callable]
+
+        @weave.op()
+        def do_all(self, another_val: int) -> int:
+            val = another_val
+            for method in self.methods:
+                val += method(self.val_b)
+            return val
+
+    a = CustomClassWithOp(val_a=5)
+    b = CustomClassWithManyOps(
+        val_b=10,
+        methods=[
+            # Contains a simple op
+            simple_op,
+            # contains a method bound to another object
+            a.method_a,
+        ],
+    )
+
+    assert simple_op(1) == 2
+    assert a.method_a(1) == 6
+    assert b.do_all(1) == 27
+
+    a_ref = weave.publish(a, "a_obj")
+    b_ref = weave.publish(b, "b_obj")
+
+    a_loaded = a_ref.get()
+    b_loaded = b_ref.get()
+
+    # Akin to running model.predict after loading a model
+    assert a_loaded.method_a(1) == 6
+
+    # Has 2 cases:
+    # 1) Akin to running a saved dataset preprocessor
+    # 2) Akin to running the vector store search on a loaded vector store
+    assert b_loaded.do_all(1) == 27
