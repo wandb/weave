@@ -69,7 +69,6 @@ const makeTraceServerEndpointHook = <
   ): LoadableWithError<Output> => {
     input = useDeepMemo(input);
     const getTsClient = useGetTraceServerClientContext();
-    const client = getTsClient();
     const [state, setState] = useState<LoadableWithError<Output>>({
       loading: true,
       result: null,
@@ -83,6 +82,7 @@ const makeTraceServerEndpointHook = <
         setState({loading: false, result: null, error: null});
         return;
       }
+      const client = getTsClient();
       client[traceServerFnName](req.params as any)
         .then(res => {
           const output = postprocessFn(res as any, ...input);
@@ -91,7 +91,7 @@ const makeTraceServerEndpointHook = <
         .catch(err => {
           setState({loading: false, result: null, error: err});
         });
-    }, [client, input]);
+    }, [input]);
 
     return state;
   };
