@@ -47,8 +47,7 @@ def test_op_versioning_saveload(client):
 def get_saved_code(client, ref):
     resp = client.server.obj_read(
         ObjReadReq(
-            entity=ref.entity,
-            project=ref.project,
+            project_id=f"{ref.entity}/{ref.project}",
             name=ref.name,
             version_digest=ref.version,
         )

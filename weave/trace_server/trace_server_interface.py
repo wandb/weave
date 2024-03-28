@@ -167,8 +167,7 @@ class OpCreateRes(BaseModel):
 
 
 class OpReadReq(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     name: str
     version_hash: str
 
@@ -184,8 +183,7 @@ class _OpVersionFilter(BaseModel):
 
 
 class OpQueryReq(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     filter: typing.Optional[_OpVersionFilter] = None
 
 
@@ -202,8 +200,7 @@ class ObjCreateRes(BaseModel):
 
 
 class ObjReadReq(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     name: str
     version_digest: str
 

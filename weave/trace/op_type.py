@@ -23,7 +23,7 @@ from .. import artifact_fs
 from .. import infer_types
 
 
-from weave.trace_server.refs import ObjectRef
+from weave.trace.refs import ObjectRef
 
 
 if typing.TYPE_CHECKING:
