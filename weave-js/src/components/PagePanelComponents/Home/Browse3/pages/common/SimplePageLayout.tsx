@@ -366,7 +366,8 @@ export const ScrollableTabContent: FC<{
         width: '100%',
         flexGrow: 1,
         overflow: 'auto',
-        p: 2,
+        p: 1,
+        pb: 0,
         ...(props.sx ?? {}),
       }}>
       {props.children}

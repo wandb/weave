@@ -89,7 +89,7 @@ export const CallDetails: FC<{
           flexDirection: 'column',
           height: '100%',
           gap: 1,
-          paddingTop: '8px',
+          // paddingTop: '8px',
         }}>
         {Object.keys(inputs).length > 0 && (
           <Box

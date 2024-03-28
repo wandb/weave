@@ -214,10 +214,10 @@ const ObjectVersionPageInner: React.FC<{
                 <Box
                   sx={{
                     flex: '0 0 auto',
-                    p: 2,
+                    // p: 2,
                   }}>
                   <ObjectViewerSectionContext.Provider value={refUri}>
-                    <ObjectViewerSection title="" data={viewerData} />
+                    <ObjectViewerSection title="" data={viewerData} noHide />
                   </ObjectViewerSectionContext.Provider>
                 </Box>
                 {/* <WeaveEditor

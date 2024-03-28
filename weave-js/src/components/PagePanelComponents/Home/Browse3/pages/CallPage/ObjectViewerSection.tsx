@@ -14,6 +14,7 @@ type Data = Record<string, any>;
 type ObjectViewerSectionProps = {
   title: string;
   data: Data;
+  noHide?: boolean;
 };
 
 const TitleRow = styled.div`
@@ -66,6 +67,7 @@ const isSimpleData = (data: Data): boolean => {
 export const ObjectViewerSection = ({
   title,
   data,
+  noHide,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
   const [mode, setMode] = useState(
@@ -159,13 +161,15 @@ export const ObjectViewerSection = ({
           onClick={() => setMode('json')}
           tooltip="View as JSON"
         />
-        <Button
-          variant="quiet"
-          icon="hide-hidden"
-          active={mode === 'hidden'}
-          onClick={() => setMode('hidden')}
-          tooltip="Hide"
-        />
+        {!noHide && (
+          <Button
+            variant="quiet"
+            icon="hide-hidden"
+            active={mode === 'hidden'}
+            onClick={() => setMode('hidden')}
+            tooltip="Hide"
+          />
+        )}
       </TitleRow>
       {body}
     </>
