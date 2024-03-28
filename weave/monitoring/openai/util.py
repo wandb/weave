@@ -29,13 +29,13 @@ def update_combined_choice(
 
 
 def token_usage(
-    input_messages: List[ChatCompletionMessage], response_choices: list[Choice]
+    input_messages: List[dict], response_choices: list[Choice]
 ) -> CompletionUsage:
     prompt_tokens = num_tokens_from_messages(input_messages)
     completion_tokens = 0
     for choice in response_choices:
         message = choice.message
-        completion_tokens += num_tokens_from_messages([message])
+        completion_tokens += num_tokens_from_messages([message.model_dump()])
 
     total_tokens = prompt_tokens + completion_tokens
     return CompletionUsage(
@@ -98,7 +98,7 @@ def reconstruct_completion(
 
 
 def num_tokens_from_messages(
-    messages: List[ChatCompletionMessage], model: str = "gpt-3.5-turbo-0613"
+    messages: List[dict], model: str = "gpt-3.5-turbo-0613"
 ) -> int:
     model_defaults = {
         "gpt-3.5-turbo-0613": ModelTokensConfig(per_message=3, per_name=1),
@@ -136,9 +136,9 @@ def num_tokens_from_messages(
     num_tokens = 3  # Prime with assistant
     for message in messages:
         num_tokens += config.per_message
-        if message.content is not None:
-            num_tokens += len(encoding.encode(message.content))
-        if message.role == "user":
+        if message.get("content") is not None:
+            num_tokens += len(encoding.encode(message["content"]))
+        if message["role"] == "user":
             num_tokens += config.per_name
 
     return num_tokens

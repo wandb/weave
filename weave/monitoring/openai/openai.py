@@ -7,7 +7,7 @@ from typing import Callable, Type, Union
 
 import openai
 from openai import AsyncStream, Stream
-from openai.types.chat import ChatCompletion
+from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
 
 from weave import graph_client_context, run_context
@@ -18,6 +18,16 @@ from .util import *
 
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
+
+
+def to_python(obj):
+    if isinstance(obj, dict):
+        return {k: to_python(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [to_python(v) for v in obj]
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    return obj
 
 
 class partialmethod_with_self(partialmethod):
@@ -48,10 +58,10 @@ class AsyncChatCompletions:
         self, *args: Any, **kwargs: Any
     ) -> AsyncStream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
-        inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run(
-            "openai.chat.completions.create", inputs.model_dump()
-        ) as finish_run:
+        messages = to_python(named_args["messages"])
+        if not isinstance(messages, list):
+            raise ValueError("messages must be a list")
+        with log_run("openai.chat.completions.create", named_args) as finish_run:
             # Need to put in a function so the outer function is not a
             # generator. Generators don't execute any of their body's
             # code until next() is called. But we want to create the run
@@ -65,7 +75,7 @@ class AsyncChatCompletions:
                 async for chunk in stream:
                     chunks.append(chunk)
                     yield chunk
-                result = reconstruct_completion(inputs.messages, chunks)  # type: ignore
+                result = reconstruct_completion(messages, chunks)  # type: ignore
                 finish_run(result.model_dump(exclude_unset=True))
 
         return _stream_create_gen()  # type: ignore
@@ -85,8 +95,7 @@ class ChatCompletions:
 
     def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
-        inputs = ChatCompletionRequest.parse_obj(named_args).dict()
-        with log_run("openai.chat.completions.create", inputs) as finish_run:
+        with log_run("openai.chat.completions.create", named_args) as finish_run:
             result = self._base_create(*args, **kwargs)
             finish_run(result.model_dump(exclude_unset=True))
         return result
@@ -95,10 +104,11 @@ class ChatCompletions:
         self, *args: Any, **kwargs: Any
     ) -> Stream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
-        inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run(
-            "openai.chat.completions.create", inputs.model_dump()
-        ) as finish_run:
+        messages = to_python(named_args["messages"])
+        if not isinstance(messages, list):
+            raise ValueError("messages must be a list")
+
+        with log_run("openai.chat.completions.create", named_args) as finish_run:
 
             def _stream_create_gen():  # type: ignore
                 stream = self._base_create(*args, **kwargs)
@@ -110,7 +120,7 @@ class ChatCompletions:
                 result = wrapped_stream.final_response()
                 result_with_usage = ChatCompletion(
                     **result.model_dump(exclude_unset=True),
-                    usage=token_usage(inputs.messages, result.choices),
+                    usage=token_usage(messages, result.choices),
                 )
                 finish_run(result_with_usage.model_dump(exclude_unset=True))
 
