@@ -58,8 +58,7 @@ class AsyncChatCompletions:
 
     async def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
-        inputs = ChatCompletionRequest.parse_obj(named_args).dict()
-        with log_run(create_op, inputs) as finish_run:
+        with log_run(create_op, named_args) as finish_run:
             result = await self._base_create(*args, **kwargs)
             finish_run(result.model_dump(exclude_unset=True))
         return result
