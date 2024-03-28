@@ -1,6 +1,7 @@
 import re
 import pytest
 import pydantic
+from pydantic import BaseModel
 import weave
 import asyncio
 from weave import op_def, Evaluation
@@ -377,19 +378,54 @@ def test_save_model(client):
     model = MyModel(prompt="input is: {input}")
     ref = client.save_object(model, "my-model")
     model2 = client.get(ref)
-    # TODO: wrong, have to manually pass self
-    assert model2.predict(model2, "x") == "input is: x"
+    assert model2.predict("x") == "input is: x"
+
+
+def test_saved_nested_modellike(client):
+    class A(weave.Object):
+        x: int
+
+        @weave.op()
+        async def call(self, input):
+            return self.x + input
+
+    class B(weave.Object):
+        a: A
+        y: int
+
+        @weave.op()
+        async def call(self, input):
+            return await self.a.call(input - self.y)
+
+    model = B(a=A(x=3), y=2)
+    ref = client.save_object(model, "my-model")
+    model2 = client.get(ref)
+
+    class C(weave.Object):
+        b: B
+        z: int
+
+        @weave.op()
+        async def call(self, input):
+            return await self.b.call(input - 2 * self.z)
+
+    @weave.op()
+    async def call_model(c, input):
+        return await c.call(input)
+
+    c = C(b=model2, z=1)
+    assert asyncio.run(call_model(c, 5)) == 4
 
 
 def test_dataset_rows_ref(client):
     dataset = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
-    saved = client.save_nested_objects(dataset)
+    saved = client.save(dataset, "my-dataset")
     assert isinstance(saved.rows.ref, weave_client.ObjectRef)
-    assert saved.rows.ref.name == "Dataset"
+    assert saved.rows.ref.name == "my-dataset"
     assert saved.rows.ref.extra == [ATTRIBUTE_EDGE_TYPE, "rows"]
 
 
-@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
+# @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_evaluate(client):
     @weave.op()
     async def model_predict(input) -> str:
@@ -517,7 +553,7 @@ def test_nested_ref_is_inner(client):
         scorers=[score],
     )
 
-    saved = client.save_nested_objects(evaluation)
+    saved = client.save(evaluation, "my-eval")
     assert saved.dataset.ref.name == "Dataset"
     assert saved.dataset.rows.ref.name == "Dataset"
 
@@ -607,16 +643,47 @@ def test_server_file(client):
     assert f_bytes == read_res.content
 
 
-# def test_publish_big_list(server):
-#     import time
+def test_isinstance_checks(client):
+    class PydanticObjA(BaseModel):
+        x: dict
 
-#     t = time.time()
-#     big_list = list({"x": i, "y": i} for i in range(1000000))
-#     print("create", time.time() - t)
-#     t = time.time()
-#     ref = server.new({"a": big_list})
-#     print("insert", time.time() - t)
-#     t = time.time()
-#     res = server.get(ref)
-#     print("get", time.time() - t)
-#     assert res == {"a": big_list}
+    class PydanticObjB(BaseModel):
+        a: PydanticObjA
+
+    b = PydanticObjB(a=PydanticObjA(x={"y": [1, "j", True, None]}))
+
+    client.save_nested_objects(b)
+
+    assert isinstance(b, PydanticObjB)
+    a = b.a
+    assert b.ref is not None
+    assert isinstance(a, PydanticObjA)
+    assert a.ref is not None
+    assert not a.ref.is_descended_from(b.ref)  # objects always saved as roots
+    x = a.x
+    assert isinstance(x, dict)
+    assert x.ref is not None
+    assert x.ref.is_descended_from(a.ref)
+    y = x["y"]
+    assert isinstance(y, list)
+    assert y.ref is not None
+    assert y.ref.is_descended_from(x.ref)
+    y0 = y[0]
+    assert isinstance(y0, int)
+    assert y0.ref is not None
+    assert y0.ref.is_descended_from(y.ref)
+    y1 = y[1]
+    assert isinstance(y1, str)
+    assert y1.ref is not None
+    assert y1.ref.is_descended_from(y.ref)
+
+    # BoxedBool can't inherit from bool
+    y2 = y[2]
+    assert not isinstance(y2, bool)
+    assert y2.ref is not None
+    assert y2.ref.is_descended_from(y.ref)
+
+    y3 = y[3]
+    assert not isinstance(y2, type(None))
+    assert y3.ref is not None
+    assert y3.ref.is_descended_from(y.ref)

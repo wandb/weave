@@ -71,7 +71,7 @@ def get_scorer_attributes(
     if weave_isinstance(scorer, Scorer):
         scorer_name = scorer.name
         if scorer_name == None:
-            scorer_name = scorer._class_name
+            scorer_name = scorer.__class__.__name__
         try:
             score_fn = scorer.score
             summarize_fn = scorer.summarize  # type: ignore

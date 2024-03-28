@@ -406,7 +406,6 @@ def test_op_return_weave_obj(strict_op_saving, client):
         saved_code = f.read()
     print("SAVED_CODE")
     print(saved_code)
-    breakpoint()
 
 
 EXPECTED_TYPEDICT_ANNO_CODE = """import weave

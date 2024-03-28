@@ -51,11 +51,11 @@ class Op:
             raise OpCallError(f"Error calling {self.name}: {e}")
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
         parent_run = run_context.get_current_run()
-        trackable_inputs = client.save_nested_objects(inputs_with_defaults)
-        run = client.create_call(self, parent_run, trackable_inputs)
+        client.save_nested_objects(inputs_with_defaults)
+        run = client.create_call(self, parent_run, inputs_with_defaults)
         try:
             with run_context.current_run(run):
-                res = self.resolve_fn(**trackable_inputs)
+                res = self.resolve_fn(**inputs)
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
@@ -160,7 +160,7 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
 
 def _apply_fn_defaults_to_inputs(
     fn: typing.Callable, inputs: Mapping[str, typing.Any]
-) -> Mapping[str, typing.Any]:
+) -> dict[str, typing.Any]:
     inputs = {**inputs}
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():

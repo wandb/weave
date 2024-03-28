@@ -1,8 +1,12 @@
-import typing
+from typing import Optional, Iterator
+
+from weave.trace.refs import TableRef
 
 
 class Table:
-    def __init__(self, rows: typing.List) -> None:
+    ref: Optional[TableRef]
+
+    def __init__(self, rows: list) -> None:
         if not isinstance(rows, list):
             try:
                 import pandas as pd
@@ -17,6 +21,7 @@ class Table:
                 + str(type(rows))
             )
         self.rows = rows
+        self.ref = None
 
-    def __iter__(self) -> typing.Iterator:
+    def __iter__(self) -> Iterator:
         return iter(self.rows)
