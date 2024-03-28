@@ -688,6 +688,9 @@ def test_root_type(client):
     class BaseTypeA(weave.Object):
         a: int
 
+    class BaseTypeX(weave.Object):
+        x: int
+
     class BaseTypeB(BaseTypeA):
         b: int
 
@@ -695,11 +698,34 @@ def test_root_type(client):
         c: int
 
     c = BaseTypeC(a=1, b=2, c=3)
+    x = BaseTypeX(x=5)
+
+    ref = weave.publish(x)
+    x2 = weave.ref(ref.uri()).get()
+    assert x2.x == 5
 
     ref = weave.publish(c)
-
     c2 = weave.ref(ref.uri()).get()
 
     assert c2.a == 1
     assert c2.b == 2
     assert c2.c == 3
+
+    inner_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.objs) == 2
+
+    inner_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi._ObjectVersionFilter(
+                base_object_classes=["BaseTypeA"],
+            ),
+        )
+    )
+
+    assert len(inner_res.objs) == 1
