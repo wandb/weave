@@ -1,5 +1,5 @@
 import {useGridApiRef} from '@mui/x-data-grid-pro';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useContext, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import {Button} from '../../../../../Button';
@@ -14,6 +14,7 @@ type Data = Record<string, any>;
 type ObjectViewerSectionProps = {
   title: string;
   data: Data;
+  noHide?: boolean;
 };
 
 const TitleRow = styled.div`
@@ -66,6 +67,7 @@ const isSimpleData = (data: Data): boolean => {
 export const ObjectViewerSection = ({
   title,
   data,
+  noHide,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
   const [mode, setMode] = useState(
@@ -73,6 +75,7 @@ export const ObjectViewerSection = ({
   );
 
   const isOneValue = '_result' in data;
+  const baseRef = useContext(ObjectViewerSectionContext);
 
   const body = useMemo(() => {
     if (mode === 'collapsed' || mode === 'expanded') {
@@ -82,7 +85,9 @@ export const ObjectViewerSection = ({
           valueType: getValueType(data._result),
           isLeaf: true,
         };
-        return <ValueView data={oneResultData} isExpanded={true} />;
+        return (
+          <ValueView data={oneResultData} isExpanded={true} baseRef={baseRef} />
+        );
       }
       return (
         <ObjectViewer
@@ -102,7 +107,7 @@ export const ObjectViewerSection = ({
       );
     }
     return null;
-  }, [apiRef, mode, data, isOneValue]);
+  }, [mode, isOneValue, apiRef, data, baseRef]);
 
   const setTreeExpanded = useCallback(
     (isExpanded: boolean) => {
@@ -156,15 +161,22 @@ export const ObjectViewerSection = ({
           onClick={() => setMode('json')}
           tooltip="View as JSON"
         />
-        <Button
-          variant="quiet"
-          icon="hide-hidden"
-          active={mode === 'hidden'}
-          onClick={() => setMode('hidden')}
-          tooltip="Hide"
-        />
+        {!noHide && (
+          <Button
+            variant="quiet"
+            icon="hide-hidden"
+            active={mode === 'hidden'}
+            onClick={() => setMode('hidden')}
+            tooltip="Hide"
+          />
+        )}
       </TitleRow>
       {body}
     </>
   );
 };
+
+// Create a context that can be consumed by ObjectViewerSection
+export const ObjectViewerSectionContext = React.createContext<
+  string | undefined
+>(undefined);

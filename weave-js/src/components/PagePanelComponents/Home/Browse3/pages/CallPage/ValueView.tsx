@@ -1,7 +1,9 @@
-import React from 'react';
+import {Box} from '@material-ui/core';
+import React, {useMemo} from 'react';
 
 import {parseRef} from '../../../../../../react';
-import {SmallRef} from '../../../Browse2/SmallRef';
+import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
+import {WeaveCHTable, WeaveDataTable} from '../../../Browse2/WeaveEditors';
 import {isRef} from '../common/util';
 import {ValueViewNumber} from './ValueViewNumber';
 import {ValueViewPrimitive} from './ValueViewPrimitive';
@@ -12,13 +14,29 @@ type ValueData = Record<string, any>;
 type ValueViewProps = {
   data: ValueData;
   isExpanded: boolean;
+  baseRef?: string;
 };
 
-export const ValueView = ({data, isExpanded}: ValueViewProps) => {
+export const ValueView = ({data, isExpanded, baseRef}: ValueViewProps) => {
+  const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
     if (data.valueType === 'object' && '_ref' in data.value) {
       return <SmallRef objRef={parseRef(data.value._ref)} />;
     }
+    if (data.valueType === 'array') {
+      return (
+        // <Box
+        //   style={{
+        //     // minHeight: '400px',
+        //     // maxHeight: '400px',
+        //     width: '100%',
+        //     overflow: 'hidden',
+        //   }}>
+        <WeaveDataTable data={data.value} />
+        // </Box>
+      );
+    }
+    console.log(data);
     return null;
   }
 
@@ -29,6 +47,20 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     return <ValueViewPrimitive>null</ValueViewPrimitive>;
   }
   if (isRef(data.value)) {
+    if (
+      opDefRef &&
+      opDefRef.scheme === 'weave' &&
+      opDefRef.weaveKind === 'table'
+    ) {
+      console.log(data);
+      return (
+        <WeaveCHTable
+          tableRefUri={data.value}
+          path={data.path.path}
+          baseRef={baseRef}
+        />
+      );
+    }
     return <SmallRef objRef={parseRef(data.value)} />;
   }
 
