@@ -83,7 +83,6 @@ import {
 } from './constants';
 import {
   opNameToCategory,
-  opVersionRefOpCategory,
   refUriToOpVersionKey,
   typeNameToCategory,
 } from './utilities';
@@ -95,7 +94,6 @@ import {
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
-  OpCategory,
   OpVersionFilter,
   OpVersionKey,
   OpVersionSchema,

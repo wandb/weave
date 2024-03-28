@@ -16,11 +16,7 @@ import {callCache, objectVersionCache, refDataCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
-import {
-  opVersionRefOpCategory,
-  refUriToObjectVersionKey,
-  refUriToOpVersionKey,
-} from './utilities';
+import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -30,7 +26,6 @@ import {
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
-  OpCategory,
   OpVersionFilter,
   OpVersionKey,
   OpVersionSchema,
