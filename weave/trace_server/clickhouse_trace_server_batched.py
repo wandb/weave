@@ -111,7 +111,7 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 class ObjCHInsertable(BaseModel):
     project_id: str
     kind: str
-    object_root_weave_type: typing.Optional[str]
+    root_obj_type: typing.Optional[str]
     name: str
     refs: typing.List[str]
     val: str
@@ -125,7 +125,7 @@ class SelectableCHObjSchema(BaseModel):
     refs: typing.List[str]
     val: str
     kind: str
-    object_root_weave_type: typing.Optional[str]
+    root_obj_type: typing.Optional[str]
     digest: str
     version_index: int
     is_latest: int
@@ -341,7 +341,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             project_id=req_obj.project_id,
             name=req_obj.name,
             kind=get_kind(req.obj.val),
-            object_root_weave_type=get_object_root_weave_type(req.obj.val),
+            root_obj_type=get_root_obj_type(req.obj.val),
             refs=[],
             val=json_val,
             digest=digest,
@@ -1096,7 +1096,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,
         kind=ch_obj.kind,
-        object_root_weave_type=ch_obj.object_root_weave_type,
+        root_obj_type=ch_obj.root_obj_type,
         val=json.loads(ch_obj.val),
     )
 
@@ -1189,7 +1189,7 @@ def get_kind(val: typing.Any) -> str:
     return "object"
 
 
-def get_object_root_weave_type(val: typing.Any) -> typing.Optional[str]:
+def get_root_obj_type(val: typing.Any) -> typing.Optional[str]:
     if "_bases" in val:
         if isinstance(val["_bases"], list):
             if len(val["_bases"]) > 2:

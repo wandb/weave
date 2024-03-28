@@ -89,7 +89,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 name TEXT,
                 created_at TEXT,
                 kind TEXT,
-                object_root_weave_type TEXT,
+                root_obj_type TEXT,
                 refs TEXT,
                 val TEXT,
                 digest TEXT UNIQUE,
@@ -320,7 +320,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     name,
                     created_at,
                     kind,
-                    object_root_weave_type,
+                    root_obj_type,
                     refs,
                     val,
                     digest,
@@ -332,7 +332,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req_obj.name,
                     datetime.datetime.now().isoformat(),
                     get_kind(req_obj.val),
-                    get_object_root_weave_type(req_obj.val),
+                    get_root_obj_type(req_obj.val),
                     json.dumps([]),
                     json_val,
                     digest,
@@ -585,7 +585,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     name=row[1],
                     created_at=row[2],
                     kind=row[3],
-                    object_root_weave_type=row[4],
+                    root_obj_type=row[4],
                     val=json.loads(row[6]),
                     digest=row[7],
                     version_index=row[8],
@@ -617,7 +617,7 @@ def get_kind(val: Any) -> str:
     return "object"
 
 
-def get_object_root_weave_type(val: Any) -> Optional[str]:
+def get_root_obj_type(val: Any) -> Optional[str]:
     if "_bases" in val:
         if isinstance(val["_bases"], list):
             if len(val["_bases"]) > 2:

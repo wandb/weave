@@ -94,7 +94,7 @@ class ObjSchema(BaseModel):
     version_index: int
     is_latest: int
     kind: str
-    object_root_weave_type: typing.Optional[str]
+    root_obj_type: typing.Optional[str]
     val: typing.Any
 
 
