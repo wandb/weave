@@ -403,6 +403,7 @@ class WandbApi:
         """
         query DefaultEntity {
             viewer {
+                username
                 defaultEntity {
                     name
                 }
@@ -417,6 +418,14 @@ class WandbApi:
         except gql.transport.exceptions.TransportQueryError as e:
             return None
         return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
+
+    def username(self) -> typing.Optional[str]:
+        try:
+            result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
+        except gql.transport.exceptions.TransportQueryError as e:
+            return None
+
+        return result.get("viewer", {}).get("username", None)
 
 
 async def get_wandb_api() -> WandbApiAsync:

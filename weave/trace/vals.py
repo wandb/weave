@@ -5,7 +5,7 @@ import operator
 import typing
 
 from weave.trace.op import Op
-from weave.trace_server.refs import (
+from weave.trace.refs import (
     RefWithExtra,
     ObjectRef,
     TableRef,
@@ -362,8 +362,7 @@ def make_trace_obj(
         extra = val.extra
         read_res = server.obj_read(
             ObjReadReq(
-                entity=val.entity,
-                project=val.project,
+                project_id=f"{val.entity}/{val.project}",
                 name=val.name,
                 version_digest=val.version,
             )

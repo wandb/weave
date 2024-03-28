@@ -7,14 +7,14 @@ from weave import op_def, Evaluation
 
 from weave import weave_client
 from weave.trace.op import Op
-from weave.trace_server.refs import (
+from weave.trace.refs import (
     ATTRIBUTE_EDGE_TYPE,
     ID_EDGE_TYPE,
     INDEX_EDGE_TYPE,
     KEY_EDGE_TYPE,
 )
 
-from weave.trace_server import refs
+from weave.trace import refs
 from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
     TableCreateReq,

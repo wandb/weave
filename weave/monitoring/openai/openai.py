@@ -4,6 +4,7 @@ import functools
 from contextlib import contextmanager
 from functools import partialmethod
 from typing import Callable, Type, Union
+import typing
 
 import openai
 from openai import AsyncStream, Stream
@@ -11,6 +12,7 @@ from openai.types.chat import ChatCompletion
 from packaging import version
 
 from weave import graph_client_context, run_context
+from weave.trace.op import Op
 
 from ..monitor import _get_global_monitor
 from .models import *
@@ -18,6 +20,14 @@ from .util import *
 
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
+
+create_op_name = "openai.chat.completions.create"
+create_op: typing.Union[str, Op] = create_op_name
+try:
+    create_op = Op(old_create)
+    create_op.name = create_op_name
+except Exception as e:
+    pass
 
 
 class partialmethod_with_self(partialmethod):
@@ -39,7 +49,7 @@ class AsyncChatCompletions:
     async def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args).dict()
-        with log_run("openai.chat.completions.create", inputs) as finish_run:
+        with log_run(create_op, inputs) as finish_run:
             result = await self._base_create(*args, **kwargs)
             finish_run(result.model_dump(exclude_unset=True))
         return result
@@ -49,9 +59,7 @@ class AsyncChatCompletions:
     ) -> AsyncStream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run(
-            "openai.chat.completions.create", inputs.model_dump()
-        ) as finish_run:
+        with log_run(create_op, inputs.model_dump()) as finish_run:
             # Need to put in a function so the outer function is not a
             # generator. Generators don't execute any of their body's
             # code until next() is called. But we want to create the run
@@ -86,7 +94,7 @@ class ChatCompletions:
     def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args).dict()
-        with log_run("openai.chat.completions.create", inputs) as finish_run:
+        with log_run(create_op, inputs) as finish_run:
             result = self._base_create(*args, **kwargs)
             finish_run(result.model_dump(exclude_unset=True))
         return result
@@ -96,9 +104,7 @@ class ChatCompletions:
     ) -> Stream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
         inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run(
-            "openai.chat.completions.create", inputs.model_dump()
-        ) as finish_run:
+        with log_run(create_op, inputs.model_dump()) as finish_run:
 
             def _stream_create_gen():  # type: ignore
                 stream = self._base_create(*args, **kwargs)
@@ -159,7 +165,9 @@ def unpatch() -> None:
 
 # TODO: centralize
 @contextmanager
-def log_run(call_name: str, inputs: dict[str, Any]) -> Iterator[Callable]:
+def log_run(
+    call_name: typing.Union[str, Op], inputs: dict[str, Any]
+) -> Iterator[Callable]:
     client = graph_client_context.require_graph_client()
     parent_run = run_context.get_current_run()
     # TODO: client should not need refs passed in.

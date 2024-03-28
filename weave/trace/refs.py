@@ -1,10 +1,11 @@
 from typing import Union, Any
 import dataclasses
+from ..trace_server import refs_internal
 
-KEY_EDGE_TYPE = "key"
-INDEX_EDGE_TYPE = "ndx"
-ATTRIBUTE_EDGE_TYPE = "atr"
-ID_EDGE_TYPE = "id"
+KEY_EDGE_TYPE = refs_internal.KEY_EDGE_TYPE
+INDEX_EDGE_TYPE = refs_internal.INDEX_EDGE_TYPE
+ATTRIBUTE_EDGE_TYPE = refs_internal.ATTRIBUTE_EDGE_TYPE
+ID_EDGE_TYPE = refs_internal.ID_EDGE_TYPE
 
 
 @dataclasses.dataclass

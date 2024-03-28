@@ -31,7 +31,7 @@ from weave.trace_server.trace_server_interface import (
     _CallsFilter,
     _ObjectVersionFilter,
 )
-from weave.trace_server.refs import (
+from weave.trace.refs import (
     Ref,
     ObjectRef,
     TableRef,
@@ -261,8 +261,7 @@ class WeaveClient:
     def get(self, ref: ObjectRef) -> Any:
         read_res = self.server.obj_read(
             ObjReadReq(
-                entity=self.entity,
-                project=self.project,
+                project_id=self._project_id(),
                 name=ref.name,
                 version_digest=ref.version,
             )
@@ -395,7 +394,11 @@ class WeaveClient:
     # These are the old client interface terms, op_execute still relies
     # on them.
     def create_run(
-        self, op_name: str, parent_run: typing.Optional[Call], inputs: dict, refs: Any
+        self,
+        op_name: Union[str, Op],
+        parent_run: typing.Optional[Call],
+        inputs: dict,
+        refs: Any,
     ) -> Call:
         return self.create_call(op_name, parent_run, inputs)
 
@@ -460,6 +463,9 @@ class WeaveClient:
 
     def ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
+
+    def __repr__(self) -> str:
+        return ""
 
 
 def safe_current_wb_run_id() -> Optional[str]:
