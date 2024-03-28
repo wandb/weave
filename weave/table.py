@@ -1,6 +1,6 @@
 from typing import Optional, Iterator
 
-from weave.trace_server.refs import TableRef
+from weave.trace.refs import TableRef
 
 
 class Table:
