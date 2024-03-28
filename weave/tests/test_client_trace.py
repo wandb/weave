@@ -655,3 +655,50 @@ def test_trace_call_query_offset(client):
         )
 
         assert len(inner_res.calls) == exp_count
+
+
+def test_unknown_input_and_output_types(client):
+    class MyUnserializableClassA:
+        a_val: int
+
+        def __init__(self, a_val) -> None:
+            self.a_val = a_val
+
+    class MyUnserializableClassB:
+        b_val: int
+
+        def __init__(self, b_val) -> None:
+            self.b_val = b_val
+
+    @weave.op()
+    def op_with_unknown_types(
+        a: MyUnserializableClassA, b: int
+    ) -> MyUnserializableClassB:
+        return MyUnserializableClassB(a.a_val + b)
+
+    a = MyUnserializableClassA(3)
+    res = op_with_unknown_types(a, 0.14)
+    assert res.b_val == 3.14
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 1
+    assert inner_res.calls[0].inputs == {
+        "a": {
+            "_type": "UnknownUserType",
+            "type_name": "MyUnserializableClassA",
+            "repr": repr(a),
+        },
+        "b": 0.14,
+    }
+    assert inner_res.calls[0].outputs == {
+        "_result": {
+            "_type": "UnknownUserType",
+            "type_name": "MyUnserializableClassB",
+            "repr": repr(res),
+        }
+    }
