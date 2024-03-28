@@ -58,7 +58,6 @@ export const TrackedWandbLoader = ({
   onStart,
   ...props
 }: TrackedWandbLoaderProps) => {
-
   const trackFunction = (data: ProfileData) => {
     try {
       // log the lifecycle for each loader to segment
@@ -68,7 +67,7 @@ export const TrackedWandbLoader = ({
         duration: data.duration,
         ...additionalData,
       };
-      
+
       onComplete?.(name, trackedData);
 
       const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
