@@ -106,7 +106,7 @@ export const IconNames = {
   MicrophoneAudio: 'microphone-audio',
   MinimizeMode: 'minimize-mode',
   Model: 'model',
-  ModelFilled: 'model-filled',
+  ModelOnDark: 'model-on-dark',
   MusicAudio: 'music-audio',
   Number: 'number',
   OpenNewTab: 'open-new-tab',
