@@ -1,15 +1,11 @@
 import {Box} from '@material-ui/core';
-import React, {FC} from 'react';
+import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {
-  queryGetBoolean,
-  queryGetString,
-  queryToggleBoolean,
-} from '../../urlQueryUtil';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -23,6 +19,8 @@ export const CallPage: FC<{
   entity: string;
   project: string;
   callId: string;
+  showTraceTree?: boolean;
+  path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
 
@@ -63,22 +61,48 @@ const useCallTabs = (call: CallSchema) => {
 
 const CallPageInnerVertical: FC<{
   call: CallSchema;
-}> = ({call}) => {
+  showTraceTree?: boolean;
+  path?: string;
+}> = ({call, showTraceTree, path}) => {
   const history = useHistory();
-  const showTraceTree = queryGetBoolean(history, 'tracetree', true);
-  const onToggleTraceTree = () => {
-    queryToggleBoolean(history, 'tracetree', true);
-  };
+  const currentRouter = useWeaveflowCurrentRouteContext();
 
-  const path = queryGetString(history, 'path');
-  const {rows, selectedCall, expandKeys, loading} = useCallFlattenedTraceTree(
-    call,
-    path
-  );
+  const onToggleTraceTree = useCallback(() => {
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        !showTraceTree
+      )
+    );
+  }, [
+    call.callId,
+    call.entity,
+    call.project,
+    call.traceId,
+    currentRouter,
+    history,
+    path,
+    showTraceTree,
+  ]);
+
+  const tree = useCallFlattenedTraceTree(call, path ?? null);
+  const {rows, expandKeys, loading} = tree;
+  let {selectedCall} = tree;
+
+  const assumeCallIsSelectedCall = path == null || path === '';
+
+  if (assumeCallIsSelectedCall) {
+    // Allows us to bypass the loading state when the call is already selected.
+    selectedCall = call;
+  }
 
   const callTabs = useCallTabs(selectedCall);
 
-  if (loading) {
+  if (loading && !assumeCallIsSelectedCall) {
     return <Loader active />;
   }
 
@@ -101,12 +125,17 @@ const CallPageInnerVertical: FC<{
       isSidebarOpen={showTraceTree}
       headerContent={<CallOverview call={selectedCall} />}
       leftSidebar={
-        <CallTraceView
-          call={call}
-          selectedCall={selectedCall}
-          rows={rows}
-          forcedExpandKeys={expandKeys}
-        />
+        loading ? (
+          <Loader active />
+        ) : (
+          <CallTraceView
+            call={call}
+            selectedCall={selectedCall}
+            rows={rows}
+            forcedExpandKeys={expandKeys}
+            path={path}
+          />
+        )
       }
       tabs={callTabs}
     />

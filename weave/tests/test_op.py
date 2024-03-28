@@ -23,9 +23,6 @@ def op_simple(a, b):
     return str(a) + str(b)
 
 
-_context_state.clear_loading_built_ins(_loading_builtins_token)
-
-
 def test_op_simple():
     x = op_simple(3, 4)
     assert str(x) == "op_simple(3, 4)"
@@ -48,6 +45,9 @@ def op_inferredtype(a: int, b: int) -> str:
     return str(a) + str(b)
 
 
+_context_state.clear_loading_built_ins(_loading_builtins_token)
+
+
 def test_op_inferred_type():
     assert op_inferredtype.input_type.arg_types == {
         "a": types.Int(),
@@ -59,45 +59,78 @@ def test_op_inferred_type():
 def test_op_incompatible_return_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
 
-        @weave.op(output_type=types.Int())
-        def op_invalid_returntype(a: int, b: int) -> str:
-            return str(a) + str(b)
+        _t = _context_state.set_loading_built_ins()
+
+        try:
+
+            @weave.op(output_type=types.Int())
+            def op_invalid_returntype(a: int, b: int) -> str:
+                return str(a) + str(b)
+
+        finally:
+            _context_state.clear_loading_built_ins(_t)
 
 
 def test_op_incompatible_input_arg_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
+        _t = _context_state.set_loading_built_ins()
 
-        @weave.op(
-            input_type={"a": types.String(), "b": types.Int()}, output_type=types.Int()
-        )
-        def op_invalid_input_arg_type(a: int, b: int) -> str:
-            return str(a) + str(b)
+        try:
+
+            @weave.op(
+                input_type={"a": types.String(), "b": types.Int()},
+                output_type=types.Int(),
+            )
+            def op_invalid_input_arg_type(a: int, b: int) -> str:
+                return str(a) + str(b)
+
+        finally:
+            _context_state.clear_loading_built_ins(_t)
 
 
 def test_op_too_few_input_arg_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
+        _t = _context_state.set_loading_built_ins()
 
-        @weave.op(input_type={"a": types.Int()}, output_type=types.Int())
-        def op_invalid_too_few(a: int, b: int) -> str:
-            return str(a) + str(b)
+        try:
+
+            @weave.op(input_type={"a": types.Int()}, output_type=types.Int())
+            def op_invalid_too_few(a: int, b: int) -> str:
+                return str(a) + str(b)
+
+        finally:
+            _context_state.clear_loading_built_ins(_t)
 
 
 def test_op_too_many_input_arg_type():
     with pytest.raises(weave.errors.WeaveDefinitionError):
+        _t = _context_state.set_loading_built_ins()
 
-        @weave.op(
-            input_type={"a": types.Int(), "b": types.Int(), "c": types.Int()},
-        )
-        def op_invalid_too_many(a: int, b: int) -> str:
-            return str(a) + str(b)
+        try:
+
+            @weave.op(
+                input_type={"a": types.Int(), "b": types.Int(), "c": types.Int()},
+            )
+            def op_invalid_too_many(a: int, b: int) -> str:
+                return str(a) + str(b)
+
+        finally:
+            _context_state.clear_loading_built_ins(_t)
 
 
 def test_op_callable_output_type_and_return_type_declared():
     with pytest.raises(weave.errors.WeaveDefinitionError):
+        _t = _context_state.set_loading_built_ins()
+        try:
 
-        @weave.op(input_type={"a": types.Int()}, output_type=lambda a: types.String())
-        def op_callable_output_type_and_return_type_declared(a: int) -> str:
-            return str(a)
+            @weave.op(
+                input_type={"a": types.Int()}, output_type=lambda a: types.String()
+            )
+            def op_callable_output_type_and_return_type_declared(a: int) -> str:
+                return str(a)
+
+        finally:
+            _context_state.clear_loading_built_ins(_t)
 
 
 def test_op_no_arg_type():
@@ -132,19 +165,31 @@ def test_op_no_return_type():
 
 
 def test_op_inferred_list_return():
-    @weave.op()
-    def op_under_test(a: int) -> list[int]:
-        return [a, 2 * a, 3 * a]
+    _t = _context_state.set_loading_built_ins()
+    try:
+
+        @weave.op()
+        def op_under_test(a: int) -> list[int]:
+            return [a, 2 * a, 3 * a]
+
+    finally:
+        _context_state.clear_loading_built_ins(_t)
 
     assert op_under_test.concrete_output_type == types.List(types.Int())
 
 
 def test_op_inferred_typeddict_return():
-    @weave.op()
-    def op_test_op_inferred_typeddict_return_op(
-        a: int,
-    ) -> typing.TypedDict("OpReturn", {"x": int, "y": str}):
-        return {"a": 1, "y": "x"}
+    _t = _context_state.set_loading_built_ins()
+    try:
+
+        @weave.op()
+        def op_test_op_inferred_typeddict_return_op(
+            a: int,
+        ) -> typing.TypedDict("OpReturn", {"x": int, "y": str}):
+            return {"a": 1, "y": "x"}
+
+    finally:
+        _context_state.clear_loading_built_ins(_t)
 
     assert (
         op_test_op_inferred_typeddict_return_op.concrete_output_type
@@ -153,11 +198,17 @@ def test_op_inferred_typeddict_return():
 
 
 def test_op_inferred_list_typeddict_return():
-    @weave.op()
-    def op_inferred_list_typeddict_return(
-        a: int,
-    ) -> list[typing.TypedDict("OpReturn", {"x": int, "y": str})]:
-        return [{"a": 1, "y": "x"}]
+    _t = _context_state.set_loading_built_ins()
+    try:
+
+        @weave.op()
+        def op_inferred_list_typeddict_return(
+            a: int,
+        ) -> list[typing.TypedDict("OpReturn", {"x": int, "y": str})]:
+            return [{"a": 1, "y": "x"}]
+
+    finally:
+        _context_state.clear_loading_built_ins(_t)
 
     assert op_inferred_list_typeddict_return.concrete_output_type == types.List(
         types.TypedDict({"x": types.Int(), "y": types.String()})
@@ -165,9 +216,15 @@ def test_op_inferred_list_typeddict_return():
 
 
 def test_op_inferred_dict_return() -> None:
-    @weave.op()
-    def op_inferred_dict_return(a: int) -> dict[str, list[int]]:
-        return {"a": [5]}
+    _t = _context_state.set_loading_built_ins()
+    try:
+
+        @weave.op()
+        def op_inferred_dict_return(a: int) -> dict[str, list[int]]:
+            return {"a": [5]}
+
+    finally:
+        _context_state.clear_loading_built_ins(_t)
 
     assert op_inferred_dict_return.concrete_output_type == types.Dict(
         types.String(), types.List(types.Int())
@@ -178,11 +235,17 @@ def test_op_method_inferred_self():
     class SomeWeaveType(types.Type):
         name = "SomeWeaveType"
 
-    @weave.weave_class(weave_type=SomeWeaveType)
-    class SomeWeaveObj:
-        @weave.op()
-        def my_op(self, a: int) -> str:  # type: ignore[empty-body]
-            pass
+    _t = _context_state.set_loading_built_ins()
+    try:
+
+        @weave.weave_class(weave_type=SomeWeaveType)
+        class SomeWeaveObj:
+            @weave.op()
+            def my_op(self, a: int) -> str:  # type: ignore[empty-body]
+                pass
+
+    finally:
+        _context_state.clear_loading_built_ins(_t)
 
     assert SomeWeaveObj.my_op.input_type.arg_types == {
         "self": SomeWeaveType(),

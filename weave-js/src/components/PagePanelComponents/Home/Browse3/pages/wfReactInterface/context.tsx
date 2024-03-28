@@ -16,7 +16,7 @@ import {tsWFDataModelHooks} from './tsDataModelHooks';
 import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
 
 //  Set this to `true` once the trace server supports objects
-const TRACE_SERVER_SUPPORTS_OBJECTS = false;
+const TRACE_SERVER_SUPPORTS_OBJECTS = true;
 
 const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
   null
@@ -55,9 +55,15 @@ const WFDataModelFromTraceServerCallsOnlyProvider: FC = ({children}) => {
       useOpVersions: cgWFDataModelHooks.useOpVersions,
       useObjectVersion: cgWFDataModelHooks.useObjectVersion,
       useRootObjectVersions: cgWFDataModelHooks.useRootObjectVersions,
+      useRefsData: cgWFDataModelHooks.useRefsData,
+      useApplyMutationsToRef: cgWFDataModelHooks.useApplyMutationsToRef,
+      useFileContent: cgWFDataModelHooks.useFileContent,
       derived: {
         useChildCallsForCompare:
           tsWFDataModelHooks.derived.useChildCallsForCompare,
+        useGetRefsType: cgWFDataModelHooks.derived.useGetRefsType,
+        useRefsType: cgWFDataModelHooks.derived.useRefsType,
+        useCodeForOpRef: cgWFDataModelHooks.derived.useCodeForOpRef,
       },
     };
   }, []);
@@ -72,7 +78,8 @@ export const WFDataModelAutoProvider: FC<{
   entityName: string;
   projectName: string;
 }> = ({entityName, projectName, children}) => {
-  const hasTSData = useProjectHasTraceServerCalls(entityName, projectName);
+  // const { result: hasTSData } = useProjectHasTraceServerData(entityName, projectName);
+  const hasTSData = true;
 
   if (hasTSData) {
     if (TRACE_SERVER_SUPPORTS_OBJECTS) {
@@ -97,7 +104,7 @@ export const WFDataModelAutoProvider: FC<{
 
 /**
  * Returns true if the client can connect to trace server and the project has
- * data in the trace server.
+ * calls.
  */
 export const useProjectHasTraceServerCalls = (
   entity: string,
@@ -107,6 +114,38 @@ export const useProjectHasTraceServerCalls = (
   const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
     skip: !hasTraceServer,
   });
+  const loading = calls.loading;
+  return {
+    loading,
+    result: (calls.result ?? []).length > 0,
+  };
+};
 
-  return (calls.result ?? []).length > 0;
+/**
+ * Returns true if the client can connect to trace server and the project has
+ * objects or calls.
+ */
+export const useProjectHasTraceServerData = (
+  entity: string,
+  project: string
+) => {
+  const hasTraceServer = useHasTraceServerClientContext();
+  const objs = tsWFDataModelHooks.useRootObjectVersions(
+    entity,
+    project,
+    {},
+    1,
+    {
+      skip: !hasTraceServer,
+    }
+  );
+
+  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
+    skip: !hasTraceServer,
+  });
+  const loading = objs.loading || calls.loading;
+  return {
+    loading,
+    result: (objs.result ?? []).length > 0 || (calls.result ?? []).length > 0,
+  };
 };

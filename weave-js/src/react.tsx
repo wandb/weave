@@ -457,12 +457,14 @@ export const useValue = <T extends Type>(
 };
 
 interface LocalArtifactRef {
+  scheme: 'local-artifact';
   artifactName: string;
   artifactVersion: string;
   artifactPath: string;
 }
 
 export interface WandbArtifactRef {
+  scheme: 'wandb-artifact';
   entityName: string;
   projectName: string;
   artifactName: string;
@@ -471,16 +473,30 @@ export interface WandbArtifactRef {
   artifactRefExtra?: string;
 }
 
+export interface WeaveObjectRef {
+  scheme: 'weave';
+  entityName: string;
+  projectName: string;
+  weaveKind: 'object' | 'op' | 'table';
+  artifactName: string;
+  artifactVersion: string;
+  artifactRefExtra?: string;
+}
+
 export type ArtifactRef = LocalArtifactRef | WandbArtifactRef;
 
-export type ObjectRef = ArtifactRef & {
+type ArtifactObjectRef = ArtifactRef & {
   artifactRefExtra?: string;
 };
 
-export const isWandbArtifactRef = (
-  ref: ArtifactRef
-): ref is WandbArtifactRef => {
-  return 'entityName' in ref;
+export type ObjectRef = ArtifactObjectRef | WeaveObjectRef;
+
+export const isWandbArtifactRef = (ref: ObjectRef): ref is WandbArtifactRef => {
+  return ref.scheme === 'wandb-artifact';
+};
+
+export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
+  return ref.scheme === 'weave';
 };
 
 export const parseRef = (ref: string): ObjectRef => {
@@ -489,11 +505,13 @@ export const parseRef = (ref: string): ObjectRef => {
 
   const isWandbArtifact = url.protocol.startsWith('wandb-artifact');
   const isLocalArtifact = url.protocol.startsWith('local-artifact');
-
+  const isWeaveRef = url.protocol.startsWith('weave');
   if (isWandbArtifact) {
     splitLimit = 4;
   } else if (isLocalArtifact) {
     splitLimit = 2;
+  } else if (isWeaveRef) {
+    splitLimit = 4;
   } else {
     throw new Error(`Unknown protocol: ${url.protocol}`);
   }
@@ -508,6 +526,7 @@ export const parseRef = (ref: string): ObjectRef => {
     const [entityName, projectName, artifactId, artifactPathPart] = splitUri;
     const [artifactNamePart, artifactVersion] = artifactId.split(':', 2);
     return {
+      scheme: 'wandb-artifact',
       entityName,
       projectName,
       artifactName: artifactNamePart,
@@ -515,21 +534,93 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactPath: artifactPathPart,
       artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
     };
-  }
+  } else if (isLocalArtifact) {
+    const [artifactName, artifactPath] = splitUri;
+    return {
+      scheme: 'local-artifact',
+      artifactName,
+      artifactVersion: 'latest',
+      artifactPath,
+    };
+  } else if (isWeaveRef) {
+    const [
+      entityName,
+      projectName,
+      weaveKind,
+      artifactNameAndVersion,
+      ...refExtraParts
+    ] = url.pathname.replace(/^\/+/, '').split('/');
 
-  const [artifactName, artifactPath] = splitUri;
+    if (!['object', 'op', 'table'].includes(weaveKind)) {
+      throw new Error('Invalid uri: ' + ref + '. got: ' + weaveKind);
+    }
+
+    // const [artifactId, artifactRefExtra] = artifactIdAndExtra.split('/', 2);
+    let [artifactNamePart, artifactVersion] = artifactNameAndVersion.split(
+      ':',
+      2
+    );
+    if (weaveKind === 'table') {
+      if (artifactVersion != null && artifactVersion !== '') {
+        throw new Error('Invalid uri: ' + ref + '. got: ' + artifactVersion);
+      }
+      artifactVersion = artifactNamePart;
+      artifactNamePart = '';
+    }
+    return {
+      scheme: 'weave',
+      entityName,
+      projectName,
+      weaveKind: weaveKind as 'object' | 'op' | 'table',
+      artifactName: artifactNamePart,
+      artifactVersion,
+      artifactRefExtra: refExtraParts.join('/'),
+    };
+  }
+  throw new Error(`Unknown protocol: ${url.protocol}`);
+};
+
+export const objectRefWithExtra = (
+  objRef: ObjectRef,
+  extra: string
+): ObjectRef => {
+  let newExtra = '';
+  if (objRef.artifactRefExtra != null && objRef.artifactRefExtra !== '') {
+    newExtra = objRef.artifactRefExtra + '/';
+  }
+  newExtra += extra;
   return {
-    artifactName,
-    artifactVersion: 'latest',
-    artifactPath,
+    ...objRef,
+    artifactRefExtra: newExtra,
   };
 };
 
-export const refUri = (ref: ArtifactRef): string => {
+export const refUri = (ref: ObjectRef): string => {
   if (isWandbArtifactRef(ref)) {
     let uri = `wandb-artifact:///${ref.entityName}/${ref.projectName}/${ref.artifactName}:${ref.artifactVersion}`;
     if (ref.artifactPath) {
       uri = `${uri}/${ref.artifactPath}`;
+      if (ref.artifactRefExtra) {
+        uri = `${uri}#${ref.artifactRefExtra}`;
+      }
+    }
+    return uri;
+  } else if (isWeaveObjectRef(ref)) {
+    let name = `${ref.artifactName}:${ref.artifactVersion}`;
+    if (ref.artifactName === '' && ref.weaveKind === 'table') {
+      name = ref.artifactVersion;
+    }
+    let uri = `weave:///${ref.entityName}/${ref.projectName}/${ref.weaveKind}/${name}`;
+    if (ref.artifactRefExtra != null && ref.artifactRefExtra !== '') {
+      if (ref.artifactRefExtra.startsWith('/')) {
+        // UGG Why does this happen???
+        uri = `${uri}${ref.artifactRefExtra}`;
+      } else {
+        uri = `${uri}/${ref.artifactRefExtra}`;
+      }
+    }
+    if (uri.endsWith('/')) {
+      uri = uri.slice(0, -1);
     }
     return uri;
   } else {

@@ -8,15 +8,14 @@ hide_table_of_contents: true
 A `Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
 
 To create a model in Weave, you need the following:
-- `@weave.type` decorator on a class that inherits from `weaveflow.Model`
+- a class that inherits from `weave.Model`
 - type definitions on all attributes
 - a typed `predict` function with `@weave.op()` decorator
 
 ```python
-from weave.weaveflow import Model
+from weave import Model
 import weave
 
-@weave.type()
 class YourModel(Model):
     attribute1: str
     attribute2: int
@@ -33,7 +32,7 @@ You can call the model as usual with:
 import weave
 weave.init('project-name')
 
-model = YourModel('hello', 5)
+model = YourModel(attribute1='hello', attribute2=5)
 model.predict('world')
 ```
 
@@ -49,7 +48,7 @@ For example, here we create a new model:
 import weave
 weave.init('project-name')
 
-model = YourModel('howdy', 10)
+model = YourModel(attribute1='howdy', attribute2=10)
 model.predict('world')
 ```
 

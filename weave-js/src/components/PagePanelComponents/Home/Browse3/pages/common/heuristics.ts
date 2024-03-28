@@ -1,0 +1,12 @@
+const PREDICT_AND_SCORE_OP_NAME_PRE_PYDANTIC = 'Evaluation-predict_and_score';
+const PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC = 'predict_and_score';
+const EVALUATE_OP_NAME_PRE_PYDANTIC = 'Evaluation-evaluate';
+const EVALUATE_OP_NAME_POST_PYDANTIC = 'evaluate';
+
+export const isPredictAndScoreOp = (opName: string) =>
+  opName === PREDICT_AND_SCORE_OP_NAME_PRE_PYDANTIC ||
+  opName === PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC;
+
+export const isEvaluateOp = (opName: string) =>
+  opName === EVALUATE_OP_NAME_PRE_PYDANTIC ||
+  opName === EVALUATE_OP_NAME_POST_PYDANTIC;

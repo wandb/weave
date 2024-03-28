@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
+import {Alert} from '../../../../../Alert';
 import {CategoryChip} from '../common/CategoryChip';
 import {CallId, opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
@@ -26,6 +27,11 @@ export const CallName = styled.div`
 `;
 CallName.displayName = 'S.CallName';
 
+const Exception = styled.span`
+  font-weight: 600;
+`;
+Exception.displayName = 'S.Exception';
+
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
@@ -46,11 +52,18 @@ export const CallOverview: React.FC<{
   const statusCode = call.rawSpan.status_code;
 
   return (
-    <Overview>
-      <CallName>{opName}</CallName>
-      <CallId>{truncatedId}</CallId>
-      {opCategory && <CategoryChip value={opCategory} />}
-      <StatusChip value={statusCode} iconOnly />
-    </Overview>
+    <>
+      <Overview>
+        <CallName>{opName}</CallName>
+        <CallId>{truncatedId}</CallId>
+        {opCategory && <CategoryChip value={opCategory} />}
+        <StatusChip value={statusCode} iconOnly />
+      </Overview>
+      {call.rawSpan.exception && (
+        <Alert severity="error">
+          <Exception>Exception:</Exception> {call.rawSpan.exception}
+        </Alert>
+      )}
+    </>
   );
 };

@@ -8,17 +8,10 @@ import {
   Grid,
   Typography,
 } from '@mui/material';
-import {useWeaveContext} from '@wandb/weave/context';
-import {constString, opGet} from '@wandb/weave/core';
 import React, {FC, useCallback, useState} from 'react';
 
+import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {Link} from './CommonLib';
-import {
-  mutationAppend,
-  mutationPublishArtifact,
-  weaveGet,
-  weaveObject,
-} from './easyWeave';
 import {ObjectEditor, useObjectEditorState} from './ObjectEditor';
 import {ChosenObjectNameOption, ObjectNamePicker} from './ObjectPicker';
 import {ProjectNamePicker} from './ProjectPicker';
@@ -36,7 +29,6 @@ export const AddRowToTable: FC<{
   handleClose: () => void;
   initialFormState: AddRowToPaneFormState;
 }> = ({entityName, open, handleClose, initialFormState}) => {
-  const weave = useWeaveContext();
   const [projectName, setProjectName] = useState<string | null>(
     initialFormState.projectName ?? null
   );
@@ -58,39 +50,24 @@ export const AddRowToTable: FC<{
     'idle' | 'addingRow' | 'publishing' | 'done'
   >('idle');
   const [newUri, setNewUri] = useState<string | null>(null);
+  const {useApplyMutationsToRef} = useWFHooks();
+  const applyMutationsToRef = useApplyMutationsToRef();
   const addRowToDataset = useCallback(async () => {
     if (projectName && datasetName) {
       setWorking('addingRow');
-
-      const datasetRowsNode = weaveGet(
-        // Dataset object we are appending to
-        `wandb-artifact:///${entityName}/${projectName}/${datasetName.name}:latest/obj`,
-        // Default value if the dataset doesn't exist
-        weaveObject('Dataset', {rows: []})
-      ).getAttr('rows');
-
-      const workingRootUri = await mutationAppend(weave, datasetRowsNode, row);
-      setWorking('publishing');
-
-      // Returns final root uri if we need it.
-      const finalRootUri = await mutationPublishArtifact(
-        weave,
-        // Local branch
-        opGet({uri: constString(workingRootUri)}),
-        // Target branch
-        entityName,
-        projectName,
-        datasetName.name
-      );
-
-      // if ((orm?.projectConnection as WFNaiveProject).reload) {
-      //   await (orm!.projectConnection as WFNaiveProject).reload();
-      // }
-
+      // Note: this is not necessarily correct when we move to the new object
+      // server - we may need to use a different ref type
+      const refUri = `wandb-artifact:///${entityName}/${projectName}/${datasetName.name}:latest/obj#atr/rows`;
+      const finalRootUri = await applyMutationsToRef(refUri, [
+        {
+          type: 'append',
+          newValue: row,
+        },
+      ]);
       setNewUri(finalRootUri);
       setWorking('done');
     }
-  }, [datasetName, entityName, projectName, row, weave]);
+  }, [applyMutationsToRef, datasetName, entityName, projectName, row]);
 
   const handleSubmit = useCallback(() => {
     addRowToDataset();

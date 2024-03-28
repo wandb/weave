@@ -1,10 +1,10 @@
-import {PivotTableChart} from '@mui/icons-material';
+// import {PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
   Chip,
   FormControl,
-  IconButton,
+  // IconButton,
   ListItem,
   ListItemButton,
   ListItemText,
@@ -15,6 +15,7 @@ import React, {FC, useCallback, useMemo} from 'react';
 
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
+import {isEvaluateOp} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
@@ -63,7 +64,7 @@ export const CallsPage: FC<{
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
       const niceName = opNiceName(opName);
-      if (niceName === 'Evaluation-evaluate') {
+      if (isEvaluateOp(niceName)) {
         // Very special case for now
         if (filter.isPivot) {
           return 'Evaluation Leaderboard';
@@ -176,20 +177,21 @@ export const CallsTable: FC<{
   const traceRootOptions = [true, false];
 
   const userEnabledPivot = effectiveFilter.isPivot ?? false;
-  const setUserEnabledPivot = useCallback(
-    (enabled: boolean) => {
-      setFilter({
-        ...filter,
-        isPivot: enabled,
-        // Reset the pivot dims when disabling pivot
-        pivotSpec:
-          filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
-            ? undefined
-            : filter.pivotSpec,
-      });
-    },
-    [filter, setFilter]
-  );
+  // TODO: Decide if we want to expose pivot or remove.
+  // const setUserEnabledPivot = useCallback(
+  //   (enabled: boolean) => {
+  //     setFilter({
+  //       ...filter,
+  //       isPivot: enabled,
+  //       // Reset the pivot dims when disabling pivot
+  //       pivotSpec:
+  //         filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
+  //           ? undefined
+  //           : filter.pivotSpec,
+  //     });
+  //   },
+  //   [filter, setFilter]
+  // );
   const setPivotDims = useCallback(
     (spec: Partial<WFHighLevelPivotSpec>) => {
       if (
@@ -214,10 +216,7 @@ export const CallsTable: FC<{
     );
     // Super restrictive for now - just showing pivot when
     // there is only one span name and it is the evaluation.
-    return (
-      shownSpanNames.length === 1 &&
-      shownSpanNames[0].includes('Evaluation-evaluate')
-    );
+    return shownSpanNames.length === 1 && isEvaluateOp(shownSpanNames[0]);
   }, [calls.result]);
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
@@ -238,6 +237,13 @@ export const CallsTable: FC<{
     traceRootOptions.length <= 1 ||
     Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly');
 
+  const callsKey = useMemo(() => {
+    if (calls.loading || calls.result == null) {
+      return null;
+    }
+    return Math.random();
+  }, [calls.loading, calls.result]);
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -254,7 +260,7 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <>
-          <IconButton
+          {/* <IconButton
             style={{width: '37px', height: '37px'}}
             size="small"
             color={userEnabledPivot ? 'primary' : 'default'}
@@ -263,7 +269,7 @@ export const CallsTable: FC<{
               setUserEnabledPivot(!userEnabledPivot);
             }}>
             <PivotTableChart />
-          </IconButton>
+          </IconButton> */}
 
           <ListItem sx={{width: '190px', flex: '0 0 190px'}}>
             <FormControl fullWidth>
@@ -303,7 +309,7 @@ export const CallsTable: FC<{
                   isPivoting ||
                   Object.keys(props.frozenFilter ?? {}).includes('opVersions')
                 }
-                value={opVersion ? opVersionRef : null}
+                value={opVersionRef}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
@@ -386,7 +392,7 @@ export const CallsTable: FC<{
                   traceRootsOnly: !effectiveFilter.traceRootsOnly,
                 });
               }}>
-              <ListItemText primary="Roots Only" />
+              <ListItemText primary="Roots only" />
             </ListItemButton>
           </ListItem>
         </>
@@ -407,6 +413,7 @@ export const CallsTable: FC<{
         />
       ) : (
         <RunsTable
+          key={callsKey}
           loading={calls.loading}
           spans={calls.result ?? []}
           clearFilters={clearFilters}
@@ -494,17 +501,19 @@ const useOpVersionOptions = (
       });
     });
 
-    _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
-      ov => {
-        const ref = opVersionKeyToRefUri(ov);
-        result.push({
-          title: opNiceName(ov.opId) + ':v' + ov.versionIndex,
-          ref,
-          group: `Versions of ${opNiceName(currentOpId!)}`,
-          objectVersion: ov,
-        });
-      }
-    );
+    if (currentOpId) {
+      _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
+        ov => {
+          const ref = opVersionKeyToRefUri(ov);
+          result.push({
+            title: opNiceName(ov.opId) + ':v' + ov.versionIndex,
+            ref,
+            group: `Versions of ${opNiceName(currentOpId)}`,
+            objectVersion: ov,
+          });
+        }
+      );
+    }
 
     return _.fromPairs(result.map(r => [r.ref, r]));
   }, [currentOpId, currentVersions.result, latestVersions.result]);

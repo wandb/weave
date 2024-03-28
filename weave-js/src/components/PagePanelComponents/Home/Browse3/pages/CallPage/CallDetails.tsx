@@ -1,13 +1,13 @@
 import {Box} from '@material-ui/core';
 import {Typography} from '@mui/material';
 import _ from 'lodash';
-import React, {FC, useMemo} from 'react';
+import React, {FC, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
-import {useWeaveflowRouteContext} from '../../context';
+import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {CallsTable} from '../CallsPage/CallsPage';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
@@ -70,6 +70,7 @@ export const CallDetails: FC<{
     [childCalls.loading, childCalls.result]
   );
   const {baseRouter} = useWeaveflowRouteContext();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
   const history = useHistory();
 
   return (
@@ -123,6 +124,27 @@ export const CallDetails: FC<{
           const onClick = () => {
             history.push(multipleChildURL);
           };
+
+          let callsTable = (
+            <CallsTable
+              hideControls
+              ioColumnsOnly
+              initialFilter={{
+                opVersionRefs: [opVersionRef],
+                parentId: call.callId,
+              }}
+              entity={call.entity}
+              project={call.project}
+            />
+          );
+          if (isPeeking) {
+            callsTable = (
+              <ButtonOverlay url={multipleChildURL} text="Click to view table">
+                {callsTable}
+              </ButtonOverlay>
+            );
+          }
+
           return (
             <Box
               key={opVersionRef}
@@ -163,20 +185,7 @@ export const CallDetails: FC<{
                   flex: '1 1 auto',
                   overflow: 'hidden',
                 }}>
-                <ButtonOverlay
-                  url={multipleChildURL}
-                  text="Click to view table">
-                  <CallsTable
-                    hideControls
-                    ioColumnsOnly
-                    initialFilter={{
-                      opVersionRefs: [opVersionRef],
-                      parentId: call.callId,
-                    }}
-                    entity={call.entity}
-                    project={call.project}
-                  />
-                </ButtonOverlay>
+                {callsTable}
               </Box>
             </Box>
           );

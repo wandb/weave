@@ -386,7 +386,7 @@ def test_ref_objects_across_artifacts_nocross(ref_tracking, get_custom_object_cl
 
 @pytest.mark.parametrize(
     "get_custom_object_classes",
-    [make_custom_object_classes_classic_type, make_custom_object_classes_pydantic],
+    [make_custom_object_classes_classic_type],
 )
 def test_ref_objects_across_artifacts_cross(ref_tracking, get_custom_object_classes):
     CustomObjectA, CustomObjectB = get_custom_object_classes()

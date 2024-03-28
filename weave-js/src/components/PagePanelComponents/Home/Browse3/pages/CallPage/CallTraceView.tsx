@@ -11,7 +11,6 @@ import styled from 'styled-components';
 import {Button} from '../../../../../Button';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
-import {querySetBoolean, querySetString} from '../../urlQueryUtil';
 import {CallStatusType} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -50,7 +49,8 @@ export const CallTraceView: FC<{
   selectedCall: CallSchema;
   rows: Row[];
   forcedExpandKeys: Set<string>;
-}> = ({call, selectedCall, rows, forcedExpandKeys}) => {
+  path?: string;
+}> = ({call, selectedCall, rows, forcedExpandKeys, path}) => {
   const apiRef = useGridApiRef();
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
@@ -112,15 +112,32 @@ export const CallTraceView: FC<{
             rowCall.project,
             '',
             rowCall.callId,
-            ''
+            '',
+            true
           )
         );
       } else {
         // Browse within selected call
-        querySetString(history, 'path', params.row.path);
+        history.replace(
+          currentRouter.callUIUrl(
+            call.entity,
+            call.project,
+            call.traceId,
+            call.callId,
+            params.row.path,
+            true
+          )
+        );
       }
     },
-    [currentRouter, history]
+    [
+      call.callId,
+      call.entity,
+      call.project,
+      call.traceId,
+      currentRouter,
+      history,
+    ]
   );
   const onRowDoubleClick: DataGridProProps['onRowDoubleClick'] = useCallback(
     params => {
@@ -168,6 +185,7 @@ export const CallTraceView: FC<{
   const sx: DataGridProProps['sx'] = useMemo(
     () => ({
       border: 0,
+      fontFamily: 'Source Sans Pro',
       '&>.MuiDataGrid-main': {
         '& div div div div >.MuiDataGrid-cell': {
           borderBottom: 'none',
@@ -210,9 +228,26 @@ export const CallTraceView: FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiRef, callId]);
 
-  const onCloseTraceTree = () => {
-    querySetBoolean(history, 'tracetree', false);
-  };
+  const onCloseTraceTree = useCallback(() => {
+    history.replace(
+      currentRouter.callUIUrl(
+        call.entity,
+        call.project,
+        call.traceId,
+        call.callId,
+        path,
+        false
+      )
+    );
+  }, [
+    call.callId,
+    call.entity,
+    call.project,
+    call.traceId,
+    path,
+    currentRouter,
+    history,
+  ]);
 
   // This is used because when we first load the trace view in a drawer, the animation cant handle all the rows
   // so we delay for the first render
@@ -227,7 +262,12 @@ export const CallTraceView: FC<{
     <CallTrace>
       <CallTraceHeader>
         <CallTraceHeaderTitle>Trace tree</CallTraceHeaderTitle>
-        <Button icon="close" variant="ghost" onClick={onCloseTraceTree} />
+        <Button
+          icon="close"
+          variant="ghost"
+          onClick={onCloseTraceTree}
+          tooltip="Hide trace tree"
+        />
       </CallTraceHeader>
       <CallTraceTree>
         <ErrorBoundary>

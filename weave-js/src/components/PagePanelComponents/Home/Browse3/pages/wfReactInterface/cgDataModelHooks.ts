@@ -5,13 +5,16 @@
  */
 
 import _ from 'lodash';
-import {useMemo} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 
+import {useWeaveContext} from '../../../../../../context';
 import {
+  callOpVeryUnsafe,
   constBoolean,
   constFunction,
   constNumber,
   constString,
+  listObjectType,
   Node,
   opAnd,
   opArray,
@@ -21,14 +24,17 @@ import {
   opArtifactTypeArtifacts,
   opArtifactVersionArtifactSequence,
   opArtifactVersionCreatedAt,
+  opArtifactVersionFile,
   opArtifactVersionHash,
   opArtifactVersionIsWeaveObject,
   opArtifactVersionMetadata,
   opArtifactVersions,
   opArtifactVersionVersionId,
   opDict,
+  opFileContents,
   opFilter,
   opFlatten,
+  opGet,
   opIsNone,
   opJoin,
   opLimit,
@@ -39,34 +45,53 @@ import {
   opProjectArtifactVersion,
   opRootProject,
   opStringEqual,
+  OutputNode,
+  Type,
   typedDict,
 } from '../../../../../../core';
-import {useNodeValue} from '../../../../../../react';
+import {useDeepMemo} from '../../../../../../hookUtils';
+import {
+  isWandbArtifactRef,
+  parseRef,
+  useNodeValue,
+  WandbArtifactRef,
+} from '../../../../../../react';
+import {WeaveApp} from '../../../../../../weave';
 import {fnRunsNode, useRuns} from '../../../Browse2/callTreeHooks';
 import {
-  getCallFromCache,
-  getObjectVersionFromCache,
-  getOpVersionFromCache,
-  setCallInCache,
-  setObjectVersionInCache,
-  setOpVersionInCache,
+  mutationAppend,
+  mutationPublishArtifact,
+  mutationSet,
+  nodeToEasyNode,
+  weaveGet,
+} from '../../../Browse2/easyWeave';
+import {
+  callCache,
+  objectVersionCache,
+  opVersionCache,
+  refDataCache,
+  refTypedNodeCache,
 } from './cache';
 import {
-  OBJECT_CATEGORIES,
+  DICT_KEY_EDGE_TYPE,
+  LIST_INDEX_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
   PROJECT_CALL_STREAM_NAME,
+  TABLE_COLUMN_EDGE_TYPE,
+  TABLE_ROW_EDGE_TYPE,
   WANDB_ARTIFACT_REF_PREFIX,
 } from './constants';
 import {
   opNameToCategory,
   opVersionRefOpCategory,
   refUriToOpVersionKey,
+  typeNameToCategory,
 } from './utilities';
 import {
   CallFilter,
   CallKey,
   CallSchema,
   Loadable,
-  ObjectCategory,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -76,11 +101,13 @@ import {
   OpVersionSchema,
   RawSpanFromStreamTableEra,
   RawSpanFromStreamTableEraWithFeedback,
+  RefMutation,
+  TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
-  const cachedCall = key ? getCallFromCache(key) : null;
+  const cachedCall = key ? callCache.get(key) : null;
   const calls = useRuns(
     {
       entityName: key?.entity ?? '',
@@ -117,7 +144,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
       };
     } else {
       if (result) {
-        setCallInCache(key, result);
+        callCache.set(key, result);
       }
       return {
         loading: false,
@@ -180,7 +207,7 @@ const useCalls = (
       };
     } else {
       allResults.forEach(call => {
-        setCallInCache(
+        callCache.set(
           {
             entity,
             project,
@@ -201,7 +228,7 @@ const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
-  const cachedOpVersion = key ? getOpVersionFromCache(key) : null;
+  const cachedOpVersion = key ? opVersionCache.get(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
       entity: constString(key?.entity ?? ''),
@@ -244,7 +271,7 @@ const useOpVersion = (
       };
     } else {
       if (result) {
-        setOpVersionInCache(key, result);
+        opVersionCache.set(key, result);
       }
       return {
         loading: false,
@@ -301,7 +328,7 @@ const useOpVersions = (
       };
     } else {
       result.forEach(op => {
-        setOpVersionInCache(
+        opVersionCache.set(
           {
             entity,
             project,
@@ -330,7 +357,7 @@ const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
-  const cachedObjectVersion = key ? getObjectVersionFromCache(key) : null;
+  const cachedObjectVersion = key ? objectVersionCache.get(key) : null;
   const artifactVersionNode = opProjectArtifactVersion({
     project: opRootProject({
       entity: constString(key?.entity ?? ''),
@@ -368,6 +395,7 @@ const useObjectVersion = (
             typeName: dataValue.result.typeName as string,
             category: typeNameToCategory(dataValue.result.typeName as string),
             createdAtMs: dataValue.result.createdAtMs as number,
+            val: null,
           };
     if (dataValue.loading) {
       return {
@@ -376,7 +404,7 @@ const useObjectVersion = (
       };
     } else {
       if (result) {
-        setObjectVersionInCache(key, result);
+        objectVersionCache.set(key, result);
       }
       return {
         loading: false,
@@ -436,8 +464,9 @@ const useRootObjectVersions = (
       };
     } else {
       result.forEach(obj => {
-        setObjectVersionInCache(
+        objectVersionCache.set(
           {
+            scheme: 'wandb-artifact',
             entity,
             project,
             objectId: obj.objectId,
@@ -739,6 +768,220 @@ const useOpVersionsNode = (
   return dataNode;
 };
 
+const applyTableQuery = (node: Node, tableQuery: TableQuery): Node => {
+  if ((tableQuery.columns ?? []).length > 0) {
+    node = opMap({
+      arr: node,
+      mapFn: constFunction({row: listObjectType(node.type)}, ({row}) =>
+        opDict(
+          _.fromPairs(
+            (tableQuery.columns ?? []).map(key => [
+              key,
+              opPick({obj: row, key: constString(key)}),
+            ])
+          ) as any
+        )
+      ),
+    });
+  }
+  if (tableQuery.limit) {
+    node = opLimit({
+      arr: node,
+      limit: constNumber(tableQuery.limit),
+    });
+  }
+  return node;
+};
+
+const getCachedRefData = async (
+  weave: WeaveApp,
+  uri: string,
+  tableQuery?: TableQuery
+): Promise<any> => {
+  const key = uri + (tableQuery ? '?query=' + JSON.stringify(tableQuery) : '');
+  const cacheRes = refDataCache.get(key);
+  if (cacheRes != null) {
+    return cacheRes;
+  }
+  let node = await getCachedRefToTypedNode(weave, uri);
+  if (tableQuery) {
+    node = applyTableQuery(node, tableQuery);
+  }
+  const res = await weave.client.query(node);
+  refDataCache.set(key, res);
+  return res;
+};
+
+const useRefsData = (
+  refUris: string[],
+  tableQuery?: TableQuery
+): Loadable<any[]> => {
+  const refUrisDeep = useDeepMemo(refUris);
+  const tableQueryDeep = useDeepMemo(tableQuery);
+  const weave = useWeaveContext();
+  const [refData, setRefData] = useState<any[]>();
+  useEffect(() => {
+    let isMounted = true;
+    const updateRefData = async () => {
+      const uris = [...refUrisDeep];
+      const data = await Promise.allSettled(
+        uris.map(uri => getCachedRefData(weave, uri, tableQueryDeep))
+      );
+      if (!isMounted || !_.isEqual(uris, refUrisDeep)) {
+        return;
+      }
+
+      setRefData(
+        data.map(d => {
+          if (d.status === 'fulfilled') {
+            return d.value;
+          } else {
+            return null;
+          }
+        })
+      );
+    };
+    updateRefData();
+    return () => {
+      isMounted = false;
+    };
+  }, [refUrisDeep, tableQueryDeep, weave]);
+
+  return useMemo(
+    () => ({
+      loading: refData == null,
+      result: refData ?? [],
+    }),
+    [refData]
+  );
+};
+
+const useApplyMutationsToRef = (): ((
+  refUri: string,
+  mutations: RefMutation[]
+) => Promise<string>) => {
+  const weave = useWeaveContext();
+  const applyMutationsToRef = useCallback(
+    async (refUri: string, mutations: RefMutation[]): Promise<string> => {
+      let workingRootNode = await getCachedRefToTypedNode(weave, refUri);
+      const rootObjectRef = parseRef(refUri) as WandbArtifactRef;
+      for (const edit of mutations) {
+        let targetNode = nodeToEasyNode(workingRootNode as OutputNode);
+        if (edit.type === 'set') {
+          for (const pathEl of edit.path) {
+            if (pathEl.type === 'getattr') {
+              targetNode = targetNode.getAttr(pathEl.key);
+            } else if (pathEl.type === 'pick') {
+              targetNode = targetNode.pick(pathEl.key);
+            } else {
+              throw new Error('invalid pathEl type');
+            }
+          }
+          const workingRootUri = await mutationSet(
+            weave,
+            targetNode,
+            edit.newValue
+          );
+          workingRootNode = weaveGet(workingRootUri);
+        } else if (edit.type === 'append') {
+          const workingRootUri = await mutationAppend(
+            weave,
+            targetNode,
+            edit.newValue
+          );
+          workingRootNode = weaveGet(workingRootUri);
+        } else {
+          throw new Error('invalid mutation type');
+        }
+      }
+      const finalRootUri = await mutationPublishArtifact(
+        weave,
+        // Local branch
+        workingRootNode,
+        // Target branch
+        rootObjectRef.entityName,
+        rootObjectRef.projectName,
+        rootObjectRef.artifactName
+      );
+      return finalRootUri;
+    },
+
+    [weave]
+  );
+  return applyMutationsToRef;
+};
+
+const getCachedRefToTypedNode = async (
+  weave: WeaveApp,
+  refUri: string
+): Promise<Node> => {
+  const cachedTypedNode = refTypedNodeCache.get(refUri);
+  if (cachedTypedNode != null) {
+    return cachedTypedNode;
+  }
+
+  const uriParts = refUri.split('#');
+  const baseUri = uriParts[0];
+  let node: Node = opGet({uri: constString(baseUri)});
+
+  if (uriParts.length !== 1) {
+    const extraFields = uriParts[1].split('/');
+    node = nodeFromExtra(node, extraFields);
+  }
+  const typedNode = await weave.refineNode(node, []);
+  refTypedNodeCache.set(refUri, typedNode);
+
+  return typedNode;
+};
+
+const useGetRefsType = (): ((refUris: string[]) => Promise<Type[]>) => {
+  const weave = useWeaveContext();
+  const getRefsType = useCallback(
+    async (refUris: string[]): Promise<Type[]> => {
+      const results = refUris.map(refUri =>
+        getCachedRefToTypedNode(weave, refUri)
+      );
+      return Promise.allSettled(results).then(nodeResults =>
+        nodeResults.map(nodeResult =>
+          nodeResult.status === 'rejected' ? 'unknown' : nodeResult.value.type
+        )
+      );
+    },
+    [weave]
+  );
+  return getRefsType;
+};
+
+const useRefsType = (refUris: string[]): Loadable<Type[]> => {
+  const refUrisDeep = useDeepMemo(refUris);
+  const [results, setResults] = useState<Type[]>();
+  const getRefsType = useGetRefsType();
+  useEffect(() => {
+    let isMounted = true;
+    const updateResults = async () => {
+      const res = await getRefsType(refUrisDeep);
+      if (!isMounted) {
+        return;
+      }
+      setResults(res);
+    };
+    updateResults();
+    return () => {
+      isMounted = false;
+    };
+  }, [getRefsType, refUrisDeep]);
+  return {
+    loading: results == null,
+    result: results ?? [],
+  };
+};
+
+const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
+  return useNodeValue(
+    useMemo(() => opDefCodeNode(opVersionRef), [opVersionRef])
+  );
+};
+
 // Converters //
 const spanToCallSchema = (
   entity: string,
@@ -774,14 +1017,74 @@ const spanToCallSchema = (
   };
 };
 
-// Helpers //
-const typeNameToCategory = (typeName: string): ObjectCategory | null => {
-  for (const category of OBJECT_CATEGORIES) {
-    if (typeName.toLocaleLowerCase().includes(category)) {
-      return category as ObjectCategory;
-    }
+export const nodeFromExtra = (node: Node, extra: string[]): Node => {
+  if (extra.length === 0) {
+    return node;
   }
-  return null;
+  if (extra[0] === LIST_INDEX_EDGE_TYPE || extra[0] === TABLE_ROW_EDGE_TYPE) {
+    return nodeFromExtra(
+      callOpVeryUnsafe('index', {
+        arr: node,
+        index: constNumber(parseInt(extra[1], 10)),
+      }) as Node,
+      extra.slice(2)
+    );
+  } else if (
+    extra[0] === DICT_KEY_EDGE_TYPE ||
+    extra[0] === TABLE_COLUMN_EDGE_TYPE
+  ) {
+    return nodeFromExtra(
+      callOpVeryUnsafe('pick', {
+        obj: node,
+        key: constString(extra[1]),
+      }) as Node,
+      extra.slice(2)
+    );
+  } else if (extra[0] === OBJECT_ATTRIBUTE_EDGE_TYPE) {
+    return nodeFromExtra(
+      callOpVeryUnsafe('Object-__getattr__', {
+        self: node,
+        name: constString(extra[1]),
+      }) as Node,
+      extra.slice(2)
+    );
+  } else {
+    throw new Error('Unknown extra type: ' + extra);
+  }
+};
+
+const refUnderlyingArtifactNode = (uri: string) => {
+  const ref = parseRef(uri);
+  if (!isWandbArtifactRef(ref)) {
+    throw new Error(`Expected wandb artifact ref, got ${ref}`);
+  }
+  const projNode = opRootProject({
+    entityName: constString(ref.entityName),
+    projectName: constString(ref.projectName),
+  });
+  return opProjectArtifactVersion({
+    project: projNode,
+    artifactName: constString(ref.artifactName),
+    artifactVersionAlias: constString(ref.artifactVersion),
+  });
+};
+
+const opDefCodeNode = (uri: string) => {
+  const artifactVersionNode = refUnderlyingArtifactNode(uri);
+  const objPyFileNode = opArtifactVersionFile({
+    artifactVersin: artifactVersionNode,
+    path: constString('obj.py'),
+  });
+  return opFileContents({file: objPyFileNode});
+};
+
+const useFileContent = (
+  entity: string,
+  project: string,
+  digest: string,
+  opts?: {skip?: boolean}
+): Loadable<string> => {
+  throw new Error('Not implemented');
 };
 
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
@@ -791,5 +1094,13 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useOpVersions,
   useObjectVersion,
   useRootObjectVersions,
-  derived: {useChildCallsForCompare},
+  useRefsData,
+  useApplyMutationsToRef,
+  useFileContent,
+  derived: {
+    useChildCallsForCompare,
+    useGetRefsType,
+    useRefsType,
+    useCodeForOpRef,
+  },
 };

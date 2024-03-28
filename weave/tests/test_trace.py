@@ -4,7 +4,7 @@ from .. import api as weave
 from .. import graph
 from ..weave_internal import make_const_node
 from .. import storage
-from .. import trace
+from .. import trace_legacy
 
 
 def test_node_expr():
@@ -28,12 +28,12 @@ def test_trace():
     nine = make_const_node(weave.types.Number(), 9)
     res = weave.use((nine + 3) * 4)
     assert res == 48
-    mult_run = trace.get_obj_creator(storage._get_ref(res))
+    mult_run = trace_legacy.get_obj_creator(storage._get_ref(res))
     assert mult_run.op_name == "number-mult"
     assert re.match(
         "^local-artifact://.*run-number-add-.*-output:.*$", str(mult_run.inputs["lhs"])
     )
     assert mult_run.inputs["rhs"] == 4
-    add_run = trace.get_obj_creator(mult_run.inputs["lhs"])
+    add_run = trace_legacy.get_obj_creator(mult_run.inputs["lhs"])
     assert add_run.op_name == "number-add"
     assert add_run.inputs == {"lhs": 9, "rhs": 3}

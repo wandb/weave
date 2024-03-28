@@ -1,15 +1,12 @@
-import os
-from . import graph_client
-from . import graph_client_local
-from . import graph_client_wandb_art_st
-from .trace_server import graph_client_trace, remote_http_trace_server
+from .trace_server import remote_http_trace_server, sqlite_trace_server
 from . import context_state
 from . import errors
 from . import autopatch
+from . import weave_client
 
 
 class InitializedClient:
-    def __init__(self, client: graph_client.GraphClient):
+    def __init__(self, client: weave_client.WeaveClient):
         self.client = client
         self.graph_client_token = context_state._graph_client.set(client)
         self.ref_tracking_token = context_state._ref_tracking_enabled.set(True)
@@ -50,13 +47,31 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     return entity_name, project_name
 
 
-def init_wandb(project_name: str) -> InitializedClient:
+def init_weave(project_name: str) -> InitializedClient:
+    from . import wandb_api
+
     entity_name, project_name = get_entity_project_from_project_name(project_name)
-    client = graph_client_wandb_art_st.GraphClientWandbArtStreamTable(
-        entity_name, project_name
-    )
+
+    remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
+    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+
+    # Must init to read ensure we've read auth from the environment, in
+    # case we're on a new thread.
+    wandb_api.init()
+    wandb_context = wandb_api.get_wandb_api_context()
+    if wandb_context is not None and wandb_context.api_key is not None:
+        remote_server.set_auth(("api", wandb_context.api_key))
+
+    # server = ClickHouseTraceServer(host="localhost")
+    client = weave_client.WeaveClient(entity_name, project_name, remote_server)
 
     init_client = InitializedClient(client)
+    # entity_name, project_name = get_entity_project_from_project_name(project_name)
+    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+
+    # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
+
+    # init_client = InitializedClient(client)  # type: ignore
 
     # autopatching is only supporte for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this autopatch call can be
@@ -67,29 +82,7 @@ def init_wandb(project_name: str) -> InitializedClient:
 
 
 def init_local() -> InitializedClient:
-    client = graph_client_local.GraphClientLocal()
+    server = sqlite_trace_server.SqliteTraceServer("weave.db")
+    server.setup_tables()
+    client = weave_client.WeaveClient("none", "none", server)
     return InitializedClient(client)
-
-
-def init_trace_remote(project_name: str) -> InitializedClient:
-    from . import wandb_api
-
-    entity_name, project_name = get_entity_project_from_project_name(project_name)
-
-    remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
-    wandb_context = wandb_api.get_wandb_api_context()
-    if wandb_context is not None and wandb_context.api_key is not None:
-        remote_server.set_auth(("api", wandb_context.api_key))
-
-    client = graph_client_trace.GraphClientTraceWithArtifactStorage(
-        entity_name, project_name, remote_server
-    )
-
-    init_client = InitializedClient(client)
-
-    # autopatching is only supporte for the wandb client, because OpenAI calls are not
-    # logged in local mode currently. When that's fixed, this autopatch call can be
-    # moved to InitializedClient.__init__
-    autopatch.autopatch()
-
-    return init_client

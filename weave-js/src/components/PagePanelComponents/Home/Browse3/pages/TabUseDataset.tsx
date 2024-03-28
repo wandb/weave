@@ -1,10 +1,15 @@
-import {Alert, Box} from '@mui/material';
+import {Box} from '@mui/material';
 import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
 import {parseRef} from '../../../../../react';
+import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
+import {
+  LIST_INDEX_EDGE_TYPE,
+  OBJECT_ATTRIBUTE_EDGE_TYPE,
+} from './wfReactInterface/constants';
 
 type TabUseDatasetProps = {
   name: string;
@@ -12,7 +17,7 @@ type TabUseDatasetProps = {
   versionIndex: number;
 };
 
-const ROW_PATH_PREFIX = 'atr/rows/ndx/';
+const ROW_PATH_PREFIX = `${OBJECT_ATTRIBUTE_EDGE_TYPE}/rows/${LIST_INDEX_EDGE_TYPE}/`;
 
 export const TabUseDataset = ({
   name,
@@ -39,7 +44,7 @@ ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
 
   return (
     <Box m={2}>
-      <Alert severity="info" variant="outlined">
+      <Alert icon="lightbulb-info">
         See{' '}
         <DocLink
           path="guides/tracking/objects#getting-an-object-back"

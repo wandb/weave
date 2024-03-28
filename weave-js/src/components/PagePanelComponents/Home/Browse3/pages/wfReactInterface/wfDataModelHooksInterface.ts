@@ -9,6 +9,7 @@
  *    - `ObjectVersionSchema`
  */
 
+import * as Types from '../../../../../../core/model/types';
 import {OBJECT_CATEGORIES, OP_CATEGORIES} from './constants';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
@@ -17,6 +18,12 @@ export type ObjectCategory = (typeof OBJECT_CATEGORIES)[number];
 export type Loadable<T> = {
   loading: boolean;
   result: T | null;
+};
+
+export type LoadableWithError<T> = {
+  loading: boolean;
+  result: T | null;
+  error: Error | null;
 };
 
 export type CallKey = {
@@ -73,7 +80,7 @@ export type OpVersionFilter = {
   latestOnly?: boolean;
 };
 
-export type ObjectVersionKey = {
+type CommonObjectVersionKey = {
   entity: string;
   project: string;
   objectId: string;
@@ -82,12 +89,26 @@ export type ObjectVersionKey = {
   refExtra?: string;
 };
 
+type WandbArtifactObjectVersionKey = {
+  scheme: 'wandb-artifact';
+} & CommonObjectVersionKey;
+
+type WeaveObjectVersionKey = {
+  scheme: 'weave';
+  weaveKind: 'object' | 'table' | 'op';
+} & CommonObjectVersionKey;
+
+export type ObjectVersionKey =
+  | WandbArtifactObjectVersionKey
+  | WeaveObjectVersionKey;
+
 export type ObjectVersionSchema = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   typeName: string;
   category: ObjectCategory | null;
   createdAtMs: number;
+  val: any;
 };
 
 export type ObjectVersionFilter = {
@@ -96,6 +117,36 @@ export type ObjectVersionFilter = {
   objectIds?: string[];
   latestOnly?: boolean;
 };
+
+export type TableQuery = {
+  columns?: string[];
+  limit?: number;
+};
+
+interface PathElObject {
+  type: 'getattr';
+  key: string;
+}
+
+interface PathElTypedDict {
+  type: 'pick';
+  key: string;
+}
+
+type PathEl = PathElObject | PathElTypedDict;
+
+type SetRefMutation = {
+  type: 'set';
+  path: PathEl[];
+  newValue: any;
+};
+
+type AppendRefMutation = {
+  type: 'append';
+  newValue: {[key: string]: any};
+};
+
+export type RefMutation = SetRefMutation | AppendRefMutation;
 
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
@@ -124,9 +175,22 @@ export type WFDataModelHooksInterface = {
     limit?: number,
     opts?: {skip?: boolean}
   ) => Loadable<ObjectVersionSchema[]>;
+  // `useRefsData` is in beta while we integrate Shawn's new Object DB
+  useRefsData: (refUris: string[], tableQuery?: TableQuery) => Loadable<any[]>;
+  // `useApplyMutationsToRef` is in beta while we integrate Shawn's new Object DB
+  useApplyMutationsToRef: () => (
+    refUri: string,
+    mutations: RefMutation[]
+  ) => Promise<string>;
   // Derived are under a subkey because they are not directly from the data model
   // and the logic should be pushed into the core APIs. This is a temporary solution
   // during the transition period.
+  useFileContent: (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<string>;
   derived: {
     useChildCallsForCompare: (
       entity: string,
@@ -135,6 +199,11 @@ export type WFDataModelHooksInterface = {
       selectedOpVersionRef: string | null,
       selectedObjectVersionRef: string | null
     ) => Loadable<CallSchema[]>;
+    // `useGetRefsType` is in beta while we integrate Shawn's new Object DB
+    useGetRefsType: () => (refUris: string[]) => Promise<Types.Type[]>;
+    // `useRefsType` is in beta while we integrate Shawn's new Object DB
+    useRefsType: (refUris: string[]) => Loadable<Types.Type[]>;
+    useCodeForOpRef: (opVersionRef: string) => Loadable<string>;
   };
 };
 

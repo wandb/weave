@@ -42,6 +42,10 @@ export interface TrackedWandbLoaderProps extends WandbLoaderProps {
   samplingRate?: number;
   /* Tell me you're a Segment .track() event without telling me about Segment */
   track: (eventName: string, data: Record<string, unknown> | undefined) => void;
+  /* Optional callback fired when finished loading */
+  onComplete?(name: string, data: Record<string, unknown> | undefined): void;
+  /* Optional callback fired when started loading */
+  onStart?(name: string): void;
 }
 
 export const TrackedWandbLoader = ({
@@ -50,26 +54,35 @@ export const TrackedWandbLoader = ({
   profilingCb,
   samplingRate = 0.1,
   track,
+  onComplete,
+  onStart,
   ...props
 }: TrackedWandbLoaderProps) => {
-  useLifecycleProfiling(name, (data: ProfileData) => {
-    try {
-      // log the lifecycle for each loader to segment
-      const additionalData = profilingCb ? profilingCb() : {};
-      const trackedData = {
-        componentId: data.id,
-        duration: data.duration,
-        ...additionalData,
-      };
-      const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
-      if (randomNum <= samplingRate * 100) {
-        track('wandb-loader-onscreen', trackedData);
+  useLifecycleProfiling(
+    name,
+    (data: ProfileData) => {
+      try {
+        // log the lifecycle for each loader to segment
+        const additionalData = profilingCb ? profilingCb() : {};
+        const trackedData = {
+          componentId: data.id,
+          duration: data.duration,
+          ...additionalData,
+        };
+        if (onComplete) {
+          onComplete(name, trackedData);
+        }
+        const randomNum = Number(Math.random().toString().slice(-2)); // take the last two digits off a random number
+        if (randomNum <= samplingRate * 100) {
+          track('wandb-loader-onscreen', trackedData);
+        }
+      } catch (e) {
+        // Tracking should be able to fail gracefully without breaking the app
+        captureException?.(e);
       }
-    } catch (e) {
-      // Tracking should be able to fail gracefully without breaking the app
-      captureException?.(e);
-    }
-  });
+    },
+    onStart
+  );
 
   return <WandbLoader {...props} />;
 };
