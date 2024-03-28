@@ -406,7 +406,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
-                raise ValueError("All rows must be dictionaries")
+                raise ValueError(
+                    f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
+                )
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
             insert_rows.append((entity, project, row_digest, row_json))
