@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine
 from typing_extensions import ParamSpec
 
 from weave.trace.errors import OpCallError
-from weave.trace_server.refs import ObjectRef
+from weave.trace.refs import ObjectRef
 from weave import graph_client_context
 from weave import run_context
 from weave import box

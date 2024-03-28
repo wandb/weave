@@ -14,8 +14,7 @@ def test_save_object(clickhouse_trace_server):
     )
     read_res = clickhouse_trace_server.obj_read(
         tsi.ObjReadReq(
-            entity="shawn",
-            project="proj",
+            project_id="shawn/proj",
             name="my-obj",
             version_digest=create_res.version_digest,
         )

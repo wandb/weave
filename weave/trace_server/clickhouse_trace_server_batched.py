@@ -28,7 +28,7 @@ from .trace_server_interface_util import (
 )
 from . import trace_server_interface as tsi
 
-from . import refs
+from . import refs_internal
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -109,8 +109,7 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 
 
 class ObjCHInsertable(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     type: str
     name: str
     refs: typing.List[str]
@@ -119,8 +118,7 @@ class ObjCHInsertable(BaseModel):
 
 
 class SelectableCHObjSchema(BaseModel):
-    entity: str
-    project: str
+    project_id: str
     name: str
     created_at: datetime.datetime
     refs: typing.List[str]
@@ -307,7 +305,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ]
         parameters = {"name": req.name, "digest": req.version_hash}
         objs = self._select_objs_query(
-            req.entity, req.project, conditions=conds, parameters=parameters
+            req.project_id, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.version_hash} not found")
@@ -326,8 +324,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append("is_latest = 1")
 
         ch_objs = self._select_objs_query(
-            req.entity,
-            req.project,
+            req.project_id,
             conditions=conds,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
@@ -338,10 +335,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         digest = str_digest(json_val)
 
         req_obj = req.obj
-        entity, project = req_obj.project_id.split("/")
         ch_obj = ObjCHInsertable(
-            entity=entity,
-            project=project,
+            project_id=req_obj.project_id,
             name=req_obj.name,
             type=get_type(req.obj.val),
             refs=[],
@@ -370,7 +365,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conds.append("digest = {version_digest: String}")
                 parameters["version_digest"] = req.version_digest
         objs = self._select_objs_query(
-            req.entity, req.project, conditions=conds, parameters=parameters
+            req.project_id, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
@@ -391,10 +386,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters["object_names"] = req.filter.object_names
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
-        entity, project = req.project_id.split("/")
+
         objs = self._select_objs_query(
-            entity,
-            project,
+            req.project_id,
             conditions=conds,
             parameters=parameters,
         )
@@ -402,7 +396,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        entity, project = req.table.project_id.split("/")
+
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
@@ -411,15 +405,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
-            insert_rows.append((entity, project, row_digest, row_json))
+            insert_rows.append((req.table.project_id, row_digest, row_json))
 
         self._insert(
             "table_rows",
             data=insert_rows,
-            column_names=["entity", "project", "digest", "val"],
+            column_names=["project_id", "digest", "val"],
         )
 
-        row_digests = [r[2] for r in insert_rows]
+        row_digests = [r[1] for r in insert_rows]
 
         table_hasher = hashlib.sha256()
         for row_digest in row_digests:
@@ -428,13 +422,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         self._insert(
             "tables",
-            data=[(entity, project, table_digest, row_digests)],
-            column_names=["entity", "project", "digest", "row_digests"],
+            data=[(req.table.project_id, table_digest, row_digests)],
+            column_names=["project_id", "digest", "row_digests"],
         )
         return tsi.TableCreateRes(digest=table_digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        entity, project = req.project_id.split("/")
         conds = []
         parameters = {}
         if req.filter:
@@ -444,8 +437,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             conds.append("1 = 1")
         rows = self._table_query(
-            entity,
-            project,
+            req.project_id,
             req.table_digest,
             conditions=conds,
             limit=req.limit,
@@ -455,15 +447,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _table_query(
         self,
-        entity: str,
-        project: str,
+        project_id: str,
         table_digest: str,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[tsi.TableRowSchema]:
-        conds = ["entity = {entity: String}", "project = {project: String}"]
+        conds = ["project_id = {project_id: String}"]
         if conditions:
             conds.extend(conditions)
 
@@ -471,12 +462,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = f"""
                 SELECT tr.digest, tr.val
                 FROM (
-                    SELECT entity, project, row_digest
+                    SELECT project_id, row_digest
                     FROM tables_deduped
                     ARRAY JOIN row_digests AS row_digest
                     WHERE digest = {{table_digest:String}}
                 ) AS t
-                JOIN table_rows_deduped tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
+                JOIN table_rows_deduped tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
             """
         if parameters is None:
@@ -491,8 +482,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query_result = self.ch_client.query(
             query,
             parameters={
-                "entity": entity,
-                "project": project,
+                "project_id": project_id,
                 "table_digest": table_digest,
                 **parameters,
             },
@@ -511,15 +501,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_raw_refs = [refs.parse_uri(r) for r in req.refs]
-        if any(isinstance(r, refs.TableRef) for r in parsed_raw_refs):
+        parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
+        if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
-        parsed_refs = typing.cast(typing.List[refs.ObjectRef], parsed_raw_refs)
+        parsed_refs = typing.cast(
+            typing.List[refs_internal.InternalObjectRef], parsed_raw_refs
+        )
 
         root_val_cache: typing.Dict[str, typing.Any] = {}
 
-        def get_object_ref_root_val(r: refs.ObjectRef) -> typing.Any:
-            cache_key = f"{r.entity}/{r.project}/{r.name}/{r.version}"
+        def get_object_ref_root_val(r: refs_internal.InternalObjectRef) -> typing.Any:
+            cache_key = f"{r.project_id}/{r.name}/{r.version}"
             if cache_key in root_val_cache:
                 val = root_val_cache[cache_key]
             else:
@@ -542,7 +534,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         "version": r.version,
                     }
                 objs = self._select_objs_query(
-                    r.entity, r.project, conditions=conds, parameters=parameters
+                    r.project_id, conditions=conds, parameters=parameters
                 )
                 if len(objs) == 0:
                     raise NotFoundError(f"Obj {r.name}:{r.version} not found")
@@ -556,23 +548,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         class PartialRefResult:
             remaining_extra: list[str]
             # unresolved_obj_ref and unresolved_table_ref are mutually exclusive
-            unresolved_obj_ref: typing.Optional[refs.ObjectRef]
-            unresolved_table_ref: typing.Optional[refs.TableRef]
+            unresolved_obj_ref: typing.Optional[refs_internal.InternalObjectRef]
+            unresolved_table_ref: typing.Optional[refs_internal.InternalTableRef]
             val: typing.Any
 
         def resolve_extra(extra: list[str], val: typing.Any) -> typing.Any:
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-                if isinstance(val, str) and val.startswith("weave://"):
-                    parsed_ref = refs.parse_uri(val)
-                    if isinstance(parsed_ref, refs.ObjectRef):
+                if isinstance(val, str) and val.startswith(
+                    refs_internal.WEAVE_INTERNAL_SCHEME + "://"
+                ):
+                    parsed_ref = refs_internal.parse_internal_uri(val)
+                    if isinstance(parsed_ref, refs_internal.InternalObjectRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
                             unresolved_obj_ref=parsed_ref,
                             unresolved_table_ref=None,
                             val=val,
                         )
-                    elif isinstance(parsed_ref, refs.TableRef):
+                    elif isinstance(parsed_ref, refs_internal.InternalTableRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
                             unresolved_obj_ref=None,
@@ -586,11 +580,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         unresolved_table_ref=None,
                         val=None,
                     )
-                if op == refs.KEY_EDGE_TYPE:
+                if op == refs_internal.KEY_EDGE_TYPE:
                     val = val.get(arg)
-                elif op == refs.ATTRIBUTE_EDGE_TYPE:
+                elif op == refs_internal.ATTRIBUTE_EDGE_TYPE:
                     val = val.get(arg)
-                elif op == refs.INDEX_EDGE_TYPE:
+                elif op == refs_internal.INDEX_EDGE_TYPE:
                     index = int(arg)
                     if index >= len(val):
                         return None
@@ -635,9 +629,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     )
 
             # Resolve any unresolved table refs
-            # First batch the table queries by entity, project, and table digest
+            # First batch the table queries by project_id and table digest
             table_queries: dict[
-                typing.Tuple[str, str, str], list[typing.Tuple[int, str]]
+                typing.Tuple[str, str], list[typing.Tuple[int, str]]
             ] = {}
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_table_ref is not None:
@@ -648,17 +642,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra[0],
                         extra_result.remaining_extra[1],
                     )
-                    if op != refs.ID_EDGE_TYPE:
+                    if op != refs_internal.ID_EDGE_TYPE:
                         raise ValueError("Table refs must have id extra")
                     table_queries.setdefault(
-                        (table_ref.entity, table_ref.project, table_ref.digest), []
+                        (table_ref.project_id, table_ref.digest), []
                     ).append((i, row_digest))
             # Make the queries
-            for (entity, project, digest), index_digests in table_queries.items():
+            for (project_id, digest), index_digests in table_queries.items():
                 row_digests = [d for i, d in index_digests]
                 rows = self._table_query(
-                    entity=entity,
-                    project=project,
+                    project_id=project_id,
                     table_digest=digest,
                     conditions=["digest IN {digests: Array(String)}"],
                     parameters={"digests": row_digests},
@@ -899,8 +892,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _select_objs_query(
         self,
-        entity: str,
-        project: str,
+        project_id: str,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
@@ -920,11 +912,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             f"""
             SELECT *
             FROM objects_deduped
-            WHERE entity = {{entity: String}} AND project = {{project: String}}
+            WHERE project_id = {{project_id: String}}
             AND {conditions_part}
             {limit_part}
         """,
-            {"entity": entity, "project": project, **parameters},
+            {"project_id": project_id, **parameters},
         )
         result: typing.List[SelectableCHObjSchema] = []
         for row in query_result.result_rows:
@@ -1094,9 +1086,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
 
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
-        # entity=ch_obj.entity,
-        # project=ch_obj.project,
-        project_id=f"{ch_obj.entity}/{ch_obj.project}",
+        project_id=ch_obj.project_id,
         name=ch_obj.name,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
         version_index=ch_obj.version_index,
@@ -1166,8 +1156,7 @@ def _process_parameters(
 
 #     return ObjCHInsertable(
 #         id=uuid.uuid4(),
-#         entity=partial_obj.entity,
-#         project=partial_obj.project,
+#         project_id=partial_obj.project_id,
 #         name=partial_obj.name,
 #         type="unknown",
 #         refs=[],
