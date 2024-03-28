@@ -93,7 +93,8 @@ class ObjSchema(BaseModel):
     digest: str
     version_index: int
     is_latest: int
-    type: str
+    kind: str
+    object_root_weave_type: typing.Optional[str]
     val: typing.Any
 
 

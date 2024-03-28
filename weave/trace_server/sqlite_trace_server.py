@@ -88,7 +88,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 project_id TEXT,
                 name TEXT,
                 created_at TEXT,
-                type TEXT,
+                kind TEXT,
+                object_root_weave_type TEXT,
                 refs TEXT,
                 val TEXT,
                 digest TEXT UNIQUE,
@@ -318,18 +319,20 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     project_id,
                     name,
                     created_at,
-                    type,
+                    kind,
+                    object_root_weave_type,
                     refs,
                     val,
                     digest,
                     version_index,
                     is_latest
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req_obj.project_id,
                     req_obj.name,
                     datetime.datetime.now().isoformat(),
-                    get_type(req_obj.val),
+                    get_kind(req_obj.val),
+                    get_object_root_weave_type(req_obj.val),
                     json.dumps([]),
                     json_val,
                     digest,
@@ -581,11 +584,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     project_id=f"{row[0]}",
                     name=row[1],
                     created_at=row[2],
-                    type=row[3],
-                    val=json.loads(row[5]),
-                    digest=row[6],
-                    version_index=row[7],
-                    is_latest=row[8],
+                    kind=row[3],
+                    object_root_weave_type=row[4],
+                    val=json.loads(row[6]),
+                    digest=row[7],
+                    version_index=row[8],
+                    is_latest=row[9],
                 )
             )
 
@@ -604,3 +608,20 @@ def get_type(val: Any) -> str:
     elif isinstance(val, list):
         return "list"
     return "unknown"
+
+
+def get_kind(val: Any) -> str:
+    val_type = get_type(val)
+    if val_type == "Op":
+        return "op"
+    return "object"
+
+
+def get_object_root_weave_type(val: Any) -> Optional[str]:
+    if "_bases" in val:
+        if isinstance(val["_bases"], list):
+            if len(val["_bases"]) > 2:
+                if val["_bases"][-1] == "BaseModel":
+                    if val["_bases"][-2] == "Object":
+                        return val["_bases"][-3]
+    return None

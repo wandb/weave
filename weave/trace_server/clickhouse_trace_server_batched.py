@@ -110,7 +110,8 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 
 class ObjCHInsertable(BaseModel):
     project_id: str
-    type: str
+    kind: str
+    object_root_weave_type: typing.Optional[str]
     name: str
     refs: typing.List[str]
     val: str
@@ -123,7 +124,8 @@ class SelectableCHObjSchema(BaseModel):
     created_at: datetime.datetime
     refs: typing.List[str]
     val: str
-    type: str
+    kind: str
+    object_root_weave_type: typing.Optional[str]
     digest: str
     version_index: int
     is_latest: int
@@ -338,7 +340,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_obj = ObjCHInsertable(
             project_id=req_obj.project_id,
             name=req_obj.name,
-            type=get_type(req.obj.val),
+            kind=get_kind(req.obj.val),
+            object_root_weave_type=get_object_root_weave_type(req.obj.val),
             refs=[],
             val=json_val,
             digest=digest,
@@ -1092,7 +1095,8 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,
-        type=ch_obj.type,
+        kind=ch_obj.kind,
+        object_root_weave_type=ch_obj.object_root_weave_type,
         val=json.loads(ch_obj.val),
     )
 
@@ -1176,6 +1180,23 @@ def get_type(val: typing.Any) -> str:
     elif isinstance(val, list):
         return "list"
     return "unknown"
+
+
+def get_kind(val: typing.Any) -> str:
+    val_type = get_type(val)
+    if val_type == "Op":
+        return "op"
+    return "object"
+
+
+def get_object_root_weave_type(val: typing.Any) -> typing.Optional[str]:
+    if "_bases" in val:
+        if isinstance(val["_bases"], list):
+            if len(val["_bases"]) > 2:
+                if val["_bases"][-1] == "BaseModel":
+                    if val["_bases"][-2] == "Object":
+                        return val["_bases"][-3]
+    return None
 
 
 def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
