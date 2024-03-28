@@ -565,6 +565,10 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     if artifactVersion["artifactSequence"]["project"] is not None:
         entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
         project_name = artifactVersion["artifactSequence"]["project"]["name"]
+    print(
+        f"\n\nlogging version project_name: ===> \n{project_name}\nentity_name ===> {entity_name}\n\n",
+        flush=True,
+    )
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
     commit_hash = artifactVersion["commitHash"]

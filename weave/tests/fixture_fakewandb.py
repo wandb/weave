@@ -274,7 +274,7 @@ class FakeIoServiceClient:
         ma = MockedArtifact(artifact)
         self.mocked_artifacts[str(artifact_uri)] = ma
 
-    def manifest(self, artifact_id, artifact_uri):
+    def manifest(self, artifact_uri, artifact_id):
         uri_str = str(artifact_uri.with_path(""))
         if uri_str in self.mocked_artifacts:
             return FakeArtifactManifest(self.mocked_artifacts[uri_str].artifact)
@@ -295,10 +295,10 @@ class FakeIoServiceClient:
 
         return FakeFs()
 
-    def direct_url(self, artifact_id, artifact_uri):
+    def direct_url(self, artifact_uri, artifact_id):
         return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
-    def ensure_file(self, artifact_id, artifact_uri):
+    def ensure_file(self, artifact_uri, artifact_id):
         uri_str = str(artifact_uri.with_path(""))
         print(self.mocked_artifacts)
         if uri_str in self.mocked_artifacts:
@@ -336,7 +336,7 @@ class SetupResponse:
         },
     ):
         artifact_uri = WeaveWBArtifactURI.parse(
-            f"wandb-artifact:///_/_/{artifact.name}:{artifact.commit_hash}"
+            f"wandb-artifact:///{entity_name}/{project_name}/{artifact.name}:{artifact.commit_hash}"
         )
 
         self.fake_io.add_artifact(artifact, artifact_uri)
@@ -436,6 +436,7 @@ defaultArtifactType_payload = {
 artifactSequence_payload = {
     "id": "QXJ0aWZhY3RDb2xsZWN0aW9uOjE4MDQ0MjY=",
     "name": "test_res_1fwmcd3q",
+    "project": project_payload,
     "defaultArtifactType": defaultArtifactType_payload,
 }
 artifactVersion_payload = {
