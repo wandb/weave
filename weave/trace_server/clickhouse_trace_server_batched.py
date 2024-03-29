@@ -45,7 +45,7 @@ class CallStartCHInsertable(BaseModel):
     id: str
     trace_id: str
     parent_id: typing.Optional[str] = None
-    name: str
+    op_name: str
     start_datetime: datetime.datetime
     attributes_dump: str
     inputs_dump: str
@@ -77,7 +77,7 @@ class SelectableCHCallSchema(BaseModel):
     project_id: str
     id: str
 
-    name: str
+    op_name: str
 
     trace_id: str
     parent_id: typing.Optional[str] = None
@@ -237,13 +237,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 if non_wildcarded_names:
                     or_conditions.append(
-                        "name IN {non_wildcarded_names: Array(String)}"
+                        "op_name IN {non_wildcarded_names: Array(String)}"
                     )
                     parameters["non_wildcarded_names"] = non_wildcarded_names
 
                 for name_ndx, name in enumerate(wildcarded_names):
                     param_name = "wildcarded_name_" + str(name_ndx)
-                    or_conditions.append("name LIKE {" + param_name + ": String}")
+                    or_conditions.append("op_name LIKE {" + param_name + ": String}")
                     like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
                     parameters[param_name] = like_name
 
@@ -757,7 +757,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 settings=settings,
             )
 
-
     def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
         # Generate and run the query to get the call from the database
         ch_calls = self._select_calls_query(
@@ -1036,7 +1035,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         id=ch_call.id,
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
-        name=ch_call.name,
+        op_name=ch_call.op_name,
         start_datetime=_ensure_datetimes_have_tz(ch_call.start_datetime),
         end_datetime=_ensure_datetimes_have_tz(ch_call.end_datetime),
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
@@ -1056,7 +1055,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         id=ch_call_dict.get("id"),
         trace_id=ch_call_dict.get("trace_id"),
         parent_id=ch_call_dict.get("parent_id"),
-        name=ch_call_dict.get("name"),
+        op_name=ch_call_dict.get("op_name"),
         start_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("start_datetime")),
         end_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("end_datetime")),
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
@@ -1095,7 +1094,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         id=call_id,
         trace_id=trace_id,
         parent_id=start_call.parent_id,
-        name=start_call.name,
+        op_name=start_call.op_name,
         start_datetime=start_call.start_datetime,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),

@@ -9,7 +9,7 @@ class CallSchema(BaseModel):
     id: str
 
     # Name of the calling function (op)
-    name: str  # op_name
+    op_name: str
 
     ## Trace ID
     trace_id: str
@@ -49,7 +49,7 @@ class StartedCallSchemaForInsert(BaseModel):
     id: typing.Optional[str] = None  # Will be generated if not provided
 
     # Name of the calling function (op)
-    name: str
+    op_name: str
 
     ## Trace ID
     trace_id: typing.Optional[str] = None  # Will be generated if not provided
@@ -209,9 +209,9 @@ class ObjReadRes(BaseModel):
 
 
 class _ObjectVersionFilter(BaseModel):
-    base_object_classes: typing.Optional[typing.List[str]] = (
-        None  # category is better :)
-    )
+    base_object_classes: typing.Optional[
+        typing.List[str]
+    ] = None  # category is better :)
     object_names: typing.Optional[typing.List[str]] = None  # change to object_ids
     is_op: typing.Optional[bool] = None
     latest_only: typing.Optional[bool] = None
@@ -288,36 +288,46 @@ class TraceServerInterface:
 
     # Call API
     @abc.abstractmethod
-    def call_start(self, req: CallStartReq) -> CallStartRes: ...
+    def call_start(self, req: CallStartReq) -> CallStartRes:
+        ...
 
     @abc.abstractmethod
-    def call_end(self, req: CallEndReq) -> CallEndRes: ...
+    def call_end(self, req: CallEndReq) -> CallEndRes:
+        ...
 
     @abc.abstractmethod
-    def call_read(self, req: CallReadReq) -> CallReadRes: ...
+    def call_read(self, req: CallReadReq) -> CallReadRes:
+        ...
 
     @abc.abstractmethod
-    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
+        ...
 
     # Op API
     @abc.abstractmethod
-    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
+    def op_create(self, req: OpCreateReq) -> OpCreateRes:
+        ...
 
     @abc.abstractmethod
-    def op_read(self, req: OpReadReq) -> OpReadRes: ...
+    def op_read(self, req: OpReadReq) -> OpReadRes:
+        ...
 
     @abc.abstractmethod
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
+    def ops_query(self, req: OpQueryReq) -> OpQueryRes:
+        ...
 
     # Obj API
     @abc.abstractmethod
-    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
+        ...
 
     @abc.abstractmethod
-    def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
+        ...
 
     @abc.abstractmethod
-    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
+        ...
 
     @abc.abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes:

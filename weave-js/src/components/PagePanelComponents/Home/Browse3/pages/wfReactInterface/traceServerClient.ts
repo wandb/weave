@@ -25,7 +25,7 @@ export type KeyedDictType = {
 export type TraceCallSchema = {
   project_id: string;
   id: string;
-  name: string;
+  op_name: string;
   trace_id: string;
   parent_id?: string;
   start_datetime: string;

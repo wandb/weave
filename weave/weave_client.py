@@ -200,7 +200,7 @@ def make_client_call(
     if isinstance(output, dict) and "_result" in output:
         output = output["_result"]
     call = Call(
-        op_name=server_call.name,
+        op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
@@ -367,7 +367,7 @@ class WeaveClient:
         start = StartedCallSchemaForInsert(
             project_id=self._project_id(),
             id=call_id,
-            name=op_str,
+            op_name=op_str,
             trace_id=trace_id,
             start_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,

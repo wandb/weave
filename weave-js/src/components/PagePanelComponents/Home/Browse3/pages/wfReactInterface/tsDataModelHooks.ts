@@ -872,7 +872,7 @@ const traceCallToLegacySpan = (
     ...(traceCall.summary ?? {}),
   };
   return {
-    name: traceCall.name,
+    name: traceCall.op_name,
     inputs: traceCall.inputs,
     output: traceCall.outputs,
     status_code: statusCode,
@@ -904,14 +904,14 @@ const traceCallToUICallSchema = (
     traceId: traceCall.trace_id,
     parentId: traceCall.parent_id ?? null,
     spanName:
-      traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      traceCall.name.startsWith(WEAVE_REF_PREFIX)
-        ? refUriToOpVersionKey(traceCall.name).opId
-        : traceCall.name,
+      traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+        ? refUriToOpVersionKey(traceCall.op_name).opId
+        : traceCall.op_name,
     opVersionRef:
-      traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      traceCall.name.startsWith(WEAVE_REF_PREFIX)
-        ? traceCall.name
+      traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+        ? traceCall.op_name
         : null,
     rawSpan: traceCallToLegacySpan(traceCall),
     rawFeedback: {},
