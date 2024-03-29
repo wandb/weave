@@ -318,9 +318,9 @@ const useOpVersions = makeTraceServerEndpointHook<
       return {
         entity,
         project,
-        opId: obj.name,
+        opId: obj.object_id,
         versionHash: obj.digest,
-        name: obj.name,
+        name: obj.object_id,
         path: 'obj',
         createdAtMs: convertISOToDate(obj.created_at).getTime(),
         versionIndex: obj.version_index,
@@ -446,9 +446,9 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
         entity,
         project,
         weaveKind: 'object' as const,
-        objectId: obj.name,
+        objectId: obj.object_id,
         versionHash: obj.digest,
-        name: obj.name,
+        name: obj.object_id,
         path: 'obj',
         createdAtMs: convertISOToDate(obj.created_at).getTime(),
         baseObjectClass: obj.base_object_class ?? null,
@@ -487,14 +487,14 @@ const useTableQuery = makeTraceServerEndpointHook<
   'tableQuery',
   (
     projectId: traceServerClient.TraceTableQueryReq['project_id'],
-    tableDigest: traceServerClient.TraceTableQueryReq['table_digest'],
+    digest: traceServerClient.TraceTableQueryReq['digest'],
     filter: traceServerClient.TraceTableQueryReq['filter'],
     limit: traceServerClient.TraceTableQueryReq['limit'],
     opts?: {skip?: boolean}
   ) => ({
     params: {
       project_id: projectId,
-      table_digest: tableDigest,
+      digest,
       filter,
       limit,
     },
@@ -853,14 +853,14 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 const traceCallToLegacySpan = (
   traceCall: traceServerClient.TraceCallSchema
 ): RawSpanFromStreamTableEra => {
-  const startDate = convertISOToDate(traceCall.start_datetime);
-  const endDate = traceCall.end_datetime
-    ? convertISOToDate(traceCall.end_datetime)
+  const startDate = convertISOToDate(traceCall.started_at);
+  const endDate = traceCall.ended_at
+    ? convertISOToDate(traceCall.ended_at)
     : null;
   let statusCode = 'UNSET';
   if (traceCall.exception) {
     statusCode = 'ERROR';
-  } else if (traceCall.end_datetime) {
+  } else if (traceCall.ended_at) {
     statusCode = 'SUCCESS';
   }
   let latencyS = 0;
@@ -872,9 +872,9 @@ const traceCallToLegacySpan = (
     ...(traceCall.summary ?? {}),
   };
   return {
-    name: traceCall.name,
+    name: traceCall.op_name,
     inputs: traceCall.inputs,
-    output: traceCall.outputs,
+    output: traceCall.output,
     status_code: statusCode,
     exception: traceCall.exception,
     attributes: traceCall.attributes,
@@ -904,14 +904,14 @@ const traceCallToUICallSchema = (
     traceId: traceCall.trace_id,
     parentId: traceCall.parent_id ?? null,
     spanName:
-      traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      traceCall.name.startsWith(WEAVE_REF_PREFIX)
-        ? refUriToOpVersionKey(traceCall.name).opId
-        : traceCall.name,
+      traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+        ? refUriToOpVersionKey(traceCall.op_name).opId
+        : traceCall.op_name,
     opVersionRef:
-      traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      traceCall.name.startsWith(WEAVE_REF_PREFIX)
-        ? traceCall.name
+      traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+        ? traceCall.op_name
         : null,
     rawSpan: traceCallToLegacySpan(traceCall),
     rawFeedback: {},

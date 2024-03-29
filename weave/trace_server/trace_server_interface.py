@@ -5,11 +5,11 @@ from pydantic import BaseModel
 
 
 class CallSchema(BaseModel):
-    project_id: str
     id: str
+    project_id: str
 
     # Name of the calling function (op)
-    name: str
+    op_name: str
 
     ## Trace ID
     trace_id: str
@@ -17,7 +17,7 @@ class CallSchema(BaseModel):
     parent_id: typing.Optional[str] = None
 
     ## Start time is required
-    start_datetime: datetime.datetime
+    started_at: datetime.datetime
     ## Attributes: properties of the call
     attributes: typing.Dict[str, typing.Any]
 
@@ -25,13 +25,13 @@ class CallSchema(BaseModel):
     inputs: typing.Dict[str, typing.Any]
 
     ## End time is required if finished
-    end_datetime: typing.Optional[datetime.datetime] = None
+    ended_at: typing.Optional[datetime.datetime] = None
 
     ## Exception is present if the call failed
     exception: typing.Optional[str] = None
 
     ## Outputs
-    outputs: typing.Optional[typing.Dict[str, typing.Any]] = None
+    output: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     ## Summary: a summary of the call
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -49,7 +49,7 @@ class StartedCallSchemaForInsert(BaseModel):
     id: typing.Optional[str] = None  # Will be generated if not provided
 
     # Name of the calling function (op)
-    name: str
+    op_name: str
 
     ## Trace ID
     trace_id: typing.Optional[str] = None  # Will be generated if not provided
@@ -57,7 +57,7 @@ class StartedCallSchemaForInsert(BaseModel):
     parent_id: typing.Optional[str] = None
 
     ## Start time is required
-    start_datetime: datetime.datetime
+    started_at: datetime.datetime
     ## Attributes: properties of the call
     attributes: typing.Dict[str, typing.Any]
 
@@ -74,13 +74,13 @@ class EndedCallSchemaForInsert(BaseModel):
     id: str
 
     ## End time is required
-    end_datetime: datetime.datetime
+    ended_at: datetime.datetime
 
     ## Exception is present if the call failed
     exception: typing.Optional[str] = None
 
     ## Outputs
-    outputs: typing.Dict[str, typing.Any]
+    output: typing.Dict[str, typing.Any]
 
     ## Summary: a summary of the call
     summary: typing.Dict[str, typing.Any]
@@ -88,7 +88,7 @@ class EndedCallSchemaForInsert(BaseModel):
 
 class ObjSchema(BaseModel):
     project_id: str
-    name: str
+    object_id: str
     created_at: datetime.datetime
     digest: str
     version_index: int
@@ -100,7 +100,7 @@ class ObjSchema(BaseModel):
 
 class ObjSchemaForInsert(BaseModel):
     project_id: str
-    name: str
+    object_id: str
     val: typing.Any
 
 
@@ -136,9 +136,9 @@ class CallReadRes(BaseModel):
 
 
 class _CallsFilter(BaseModel):
-    op_version_refs: typing.Optional[typing.List[str]] = None
-    input_object_version_refs: typing.Optional[typing.List[str]] = None
-    output_object_version_refs: typing.Optional[typing.List[str]] = None
+    op_names: typing.Optional[typing.List[str]] = None
+    input_refs: typing.Optional[typing.List[str]] = None
+    output_refs: typing.Optional[typing.List[str]] = None
     parent_ids: typing.Optional[typing.List[str]] = None
     trace_ids: typing.Optional[typing.List[str]] = None
     call_ids: typing.Optional[typing.List[str]] = None
@@ -163,13 +163,13 @@ class OpCreateReq(BaseModel):
 
 
 class OpCreateRes(BaseModel):
-    version_hash: str
+    digest: str
 
 
 class OpReadReq(BaseModel):
     project_id: str
     name: str
-    version_hash: str
+    digest: str
 
 
 class OpReadRes(BaseModel):
@@ -195,13 +195,13 @@ class ObjCreateReq(BaseModel):
 
 
 class ObjCreateRes(BaseModel):
-    version_digest: str
+    digest: str  #
 
 
 class ObjReadReq(BaseModel):
     project_id: str
-    name: str
-    version_digest: str
+    object_id: str
+    digest: str
 
 
 class ObjReadRes(BaseModel):
@@ -210,7 +210,7 @@ class ObjReadRes(BaseModel):
 
 class _ObjectVersionFilter(BaseModel):
     base_object_classes: typing.Optional[typing.List[str]] = None
-    object_names: typing.Optional[typing.List[str]] = None
+    object_ids: typing.Optional[typing.List[str]] = None
     is_op: typing.Optional[bool] = None
     latest_only: typing.Optional[bool] = None
 
@@ -243,7 +243,7 @@ class _TableRowFilter(BaseModel):
 
 class TableQueryReq(BaseModel):
     project_id: str
-    table_digest: str
+    digest: str
     filter: typing.Optional[_TableRowFilter] = None
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None

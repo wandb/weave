@@ -24,15 +24,15 @@ export type KeyedDictType = {
 export type TraceCallSchema = {
   project_id: string;
   id: string;
-  name: string;
+  op_name: string;
   trace_id: string;
   parent_id?: string;
-  start_datetime: string;
+  started_at: string;
   attributes: KeyedDictType;
   inputs: KeyedDictType;
-  end_datetime?: string;
+  ended_at?: string;
   exception?: string;
-  outputs?: KeyedDictType;
+  output?: KeyedDictType;
   summary?: KeyedDictType;
   wb_run_id?: string;
   wb_user_id?: string;
@@ -48,9 +48,9 @@ export type TraceCallReadRes = {
 };
 
 interface TraceCallsFilter {
-  op_version_refs?: string[];
-  input_object_version_refs?: string[];
-  output_object_version_refs?: string[];
+  op_names?: string[];
+  input_refs?: string[];
+  output_refs?: string[];
   parent_ids?: string[];
   trace_ids?: string[];
   call_ids?: string[];
@@ -84,7 +84,7 @@ type TraceObjQueryReq = {
 
 export interface TraceObjSchema {
   project_id: string;
-  name: string;
+  object_id: string;
   created_at: string;
   digest: string;
   version_index: number;
@@ -108,7 +108,7 @@ export type TraceRefsReadBatchRes = {
 
 export type TraceTableQueryReq = {
   project_id: string;
-  table_digest: string;
+  digest: string;
   filter?: {
     row_digests?: string[];
   };

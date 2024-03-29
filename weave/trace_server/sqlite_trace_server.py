@@ -74,15 +74,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 id TEXT PRIMARY KEY,
                 trace_id TEXT,
                 parent_id TEXT,
-                name TEXT,
-                start_datetime TEXT,
-                end_datetime TEXT,
+                op_name TEXT,
+                started_at TEXT,
+                ended_at TEXT,
                 exception TEXT,
                 attributes TEXT,
                 inputs TEXT,
                 input_refs TEXT,
-                outputs TEXT,
+                output TEXT,
                 output_refs TEXT,
+                summary TEXT,
                 wb_user_id TEXT,
                 wb_run_id TEXT
             )
@@ -92,12 +93,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             """
             CREATE TABLE IF NOT EXISTS objects (
                 project_id TEXT,
-                name TEXT,
+                object_id TEXT,
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
                 refs TEXT,
-                val TEXT,
+                val_dump TEXT,
                 digest TEXT UNIQUE,
                 version_index INTEGER,
                 is_latest INTEGER
@@ -146,8 +147,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     id,
                     trace_id,
                     parent_id,
-                    name,
-                    start_datetime,
+                    op_name,
+                    started_at,
                     attributes,
                     inputs,
                     input_refs,
@@ -159,8 +160,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.id,
                     req.start.trace_id,
                     req.start.parent_id,
-                    req.start.name,
-                    req.start.start_datetime.isoformat(),
+                    req.start.op_name,
+                    req.start.started_at.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
                     json.dumps(
@@ -183,18 +184,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         with self.lock:
             cursor.execute(
                 """UPDATE calls SET
-                    end_datetime = ?,
+                    ended_at = ?,
                     exception = ?,
-                    outputs = ?,
-                    output_refs = ?
+                    output = ?,
+                    output_refs = ?,
+                    summary = ?
                 WHERE id = ?""",
                 (
-                    req.end.end_datetime.isoformat(),
+                    req.end.ended_at.isoformat(),
                     req.end.exception,
-                    json.dumps(req.end.outputs),
-                    json.dumps(
-                        extract_refs_from_values(list(req.end.outputs.values()))
-                    ),
+                    json.dumps(req.end.output),
+                    json.dumps(extract_refs_from_values(list(req.end.output.values()))),
+                    json.dumps(req.end.summary),
                     req.end.id,
                 ),
             )
@@ -202,7 +203,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        raise NotImplementedError()
+        return tsi.CallReadRes(
+            call=self.calls_query(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    limit=1,
+                    filter=tsi._CallsFilter(call_ids=[req.id]),
+                )
+            ).calls[0]
+        )
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         print("REQ", req)
@@ -210,12 +219,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conds = []
         filter = req.filter
         if filter:
-            if filter.op_version_refs:
+            if filter.op_names:
                 or_conditions: list[str] = []
 
                 non_wildcarded_names: list[str] = []
                 wildcarded_names: list[str] = []
-                for name in filter.op_version_refs:
+                for name in filter.op_names:
                     if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
                         wildcarded_names.append(name)
                     else:
@@ -223,23 +232,23 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
                 if non_wildcarded_names:
                     in_expr = ", ".join((f"'{x}'" for x in non_wildcarded_names))
-                    or_conditions += [f"name IN ({', '.join({in_expr})})"]
+                    or_conditions += [f"op_name IN ({', '.join({in_expr})})"]
 
                 for name_ndx, name in enumerate(wildcarded_names):
                     like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
-                    or_conditions.append(f"name LIKE '{like_name}'")
+                    or_conditions.append(f"op_name LIKE '{like_name}'")
 
                 if or_conditions:
                     conds.append("(" + " OR ".join(or_conditions) + ")")
 
-            if filter.input_object_version_refs:
+            if filter.input_refs:
                 or_conditions = []
-                for ref in filter.input_object_version_refs:
+                for ref in filter.input_refs:
                     or_conditions.append(f"input_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
-            if filter.output_object_version_refs:
+            if filter.output_refs:
                 or_conditions = []
-                for ref in filter.output_object_version_refs:
+                for ref in filter.output_refs:
                     or_conditions.append(f"output_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
@@ -281,15 +290,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     id=row[1],
                     trace_id=row[2],
                     parent_id=row[3],
-                    name=row[4],
-                    start_datetime=row[5],
-                    end_datetime=row[6],
+                    op_name=row[4],
+                    started_at=row[5],
+                    ended_at=row[6],
                     exception=row[7],
                     attributes=json.loads(row[8]),
                     inputs=json.loads(row[9]),
-                    outputs=None if row[11] is None else json.loads(row[11]),
-                    wb_user_id=row[13],
-                    wb_run_id=row[14],
+                    output=None if row[11] is None else json.loads(row[11]),
+                    output_refs=None if row[12] is None else json.loads(row[12]),
+                    summary=json.loads(row[13]) if row[13] else None,
+                    wb_user_id=row[14],
+                    wb_run_id=row[15],
                 )
                 for row in query_result
             ]
@@ -315,27 +326,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             cursor.execute("BEGIN TRANSACTION")
             # first get version count
             cursor.execute(
-                """SELECT COUNT(*) FROM objects WHERE project_id = ? AND name = ?""",
-                (req.obj.project_id, req_obj.name),
+                """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
+                (req.obj.project_id, req_obj.object_id),
             )
             version_index = cursor.fetchone()[0]
 
             cursor.execute(
                 """INSERT OR IGNORE INTO objects (
                     project_id,
-                    name,
+                    object_id,
                     created_at,
                     kind,
                     base_object_class,
                     refs,
-                    val,
+                    val_dump,
                     digest,
                     version_index,
                     is_latest
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req_obj.project_id,
-                    req_obj.name,
+                    req_obj.object_id,
                     datetime.datetime.now().isoformat(),
                     get_kind(req_obj.val),
                     get_base_object_class(req_obj.val),
@@ -347,22 +358,22 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 ),
             )
             conn.commit()
-        return tsi.ObjCreateRes(version_digest=digest)
+        return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [
-            f"name = '{req.name}'",
+            f"object_id = '{req.object_id}'",
         ]
-        if req.version_digest == "latest":
+        if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
-            conds.append(f"digest = '{req.version_digest}'")
+            conds.append(f"digest = '{req.digest}'")
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
+            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         return tsi.ObjReadRes(obj=objs[0])
 
@@ -374,9 +385,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     conds.append("kind = 'op'")
                 else:
                     conds.append("kind != 'op'")
-            if req.filter.object_names:
-                in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
-                conds.append(f"name IN ({in_list})")
+            if req.filter.object_ids:
+                in_list = ", ".join([f"'{n}'" for n in req.filter.object_ids])
+                conds.append(f"object_id IN ({in_list})")
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:
@@ -410,15 +421,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             table_hasher = hashlib.sha256()
             for row_digest in row_digests:
                 table_hasher.update(row_digest.encode())
-            table_digest = table_hasher.hexdigest()
+            digest = table_hasher.hexdigest()
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
-                (req.table.project_id, table_digest, json.dumps(row_digests)),
+                (req.table.project_id, digest, json.dumps(row_digests)),
             )
             conn.commit()
 
-        return tsi.TableCreateRes(digest=table_digest)
+        return tsi.TableCreateRes(digest=digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
@@ -426,7 +437,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotImplementedError("Table filter not implemented")
         else:
             conds.append("1 = 1")
-        rows = self._table_query(req.project_id, req.table_digest, conditions=conds)
+        rows = self._table_query(req.project_id, req.digest, conditions=conds)
 
         return tsi.TableQueryRes(rows=rows)
 
@@ -445,15 +456,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         def read_ref(r: refs.ObjectRef) -> Any:
             conds = [
-                f"name = '{r.name}'",
-                f"digest = '{r.version}'",
+                f"object_id = '{r.name}'",
+                f"digest = '{r.digest}'",
             ]
             objs = self._select_objs_query(
                 f"{r.entity}/{r.project}",
                 conditions=conds,
             )
             if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
+                raise NotFoundError(f"Obj {r.name}:{r.digest} not found")
             obj = objs[0]
             val = obj.val
             extra = r.extra
@@ -516,7 +527,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def _table_query(
         self,
         project_id: str,
-        table_digest: str,
+        digest: str,
         conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
         parameters: Optional[dict[str, Any]] = None,
@@ -549,7 +560,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 OrderedDigests
                 JOIN table_rows ON OrderedDigests.digest = table_rows.digest
             """,
-            (project_id, table_digest),
+            (project_id, digest),
         )
         query_result = cursor.fetchall()
         return [
@@ -591,7 +602,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             result.append(
                 tsi.ObjSchema(
                     project_id=f"{row[0]}",
-                    name=row[1],
+                    object_id=row[1],
                     created_at=row[2],
                     kind=row[3],
                     base_object_class=row[4],

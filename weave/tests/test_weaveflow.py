@@ -5,6 +5,8 @@ import numpy as np
 
 from .. import ref_base
 
+pytestmark = pytest.mark.trace
+
 
 @pytest.mark.skip("failing in ci")
 def test_digestrefs(client):

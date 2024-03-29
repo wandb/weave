@@ -48,8 +48,8 @@ def get_saved_code(client, ref):
     resp = client.server.obj_read(
         ObjReadReq(
             project_id=f"{ref.entity}/{ref.project}",
-            name=ref.name,
-            version_digest=ref.version,
+            object_id=ref.name,
+            digest=ref.digest,
         )
     )
     files = resp.obj.val["files"]

@@ -26,6 +26,8 @@ from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
 )
 
+pytestmark = pytest.mark.trace
+
 
 class RegexStringMatcher(str):
     def __init__(self, pattern):
@@ -51,7 +53,7 @@ def test_table_create(client):
         )
     )
     result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", table_digest=res.digest)
+        TableQueryReq(project_id="test/test-project", digest=res.digest)
     )
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2
@@ -121,7 +123,7 @@ def test_dataset_refs(client):
         "shawn",
         "test-project",
         "my-dataset",
-        ref.ref.version,
+        ref.ref.digest,
         [
             OBJECT_ATTR_EDGE_NAME,
             "rows",
@@ -139,7 +141,7 @@ def test_dataset_refs(client):
         "shawn",
         "test-project",
         "my-dataset",
-        ref.ref.version,
+        ref.ref.digest,
         [
             OBJECT_ATTR_EDGE_NAME,
             "rows",
@@ -207,7 +209,7 @@ def test_calls_query(client):
     call0 = client.create_call("x", None, {"a": 5, "b": 10})
     call1 = client.create_call("x", None, {"a": 6, "b": 11})
     client.create_call("y", None, {"a": 5, "b": 10})
-    result = list(client.calls(weave_client._CallsFilter(op_version_refs=["x"])))
+    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
         op_name="x",

@@ -196,11 +196,11 @@ class CallsIter:
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> TraceObject:
-    output = server_call.outputs
+    output = server_call.output
     if isinstance(output, dict) and "_result" in output:
         output = output["_result"]
     call = Call(
-        op_name=server_call.name,
+        op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
@@ -245,15 +245,17 @@ class WeaveClient:
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project, name=name, val=json_val
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
                 )
             )
         )
         ref: Ref
         if is_opdef:
-            ref = OpRef(self.entity, self.project, name, response.version_digest)
+            ref = OpRef(self.entity, self.project, name, response.digest)
         else:
-            ref = ObjectRef(self.entity, self.project, name, response.version_digest)
+            ref = ObjectRef(self.entity, self.project, name, response.digest)
         # TODO: Try to put a ref onto val? Or should user code use a style like
         # save instead?
         return ref
@@ -268,13 +270,13 @@ class WeaveClient:
         read_res = self.server.obj_read(
             ObjReadReq(
                 project_id=self._project_id(),
-                name=ref.name,
-                version_digest=ref.version,
+                object_id=ref.name,
+                digest=ref.digest,
             )
         )
         # Probably bad form to mutate the ref here
-        if ref.version == "latest":
-            ref.version = read_res.obj.digest
+        if ref.digest == "latest":
+            ref.digest = read_res.obj.digest
         val = from_json(read_res.obj.val, self._project_id(), self.server)
         return make_trace_obj(val, ref, self.server, None)
 
@@ -312,7 +314,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(_CallsFilter(op_version_refs=[op_ref.uri()]))
+        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
 
     def objects(self, filter: Optional[_ObjectVersionFilter] = None) -> list[ObjSchema]:
         if not filter:
@@ -367,9 +369,9 @@ class WeaveClient:
         start = StartedCallSchemaForInsert(
             project_id=self._project_id(),
             id=call_id,
-            name=op_str,
+            op_name=op_str,
             trace_id=trace_id,
-            start_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes={},
@@ -391,8 +393,8 @@ class WeaveClient:
                     "end": {
                         "project_id": self._project_id(),
                         "id": call.id,
-                        "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
-                        "outputs": to_json(output, self._project_id(), self.server),
+                        "ended_at": datetime.datetime.now(tz=datetime.timezone.utc),
+                        "output": to_json(output, self._project_id(), self.server),
                         "summary": {},
                     },
                 }

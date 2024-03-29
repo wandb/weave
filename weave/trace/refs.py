@@ -49,11 +49,11 @@ class ObjectRef(RefWithExtra):
     entity: str
     project: str
     name: str
-    version: str
+    digest: str
     extra: list[str] = dataclasses.field(default_factory=list)
 
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.version}"
+        u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
@@ -74,7 +74,7 @@ class ObjectRef(RefWithExtra):
             return False
         if self.name != potential_ancestor.name:
             return False
-        if self.version != potential_ancestor.version:
+        if self.digest != potential_ancestor.digest:
             return False
         if len(self.extra) <= len(potential_ancestor.extra):
             return False
@@ -87,7 +87,7 @@ class ObjectRef(RefWithExtra):
 @dataclasses.dataclass
 class OpRef(ObjectRef):
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.version}"
+        u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
@@ -124,7 +124,7 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
             entity=entity,
             project=project,
             name=name,
-            version=version,
+            digest=version,
             extra=remaining[1:],
         )
     elif kind == "op":
@@ -133,7 +133,7 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
             entity=entity,
             project=project,
             name=name,
-            version=version,
+            digest=version,
             extra=remaining[1:],
         )
     else:
