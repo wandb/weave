@@ -41,8 +41,8 @@ import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {
-  DICT_KEY_EDGE_TYPE,
-  OBJECT_ATTRIBUTE_EDGE_TYPE,
+  DICT_KEY_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
 } from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {opVersionRefOpName} from '../Browse3/pages/wfReactInterface/utilities';
@@ -179,7 +179,7 @@ const getExtraColumns = (
           const subKeys = getExtraColumns([innerType]);
           subKeys.forEach(sk => {
             cols[k + '.' + sk.label] =
-              k + `/${OBJECT_ATTRIBUTE_EDGE_TYPE}/` + sk.path;
+              k + `/${OBJECT_ATTR_EDGE_NAME}/` + sk.path;
           });
         } else {
           cols[k] = k;
@@ -193,7 +193,7 @@ const getExtraColumns = (
         if (isExpandableType(innerType)) {
           const subKeys = getExtraColumns([innerType]);
           subKeys.forEach(sk => {
-            cols[k + '.' + sk.label] = k + `/${DICT_KEY_EDGE_TYPE}/` + sk.path;
+            cols[k + '.' + sk.label] = k + `/${DICT_KEY_EDGE_NAME}/` + sk.path;
           });
         } else {
           cols[k] = k;

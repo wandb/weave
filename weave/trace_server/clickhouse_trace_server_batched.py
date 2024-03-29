@@ -588,11 +588,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         unresolved_table_ref=None,
                         val=None,
                     )
-                if op == refs_internal.KEY_EDGE_TYPE:
+                if op == refs_internal.DICT_KEY_EDGE_NAME:
                     val = val.get(arg)
-                elif op == refs_internal.ATTRIBUTE_EDGE_TYPE:
+                elif op == refs_internal.OBJECT_ATTR_EDGE_NAME:
                     val = val.get(arg)
-                elif op == refs_internal.INDEX_EDGE_TYPE:
+                elif op == refs_internal.LIST_INDEX_EDGE_NAME:
                     index = int(arg)
                     if index >= len(val):
                         return None
@@ -650,7 +650,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra[0],
                         extra_result.remaining_extra[1],
                     )
-                    if op != refs_internal.ID_EDGE_TYPE:
+                    if op != refs_internal.TABLE_ROW_ID_EDGE_TYPE:
                         raise ValueError("Table refs must have id extra")
                     table_queries.setdefault(
                         (table_ref.project_id, table_ref.digest), []

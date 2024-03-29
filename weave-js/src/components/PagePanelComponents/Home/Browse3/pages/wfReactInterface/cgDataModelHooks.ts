@@ -73,12 +73,12 @@ import {
   refTypedNodeCache,
 } from './cache';
 import {
-  DICT_KEY_EDGE_TYPE,
-  LIST_INDEX_EDGE_TYPE,
-  OBJECT_ATTRIBUTE_EDGE_TYPE,
+  AWL_COL_EDGE_NAME,
+  AWL_ROW_EDGE_NAME,
+  DICT_KEY_EDGE_NAME,
+  LIST_INDEX_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
   PROJECT_CALL_STREAM_NAME,
-  TABLE_COLUMN_EDGE_TYPE,
-  TABLE_ROW_EDGE_TYPE,
   WANDB_ARTIFACT_REF_PREFIX,
 } from './constants';
 import {
@@ -999,7 +999,7 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
     return node;
   }
-  if (extra[0] === LIST_INDEX_EDGE_TYPE || extra[0] === TABLE_ROW_EDGE_TYPE) {
+  if (extra[0] === LIST_INDEX_EDGE_NAME || extra[0] === AWL_ROW_EDGE_NAME) {
     return nodeFromExtra(
       callOpVeryUnsafe('index', {
         arr: node,
@@ -1008,8 +1008,8 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
       extra.slice(2)
     );
   } else if (
-    extra[0] === DICT_KEY_EDGE_TYPE ||
-    extra[0] === TABLE_COLUMN_EDGE_TYPE
+    extra[0] === DICT_KEY_EDGE_NAME ||
+    extra[0] === AWL_COL_EDGE_NAME
   ) {
     return nodeFromExtra(
       callOpVeryUnsafe('pick', {
@@ -1018,7 +1018,7 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
       }) as Node,
       extra.slice(2)
     );
-  } else if (extra[0] === OBJECT_ATTRIBUTE_EDGE_TYPE) {
+  } else if (extra[0] === OBJECT_ATTR_EDGE_NAME) {
     return nodeFromExtra(
       callOpVeryUnsafe('Object-__getattr__', {
         self: node,
