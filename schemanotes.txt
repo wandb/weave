@@ -1,0 +1,45 @@
+calls:
+  - name -> op_name
+  - outputs -> output
+
+datetimes:
+- calls:
+  - start_datetime
+  - end_datetime
+- most db records have
+  - insert_datetime
+
+
+files
+- add insert_datetime
+
+
+objects -> object_versions_raw
+ - name -> object_id
+ - created_at ->  insert_datetime
+ - val -> dumps
+ - add refs column
+
+
+objects_deduped
+- created_at -> insert_datetime
+
+table_rows
+- insert_datetime
+- val -> dumps
+- add refs column
+
+
+table_rows_deduped
+- remove 'rn'
+
+tables
+- insert_datetime
+
+table_rows_deduped
+- remove rn
+
+
+# NOTES
+#   - remove _result from everything
+#   - pull out all refs within values into refs columns for any "dumps" field
