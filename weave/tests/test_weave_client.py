@@ -121,7 +121,7 @@ def test_dataset_refs(client):
         "shawn",
         "test-project",
         "my-dataset",
-        ref.ref.version,
+        ref.ref.digest,
         [
             ATTRIBUTE_EDGE_TYPE,
             "rows",
@@ -139,7 +139,7 @@ def test_dataset_refs(client):
         "shawn",
         "test-project",
         "my-dataset",
-        ref.ref.version,
+        ref.ref.digest,
         [
             ATTRIBUTE_EDGE_TYPE,
             "rows",

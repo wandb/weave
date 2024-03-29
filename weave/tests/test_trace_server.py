@@ -4,18 +4,18 @@ import datetime
 from weave.trace_server import trace_server_interface as tsi
 
 
-def test_save_object(clickhouse_trace_server):
-    create_res = clickhouse_trace_server.obj_create(
+def test_save_object(client):
+    create_res = client.server.obj_create(
         tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
-                project_id="shawn/proj", name="my-obj", val={"a": 1}
+                project_id="shawn/proj", object_id="my-obj", val={"a": 1}
             )
         )
     )
-    read_res = clickhouse_trace_server.obj_read(
+    read_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id="shawn/proj",
-            name="my-obj",
-            version_digest=create_res.version_digest,
+            object_id="my-obj",
+            digest=create_res.digest,
         )
     )

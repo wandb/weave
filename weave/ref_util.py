@@ -41,8 +41,8 @@ def val_with_relative_ref(
         # the child's inherent ref, not the relative ref from the parent.
         if child_ref is not None:
             if parent_ref is not None:
-                if hasattr(child_ref, "version") and hasattr(parent_ref, "version"):
-                    if child_ref.version != parent_ref.version:
+                if hasattr(child_ref, "digest") and hasattr(parent_ref, "digest"):
+                    if child_ref.digest != parent_ref.digest:
                         return child_object
 
         if parent_ref is not None:
