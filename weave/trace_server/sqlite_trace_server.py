@@ -22,6 +22,12 @@ from weave.trace import refs
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+from weave.trace_server.refs_internal import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    OBJECT_ATTR_EDGE_NAME,
+    TABLE_ROW_ID_EDGE_NAME,
+)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -464,13 +470,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-                if op == "key":
+                if op == DICT_KEY_EDGE_NAME:
                     val = val[arg]
-                elif op == "atr":
+                elif op == OBJECT_ATTR_EDGE_NAME:
                     val = val[arg]
-                elif op == "ndx":
+                elif op == LIST_INDEX_EDGE_NAME:
                     val = val[int(arg)]
-                elif op == "id":
+                elif op == TABLE_ROW_ID_EDGE_NAME:
                     if isinstance(val, str) and val.startswith("weave://"):
                         table_ref = refs.parse_uri(val)
                         if not isinstance(table_ref, refs.TableRef):

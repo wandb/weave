@@ -11,10 +11,10 @@ import dataclasses
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
 
-KEY_EDGE_TYPE = "key"
-INDEX_EDGE_TYPE = "ndx"
-ATTRIBUTE_EDGE_TYPE = "atr"
-ID_EDGE_TYPE = "id"
+DICT_KEY_EDGE_NAME = "key"
+LIST_INDEX_EDGE_NAME = "index"
+OBJECT_ATTR_EDGE_NAME = "attr"
+TABLE_ROW_ID_EDGE_NAME = "id"
 
 
 @dataclasses.dataclass

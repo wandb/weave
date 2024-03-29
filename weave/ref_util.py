@@ -3,12 +3,13 @@ import dataclasses
 from urllib import parse
 
 from . import box
+from .trace_server import refs_internal
 
-DICT_KEY_EDGE_TYPE = "key"
-LIST_INDEX_EDGE_TYPE = "ndx"
-OBJECT_ATTRIBUTE_EDGE_TYPE = "atr"
-TABLE_ROW_EDGE_TYPE = "row"
-TABLE_COLUMN_EDGE_TYPE = "col"
+DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
+LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
+OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
+AWL_ROW_EDGE_NAME = "row"
+AWL_COL_EDGE_NAME = "col"
 
 
 def parse_local_ref_str(s: str) -> typing.Tuple[str, typing.Optional[list[str]]]:

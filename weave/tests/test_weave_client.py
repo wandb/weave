@@ -9,10 +9,10 @@ from weave import op_def, Evaluation
 from weave import weave_client
 from weave.trace.op import Op
 from weave.trace.refs import (
-    ATTRIBUTE_EDGE_TYPE,
-    ID_EDGE_TYPE,
-    INDEX_EDGE_TYPE,
-    KEY_EDGE_TYPE,
+    OBJECT_ATTR_EDGE_NAME,
+    TABLE_ROW_ID_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    DICT_KEY_EDGE_NAME,
 )
 
 from weave.trace import refs
@@ -45,9 +45,9 @@ def test_table_create(client):
             table=TableSchemaForInsert(
                 project_id="test/test-project",
                 rows=[
-                    {ID_EDGE_TYPE: 1, "val": 1},
-                    {ID_EDGE_TYPE: 2, "val": 2},
-                    {ID_EDGE_TYPE: 3, "val": 3},
+                    {TABLE_ROW_ID_EDGE_NAME: 1, "val": 1},
+                    {TABLE_ROW_ID_EDGE_NAME: 2, "val": 2},
+                    {TABLE_ROW_ID_EDGE_NAME: 3, "val": 3},
                 ],
             )
         )
@@ -125,11 +125,11 @@ def test_dataset_refs(client):
         "my-dataset",
         ref.ref.digest,
         [
-            ATTRIBUTE_EDGE_TYPE,
+            OBJECT_ATTR_EDGE_NAME,
             "rows",
-            ID_EDGE_TYPE,
+            TABLE_ROW_ID_EDGE_NAME,
             RegexStringMatcher(".*"),
-            KEY_EDGE_TYPE,
+            DICT_KEY_EDGE_NAME,
             "v",
         ],
     )
@@ -143,11 +143,11 @@ def test_dataset_refs(client):
         "my-dataset",
         ref.ref.digest,
         [
-            ATTRIBUTE_EDGE_TYPE,
+            OBJECT_ATTR_EDGE_NAME,
             "rows",
-            ID_EDGE_TYPE,
+            TABLE_ROW_ID_EDGE_NAME,
             RegexStringMatcher(".*"),
-            KEY_EDGE_TYPE,
+            DICT_KEY_EDGE_NAME,
             "v",
         ],
     )
@@ -259,15 +259,15 @@ def test_mutations(client):
     dataset.cows = "moo"
     assert dataset.mutations == [
         weave_client.MutationAppend(
-            path=[ATTRIBUTE_EDGE_TYPE, "rows"],
+            path=[OBJECT_ATTR_EDGE_NAME, "rows"],
             operation="append",
             args=({"doc": "zz", "label": "e"},),
         ),
         weave_client.MutationSetitem(
             path=[
-                ATTRIBUTE_EDGE_TYPE,
+                OBJECT_ATTR_EDGE_NAME,
                 "rows",
-                ID_EDGE_TYPE,
+                TABLE_ROW_ID_EDGE_NAME,
                 RegexStringMatcher(".*,.*"),
             ],
             operation="setitem",
@@ -275,13 +275,13 @@ def test_mutations(client):
         ),
         weave_client.MutationSetitem(
             path=[
-                ATTRIBUTE_EDGE_TYPE,
+                OBJECT_ATTR_EDGE_NAME,
                 "rows",
-                ID_EDGE_TYPE,
+                TABLE_ROW_ID_EDGE_NAME,
                 RegexStringMatcher(".*,.*"),
-                KEY_EDGE_TYPE,
+                DICT_KEY_EDGE_NAME,
                 "somelist",
-                INDEX_EDGE_TYPE,
+                LIST_INDEX_EDGE_NAME,
                 "0",
             ],
             operation="setitem",
@@ -424,10 +424,10 @@ def test_dataset_rows_ref(client):
     saved = client.save(dataset, "my-dataset")
     assert isinstance(saved.rows.ref, weave_client.ObjectRef)
     assert saved.rows.ref.name == "my-dataset"
-    assert saved.rows.ref.extra == [ATTRIBUTE_EDGE_TYPE, "rows"]
+    assert saved.rows.ref.extra == [OBJECT_ATTR_EDGE_NAME, "rows"]
 
 
-# @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
+@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_evaluate(client):
     @weave.op()
     async def model_predict(input) -> str:
@@ -493,31 +493,31 @@ def test_evaluate(client):
     example0_obj = child0.inputs["example"]
     assert example0_obj.ref.name == "Dataset"
     assert example0_obj.ref.extra == [
-        ATTRIBUTE_EDGE_TYPE,
+        OBJECT_ATTR_EDGE_NAME,
         "rows",
-        ID_EDGE_TYPE,
+        TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
     ]
     example0_obj_input = example0_obj["input"]
     assert example0_obj_input == "1 + 2"
     assert example0_obj_input.ref.name == "Dataset"
     assert example0_obj_input.ref.extra == [
-        ATTRIBUTE_EDGE_TYPE,
+        OBJECT_ATTR_EDGE_NAME,
         "rows",
-        ID_EDGE_TYPE,
+        TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
-        KEY_EDGE_TYPE,
+        DICT_KEY_EDGE_NAME,
         "input",
     ]
     example0_obj_target = example0_obj["target"]
     assert example0_obj_target == 3
     assert example0_obj_target.ref.name == "Dataset"
     assert example0_obj_target.ref.extra == [
-        ATTRIBUTE_EDGE_TYPE,
+        OBJECT_ATTR_EDGE_NAME,
         "rows",
-        ID_EDGE_TYPE,
+        TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
-        KEY_EDGE_TYPE,
+        DICT_KEY_EDGE_NAME,
         "target",
     ]
 
@@ -533,9 +533,9 @@ def test_evaluate(client):
     example1_obj = child1.inputs["example"]
     assert example1_obj.ref.name == "Dataset"
     assert example1_obj.ref.extra == [
-        ATTRIBUTE_EDGE_TYPE,
+        OBJECT_ATTR_EDGE_NAME,
         "rows",
-        ID_EDGE_TYPE,
+        TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
     ]
     # Should be a different row ref
@@ -646,10 +646,10 @@ def test_server_file(client):
 
 
 def test_isinstance_checks(client):
-    class PydanticObjA(BaseModel):
+    class PydanticObjA(weave.Object):
         x: dict
 
-    class PydanticObjB(BaseModel):
+    class PydanticObjB(weave.Object):
         a: PydanticObjA
 
     b = PydanticObjB(a=PydanticObjA(x={"y": [1, "j", True, None]}))

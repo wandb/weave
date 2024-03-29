@@ -10,10 +10,10 @@ from weave.trace.refs import (
     RefWithExtra,
     ObjectRef,
     TableRef,
-    KEY_EDGE_TYPE,
-    ATTRIBUTE_EDGE_TYPE,
-    INDEX_EDGE_TYPE,
-    ID_EDGE_TYPE,
+    DICT_KEY_EDGE_NAME,
+    OBJECT_ATTR_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    TABLE_ROW_ID_EDGE_NAME,
 )
 from weave import box
 from weave.table import Table
@@ -396,13 +396,13 @@ def make_trace_obj(
         # This is where extra resolution happens?
         for extra_index in range(0, len(extra), 2):
             op, arg = extra[extra_index], extra[extra_index + 1]
-            if op == KEY_EDGE_TYPE:
+            if op == DICT_KEY_EDGE_NAME:
                 val = val[arg]
-            elif op == ATTRIBUTE_EDGE_TYPE:
+            elif op == OBJECT_ATTR_EDGE_NAME:
                 val = getattr(val, arg)
-            elif op == INDEX_EDGE_TYPE:
+            elif op == LIST_INDEX_EDGE_NAME:
                 val = val[int(arg)]
-            elif op == ID_EDGE_TYPE:
+            elif op == TABLE_ROW_ID_EDGE_NAME:
                 val = val[arg]
             else:
                 raise ValueError(f"Unknown ref type: {extra[extra_index]}")
