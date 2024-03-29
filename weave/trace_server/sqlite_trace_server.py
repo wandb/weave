@@ -12,7 +12,7 @@ import sqlite3
 
 
 from .trace_server_interface_util import (
-    extract_refs,
+    extract_refs_from_values,
     str_digest,
     bytes_digest,
 )
@@ -157,7 +157,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.start_datetime.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
-                    json.dumps(extract_refs(req.start.inputs)),
+                    json.dumps(
+                        extract_refs_from_values(list(req.start.inputs.values()))
+                    ),
                     req.start.wb_user_id,
                     req.start.wb_run_id,
                 ),
@@ -184,7 +186,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.end.end_datetime.isoformat(),
                     req.end.exception,
                     json.dumps(req.end.output),
-                    json.dumps(extract_refs(req.end.output)),
+                    json.dumps(extract_refs_from_values(list(req.end.output.values()))),
                     req.end.id,
                 ),
             )

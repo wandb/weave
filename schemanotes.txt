@@ -42,6 +42,9 @@ table_rows_deduped
 
 
 # NOTES
-#   - [IN PROG] remove _result from everything
-#   - [DONE] recursively pull out refs from values
 #   - pull out all refs within values into refs columns for any "dumps" field
+
+
+TODO After:
+* Remove `_result` from output
+* recursively pull out refs from values

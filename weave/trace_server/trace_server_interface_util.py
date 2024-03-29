@@ -62,22 +62,14 @@ valid_schemes = [
 ]
 
 
-def extract_refs(
-    val: typing.Optional[typing.Any],
+def extract_refs_from_values(
+    vals: typing.Optional[typing.List[typing.Any]],
 ) -> typing.List[str]:
-    if isinstance(val, str) and any(
-        val.startswith(scheme + "://") for scheme in valid_schemes
-    ):
-        return [val]
-    elif isinstance(val, dict):
-        # Short circuit if this is a structured object
-        if "_type" in val:
-            return []
-        return extract_refs(val.values())
-    elif isinstance(val, list):
-        refs = []
-        for v in val:
-            refs.extend(extract_refs(v))
-        return refs
-    else:
-        return []
+    refs = []
+    if vals:
+        for val in vals:
+            if isinstance(val, str) and any(
+                val.startswith(scheme + "://") for scheme in valid_schemes
+            ):
+                refs.append(val)
+    return refs

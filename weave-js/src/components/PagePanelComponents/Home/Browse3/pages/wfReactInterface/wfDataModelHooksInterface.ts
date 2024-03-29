@@ -225,15 +225,7 @@ export type WFDataModelHooksInterface = {
 export interface RawSpanFromStreamTableEra {
   name: string;
   inputs: {_keys?: string[]; [key: string]: any};
-  // output: undefined | {_keys?: string[]; [key: string]: any};
-  output:
-    | undefined
-    | string
-    | number
-    | boolean
-    | null
-    | {[key: string]: any}
-    | any[];
+  output: undefined | {_keys?: string[]; [key: string]: any};
   status_code: string; // TODO enum
   exception?: string;
   attributes: {[key: string]: any};

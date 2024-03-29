@@ -33,14 +33,7 @@ export type TraceCallSchema = {
   inputs: KeyedDictType;
   end_datetime?: string;
   exception?: string;
-  output?:
-    | undefined
-    | string
-    | number
-    | boolean
-    | null
-    | {[key: string]: any}
-    | any[];
+  outputs?: KeyedDictType;
   summary?: KeyedDictType;
   wb_run_id?: string;
   wb_user_id?: string;
