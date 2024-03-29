@@ -13,7 +13,7 @@ from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
-    TABLE_ROW_ID_EDGE_TYPE,
+    TABLE_ROW_ID_EDGE_NAME,
 )
 from weave import box
 from weave.table import Table
@@ -402,7 +402,7 @@ def make_trace_obj(
                 val = getattr(val, arg)
             elif op == LIST_INDEX_EDGE_NAME:
                 val = val[int(arg)]
-            elif op == TABLE_ROW_ID_EDGE_TYPE:
+            elif op == TABLE_ROW_ID_EDGE_NAME:
                 val = val[arg]
             else:
                 raise ValueError(f"Unknown ref type: {extra[extra_index]}")
