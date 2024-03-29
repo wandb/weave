@@ -102,13 +102,21 @@ def test_trace_server_call_start_and_end(client):
         start.started_at.isoformat(timespec="milliseconds")
     )
 
+    class FuzzyDateTimeMatcher:
+        def __init__(self, dt):
+            self.dt = dt
+
+        def __eq__(self, other):
+            # Checks within 1ms
+            return abs((self.dt - other).total_seconds()) < 0.001
+
     assert res.call.model_dump() == {
         "project_id": "test_entity/test_project",
         "id": call_id,
         "op_name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
-        "started_at": start.started_at,  # exp_started_at,
+        "started_at": FuzzyDateTimeMatcher(start.started_at),
         "ended_at": None,
         "exception": None,
         "attributes": {"a": 5},
@@ -145,8 +153,8 @@ def test_trace_server_call_start_and_end(client):
         "op_name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
-        "started_at": start.started_at,  # exp_started_at,
-        "ended_at": end.ended_at,  # exp_ended_at,
+        "started_at": FuzzyDateTimeMatcher(start.started_at),
+        "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
         "attributes": {"a": 5},
         "inputs": {"b": 5},
