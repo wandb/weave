@@ -1,5 +1,4 @@
 /**
- * EDIT ME
  * This file defines the connection between the web client and the trace server.
  * The intention is that the implementation is a 1-1 mapping to the trace
  * server's API. This file should not contain any business logic. If possible,
