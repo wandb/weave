@@ -17,30 +17,88 @@ CREATE TABLE call_parts (
     */
     project_id String,
     /*
-    
+    `parent_id`: The ID of the parent call. This is typically a UUID.
+        - Required for call-start (if the call is not a top-level root call)
     */
-    # Start Fields (All fields except parent_id are required when starting
-    # a call. However, to support a fast "update" we need to allow nulls)
-    trace_id String NULL,
     parent_id String NULL,
-    # This field is actually nullable
+    /*
+    `trace_id`: The ID of the trace that this call is part of. This is typically a UUID.
+        - Required for call-start
+    */
+    trace_id String NULL,
+    /*
+    `op_name`: The name of the operation that was called. This is most often a ref string
+    referring to the Op that produced the call. However, it can also be a string
+        - Required for call-start
+    */
     op_name String NULL,
+    /*
+    `started_at`: The time that the call started. No timezone information is stored and the
+    precision is to the millisecond.
+       - Required for call-start
+    */
     started_at DateTime64(3) NULL,
+    /*
+    `attributes_dump`: A `json.dumps` of the attributes of the call. Attributes are essentially
+    metadata about the call itself and are not the inputs or outputs of the call.
+       - Required for call-start
+    */
     attributes_dump String NULL,
+    /*
+    `inputs_dump`: A `json.dumps` of the inputs to the call. This is typically a dictionary
+    of the inputs to the call.
+       - Required for call-start
+    */
     inputs_dump String NULL,
+    /*
+    `input_refs`: A derived field that contains the references used in the inputs. This is
+    used to track the dependencies of the call.
+       - Required for call-start
+    */
     input_refs Array(String),
-    # Empty array treated as null
-    # End Fields (All fields are required when ending
-    # a call. However, to support a fast "update" we need to allow nulls)
+    /*
+    `ended_at`: The time that the call ended. No timezone information is stored and the
+    precision is to the millisecond.
+       - Required for call-end
+    */
     ended_at DateTime64(3) NULL,
+    /*
+    `output_dump`: A `json.dumps` of the output of the call. This is not guaranteed to be
+    a dictionary.
+       - Required for call-end
+    */
     output_dump String NULL,
+    /*
+    `summary_dump`: A `json.dumps` of the summary of the call. This is typically a dictionary
+    of the summary of the call. Importantly, this is not the same as the output of the call. 
+    In contrast to attributes, the summary is calculated after the call has completed.
+       - Required for call-end
+    */
     summary_dump String NULL,
+    /*
+    `exception`: A string representation of the exception that was raised during the call.
+       - Required for call-end (if an exception was raised)
+    */
     exception String NULL,
+    /*
+    `output_refs`: A derived field that contains the references used in the output. This is
+    used to track the dependencies of the call.
+       - Required for call-end
+    */
     output_refs Array(String),
+    /*
+    `wb_user_id`: The ID of the user that created the call. This is the ID of the user in the
+    W&B API.
+    */
     wb_user_id Nullable(String),
+    /*
+    `wb_run_id`: The ID of the run that the call is part of. This is a composite of the 
+    W&B Project ID and Run ID in the W&B API.
+    */
     wb_run_id Nullable(String),
-    # Empty array treated as null
-    # Bookkeeping
+    /*
+    `created_at`: The time that the row was inserted into the database.
+    */
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = MergeTree
 ORDER BY (project_id, id);

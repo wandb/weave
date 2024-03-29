@@ -207,7 +207,7 @@ def test_calls_query(client):
     call0 = client.create_call("x", None, {"a": 5, "b": 10})
     call1 = client.create_call("x", None, {"a": 6, "b": 11})
     client.create_call("y", None, {"a": 5, "b": 10})
-    result = list(client.calls(weave_client._CallsFilter(op_version_refs=["x"])))
+    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
         op_name="x",
