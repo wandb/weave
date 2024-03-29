@@ -1,0 +1,175 @@
+CREATE TABLE calls_raw (
+    project_id String,
+    id String,
+    # Start Fields (All fields except parent_id are required when starting
+    # a call. However, to support a fast "update" we need to allow nulls)
+    trace_id String NULL,
+    parent_id String NULL,
+    # This field is actually nullable
+    name String NULL,
+    start_datetime DateTime64(3) NULL,
+    attributes_dump String NULL,
+    inputs_dump String NULL,
+    input_refs Array(String),
+    # Empty array treated as null
+    # End Fields (All fields are required when ending
+    # a call. However, to support a fast "update" we need to allow nulls)
+    end_datetime DateTime64(3) NULL,
+    outputs_dump String NULL,
+    summary_dump String NULL,
+    exception String NULL,
+    output_refs Array(String),
+    wb_user_id Nullable(String),
+    wb_run_id Nullable(String),
+    # Empty array treated as null
+    # Bookkeeping
+    db_row_created_at DateTime64(3) DEFAULT now64(3)
+) ENGINE = MergeTree
+ORDER BY (project_id, id);
+
+CREATE TABLE calls_merged (
+    project_id String,
+    id String,
+    # While these fields are all marked as null, the practical expectation
+    # is that they will be non-null except for parent_id. The problem is that
+    # clickhouse might not aggregate the data immediately, so we need to allow
+    # for nulls in the interim.
+    trace_id SimpleAggregateFunction(any, Nullable(String)),
+    parent_id SimpleAggregateFunction(any, Nullable(String)),
+    name SimpleAggregateFunction(any, Nullable(String)),
+    start_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
+    attributes_dump SimpleAggregateFunction(any, Nullable(String)),
+    inputs_dump SimpleAggregateFunction(any, Nullable(String)),
+    input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
+    end_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
+    outputs_dump SimpleAggregateFunction(any, Nullable(String)),
+    summary_dump SimpleAggregateFunction(any, Nullable(String)),
+    exception SimpleAggregateFunction(any, Nullable(String)),
+    output_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
+    wb_user_id SimpleAggregateFunction(any, Nullable(String)),
+    wb_run_id SimpleAggregateFunction(any, Nullable(String))
+) ENGINE = AggregatingMergeTree
+ORDER BY (project_id, id);
+CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS
+SELECT project_id,
+    id,
+    anySimpleState(wb_run_id) as wb_run_id,
+    anySimpleState(wb_user_id) as wb_user_id,
+    anySimpleState(trace_id) as trace_id,
+    anySimpleState(parent_id) as parent_id,
+    anySimpleState(name) as name,
+    anySimpleState(start_datetime) as start_datetime,
+    anySimpleState(attributes_dump) as attributes_dump,
+    anySimpleState(inputs_dump) as inputs_dump,
+    array_concat_aggSimpleState(input_refs) as input_refs,
+    anySimpleState(end_datetime) as end_datetime,
+    anySimpleState(outputs_dump) as outputs_dump,
+    anySimpleState(summary_dump) as summary_dump,
+    anySimpleState(exception) as exception,
+    array_concat_aggSimpleState(output_refs) as output_refs
+FROM calls_raw
+GROUP BY project_id,
+    id;
+CREATE TABLE objects (
+    project_id String,
+    name String,
+    created_at DateTime64 DEFAULT now64(),
+    kind Enum('op', 'object'),
+    base_object_class String NULL,
+    refs Array(String),
+    val String,
+    digest String
+) ENGINE = ReplacingMergeTree()
+ORDER BY (project_id, kind, name, digest);
+CREATE VIEW objects_deduped AS
+SELECT project_id,
+    name,
+    created_at,
+    kind,
+    base_object_class,
+    refs,
+    val,
+    digest,
+    if (kind = 'op', 1, 0) AS is_op,
+    row_number() OVER (
+        PARTITION BY project_id,
+        kind,
+        name
+        ORDER BY created_at ASC
+    ) AS _version_index_plus_1,
+    _version_index_plus_1 - 1 AS version_index,
+    count(*) OVER (PARTITION BY project_id, kind, name) as version_count,
+    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
+FROM (
+        SELECT *,
+            row_number() OVER (
+                PARTITION BY project_id,
+                kind,
+                name,
+                digest
+                ORDER BY created_at ASC
+            ) AS rn
+        FROM objects
+    )
+WHERE rn = 1 WINDOW w AS (
+        PARTITION BY project_id,
+        kind,
+        name
+        ORDER BY created_at ASC
+    )
+ORDER BY project_id,
+    kind,
+    name,
+    created_at;
+CREATE TABLE table_rows (
+    project_id String,
+    digest String,
+    val String,
+) ENGINE = ReplacingMergeTree()
+ORDER BY (project_id, digest);
+CREATE VIEW table_rows_deduped AS
+SELECT *
+FROM (
+        SELECT *,
+            row_number() OVER (PARTITION BY project_id, digest) AS rn
+        FROM table_rows
+    )
+WHERE rn = 1
+ORDER BY project_id,
+    digest;
+CREATE TABLE tables (
+    project_id String,
+    digest String,
+    row_digests Array(String),
+) ENGINE = ReplacingMergeTree()
+ORDER BY (project_id, digest);
+CREATE VIEW tables_deduped AS
+SELECT *
+FROM (
+        SELECT *,
+            row_number() OVER (PARTITION BY project_id, digest) AS rn
+        FROM tables
+    )
+WHERE rn = 1
+ORDER BY project_id,
+    digest;
+CREATE TABLE files (
+    project_id String,
+    digest String,
+    chunk_index UInt32,
+    n_chunks UInt32,
+    name String,
+    val String,
+) ENGINE = ReplacingMergeTree()
+ORDER BY (project_id, digest, chunk_index);
+CREATE VIEW files_deduped AS
+SELECT *
+FROM (
+        SELECT *,
+            row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
+        FROM files
+    )
+WHERE rn = 1
+ORDER BY project_id,
+    digest,
+    chunk_index;

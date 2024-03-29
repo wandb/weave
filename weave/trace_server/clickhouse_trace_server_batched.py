@@ -295,9 +295,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
-        # ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
-        # self._insert_obj(ch_obj)
-        # return tsi.OpCreateRes(version_hash=str(ch_obj.id))
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         conds = [
@@ -760,18 +757,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 settings=settings,
             )
 
-    def _insert_obj_batch(self, batch: typing.List) -> None:
-        if batch:
-            settings = {}
-            if self._use_async_insert:
-                settings["async_insert"] = 1
-                settings["wait_for_async_insert"] = 0
-            self._insert(
-                "objects_raw",
-                data=batch,
-                column_names=all_obj_insert_columns,
-                settings=settings,
-            )
 
     def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
         # Generate and run the query to get the call from the database
@@ -989,14 +974,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _flush_calls(self) -> None:
         self._insert_call_batch(self._call_batch)
         self._call_batch = []
-
-    def _insert_obj(self, ch_obj: ObjCHInsertable) -> None:
-        parameters = ch_obj.model_dump()
-        row = []
-        for key in all_obj_insert_columns:
-            row.append(parameters.get(key, None))
-
-        self._insert_obj_batch([row])
 
 
 def _dict_value_to_dump(
