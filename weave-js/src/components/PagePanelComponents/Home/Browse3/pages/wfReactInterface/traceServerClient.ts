@@ -32,7 +32,11 @@ export type TraceCallSchema = {
   inputs: KeyedDictType;
   ended_at?: string;
   exception?: string;
-  output?: KeyedDictType;
+  // Using `unknown` for `output` instead of an `any` so that the type checkers
+  // force us to handle all possible types. When using `any`, this value can be
+  // freely assigned to any other variable without any type checking. This way,
+  // we can ensure that we handle all possible types.
+  output?: unknown;
   summary?: KeyedDictType;
   wb_run_id?: string;
   wb_user_id?: string;
@@ -59,7 +63,7 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
-type TraceCallsQueryReq = {
+export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
