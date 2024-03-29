@@ -196,7 +196,7 @@ class CallsIter:
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> TraceObject:
-    output = server_call.outputs
+    output = server_call.output
     if isinstance(output, dict) and "_result" in output:
         output = output["_result"]
     call = Call(

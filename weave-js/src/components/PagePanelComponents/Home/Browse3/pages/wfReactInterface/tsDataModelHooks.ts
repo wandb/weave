@@ -874,7 +874,7 @@ const traceCallToLegacySpan = (
   return {
     name: traceCall.op_name,
     inputs: traceCall.inputs,
-    output: traceCall.outputs,
+    output: traceCall.output,
     status_code: statusCode,
     exception: traceCall.exception,
     attributes: traceCall.attributes,

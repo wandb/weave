@@ -31,7 +31,7 @@ class CallSchema(BaseModel):
     exception: typing.Optional[str] = None
 
     ## Outputs
-    outputs: typing.Optional[typing.Any] = None  # output
+    output: typing.Optional[typing.Any] = None  # output
 
     ## Summary: a summary of the call
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -80,7 +80,7 @@ class EndedCallSchemaForInsert(BaseModel):
     exception: typing.Optional[str] = None
 
     ## Outputs
-    outputs: typing.Dict[str, typing.Any]
+    output: typing.Any
 
     ## Summary: a summary of the call
     summary: typing.Dict[str, typing.Any]

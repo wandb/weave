@@ -20,7 +20,7 @@ from . import clickhouse_trace_server_migrator as wf_migrator
 from .errors import RequestTooLarge
 
 from .trace_server_interface_util import (
-    extract_refs_from_values,
+    extract_refs,
     generate_id,
     str_digest,
     bytes_digest,
@@ -62,7 +62,7 @@ class CallEndCHInsertable(BaseModel):
     end_datetime: datetime.datetime
     exception: typing.Optional[str] = None
     summary_dump: str
-    outputs_dump: str
+    output_dump: str
     input_refs: typing.List[str] = []  # sadly, this is required
     output_refs: typing.List[str]
 
@@ -88,7 +88,7 @@ class SelectableCHCallSchema(BaseModel):
 
     attributes_dump: str
     inputs_dump: str
-    outputs_dump: typing.Optional[str] = None
+    output_dump: typing.Optional[str] = None
     summary_dump: typing.Optional[str] = None
 
     input_refs: typing.List[str]
@@ -990,6 +990,10 @@ def _dict_dump_to_dict(val: str) -> typing.Dict[str, typing.Any]:
     return json.loads(val)
 
 
+def _json_dump_to_any(val: str) -> typing.Any:
+    return json.loads(val)
+
+
 def _ensure_datetimes_have_tz(
     dt: typing.Optional[datetime.datetime] = None,
 ) -> typing.Optional[datetime.datetime]:
@@ -1015,18 +1019,16 @@ def _nullable_dict_dump_to_dict(
     return _dict_dump_to_dict(val) if val else None
 
 
+def _nullable_json_dump_to_any(
+    val: typing.Optional[str],
+) -> typing.Optional[typing.Any]:
+    return _json_dump_to_any(val) if val else None
+
+
 def _raw_call_dict_to_ch_call(
     call: typing.Dict[str, typing.Any]
 ) -> SelectableCHCallSchema:
     return SelectableCHCallSchema.model_validate(call)
-
-
-def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHObjSchema:
-    if obj["bytes_file_map"]:
-        obj["bytes_file_map"] = {
-            k.decode("utf-8"): v for k, v in obj["bytes_file_map"].items()
-        }
-    return SelectableCHObjSchema.model_validate(obj)
 
 
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
@@ -1040,7 +1042,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         end_datetime=_ensure_datetimes_have_tz(ch_call.end_datetime),
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
-        outputs=_nullable_dict_dump_to_dict(ch_call.outputs_dump),
+        output=_nullable_json_dump_to_any(ch_call.output_dump),
         summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
@@ -1060,7 +1062,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         end_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("end_datetime")),
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
-        outputs=_nullable_dict_dump_to_dict(ch_call_dict.get("outputs_dump")),
+        output=_nullable_json_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
@@ -1098,7 +1100,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         start_datetime=start_call.start_datetime,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
-        input_refs=extract_refs_from_values(list(start_call.inputs.values())),
+        input_refs=extract_refs(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
         wb_user_id=start_call.wb_user_id,
     )
@@ -1115,8 +1117,8 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         exception=end_call.exception,
         end_datetime=end_call.end_datetime,
         summary_dump=_dict_value_to_dump(end_call.summary),
-        outputs_dump=_dict_value_to_dump(end_call.outputs),
-        output_refs=extract_refs_from_values(list(end_call.outputs.values())),
+        output_dump=_dict_value_to_dump(end_call.output),
+        output_refs=extract_refs(end_call.output),
     )
 
 

@@ -1,6 +1,7 @@
 calls:
   - [DONE] name -> op_name
-  - outputs -> output
+  - [DONE] outputs -> output
+  - [IN PROG] output as any
 
 datetimes:
 - calls:
@@ -41,5 +42,6 @@ table_rows_deduped
 
 
 # NOTES
-#   - remove _result from everything
+#   - [IN PROG] remove _result from everything
+#   - [DONE] recursively pull out refs from values
 #   - pull out all refs within values into refs columns for any "dumps" field

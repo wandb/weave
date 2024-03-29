@@ -12,7 +12,7 @@ import sqlite3
 
 
 from .trace_server_interface_util import (
-    extract_refs_from_values,
+    extract_refs,
     str_digest,
     bytes_digest,
 )
@@ -68,14 +68,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 id TEXT PRIMARY KEY,
                 trace_id TEXT,
                 parent_id TEXT,
-                name TEXT,
+                op_name TEXT,
                 start_datetime TEXT,
                 end_datetime TEXT,
                 exception TEXT,
                 attributes TEXT,
                 inputs TEXT,
                 input_refs TEXT,
-                outputs TEXT,
+                output TEXT,
                 output_refs TEXT,
                 wb_user_id TEXT,
                 wb_run_id TEXT
@@ -140,7 +140,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     id,
                     trace_id,
                     parent_id,
-                    name,
+                    op_name,
                     start_datetime,
                     attributes,
                     inputs,
@@ -157,9 +157,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.start_datetime.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
-                    json.dumps(
-                        extract_refs_from_values(list(req.start.inputs.values()))
-                    ),
+                    json.dumps(extract_refs(req.start.inputs)),
                     req.start.wb_user_id,
                     req.start.wb_run_id,
                 ),
@@ -179,16 +177,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 """UPDATE calls SET
                     end_datetime = ?,
                     exception = ?,
-                    outputs = ?,
+                    output = ?,
                     output_refs = ?
                 WHERE id = ?""",
                 (
                     req.end.end_datetime.isoformat(),
                     req.end.exception,
-                    json.dumps(req.end.outputs),
-                    json.dumps(
-                        extract_refs_from_values(list(req.end.outputs.values()))
-                    ),
+                    json.dumps(req.end.output),
+                    json.dumps(extract_refs(req.end.output)),
                     req.end.id,
                 ),
             )
@@ -281,7 +277,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     exception=row[7],
                     attributes=json.loads(row[8]),
                     inputs=json.loads(row[9]),
-                    outputs=None if row[11] is None else json.loads(row[11]),
+                    output=None if row[11] is None else json.loads(row[11]),
                     wb_user_id=row[13],
                     wb_run_id=row[14],
                 )

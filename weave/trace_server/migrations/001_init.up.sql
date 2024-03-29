@@ -15,7 +15,7 @@ CREATE TABLE calls_raw (
     # End Fields (All fields are required when ending
     # a call. However, to support a fast "update" we need to allow nulls)
     end_datetime DateTime64(3) NULL,
-    outputs_dump String NULL,
+    output_dump String NULL,
     summary_dump String NULL,
     exception String NULL,
     output_refs Array(String),
@@ -42,7 +42,7 @@ CREATE TABLE calls_merged (
     inputs_dump SimpleAggregateFunction(any, Nullable(String)),
     input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
     end_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-    outputs_dump SimpleAggregateFunction(any, Nullable(String)),
+    output_dump SimpleAggregateFunction(any, Nullable(String)),
     summary_dump SimpleAggregateFunction(any, Nullable(String)),
     exception SimpleAggregateFunction(any, Nullable(String)),
     output_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
@@ -63,7 +63,7 @@ SELECT project_id,
     anySimpleState(inputs_dump) as inputs_dump,
     array_concat_aggSimpleState(input_refs) as input_refs,
     anySimpleState(end_datetime) as end_datetime,
-    anySimpleState(outputs_dump) as outputs_dump,
+    anySimpleState(output_dump) as output_dump,
     anySimpleState(summary_dump) as summary_dump,
     anySimpleState(exception) as exception,
     array_concat_aggSimpleState(output_refs) as output_refs
