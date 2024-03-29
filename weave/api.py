@@ -214,7 +214,7 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
         url = urls.object_version_path(
             ref.entity,
             ref.project,
-            ref.object_id,
+            ref.name,
             ref.digest,
         )
         print(f"{TRACE_OBJECT_EMOJI} Published to {url}")

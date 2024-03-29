@@ -77,6 +77,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 input_refs TEXT,
                 output TEXT,
                 output_refs TEXT,
+                summary TEXT,
                 wb_user_id TEXT,
                 wb_run_id TEXT
             )
@@ -180,13 +181,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     ended_at = ?,
                     exception = ?,
                     output = ?,
-                    output_refs = ?
+                    output_refs = ?,
+                    summary = ?
                 WHERE id = ?""",
                 (
                     req.end.ended_at.isoformat(),
                     req.end.exception,
                     json.dumps(req.end.output),
                     json.dumps(extract_refs_from_values(list(req.end.output.values()))),
+                    json.dumps(req.end.summary),
                     req.end.id,
                 ),
             )
@@ -194,7 +197,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallEndRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        raise NotImplementedError()
+        return tsi.CallReadRes(
+            call=self.calls_query(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    limit=1,
+                    filter=tsi._CallsFilter(call_ids=[req.id]),
+                )
+            ).calls[0]
+        )
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         print("REQ", req)
@@ -215,11 +226,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
                 if non_wildcarded_names:
                     in_expr = ", ".join((f"'{x}'" for x in non_wildcarded_names))
-                    or_conditions += [f"name IN ({', '.join({in_expr})})"]
+                    or_conditions += [f"op_name IN ({', '.join({in_expr})})"]
 
                 for name_ndx, name in enumerate(wildcarded_names):
                     like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
-                    or_conditions.append(f"name LIKE '{like_name}'")
+                    or_conditions.append(f"op_name LIKE '{like_name}'")
 
                 if or_conditions:
                     conds.append("(" + " OR ".join(or_conditions) + ")")
@@ -280,8 +291,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     attributes=json.loads(row[8]),
                     inputs=json.loads(row[9]),
                     output=None if row[11] is None else json.loads(row[11]),
-                    wb_user_id=row[13],
-                    wb_run_id=row[14],
+                    output_refs=None if row[12] is None else json.loads(row[12]),
+                    summary=json.loads(row[13]) if row[13] else None,
+                    wb_user_id=row[14],
+                    wb_run_id=row[15],
                 )
                 for row in query_result
             ]
@@ -437,7 +450,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         def read_ref(r: refs.ObjectRef) -> Any:
             conds = [
-                f"object_id = '{r.object_id}'",
+                f"object_id = '{r.name}'",
                 f"digest = '{r.digest}'",
             ]
             objs = self._select_objs_query(
@@ -445,7 +458,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 conditions=conds,
             )
             if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.object_id}:{r.digest} not found")
+                raise NotFoundError(f"Obj {r.name}:{r.digest} not found")
             obj = objs[0]
             val = obj.val
             extra = r.extra

@@ -1,6 +1,24 @@
+/*
+`call_parts` contains the raw data for each call. In particular, for each
+logical "call" will contain 2 rows: one for the start and one for the end. Note:
+it is possible that a single `call_parts` row will contain both the start and
+end data, but this is not practically possible given the current APIs. The
+`calls_merged` table is a materialized view that aggregates the start and end
+data into a single row.
+*/
 CREATE TABLE call_parts (
-    project_id String,
+    /*
+    `id`: The unique identifier for the call. This is typically a UUID.
+    */
     id String,
+    /*
+    `project_id`: The project identifier for the call. In practice, this is an internal
+    identifier that matches the project identifier in the W&B API.
+    */
+    project_id String,
+    /*
+    
+    */
     # Start Fields (All fields except parent_id are required when starting
     # a call. However, to support a fast "update" we need to allow nulls)
     trace_id String NULL,

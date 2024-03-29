@@ -5,8 +5,8 @@ from pydantic import BaseModel
 
 
 class CallSchema(BaseModel):
-    project_id: str
     id: str
+    project_id: str
 
     # Name of the calling function (op)
     op_name: str

@@ -270,7 +270,7 @@ class WeaveClient:
         read_res = self.server.obj_read(
             ObjReadReq(
                 project_id=self._project_id(),
-                object_id=ref.object_id,
+                object_id=ref.name,
                 digest=ref.digest,
             )
         )
@@ -393,8 +393,8 @@ class WeaveClient:
                     "end": {
                         "project_id": self._project_id(),
                         "id": call.id,
-                        "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
-                        "outputs": to_json(output, self._project_id(), self.server),
+                        "ended_at": datetime.datetime.now(tz=datetime.timezone.utc),
+                        "output": to_json(output, self._project_id(), self.server),
                         "summary": {},
                     },
                 }
