@@ -197,8 +197,6 @@ def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> TraceObject:
     output = server_call.output
-    if isinstance(output, dict) and "_result" in output:
-        output = output["_result"]
     call = Call(
         op_name=server_call.op_name,
         project_id=server_call.project_id,
@@ -385,8 +383,6 @@ class WeaveClient:
         self.save_nested_objects(output)
         output = map_to_refs(output)
         call.output = output
-        if not isinstance(output, dict):
-            output = {"_result": output}
         self.server.call_end(
             CallEndReq.model_validate(
                 {

@@ -181,6 +181,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         conn, cursor = get_conn_cursor(self.db_path)
+        parsable_output = req.end.output
+        if not isinstance(parsable_output, dict):
+            parsable_output = {"output": parsable_output}
+        parsable_output = cast(dict, parsable_output)
         with self.lock:
             cursor.execute(
                 """UPDATE calls SET
@@ -194,7 +198,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.end.ended_at.isoformat(),
                     req.end.exception,
                     json.dumps(req.end.output),
-                    json.dumps(extract_refs_from_values(list(req.end.output.values()))),
+                    json.dumps(
+                        extract_refs_from_values(list(parsable_output.values()))
+                    ),
                     json.dumps(req.end.summary),
                     req.end.id,
                 ),

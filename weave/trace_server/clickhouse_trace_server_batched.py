@@ -980,15 +980,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 def _dict_value_to_dump(
     value: dict,
 ) -> str:
+    if not isinstance(value, dict):
+        raise ValueError(f"Value is not a dict: {value}")
     return json.dumps(value)
-    cpy = value.copy()
-    if cpy:
-        keys = list(cpy.keys())
-        # cpy["_keys"] = keys
-    return json.dumps(cpy)
+
+
+def _any_value_to_dump(
+    value: typing.Any,
+) -> str:
+    return json.dumps(value)
 
 
 def _dict_dump_to_dict(val: str) -> typing.Dict[str, typing.Any]:
+    res = json.loads(val)
+    if not isinstance(res, dict):
+        raise ValueError(f"Value is not a dict: {val}")
+    return res
+
+
+def _any_dump_to_any(val: str) -> typing.Any:
     return json.loads(val)
 
 
@@ -1017,6 +1027,12 @@ def _nullable_dict_dump_to_dict(
     return _dict_dump_to_dict(val) if val else None
 
 
+def _nullable_any_dump_to_any(
+    val: typing.Optional[str],
+) -> typing.Optional[typing.Any]:
+    return _any_dump_to_any(val) if val else None
+
+
 def _raw_call_dict_to_ch_call(
     call: typing.Dict[str, typing.Any]
 ) -> SelectableCHCallSchema:
@@ -1034,7 +1050,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
-        output=_nullable_dict_dump_to_dict(ch_call.output_dump),
+        output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
@@ -1054,7 +1070,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
-        output=_nullable_dict_dump_to_dict(ch_call_dict.get("output_dump")),
+        output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
@@ -1109,7 +1125,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         exception=end_call.exception,
         ended_at=end_call.ended_at,
         summary_dump=_dict_value_to_dump(end_call.summary),
-        output_dump=_dict_value_to_dump(end_call.output),
+        output_dump=_any_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(end_call.output),
     )
 
