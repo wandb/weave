@@ -67,7 +67,7 @@ def extract_refs_from_values(
 ) -> typing.List[str]:
     refs = []
 
-    def _visit(val: typing.Any):
+    def _visit(val: typing.Any) -> typing.Any:
         if isinstance(val, dict):
             for v in val.values():
                 _visit(v)
