@@ -26,7 +26,11 @@ from flask.testing import FlaskClient
 from .tests.wandb_system_tests_conftest import *
 from .tests.trace_server_clickhouse_conftest import *
 
-from weave.trace_server import sqlite_trace_server, trace_server_interface
+from weave.trace_server import (
+    sqlite_trace_server,
+    trace_server_interface,
+    remote_http_trace_server,
+)
 from weave import weave_init
 
 logs.configure_logger()
@@ -302,16 +306,16 @@ def strict_op_saving():
 
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
-    server_type = request.config.getoption("--weave-server")
+    weave_server_flag = request.config.getoption("--weave-server")
     tsi: trace_server_interface.TraceServerInterface
-    if server_type == "sqlite":
+    if weave_server_flag == "sqlite":
         sql_lite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
         )
         sql_lite_server.drop_tables()
         sql_lite_server.setup_tables()
         tsi = sql_lite_server
-    elif server_type == "clickhouse":
+    elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
             use_async_insert=False
         )
@@ -319,6 +323,11 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
         tsi = ch_server
+    elif weave_server_flag.startswith("http"):
+        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
+            weave_server_flag
+        )
+        tsi = remote_server
 
     client = weave_client.WeaveClient("shawn", "test-project", tsi)
     inited_client = weave_init.InitializedClient(client)
