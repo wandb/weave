@@ -19,6 +19,11 @@ import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from './pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './pages/util';
+import {
+  AWL_ROW_EDGE_NAME,
+  DICT_KEY_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
+} from './pages/wfReactInterface/constants';
 
 const pruneEmptyFields = (filter: {[key: string]: any} | null | undefined) => {
   if (!filter) {
@@ -238,12 +243,12 @@ const browse3ContextGen = (
       if (isWandbArtifactRef(objRef)) {
         if (objRef.artifactPath.endsWith('rows%2F0')) {
           objRef.artifactPath = 'obj';
-          let newArtifactRefExtra = 'atr/rows';
+          let newArtifactRefExtra = `${OBJECT_ATTR_EDGE_NAME}/rows`;
           objRef.artifactRefExtra?.split('/').forEach(part => {
             if (isNaN(parseInt(part, 10))) {
-              newArtifactRefExtra += '/key/' + part;
+              newArtifactRefExtra += `/${DICT_KEY_EDGE_NAME}/` + part;
             } else {
-              newArtifactRefExtra += '/row/' + part;
+              newArtifactRefExtra += `/${AWL_ROW_EDGE_NAME}/` + part;
             }
           });
           objRef.artifactRefExtra = newArtifactRefExtra;
