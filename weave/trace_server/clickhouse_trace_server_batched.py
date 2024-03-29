@@ -650,7 +650,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra[0],
                         extra_result.remaining_extra[1],
                     )
-                    if op != refs_internal.TABLE_ROW_ID_EDGE_TYPE:
+                    if op != refs_internal.AWL_ROW_ID_EDGE_TYPE:
                         raise ValueError("Table refs must have id extra")
                     table_queries.setdefault(
                         (table_ref.project_id, table_ref.digest), []

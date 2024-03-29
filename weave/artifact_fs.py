@@ -307,9 +307,9 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
                                 f"Cannot get type of {self} with extra {self.extra}"
                             )
                         ot = ot.property_types()[extra_edge_value]  # type: ignore
-                    elif extra_edge_type == ref_util.TABLE_ROW_EDGE_TYPE:
+                    elif extra_edge_type == ref_util.AWL_ROW_EDGE_NAME:
                         ot = ot.object_type  # type: ignore
-                    elif extra_edge_type == ref_util.TABLE_COLUMN_EDGE_TYPE:
+                    elif extra_edge_type == ref_util.AWL_COL_EDGE_NAME:
                         ot = types.List(ot.object_type.property_types[extra_edge_value])  # type: ignore
                     else:
                         raise errors.WeaveInternalError(
