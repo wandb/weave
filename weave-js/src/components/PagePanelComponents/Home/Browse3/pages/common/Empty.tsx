@@ -6,6 +6,7 @@ import React from 'react';
 import styled from 'styled-components';
 
 import * as Colors from '../../../../../../common/css/color.styles';
+import {hexToRGB} from '../../../../../../common/css/utils';
 import {Icon, IconName} from '../../../../../Icon';
 
 export type EmptyProps = {
@@ -31,12 +32,11 @@ const Content = styled.div`
 `;
 Content.displayName = 'S.Content';
 
-// TODO: Verify color not from palette with design
 const Circle = styled.div`
   border-radius: 50%;
   width: 80px;
   height: 80px;
-  background-color: #0096ad1a;
+  background-color: ${hexToRGB(Colors.TEAL_300, 0.48)};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -47,7 +47,7 @@ Circle.displayName = 'S.Circle';
 const CircleIcon = styled(Icon)`
   width: 33px;
   height: 33px;
-  color: ${Colors.TEAL_550};
+  color: ${Colors.TEAL_600};
 `;
 CircleIcon.displayName = 'S.CircleIcon';
 
