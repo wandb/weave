@@ -245,7 +245,7 @@ class WeaveClient:
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project, name=name, val=json_val
+                    project_id=self.entity + "/" + self.project, object_id=name, val=json_val
                 )
             )
         )
@@ -268,7 +268,7 @@ class WeaveClient:
         read_res = self.server.obj_read(
             ObjReadReq(
                 project_id=self._project_id(),
-                name=ref.name,
+                object_id=ref.name,
                 digest=ref.version,
             )
         )

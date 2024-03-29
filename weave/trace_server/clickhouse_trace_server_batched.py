@@ -353,7 +353,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = ["name = {name: String}"]
-        parameters: typing.Dict[str, typing.Union[str, int]] = {"name": req.name}
+        parameters: typing.Dict[str, typing.Union[str, int]] = {"name": req.object_id}
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
@@ -368,7 +368,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.project_id, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
+            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 
@@ -381,9 +381,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     conds.append("is_op = 1")
                 else:
                     conds.append("is_op = 0")
-            if req.filter.object_names:
+            if req.filter.object_ids:
                 conds.append("name IN {object_names: Array(String)}")
-                parameters["object_names"] = req.filter.object_names
+                parameters["object_names"] = req.filter.object_ids
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:

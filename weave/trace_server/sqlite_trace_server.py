@@ -86,12 +86,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             """
             CREATE TABLE IF NOT EXISTS objects (
                 project_id TEXT,
-                name TEXT,
+                object_id TEXT,
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
                 refs TEXT,
-                val TEXT,
+                val_dump TEXT,
                 digest TEXT UNIQUE,
                 version_index INTEGER,
                 is_latest INTEGER
@@ -307,27 +307,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             cursor.execute("BEGIN TRANSACTION")
             # first get version count
             cursor.execute(
-                """SELECT COUNT(*) FROM objects WHERE project_id = ? AND name = ?""",
-                (req.obj.project_id, req_obj.name),
+                """SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?""",
+                (req.obj.project_id, req_obj.object_id),
             )
             version_index = cursor.fetchone()[0]
 
             cursor.execute(
                 """INSERT OR IGNORE INTO objects (
                     project_id,
-                    name,
+                    object_id,
                     created_at,
                     kind,
                     base_object_class,
                     refs,
-                    val,
+                    val_dump,
                     digest,
                     version_index,
                     is_latest
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req_obj.project_id,
-                    req_obj.name,
+                    req_obj.object_id,
                     datetime.datetime.now().isoformat(),
                     get_kind(req_obj.val),
                     get_base_object_class(req_obj.val),
@@ -343,7 +343,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [
-            f"name = '{req.name}'",
+            f"object_id = '{req.object_id}'",
         ]
         if req.digest == "latest":
             conds.append("is_latest = 1")
@@ -354,7 +354,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conditions=conds,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
+            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         return tsi.ObjReadRes(obj=objs[0])
 
@@ -366,9 +366,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     conds.append("kind = 'op'")
                 else:
                     conds.append("kind != 'op'")
-            if req.filter.object_names:
-                in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
-                conds.append(f"name IN ({in_list})")
+            if req.filter.object_ids:
+                in_list = ", ".join([f"'{n}'" for n in req.filter.object_ids])
+                conds.append(f"object_id IN ({in_list})")
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:
@@ -437,7 +437,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         def read_ref(r: refs.ObjectRef) -> Any:
             conds = [
-                f"name = '{r.name}'",
+                f"object_id = '{r.name}'",
                 f"digest = '{r.version}'",
             ]
             objs = self._select_objs_query(
@@ -583,7 +583,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             result.append(
                 tsi.ObjSchema(
                     project_id=f"{row[0]}",
-                    name=row[1],
+                    object_id=row[1],
                     created_at=row[2],
                     kind=row[3],
                     base_object_class=row[4],
