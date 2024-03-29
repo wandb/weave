@@ -1,4 +1,4 @@
-CREATE TABLE calls_raw (
+CREATE TABLE call_parts (
     project_id String,
     id String,
     # Start Fields (All fields except parent_id are required when starting
@@ -67,10 +67,10 @@ SELECT project_id,
     anySimpleState(summary_dump) as summary_dump,
     anySimpleState(exception) as exception,
     array_concat_aggSimpleState(output_refs) as output_refs
-FROM calls_raw
+FROM call_parts
 GROUP BY project_id,
     id;
-CREATE TABLE objects (
+CREATE TABLE object_versions (
     project_id String,
     name String,
     kind Enum('op', 'object'),
@@ -109,7 +109,7 @@ FROM (
                 digest
                 ORDER BY created_at ASC
             ) AS rn
-        FROM objects
+        FROM object_versions
     )
 WHERE rn = 1 WINDOW w AS (
         PARTITION BY project_id,

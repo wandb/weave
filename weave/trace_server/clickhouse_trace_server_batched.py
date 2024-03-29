@@ -345,7 +345,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         self._insert(
-            "objects",
+            "object_versions",
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
@@ -751,7 +751,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 settings["async_insert"] = 1
                 settings["wait_for_async_insert"] = 0
             self._insert(
-                "calls_raw",
+                "call_parts",
                 data=batch,
                 column_names=all_call_insert_columns,
                 settings=settings,

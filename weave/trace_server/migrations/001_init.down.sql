@@ -1,4 +1,4 @@
-DROP TABLE calls_raw;
+DROP TABLE call_parts;
 DROP TABLE calls_merged;
 
 DROP TABLE objects;

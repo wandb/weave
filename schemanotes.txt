@@ -1,9 +1,6 @@
 calls:
   - [DONE] name -> op_name
   - [DONE] outputs -> output
-
-datetimes:
-- most db records have
   - [DONE] db_row_inserted_at -> created_at
 
 
@@ -14,7 +11,6 @@ files
 objects -> object_versions_raw
  - name -> object_id
  - val -> dumps
- - add refs column
 
 
 objects_deduped
@@ -23,7 +19,6 @@ objects_deduped
 table_rows
 - [DONE] insert_datetime
 - val -> dumps
-- add refs column
 
 
 table_rows_deduped
@@ -32,11 +27,8 @@ table_rows_deduped
 tables
 - [DONE] insert_datetime
 
-# NOTES
-#   - pull out all refs within values into refs columns for any "dumps" field
-
 
 TODO After:
 * Remove `_result` from output (and re-type as `any`)
 * recursively pull out refs from values
-* Should add `x_refs` to any value dumps field (calls.inputs, calls.output, objects.val, table_rows.val)
+* Should add `x_refs` to any value dumps field (call_parts.inputs, call_parts.output, objects.val, table_rows.val)
