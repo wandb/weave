@@ -85,7 +85,7 @@ type TraceObjQueryReq = {
 
 export interface TraceObjSchema {
   project_id: string;
-  name: string;
+  object_id: string;
   created_at: string;
   digest: string;
   version_index: number;

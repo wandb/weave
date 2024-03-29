@@ -72,7 +72,7 @@ GROUP BY project_id,
     id;
 CREATE TABLE object_versions (
     project_id String,
-    name String,
+    object_id String,
     kind Enum('op', 'object'),
     base_object_class String NULL,
     refs Array(String),

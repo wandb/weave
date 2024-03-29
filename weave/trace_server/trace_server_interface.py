@@ -88,7 +88,7 @@ class EndedCallSchemaForInsert(BaseModel):
 
 class ObjSchema(BaseModel):
     project_id: str
-    name: str  # -> id
+    object_id: str
     created_at: datetime.datetime
     digest: str
     version_index: int
@@ -100,7 +100,7 @@ class ObjSchema(BaseModel):
 
 class ObjSchemaForInsert(BaseModel):
     project_id: str
-    name: str
+    object_id: str
     val: typing.Any
 
 

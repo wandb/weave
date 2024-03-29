@@ -112,7 +112,7 @@ class ObjCHInsertable(BaseModel):
     project_id: str
     kind: str
     base_object_class: typing.Optional[str]
-    name: str
+    object_id: str
     refs: typing.List[str]
     val: str
     digest: str
@@ -120,7 +120,7 @@ class ObjCHInsertable(BaseModel):
 
 class SelectableCHObjSchema(BaseModel):
     project_id: str
-    name: str
+    object_id: str
     created_at: datetime.datetime
     refs: typing.List[str]
     val: str
@@ -336,7 +336,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         req_obj = req.obj
         ch_obj = ObjCHInsertable(
             project_id=req_obj.project_id,
-            name=req_obj.name,
+            object_id=req_obj.name,
             kind=get_kind(req.obj.val),
             base_object_class=get_base_object_class(req.obj.val),
             refs=[],
@@ -1063,7 +1063,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
         project_id=ch_obj.project_id,
-        name=ch_obj.name,
+        name=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
