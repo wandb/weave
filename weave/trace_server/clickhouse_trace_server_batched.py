@@ -531,20 +531,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             else:
                 if r.version == "latest":
                     raise NotFoundError("Reading refs with `latest` is not supported")
-                    # conds = [
-                    #     "name = {name: String}",
-                    #     "is_latest = 1",
-                    # ]
-                    # parameters = {
-                    #     "name": r.name,
-                    # }
                 else:
                     conds = [
-                        "name = {name: String}",
+                        "object_id = {object_id: String}",
                         "digest = {version: String}",
                     ]
                     parameters = {
-                        "name": r.name,
+                        "object_id": r.name,
                         "version": r.version,
                     }
                 objs = self._select_objs_query(
