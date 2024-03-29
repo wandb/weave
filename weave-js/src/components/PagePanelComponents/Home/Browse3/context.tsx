@@ -208,7 +208,7 @@ export const browse2Context = {
   },
 };
 
-const browse3ContextGen = (
+export const browse3ContextGen = (
   projectRoot: (entityName: string, projectName: string) => string
 ) => {
   const browse3Context = {
