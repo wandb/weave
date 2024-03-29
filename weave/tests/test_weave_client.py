@@ -644,10 +644,10 @@ def test_server_file(client):
 
 
 def test_isinstance_checks(client):
-    class PydanticObjA(BaseModel):
+    class PydanticObjA(weave.Object):
         x: dict
 
-    class PydanticObjB(BaseModel):
+    class PydanticObjB(weave.Object):
         a: PydanticObjA
 
     b = PydanticObjB(a=PydanticObjA(x={"y": [1, "j", True, None]}))
