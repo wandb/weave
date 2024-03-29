@@ -26,7 +26,7 @@ from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
-    AWL_ROW_ID_EDGE_TYPE,
+    TABLE_ROW_ID_EDGE_TYPE,
 )
 
 MAX_FLUSH_COUNT = 10000
@@ -465,7 +465,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     val = val[arg]
                 elif op == LIST_INDEX_EDGE_NAME:
                     val = val[int(arg)]
-                elif op == AWL_ROW_ID_EDGE_TYPE:
+                elif op == TABLE_ROW_ID_EDGE_TYPE:
                     if isinstance(val, str) and val.startswith("weave://"):
                         table_ref = refs.parse_uri(val)
                         if not isinstance(table_ref, refs.TableRef):

@@ -14,7 +14,7 @@ WEAVE_SCHEME = "weave"
 DICT_KEY_EDGE_NAME = "key"
 LIST_INDEX_EDGE_NAME = "index"
 OBJECT_ATTR_EDGE_NAME = "attr"
-AWL_ROW_ID_EDGE_TYPE = "id"
+TABLE_ROW_ID_EDGE_TYPE = "id"
 
 
 @dataclasses.dataclass

@@ -5,7 +5,7 @@ from ..trace_server import refs_internal
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
 OBJECT_ATTR_EDGE_NAME = refs_internal.OBJECT_ATTR_EDGE_NAME
-AWL_ROW_ID_EDGE_TYPE = refs_internal.AWL_ROW_ID_EDGE_TYPE
+TABLE_ROW_ID_EDGE_TYPE = refs_internal.TABLE_ROW_ID_EDGE_TYPE
 
 
 @dataclasses.dataclass
@@ -41,7 +41,7 @@ class RefWithExtra(Ref):
         return self.with_extra([LIST_INDEX_EDGE_NAME, str(index)])
 
     def with_item(self, item_digest: str) -> "RefWithExtra":
-        return self.with_extra([AWL_ROW_ID_EDGE_TYPE, f"{item_digest}"])
+        return self.with_extra([TABLE_ROW_ID_EDGE_TYPE, f"{item_digest}"])
 
 
 @dataclasses.dataclass
