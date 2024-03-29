@@ -26,6 +26,8 @@ from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
 )
 
+pytestmark = pytest.mark.trace
+
 
 class RegexStringMatcher(str):
     def __init__(self, pattern):

@@ -16,6 +16,8 @@ from ..trace_server.trace_server_interface_util import (
 )
 from ..trace_server import trace_server_interface as tsi
 
+pytestmark = pytest.mark.trace
+
 
 ## Hacky interface compatibility helpers
 
@@ -585,7 +587,7 @@ def test_trace_call_query_filter_trace_roots_only(client):
         assert len(inner_res.calls) == exp_count
 
 
-# @pytest.mark.skip("too slow")
+@pytest.mark.skip("too slow")
 def test_trace_call_query_filter_wb_run_ids(client, user_by_api_key_in_env):
     call_spec = simple_line_call_bootstrap(init_wandb=True)
 

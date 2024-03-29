@@ -126,6 +126,7 @@ CREATE TABLE calls_merged (
     wb_run_id SimpleAggregateFunction(any, Nullable(String))
 ) ENGINE = AggregatingMergeTree
 ORDER BY (project_id, id);
+
 CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS
 SELECT project_id,
     id,
@@ -146,6 +147,7 @@ SELECT project_id,
 FROM call_parts
 GROUP BY project_id,
     id;
+
 CREATE TABLE object_versions (
     project_id String,
     object_id String,
@@ -156,10 +158,11 @@ CREATE TABLE object_versions (
     digest String,
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (project_id, kind, name, digest);
-CREATE VIEW objects_deduped AS
+ORDER BY (project_id, kind, object_id, digest);
+
+CREATE VIEW object_versions_deduped AS
 SELECT project_id,
-    name,
+    object_id,
     created_at,
     kind,
     base_object_class,
@@ -170,18 +173,18 @@ SELECT project_id,
     row_number() OVER (
         PARTITION BY project_id,
         kind,
-        name
+        object_id
         ORDER BY created_at ASC
     ) AS _version_index_plus_1,
     _version_index_plus_1 - 1 AS version_index,
-    count(*) OVER (PARTITION BY project_id, kind, name) as version_count,
+    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
     if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
 FROM (
         SELECT *,
             row_number() OVER (
                 PARTITION BY project_id,
                 kind,
-                name,
+                object_id,
                 digest
                 ORDER BY created_at ASC
             ) AS rn
@@ -190,13 +193,14 @@ FROM (
 WHERE rn = 1 WINDOW w AS (
         PARTITION BY project_id,
         kind,
-        name
+        object_id
         ORDER BY created_at ASC
     )
 ORDER BY project_id,
     kind,
-    name,
+    object_id,
     created_at;
+
 CREATE TABLE table_rows (
     project_id String,
     digest String,
@@ -214,6 +218,7 @@ FROM (
 WHERE rn = 1
 ORDER BY project_id,
     digest;
+
 CREATE TABLE tables (
     project_id String,
     digest String,
@@ -231,6 +236,7 @@ FROM (
 WHERE rn = 1
 ORDER BY project_id,
     digest;
+
 CREATE TABLE files (
     project_id String,
     digest String,
@@ -241,6 +247,7 @@ CREATE TABLE files (
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest, chunk_index);
+
 CREATE VIEW files_deduped AS
 SELECT *
 FROM (

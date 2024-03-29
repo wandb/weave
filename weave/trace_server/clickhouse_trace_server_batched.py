@@ -336,7 +336,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         req_obj = req.obj
         ch_obj = ObjCHInsertable(
             project_id=req_obj.project_id,
-            object_id=req_obj.name,
+            object_id=req_obj.object_id,
             kind=get_kind(req.obj.val),
             base_object_class=get_base_object_class(req.obj.val),
             refs=[],
@@ -352,8 +352,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = ["name = {name: String}"]
-        parameters: typing.Dict[str, typing.Union[str, int]] = {"name": req.object_id}
+        conds = ["object_id = {object_id: String}"]
+        parameters: typing.Dict[str, typing.Union[str, int]] = {
+            "object_id": req.object_id
+        }
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
@@ -415,7 +417,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._insert(
             "table_rows",
             data=insert_rows,
-            column_names=["project_id", "digest", "val"],
+            column_names=["project_id", "digest", "val_dump"],
         )
 
         row_digests = [r[1] for r in insert_rows]
@@ -465,7 +467,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         predicate = " AND ".join(conds)
         query = f"""
-                SELECT tr.digest, tr.val
+                SELECT tr.digest, tr.val_dump
                 FROM (
                     SELECT project_id, row_digest
                     FROM tables_deduped
@@ -903,7 +905,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query_result = self._query(
             f"""
             SELECT *
-            FROM objects_deduped
+            FROM object_versions_deduped
             WHERE project_id = {{project_id: String}}
             AND {conditions_part}
             {limit_part}
@@ -1063,7 +1065,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
         project_id=ch_obj.project_id,
-        name=ch_obj.object_id,
+        object_id=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,

@@ -5,6 +5,9 @@ from weave import ref_base
 from weave.flow.scorer import MulticlassF1Score
 from weave import Dataset, Model, Evaluation
 
+pytestmark = pytest.mark.webtest
+
+
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
 
