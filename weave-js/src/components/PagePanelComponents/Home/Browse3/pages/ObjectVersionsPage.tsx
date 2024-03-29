@@ -108,6 +108,11 @@ export const FilterableObjectVersionsTable: React.FC<{
     }
   );
 
+  if (filteredObjectVersions.loading) {
+    // TODO: Do we want a loading indicator here
+    return null;
+  }
+
   // TODO: Only show the empty state if no filters other than baseObjectClass
   const objectVersions = filteredObjectVersions.result ?? [];
   const isEmpty = objectVersions.length === 0;
