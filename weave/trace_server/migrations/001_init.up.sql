@@ -128,7 +128,7 @@ CREATE TABLE table_rows (
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest);
 CREATE VIEW table_rows_deduped AS
-SELECT *
+SELECT project_id, digest, val
 FROM (
         SELECT *,
             row_number() OVER (PARTITION BY project_id, digest) AS rn

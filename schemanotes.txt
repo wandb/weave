@@ -1,7 +1,6 @@
 calls:
   - [DONE] name -> op_name
   - [DONE] outputs -> output
-  - [IN PROG] output as any
 
 datetimes:
 - calls:
@@ -32,19 +31,15 @@ table_rows
 
 
 table_rows_deduped
-- remove 'rn'
+- [DONE] remove 'rn'
 
 tables
 - insert_datetime
-
-table_rows_deduped
-- remove rn
-
 
 # NOTES
 #   - pull out all refs within values into refs columns for any "dumps" field
 
 
 TODO After:
-* Remove `_result` from output
+* Remove `_result` from output (and re-type as `any`)
 * recursively pull out refs from values
