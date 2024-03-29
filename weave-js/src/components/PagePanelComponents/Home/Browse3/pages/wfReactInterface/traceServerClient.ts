@@ -49,9 +49,9 @@ export type TraceCallReadRes = {
 };
 
 interface TraceCallsFilter {
-  op_version_refs?: string[];
-  input_object_version_refs?: string[];
-  output_object_version_refs?: string[];
+  op_names?: string[];
+  input_refs?: string[];
+  output_refs?: string[];
   parent_ids?: string[];
   trace_ids?: string[];
   call_ids?: string[];
@@ -109,7 +109,7 @@ export type TraceRefsReadBatchRes = {
 
 export type TraceTableQueryReq = {
   project_id: string;
-  table_digest: string;
+  digest: string;
   filter?: {
     row_digests?: string[];
   };

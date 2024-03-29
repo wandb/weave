@@ -220,7 +220,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions = []
         parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
-            if req.filter.op_version_refs:
+            if req.filter.op_names:
                 # We will build up (0 or 1) + N conditions for the op_version_refs
                 # If there are any non-wildcarded names, then we at least have an IN condition
                 # If there are any wildcarded names, then we have a LIKE condition for each
@@ -229,7 +229,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 non_wildcarded_names: typing.List[str] = []
                 wildcarded_names: typing.List[str] = []
-                for name in req.filter.op_version_refs:
+                for name in req.filter.op_names:
                     if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
                         wildcarded_names.append(name)
                     else:
@@ -250,12 +250,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if or_conditions:
                     conditions.append("(" + " OR ".join(or_conditions) + ")")
 
-            if req.filter.input_object_version_refs:
-                parameters["input_refs"] = req.filter.input_object_version_refs
+            if req.filter.input_refs:
+                parameters["input_refs"] = req.filter.input_refs
                 conditions.append("hasAny(input_refs, {input_refs: Array(String)})")
 
-            if req.filter.output_object_version_refs:
-                parameters["output_refs"] = req.filter.output_object_version_refs
+            if req.filter.output_refs:
+                parameters["output_refs"] = req.filter.output_refs
                 conditions.append("hasAny(output_refs, {output_refs: Array(String)})")
 
             if req.filter.parent_ids:
@@ -302,12 +302,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "digest = {version_hash: String}",
             "is_op = 1",
         ]
-        parameters = {"name": req.name, "digest": req.version_hash}
+        parameters = {"name": req.name, "digest": req.digest}
         objs = self._select_objs_query(
             req.project_id, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.version_hash} not found")
+            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
 
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
@@ -349,26 +349,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
-        return tsi.ObjCreateRes(version_digest=digest)
+        return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = ["name = {name: String}"]
         parameters: typing.Dict[str, typing.Union[str, int]] = {"name": req.name}
-        if req.version_digest == "latest":
+        if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
-            (is_version, version_index) = _digest_is_version_like(req.version_digest)
+            (is_version, version_index) = _digest_is_version_like(req.digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
                 parameters["version_index"] = version_index
             else:
                 conds.append("digest = {version_digest: String}")
-                parameters["version_digest"] = req.version_digest
+                parameters["version_digest"] = req.digest
         objs = self._select_objs_query(
             req.project_id, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
+            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
 
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 

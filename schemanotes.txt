@@ -9,15 +9,12 @@ files
 
 
 objects -> object_versions_raw
- - name -> object_id
+ - [DONE] name -> object_id
  - val -> dumps
 
 
-objects_deduped
-- created_at -> insert_datetime
-
 table_rows
-- [DONE] insert_datetime
+- [DONE] created_at
 - val -> dumps
 
 
@@ -25,7 +22,7 @@ table_rows_deduped
 - [DONE] remove 'rn'
 
 tables
-- [DONE] insert_datetime
+- [DONE] created_at
 
 
 TODO After:

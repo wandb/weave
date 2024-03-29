@@ -202,12 +202,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conds = []
         filter = req.filter
         if filter:
-            if filter.op_version_refs:
+            if filter.op_names:
                 or_conditions: list[str] = []
 
                 non_wildcarded_names: list[str] = []
                 wildcarded_names: list[str] = []
-                for name in filter.op_version_refs:
+                for name in filter.op_names:
                     if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
                         wildcarded_names.append(name)
                     else:
@@ -224,14 +224,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if or_conditions:
                     conds.append("(" + " OR ".join(or_conditions) + ")")
 
-            if filter.input_object_version_refs:
+            if filter.input_refs:
                 or_conditions = []
-                for ref in filter.input_object_version_refs:
+                for ref in filter.input_refs:
                     or_conditions.append(f"input_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
-            if filter.output_object_version_refs:
+            if filter.output_refs:
                 or_conditions = []
-                for ref in filter.output_object_version_refs:
+                for ref in filter.output_refs:
                     or_conditions.append(f"output_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
@@ -339,22 +339,22 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 ),
             )
             conn.commit()
-        return tsi.ObjCreateRes(version_digest=digest)
+        return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [
             f"name = '{req.name}'",
         ]
-        if req.version_digest == "latest":
+        if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
-            conds.append(f"digest = '{req.version_digest}'")
+            conds.append(f"digest = '{req.digest}'")
         objs = self._select_objs_query(
             req.project_id,
             conditions=conds,
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
+            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
 
         return tsi.ObjReadRes(obj=objs[0])
 

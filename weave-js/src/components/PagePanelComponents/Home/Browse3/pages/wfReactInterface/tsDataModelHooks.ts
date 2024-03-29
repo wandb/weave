@@ -487,14 +487,14 @@ const useTableQuery = makeTraceServerEndpointHook<
   'tableQuery',
   (
     projectId: traceServerClient.TraceTableQueryReq['project_id'],
-    tableDigest: traceServerClient.TraceTableQueryReq['table_digest'],
+    tableDigest: traceServerClient.TraceTableQueryReq['digest'],
     filter: traceServerClient.TraceTableQueryReq['filter'],
     limit: traceServerClient.TraceTableQueryReq['limit'],
     opts?: {skip?: boolean}
   ) => ({
     params: {
       project_id: projectId,
-      table_digest: tableDigest,
+      digest: tableDigest,
       filter,
       limit,
     },

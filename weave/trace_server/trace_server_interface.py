@@ -31,7 +31,7 @@ class CallSchema(BaseModel):
     exception: typing.Optional[str] = None
 
     ## Outputs
-    output: typing.Optional[typing.Dict[str, typing.Any]] = None  # output
+    output: typing.Optional[typing.Dict[str, typing.Any]] = None
 
     ## Summary: a summary of the call
     summary: typing.Optional[typing.Dict[str, typing.Any]] = None
@@ -136,9 +136,9 @@ class CallReadRes(BaseModel):
 
 
 class _CallsFilter(BaseModel):
-    op_version_refs: typing.Optional[typing.List[str]] = None  # op_names
-    input_object_version_refs: typing.Optional[typing.List[str]] = None  # input_refs
-    output_object_version_refs: typing.Optional[typing.List[str]] = None  # output_refs
+    op_names: typing.Optional[typing.List[str]] = None
+    input_refs: typing.Optional[typing.List[str]] = None
+    output_refs: typing.Optional[typing.List[str]] = None
     parent_ids: typing.Optional[typing.List[str]] = None
     trace_ids: typing.Optional[typing.List[str]] = None
     call_ids: typing.Optional[typing.List[str]] = None
@@ -163,13 +163,13 @@ class OpCreateReq(BaseModel):
 
 
 class OpCreateRes(BaseModel):
-    version_hash: str  # change to digest
+    digest: str
 
 
 class OpReadReq(BaseModel):
     project_id: str
     name: str
-    version_hash: str  # change to digest
+    digest: str
 
 
 class OpReadRes(BaseModel):
@@ -195,13 +195,13 @@ class ObjCreateReq(BaseModel):
 
 
 class ObjCreateRes(BaseModel):
-    version_digest: str  # change to digest
+    digest: str  #
 
 
 class ObjReadReq(BaseModel):
     project_id: str
     name: str
-    version_digest: str  # change to digest
+    digest: str
 
 
 class ObjReadRes(BaseModel):
@@ -245,7 +245,7 @@ class _TableRowFilter(BaseModel):
 
 class TableQueryReq(BaseModel):
     project_id: str
-    table_digest: str
+    digest: str
     filter: typing.Optional[_TableRowFilter] = None
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None

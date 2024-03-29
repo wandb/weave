@@ -251,9 +251,9 @@ class WeaveClient:
         )
         ref: Ref
         if is_opdef:
-            ref = OpRef(self.entity, self.project, name, response.version_digest)
+            ref = OpRef(self.entity, self.project, name, response.digest)
         else:
-            ref = ObjectRef(self.entity, self.project, name, response.version_digest)
+            ref = ObjectRef(self.entity, self.project, name, response.digest)
         # TODO: Try to put a ref onto val? Or should user code use a style like
         # save instead?
         return ref
@@ -269,7 +269,7 @@ class WeaveClient:
             ObjReadReq(
                 project_id=self._project_id(),
                 name=ref.name,
-                version_digest=ref.version,
+                digest=ref.version,
             )
         )
         # Probably bad form to mutate the ref here
@@ -312,7 +312,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(_CallsFilter(op_version_refs=[op_ref.uri()]))
+        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
 
     def objects(self, filter: Optional[_ObjectVersionFilter] = None) -> list[ObjSchema]:
         if not filter:

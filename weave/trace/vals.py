@@ -380,7 +380,7 @@ def make_trace_obj(
             ObjReadReq(
                 project_id=f"{val.entity}/{val.project}",
                 name=val.name,
-                version_digest=val.version,
+                digest=val.version,
             )
         )
         val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
