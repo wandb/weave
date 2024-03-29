@@ -10,12 +10,12 @@ files
 
 objects -> object_versions_raw
  - [DONE] name -> object_id
- - val -> dumps
+ - [DONE] val -> dumps
 
 
 table_rows
 - [DONE] created_at
-- val -> dumps
+- [DONE] val -> dumps
 
 
 table_rows_deduped

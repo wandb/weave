@@ -76,7 +76,7 @@ CREATE TABLE object_versions (
     kind Enum('op', 'object'),
     base_object_class String NULL,
     refs Array(String),
-    val String,
+    val_dump String,
     digest String,
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
@@ -88,7 +88,7 @@ SELECT project_id,
     kind,
     base_object_class,
     refs,
-    val,
+    val_dump,
     digest,
     if (kind = 'op', 1, 0) AS is_op,
     row_number() OVER (
@@ -124,12 +124,12 @@ ORDER BY project_id,
 CREATE TABLE table_rows (
     project_id String,
     digest String,
-    val String,
+    val_dump String,
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest);
 CREATE VIEW table_rows_deduped AS
-SELECT project_id, digest, val
+SELECT project_id, digest, val_dump
 FROM (
         SELECT *,
             row_number() OVER (PARTITION BY project_id, digest) AS rn
@@ -161,7 +161,7 @@ CREATE TABLE files (
     chunk_index UInt32,
     n_chunks UInt32,
     name String,
-    val String,
+    val_bytes String,
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest, chunk_index);

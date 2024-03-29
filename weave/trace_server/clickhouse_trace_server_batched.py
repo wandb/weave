@@ -114,7 +114,7 @@ class ObjCHInsertable(BaseModel):
     base_object_class: typing.Optional[str]
     object_id: str
     refs: typing.List[str]
-    val: str
+    val_dump: str
     digest: str
 
 
@@ -123,7 +123,7 @@ class SelectableCHObjSchema(BaseModel):
     object_id: str
     created_at: datetime.datetime
     refs: typing.List[str]
-    val: str
+    val_dump: str
     kind: str
     base_object_class: typing.Optional[str]
     digest: str
@@ -340,7 +340,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             kind=get_kind(req.obj.val),
             base_object_class=get_base_object_class(req.obj.val),
             refs=[],
-            val=json_val,
+            val_dump=json_val,
             digest=digest,
         )
 
@@ -544,7 +544,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if len(objs) == 0:
                     raise NotFoundError(f"Obj {r.name}:{r.version} not found")
                 obj = objs[0]
-                val = json.loads(obj.val)
+                val = json.loads(obj.val_dump)
                 root_val_cache[cache_key] = val
             return val
 
@@ -705,16 +705,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "chunk_index",
                 "n_chunks",
                 "name",
-                "val",
+                "val_bytes",
             ],
         )
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         query_result = self.ch_client.query(
-            "SELECT n_chunks, val FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
+            "SELECT n_chunks, val_bytes FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
             parameters={"project_id": req.project_id, "digest": req.digest},
-            column_formats={"val": "bytes"},
+            column_formats={"val_bytes": "bytes"},
         )
         n_chunks = query_result.result_rows[0][0]
         chunks = [r[1] for r in query_result.result_rows]
@@ -1070,7 +1070,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         digest=ch_obj.digest,
         kind=ch_obj.kind,
         base_object_class=ch_obj.base_object_class,
-        val=json.loads(ch_obj.val),
+        val=json.loads(ch_obj.val_dump),
     )
 
 
