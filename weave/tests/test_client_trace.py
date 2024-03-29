@@ -366,11 +366,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     input_object_version_refs = unique_vals(
-        [
-            ref
-            for call in res.calls
-            for ref in extract_refs_from_values(call.inputs.values())
-        ]
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
     )
     assert len(input_object_version_refs) > 3
 
@@ -387,7 +383,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs.values()),
+                        extract_refs_from_values(call.inputs),
                         input_object_version_refs[:1],
                     )
                 ]
@@ -401,7 +397,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs.values()),
+                        extract_refs_from_values(call.inputs),
                         input_object_version_refs[:3],
                     )
                 ]
@@ -424,11 +420,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     output_object_version_refs = unique_vals(
-        [
-            ref
-            for call in res.calls
-            for ref in extract_refs_from_values(call.output.values())
-        ]
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
     )
     assert len(output_object_version_refs) > 3
 
@@ -445,7 +437,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.output.values()),
+                        extract_refs_from_values(call.output),
                         output_object_version_refs[:1],
                     )
                 ]
@@ -459,7 +451,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.output.values()),
+                        extract_refs_from_values(call.output),
                         output_object_version_refs[:3],
                     )
                 ]

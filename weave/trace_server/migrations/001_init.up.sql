@@ -204,6 +204,7 @@ ORDER BY project_id,
 CREATE TABLE table_rows (
     project_id String,
     digest String,
+    refs Array(String),
     val_dump String,
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()

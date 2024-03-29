@@ -339,7 +339,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_id=req_obj.object_id,
             kind=get_kind(req.obj.val),
             base_object_class=get_base_object_class(req.obj.val),
-            refs=[],
+            refs=extract_refs_from_values(req.obj.val),
             val_dump=json_val,
             digest=digest,
         )
@@ -412,12 +412,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
-            insert_rows.append((req.table.project_id, row_digest, row_json))
+            insert_rows.append(
+                (
+                    req.table.project_id,
+                    row_digest,
+                    extract_refs_from_values(r),
+                    row_json,
+                )
+            )
 
         self._insert(
             "table_rows",
             data=insert_rows,
-            column_names=["project_id", "digest", "val_dump"],
+            column_names=["project_id", "digest", "refs", "val_dump"],
         )
 
         row_digests = [r[1] for r in insert_rows]
@@ -1092,7 +1099,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         started_at=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
-        input_refs=extract_refs_from_values(list(start_call.inputs.values())),
+        input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
         wb_user_id=start_call.wb_user_id,
     )
@@ -1110,7 +1117,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         ended_at=end_call.ended_at,
         summary_dump=_dict_value_to_dump(end_call.summary),
         output_dump=_dict_value_to_dump(end_call.output),
-        output_refs=extract_refs_from_values(list(end_call.output.values())),
+        output_refs=extract_refs_from_values(end_call.output),
     )
 
 
