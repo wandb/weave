@@ -402,15 +402,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             table_hasher = hashlib.sha256()
             for row_digest in row_digests:
                 table_hasher.update(row_digest.encode())
-            table_digest = table_hasher.hexdigest()
+            digest = table_hasher.hexdigest()
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
-                (req.table.project_id, table_digest, json.dumps(row_digests)),
+                (req.table.project_id, digest, json.dumps(row_digests)),
             )
             conn.commit()
 
-        return tsi.TableCreateRes(digest=table_digest)
+        return tsi.TableCreateRes(digest=digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
@@ -418,7 +418,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotImplementedError("Table filter not implemented")
         else:
             conds.append("1 = 1")
-        rows = self._table_query(req.project_id, req.table_digest, conditions=conds)
+        rows = self._table_query(req.project_id, req.digest, conditions=conds)
 
         return tsi.TableQueryRes(rows=rows)
 
@@ -437,15 +437,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         def read_ref(r: refs.ObjectRef) -> Any:
             conds = [
-                f"object_id = '{r.name}'",
-                f"digest = '{r.version}'",
+                f"object_id = '{r.object_id}'",
+                f"digest = '{r.digest}'",
             ]
             objs = self._select_objs_query(
                 f"{r.entity}/{r.project}",
                 conditions=conds,
             )
             if len(objs) == 0:
-                raise NotFoundError(f"Obj {r.name}:{r.version} not found")
+                raise NotFoundError(f"Obj {r.object_id}:{r.digest} not found")
             obj = objs[0]
             val = obj.val
             extra = r.extra
@@ -508,7 +508,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def _table_query(
         self,
         project_id: str,
-        table_digest: str,
+        digest: str,
         conditions: Optional[list[str]] = None,
         limit: Optional[int] = None,
         parameters: Optional[dict[str, Any]] = None,
@@ -541,7 +541,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 OrderedDigests
                 JOIN table_rows ON OrderedDigests.digest = table_rows.digest
             """,
-            (project_id, table_digest),
+            (project_id, digest),
         )
         query_result = cursor.fetchall()
         return [

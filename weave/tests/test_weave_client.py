@@ -51,7 +51,7 @@ def test_table_create(client):
         )
     )
     result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", table_digest=res.digest)
+        TableQueryReq(project_id="test/test-project", digest=res.digest)
     )
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2

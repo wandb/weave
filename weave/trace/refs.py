@@ -48,12 +48,12 @@ class RefWithExtra(Ref):
 class ObjectRef(RefWithExtra):
     entity: str
     project: str
-    name: str
-    version: str
+    object_id: str
+    digest: str
     extra: list[str] = dataclasses.field(default_factory=list)
 
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.version}"
+        u = f"weave:///{self.entity}/{self.project}/object/{self.object_id}:{self.digest}"
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
@@ -72,9 +72,9 @@ class ObjectRef(RefWithExtra):
             return False
         if self.project != potential_ancestor.project:
             return False
-        if self.name != potential_ancestor.name:
+        if self.object_id != potential_ancestor.object_id:
             return False
-        if self.version != potential_ancestor.version:
+        if self.digest != potential_ancestor.digest:
             return False
         if len(self.extra) <= len(potential_ancestor.extra):
             return False
@@ -87,7 +87,7 @@ class ObjectRef(RefWithExtra):
 @dataclasses.dataclass
 class OpRef(ObjectRef):
     def uri(self) -> str:
-        u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.version}"
+        u = f"weave:///{self.entity}/{self.project}/op/{self.object_id}:{self.digest}"
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
@@ -123,8 +123,8 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
         return ObjectRef(
             entity=entity,
             project=project,
-            name=name,
-            version=version,
+            object_id=name,
+            digest=version,
             extra=remaining[1:],
         )
     elif kind == "op":
@@ -132,8 +132,8 @@ def parse_uri(uri: str) -> Union[ObjectRef, TableRef]:
         return OpRef(
             entity=entity,
             project=project,
-            name=name,
-            version=version,
+            object_id=name,
+            digest=version,
             extra=remaining[1:],
         )
     else:

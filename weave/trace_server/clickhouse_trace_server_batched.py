@@ -423,14 +423,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         table_hasher = hashlib.sha256()
         for row_digest in row_digests:
             table_hasher.update(row_digest.encode())
-        table_digest = table_hasher.hexdigest()
+        digest = table_hasher.hexdigest()
 
         self._insert(
             "tables",
-            data=[(req.table.project_id, table_digest, row_digests)],
+            data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],
         )
-        return tsi.TableCreateRes(digest=table_digest)
+        return tsi.TableCreateRes(digest=digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
@@ -443,7 +443,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conds.append("1 = 1")
         rows = self._table_query(
             req.project_id,
-            req.table_digest,
+            req.digest,
             conditions=conds,
             limit=req.limit,
             offset=req.offset,
@@ -453,7 +453,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _table_query(
         self,
         project_id: str,
-        table_digest: str,
+        digest: str,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
@@ -470,7 +470,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     SELECT project_id, row_digest
                     FROM tables_deduped
                     ARRAY JOIN row_digests AS row_digest
-                    WHERE digest = {{table_digest:String}}
+                    WHERE digest = {{digest:String}}
                 ) AS t
                 JOIN table_rows_deduped tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
@@ -488,7 +488,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             query,
             parameters={
                 "project_id": project_id,
-                "table_digest": table_digest,
+                "digest": digest,
                 **parameters,
             },
         )
@@ -657,7 +657,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 row_digests = [d for i, d in index_digests]
                 rows = self._table_query(
                     project_id=project_id,
-                    table_digest=digest,
+                    digest=digest,
                     conditions=["digest IN {digests: Array(String)}"],
                     parameters={"digests": row_digests},
                 )

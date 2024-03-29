@@ -494,7 +494,7 @@ const useTableQuery = makeTraceServerEndpointHook<
   ) => ({
     params: {
       project_id: projectId,
-      digest: digest,
+      digest,
       filter,
       limit,
     },

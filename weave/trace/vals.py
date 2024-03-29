@@ -229,7 +229,7 @@ class TraceTable(Tracable):
             response = self.server.table_query(
                 TableQueryReq(
                     project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
-                    table_digest=self.table_ref.digest,
+                    digest=self.table_ref.digest,
                     offset=page_index * page_size,
                     limit=page_size,
                     # filter=self.filter,
@@ -379,8 +379,8 @@ def make_trace_obj(
         read_res = server.obj_read(
             ObjReadReq(
                 project_id=f"{val.entity}/{val.project}",
-                object_id=val.name,
-                digest=val.version,
+                object_id=val.object_id,
+                digest=val.digest,
             )
         )
         val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)

@@ -212,7 +212,7 @@ class _ObjectVersionFilter(BaseModel):
     base_object_classes: typing.Optional[
         typing.List[str]
     ] = None  # category is better :)
-    object_ids: typing.Optional[typing.List[str]] = None 
+    object_ids: typing.Optional[typing.List[str]] = None
     is_op: typing.Optional[bool] = None
     latest_only: typing.Optional[bool] = None
 

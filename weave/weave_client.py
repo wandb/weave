@@ -245,7 +245,9 @@ class WeaveClient:
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project, object_id=name, val=json_val
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
                 )
             )
         )
@@ -268,13 +270,13 @@ class WeaveClient:
         read_res = self.server.obj_read(
             ObjReadReq(
                 project_id=self._project_id(),
-                object_id=ref.name,
-                digest=ref.version,
+                object_id=ref.object_id,
+                digest=ref.digest,
             )
         )
         # Probably bad form to mutate the ref here
-        if ref.version == "latest":
-            ref.version = read_res.obj.digest
+        if ref.digest == "latest":
+            ref.digest = read_res.obj.digest
         val = from_json(read_res.obj.val, self._project_id(), self.server)
         return make_trace_obj(val, ref, self.server, None)
 
