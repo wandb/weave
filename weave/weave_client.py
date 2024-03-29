@@ -369,7 +369,7 @@ class WeaveClient:
             id=call_id,
             op_name=op_str,
             trace_id=trace_id,
-            start_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes={},

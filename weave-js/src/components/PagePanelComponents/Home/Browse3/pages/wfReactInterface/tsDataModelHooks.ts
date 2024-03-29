@@ -853,14 +853,14 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 const traceCallToLegacySpan = (
   traceCall: traceServerClient.TraceCallSchema
 ): RawSpanFromStreamTableEra => {
-  const startDate = convertISOToDate(traceCall.start_datetime);
-  const endDate = traceCall.end_datetime
-    ? convertISOToDate(traceCall.end_datetime)
+  const startDate = convertISOToDate(traceCall.started_at);
+  const endDate = traceCall.ended_at
+    ? convertISOToDate(traceCall.ended_at)
     : null;
   let statusCode = 'UNSET';
   if (traceCall.exception) {
     statusCode = 'ERROR';
-  } else if (traceCall.end_datetime) {
+  } else if (traceCall.ended_at) {
     statusCode = 'SUCCESS';
   }
   let latencyS = 0;

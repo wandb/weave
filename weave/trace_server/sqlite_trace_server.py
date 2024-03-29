@@ -69,8 +69,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 trace_id TEXT,
                 parent_id TEXT,
                 op_name TEXT,
-                start_datetime TEXT,
-                end_datetime TEXT,
+                started_at TEXT,
+                ended_at TEXT,
                 exception TEXT,
                 attributes TEXT,
                 inputs TEXT,
@@ -141,7 +141,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     trace_id,
                     parent_id,
                     op_name,
-                    start_datetime,
+                    started_at,
                     attributes,
                     inputs,
                     input_refs,
@@ -154,7 +154,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.trace_id,
                     req.start.parent_id,
                     req.start.op_name,
-                    req.start.start_datetime.isoformat(),
+                    req.start.started_at.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
                     json.dumps(
@@ -177,13 +177,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         with self.lock:
             cursor.execute(
                 """UPDATE calls SET
-                    end_datetime = ?,
+                    ended_at = ?,
                     exception = ?,
                     output = ?,
                     output_refs = ?
                 WHERE id = ?""",
                 (
-                    req.end.end_datetime.isoformat(),
+                    req.end.ended_at.isoformat(),
                     req.end.exception,
                     json.dumps(req.end.output),
                     json.dumps(extract_refs_from_values(list(req.end.output.values()))),
@@ -274,8 +274,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     trace_id=row[2],
                     parent_id=row[3],
                     op_name=row[4],
-                    start_datetime=row[5],
-                    end_datetime=row[6],
+                    started_at=row[5],
+                    ended_at=row[6],
                     exception=row[7],
                     attributes=json.loads(row[8]),
                     inputs=json.loads(row[9]),

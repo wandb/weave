@@ -28,12 +28,12 @@ export type TraceCallSchema = {
   op_name: string;
   trace_id: string;
   parent_id?: string;
-  start_datetime: string;
+  started_at: string;
   attributes: KeyedDictType;
   inputs: KeyedDictType;
-  end_datetime?: string;
+  ended_at?: string;
   exception?: string;
-  outputs?: KeyedDictType;
+  output?: KeyedDictType;
   summary?: KeyedDictType;
   wb_run_id?: string;
   wb_user_id?: string;

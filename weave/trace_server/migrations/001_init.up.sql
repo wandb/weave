@@ -7,14 +7,14 @@ CREATE TABLE calls_raw (
     parent_id String NULL,
     # This field is actually nullable
     op_name String NULL,
-    start_datetime DateTime64(3) NULL,
+    started_at DateTime64(3) NULL,
     attributes_dump String NULL,
     inputs_dump String NULL,
     input_refs Array(String),
     # Empty array treated as null
     # End Fields (All fields are required when ending
     # a call. However, to support a fast "update" we need to allow nulls)
-    end_datetime DateTime64(3) NULL,
+    ended_at DateTime64(3) NULL,
     output_dump String NULL,
     summary_dump String NULL,
     exception String NULL,
@@ -23,7 +23,7 @@ CREATE TABLE calls_raw (
     wb_run_id Nullable(String),
     # Empty array treated as null
     # Bookkeeping
-    db_row_created_at DateTime64(3) DEFAULT now64(3)
+    created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = MergeTree
 ORDER BY (project_id, id);
 
@@ -37,11 +37,11 @@ CREATE TABLE calls_merged (
     trace_id SimpleAggregateFunction(any, Nullable(String)),
     parent_id SimpleAggregateFunction(any, Nullable(String)),
     op_name SimpleAggregateFunction(any, Nullable(String)),
-    start_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
+    started_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
     attributes_dump SimpleAggregateFunction(any, Nullable(String)),
     inputs_dump SimpleAggregateFunction(any, Nullable(String)),
     input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
-    end_datetime SimpleAggregateFunction(any, Nullable(DateTime64(3))),
+    ended_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
     output_dump SimpleAggregateFunction(any, Nullable(String)),
     summary_dump SimpleAggregateFunction(any, Nullable(String)),
     exception SimpleAggregateFunction(any, Nullable(String)),
@@ -58,11 +58,11 @@ SELECT project_id,
     anySimpleState(trace_id) as trace_id,
     anySimpleState(parent_id) as parent_id,
     anySimpleState(op_name) as op_name,
-    anySimpleState(start_datetime) as start_datetime,
+    anySimpleState(started_at) as started_at,
     anySimpleState(attributes_dump) as attributes_dump,
     anySimpleState(inputs_dump) as inputs_dump,
     array_concat_aggSimpleState(input_refs) as input_refs,
-    anySimpleState(end_datetime) as end_datetime,
+    anySimpleState(ended_at) as ended_at,
     anySimpleState(output_dump) as output_dump,
     anySimpleState(summary_dump) as summary_dump,
     anySimpleState(exception) as exception,
@@ -73,12 +73,12 @@ GROUP BY project_id,
 CREATE TABLE objects (
     project_id String,
     name String,
-    created_at DateTime64 DEFAULT now64(),
     kind Enum('op', 'object'),
     base_object_class String NULL,
     refs Array(String),
     val String,
-    digest String
+    digest String,
+    created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, kind, name, digest);
 CREATE VIEW objects_deduped AS
@@ -125,6 +125,7 @@ CREATE TABLE table_rows (
     project_id String,
     digest String,
     val String,
+    created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest);
 CREATE VIEW table_rows_deduped AS
@@ -141,6 +142,7 @@ CREATE TABLE tables (
     project_id String,
     digest String,
     row_digests Array(String),
+    created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest);
 CREATE VIEW tables_deduped AS
@@ -160,6 +162,7 @@ CREATE TABLE files (
     n_chunks UInt32,
     name String,
     val String,
+    created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest, chunk_index);
 CREATE VIEW files_deduped AS

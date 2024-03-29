@@ -17,7 +17,7 @@ class CallSchema(BaseModel):
     parent_id: typing.Optional[str] = None
 
     ## Start time is required
-    start_datetime: datetime.datetime
+    started_at: datetime.datetime
     ## Attributes: properties of the call
     attributes: typing.Dict[str, typing.Any]
 
@@ -25,7 +25,7 @@ class CallSchema(BaseModel):
     inputs: typing.Dict[str, typing.Any]
 
     ## End time is required if finished
-    end_datetime: typing.Optional[datetime.datetime] = None
+    ended_at: typing.Optional[datetime.datetime] = None
 
     ## Exception is present if the call failed
     exception: typing.Optional[str] = None
@@ -57,7 +57,7 @@ class StartedCallSchemaForInsert(BaseModel):
     parent_id: typing.Optional[str] = None
 
     ## Start time is required
-    start_datetime: datetime.datetime
+    started_at: datetime.datetime
     ## Attributes: properties of the call
     attributes: typing.Dict[str, typing.Any]
 
@@ -74,7 +74,7 @@ class EndedCallSchemaForInsert(BaseModel):
     id: str
 
     ## End time is required
-    end_datetime: datetime.datetime
+    ended_at: datetime.datetime
 
     ## Exception is present if the call failed
     exception: typing.Optional[str] = None

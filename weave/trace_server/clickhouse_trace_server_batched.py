@@ -46,7 +46,7 @@ class CallStartCHInsertable(BaseModel):
     trace_id: str
     parent_id: typing.Optional[str] = None
     op_name: str
-    start_datetime: datetime.datetime
+    started_at: datetime.datetime
     attributes_dump: str
     inputs_dump: str
     input_refs: typing.List[str]
@@ -59,7 +59,7 @@ class CallStartCHInsertable(BaseModel):
 class CallEndCHInsertable(BaseModel):
     project_id: str
     id: str
-    end_datetime: datetime.datetime
+    ended_at: datetime.datetime
     exception: typing.Optional[str] = None
     summary_dump: str
     output_dump: str
@@ -82,8 +82,8 @@ class SelectableCHCallSchema(BaseModel):
     trace_id: str
     parent_id: typing.Optional[str] = None
 
-    start_datetime: datetime.datetime
-    end_datetime: typing.Optional[datetime.datetime] = None
+    started_at: datetime.datetime
+    ended_at: typing.Optional[datetime.datetime] = None
     exception: typing.Optional[str] = None
 
     attributes_dump: str
@@ -837,7 +837,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         conditions_part = " AND ".join(conditions)
 
-        order_by_part = "ORDER BY start_datetime ASC"
+        order_by_part = "ORDER BY started_at ASC"
         # if order_by != None:
         #     order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
         #     for field, direction in order_by:
@@ -1028,8 +1028,8 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
         op_name=ch_call.op_name,
-        start_datetime=_ensure_datetimes_have_tz(ch_call.start_datetime),
-        end_datetime=_ensure_datetimes_have_tz(ch_call.end_datetime),
+        started_at=_ensure_datetimes_have_tz(ch_call.started_at),
+        ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
         output=_nullable_dict_dump_to_dict(ch_call.output_dump),
@@ -1048,8 +1048,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         trace_id=ch_call_dict.get("trace_id"),
         parent_id=ch_call_dict.get("parent_id"),
         op_name=ch_call_dict.get("op_name"),
-        start_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("start_datetime")),
-        end_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("end_datetime")),
+        started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
+        ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
         output=_nullable_dict_dump_to_dict(ch_call_dict.get("output_dump")),
@@ -1087,7 +1087,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         trace_id=trace_id,
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
-        start_datetime=start_call.start_datetime,
+        started_at=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(list(start_call.inputs.values())),
@@ -1105,7 +1105,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         project_id=end_call.project_id,
         id=end_call.id,
         exception=end_call.exception,
-        end_datetime=end_call.end_datetime,
+        ended_at=end_call.ended_at,
         summary_dump=_dict_value_to_dump(end_call.summary),
         output_dump=_dict_value_to_dump(end_call.output),
         output_refs=extract_refs_from_values(list(end_call.output.values())),
