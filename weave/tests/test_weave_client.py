@@ -425,7 +425,7 @@ def test_dataset_rows_ref(client):
     assert saved.rows.ref.extra == [OBJECT_ATTR_EDGE_NAME, "rows"]
 
 
-# @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
+@pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_evaluate(client):
     @weave.op()
     async def model_predict(input) -> str:
@@ -644,10 +644,10 @@ def test_server_file(client):
 
 
 def test_isinstance_checks(client):
-    class PydanticObjA(BaseModel):
+    class PydanticObjA(weave.Object):
         x: dict
 
-    class PydanticObjB(BaseModel):
+    class PydanticObjB(weave.Object):
         a: PydanticObjA
 
     b = PydanticObjB(a=PydanticObjA(x={"y": [1, "j", True, None]}))

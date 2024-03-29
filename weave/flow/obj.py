@@ -74,6 +74,7 @@ class Object(BaseModel):
         return handler(v)
 
 
-# This enables Weave ref-tracking for all pydantic objects, not just
-# Object
-BaseModel.__getattribute__ = pydantic_getattribute
+# Enable ref tracking for Weave.Object
+# We could try to do this on BaseModel, but we haven't proven that's safe.
+# So only Weave Objects will get ref tracking behavior for now.
+Object.__getattribute__ = pydantic_getattribute  # type: ignore
