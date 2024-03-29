@@ -15,6 +15,8 @@ import React, {FC, useCallback, useMemo} from 'react';
 
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
+import {Empty} from '../common/Empty';
+import {EMPTY_PROPS_TRACES} from '../common/EmptyContent';
 import {isEvaluateOp} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
@@ -233,6 +235,17 @@ export const CallsTable: FC<{
     return Math.random();
   }, [calls.loading, calls.result]);
 
+  if (calls.loading) {
+    // TODO: Do we want a loading indicator here
+    return null;
+  }
+
+  const spans = calls.result ?? [];
+  const isEmpty = spans.length === 0;
+  if (isEmpty) {
+    return <Empty {...EMPTY_PROPS_TRACES} />;
+  }
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -376,7 +389,7 @@ export const CallsTable: FC<{
         <RunsTable
           key={callsKey}
           loading={calls.loading}
-          spans={calls.result ?? []}
+          spans={spans}
           clearFilters={clearFilters}
           ioColumnsOnly={props.ioColumnsOnly}
         />

@@ -11,6 +11,12 @@ import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
+import {Empty} from './common/Empty';
+import {
+  EMPTY_PROPS_DATASETS,
+  EMPTY_PROPS_MODEL,
+  EMPTY_PROPS_OBJECTS,
+} from './common/EmptyContent';
 import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
@@ -102,6 +108,20 @@ export const FilterableObjectVersionsTable: React.FC<{
     }
   );
 
+  // TODO: Only show the empty state if no filters other than baseObjectClass
+  const objectVersions = filteredObjectVersions.result ?? [];
+  const isEmpty = objectVersions.length === 0;
+  if (isEmpty) {
+    let propsEmpty = EMPTY_PROPS_OBJECTS;
+    const base = props.initialFilter?.baseObjectClass;
+    if ('Model' === base) {
+      propsEmpty = EMPTY_PROPS_MODEL;
+    } else if ('Dataset' === base) {
+      propsEmpty = EMPTY_PROPS_DATASETS;
+    }
+    return <Empty {...propsEmpty} />;
+  }
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -112,7 +132,7 @@ export const FilterableObjectVersionsTable: React.FC<{
         effectiveFilter
       )}>
       <ObjectVersionsTable
-        objectVersions={filteredObjectVersions.result ?? []}
+        objectVersions={objectVersions}
         usingLatestFilter={effectivelyLatestOnly}
       />
     </FilterLayoutTemplate>
