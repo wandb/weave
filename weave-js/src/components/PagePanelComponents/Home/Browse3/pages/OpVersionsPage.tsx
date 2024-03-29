@@ -4,12 +4,10 @@ import {
   GridRowSelectionModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
-import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
-import {CategoryChip} from './common/CategoryChip';
 import {basicField} from './common/DataTable';
 import {
   CallsLink,
@@ -19,13 +17,11 @@ import {
 } from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
-import {HackyOpCategory} from './wfInterface/types';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
 
 export type WFHighLevelOpVersionFilter = {
-  opCategory?: HackyOpCategory | null;
   opName?: string | null;
 };
 
@@ -45,11 +41,9 @@ export const OpVersionsPage: React.FC<{
   const title = useMemo(() => {
     if (filter.opName) {
       return 'Implementations of ' + filter.opName;
-    } else if (filter.opCategory) {
-      return _.capitalize(filter.opCategory) + ' Operations';
     }
     return 'All Operations';
-  }, [filter.opCategory, filter.opName]);
+  }, [filter.opName]);
 
   return (
     <SimplePageLayout
@@ -88,9 +82,6 @@ export const FilterableOpVersionsTable: React.FC<{
   const effectivelyLatestOnly = !effectiveFilter.opName;
 
   const filteredObjectVersions = useOpVersions(props.entity, props.project, {
-    category: effectiveFilter.opCategory
-      ? [effectiveFilter.opCategory]
-      : undefined,
     opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
     latestOnly: effectivelyLatestOnly,
   });
@@ -130,14 +121,6 @@ export const FilterableOpVersionsTable: React.FC<{
       renderCell: cellParams => {
         const obj: OpVersionSchema = cellParams.row.obj;
         return <OpCallsLink obj={obj} />;
-      },
-    }),
-
-    basicField('category', 'Category', {
-      width: 100,
-      renderCell: cellParams => {
-        const category = cellParams.value;
-        return category && <CategoryChip value={category} />;
       },
     }),
 

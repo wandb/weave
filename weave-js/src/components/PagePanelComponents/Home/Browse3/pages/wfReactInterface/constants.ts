@@ -17,4 +17,4 @@ export const OP_CATEGORIES = [
   'evaluate',
   'tune',
 ] as const;
-export const OBJECT_CATEGORIES = ['model', 'dataset'] as const;
+export const KNOWN_BASE_OBJECT_CLASSES = ['Model', 'Dataset'] as const;

@@ -110,7 +110,8 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 
 class ObjCHInsertable(BaseModel):
     project_id: str
-    type: str
+    kind: str
+    base_object_class: typing.Optional[str]
     name: str
     refs: typing.List[str]
     val: str
@@ -123,7 +124,8 @@ class SelectableCHObjSchema(BaseModel):
     created_at: datetime.datetime
     refs: typing.List[str]
     val: str
-    type: str
+    kind: str
+    base_object_class: typing.Optional[str]
     digest: str
     version_index: int
     is_latest: int
@@ -338,7 +340,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ch_obj = ObjCHInsertable(
             project_id=req_obj.project_id,
             name=req_obj.name,
-            type=get_type(req.obj.val),
+            kind=get_kind(req.obj.val),
+            base_object_class=get_base_object_class(req.obj.val),
             refs=[],
             val=json_val,
             digest=digest,
@@ -386,6 +389,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters["object_names"] = req.filter.object_names
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
+            if req.filter.base_object_classes:
+                conds.append(
+                    "base_object_class IN {base_object_classes: Array(String)}"
+                )
+                parameters["base_object_classes"] = req.filter.base_object_classes
 
         objs = self._select_objs_query(
             req.project_id,
@@ -1092,7 +1100,8 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,
-        type=ch_obj.type,
+        kind=ch_obj.kind,
+        base_object_class=ch_obj.base_object_class,
         val=json.loads(ch_obj.val),
     )
 
@@ -1176,6 +1185,27 @@ def get_type(val: typing.Any) -> str:
     elif isinstance(val, list):
         return "list"
     return "unknown"
+
+
+def get_kind(val: typing.Any) -> str:
+    val_type = get_type(val)
+    if val_type == "Op":
+        return "op"
+    return "object"
+
+
+def get_base_object_class(val: typing.Any) -> typing.Optional[str]:
+    if isinstance(val, dict):
+        if "_bases" in val:
+            if isinstance(val["_bases"], list):
+                if len(val["_bases"]) >= 2:
+                    if val["_bases"][-1] == "BaseModel":
+                        if val["_bases"][-2] == "Object":
+                            if len(val["_bases"]) > 2:
+                                return val["_bases"][-3]
+                            elif "_class_name" in val:
+                                return val["_class_name"]
+    return None
 
 
 def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:

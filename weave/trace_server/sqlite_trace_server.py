@@ -88,7 +88,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 project_id TEXT,
                 name TEXT,
                 created_at TEXT,
-                type TEXT,
+                kind TEXT,
+                base_object_class TEXT,
                 refs TEXT,
                 val TEXT,
                 digest TEXT UNIQUE,
@@ -318,18 +319,20 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     project_id,
                     name,
                     created_at,
-                    type,
+                    kind,
+                    base_object_class,
                     refs,
                     val,
                     digest,
                     version_index,
                     is_latest
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req_obj.project_id,
                     req_obj.name,
                     datetime.datetime.now().isoformat(),
-                    get_type(req_obj.val),
+                    get_kind(req_obj.val),
+                    get_base_object_class(req_obj.val),
                     json.dumps([]),
                     json_val,
                     digest,
@@ -362,14 +365,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.filter:
             if req.filter.is_op is not None:
                 if req.filter.is_op:
-                    conds.append("type = 'Op'")
+                    conds.append("kind = 'op'")
                 else:
-                    conds.append("type != 'Op'")
+                    conds.append("kind != 'op'")
             if req.filter.object_names:
                 in_list = ", ".join([f"'{n}'" for n in req.filter.object_names])
                 conds.append(f"name IN ({in_list})")
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
+            if req.filter.base_object_classes:
+                in_list = ", ".join([f"'{t}'" for t in req.filter.base_object_classes])
+                conds.append(f"base_object_class IN ({in_list})")
 
         objs = self._select_objs_query(
             req.project_id,
@@ -581,11 +587,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     project_id=f"{row[0]}",
                     name=row[1],
                     created_at=row[2],
-                    type=row[3],
-                    val=json.loads(row[5]),
-                    digest=row[6],
-                    version_index=row[7],
-                    is_latest=row[8],
+                    kind=row[3],
+                    base_object_class=row[4],
+                    val=json.loads(row[6]),
+                    digest=row[7],
+                    version_index=row[8],
+                    is_latest=row[9],
                 )
             )
 
@@ -604,3 +611,24 @@ def get_type(val: Any) -> str:
     elif isinstance(val, list):
         return "list"
     return "unknown"
+
+
+def get_kind(val: Any) -> str:
+    val_type = get_type(val)
+    if val_type == "Op":
+        return "op"
+    return "object"
+
+
+def get_base_object_class(val: Any) -> Optional[str]:
+    if isinstance(val, dict):
+        if "_bases" in val:
+            if isinstance(val["_bases"], list):
+                if len(val["_bases"]) >= 2:
+                    if val["_bases"][-1] == "BaseModel":
+                        if val["_bases"][-2] == "Object":
+                            if len(val["_bases"]) > 2:
+                                return val["_bases"][-3]
+                            elif "_class_name" in val:
+                                return val["_class_name"]
+    return None

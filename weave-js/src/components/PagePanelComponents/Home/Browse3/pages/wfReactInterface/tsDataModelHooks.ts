@@ -16,12 +16,7 @@ import {callCache, objectVersionCache, refDataCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
-import {
-  opVersionRefOpCategory,
-  refUriToObjectVersionKey,
-  refUriToOpVersionKey,
-  typeNameToCategory,
-} from './utilities';
+import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -31,7 +26,6 @@ import {
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
-  OpCategory,
   OpVersionFilter,
   OpVersionKey,
   OpVersionSchema,
@@ -244,15 +238,7 @@ const useCalls = (
       };
     }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
-    const result = allResults.filter((row: any) => {
-      return (
-        deepFilter.opCategory == null ||
-        (row.opVersionRef &&
-          deepFilter.opCategory.includes(
-            opVersionRefOpCategory(row.opVersionRef) as OpCategory
-          ))
-      );
-    });
+    const result = allResults;
 
     if (callRes == null || loadingRef.current) {
       return {
@@ -275,7 +261,7 @@ const useCalls = (
         result,
       };
     }
-  }, [callRes, deepFilter.opCategory, entity, project, opts?.skip]);
+  }, [callRes, entity, project, opts?.skip]);
 };
 
 const useOpVersion = (
@@ -334,11 +320,9 @@ const useOpVersions = makeTraceServerEndpointHook<
         project,
         opId: obj.name,
         versionHash: obj.digest,
-        typeName: obj.type,
         name: obj.name,
         path: 'obj',
         createdAtMs: convertISOToDate(obj.created_at).getTime(),
-        category: null,
         versionIndex: obj.version_index,
         value: obj.val,
       };
@@ -439,6 +423,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     params: {
       project_id: projectIdFromParts({entity, project}),
       filter: {
+        base_object_classes: filter.baseObjectClasses,
         object_names: filter.objectIds,
         latest_only: filter.latestOnly,
         is_op: false,
@@ -454,31 +439,23 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     limit,
     opts
   ): ObjectVersionSchema[] =>
-    res.objs
-      .map(obj => {
-        const [entity, project] = obj.project_id.split('/');
-        return {
-          scheme: 'weave' as const,
-          entity,
-          project,
-          weaveKind: 'object' as const,
-          objectId: obj.name,
-          versionHash: obj.digest,
-          typeName: obj.type,
-          name: obj.name,
-          path: 'obj',
-          createdAtMs: convertISOToDate(obj.created_at).getTime(),
-          category: typeNameToCategory(obj.type),
-          versionIndex: obj.version_index,
-          val: obj.val,
-        };
-      })
-      .filter(obj => {
-        return (
-          filter.category == null ||
-          (obj.category != null && filter.category.includes(obj.category))
-        );
-      })
+    res.objs.map(obj => {
+      const [entity, project] = obj.project_id.split('/');
+      return {
+        scheme: 'weave' as const,
+        entity,
+        project,
+        weaveKind: 'object' as const,
+        objectId: obj.name,
+        versionHash: obj.digest,
+        name: obj.name,
+        path: 'obj',
+        createdAtMs: convertISOToDate(obj.created_at).getTime(),
+        baseObjectClass: obj.base_object_class ?? null,
+        versionIndex: obj.version_index,
+        val: obj.val,
+      };
+    })
 );
 
 const useRefsReadBatch = makeTraceServerEndpointHook<

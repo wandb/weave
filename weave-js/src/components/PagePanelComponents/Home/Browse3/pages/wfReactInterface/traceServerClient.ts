@@ -71,6 +71,7 @@ export type TraceCallsQueryRes = {
 };
 
 interface TraceObjectsFilter {
+  base_object_classes?: string[];
   object_names?: string[];
   is_op?: boolean;
   latest_only?: boolean;
@@ -88,7 +89,8 @@ export interface TraceObjSchema {
   digest: string;
   version_index: number;
   is_latest: number;
-  type: string;
+  kind: 'op' | 'object';
+  base_object_class?: string;
   val: any;
 }
 
