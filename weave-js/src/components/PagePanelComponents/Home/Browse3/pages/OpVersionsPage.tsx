@@ -9,6 +9,8 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
+import {Empty} from './common/Empty';
+import {EMPTY_PROPS_OPERATIONS} from './common/EmptyContent';
 import {
   CallsLink,
   opNiceName,
@@ -81,13 +83,13 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const effectivelyLatestOnly = !effectiveFilter.opName;
 
-  const filteredObjectVersions = useOpVersions(props.entity, props.project, {
+  const filteredOpVersions = useOpVersions(props.entity, props.project, {
     opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
     latestOnly: effectivelyLatestOnly,
   });
 
   const rows: GridRowsProp = useMemo(() => {
-    return (filteredObjectVersions.result ?? []).map((ov, i) => {
+    return (filteredOpVersions.result ?? []).map((ov, i) => {
       return {
         ...ov,
         id: opVersionKeyToRefUri(ov),
@@ -95,7 +97,7 @@ export const FilterableOpVersionsTable: React.FC<{
         obj: ov,
       };
     });
-  }, [filteredObjectVersions.result]);
+  }, [filteredOpVersions.result]);
   const columns: GridColDef[] = [
     basicField('op', 'Op', {
       hideable: false,
@@ -173,6 +175,18 @@ export const FilterableOpVersionsTable: React.FC<{
       }
     }
   }, [rowIds, peekId]);
+
+  if (filteredOpVersions.loading) {
+    // TODO: Do we want a loading indicator here
+    return null;
+  }
+
+  // TODO: Only show the empty state if unfiltered
+  const opVersions = filteredOpVersions.result ?? [];
+  const isEmpty = opVersions.length === 0;
+  if (isEmpty) {
+    return <Empty {...EMPTY_PROPS_OPERATIONS} />;
+  }
 
   return (
     <StyledDataGrid
