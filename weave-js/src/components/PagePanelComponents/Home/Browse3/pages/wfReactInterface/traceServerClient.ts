@@ -63,7 +63,7 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
-type TraceCallsQueryReq = {
+export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;

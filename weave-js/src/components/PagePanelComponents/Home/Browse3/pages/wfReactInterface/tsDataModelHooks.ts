@@ -196,12 +196,12 @@ const useCalls = (
     }
     setCallRes(null);
     loadingRef.current = true;
-    const req = {
+    const req: traceServerClient.TraceCallsQueryReq = {
       project_id: projectIdFromParts({entity, project}),
       filter: {
-        op_version_refs: deepFilter.opVersionRefs,
-        input_object_version_refs: deepFilter.inputObjectVersionRefs,
-        output_object_version_refs: deepFilter.outputObjectVersionRefs,
+        op_names: deepFilter.opVersionRefs,
+        input_refs: deepFilter.inputObjectVersionRefs,
+        output_refs: deepFilter.outputObjectVersionRefs,
         parent_ids: deepFilter.parentIds,
         trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
         call_ids: deepFilter.callIds,
