@@ -79,7 +79,7 @@ def test_dataset(client):
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
-        project_id="test_entity/test_project",
+        project_id=client._project_id(),
         id=call_id,
         op_name="test_name",
         trace_id="test_trace_id",
@@ -93,7 +93,7 @@ def test_trace_server_call_start_and_end(client):
 
     res = client.server.call_read(
         tsi.CallReadReq(
-            project_id="test_entity/test_project",
+            project_id=client._project_id(),
             id=call_id,
         )
     )
@@ -110,8 +110,17 @@ def test_trace_server_call_start_and_end(client):
             # Checks within 1ms
             return abs((self.dt - other).total_seconds()) < 0.001
 
+    class MaybeStringMatcher:
+        def __init__(self, s):
+            self.s = s
+
+        def __eq__(self, other):
+            if other is None:
+                return True
+            return self.s == other
+
     assert res.call.model_dump() == {
-        "project_id": "test_entity/test_project",
+        "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
         "trace_id": "test_trace_id",
@@ -123,12 +132,12 @@ def test_trace_server_call_start_and_end(client):
         "inputs": {"b": 5},
         "output": None,
         "summary": None,
-        "wb_user_id": None,
+        "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
-        project_id="test_entity/test_project",
+        project_id=client._project_id(),
         id=call_id,
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
@@ -138,7 +147,7 @@ def test_trace_server_call_start_and_end(client):
 
     res = client.server.call_read(
         tsi.CallReadReq(
-            project_id="test_entity/test_project",
+            project_id=client._project_id(),
             id=call_id,
         )
     )
@@ -148,7 +157,7 @@ def test_trace_server_call_start_and_end(client):
     )
 
     assert res.call.model_dump() == {
-        "project_id": "test_entity/test_project",
+        "project_id": client._project_id(),
         "id": call_id,
         "op_name": "test_name",
         "trace_id": "test_trace_id",
@@ -160,7 +169,7 @@ def test_trace_server_call_start_and_end(client):
         "inputs": {"b": 5},
         "output": {"d": 5},
         "summary": {"c": 5},
-        "wb_user_id": None,
+        "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
     }
 
