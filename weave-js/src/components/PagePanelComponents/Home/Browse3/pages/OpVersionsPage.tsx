@@ -6,6 +6,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {Loading} from '../../../../Loading';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
@@ -177,8 +178,7 @@ export const FilterableOpVersionsTable: React.FC<{
   }, [rowIds, peekId]);
 
   if (filteredOpVersions.loading) {
-    // TODO: Do we want a loading indicator here
-    return null;
+    return <Loading centered />;
   }
 
   // TODO: Only show the empty state if unfiltered
