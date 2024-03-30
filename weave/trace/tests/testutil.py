@@ -1,10 +1,17 @@
+from typing import Optional, Any
 from weave.trace.refs import parse_uri, ObjectRef, OpRef
 
 
 class ObjectRefStrMatcher:
     def __init__(
-        self, entity=None, project=None, kind=None, name=None, digest=None, extra=None
-    ):
+        self,
+        entity: Optional[str] = None,
+        project: Optional[str] = None,
+        kind: Optional[str] = None,
+        name: Optional[str] = None,
+        digest: Optional[str] = None,
+        extra: Optional[list[str]] = None,
+    ) -> None:
         self.entity = entity
         self.project = project
         self.kind = kind
@@ -12,7 +19,7 @@ class ObjectRefStrMatcher:
         self.digest = digest
         self.extra = extra
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         other_ref = parse_uri(other)
         if not isinstance(other_ref, ObjectRef):
             return False

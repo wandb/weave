@@ -1,3 +1,4 @@
+import dataclasses
 import re
 import pytest
 import pydantic
@@ -194,8 +195,7 @@ def test_call_create(client):
     call = client.create_call("x", None, {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.call(call.id)
-    print("RESULT", result)
-    assert result == weave_client.Call(
+    expected = weave_client.Call(
         op_name="x",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
@@ -203,7 +203,11 @@ def test_call_create(client):
         inputs={"a": 5, "b": 10},
         id=call.id,
         output="hello",
+        exception=None,
+        summary={},
+        _children=[],
     )
+    assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
 
 def test_calls_query(client):
