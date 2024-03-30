@@ -16,6 +16,7 @@ from weave.trace.refs import (
 )
 
 from weave.trace import refs
+from weave.trace.tests.testutil import ObjectRefStrMatcher
 from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
     TableCreateReq,
@@ -689,3 +690,94 @@ def test_isinstance_checks(client):
     assert not isinstance(y2, type(None))
     assert y3.ref is not None
     assert y3.ref.is_descended_from(y.ref)
+
+
+def test_summary_tokens(client):
+    @weave.op()
+    def model_a(text):
+        result = "a: " + text
+        return {
+            "result": result,
+            "model": "model_a",
+            "usage": {
+                "prompt_tokens": len(text),
+                "completion_tokens": len(result),
+            },
+        }
+
+    @weave.op()
+    def model_b(text):
+        result = "bbbb: " + text
+        return {
+            "result": result,
+            "model": "model_b",
+            "usage": {
+                "prompt_tokens": len(text),
+                "completion_tokens": len(result),
+            },
+        }
+
+    @weave.op()
+    def models(text):
+        return (
+            model_a(text)["result"]
+            + " "
+            + model_a(text)["result"]
+            + " "
+            + model_b(text)["result"]
+        )
+
+    res = models("hello")
+    assert res == "a: hello a: hello bbbb: hello"
+
+    call = list(models.calls())[0]
+
+    assert call.summary["usage"] == {
+        "model_a": {"requests": 2, "prompt_tokens": 10, "completion_tokens": 16},
+        "model_b": {"requests": 1, "prompt_tokens": 5, "completion_tokens": 11},
+    }
+
+
+def test_summary_descendents(client):
+    @weave.op()
+    def model_a(text):
+        return "a: " + text
+
+    @weave.op()
+    def model_b(text):
+        return "bbbb: " + text
+
+    @weave.op()
+    def model_error(text):
+        raise ValueError("error: " + text)
+
+    @weave.op()
+    def model_error_catch(text):
+        try:
+            model_error(text)
+        except ValueError as e:
+            return str(e)
+
+    @weave.op()
+    def models(text):
+        return (
+            model_a(text)
+            + " "
+            + model_a(text)
+            + " "
+            + model_b(text)
+            + " "
+            + model_error_catch(text)
+        )
+
+    res = models("hello")
+    assert res == "a: hello a: hello bbbb: hello error: hello"
+
+    call = list(models.calls())[0]
+
+    assert list(call.summary["descendants"].items()) == [
+        (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
+        (ObjectRefStrMatcher(name="model_b"), {"successes": 1, "errors": 0}),
+        (ObjectRefStrMatcher(name="model_error"), {"successes": 0, "errors": 1}),
+        (ObjectRefStrMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
+    ]
