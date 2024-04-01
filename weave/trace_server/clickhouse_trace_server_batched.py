@@ -244,7 +244,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 for name_ndx, name in enumerate(wildcarded_names):
                     param_name = "wildcarded_name_" + str(name_ndx)
                     or_conditions.append("op_name LIKE {" + param_name + ": String}")
-                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
+                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
                     parameters[param_name] = like_name
 
                 if or_conditions:
