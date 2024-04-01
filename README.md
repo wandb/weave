@@ -4,7 +4,7 @@
 
 ---
 
-Weave is a toolkit for developing AI-powered applications
+Weave is a toolkit for developing AI-powered applications.
 
 You can use Weave to:
 
@@ -15,6 +15,8 @@ You can use Weave to:
 ## Getting Started with Weave
 
 To get started debugging, evaluating, and monitoring AI applications, read [the docs](https://wandb.me/weave)!
+
+![Weave UI Example](./docs/static/weave-ui-example.jpg)
 
 ## The code base
 
