@@ -76,7 +76,7 @@ export type TraceCallsQueryRes = {
 
 interface TraceObjectsFilter {
   base_object_classes?: string[];
-  object_names?: string[];
+  object_ids?: string[];
   is_op?: boolean;
   latest_only?: boolean;
 }
