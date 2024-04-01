@@ -742,6 +742,7 @@ def test_summary_tokens(client):
     }
 
 
+@pytest.mark.skip("descendent error tracking disabled until we fix UI")
 def test_summary_descendents(client):
     @weave.op()
     def model_a(text):

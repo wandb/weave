@@ -431,20 +431,23 @@ class WeaveClient:
             )
         )
 
+        # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
         # descendents are included in what we log
-        summary.setdefault("descendants", {}).setdefault(
-            call.op_name, {"successes": 0, "errors": 0}
-        )["successes"] += 1
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["successes"] += 1
         call.summary = summary
 
     def fail_call(self, call: Call, exception: BaseException) -> None:
-        stack_trace = "".join(
-            traceback.format_exception(
-                type(exception), exception, exception.__traceback__
-            )
-        )
-        exception_str = f"{stack_trace}\n{type(exception).__name__}: {str(exception)}"
+        # Full traceback disabled til we fix UI.
+        # stack_trace = "".join(
+        #     traceback.format_exception(
+        #         type(exception), exception, exception.__traceback__
+        #     )
+        # )
+        # exception_str = f"{stack_trace}\n{type(exception).__name__}: {str(exception)}"
+        exception_str = str(exception)
         call.exception = exception_str
 
         # Summary handling
@@ -464,11 +467,13 @@ class WeaveClient:
             )
         )
 
+        # Descendent error tracking disabled til we fix UI
         # Add this call's summary after logging the call, so that only
         # descendents are included in what we log
-        summary.setdefault("descendants", {}).setdefault(
-            call.op_name, {"successes": 0, "errors": 0}
-        )["errors"] += 1
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["errors"] += 1
+
         call.summary = summary
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
