@@ -56,12 +56,28 @@ def _print_version_check() -> None:
             print(use_message)
 
 
+def _assert_min_version(host: str, min_required_version: str) -> None:
+    import weave
+
+    if _parse_version(min_required_version) > _parse_version(weave.__version__):
+        message = (
+            f"The target Weave host {host} requires a `weave` package version >= {min_required_version}."
+            " To upgrade, please run:\n"
+            " $ pip install weave --upgrade"
+        )
+        raise ValueError(message)
+
+
 def print_init_message(
     username: typing.Optional[str],
     entity_name: str,
     project_name: str,
-    host: str = "https://wandb.ai",
+    min_required_version: str,
+    trace_server_host: str = "https://trace.wandb.ai",
+    uri_host: str = "https://wandb.ai",
 ) -> None:
+    _assert_min_version(trace_server_host, min_required_version)
+
     try:
         _print_version_check()
     except Exception as e:
@@ -70,6 +86,6 @@ def print_init_message(
     message = ""
     if username is not None:
         message += f"Logged in as W&B user {username}.\n"
-    message += f"View Weave data at {host}/{entity_name}/{project_name}/weave"
+    message += f"View Weave data at {uri_host}/{entity_name}/{project_name}/weave"
 
     print(message)
