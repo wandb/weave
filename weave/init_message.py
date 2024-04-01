@@ -56,14 +56,17 @@ def _print_version_check() -> None:
             print(use_message)
 
 
-def _assert_min_version(host: str, min_required_version: str) -> None:
+def assert_min_weave_version(
+    min_required_version: str, trace_server_host: str = "https://trace.wandb.ai"
+) -> None:
     import weave
 
     if _parse_version(min_required_version) > _parse_version(weave.__version__):
         message = (
-            f"The target Weave host {host} requires a `weave` package version >= {min_required_version}."
-            " To upgrade, please run:\n"
-            " $ pip install weave --upgrade"
+            f"The target Weave host {trace_server_host} requires a `weave` package version >= {min_required_version}."
+            " To remedy, either:\n"
+            "   * Upgrade `weave` by running: `pip install weave --upgrade`\n"
+            "   * Disable logging by omitting calls to `weave.init` To upgrade, please run:\n"
         )
         raise ValueError(message)
 
@@ -72,12 +75,8 @@ def print_init_message(
     username: typing.Optional[str],
     entity_name: str,
     project_name: str,
-    min_required_version: str,
-    trace_server_host: str = "https://trace.wandb.ai",
     uri_host: str = "https://wandb.ai",
 ) -> None:
-    _assert_min_version(trace_server_host, min_required_version)
-
     try:
         _print_version_check()
     except Exception as e:
