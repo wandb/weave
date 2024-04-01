@@ -7,6 +7,7 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {Loading} from '../../../../Loading';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
@@ -109,8 +110,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   );
 
   if (filteredObjectVersions.loading) {
-    // TODO: Do we want a loading indicator here
-    return null;
+    return <Loading centered />;
   }
 
   // TODO: Only show the empty state if no filters other than baseObjectClass
