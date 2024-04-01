@@ -305,7 +305,7 @@ const useOpVersions = makeTraceServerEndpointHook<
       // entity,
       // project,
       filter: {
-        object_names: filter.opIds,
+        object_ids: filter.opIds,
         latest_only: filter.latestOnly,
         is_op: true,
       },
@@ -424,7 +424,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
       project_id: projectIdFromParts({entity, project}),
       filter: {
         base_object_classes: filter.baseObjectClasses,
-        object_names: filter.objectIds,
+        object_ids: filter.objectIds,
         latest_only: filter.latestOnly,
         is_op: false,
       },

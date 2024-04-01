@@ -298,7 +298,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         conds = [
-            "name = {name: String}",
+            "object_id = {name: String}",
             "digest = {version_hash: String}",
             "is_op = 1",
         ]
@@ -316,7 +316,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conds: typing.List[str] = ["is_op = 1"]
         if req.filter:
             if req.filter.op_names:
-                conds.append("name IN {op_names: Array(String)}")
+                conds.append("object_id IN {op_names: Array(String)}")
                 parameters["op_names"] = req.filter.op_names
 
             if req.filter.latest_only:
@@ -384,8 +384,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 else:
                     conds.append("is_op = 0")
             if req.filter.object_ids:
-                conds.append("name IN {object_names: Array(String)}")
-                parameters["object_names"] = req.filter.object_ids
+                conds.append("object_id IN {object_ids: Array(String)}")
+                parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
             if req.filter.base_object_classes:
