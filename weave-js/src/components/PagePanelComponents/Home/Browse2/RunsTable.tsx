@@ -243,6 +243,7 @@ export const RunsTable: FC<{
   };
 
   const [expandedColInfo, setExpandedColInfo] = useState<ExtraColumns>({});
+  console.log({expandedColInfo});
 
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
@@ -282,6 +283,7 @@ export const RunsTable: FC<{
       break;
     }
   }
+  console.log({onlyOneOutputResult});
 
   const tableData = useMemo(() => {
     return spans.map((call: CallSchema) => {
@@ -680,9 +682,18 @@ export const RunsTable: FC<{
         })
       );
 
+      const outputGroup: Exclude<
+        ComponentProps<typeof DataGrid>['columnGroupingModel'],
+        undefined
+      >[number] = {
+        groupId: 'output',
+        children: [],
+      };
+
       const outputOrder = Object.keys(outputKeys);
-      const outputGrouping = buildTree(outputOrder, 'output');
-      colGroupingModel.push(outputGrouping);
+      // const outputGrouping = buildTree(outputOrder, 'output');
+      // colGroupingModel.push(outputGrouping);
+
       for (const key of outputOrder) {
         const field = 'output.' + key;
         const isExpanded = expandedRefCols.has(field);
@@ -710,7 +721,56 @@ export const RunsTable: FC<{
             return <NotApplicable />;
           },
         });
+        if (isExpanded) {
+          const outputGroupChildren = [{field}];
+          const expandCols = expandedColInfo[field] ?? [];
+          for (const col of expandCols) {
+            const expandField = field + '.' + col.label;
+            cols.push({
+              flex: 1,
+              field: expandField,
+              renderHeader: headerParams => {
+                return (
+                  <CustomGroupedColumnHeader
+                    field={headerParams.field}
+                    // TODO: after merging object store stuff - re-write expansion logic. This should be grouped.
+                    titleOverride={col.label}
+                  />
+                );
+              },
+              renderCell: cellParams => {
+                const weaveRef = (cellParams.row as any)[field];
+                if (weaveRef === undefined) {
+                  return <NotApplicable />;
+                }
+                return (
+                  <ErrorBoundary>
+                    <RefValue weaveRef={weaveRef} attribute={col.path} />
+                  </ErrorBoundary>
+                );
+              },
+            });
+            outputGroupChildren.push({field: expandField});
+          }
+          outputGroup.children.push({
+            groupId: field,
+            headerName: key,
+            children: outputGroupChildren,
+            renderHeaderGroup: () => {
+              return (
+                <CollapseGroupHeader
+                  headerName={key}
+                  field={field}
+                  onCollapse={onCollapse}
+                />
+              );
+            },
+          });
+        } else {
+          outputGroup.children.push({field});
+        }
       }
+      colGroupingModel.push(outputGroup);
     }
 
     let feedbackKeys: {[key: string]: true} = {};
@@ -816,7 +876,7 @@ export const RunsTable: FC<{
       apiRef.current.restoreState(initialState);
     }
   }, [columns, initialState, apiRef]);
-
+  console.log(columns.cols);
   return (
     <>
       {showVisibilityAlert && (
