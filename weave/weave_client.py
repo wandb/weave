@@ -346,7 +346,11 @@ class WeaveClient:
         return op_def_ref
 
     def create_call(
-        self, op: Union[str, Op], parent: Optional[Call], inputs: dict
+        self,
+        op: Union[str, Op],
+        parent: Optional[Call],
+        inputs: dict,
+        attributes: dict = {},
     ) -> Call:
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
@@ -380,7 +384,7 @@ class WeaveClient:
             started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
-            attributes={},
+            attributes=attributes,
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
