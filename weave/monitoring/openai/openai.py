@@ -3,7 +3,7 @@ __all__ = ["patch", "unpatch"]
 import functools
 from contextlib import contextmanager
 from functools import partialmethod
-from typing import Callable, Type, Union
+from typing import Callable, Type, Union, AsyncIterator
 import typing
 
 import openai
@@ -45,6 +45,35 @@ class partialmethod_with_self(partialmethod):
         return self._make_unbound_method().__get__(obj, cls)  # type: ignore
 
 
+class WeaveAsyncStream(AsyncStream):
+    def __init__(
+        self,
+        *,
+        base_stream: AsyncStream,
+        messages: List[ChatCompletionMessageParam], 
+        finish_run: Callable,
+    ) -> None:
+        self._messages = messages
+        self._chunks = []
+        self._finish_run = finish_run
+        super().__init__(
+            cast_to=ChatCompletionChunk,
+            client=base_stream._client,
+            response=base_stream.response
+        )
+
+    async def __anext__(self) -> ChatCompletionChunk:
+        item = await self._iterator.__anext__()
+        self._chunks.append(item)
+        return item
+
+    async def __aiter__(self) -> AsyncIterator[ChatCompletionChunk]:
+        async for item in self._iterator:
+            self._chunks.append(item)
+            yield item
+        result = reconstruct_completion(self._messages, self._chunks)  # type: ignore
+        self._finish_run(result.model_dump(exclude_unset=True))
+
 class AsyncChatCompletions:
     def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
@@ -68,33 +97,20 @@ class AsyncChatCompletions:
     ) -> AsyncStream[ChatCompletionChunk]:
         from weave.flow.chat_util import OpenAIStream
 
-        named_args = bind_params(old_create, *args, **kwargs)
+        named_args = bind_params(old_async_create, *args, **kwargs)
         messages = to_python(named_args["messages"])
         if not isinstance(messages, list):
             raise ValueError("messages must be a list")
         with log_run(create_op, named_args) as finish_run:
-            # Need to put in a function so the outer function is not a
-            # generator. Generators don't execute any of their body's
-            # code until next() is called. But we want to create the run
-            # as a child of whatever the parent is, at function call time,
-            # not generator start time.
-            async def _stream_create_gen():  # type: ignore
-                chunks = []
-                stream = await self._base_create(*args, **kwargs)
-                async for chunk in stream:
-                    chunks.append(chunk)
-                    yield chunk
-                wrapped_stream = OpenAIStream(chunks)
-                list(wrapped_stream)
-
-                result = wrapped_stream.final_response()
-                result_with_usage = ChatCompletion(
-                    **result.model_dump(exclude_unset=True),
-                    usage=token_usage(messages, result.choices),
-                )
-                finish_run(result_with_usage.model_dump(exclude_unset=True))
-
-        return _stream_create_gen()  # type: ignore
+            # We return a special AsyncStream that mimics the underlying
+            # one, but also logs the result of the completion.
+            base_stream = await self._base_create(*args, **kwargs)
+            stream = WeaveAsyncStream(
+                base_stream=base_stream,
+                messages=messages,
+                finish_run=finish_run,
+            )
+        return stream
 
 
 class ChatCompletions:
