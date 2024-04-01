@@ -44,7 +44,6 @@ class partialmethod_with_self(partialmethod):
     def __get__(self, obj: Any, cls: Optional[Type[Any]] = None) -> Callable:
         return self._make_unbound_method().__get__(obj, cls)  # type: ignore
 
-
 class WeaveAsyncStream(AsyncStream):
     def __init__(
         self,
@@ -68,11 +67,19 @@ class WeaveAsyncStream(AsyncStream):
         return item
 
     async def __aiter__(self) -> AsyncIterator[ChatCompletionChunk]:
+        from weave.flow.chat_util import OpenAIStream
         async for item in self._iterator:
             self._chunks.append(item)
             yield item
-        result = reconstruct_completion(self._messages, self._chunks)  # type: ignore
-        self._finish_run(result.model_dump(exclude_unset=True))
+        wrapped_stream = OpenAIStream(self._chunks)
+        list(wrapped_stream)
+
+        result = wrapped_stream.final_response()
+        result_with_usage = ChatCompletion(
+            **result.model_dump(exclude_unset=True),
+            usage=token_usage(self._messages, result.choices),
+        )
+        self._finish_run(result_with_usage.model_dump(exclude_unset=True))
 
 
 class AsyncChatCompletions:
@@ -83,7 +90,7 @@ class AsyncChatCompletions:
         self, *args: Any, **kwargs: Any
     ) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
         if kwargs.get("stream", False):
-            return self._streaming_create(*args, **kwargs)
+            return await self._streaming_create(*args, **kwargs)
         return await self._create(*args, **kwargs)
 
     async def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
