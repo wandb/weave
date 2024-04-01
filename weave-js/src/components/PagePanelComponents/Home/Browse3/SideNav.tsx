@@ -41,7 +41,6 @@ export const SideNav = () => {
     const category = Object.keys(filters).find(key =>
       key.includes('baseObjectClass')
     );
-    console.log(category);
     if (category === undefined) {
       return undefined;
     }

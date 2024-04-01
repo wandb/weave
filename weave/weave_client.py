@@ -7,6 +7,8 @@ import datetime
 import traceback
 
 
+from requests import HTTPError
+
 from weave.table import Table
 from weave import urls
 from weave import run_context
@@ -287,13 +289,19 @@ class WeaveClient:
         return self.get(ref)
 
     def get(self, ref: ObjectRef) -> Any:
-        read_res = self.server.obj_read(
-            ObjReadReq(
-                project_id=self._project_id(),
-                object_id=ref.name,
-                digest=ref.digest,
+        try:
+            read_res = self.server.obj_read(
+                ObjReadReq(
+                    project_id=self._project_id(),
+                    object_id=ref.name,
+                    digest=ref.digest,
+                )
             )
-        )
+        except HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+            raise
+
         # Probably bad form to mutate the ref here
         if ref.digest == "latest":
             ref.digest = read_res.obj.digest
@@ -360,7 +368,11 @@ class WeaveClient:
         return op_def_ref
 
     def create_call(
-        self, op: Union[str, Op], parent: Optional[Call], inputs: dict
+        self,
+        op: Union[str, Op],
+        parent: Optional[Call],
+        inputs: dict,
+        attributes: dict = {},
     ) -> Call:
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
@@ -400,7 +412,7 @@ class WeaveClient:
             started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
-            attributes={},
+            attributes=attributes,
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))

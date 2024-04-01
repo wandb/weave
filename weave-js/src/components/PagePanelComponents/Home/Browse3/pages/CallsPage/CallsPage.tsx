@@ -13,6 +13,7 @@ import {
 import _ from 'lodash';
 import React, {FC, useCallback, useMemo} from 'react';
 
+import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../common/Empty';
@@ -236,8 +237,7 @@ export const CallsTable: FC<{
   }, [calls.loading, calls.result]);
 
   if (calls.loading) {
-    // TODO: Do we want a loading indicator here
-    return null;
+    return <Loading centered />;
   }
 
   const spans = calls.result ?? [];

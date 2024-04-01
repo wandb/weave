@@ -737,3 +737,22 @@ def test_root_type(client):
     )
 
     assert len(inner_res.objs) == 1
+
+
+def test_attributes_on_ops(client):
+    @weave.op()
+    def op_with_attrs(a: int, b: int) -> int:
+        return a + b
+
+    with weave.attributes({"custom": "attribute"}):
+        op_with_attrs(1, 2)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(op_with_attrs)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].attributes == {"custom": "attribute"}

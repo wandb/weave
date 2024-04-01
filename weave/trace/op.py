@@ -7,6 +7,7 @@ from typing_extensions import ParamSpec
 
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
+from weave.trace.context import call_attributes
 from weave import graph_client_context
 from weave import run_context
 from weave import box
@@ -52,7 +53,10 @@ class Op:
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
         parent_run = run_context.get_current_run()
         client.save_nested_objects(inputs_with_defaults)
-        run = client.create_call(self, parent_run, inputs_with_defaults)
+        attributes = call_attributes.get()
+        run = client.create_call(
+            self, parent_run, inputs_with_defaults, attributes=attributes
+        )
         try:
             with run_context.current_run(run):
                 res = self.resolve_fn(**inputs)
