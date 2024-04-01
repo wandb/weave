@@ -50,7 +50,7 @@ class WeaveAsyncStream(AsyncStream):
         self,
         *,
         base_stream: AsyncStream,
-        messages: List[ChatCompletionMessageParam], 
+        messages: List[ChatCompletionMessageParam],
         finish_run: Callable,
     ) -> None:
         self._messages = messages
@@ -59,7 +59,7 @@ class WeaveAsyncStream(AsyncStream):
         super().__init__(
             cast_to=ChatCompletionChunk,
             client=base_stream._client,
-            response=base_stream.response
+            response=base_stream.response,
         )
 
     async def __anext__(self) -> ChatCompletionChunk:
@@ -73,6 +73,7 @@ class WeaveAsyncStream(AsyncStream):
             yield item
         result = reconstruct_completion(self._messages, self._chunks)  # type: ignore
         self._finish_run(result.model_dump(exclude_unset=True))
+
 
 class AsyncChatCompletions:
     def __init__(self, base_create: Callable) -> None:
