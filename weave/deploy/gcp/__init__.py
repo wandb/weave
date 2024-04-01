@@ -10,7 +10,7 @@ import tempfile
 from weave.artifact_wandb import WeaveWBArtifactURI
 from ..util import execute, safe_name
 from weave import environment, __version__
-from weave.uris import WeaveURI
+from weave.trace.refs import parse_uri, ObjectRef
 
 
 def generate_dockerfile(
@@ -22,10 +22,10 @@ def generate_dockerfile(
 ) -> str:
     """Generates a Dockerfile to run the weave op"""
     if project_name is None:
-        ref_uri = WeaveURI.parse(model_ref)
-        if not isinstance(ref_uri, WeaveWBArtifactURI):
-            raise ValueError(f"Expected a wandb artifact ref, got {type(ref_uri)}")
-        project_name = ref_uri.project_name
+        ref_uri = parse_uri(model_ref)
+        if not isinstance(ref_uri, ObjectRef):
+            raise ValueError(f"Expected a ObjectRef artifact ref, got {type(ref_uri)}")
+        project_name = ref_uri.project
     src = Path(__file__).parent.parent / "Dockerfile"
     template = string.Template(src.read_text())
 
@@ -251,11 +251,11 @@ def deploy(
                 "WARNING: No service account specified.  Using the compute engine default service account..."
             )
     dir = compile(model_ref, model_method, wandb_project, auth_entity, base_image)
-    ref = WeaveURI.parse(model_ref)
-    if not isinstance(ref, WeaveWBArtifactURI):
-        raise ValueError(f"Expected a wandb artifact ref, got {type(ref)}")
-    name = safe_name(f"{ref.project_name}-{ref.name}")
-    project = wandb_project or ref.project_name
+    ref = parse_uri(model_ref)
+    if not isinstance(ref, ObjectRef):
+        raise ValueError(f"Expected a weave object uri, got {type(ref)}")
+    name = safe_name(f"{ref.project}-{ref.name}")
+    project = wandb_project or ref.project
     key = environment.weave_wandb_api_key()
     secrets = {
         "WANDB_API_KEY": key,
@@ -307,7 +307,10 @@ def develop(
         auth_entity=auth_entity,
         dev=True,
     )
-    name = safe_name(WeaveURI.parse(model_ref).name)
+    model_uri = parse_uri(model_ref)
+    if not isinstance(model_uri, ObjectRef):
+        raise ValueError(f"Expected a weave object uri, got {type(model_uri)}")
+    name = safe_name(model_uri.name)
     docker = shutil.which("docker")
     if docker is None:
         raise ValueError("docker command required: https://docs.docker.com/get-docker/")

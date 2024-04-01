@@ -1,5 +1,7 @@
 import dataclasses
 import re
+import signal
+import requests
 import pytest
 import pydantic
 from pydantic import BaseModel
@@ -786,3 +788,19 @@ def test_summary_descendents(client):
         (ObjectRefStrMatcher(name="model_error"), {"successes": 0, "errors": 1}),
         (ObjectRefStrMatcher(name="model_error_catch"), {"successes": 1, "errors": 0}),
     ]
+
+
+def test_weave_server(client):
+    class MyModel(weave.Model):
+        prompt: str
+
+        @weave.op()
+        def predict(self, input: str) -> str:
+            return self.prompt.format(input=input)
+
+    model = MyModel(prompt="input is: {input}")
+    ref = client.save_object(model, "my-model")
+
+    url = weave.serve(ref, thread=True)
+    response = requests.post(url + "/predict", json={"input": "x"})
+    assert response.json() == {"result": "input is: x"}

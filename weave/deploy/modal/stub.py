@@ -4,6 +4,7 @@ from weave.artifact_wandb import WandbArtifactRef
 from weave.uris import WeaveURI
 from weave.deploy.util import safe_name
 import os
+from weave.trace.refs import parse_uri, ObjectRef
 
 image = (
     Image.debian_slim()
@@ -28,10 +29,9 @@ def fastapi_app() -> FastAPI:
     from weave.uris import WeaveURI
     from weave import api
 
-    uri = WeaveURI.parse(os.environ["MODEL_REF"])
-    uri_ref = uri.to_ref()
-    if not isinstance(uri_ref, WandbArtifactRef):
-        raise ValueError(f"Expected a wandb artifact ref, got {type(uri_ref)}")
+    uri_ref = parse_uri(os.environ["MODEL_REF"])
+    if not isinstance(uri_ref, ObjectRef):
+        raise ValueError(f"Expected a weave object uri, got {type(uri_ref)}")
     app = object_method_app(uri_ref, auth_entity=os.environ.get("AUTH_ENTITY"))
 
     api.init(os.environ["PROJECT_NAME"])
