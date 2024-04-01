@@ -64,9 +64,9 @@ def assert_min_weave_version(
     if _parse_version(min_required_version) > _parse_version(weave.__version__):
         message = (
             f"The target Weave host {trace_server_host} requires a `weave` package version >= {min_required_version}."
-            " To remedy, either:\n"
-            "   * Upgrade `weave` by running: `pip install weave --upgrade`\n"
-            "   * Disable logging by omitting calls to `weave.init` To upgrade, please run:\n"
+            " To resolve, either:\n"
+            "   * Upgrade `weave` by running: `pip install weave --upgrade`.\n"
+            "   * Disable logging by omitting calls to `weave.init`."
         )
         raise ValueError(message)
 
