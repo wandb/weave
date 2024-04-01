@@ -329,6 +329,8 @@ def serve(
     trace_attrs = _monitor._attributes.get()
 
     def run():
+        # This function doesn't return, because uvicorn.run does not
+        # return.
         with _graph_client_context.set_graph_client(client):
             with _wandb_api.wandb_api_context(wandb_api_ctx):
                 with attributes(trace_attrs):
@@ -343,6 +345,7 @@ def serve(
         time.sleep(1)
         return "http://localhost:%d" % port
     else:
+        # Run should never return
         run()
     raise ValueError("Should not reach here")
 
