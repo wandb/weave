@@ -127,6 +127,35 @@ jobs:
           # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
         run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --job-num=${{ matrix.job_num }} --timeout=90 ./tests ./ops_arrow ./ecosystem ./trace_server/tests --ddtrace --durations=5
 
+  test:
+    name: Python unit tests (trace, clickhouse)
+    timeout-minutes: 15 # do not raise! running longer than this indicates an issue with the tests. fix there.
+    needs:
+      - build-container
+    # runs-on: [self-hosted, gke-runner]
+    runs-on: ubuntu-latest
+
+    container: us-east4-docker.pkg.dev/weave-support-367421/weave-images/weave-integration-test:${{ github.sha }}
+    services:
+      weave_clickhouse:
+        image: clickhouse/clickhouse-server
+        ports:
+          - "8123:8123"
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
+    steps:
+      # - uses: datadog/agent-github-action@v1.3
+      #   with:
+      #     api_key: ${{ secrets.DD_API_KEY }}
+      - uses: actions/checkout@v2
+      - name: Verify wandb server is running
+        run: curl -s http://wandbservice:8080/healthz
+      - name: Run tests
+        env:
+          DD_SERVICE: weave-python
+          DD_ENV: ci
+          # PARQUET_ENABLED: true # TODO: Enable parquet after available in CI
+        run: CI=1 WB_SERVER_HOST=http://wandbservice WF_CLICKHOUSE_HOST=weave_clickhouse WEAVE_SERVER_DISABLE_ECOSYSTEM=1 source /root/venv/bin/activate && cd weave && pytest --timeout=90 -m trace --ddtrace --durations=5
+
   # nbmake:
   #   name: Run notebooks with nbmake
   #   runs-on: self-hosted
