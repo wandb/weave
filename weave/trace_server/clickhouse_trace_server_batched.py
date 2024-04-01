@@ -28,7 +28,7 @@ from .trace_server_interface_util import (
 )
 from . import trace_server_interface as tsi
 
-from . import refs
+from . import refs_internal
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -45,8 +45,8 @@ class CallStartCHInsertable(BaseModel):
     id: str
     trace_id: str
     parent_id: typing.Optional[str] = None
-    name: str
-    start_datetime: datetime.datetime
+    op_name: str
+    started_at: datetime.datetime
     attributes_dump: str
     inputs_dump: str
     input_refs: typing.List[str]
@@ -59,10 +59,10 @@ class CallStartCHInsertable(BaseModel):
 class CallEndCHInsertable(BaseModel):
     project_id: str
     id: str
-    end_datetime: datetime.datetime
+    ended_at: datetime.datetime
     exception: typing.Optional[str] = None
     summary_dump: str
-    outputs_dump: str
+    output_dump: str
     input_refs: typing.List[str] = []  # sadly, this is required
     output_refs: typing.List[str]
 
@@ -77,18 +77,18 @@ class SelectableCHCallSchema(BaseModel):
     project_id: str
     id: str
 
-    name: str
+    op_name: str
 
     trace_id: str
     parent_id: typing.Optional[str] = None
 
-    start_datetime: datetime.datetime
-    end_datetime: typing.Optional[datetime.datetime] = None
+    started_at: datetime.datetime
+    ended_at: typing.Optional[datetime.datetime] = None
     exception: typing.Optional[str] = None
 
     attributes_dump: str
     inputs_dump: str
-    outputs_dump: typing.Optional[str] = None
+    output_dump: typing.Optional[str] = None
     summary_dump: typing.Optional[str] = None
 
     input_refs: typing.List[str]
@@ -109,23 +109,23 @@ required_call_columns = list(set(all_call_select_columns) - set([]))
 
 
 class ObjCHInsertable(BaseModel):
-    entity: str
-    project: str
-    type: str
-    name: str
+    project_id: str
+    kind: str
+    base_object_class: typing.Optional[str]
+    object_id: str
     refs: typing.List[str]
-    val: str
+    val_dump: str
     digest: str
 
 
 class SelectableCHObjSchema(BaseModel):
-    entity: str
-    project: str
-    name: str
+    project_id: str
+    object_id: str
     created_at: datetime.datetime
     refs: typing.List[str]
-    val: str
-    type: str
+    val_dump: str
+    kind: str
+    base_object_class: typing.Optional[str]
     digest: str
     version_index: int
     is_latest: int
@@ -220,7 +220,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions = []
         parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
-            if req.filter.op_version_refs:
+            if req.filter.op_names:
                 # We will build up (0 or 1) + N conditions for the op_version_refs
                 # If there are any non-wildcarded names, then we at least have an IN condition
                 # If there are any wildcarded names, then we have a LIKE condition for each
@@ -229,7 +229,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 non_wildcarded_names: typing.List[str] = []
                 wildcarded_names: typing.List[str] = []
-                for name in req.filter.op_version_refs:
+                for name in req.filter.op_names:
                     if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
                         wildcarded_names.append(name)
                     else:
@@ -237,25 +237,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 if non_wildcarded_names:
                     or_conditions.append(
-                        "name IN {non_wildcarded_names: Array(String)}"
+                        "op_name IN {non_wildcarded_names: Array(String)}"
                     )
                     parameters["non_wildcarded_names"] = non_wildcarded_names
 
                 for name_ndx, name in enumerate(wildcarded_names):
                     param_name = "wildcarded_name_" + str(name_ndx)
-                    or_conditions.append("name LIKE {" + param_name + ": String}")
-                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
+                    or_conditions.append("op_name LIKE {" + param_name + ": String}")
+                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
                     parameters[param_name] = like_name
 
                 if or_conditions:
                     conditions.append("(" + " OR ".join(or_conditions) + ")")
 
-            if req.filter.input_object_version_refs:
-                parameters["input_refs"] = req.filter.input_object_version_refs
+            if req.filter.input_refs:
+                parameters["input_refs"] = req.filter.input_refs
                 conditions.append("hasAny(input_refs, {input_refs: Array(String)})")
 
-            if req.filter.output_object_version_refs:
-                parameters["output_refs"] = req.filter.output_object_version_refs
+            if req.filter.output_refs:
+                parameters["output_refs"] = req.filter.output_refs
                 conditions.append("hasAny(output_refs, {output_refs: Array(String)})")
 
             if req.filter.parent_ids:
@@ -295,22 +295,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
-        # ch_obj = _partial_obj_schema_to_ch_obj(req.op_obj)
-        # self._insert_obj(ch_obj)
-        # return tsi.OpCreateRes(version_hash=str(ch_obj.id))
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         conds = [
-            "name = {name: String}",
+            "object_id = {name: String}",
             "digest = {version_hash: String}",
             "is_op = 1",
         ]
-        parameters = {"name": req.name, "digest": req.version_hash}
+        parameters = {"name": req.name, "digest": req.digest}
         objs = self._select_objs_query(
-            req.entity, req.project, conditions=conds, parameters=parameters
+            req.project_id, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.version_hash} not found")
+            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
 
         return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(objs[0]))
 
@@ -319,15 +316,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conds: typing.List[str] = ["is_op = 1"]
         if req.filter:
             if req.filter.op_names:
-                conds.append("name IN {op_names: Array(String)}")
+                conds.append("object_id IN {op_names: Array(String)}")
                 parameters["op_names"] = req.filter.op_names
 
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
 
         ch_objs = self._select_objs_query(
-            req.entity,
-            req.project,
+            req.project_id,
             conditions=conds,
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
@@ -338,42 +334,43 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         digest = str_digest(json_val)
 
         req_obj = req.obj
-        entity, project = req_obj.project_id.split("/")
         ch_obj = ObjCHInsertable(
-            entity=entity,
-            project=project,
-            name=req_obj.name,
-            type=get_type(req.obj.val),
-            refs=[],
-            val=json_val,
+            project_id=req_obj.project_id,
+            object_id=req_obj.object_id,
+            kind=get_kind(req.obj.val),
+            base_object_class=get_base_object_class(req.obj.val),
+            refs=extract_refs_from_values(req.obj.val),
+            val_dump=json_val,
             digest=digest,
         )
 
         self._insert(
-            "objects",
+            "object_versions",
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
-        return tsi.ObjCreateRes(version_digest=digest)
+        return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = ["name = {name: String}"]
-        parameters: typing.Dict[str, typing.Union[str, int]] = {"name": req.name}
-        if req.version_digest == "latest":
+        conds = ["object_id = {object_id: String}"]
+        parameters: typing.Dict[str, typing.Union[str, int]] = {
+            "object_id": req.object_id
+        }
+        if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
-            (is_version, version_index) = _digest_is_version_like(req.version_digest)
+            (is_version, version_index) = _digest_is_version_like(req.digest)
             if is_version:
                 conds.append("version_index = {version_index: UInt64}")
                 parameters["version_index"] = version_index
             else:
                 conds.append("digest = {version_digest: String}")
-                parameters["version_digest"] = req.version_digest
+                parameters["version_digest"] = req.digest
         objs = self._select_objs_query(
-            req.entity, req.project, conditions=conds, parameters=parameters
+            req.project_id, conditions=conds, parameters=parameters
         )
         if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.version_digest} not found")
+            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(objs[0]))
 
@@ -386,15 +383,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     conds.append("is_op = 1")
                 else:
                     conds.append("is_op = 0")
-            if req.filter.object_names:
-                conds.append("name IN {object_names: Array(String)}")
-                parameters["object_names"] = req.filter.object_names
+            if req.filter.object_ids:
+                conds.append("object_id IN {object_ids: Array(String)}")
+                parameters["object_ids"] = req.filter.object_ids
             if req.filter.latest_only:
                 conds.append("is_latest = 1")
-        entity, project = req.project_id.split("/")
+            if req.filter.base_object_classes:
+                conds.append(
+                    "base_object_class IN {base_object_classes: Array(String)}"
+                )
+                parameters["base_object_classes"] = req.filter.base_object_classes
+
         objs = self._select_objs_query(
-            entity,
-            project,
+            req.project_id,
             conditions=conds,
             parameters=parameters,
         )
@@ -402,37 +403,45 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        entity, project = req.table.project_id.split("/")
+
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
-                raise ValueError("All rows must be dictionaries")
+                raise ValueError(
+                    f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
+                )
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
-            insert_rows.append((entity, project, row_digest, row_json))
+            insert_rows.append(
+                (
+                    req.table.project_id,
+                    row_digest,
+                    extract_refs_from_values(r),
+                    row_json,
+                )
+            )
 
         self._insert(
             "table_rows",
             data=insert_rows,
-            column_names=["entity", "project", "digest", "val"],
+            column_names=["project_id", "digest", "refs", "val_dump"],
         )
 
-        row_digests = [r[2] for r in insert_rows]
+        row_digests = [r[1] for r in insert_rows]
 
         table_hasher = hashlib.sha256()
         for row_digest in row_digests:
             table_hasher.update(row_digest.encode())
-        table_digest = table_hasher.hexdigest()
+        digest = table_hasher.hexdigest()
 
         self._insert(
             "tables",
-            data=[(entity, project, table_digest, row_digests)],
-            column_names=["entity", "project", "digest", "row_digests"],
+            data=[(req.table.project_id, digest, row_digests)],
+            column_names=["project_id", "digest", "row_digests"],
         )
-        return tsi.TableCreateRes(digest=table_digest)
+        return tsi.TableCreateRes(digest=digest)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        entity, project = req.project_id.split("/")
         conds = []
         parameters = {}
         if req.filter:
@@ -442,9 +451,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             conds.append("1 = 1")
         rows = self._table_query(
-            entity,
-            project,
-            req.table_digest,
+            req.project_id,
+            req.digest,
             conditions=conds,
             limit=req.limit,
             offset=req.offset,
@@ -453,28 +461,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _table_query(
         self,
-        entity: str,
-        project: str,
-        table_digest: str,
+        project_id: str,
+        digest: str,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[tsi.TableRowSchema]:
-        conds = ["entity = {entity: String}", "project = {project: String}"]
+        conds = ["project_id = {project_id: String}"]
         if conditions:
             conds.extend(conditions)
 
         predicate = " AND ".join(conds)
         query = f"""
-                SELECT tr.digest, tr.val
+                SELECT tr.digest, tr.val_dump
                 FROM (
-                    SELECT entity, project, row_digest
+                    SELECT project_id, row_digest
                     FROM tables_deduped
                     ARRAY JOIN row_digests AS row_digest
-                    WHERE digest = {{table_digest:String}}
+                    WHERE digest = {{digest:String}}
                 ) AS t
-                JOIN table_rows_deduped tr ON t.entity = tr.entity AND t.project = tr.project AND t.row_digest = tr.digest
+                JOIN table_rows_deduped tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
             """
         if parameters is None:
@@ -489,9 +496,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query_result = self.ch_client.query(
             query,
             parameters={
-                "entity": entity,
-                "project": project,
-                "table_digest": table_digest,
+                "project_id": project_id,
+                "digest": digest,
                 **parameters,
             },
         )
@@ -509,43 +515,38 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(req.refs) > 1000:
             raise ValueError("Too many refs")
 
-        parsed_raw_refs = [refs.parse_uri(r) for r in req.refs]
-        if any(isinstance(r, refs.TableRef) for r in parsed_raw_refs):
+        parsed_raw_refs = [refs_internal.parse_internal_uri(r) for r in req.refs]
+        if any(isinstance(r, refs_internal.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
-        parsed_refs = typing.cast(typing.List[refs.ObjectRef], parsed_raw_refs)
+        parsed_refs = typing.cast(
+            typing.List[refs_internal.InternalObjectRef], parsed_raw_refs
+        )
 
         root_val_cache: typing.Dict[str, typing.Any] = {}
 
-        def get_object_ref_root_val(r: refs.ObjectRef) -> typing.Any:
-            cache_key = f"{r.entity}/{r.project}/{r.name}/{r.version}"
+        def get_object_ref_root_val(r: refs_internal.InternalObjectRef) -> typing.Any:
+            cache_key = f"{r.project_id}/{r.name}/{r.version}"
             if cache_key in root_val_cache:
                 val = root_val_cache[cache_key]
             else:
                 if r.version == "latest":
                     raise NotFoundError("Reading refs with `latest` is not supported")
-                    # conds = [
-                    #     "name = {name: String}",
-                    #     "is_latest = 1",
-                    # ]
-                    # parameters = {
-                    #     "name": r.name,
-                    # }
                 else:
                     conds = [
-                        "name = {name: String}",
+                        "object_id = {object_id: String}",
                         "digest = {version: String}",
                     ]
                     parameters = {
-                        "name": r.name,
+                        "object_id": r.name,
                         "version": r.version,
                     }
                 objs = self._select_objs_query(
-                    r.entity, r.project, conditions=conds, parameters=parameters
+                    r.project_id, conditions=conds, parameters=parameters
                 )
                 if len(objs) == 0:
                     raise NotFoundError(f"Obj {r.name}:{r.version} not found")
                 obj = objs[0]
-                val = json.loads(obj.val)
+                val = json.loads(obj.val_dump)
                 root_val_cache[cache_key] = val
             return val
 
@@ -554,23 +555,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         class PartialRefResult:
             remaining_extra: list[str]
             # unresolved_obj_ref and unresolved_table_ref are mutually exclusive
-            unresolved_obj_ref: typing.Optional[refs.ObjectRef]
-            unresolved_table_ref: typing.Optional[refs.TableRef]
+            unresolved_obj_ref: typing.Optional[refs_internal.InternalObjectRef]
+            unresolved_table_ref: typing.Optional[refs_internal.InternalTableRef]
             val: typing.Any
 
         def resolve_extra(extra: list[str], val: typing.Any) -> typing.Any:
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-                if isinstance(val, str) and val.startswith("weave://"):
-                    parsed_ref = refs.parse_uri(val)
-                    if isinstance(parsed_ref, refs.ObjectRef):
+                if isinstance(val, str) and val.startswith(
+                    refs_internal.WEAVE_INTERNAL_SCHEME + "://"
+                ):
+                    parsed_ref = refs_internal.parse_internal_uri(val)
+                    if isinstance(parsed_ref, refs_internal.InternalObjectRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
                             unresolved_obj_ref=parsed_ref,
                             unresolved_table_ref=None,
                             val=val,
                         )
-                    elif isinstance(parsed_ref, refs.TableRef):
+                    elif isinstance(parsed_ref, refs_internal.InternalTableRef):
                         return PartialRefResult(
                             remaining_extra=extra[extra_index:],
                             unresolved_obj_ref=None,
@@ -584,11 +587,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         unresolved_table_ref=None,
                         val=None,
                     )
-                if op == refs.KEY_EDGE_TYPE:
+                if op == refs_internal.DICT_KEY_EDGE_NAME:
                     val = val.get(arg)
-                elif op == refs.ATTRIBUTE_EDGE_TYPE:
+                elif op == refs_internal.OBJECT_ATTR_EDGE_NAME:
                     val = val.get(arg)
-                elif op == refs.INDEX_EDGE_TYPE:
+                elif op == refs_internal.LIST_INDEX_EDGE_NAME:
                     index = int(arg)
                     if index >= len(val):
                         return None
@@ -633,9 +636,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     )
 
             # Resolve any unresolved table refs
-            # First batch the table queries by entity, project, and table digest
+            # First batch the table queries by project_id and table digest
             table_queries: dict[
-                typing.Tuple[str, str, str], list[typing.Tuple[int, str]]
+                typing.Tuple[str, str], list[typing.Tuple[int, str]]
             ] = {}
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_table_ref is not None:
@@ -646,18 +649,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         extra_result.remaining_extra[0],
                         extra_result.remaining_extra[1],
                     )
-                    if op != refs.ID_EDGE_TYPE:
+                    if op != refs_internal.TABLE_ROW_ID_EDGE_NAME:
                         raise ValueError("Table refs must have id extra")
                     table_queries.setdefault(
-                        (table_ref.entity, table_ref.project, table_ref.digest), []
+                        (table_ref.project_id, table_ref.digest), []
                     ).append((i, row_digest))
             # Make the queries
-            for (entity, project, digest), index_digests in table_queries.items():
+            for (project_id, digest), index_digests in table_queries.items():
                 row_digests = [d for i, d in index_digests]
                 rows = self._table_query(
-                    entity=entity,
-                    project=project,
-                    table_digest=digest,
+                    project_id=project_id,
+                    digest=digest,
                     conditions=["digest IN {digests: Array(String)}"],
                     parameters={"digests": row_digests},
                 )
@@ -705,16 +707,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "chunk_index",
                 "n_chunks",
                 "name",
-                "val",
+                "val_bytes",
             ],
         )
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         query_result = self.ch_client.query(
-            "SELECT n_chunks, val FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
+            "SELECT n_chunks, val_bytes FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
             parameters={"project_id": req.project_id, "digest": req.digest},
-            column_formats={"val": "bytes"},
+            column_formats={"val_bytes": "bytes"},
         )
         n_chunks = query_result.result_rows[0][0]
         chunks = [r[1] for r in query_result.result_rows]
@@ -751,22 +753,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 settings["async_insert"] = 1
                 settings["wait_for_async_insert"] = 0
             self._insert(
-                "calls_raw",
+                "call_parts",
                 data=batch,
                 column_names=all_call_insert_columns,
-                settings=settings,
-            )
-
-    def _insert_obj_batch(self, batch: typing.List) -> None:
-        if batch:
-            settings = {}
-            if self._use_async_insert:
-                settings["async_insert"] = 1
-                settings["wait_for_async_insert"] = 0
-            self._insert(
-                "objects_raw",
-                data=batch,
-                column_names=all_obj_insert_columns,
                 settings=settings,
             )
 
@@ -850,7 +839,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         conditions_part = " AND ".join(conditions)
 
-        order_by_part = "ORDER BY start_datetime ASC"
+        order_by_part = "ORDER BY started_at ASC"
         # if order_by != None:
         #     order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
         #     for field, direction in order_by:
@@ -897,8 +886,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _select_objs_query(
         self,
-        entity: str,
-        project: str,
+        project_id: str,
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
@@ -917,12 +905,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query_result = self._query(
             f"""
             SELECT *
-            FROM objects_deduped
-            WHERE entity = {{entity: String}} AND project = {{project: String}}
+            FROM object_versions_deduped
+            WHERE project_id = {{project_id: String}}
             AND {conditions_part}
             {limit_part}
         """,
-            {"entity": entity, "project": project, **parameters},
+            {"project_id": project_id, **parameters},
         )
         result: typing.List[SelectableCHObjSchema] = []
         for row in query_result.result_rows:
@@ -988,27 +976,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._insert_call_batch(self._call_batch)
         self._call_batch = []
 
-    def _insert_obj(self, ch_obj: ObjCHInsertable) -> None:
-        parameters = ch_obj.model_dump()
-        row = []
-        for key in all_obj_insert_columns:
-            row.append(parameters.get(key, None))
-
-        self._insert_obj_batch([row])
-
 
 def _dict_value_to_dump(
     value: dict,
 ) -> str:
+    if not isinstance(value, dict):
+        raise ValueError(f"Value is not a dict: {value}")
     return json.dumps(value)
-    cpy = value.copy()
-    if cpy:
-        keys = list(cpy.keys())
-        # cpy["_keys"] = keys
-    return json.dumps(cpy)
+
+
+def _any_value_to_dump(
+    value: typing.Any,
+) -> str:
+    return json.dumps(value)
 
 
 def _dict_dump_to_dict(val: str) -> typing.Dict[str, typing.Any]:
+    res = json.loads(val)
+    if not isinstance(res, dict):
+        raise ValueError(f"Value is not a dict: {val}")
+    return res
+
+
+def _any_dump_to_any(val: str) -> typing.Any:
     return json.loads(val)
 
 
@@ -1037,18 +1027,16 @@ def _nullable_dict_dump_to_dict(
     return _dict_dump_to_dict(val) if val else None
 
 
+def _nullable_any_dump_to_any(
+    val: typing.Optional[str],
+) -> typing.Optional[typing.Any]:
+    return _any_dump_to_any(val) if val else None
+
+
 def _raw_call_dict_to_ch_call(
     call: typing.Dict[str, typing.Any]
 ) -> SelectableCHCallSchema:
     return SelectableCHCallSchema.model_validate(call)
-
-
-def _raw_obj_dict_to_ch_obj(obj: typing.Dict[str, typing.Any]) -> SelectableCHObjSchema:
-    if obj["bytes_file_map"]:
-        obj["bytes_file_map"] = {
-            k.decode("utf-8"): v for k, v in obj["bytes_file_map"].items()
-        }
-    return SelectableCHObjSchema.model_validate(obj)
 
 
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
@@ -1057,12 +1045,12 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         id=ch_call.id,
         trace_id=ch_call.trace_id,
         parent_id=ch_call.parent_id,
-        name=ch_call.name,
-        start_datetime=_ensure_datetimes_have_tz(ch_call.start_datetime),
-        end_datetime=_ensure_datetimes_have_tz(ch_call.end_datetime),
+        op_name=ch_call.op_name,
+        started_at=_ensure_datetimes_have_tz(ch_call.started_at),
+        ended_at=_ensure_datetimes_have_tz(ch_call.ended_at),
         attributes=_dict_dump_to_dict(ch_call.attributes_dump),
         inputs=_dict_dump_to_dict(ch_call.inputs_dump),
-        outputs=_nullable_dict_dump_to_dict(ch_call.outputs_dump),
+        output=_nullable_any_dump_to_any(ch_call.output_dump),
         summary=_nullable_dict_dump_to_dict(ch_call.summary_dump),
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
@@ -1077,12 +1065,12 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         id=ch_call_dict.get("id"),
         trace_id=ch_call_dict.get("trace_id"),
         parent_id=ch_call_dict.get("parent_id"),
-        name=ch_call_dict.get("name"),
-        start_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("start_datetime")),
-        end_datetime=_ensure_datetimes_have_tz(ch_call_dict.get("end_datetime")),
+        op_name=ch_call_dict.get("op_name"),
+        started_at=_ensure_datetimes_have_tz(ch_call_dict.get("started_at")),
+        ended_at=_ensure_datetimes_have_tz(ch_call_dict.get("ended_at")),
         attributes=_dict_dump_to_dict(ch_call_dict["attributes_dump"]),
         inputs=_dict_dump_to_dict(ch_call_dict["inputs_dump"]),
-        outputs=_nullable_dict_dump_to_dict(ch_call_dict.get("outputs_dump")),
+        output=_nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         summary=_nullable_dict_dump_to_dict(ch_call_dict.get("summary_dump")),
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
@@ -1092,16 +1080,15 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
 
 def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
-        # entity=ch_obj.entity,
-        # project=ch_obj.project,
-        project_id=f"{ch_obj.entity}/{ch_obj.project}",
-        name=ch_obj.name,
+        project_id=ch_obj.project_id,
+        object_id=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,
-        type=ch_obj.type,
-        val=json.loads(ch_obj.val),
+        kind=ch_obj.kind,
+        base_object_class=ch_obj.base_object_class,
+        val=json.loads(ch_obj.val_dump),
     )
 
 
@@ -1117,11 +1104,11 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         id=call_id,
         trace_id=trace_id,
         parent_id=start_call.parent_id,
-        name=start_call.name,
-        start_datetime=start_call.start_datetime,
+        op_name=start_call.op_name,
+        started_at=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
-        input_refs=extract_refs_from_values(list(start_call.inputs.values())),
+        input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
         wb_user_id=start_call.wb_user_id,
     )
@@ -1136,10 +1123,10 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         project_id=end_call.project_id,
         id=end_call.id,
         exception=end_call.exception,
-        end_datetime=end_call.end_datetime,
+        ended_at=end_call.ended_at,
         summary_dump=_dict_value_to_dump(end_call.summary),
-        outputs_dump=_dict_value_to_dump(end_call.outputs),
-        output_refs=extract_refs_from_values(list(end_call.outputs.values())),
+        output_dump=_any_value_to_dump(end_call.output),
+        output_refs=extract_refs_from_values(end_call.output),
     )
 
 
@@ -1164,8 +1151,7 @@ def _process_parameters(
 
 #     return ObjCHInsertable(
 #         id=uuid.uuid4(),
-#         entity=partial_obj.entity,
-#         project=partial_obj.project,
+#         project_id=partial_obj.project_id,
 #         name=partial_obj.name,
 #         type="unknown",
 #         refs=[],
@@ -1185,6 +1171,27 @@ def get_type(val: typing.Any) -> str:
     elif isinstance(val, list):
         return "list"
     return "unknown"
+
+
+def get_kind(val: typing.Any) -> str:
+    val_type = get_type(val)
+    if val_type == "Op":
+        return "op"
+    return "object"
+
+
+def get_base_object_class(val: typing.Any) -> typing.Optional[str]:
+    if isinstance(val, dict):
+        if "_bases" in val:
+            if isinstance(val["_bases"], list):
+                if len(val["_bases"]) >= 2:
+                    if val["_bases"][-1] == "BaseModel":
+                        if val["_bases"][-2] == "Object":
+                            if len(val["_bases"]) > 2:
+                                return val["_bases"][-3]
+                            elif "_class_name" in val:
+                                return val["_class_name"]
+    return None
 
 
 def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:

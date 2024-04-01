@@ -4,6 +4,7 @@ import {ReactComponent as ImportAddNew} from '../../assets/icons/icon-add-new.sv
 import {ReactComponent as ImportAdminShieldSafe} from '../../assets/icons/icon-admin-shield-safe.svg';
 import {ReactComponent as ImportAmazonSagemaker} from '../../assets/icons/icon-amazon-sagemaker.svg';
 import {ReactComponent as ImportArea} from '../../assets/icons/icon-area.svg';
+import {ReactComponent as ImportArtifactTypeAlt} from '../../assets/icons/icon-artifact-type-alt.svg';
 import {ReactComponent as ImportAudioVolume} from '../../assets/icons/icon-audio-volume.svg';
 import {ReactComponent as ImportAutomationRobotArm} from '../../assets/icons/icon-automation-robot-arm.svg';
 import {ReactComponent as ImportBack} from '../../assets/icons/icon-back.svg';
@@ -42,6 +43,7 @@ import {ReactComponent as ImportCross} from '../../assets/icons/icon-cross.svg';
 import {ReactComponent as ImportCrownPro} from '../../assets/icons/icon-crown-pro.svg';
 import {ReactComponent as ImportCubeContainer} from '../../assets/icons/icon-cube-container.svg';
 import {ReactComponent as ImportDashboardBlackboard} from '../../assets/icons/icon-dashboard-blackboard.svg';
+import {ReactComponent as ImportDatabaseArtifacts} from '../../assets/icons/icon-database-artifacts.svg';
 import {ReactComponent as ImportDate} from '../../assets/icons/icon-date.svg';
 import {ReactComponent as ImportDelete} from '../../assets/icons/icon-delete.svg';
 import {ReactComponent as ImportDiamond} from '../../assets/icons/icon-diamond.svg';
@@ -116,6 +118,7 @@ import {ReactComponent as ImportMenu} from '../../assets/icons/icon-menu.svg';
 import {ReactComponent as ImportMicrophoneAudio} from '../../assets/icons/icon-microphone-audio.svg';
 import {ReactComponent as ImportMinimizeMode} from '../../assets/icons/icon-minimize-mode.svg';
 import {ReactComponent as ImportModel} from '../../assets/icons/icon-model.svg';
+import {ReactComponent as ImportModelOnDark} from '../../assets/icons/icon-model-on-dark.svg';
 import {ReactComponent as ImportMusicAudio} from '../../assets/icons/icon-music-audio.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
@@ -149,6 +152,7 @@ import {ReactComponent as ImportRecentClock} from '../../assets/icons/icon-recen
 import {ReactComponent as ImportRedditSocial} from '../../assets/icons/icon-reddit-social.svg';
 import {ReactComponent as ImportRedo} from '../../assets/icons/icon-redo.svg';
 import {ReactComponent as ImportRegex} from '../../assets/icons/icon-regex.svg';
+import {ReactComponent as ImportRegistries} from '../../assets/icons/icon-registries.svg';
 import {ReactComponent as ImportRemove} from '../../assets/icons/icon-remove.svg';
 import {ReactComponent as ImportRemoveAlt} from '../../assets/icons/icon-remove-alt.svg';
 import {ReactComponent as ImportReport} from '../../assets/icons/icon-report.svg';
@@ -247,6 +251,9 @@ export const IconAmazonSagemaker = (props: SVGIconProps) => (
 );
 export const IconArea = (props: SVGIconProps) => (
   <ImportArea {...updateIconProps(props)} />
+);
+export const IconArtifactTypeAlt = (props: SVGIconProps) => (
+  <ImportArtifactTypeAlt {...updateIconProps(props)} />
 );
 export const IconAudioVolume = (props: SVGIconProps) => (
   <ImportAudioVolume {...updateIconProps(props)} />
@@ -361,6 +368,9 @@ export const IconCubeContainer = (props: SVGIconProps) => (
 );
 export const IconDashboardBlackboard = (props: SVGIconProps) => (
   <ImportDashboardBlackboard {...updateIconProps(props)} />
+);
+export const IconDatabaseArtifacts = (props: SVGIconProps) => (
+  <ImportDatabaseArtifacts {...updateIconProps(props)} />
 );
 export const IconDate = (props: SVGIconProps) => (
   <ImportDate {...updateIconProps(props)} />
@@ -584,6 +594,9 @@ export const IconMinimizeMode = (props: SVGIconProps) => (
 export const IconModel = (props: SVGIconProps) => (
   <ImportModel {...updateIconProps(props)} />
 );
+export const IconModelOnDark = (props: SVGIconProps) => (
+  <ImportModelOnDark {...updateIconProps(props)} />
+);
 export const IconMusicAudio = (props: SVGIconProps) => (
   <ImportMusicAudio {...updateIconProps(props)} />
 );
@@ -682,6 +695,9 @@ export const IconRedo = (props: SVGIconProps) => (
 );
 export const IconRegex = (props: SVGIconProps) => (
   <ImportRegex {...updateIconProps(props)} />
+);
+export const IconRegistries = (props: SVGIconProps) => (
+  <ImportRegistries {...updateIconProps(props)} />
 );
 export const IconRemove = (props: SVGIconProps) => (
   <ImportRemove {...updateIconProps(props)} />
@@ -908,6 +924,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'admin-shield-safe': IconAdminShieldSafe,
   'amazon-sagemaker': IconAmazonSagemaker,
   area: IconArea,
+  'artifact-type-alt': IconArtifactTypeAlt,
   'audio-volume': IconAudioVolume,
   'automation-robot-arm': IconAutomationRobotArm,
   back: IconBack,
@@ -946,6 +963,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'crown-pro': IconCrownPro,
   'cube-container': IconCubeContainer,
   'dashboard-blackboard': IconDashboardBlackboard,
+  'database-artifacts': IconDatabaseArtifacts,
   date: IconDate,
   delete: IconDelete,
   diamond: IconDiamond,
@@ -1020,6 +1038,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'microphone-audio': IconMicrophoneAudio,
   'minimize-mode': IconMinimizeMode,
   model: IconModel,
+  'model-on-dark': IconModelOnDark,
   'music-audio': IconMusicAudio,
   number: IconNumber,
   'open-new-tab': IconOpenNewTab,
@@ -1053,6 +1072,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'reddit-social': IconRedditSocial,
   redo: IconRedo,
   regex: IconRegex,
+  registries: IconRegistries,
   remove: IconRemove,
   'remove-alt': IconRemoveAlt,
   report: IconReport,

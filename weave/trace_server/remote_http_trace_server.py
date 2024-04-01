@@ -1,4 +1,5 @@
 import io
+import json
 import typing as t
 from pydantic import BaseModel
 import requests
@@ -77,6 +78,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if r.status_code == 413 and "obj/create" in url:
             raise requests.HTTPError(
                 "413 Client Error. Request too large. Try using a weave.Dataset() object."
+            )
+        if r.status_code == 500:
+            reason_val = r.text
+            try:
+                reason_val = json.dumps(json.loads(reason_val), indent=2)
+            except json.JSONDecodeError:
+                reason_val = f"Reason: {reason_val}"
+            raise requests.HTTPError(
+                f"500 Server Error: Internal Server Error for url: {url}. {reason_val}",
+                response=r,
             )
         r.raise_for_status()
         return res_model.model_validate(r.json())

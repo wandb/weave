@@ -16,12 +16,7 @@ import {callCache, objectVersionCache, refDataCache} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
-import {
-  opVersionRefOpCategory,
-  refUriToObjectVersionKey,
-  refUriToOpVersionKey,
-  typeNameToCategory,
-} from './utilities';
+import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
@@ -31,7 +26,6 @@ import {
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
-  OpCategory,
   OpVersionFilter,
   OpVersionKey,
   OpVersionSchema,
@@ -69,7 +63,6 @@ const makeTraceServerEndpointHook = <
   ): LoadableWithError<Output> => {
     input = useDeepMemo(input);
     const getTsClient = useGetTraceServerClientContext();
-    const client = getTsClient();
     const [state, setState] = useState<LoadableWithError<Output>>({
       loading: true,
       result: null,
@@ -83,6 +76,7 @@ const makeTraceServerEndpointHook = <
         setState({loading: false, result: null, error: null});
         return;
       }
+      const client = getTsClient();
       client[traceServerFnName](req.params as any)
         .then(res => {
           const output = postprocessFn(res as any, ...input);
@@ -91,7 +85,7 @@ const makeTraceServerEndpointHook = <
         .catch(err => {
           setState({loading: false, result: null, error: err});
         });
-    }, [client, input]);
+    }, [getTsClient, input]);
 
     return state;
   };
@@ -202,12 +196,12 @@ const useCalls = (
     }
     setCallRes(null);
     loadingRef.current = true;
-    const req = {
+    const req: traceServerClient.TraceCallsQueryReq = {
       project_id: projectIdFromParts({entity, project}),
       filter: {
-        op_version_refs: deepFilter.opVersionRefs,
-        input_object_version_refs: deepFilter.inputObjectVersionRefs,
-        output_object_version_refs: deepFilter.outputObjectVersionRefs,
+        op_names: deepFilter.opVersionRefs,
+        input_refs: deepFilter.inputObjectVersionRefs,
+        output_refs: deepFilter.outputObjectVersionRefs,
         parent_ids: deepFilter.parentIds,
         trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
         call_ids: deepFilter.callIds,
@@ -244,15 +238,7 @@ const useCalls = (
       };
     }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
-    const result = allResults.filter((row: any) => {
-      return (
-        deepFilter.opCategory == null ||
-        (row.opVersionRef &&
-          deepFilter.opCategory.includes(
-            opVersionRefOpCategory(row.opVersionRef) as OpCategory
-          ))
-      );
-    });
+    const result = allResults;
 
     if (callRes == null || loadingRef.current) {
       return {
@@ -275,7 +261,7 @@ const useCalls = (
         result,
       };
     }
-  }, [callRes, deepFilter.opCategory, entity, project, opts?.skip]);
+  }, [callRes, entity, project, opts?.skip]);
 };
 
 const useOpVersion = (
@@ -319,7 +305,7 @@ const useOpVersions = makeTraceServerEndpointHook<
       // entity,
       // project,
       filter: {
-        object_names: filter.opIds,
+        object_ids: filter.opIds,
         latest_only: filter.latestOnly,
         is_op: true,
       },
@@ -332,13 +318,11 @@ const useOpVersions = makeTraceServerEndpointHook<
       return {
         entity,
         project,
-        opId: obj.name,
+        opId: obj.object_id,
         versionHash: obj.digest,
-        typeName: obj.type,
-        name: obj.name,
+        name: obj.object_id,
         path: 'obj',
         createdAtMs: convertISOToDate(obj.created_at).getTime(),
-        category: null,
         versionIndex: obj.version_index,
         value: obj.val,
       };
@@ -439,7 +423,8 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     params: {
       project_id: projectIdFromParts({entity, project}),
       filter: {
-        object_names: filter.objectIds,
+        base_object_classes: filter.baseObjectClasses,
+        object_ids: filter.objectIds,
         latest_only: filter.latestOnly,
         is_op: false,
       },
@@ -454,31 +439,23 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     limit,
     opts
   ): ObjectVersionSchema[] =>
-    res.objs
-      .map(obj => {
-        const [entity, project] = obj.project_id.split('/');
-        return {
-          scheme: 'weave' as const,
-          entity,
-          project,
-          weaveKind: 'object' as const,
-          objectId: obj.name,
-          versionHash: obj.digest,
-          typeName: obj.type,
-          name: obj.name,
-          path: 'obj',
-          createdAtMs: convertISOToDate(obj.created_at).getTime(),
-          category: typeNameToCategory(obj.type),
-          versionIndex: obj.version_index,
-          val: obj.val,
-        };
-      })
-      .filter(obj => {
-        return (
-          filter.category == null ||
-          (obj.category != null && filter.category.includes(obj.category))
-        );
-      })
+    res.objs.map(obj => {
+      const [entity, project] = obj.project_id.split('/');
+      return {
+        scheme: 'weave' as const,
+        entity,
+        project,
+        weaveKind: 'object' as const,
+        objectId: obj.object_id,
+        versionHash: obj.digest,
+        name: obj.object_id,
+        path: 'obj',
+        createdAtMs: convertISOToDate(obj.created_at).getTime(),
+        baseObjectClass: obj.base_object_class ?? null,
+        versionIndex: obj.version_index,
+        val: obj.val,
+      };
+    })
 );
 
 const useRefsReadBatch = makeTraceServerEndpointHook<
@@ -510,14 +487,14 @@ const useTableQuery = makeTraceServerEndpointHook<
   'tableQuery',
   (
     projectId: traceServerClient.TraceTableQueryReq['project_id'],
-    tableDigest: traceServerClient.TraceTableQueryReq['table_digest'],
+    digest: traceServerClient.TraceTableQueryReq['digest'],
     filter: traceServerClient.TraceTableQueryReq['filter'],
     limit: traceServerClient.TraceTableQueryReq['limit'],
     opts?: {skip?: boolean}
   ) => ({
     params: {
       project_id: projectId,
-      table_digest: tableDigest,
+      digest,
       filter,
       limit,
     },
@@ -876,14 +853,14 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 const traceCallToLegacySpan = (
   traceCall: traceServerClient.TraceCallSchema
 ): RawSpanFromStreamTableEra => {
-  const startDate = convertISOToDate(traceCall.start_datetime);
-  const endDate = traceCall.end_datetime
-    ? convertISOToDate(traceCall.end_datetime)
+  const startDate = convertISOToDate(traceCall.started_at);
+  const endDate = traceCall.ended_at
+    ? convertISOToDate(traceCall.ended_at)
     : null;
   let statusCode = 'UNSET';
   if (traceCall.exception) {
     statusCode = 'ERROR';
-  } else if (traceCall.end_datetime) {
+  } else if (traceCall.ended_at) {
     statusCode = 'SUCCESS';
   }
   let latencyS = 0;
@@ -894,10 +871,31 @@ const traceCallToLegacySpan = (
     latency_s: latencyS,
     ...(traceCall.summary ?? {}),
   };
+
+  // This is a very specific hack to make sure that the output is always an
+  // object. After the clickhouse migration, we no longer have this constraint.
+  // Before, if the output was a simple type, it would be wrapped in an object
+  // with the key '_result'. The rest of the codebase expects this, so we're
+  // keeping it for now. However, this is causing some weirdness in the UI so we
+  // should remove it soon. When we do that, we can also remove this hack.
+  const unknownOutput = traceCall.output;
+  let output: {[key: string]: any};
+  if (
+    typeof unknownOutput === 'object' &&
+    unknownOutput !== null &&
+    !Array.isArray(unknownOutput)
+  ) {
+    // If the output is already an object, we don't need to do anything.
+    output = unknownOutput as {[key: string]: any};
+  } else {
+    // If the output is a simple type, we wrap it in an object with the key
+    // '_result'.
+    output = {_result: unknownOutput as any};
+  }
   return {
-    name: traceCall.name,
+    name: traceCall.op_name,
     inputs: traceCall.inputs,
-    output: traceCall.outputs,
+    output,
     status_code: statusCode,
     exception: traceCall.exception,
     attributes: traceCall.attributes,
@@ -927,14 +925,14 @@ const traceCallToUICallSchema = (
     traceId: traceCall.trace_id,
     parentId: traceCall.parent_id ?? null,
     spanName:
-      traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      traceCall.name.startsWith(WEAVE_REF_PREFIX)
-        ? refUriToOpVersionKey(traceCall.name).opId
-        : traceCall.name,
+      traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+        ? refUriToOpVersionKey(traceCall.op_name).opId
+        : traceCall.op_name,
     opVersionRef:
-      traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
-      traceCall.name.startsWith(WEAVE_REF_PREFIX)
-        ? traceCall.name
+      traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+        ? traceCall.op_name
         : null,
     rawSpan: traceCallToLegacySpan(traceCall),
     rawFeedback: {},

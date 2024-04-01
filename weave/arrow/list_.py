@@ -583,18 +583,18 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
 
         # The client might send over refs without knowing the underlying list type is a table.
         if (
-            edge_type == ref_util.DICT_KEY_EDGE_TYPE
-            or edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE
+            edge_type == ref_util.DICT_KEY_EDGE_NAME
+            or edge_type == ref_util.OBJECT_ATTR_EDGE_NAME
         ):
-            edge_type = ref_util.TABLE_COLUMN_EDGE_TYPE
-        elif edge_type == ref_util.LIST_INDEX_EDGE_TYPE:
-            edge_type = ref_util.TABLE_ROW_EDGE_TYPE
+            edge_type = ref_util.AWL_COL_EDGE_NAME
+        elif edge_type == ref_util.LIST_INDEX_EDGE_NAME:
+            edge_type = ref_util.AWL_ROW_EDGE_NAME
 
         assert edge_type in [
-            ref_util.TABLE_ROW_EDGE_TYPE,
-            ref_util.TABLE_COLUMN_EDGE_TYPE,
+            ref_util.AWL_ROW_EDGE_NAME,
+            ref_util.AWL_COL_EDGE_NAME,
         ]
-        if edge_type == ref_util.TABLE_ROW_EDGE_TYPE:
+        if edge_type == ref_util.AWL_ROW_EDGE_NAME:
             res = self[int(edge_path)]
         else:
             res = self.column(edge_path)
@@ -1121,7 +1121,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         pylist = self.to_pylist_tagged()
         for i, x in enumerate(pylist):
             yield ref_util.val_with_relative_ref(
-                self, x, [ref_util.TABLE_ROW_EDGE_TYPE, str(i)]
+                self, x, [ref_util.AWL_ROW_EDGE_NAME, str(i)]
             )
 
     def __repr__(self):
@@ -1333,7 +1333,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
             result = awl.to_pylist_tagged()[0]
 
             return ref_util.val_with_relative_ref(
-                self, result, [ref_util.TABLE_ROW_EDGE_TYPE, str(index)]
+                self, result, [ref_util.AWL_ROW_EDGE_NAME, str(index)]
             )
         return awl
 
@@ -1446,7 +1446,7 @@ class ArrowWeaveList(typing.Generic[ArrowWeaveListObjectTypeVar]):
         )
 
         return ref_util.val_with_relative_ref(
-            self, val, [ref_util.TABLE_COLUMN_EDGE_TYPE, str(name)]
+            self, val, [ref_util.AWL_COL_EDGE_NAME, str(name)]
         )
 
     def unique(self) -> "ArrowWeaveList":

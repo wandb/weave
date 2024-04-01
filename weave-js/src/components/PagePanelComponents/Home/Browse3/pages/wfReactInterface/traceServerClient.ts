@@ -12,6 +12,7 @@
  * several other endpoints that we should implement.
  */
 
+import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
@@ -23,15 +24,19 @@ export type KeyedDictType = {
 export type TraceCallSchema = {
   project_id: string;
   id: string;
-  name: string;
+  op_name: string;
   trace_id: string;
   parent_id?: string;
-  start_datetime: string;
+  started_at: string;
   attributes: KeyedDictType;
   inputs: KeyedDictType;
-  end_datetime?: string;
+  ended_at?: string;
   exception?: string;
-  outputs?: KeyedDictType;
+  // Using `unknown` for `output` instead of an `any` so that the type checkers
+  // force us to handle all possible types. When using `any`, this value can be
+  // freely assigned to any other variable without any type checking. This way,
+  // we can ensure that we handle all possible types.
+  output?: unknown;
   summary?: KeyedDictType;
   wb_run_id?: string;
   wb_user_id?: string;
@@ -47,9 +52,9 @@ export type TraceCallReadRes = {
 };
 
 interface TraceCallsFilter {
-  op_version_refs?: string[];
-  input_object_version_refs?: string[];
-  output_object_version_refs?: string[];
+  op_names?: string[];
+  input_refs?: string[];
+  output_refs?: string[];
   parent_ids?: string[];
   trace_ids?: string[];
   call_ids?: string[];
@@ -58,7 +63,7 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
-type TraceCallsQueryReq = {
+export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
@@ -70,7 +75,8 @@ export type TraceCallsQueryRes = {
 };
 
 interface TraceObjectsFilter {
-  object_names?: string[];
+  base_object_classes?: string[];
+  object_ids?: string[];
   is_op?: boolean;
   latest_only?: boolean;
 }
@@ -82,12 +88,13 @@ type TraceObjQueryReq = {
 
 export interface TraceObjSchema {
   project_id: string;
-  name: string;
+  object_id: string;
   created_at: string;
   digest: string;
   version_index: number;
   is_latest: number;
-  type: string;
+  kind: 'op' | 'object';
+  base_object_class?: string;
   val: any;
 }
 
@@ -105,7 +112,7 @@ export type TraceRefsReadBatchRes = {
 
 export type TraceTableQueryReq = {
   project_id: string;
-  table_digest: string;
+  digest: string;
   filter?: {
     row_digests?: string[];
   };
@@ -232,17 +239,22 @@ export class TraceServerClient {
       return prom;
     }
 
+    const headers: {[key: string]: string} = {
+      'Content-Type': 'application/json',
+      // This is a dummy auth header, the trace server requires
+      // that we send a basic auth header, but it uses cookies for
+      // authentication.
+      Authorization: 'Basic ' + btoa(':'),
+    };
+    const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
+    if (useAdminPrivileges) {
+      headers['use-admin-privileges'] = 'true';
+    }
     // eslint-disable-next-line wandb/no-unprefixed-urls
     fetch(url, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        // This is a dummy auth header, the trace server requires
-        // that we send a basic auth header, but it uses cookies for
-        // authentication.
-        Authorization: 'Basic ' + btoa(':'),
-      },
+      headers,
       body: reqBody,
     })
       .then(response => {

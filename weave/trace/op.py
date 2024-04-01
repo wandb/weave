@@ -1,4 +1,4 @@
-from typing import Callable, Any, Optional
+from typing import Callable, Any, Mapping, Optional
 import inspect
 import functools
 import typing
@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine
 from typing_extensions import ParamSpec
 
 from weave.trace.errors import OpCallError
-from weave.trace_server.refs import ObjectRef
+from weave.trace.refs import ObjectRef
+from weave.trace.context import call_attributes
 from weave import graph_client_context
 from weave import run_context
 from weave import box
@@ -49,12 +50,16 @@ class Op:
             inputs = self.signature.bind(*args, **kwargs).arguments
         except TypeError as e:
             raise OpCallError(f"Error calling {self.name}: {e}")
+        inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
         parent_run = run_context.get_current_run()
-        trackable_inputs = client.save_nested_objects(inputs)
-        run = client.create_call(self, parent_run, trackable_inputs)
+        client.save_nested_objects(inputs_with_defaults)
+        attributes = call_attributes.get()
+        run = client.create_call(
+            self, parent_run, inputs_with_defaults, attributes=attributes
+        )
         try:
             with run_context.current_run(run):
-                res = self.resolve_fn(**trackable_inputs)
+                res = self.resolve_fn(**inputs)
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
@@ -155,3 +160,15 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
         return op  # type: ignore
 
     return wrap
+
+
+def _apply_fn_defaults_to_inputs(
+    fn: typing.Callable, inputs: Mapping[str, typing.Any]
+) -> dict[str, typing.Any]:
+    inputs = {**inputs}
+    sig = inspect.signature(fn)
+    for param_name, param in sig.parameters.items():
+        if param_name not in inputs:
+            if param.default != inspect.Parameter.empty:
+                inputs[param_name] = param.default
+    return inputs

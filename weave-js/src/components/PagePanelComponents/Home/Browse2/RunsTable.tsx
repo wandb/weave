@@ -36,20 +36,16 @@ import {
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
-import {CategoryChip} from '../Browse3/pages/common/CategoryChip';
 import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
 import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
 import {StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {
-  DICT_KEY_EDGE_TYPE,
-  OBJECT_ATTRIBUTE_EDGE_TYPE,
+  DICT_KEY_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
 } from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
-import {
-  opVersionRefOpCategory,
-  opVersionRefOpName,
-} from '../Browse3/pages/wfReactInterface/utilities';
+import {opVersionRefOpName} from '../Browse3/pages/wfReactInterface/utilities';
 import {
   CallSchema,
   ObjectVersionKey,
@@ -183,7 +179,7 @@ const getExtraColumns = (
           const subKeys = getExtraColumns([innerType]);
           subKeys.forEach(sk => {
             cols[k + '.' + sk.label] =
-              k + `/${OBJECT_ATTRIBUTE_EDGE_TYPE}/` + sk.path;
+              k + `/${OBJECT_ATTR_EDGE_NAME}/` + sk.path;
           });
         } else {
           cols[k] = k;
@@ -197,7 +193,7 @@ const getExtraColumns = (
         if (isExpandableType(innerType)) {
           const subKeys = getExtraColumns([innerType]);
           subKeys.forEach(sk => {
-            cols[k + '.' + sk.label] = k + `/${DICT_KEY_EDGE_TYPE}/` + sk.path;
+            cols[k + '.' + sk.label] = k + `/${DICT_KEY_EDGE_NAME}/` + sk.path;
           });
         } else {
           cols[k] = k;
@@ -313,9 +309,6 @@ export const RunsTable: FC<{
         loading,
         opVersion: call.opVersionRef,
         isRoot: call.parentId == null,
-        opCategory: call.opVersionRef
-          ? opVersionRefOpCategory(call.opVersionRef)
-          : null,
         trace_id: call.traceId,
         status_code: call.rawSpan.status_code,
         timestampMs: call.rawSpan.timestamp,
@@ -496,22 +489,6 @@ export const RunsTable: FC<{
           );
         },
       },
-      ...(!ioColumnsOnly
-        ? [
-            {
-              field: 'opCategory',
-              headerName: 'Category',
-              width: 100,
-              minWidth: 100,
-              maxWidth: 100,
-              renderCell: (cellParams: any) => {
-                return (
-                  cellParams.value && <CategoryChip value={cellParams.value} />
-                );
-              },
-            },
-          ]
-        : []),
       ...(!ioColumnsOnly
         ? [
             {
@@ -703,9 +680,16 @@ export const RunsTable: FC<{
         })
       );
 
+      const outputGroup: Exclude<
+        ComponentProps<typeof DataGrid>['columnGroupingModel'],
+        undefined
+      >[number] = {
+        groupId: 'output',
+        children: [],
+      };
+
       const outputOrder = Object.keys(outputKeys);
-      const outputGrouping = buildTree(outputOrder, 'output');
-      colGroupingModel.push(outputGrouping);
+
       for (const key of outputOrder) {
         const field = 'output.' + key;
         const isExpanded = expandedRefCols.has(field);
@@ -733,7 +717,58 @@ export const RunsTable: FC<{
             return <NotApplicable />;
           },
         });
+        if (isExpanded) {
+          // This is a direct non-dry copy of the input expansion code.
+          // We should refactor this to be DRY.
+          const outputGroupChildren = [{field}];
+          const expandCols = expandedColInfo[field] ?? [];
+          for (const col of expandCols) {
+            const expandField = field + '.' + col.label;
+            cols.push({
+              flex: 1,
+              field: expandField,
+              renderHeader: headerParams => {
+                return (
+                  <CustomGroupedColumnHeader
+                    field={headerParams.field}
+                    // TODO: after merging object store stuff - re-write expansion logic. This should be grouped.
+                    titleOverride={col.label}
+                  />
+                );
+              },
+              renderCell: cellParams => {
+                const weaveRef = (cellParams.row as any)[field];
+                if (weaveRef === undefined) {
+                  return <NotApplicable />;
+                }
+                return (
+                  <ErrorBoundary>
+                    <RefValue weaveRef={weaveRef} attribute={col.path} />
+                  </ErrorBoundary>
+                );
+              },
+            });
+            outputGroupChildren.push({field: expandField});
+          }
+          outputGroup.children.push({
+            groupId: field,
+            headerName: key,
+            children: outputGroupChildren,
+            renderHeaderGroup: () => {
+              return (
+                <CollapseGroupHeader
+                  headerName={key}
+                  field={field}
+                  onCollapse={onCollapse}
+                />
+              );
+            },
+          });
+        } else {
+          outputGroup.children.push({field});
+        }
       }
+      colGroupingModel.push(outputGroup);
     }
 
     let feedbackKeys: {[key: string]: true} = {};
@@ -839,7 +874,6 @@ export const RunsTable: FC<{
       apiRef.current.restoreState(initialState);
     }
   }, [columns, initialState, apiRef]);
-
   return (
     <>
       {showVisibilityAlert && (

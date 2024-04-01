@@ -340,19 +340,6 @@ def make_stream_table(*args, **kwargs):
 ##########
 
 
-def test_reconstruct_completion(
-    chat_completion_request_message,
-    streaming_chat_completion_messages,
-    reassembled_chat_completion_message,
-):
-    assert (
-        util.reconstruct_completion(
-            chat_completion_request_message, streaming_chat_completion_messages
-        )
-        == reassembled_chat_completion_message
-    )
-
-
 def test_log_to_span_basic(
     user_by_api_key_in_env,
     mocked_create,
@@ -379,7 +366,7 @@ def test_log_to_span_basic(
     inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
     outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
 
-    inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
+    inputs_expected = create_input
     assert inputs == inputs_expected
 
     outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)
@@ -409,7 +396,7 @@ def test_log_to_span_streaming(
     inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
     outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
 
-    inputs_expected = ChatCompletionRequest.parse_obj(create_input).dict()
+    inputs_expected = create_input
     assert inputs == inputs_expected
 
     outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)

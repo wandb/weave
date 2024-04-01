@@ -47,10 +47,9 @@ def test_op_versioning_saveload(client):
 def get_saved_code(client, ref):
     resp = client.server.obj_read(
         ObjReadReq(
-            entity=ref.entity,
-            project=ref.project,
-            name=ref.name,
-            version_digest=ref.version,
+            project_id=f"{ref.entity}/{ref.project}",
+            object_id=ref.name,
+            digest=ref.digest,
         )
     )
     files = resp.obj.val["files"]
@@ -407,7 +406,6 @@ def test_op_return_weave_obj(strict_op_saving, client):
         saved_code = f.read()
     print("SAVED_CODE")
     print(saved_code)
-    breakpoint()
 
 
 EXPECTED_TYPEDICT_ANNO_CODE = """import weave

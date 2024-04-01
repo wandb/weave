@@ -3,20 +3,24 @@ from typing import Iterator, Literal, Any, Union, Optional, Generator, SupportsI
 import dataclasses
 import operator
 import typing
+from pydantic import BaseModel
 
 from weave.trace.op import Op
-from weave.trace_server.refs import (
+from weave.trace.refs import (
     RefWithExtra,
     ObjectRef,
     TableRef,
-    KEY_EDGE_TYPE,
-    ATTRIBUTE_EDGE_TYPE,
-    INDEX_EDGE_TYPE,
-    ID_EDGE_TYPE,
+    DICT_KEY_EDGE_NAME,
+    OBJECT_ATTR_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    TABLE_ROW_ID_EDGE_NAME,
 )
 from weave import box
+from weave.table import Table
 from weave.trace.serialize import from_json
+from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
+from weave.graph_client_context import require_graph_client
 from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     _TableRowFilter,
@@ -101,6 +105,45 @@ class Tracable:
         # return self.server.mutate(self.ref, mutations)
 
 
+def pydantic_getattribute(self: BaseModel, name: str) -> Any:
+    attribute = object.__getattribute__(self, name)
+    if name not in object.__getattribute__(self, "model_fields"):
+        return attribute
+    if name == "ref":
+        try:
+            return object.__getattribute__(self, "ref")
+        except AttributeError:
+            return None
+    res = attribute_access_result(self, attribute, name)
+    return res
+
+
+def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> Any:
+    # Not ideal, what about properties?
+    if callable(val_attr_val):
+        return val_attr_val
+
+    ref = None
+    try:
+        ref = self.ref  # type: ignore
+    except AttributeError:
+        pass
+    if ref is None:
+        return val_attr_val
+
+    new_ref = ref.with_attr(attr_name)
+
+    gc = require_graph_client()
+    return make_trace_obj(
+        val_attr_val,
+        new_ref,
+        gc.server,
+        None,  # TODO: not passing root, needed for mutate which is not implemented yet
+        # self.root,
+        self,
+    )
+
+
 class TraceObject(Tracable):
     def __init__(
         self,
@@ -122,38 +165,10 @@ class TraceObject(Tracable):
         except AttributeError:
             pass
         val_attr_val = object.__getattribute__(self._val, __name)
-
-        # This condition attempts to bind the current `self` to the attribute if
-        # it happens to be both an `Op` and have a `self` argument. This is a
-        # bit of a hack since we are not always sure that the current object is
-        # the correct object to bind. There are 3 cases:
-        # 1. The attribute is part of the instance methods and the binding is
-        #    correct
-        # 2. The attribute is assigned as a property and is not bound at
-        #    assignment time. In this case, it is "unlikely" that the args
-        #    contain a `self` argument - which is why we apply this heuristic.
-        # 3. The attribute is assigned as a property and is bound to another
-        #    object at the time of assignment. In this case, the binding is
-        #    incorrect. However, in our evaluation use case we do not have this
-        #    case. We are accepting the incorrect assignment here for the sake
-        #    of expediency, but should be fixed.
-        if isinstance(val_attr_val, Op) and inspect.signature(
-            val_attr_val.resolve_fn
-        ).parameters.get("self"):
-            val_attr_val = val_attr_val.__get__(self, type(self))
-
-        # Not ideal, what about properties?
-        if callable(val_attr_val):
-            return val_attr_val
-
-        new_ref = self.ref.with_attr(__name)
-
-        return make_trace_obj(
-            val_attr_val,
-            new_ref,
-            self.server,
-            self.root,
-        )
+        result = attribute_access_result(self, val_attr_val, __name)
+        # Store the result on _val so we don't deref next time.
+        object.__setattr__(self._val, __name, result)
+        return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
         if __name in ["_val", "ref", "server", "root", "mutations"]:
@@ -165,6 +180,9 @@ class TraceObject(Tracable):
                 self.ref.extra, "setattr", __name, __value
             )
             return object.__setattr__(self._val, __name, __value)
+
+    def __dir__(self) -> list[str]:
+        return dir(self._val)
 
     def __repr__(self) -> str:
         return f"TraceObject({self._val})"
@@ -214,7 +232,7 @@ class TraceTable(Tracable):
             response = self.server.table_query(
                 TableQueryReq(
                     project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
-                    table_digest=self.table_ref.digest,
+                    digest=self.table_ref.digest,
                     offset=page_index * page_size,
                     limit=page_size,
                     # filter=self.filter,
@@ -342,6 +360,7 @@ def make_trace_obj(
     new_ref: RefWithExtra,
     server: TraceServerInterface,
     root: Optional[Tracable],
+    parent: Any = None,
 ) -> Any:
     if isinstance(val, Tracable):
         # If val is a TraceTable, we want to refer to it via the outer object
@@ -362,14 +381,17 @@ def make_trace_obj(
         extra = val.extra
         read_res = server.obj_read(
             ObjReadReq(
-                entity=val.entity,
-                project=val.project,
-                name=val.name,
-                version_digest=val.version,
+                project_id=f"{val.entity}/{val.project}",
+                object_id=val.name,
+                digest=val.digest,
             )
         )
         val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
 
+    if isinstance(val, Table):
+        if val.ref is None:
+            raise InternalError("Expected populated Table.ref")
+        val = TraceTable(val.ref, new_ref, server, _TableRowFilter(), root)
     if isinstance(val, TableRef):
         val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
 
@@ -377,13 +399,13 @@ def make_trace_obj(
         # This is where extra resolution happens?
         for extra_index in range(0, len(extra), 2):
             op, arg = extra[extra_index], extra[extra_index + 1]
-            if op == KEY_EDGE_TYPE:
+            if op == DICT_KEY_EDGE_NAME:
                 val = val[arg]
-            elif op == ATTRIBUTE_EDGE_TYPE:
+            elif op == OBJECT_ATTR_EDGE_NAME:
                 val = getattr(val, arg)
-            elif op == INDEX_EDGE_TYPE:
+            elif op == LIST_INDEX_EDGE_NAME:
                 val = val[int(arg)]
-            elif op == ID_EDGE_TYPE:
+            elif op == TABLE_ROW_ID_EDGE_NAME:
                 val = val[arg]
             else:
                 raise ValueError(f"Unknown ref type: {extra[extra_index]}")
@@ -399,6 +421,24 @@ def make_trace_obj(
             return TraceList(val, ref=new_ref, server=server, root=root)
         elif isinstance(val, dict):
             return TraceDict(val, ref=new_ref, server=server, root=root)
+    if isinstance(val, Op) and inspect.signature(val.resolve_fn).parameters.get("self"):
+        # This condition attempts to bind the current `self` to the attribute if
+        # it happens to be both an `Op` and have a `self` argument. This is a
+        # bit of a hack since we are not always sure that the current object is
+        # the correct object to bind. There are 3 cases:
+        # 1. The attribute is part of the instance methods and the binding is
+        #    correct
+        # 2. The attribute is assigned as a property and is not bound at
+        #    assignment time. In this case, it is "unlikely" that the args
+        #    contain a `self` argument - which is why we apply this heuristic.
+        # 3. The attribute is assigned as a property and is bound to another
+        #    object at the time of assignment. In this case, the binding is
+        #    incorrect. However, in our evaluation use case we do not have this
+        #    case. We are accepting the incorrect assignment here for the sake
+        #    of expediency, but should be fixed.
+        if parent is None:
+            raise ValueError("Parent is required for Op")
+        val = val.__get__(parent, type(parent))
     box_val = box.box(val)
     setattr(box_val, "ref", new_ref)
     return box_val

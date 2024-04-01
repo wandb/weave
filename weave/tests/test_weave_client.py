@@ -1,20 +1,24 @@
+import os
 import re
+import signal
+import requests
 import pytest
 import pydantic
+from pydantic import BaseModel
 import weave
 import asyncio
 from weave import op_def, Evaluation
 
 from weave import weave_client
 from weave.trace.op import Op
-from weave.trace_server.refs import (
-    ATTRIBUTE_EDGE_TYPE,
-    ID_EDGE_TYPE,
-    INDEX_EDGE_TYPE,
-    KEY_EDGE_TYPE,
+from weave.trace.refs import (
+    OBJECT_ATTR_EDGE_NAME,
+    TABLE_ROW_ID_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    DICT_KEY_EDGE_NAME,
 )
 
-from weave.trace_server import refs
+from weave.trace import refs
 from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
     TableCreateReq,
@@ -24,6 +28,8 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     FileContentReadReq,
 )
+
+pytestmark = pytest.mark.trace
 
 
 class RegexStringMatcher(str):
@@ -42,15 +48,15 @@ def test_table_create(client):
             table=TableSchemaForInsert(
                 project_id="test/test-project",
                 rows=[
-                    {ID_EDGE_TYPE: 1, "val": 1},
-                    {ID_EDGE_TYPE: 2, "val": 2},
-                    {ID_EDGE_TYPE: 3, "val": 3},
+                    {TABLE_ROW_ID_EDGE_NAME: 1, "val": 1},
+                    {TABLE_ROW_ID_EDGE_NAME: 2, "val": 2},
+                    {TABLE_ROW_ID_EDGE_NAME: 3, "val": 3},
                 ],
             )
         )
     )
     result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", table_digest=res.digest)
+        TableQueryReq(project_id="test/test-project", digest=res.digest)
     )
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2
@@ -120,13 +126,13 @@ def test_dataset_refs(client):
         "shawn",
         "test-project",
         "my-dataset",
-        ref.ref.version,
+        ref.ref.digest,
         [
-            ATTRIBUTE_EDGE_TYPE,
+            OBJECT_ATTR_EDGE_NAME,
             "rows",
-            ID_EDGE_TYPE,
+            TABLE_ROW_ID_EDGE_NAME,
             RegexStringMatcher(".*"),
-            KEY_EDGE_TYPE,
+            DICT_KEY_EDGE_NAME,
             "v",
         ],
     )
@@ -138,13 +144,13 @@ def test_dataset_refs(client):
         "shawn",
         "test-project",
         "my-dataset",
-        ref.ref.version,
+        ref.ref.digest,
         [
-            ATTRIBUTE_EDGE_TYPE,
+            OBJECT_ATTR_EDGE_NAME,
             "rows",
-            ID_EDGE_TYPE,
+            TABLE_ROW_ID_EDGE_NAME,
             RegexStringMatcher(".*"),
-            KEY_EDGE_TYPE,
+            DICT_KEY_EDGE_NAME,
             "v",
         ],
     )
@@ -206,7 +212,7 @@ def test_calls_query(client):
     call0 = client.create_call("x", None, {"a": 5, "b": 10})
     call1 = client.create_call("x", None, {"a": 6, "b": 11})
     client.create_call("y", None, {"a": 5, "b": 10})
-    result = list(client.calls(weave_client._CallsFilter(op_version_refs=["x"])))
+    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
         op_name="x",
@@ -256,15 +262,15 @@ def test_mutations(client):
     dataset.cows = "moo"
     assert dataset.mutations == [
         weave_client.MutationAppend(
-            path=[ATTRIBUTE_EDGE_TYPE, "rows"],
+            path=[OBJECT_ATTR_EDGE_NAME, "rows"],
             operation="append",
             args=({"doc": "zz", "label": "e"},),
         ),
         weave_client.MutationSetitem(
             path=[
-                ATTRIBUTE_EDGE_TYPE,
+                OBJECT_ATTR_EDGE_NAME,
                 "rows",
-                ID_EDGE_TYPE,
+                TABLE_ROW_ID_EDGE_NAME,
                 RegexStringMatcher(".*,.*"),
             ],
             operation="setitem",
@@ -272,13 +278,13 @@ def test_mutations(client):
         ),
         weave_client.MutationSetitem(
             path=[
-                ATTRIBUTE_EDGE_TYPE,
+                OBJECT_ATTR_EDGE_NAME,
                 "rows",
-                ID_EDGE_TYPE,
+                TABLE_ROW_ID_EDGE_NAME,
                 RegexStringMatcher(".*,.*"),
-                KEY_EDGE_TYPE,
+                DICT_KEY_EDGE_NAME,
                 "somelist",
-                INDEX_EDGE_TYPE,
+                LIST_INDEX_EDGE_NAME,
                 "0",
             ],
             operation="setitem",
@@ -377,16 +383,51 @@ def test_save_model(client):
     model = MyModel(prompt="input is: {input}")
     ref = client.save_object(model, "my-model")
     model2 = client.get(ref)
-    # TODO: wrong, have to manually pass self
-    assert model2.predict(model2, "x") == "input is: x"
+    assert model2.predict("x") == "input is: x"
+
+
+def test_saved_nested_modellike(client):
+    class A(weave.Object):
+        x: int
+
+        @weave.op()
+        async def call(self, input):
+            return self.x + input
+
+    class B(weave.Object):
+        a: A
+        y: int
+
+        @weave.op()
+        async def call(self, input):
+            return await self.a.call(input - self.y)
+
+    model = B(a=A(x=3), y=2)
+    ref = client.save_object(model, "my-model")
+    model2 = client.get(ref)
+
+    class C(weave.Object):
+        b: B
+        z: int
+
+        @weave.op()
+        async def call(self, input):
+            return await self.b.call(input - 2 * self.z)
+
+    @weave.op()
+    async def call_model(c, input):
+        return await c.call(input)
+
+    c = C(b=model2, z=1)
+    assert asyncio.run(call_model(c, 5)) == 4
 
 
 def test_dataset_rows_ref(client):
     dataset = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
-    saved = client.save_nested_objects(dataset)
+    saved = client.save(dataset, "my-dataset")
     assert isinstance(saved.rows.ref, weave_client.ObjectRef)
-    assert saved.rows.ref.name == "Dataset"
-    assert saved.rows.ref.extra == [ATTRIBUTE_EDGE_TYPE, "rows"]
+    assert saved.rows.ref.name == "my-dataset"
+    assert saved.rows.ref.extra == [OBJECT_ATTR_EDGE_NAME, "rows"]
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
@@ -455,31 +496,31 @@ def test_evaluate(client):
     example0_obj = child0.inputs["example"]
     assert example0_obj.ref.name == "Dataset"
     assert example0_obj.ref.extra == [
-        ATTRIBUTE_EDGE_TYPE,
+        OBJECT_ATTR_EDGE_NAME,
         "rows",
-        ID_EDGE_TYPE,
+        TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
     ]
     example0_obj_input = example0_obj["input"]
     assert example0_obj_input == "1 + 2"
     assert example0_obj_input.ref.name == "Dataset"
     assert example0_obj_input.ref.extra == [
-        ATTRIBUTE_EDGE_TYPE,
+        OBJECT_ATTR_EDGE_NAME,
         "rows",
-        ID_EDGE_TYPE,
+        TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
-        KEY_EDGE_TYPE,
+        DICT_KEY_EDGE_NAME,
         "input",
     ]
     example0_obj_target = example0_obj["target"]
     assert example0_obj_target == 3
     assert example0_obj_target.ref.name == "Dataset"
     assert example0_obj_target.ref.extra == [
-        ATTRIBUTE_EDGE_TYPE,
+        OBJECT_ATTR_EDGE_NAME,
         "rows",
-        ID_EDGE_TYPE,
+        TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
-        KEY_EDGE_TYPE,
+        DICT_KEY_EDGE_NAME,
         "target",
     ]
 
@@ -495,9 +536,9 @@ def test_evaluate(client):
     example1_obj = child1.inputs["example"]
     assert example1_obj.ref.name == "Dataset"
     assert example1_obj.ref.extra == [
-        ATTRIBUTE_EDGE_TYPE,
+        OBJECT_ATTR_EDGE_NAME,
         "rows",
-        ID_EDGE_TYPE,
+        TABLE_ROW_ID_EDGE_NAME,
         RegexStringMatcher(".*"),
     ]
     # Should be a different row ref
@@ -517,7 +558,7 @@ def test_nested_ref_is_inner(client):
         scorers=[score],
     )
 
-    saved = client.save_nested_objects(evaluation)
+    saved = client.save(evaluation, "my-eval")
     assert saved.dataset.ref.name == "Dataset"
     assert saved.dataset.rows.ref.name == "Dataset"
 
@@ -607,16 +648,63 @@ def test_server_file(client):
     assert f_bytes == read_res.content
 
 
-# def test_publish_big_list(server):
-#     import time
+def test_isinstance_checks(client):
+    class PydanticObjA(weave.Object):
+        x: dict
 
-#     t = time.time()
-#     big_list = list({"x": i, "y": i} for i in range(1000000))
-#     print("create", time.time() - t)
-#     t = time.time()
-#     ref = server.new({"a": big_list})
-#     print("insert", time.time() - t)
-#     t = time.time()
-#     res = server.get(ref)
-#     print("get", time.time() - t)
-#     assert res == {"a": big_list}
+    class PydanticObjB(weave.Object):
+        a: PydanticObjA
+
+    b = PydanticObjB(a=PydanticObjA(x={"y": [1, "j", True, None]}))
+
+    client.save_nested_objects(b)
+
+    assert isinstance(b, PydanticObjB)
+    a = b.a
+    assert b.ref is not None
+    assert isinstance(a, PydanticObjA)
+    assert a.ref is not None
+    assert not a.ref.is_descended_from(b.ref)  # objects always saved as roots
+    x = a.x
+    assert isinstance(x, dict)
+    assert x.ref is not None
+    assert x.ref.is_descended_from(a.ref)
+    y = x["y"]
+    assert isinstance(y, list)
+    assert y.ref is not None
+    assert y.ref.is_descended_from(x.ref)
+    y0 = y[0]
+    assert isinstance(y0, int)
+    assert y0.ref is not None
+    assert y0.ref.is_descended_from(y.ref)
+    y1 = y[1]
+    assert isinstance(y1, str)
+    assert y1.ref is not None
+    assert y1.ref.is_descended_from(y.ref)
+
+    # BoxedBool can't inherit from bool
+    y2 = y[2]
+    assert not isinstance(y2, bool)
+    assert y2.ref is not None
+    assert y2.ref.is_descended_from(y.ref)
+
+    y3 = y[3]
+    assert not isinstance(y2, type(None))
+    assert y3.ref is not None
+    assert y3.ref.is_descended_from(y.ref)
+
+
+def test_weave_server(client):
+    class MyModel(weave.Model):
+        prompt: str
+
+        @weave.op()
+        def predict(self, input: str) -> str:
+            return self.prompt.format(input=input)
+
+    model = MyModel(prompt="input is: {input}")
+    ref = client.save_object(model, "my-model")
+
+    url = weave.serve(ref, thread=True)
+    response = requests.post(url + "/predict", json={"input": "x"})
+    assert response.json() == {"result": "input is: x"}

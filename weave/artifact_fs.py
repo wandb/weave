@@ -289,27 +289,27 @@ class FilesystemArtifactRef(artifact_base.ArtifactRef):
                 for i in range(0, len(self.extra), 2):
                     extra_edge_type = self.extra[i]
                     extra_edge_value = self.extra[i + 1]
-                    if extra_edge_type == ref_util.DICT_KEY_EDGE_TYPE:
+                    if extra_edge_type == ref_util.DICT_KEY_EDGE_NAME:
                         if not types.is_type_like(ot, types.TypedDict({})):
                             raise errors.WeaveInternalError(
                                 f"Cannot get type of {self} with extra {self.extra}"
                             )
                         ot = ot.property_types[extra_edge_value]  # type: ignore
-                    elif extra_edge_type == ref_util.LIST_INDEX_EDGE_TYPE:
+                    elif extra_edge_type == ref_util.LIST_INDEX_EDGE_NAME:
                         if not types.is_list_like(ot):
                             raise errors.WeaveInternalError(
                                 f"Cannot get type of {self} with extra {self.extra}"
                             )
                         ot = ot.object_type  # type: ignore
-                    elif extra_edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE:
+                    elif extra_edge_type == ref_util.OBJECT_ATTR_EDGE_NAME:
                         if not types.is_type_like(ot, types.ObjectType()):
                             raise errors.WeaveInternalError(
                                 f"Cannot get type of {self} with extra {self.extra}"
                             )
                         ot = ot.property_types()[extra_edge_value]  # type: ignore
-                    elif extra_edge_type == ref_util.TABLE_ROW_EDGE_TYPE:
+                    elif extra_edge_type == ref_util.AWL_ROW_EDGE_NAME:
                         ot = ot.object_type  # type: ignore
-                    elif extra_edge_type == ref_util.TABLE_COLUMN_EDGE_TYPE:
+                    elif extra_edge_type == ref_util.AWL_COL_EDGE_NAME:
                         ot = types.List(ot.object_type.property_types[extra_edge_value])  # type: ignore
                     else:
                         raise errors.WeaveInternalError(
