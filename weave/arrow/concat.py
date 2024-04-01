@@ -268,7 +268,7 @@ def _concatenate_non_unions(
         elif pa.types.is_floating(new_arrow_type):
             new_weave_type = types.Float()
         else:
-            raise errors.WeaveInternalError('Unexpected type for "Number" type.')
+            raise errors.WeaveInternalError(f'Unexpected type "{new_arrow_type}" for "Number" type.')
 
         if len(self) == 0:
             data = other._arrow_data
