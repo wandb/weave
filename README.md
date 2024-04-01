@@ -1,10 +1,10 @@
-![Weave Logo](./docs/static/logo_horizontal.svg)
+<img src="./docs/static/logo_horizontal.svg" width="300">
 
-### **Weave** - AI Toolkit by [Weights & Biases](https://wandb.ai/)
+<!-- ### **Weave** - AI Toolkit by [Weights & Biases](https://wandb.ai/) -->
 
 ---
 
-Weave is a toolkit for developing AI-powered applications.
+Weave is a toolkit for developing AI-powered applications, built by [Weights & Biases](https://wandb.ai).
 
 You can use Weave to:
 
