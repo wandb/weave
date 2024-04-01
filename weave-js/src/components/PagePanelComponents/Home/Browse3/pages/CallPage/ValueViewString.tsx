@@ -1,10 +1,12 @@
 import copyToClipboard from 'copy-to-clipboard';
+import isUrl from 'is-url';
 import React, {ReactNode, useCallback, useEffect, useState} from 'react';
 import styled from 'styled-components';
 
 import {toast} from '../../../../../../common/components/elements/Toast';
 import Markdown from '../../../../../../common/components/Markdown';
 import {MOON_150} from '../../../../../../common/css/color.styles';
+import {TargetBlank} from '../../../../../../common/util/links';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
@@ -164,6 +166,10 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     content = <Markdown content={trimmed} />;
   } else if (format === 'Code') {
     content = <CodeEditor value={trimmed} readOnly />;
+  } else if (isUrl(trimmed)) {
+    content = <TargetBlank href={trimmed}>{trimmed}</TargetBlank>;
+  } else {
+    content = value;
   }
 
   if (mode === 2) {
@@ -186,7 +192,7 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
   }
   return (
     <Collapsed hasScrolling={hasScrolling} onClick={onClick}>
-      {value}
+      {content}
     </Collapsed>
   );
 };
