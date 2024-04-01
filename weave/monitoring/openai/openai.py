@@ -54,7 +54,7 @@ class WeaveAsyncStream(AsyncStream):
         finish_run: Callable,
     ) -> None:
         self._messages = messages
-        self._chunks = []
+        self._chunks: List[ChatCompletionChunk] = []
         self._finish_run = finish_run
         super().__init__(
             cast_to=ChatCompletionChunk,
