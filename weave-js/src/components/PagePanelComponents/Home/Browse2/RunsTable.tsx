@@ -243,7 +243,6 @@ export const RunsTable: FC<{
   };
 
   const [expandedColInfo, setExpandedColInfo] = useState<ExtraColumns>({});
-  console.log({expandedColInfo});
 
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
@@ -283,7 +282,6 @@ export const RunsTable: FC<{
       break;
     }
   }
-  console.log({onlyOneOutputResult});
 
   const tableData = useMemo(() => {
     return spans.map((call: CallSchema) => {
@@ -691,8 +689,6 @@ export const RunsTable: FC<{
       };
 
       const outputOrder = Object.keys(outputKeys);
-      // const outputGrouping = buildTree(outputOrder, 'output');
-      // colGroupingModel.push(outputGrouping);
 
       for (const key of outputOrder) {
         const field = 'output.' + key;
@@ -722,6 +718,8 @@ export const RunsTable: FC<{
           },
         });
         if (isExpanded) {
+          // This is a direct non-dry copy of the input expansion code.
+          // We should refactor this to be DRY.
           const outputGroupChildren = [{field}];
           const expandCols = expandedColInfo[field] ?? [];
           for (const col of expandCols) {
@@ -876,7 +874,6 @@ export const RunsTable: FC<{
       apiRef.current.restoreState(initialState);
     }
   }, [columns, initialState, apiRef]);
-  console.log(columns.cols);
   return (
     <>
       {showVisibilityAlert && (
