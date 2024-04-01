@@ -1,4 +1,7 @@
+import os
 import re
+import signal
+import requests
 import pytest
 import pydantic
 from pydantic import BaseModel
@@ -689,3 +692,19 @@ def test_isinstance_checks(client):
     assert not isinstance(y2, type(None))
     assert y3.ref is not None
     assert y3.ref.is_descended_from(y.ref)
+
+
+def test_weave_server(client):
+    class MyModel(weave.Model):
+        prompt: str
+
+        @weave.op()
+        def predict(self, input: str) -> str:
+            return self.prompt.format(input=input)
+
+    model = MyModel(prompt="input is: {input}")
+    ref = client.save_object(model, "my-model")
+
+    url = weave.serve(ref, thread=True)
+    response = requests.post(url + "/predict", json={"input": "x"})
+    assert response.json() == {"result": "input is: x"}

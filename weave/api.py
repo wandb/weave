@@ -8,6 +8,7 @@ import os
 import contextlib
 import dataclasses
 from typing import Any
+import threading
 
 from . import urls
 
@@ -35,6 +36,7 @@ from . import weave_client as _weave_client
 from . import graph_client_context as _graph_client_context
 from weave.monitoring import monitor as _monitor
 from .trace.constants import TRACE_OBJECT_EMOJI
+from weave.trace.refs import ObjectRef
 
 # exposed as part of api
 from . import weave_types as types
@@ -301,12 +303,12 @@ def attributes(attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
 
 
 def serve(
-    model_ref: _artifact_wandb.WandbArtifactRef,
+    model_ref: ObjectRef,
     method_name: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
     port: int = 9996,
     thread: bool = False,
-) -> typing.Optional[str]:
+) -> str:
     import uvicorn
     from .serve_fastapi import object_method_app
 
@@ -327,22 +329,22 @@ def serve(
     trace_attrs = _monitor._attributes.get()
 
     def run():
-        with _wandb_api.wandb_api_context(wandb_api_ctx):
-            with attributes(trace_attrs):
-                uvicorn.run(app, host="0.0.0.0", port=port)
+        with _graph_client_context.set_graph_client(client):
+            with _wandb_api.wandb_api_context(wandb_api_ctx):
+                with attributes(trace_attrs):
+                    uvicorn.run(app, host="0.0.0.0", port=port)
 
     if _util.is_notebook():
         thread = True
     if thread:
-        from threading import Thread
 
-        t = Thread(target=run, daemon=True)
+        t = threading.Thread(target=run, daemon=True)
         t.start()
         time.sleep(1)
         return "http://localhost:%d" % port
     else:
         run()
-    return None
+    raise ValueError("Should not reach here")
 
 
 __docspec__ = [init, publish, ref]
