@@ -44,6 +44,7 @@ class partialmethod_with_self(partialmethod):
     def __get__(self, obj: Any, cls: Optional[Type[Any]] = None) -> Callable:
         return self._make_unbound_method().__get__(obj, cls)  # type: ignore
 
+
 class WeaveAsyncStream(AsyncStream):
     def __init__(
         self,
@@ -68,6 +69,7 @@ class WeaveAsyncStream(AsyncStream):
 
     async def __aiter__(self) -> AsyncIterator[ChatCompletionChunk]:
         from weave.flow.chat_util import OpenAIStream
+
         async for item in self._iterator:
             self._chunks.append(item)
             yield item
