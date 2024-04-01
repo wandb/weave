@@ -94,7 +94,7 @@ export const ConfigComponent: React.FC<
             fontWeight: 'bold',
             paddingRight: '4px',
           }}>
-          Weave Panel Settings
+          Query Panel Settings
         </div>
         <Popup
           content={
