@@ -33,7 +33,7 @@ from . import run as _run
 from . import weave_init as _weave_init
 from . import weave_client as _weave_client
 from . import graph_client_context as _graph_client_context
-from weave.monitoring import monitor as _monitor
+from weave.trace import context as trace_context
 from .trace.constants import TRACE_OBJECT_EMOJI
 
 # exposed as part of api
@@ -290,14 +290,14 @@ import contextlib
 
 @contextlib.contextmanager
 def attributes(attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
-    cur_attributes = {**_monitor._attributes.get()}
+    cur_attributes = {**trace_context.call_attributes.get()}
     cur_attributes.update(attributes)
 
-    token = _monitor._attributes.set(cur_attributes)
+    token = trace_context.call_attributes.set(cur_attributes)
     try:
         yield
     finally:
-        _monitor._attributes.reset(token)
+        trace_context.call_attributes.reset(token)
 
 
 def serve(
@@ -324,7 +324,7 @@ def serve(
 
     wandb_api_ctx = _wandb_api.get_wandb_api_context()
     app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
-    trace_attrs = _monitor._attributes.get()
+    trace_attrs = trace_context.call_attributes.get()
 
     def run():
         with _wandb_api.wandb_api_context(wandb_api_ctx):

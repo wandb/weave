@@ -19,14 +19,11 @@ from .. import stream_data_interfaces
 from .. import graph_client_context
 from .. import run_context
 from .. import run_streamtable_span
+from ..trace import context as trace_context
 
 logger = logging.getLogger(__name__)
 
 _global_monitor: typing.Optional["Monitor"] = None
-
-_attributes: contextvars.ContextVar[
-    typing.Dict[str, typing.Any]
-] = contextvars.ContextVar("_attributes", default={})
 
 
 # Matches OpenTelemetry
@@ -255,14 +252,14 @@ class Monitor:
 
     @contextlib.contextmanager
     def attributes(self, attributes: typing.Dict[str, typing.Any]) -> typing.Iterator:
-        cur_attributes = {**_attributes.get()}
+        cur_attributes = {**trace_context.call_attributes.get()}
         cur_attributes.update(attributes)
 
-        token = _attributes.set(cur_attributes)
+        token = trace_context.call_attributes.set(cur_attributes)
         try:
             yield
         finally:
-            _attributes.reset(token)
+            trace_context.call_attributes.reset(token)
 
     def trace(
         self,
