@@ -6,6 +6,7 @@ import Grow from '@material-ui/core/Grow';
 import {Popover} from '@mui/material';
 import Tooltip, {tooltipClasses, TooltipProps} from '@mui/material/Tooltip';
 import copyToClipboard from 'copy-to-clipboard';
+import isUrl from 'is-url';
 import React, {ReactNode, useCallback, useRef, useState} from 'react';
 import Draggable from 'react-draggable';
 import styled from 'styled-components';
@@ -13,6 +14,7 @@ import styled from 'styled-components';
 import {toast} from '../../../../common/components/elements/Toast';
 import Markdown from '../../../../common/components/Markdown';
 import * as Colors from '../../../../common/css/color.styles';
+import {TargetBlank} from '../../../../common/util/links';
 import {Button} from '../../../Button';
 import {CodeEditor} from '../../../CodeEditor';
 
@@ -121,7 +123,7 @@ const DraggableGrow = ({children, ...other}: any) => {
   );
 };
 
-export const CellValueString = ({value}: CellValueStringProps) => {
+const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -254,4 +256,12 @@ export const CellValueString = ({value}: CellValueStringProps) => {
       </Popover>
     </>
   );
+};
+
+export const CellValueString = ({value}: CellValueStringProps) => {
+  const trimmed = value.trim();
+  if (isUrl(trimmed)) {
+    return <TargetBlank href={trimmed}>{trimmed}</TargetBlank>;
+  }
+  return <CellValueStringWithPopup value={value} />;
 };
