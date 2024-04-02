@@ -58,7 +58,7 @@ const OpVersionPageInner: React.FC<{
     // TODO: We really want to return `True` only when
     // the op is not a bound op. However, we don't have
     // that data available yet.
-    return false;
+    return true;
   }, []);
 
   return (
