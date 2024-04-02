@@ -439,8 +439,14 @@ def make_trace_obj(
         #    case. We are accepting the incorrect assignment here for the sake
         #    of expediency, but should be fixed.
         if parent is None:
-            raise ValueError("Parent is required for Op")
+            raise MissingSelfInstanceError(
+                f"{val.name} Op requires a bound self instance. Must be called from an instance method."
+            )
         val = val.__get__(parent, type(parent))
     box_val = box.box(val)
     setattr(box_val, "ref", new_ref)
     return box_val
+
+
+class MissingSelfInstanceError(ValueError):
+    pass
