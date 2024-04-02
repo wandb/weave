@@ -778,6 +778,10 @@ def test_tuple_support(client):
     exp = ((1, 2), 3)
     assert act == exp
 
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2 == [[1, 2], 3]
+
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
@@ -798,6 +802,10 @@ def test_namedtuple_support(client):
     act = tuple_maker(Point(1, 2), 3)
     exp = (Point(1, 2), 3)
     assert act == exp
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2 == [{"x": 1, "y": 2}, 3]
 
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
