@@ -789,7 +789,7 @@ def test_unknown_input_and_output_types(client):
 
     a = MyUnserializableClassA(3)
     res = op_with_unknown_types(a, 0.14)
-    
+
     assert res.b_val == 3.14
 
     inner_res = client.server.calls_query(
@@ -800,17 +800,7 @@ def test_unknown_input_and_output_types(client):
 
     assert len(inner_res.calls) == 1
     assert inner_res.calls[0].inputs == {
-        "a": {
-            "_type": "UnknownUserType",
-            "type_name": "MyUnserializableClassA",
-            "repr": repr(a),
-        },
+        "a": repr(a),
         "b": 0.14,
     }
-    assert inner_res.calls[0].outputs == {
-        "_result": {
-            "_type": "UnknownUserType",
-            "type_name": "MyUnserializableClassB",
-            "repr": repr(res),
-        }
-    }
+    assert inner_res.calls[0].outputs == {"_result": repr(res)}
