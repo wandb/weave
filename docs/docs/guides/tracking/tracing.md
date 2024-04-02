@@ -99,6 +99,6 @@ weave.init('intro-example')
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
 
 # highlight-next-line
-with weave.attributes({'user_id', 'lukas', 'env': 'production'}):
+with weave.attributes({'user_id': 'lukas', 'env': 'production'}):
     extract_fruit(sentence)
 ```

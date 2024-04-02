@@ -24,12 +24,14 @@ import {
   opArtifactTypeArtifacts,
   opArtifactVersionArtifactSequence,
   opArtifactVersionCreatedAt,
+  opArtifactVersionFile,
   opArtifactVersionHash,
   opArtifactVersionIsWeaveObject,
   opArtifactVersionMetadata,
   opArtifactVersions,
   opArtifactVersionVersionId,
   opDict,
+  opFileContents,
   opFilter,
   opFlatten,
   opGet,
@@ -49,6 +51,7 @@ import {
 } from '../../../../../../core';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {
+  isWandbArtifactRef,
   parseRef,
   useNodeValue,
   WandbArtifactRef,
@@ -70,30 +73,27 @@ import {
   refTypedNodeCache,
 } from './cache';
 import {
-  DICT_KEY_EDGE_TYPE,
-  LIST_INDEX_EDGE_TYPE,
-  OBJECT_ATTRIBUTE_EDGE_TYPE,
-  OBJECT_CATEGORIES,
+  AWL_COL_EDGE_NAME,
+  AWL_ROW_EDGE_NAME,
+  DICT_KEY_EDGE_NAME,
+  LIST_INDEX_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
   PROJECT_CALL_STREAM_NAME,
-  TABLE_COLUMN_EDGE_TYPE,
-  TABLE_ROW_EDGE_TYPE,
   WANDB_ARTIFACT_REF_PREFIX,
 } from './constants';
 import {
   opNameToCategory,
-  opVersionRefOpCategory,
   refUriToOpVersionKey,
+  typeNameToCategory,
 } from './utilities';
 import {
   CallFilter,
   CallKey,
   CallSchema,
   Loadable,
-  ObjectCategory,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
-  OpCategory,
   OpVersionFilter,
   OpVersionKey,
   OpVersionSchema,
@@ -188,15 +188,7 @@ const useCalls = (
       'callId'
     );
     // Unfortunately, we can't filter by category in the query level yet
-    const result = allResults.filter((row: any) => {
-      return (
-        filter.opCategory == null ||
-        (row.opVersionRef &&
-          filter.opCategory.includes(
-            opVersionRefOpCategory(row.opVersionRef) as OpCategory
-          ))
-      );
-    });
+    const result = allResults;
 
     if (calls.loading) {
       return {
@@ -219,7 +211,7 @@ const useCalls = (
         result,
       };
     }
-  }, [calls.result, calls.loading, entity, project, filter.opCategory]);
+  }, [calls.result, calls.loading, entity, project]);
 };
 
 const useOpVersion = (
@@ -300,24 +292,18 @@ const useOpVersions = (
         result: [],
       };
     }
-    const result = (dataValue.result ?? [])
-      .map((row: any) => ({
-        entity,
-        project,
-        opId: row.opId as string,
-        versionHash: row.versionHash as string,
-        path: 'obj',
-        refExtra: null,
-        versionIndex: row.dataDict.versionIndex as number,
-        typeName: row.dataDict.typeName as string,
-        category: opNameToCategory(row.opId as string),
-        createdAtMs: row.dataDict.createdAtMs as number,
-      }))
-      .filter((row: any) => {
-        return (
-          filter.category == null || filter.category.includes(row.category)
-        );
-      }) as OpVersionSchema[];
+    const result = (dataValue.result ?? []).map((row: any) => ({
+      entity,
+      project,
+      opId: row.opId as string,
+      versionHash: row.versionHash as string,
+      path: 'obj',
+      refExtra: null,
+      versionIndex: row.dataDict.versionIndex as number,
+      typeName: row.dataDict.typeName as string,
+      category: opNameToCategory(row.opId as string),
+      createdAtMs: row.dataDict.createdAtMs as number,
+    })) as OpVersionSchema[];
 
     if (dataValue.loading) {
       return {
@@ -341,14 +327,7 @@ const useOpVersions = (
         result,
       };
     }
-  }, [
-    dataValue.loading,
-    dataValue.result,
-    entity,
-    filter.category,
-    opts?.skip,
-    project,
-  ]);
+  }, [dataValue.loading, dataValue.result, entity, opts?.skip, project]);
 };
 
 const useObjectVersion = (
@@ -391,8 +370,9 @@ const useObjectVersion = (
             ...key,
             versionIndex: dataValue.result.versionIndex as number,
             typeName: dataValue.result.typeName as string,
-            category: typeNameToCategory(dataValue.result.typeName as string),
+            baseObjectClass: null,
             createdAtMs: dataValue.result.createdAtMs as number,
+            val: null,
           };
     if (dataValue.loading) {
       return {
@@ -446,7 +426,8 @@ const useRootObjectVersions = (
       }))
       .filter((row: any) => {
         return (
-          filter.category == null || filter.category.includes(row.category)
+          filter.baseObjectClasses == null ||
+          filter.baseObjectClasses.includes(row.category)
         );
       })
       // TODO: Move this to the weave filters?
@@ -463,6 +444,7 @@ const useRootObjectVersions = (
       result.forEach(obj => {
         objectVersionCache.set(
           {
+            scheme: 'wandb-artifact',
             entity,
             project,
             objectId: obj.objectId,
@@ -482,7 +464,7 @@ const useRootObjectVersions = (
     dataValue.loading,
     dataValue.result,
     entity,
-    filter.category,
+    filter.baseObjectClasses,
     opts?.skip,
     project,
   ]);
@@ -765,13 +747,13 @@ const useOpVersionsNode = (
 };
 
 const applyTableQuery = (node: Node, tableQuery: TableQuery): Node => {
-  if (tableQuery.columns.length > 0) {
+  if ((tableQuery.columns ?? []).length > 0) {
     node = opMap({
       arr: node,
       mapFn: constFunction({row: listObjectType(node.type)}, ({row}) =>
         opDict(
           _.fromPairs(
-            tableQuery.columns.map(key => [
+            (tableQuery.columns ?? []).map(key => [
               key,
               opPick({obj: row, key: constString(key)}),
             ])
@@ -972,6 +954,12 @@ const useRefsType = (refUris: string[]): Loadable<Type[]> => {
   };
 };
 
+const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
+  return useNodeValue(
+    useMemo(() => opDefCodeNode(opVersionRef), [opVersionRef])
+  );
+};
+
 // Converters //
 const spanToCallSchema = (
   entity: string,
@@ -1011,7 +999,7 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   if (extra.length === 0) {
     return node;
   }
-  if (extra[0] === LIST_INDEX_EDGE_TYPE || extra[0] === TABLE_ROW_EDGE_TYPE) {
+  if (extra[0] === LIST_INDEX_EDGE_NAME || extra[0] === AWL_ROW_EDGE_NAME) {
     return nodeFromExtra(
       callOpVeryUnsafe('index', {
         arr: node,
@@ -1020,8 +1008,8 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
       extra.slice(2)
     );
   } else if (
-    extra[0] === DICT_KEY_EDGE_TYPE ||
-    extra[0] === TABLE_COLUMN_EDGE_TYPE
+    extra[0] === DICT_KEY_EDGE_NAME ||
+    extra[0] === AWL_COL_EDGE_NAME
   ) {
     return nodeFromExtra(
       callOpVeryUnsafe('pick', {
@@ -1030,7 +1018,7 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
       }) as Node,
       extra.slice(2)
     );
-  } else if (extra[0] === OBJECT_ATTRIBUTE_EDGE_TYPE) {
+  } else if (extra[0] === OBJECT_ATTR_EDGE_NAME) {
     return nodeFromExtra(
       callOpVeryUnsafe('Object-__getattr__', {
         self: node,
@@ -1043,14 +1031,38 @@ export const nodeFromExtra = (node: Node, extra: string[]): Node => {
   }
 };
 
-// Helpers //
-const typeNameToCategory = (typeName: string): ObjectCategory | null => {
-  for (const category of OBJECT_CATEGORIES) {
-    if (typeName.toLocaleLowerCase().includes(category)) {
-      return category as ObjectCategory;
-    }
+const refUnderlyingArtifactNode = (uri: string) => {
+  const ref = parseRef(uri);
+  if (!isWandbArtifactRef(ref)) {
+    throw new Error(`Expected wandb artifact ref, got ${ref}`);
   }
-  return null;
+  const projNode = opRootProject({
+    entityName: constString(ref.entityName),
+    projectName: constString(ref.projectName),
+  });
+  return opProjectArtifactVersion({
+    project: projNode,
+    artifactName: constString(ref.artifactName),
+    artifactVersionAlias: constString(ref.artifactVersion),
+  });
+};
+
+const opDefCodeNode = (uri: string) => {
+  const artifactVersionNode = refUnderlyingArtifactNode(uri);
+  const objPyFileNode = opArtifactVersionFile({
+    artifactVersin: artifactVersionNode,
+    path: constString('obj.py'),
+  });
+  return opFileContents({file: objPyFileNode});
+};
+
+const useFileContent = (
+  entity: string,
+  project: string,
+  digest: string,
+  opts?: {skip?: boolean}
+): Loadable<string> => {
+  throw new Error('Not implemented');
 };
 
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
@@ -1062,5 +1074,11 @@ export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
-  derived: {useChildCallsForCompare, useGetRefsType, useRefsType},
+  useFileContent,
+  derived: {
+    useChildCallsForCompare,
+    useGetRefsType,
+    useRefsType,
+    useCodeForOpRef,
+  },
 };

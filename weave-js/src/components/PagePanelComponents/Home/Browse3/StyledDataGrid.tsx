@@ -7,6 +7,7 @@ import {
   Color,
   hexToRGB,
   MOON_50,
+  MOON_500,
   OBLIVION,
   TEAL_300,
   WHITE,
@@ -30,14 +31,20 @@ export const StyledDataGrid = styled(
 )(({keepBorders}) => ({
   ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
 
+  fontFamily: 'Source Sans Pro',
+
   '& .MuiDataGrid-columnHeaders': {
     backgroundColor: MOON_50,
-    color: '#979a9e',
+    color: MOON_500,
   },
 
   '& .MuiDataGrid-pinnedColumnHeaders': {
     backgroundColor: MOON_50,
-    color: '#979a9e',
+    color: MOON_500,
+  },
+
+  '& .MuiDataGrid-columnHeaderTitle': {
+    fontWeight: 600,
   },
 
   '& .MuiDataGrid-columnHeader:focus, .MuiDataGrid-cell:focus': {

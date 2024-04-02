@@ -4,24 +4,28 @@
  * backed by the "Trace Server" engine.
  */
 
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
+import * as _ from 'lodash';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {callCache} from './cache';
-import {WANDB_ARTIFACT_REF_PREFIX} from './constants';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+// import {refStringToRefDict} from '../wfInterface/naive';
+import {callCache, objectVersionCache, refDataCache} from './cache';
+import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
-import {opVersionRefOpCategory, refUriToOpVersionKey} from './utilities';
+import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
   CallKey,
   CallSchema,
   Loadable,
+  LoadableWithError,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
-  OpCategory,
   OpVersionFilter,
   OpVersionKey,
   OpVersionSchema,
@@ -38,6 +42,83 @@ const projectIdFromParts = ({
   entity: string;
   project: string;
 }) => `${entity}/${project}`;
+
+const makeTraceServerEndpointHook = <
+  FN extends keyof traceServerClient.TraceServerClient,
+  Input extends any[],
+  Output
+>(
+  traceServerFnName: FN,
+  preprocessFn: (...input: Input) => {
+    params: Parameters<traceServerClient.TraceServerClient[FN]>[0];
+    skip?: boolean;
+  },
+  postprocessFn: (
+    res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>,
+    ...input: Input
+  ) => Output
+) => {
+  const useTraceServerRequest = (
+    ...input: Input
+  ): LoadableWithError<Output> => {
+    input = useDeepMemo(input);
+    const getTsClient = useGetTraceServerClientContext();
+    const [state, setState] = useState<LoadableWithError<Output>>({
+      loading: true,
+      result: null,
+      error: null,
+    });
+
+    useEffect(() => {
+      setState({loading: true, result: null, error: null});
+      const req = preprocessFn(...input);
+      if (req.skip) {
+        setState({loading: false, result: null, error: null});
+        return;
+      }
+      const client = getTsClient();
+      client[traceServerFnName](req.params as any)
+        .then(res => {
+          const output = postprocessFn(res as any, ...input);
+          setState({loading: false, result: output, error: null});
+        })
+        .catch(err => {
+          setState({loading: false, result: null, error: err});
+        });
+    }, [getTsClient, input]);
+
+    return state;
+  };
+  return useTraceServerRequest;
+};
+
+const useMakeTraceServerEndpoint = <
+  FN extends keyof traceServerClient.TraceServerClient,
+  Input extends any[],
+  Output
+>(
+  traceServerFnName: FN,
+  preprocessFn: (
+    ...input: Input
+  ) => Parameters<traceServerClient.TraceServerClient[FN]>[0],
+  postprocessFn: (
+    res: Awaited<ReturnType<traceServerClient.TraceServerClient[FN]>>
+  ) => Output
+) => {
+  const getTsClient = useGetTraceServerClientContext();
+  const client = getTsClient();
+  const traceServerRequest = useCallback(
+    (...input: Input): Promise<Output> => {
+      return client[traceServerFnName](preprocessFn(...input) as any).then(
+        res => {
+          return postprocessFn(res as any);
+        }
+      );
+    },
+    [client, postprocessFn, preprocessFn, traceServerFnName]
+  );
+  return traceServerRequest;
+};
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -92,7 +173,6 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
     }
   }, [cachedCall, callRes, key]);
 };
-
 const useCalls = (
   entity: string,
   project: string,
@@ -102,6 +182,7 @@ const useCalls = (
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
+  const currentCancelRef = useRef<() => void>();
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
@@ -109,34 +190,44 @@ const useCalls = (
     if (opts?.skip) {
       return;
     }
+    if (currentCancelRef.current) {
+      currentCancelRef.current();
+      currentCancelRef.current = undefined;
+    }
     setCallRes(null);
     loadingRef.current = true;
-    getTsClient()
-      .callsQuery({
-        project_id: projectIdFromParts({entity, project}),
-        filter: {
-          op_version_refs: deepFilter.opVersionRefs,
-          input_object_version_refs: deepFilter.inputObjectVersionRefs,
-          output_object_version_refs: deepFilter.outputObjectVersionRefs,
-          parent_ids: deepFilter.parentIds,
-          trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
-          call_ids: deepFilter.callIds,
-          trace_roots_only: deepFilter.traceRootsOnly,
-          wb_run_ids: deepFilter.runIds,
-          wb_user_ids: deepFilter.userIds,
-        },
-        limit,
-      })
-      .then(res => {
-        loadingRef.current = false;
-        setCallRes(res);
-      })
-      .catch(e => {
-        // Temp fix before more robust error handling
-        loadingRef.current = false;
-        console.error(e);
-        setCallRes({calls: []});
-      });
+    const req: traceServerClient.TraceCallsQueryReq = {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        op_names: deepFilter.opVersionRefs,
+        input_refs: deepFilter.inputObjectVersionRefs,
+        output_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+        wb_run_ids: deepFilter.runIds,
+        wb_user_ids: deepFilter.userIds,
+      },
+      limit,
+    };
+    const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
+      loadingRef.current = false;
+      setCallRes(res);
+    };
+    const onError = (e: any) => {
+      loadingRef.current = false;
+      console.error(e);
+      setCallRes({calls: []});
+    };
+    const {cancel} = traceServerClient.chunkedCallsQuery(
+      getTsClient(),
+      req,
+      onSuccess,
+      onError
+    );
+    currentCancelRef.current = cancel;
+    return cancel;
   }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
 
   return useMemo(() => {
@@ -147,15 +238,7 @@ const useCalls = (
       };
     }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
-    const result = allResults.filter((row: any) => {
-      return (
-        deepFilter.opCategory == null ||
-        (row.opVersionRef &&
-          deepFilter.opCategory.includes(
-            opVersionRefOpCategory(row.opVersionRef) as OpCategory
-          ))
-      );
-    });
+    const result = allResults;
 
     if (callRes == null || loadingRef.current) {
       return {
@@ -178,42 +261,247 @@ const useCalls = (
         result,
       };
     }
-  }, [callRes, deepFilter.opCategory, entity, project, opts?.skip]);
+  }, [callRes, entity, project, opts?.skip]);
 };
 
 const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
-  throw new Error('Not implemented');
+  const result = useOpVersions(
+    key?.entity ?? '',
+    key?.project ?? '',
+    {
+      opIds: [key?.opId ?? ''],
+    },
+    undefined,
+    {
+      skip: key == null,
+    }
+  );
+  return {
+    loading: result.loading,
+    result: result.result?.find(
+      obj => obj.versionHash === key?.versionHash
+    ) as OpVersionSchema | null,
+  };
 };
 
-const useOpVersions = (
-  entity: string,
-  project: string,
-  filter: OpVersionFilter,
-  limit?: number,
-  opts?: {skip?: boolean}
-): Loadable<OpVersionSchema[]> => {
-  throw new Error('Not implemented');
-};
+const useOpVersions = makeTraceServerEndpointHook<
+  'objsQuery',
+  [string, string, OpVersionFilter, number?, {skip?: boolean}?],
+  OpVersionSchema[]
+>(
+  'objsQuery',
+  (
+    entity: string,
+    project: string,
+    filter: OpVersionFilter,
+    limit?: number,
+    opts?: {skip?: boolean}
+  ) => ({
+    params: {
+      project_id: projectIdFromParts({entity, project}),
+      // entity,
+      // project,
+      filter: {
+        object_ids: filter.opIds,
+        latest_only: filter.latestOnly,
+        is_op: true,
+      },
+    },
+    skip: opts?.skip,
+  }),
+  (res): OpVersionSchema[] =>
+    res.objs.map(obj => {
+      const [entity, project] = obj.project_id.split('/');
+      return {
+        entity,
+        project,
+        opId: obj.object_id,
+        versionHash: obj.digest,
+        name: obj.object_id,
+        path: 'obj',
+        createdAtMs: convertISOToDate(obj.created_at).getTime(),
+        versionIndex: obj.version_index,
+        value: obj.val,
+      };
+    })
+);
+
+const useFileContent = makeTraceServerEndpointHook<
+  'fileContent',
+  [string, string, string, {skip?: boolean}?],
+  string
+>(
+  'fileContent',
+  (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => ({
+    params: {
+      project_id: projectIdFromParts({entity, project}),
+      digest,
+    },
+    skip: opts?.skip,
+  }),
+  res => res.content
+);
 
 const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
-  throw new Error('Not implemented');
+  const cached = useMemo(() => {
+    if (key == null) {
+      return null;
+    }
+    return objectVersionCache.get(key);
+  }, [key]);
+  const result = useRootObjectVersions(
+    key?.entity ?? '',
+    key?.project ?? '',
+    {
+      objectIds: [key?.objectId ?? ''],
+    },
+    undefined,
+    {
+      skip: key == null || cached != null,
+    }
+  );
+  return useMemo(() => {
+    if (key == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+    if (cached != null) {
+      return {
+        loading: false,
+        result: cached,
+      };
+    }
+    if (result.loading || result.result == null) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+    const found = result.result.find(
+      obj => obj.versionHash === key?.versionHash
+    );
+    if (!found) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+    const cachableResult = {
+      ...key,
+      ...found,
+    } as ObjectVersionSchema;
+    objectVersionCache.set(key, cachableResult);
+    return {
+      loading: result.loading,
+      result: cachableResult,
+    };
+  }, [cached, key, result.loading, result.result]);
 };
 
-const useRootObjectVersions = (
-  entity: string,
-  project: string,
-  filter: ObjectVersionFilter,
-  limit?: number,
-  opts?: {skip?: boolean}
-): Loadable<ObjectVersionSchema[]> => {
-  throw new Error('Not implemented');
-};
+const useRootObjectVersions = makeTraceServerEndpointHook(
+  'objsQuery',
+  (
+    entity: string,
+    project: string,
+    filter: ObjectVersionFilter,
+    limit?: number,
+    opts?: {skip?: boolean}
+  ) => ({
+    params: {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        base_object_classes: filter.baseObjectClasses,
+        object_ids: filter.objectIds,
+        latest_only: filter.latestOnly,
+        is_op: false,
+      },
+    },
+    skip: opts?.skip,
+  }),
+  (
+    res,
+    inputEntity,
+    inputProject,
+    filter,
+    limit,
+    opts
+  ): ObjectVersionSchema[] =>
+    res.objs.map(obj => {
+      const [entity, project] = obj.project_id.split('/');
+      return {
+        scheme: 'weave' as const,
+        entity,
+        project,
+        weaveKind: 'object' as const,
+        objectId: obj.object_id,
+        versionHash: obj.digest,
+        name: obj.object_id,
+        path: 'obj',
+        createdAtMs: convertISOToDate(obj.created_at).getTime(),
+        baseObjectClass: obj.base_object_class ?? null,
+        versionIndex: obj.version_index,
+        val: obj.val,
+      };
+    })
+);
+
+const useRefsReadBatch = makeTraceServerEndpointHook<
+  'readBatch',
+  [string[], {skip?: boolean}?],
+  any[]
+>(
+  'readBatch',
+  (refs: string[], opts?: {skip?: boolean}) => ({
+    params: {
+      refs,
+    },
+    skip: opts?.skip,
+  }),
+  res => res.vals
+);
+
+const useTableQuery = makeTraceServerEndpointHook<
+  'tableQuery',
+  [
+    string,
+    string,
+    traceServerClient.TraceTableQueryReq['filter'],
+    traceServerClient.TraceTableQueryReq['limit'],
+    {skip?: boolean}?
+  ],
+  any[]
+>(
+  'tableQuery',
+  (
+    projectId: traceServerClient.TraceTableQueryReq['project_id'],
+    digest: traceServerClient.TraceTableQueryReq['digest'],
+    filter: traceServerClient.TraceTableQueryReq['filter'],
+    limit: traceServerClient.TraceTableQueryReq['limit'],
+    opts?: {skip?: boolean}
+  ) => ({
+    params: {
+      project_id: projectId,
+      digest,
+      filter,
+      limit,
+    },
+    skip: opts?.skip,
+  }),
+  res => res.rows
+);
 
 const useChildCallsForCompare = (
   entity: string,
@@ -288,7 +576,109 @@ const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
-  throw new Error('Not implemented');
+  const [nonTableRefUris, tableRefUris] = useMemo(() => {
+    const sUris: string[] = [];
+    const tUris: string[] = [];
+    refUris
+      .map(uri => ({uri, ref: refUriToObjectVersionKey(uri)}))
+      .forEach(({uri, ref}, ndx) => {
+        if (ref.scheme === 'weave' && ref.weaveKind === 'table') {
+          tUris.push(uri);
+        } else {
+          sUris.push(uri);
+        }
+      });
+    return [sUris, tUris];
+  }, [refUris]);
+
+  const [neededSimpleUris, cachedSimpleUriResults] = useMemo(() => {
+    const needed: string[] = [];
+    const cached: Record<string, any> = {};
+    nonTableRefUris.forEach(sUri => {
+      const res = refDataCache.get(sUri);
+      if (res == null) {
+        needed.push(sUri);
+      } else {
+        cached[sUri] = res;
+      }
+    });
+    return [needed, cached];
+  }, [nonTableRefUris]);
+
+  const simpleValsResult = useRefsReadBatch(neededSimpleUris, {
+    skip: neededSimpleUris.length === 0,
+  });
+  let tableUriProjectId = '';
+  let tableUriDigest = '';
+  if (tableRefUris.length > 1) {
+    throw new Error('Multiple table refs not supported');
+  } else if (tableRefUris.length === 1) {
+    const tableRef = refUriToObjectVersionKey(tableRefUris[0]);
+    tableUriProjectId = tableRef.entity + '/' + tableRef.project;
+    // console.log(tableUris[0].ref)
+    tableUriDigest = tableRef.objectId;
+  }
+  const tableQueryFilter = useMemo(() => {
+    // TODO: tableQuery
+    return {};
+  }, []);
+  const tableValsResult = useTableQuery(
+    tableUriProjectId,
+    tableUriDigest,
+    tableQueryFilter,
+    tableQuery?.limit,
+    {skip: tableRefUris.length === 0}
+  );
+  // console.log(tableValsResult);
+  return useMemo(() => {
+    if (refUris.length === 0) {
+      return {
+        loading: false,
+        result: [],
+        error: null,
+      };
+    }
+    if (simpleValsResult.loading || tableValsResult.loading) {
+      return {
+        loading: true,
+        result: null,
+        error: null,
+      };
+    }
+    const sRes = simpleValsResult.result;
+    const tRes = tableValsResult.result;
+
+    const valueMap = new Map<string, any>();
+    if (sRes != null) {
+      sRes.forEach((val, i) => {
+        valueMap.set(neededSimpleUris[i], val);
+        refDataCache.set(neededSimpleUris[i], val);
+      });
+    }
+    if (tRes != null) {
+      valueMap.set(tableRefUris[0], tRes);
+      // Don't cache table results (since there could be a filter)
+    }
+    Object.entries(cachedSimpleUriResults).forEach(([uri, val]) => {
+      valueMap.set(uri, val);
+    });
+    const valsResult = refUris.map(uri => valueMap.get(uri));
+
+    return {
+      loading: false,
+      result: valsResult,
+      error: null,
+    };
+  }, [
+    refUris,
+    simpleValsResult.loading,
+    simpleValsResult.result,
+    tableValsResult.loading,
+    tableValsResult.result,
+    cachedSimpleUriResults,
+    neededSimpleUris,
+    tableRefUris,
+  ]);
 };
 
 const useApplyMutationsToRef = (): ((
@@ -299,11 +689,163 @@ const useApplyMutationsToRef = (): ((
 };
 
 const useGetRefsType = (): ((refUris: string[]) => Promise<Types.Type[]>) => {
-  throw new Error('Not implemented');
+  const readBatch = useMakeTraceServerEndpoint(
+    'readBatch',
+    (refs: string[]) => ({
+      refs,
+    }),
+    (res): any[] => res.vals
+  );
+  return async (refUris: string[]) => {
+    if (refUris.length === 0) {
+      return [];
+    }
+    const needed: string[] = [];
+    const refToData: Record<string, any> = {};
+    refUris.forEach(uri => {
+      const res = refDataCache.get(uri);
+      if (res == null) {
+        needed.push(uri);
+      } else {
+        refToData[uri] = res;
+      }
+    });
+    if (needed.length !== 0) {
+      const readBatchResults = await readBatch(refUris);
+      readBatchResults.forEach((res, i) => {
+        refToData[needed[i]] = res;
+        refDataCache.set(needed[i], res);
+      });
+    }
+    return refUris.map(uri => weaveTypeOf(refToData[uri]));
+  };
+};
+
+const useCodeForOpRef = (opVersionRef: string): Loadable<string> => {
+  const query = useRefsData([opVersionRef]);
+  const fileSpec = useMemo(() => {
+    if (query.result == null) {
+      return null;
+    }
+    const result = query.result[0];
+    const ref = parseRef(opVersionRef);
+    if (isWeaveObjectRef(ref)) {
+      return {
+        digest: result.files['obj.py'],
+        entity: ref.entityName,
+        project: ref.projectName,
+      };
+    }
+    return null;
+  }, [opVersionRef, query.result]);
+  const text = useFileContent(
+    fileSpec?.entity ?? '',
+    fileSpec?.project ?? '',
+    fileSpec?.digest ?? '',
+    {skip: fileSpec == null}
+  );
+  return text;
+};
+
+const mergeTypes = (a: Types.Type, b: Types.Type): Types.Type => {
+  // TODO: this should match the python merge_types implementation.
+  if (_.isEqual(a, b)) {
+    return a;
+  }
+  if (isSimpleTypeShape(a) && isSimpleTypeShape(b)) {
+    if (a === b) {
+      return a;
+    } else {
+      return union([a, b]);
+    }
+  }
+  if (!isSimpleTypeShape(a) && !isSimpleTypeShape(b)) {
+    if (a.type === 'typedDict' && b.type === 'typedDict') {
+      const allKeysDict = Object.assign({}, a.propertyTypes, b.propertyTypes);
+      const nextPropTypes = _.mapValues(allKeysDict, (value, key) => {
+        const selfPropType = a.propertyTypes[key] ?? 'none';
+        const otherPropType = b.propertyTypes[key] ?? 'none';
+        return mergeTypes(selfPropType, otherPropType);
+      });
+      return {
+        type: 'typedDict',
+        propertyTypes: nextPropTypes,
+      };
+    } else if (a.type === 'list' && b.type === 'list') {
+      return {
+        type: 'list',
+        objectType: mergeTypes(a.objectType, b.objectType),
+      };
+    } else {
+      // This gets very noisy, so commenting out for now.
+      // console.warn('unhandled type merge ' + a.type + ' ' + b.type);
+    }
+  }
+  return union([a, b]);
+};
+
+const mergeAllTypes = (types: Types.Type[]): Types.Type => {
+  return types.reduce(mergeTypes);
+};
+
+const weaveTypeOf = (o: any): Types.Type => {
+  if (o == null) {
+    return 'none';
+  } else if (_.isArray(o)) {
+    return {
+      type: 'list',
+      objectType:
+        o.length === 0 ? 'unknown' : mergeAllTypes(o.map(weaveTypeOf)),
+    };
+  } else if (_.isObject(o)) {
+    if ('_type' in o) {
+      return {
+        type: (o as any)._type,
+        _base_type: {type: 'Object'},
+        _is_object: true,
+        ..._.mapValues(_.omit(o, ['_type']), weaveTypeOf),
+      } as any;
+    } else {
+      return {
+        type: 'typedDict',
+        propertyTypes: _.mapValues(o, weaveTypeOf),
+      } as any;
+    }
+  } else if (_.isString(o)) {
+    if (o.startsWith(WANDB_ARTIFACT_REF_PREFIX)) {
+      return {
+        type: 'WandbArtifactRef',
+      };
+    } else if (o.startsWith(WEAVE_REF_PREFIX)) {
+      return {type: 'Ref'};
+    }
+    return 'string';
+  } else if (_.isNumber(o)) {
+    return 'number'; // TODO
+  } else if (_.isBoolean(o)) {
+    return 'boolean';
+  }
+  throw new Error('Type conversion not implemeneted for value: ' + o);
 };
 
 const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
-  throw new Error('Not implemented');
+  const dataResult = useRefsData(refUris);
+  const finalRes = useMemo(() => {
+    if (!dataResult.loading) {
+      return {
+        loading: false,
+        result: dataResult.result?.map(weaveTypeOf) ?? [],
+        error: null,
+      };
+    } else {
+      return {
+        loading: true,
+        result: null,
+        error: null,
+      };
+    }
+  }, [dataResult.loading, dataResult.result]);
+  return finalRes;
 };
 
 /// Converters ///
@@ -311,14 +853,14 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 const traceCallToLegacySpan = (
   traceCall: traceServerClient.TraceCallSchema
 ): RawSpanFromStreamTableEra => {
-  const startDate = convertISOToDate(traceCall.start_datetime);
-  const endDate = traceCall.end_datetime
-    ? convertISOToDate(traceCall.end_datetime)
+  const startDate = convertISOToDate(traceCall.started_at);
+  const endDate = traceCall.ended_at
+    ? convertISOToDate(traceCall.ended_at)
     : null;
   let statusCode = 'UNSET';
   if (traceCall.exception) {
     statusCode = 'ERROR';
-  } else if (traceCall.end_datetime) {
+  } else if (traceCall.ended_at) {
     statusCode = 'SUCCESS';
   }
   let latencyS = 0;
@@ -329,10 +871,31 @@ const traceCallToLegacySpan = (
     latency_s: latencyS,
     ...(traceCall.summary ?? {}),
   };
+
+  // This is a very specific hack to make sure that the output is always an
+  // object. After the clickhouse migration, we no longer have this constraint.
+  // Before, if the output was a simple type, it would be wrapped in an object
+  // with the key '_result'. The rest of the codebase expects this, so we're
+  // keeping it for now. However, this is causing some weirdness in the UI so we
+  // should remove it soon. When we do that, we can also remove this hack.
+  const unknownOutput = traceCall.output;
+  let output: {[key: string]: any};
+  if (
+    typeof unknownOutput === 'object' &&
+    unknownOutput !== null &&
+    !Array.isArray(unknownOutput)
+  ) {
+    // If the output is already an object, we don't need to do anything.
+    output = unknownOutput as {[key: string]: any};
+  } else {
+    // If the output is a simple type, we wrap it in an object with the key
+    // '_result'.
+    output = {_result: unknownOutput as any};
+  }
   return {
-    name: traceCall.name,
+    name: traceCall.op_name,
     inputs: traceCall.inputs,
-    output: traceCall.outputs,
+    output,
     status_code: statusCode,
     exception: traceCall.exception,
     attributes: traceCall.attributes,
@@ -361,12 +924,16 @@ const traceCallToUICallSchema = (
     callId: traceCall.id,
     traceId: traceCall.trace_id,
     parentId: traceCall.parent_id ?? null,
-    spanName: traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
-      ? refUriToOpVersionKey(traceCall.name).opId
-      : traceCall.name,
-    opVersionRef: traceCall.name.startsWith(WANDB_ARTIFACT_REF_PREFIX)
-      ? traceCall.name
-      : null,
+    spanName:
+      traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+        ? refUriToOpVersionKey(traceCall.op_name).opId
+        : traceCall.op_name,
+    opVersionRef:
+      traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
+      traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
+        ? traceCall.op_name
+        : null,
     rawSpan: traceCallToLegacySpan(traceCall),
     rawFeedback: {},
     userId: traceCall.wb_user_id ?? null,
@@ -391,9 +958,11 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useRootObjectVersions,
   useRefsData,
   useApplyMutationsToRef,
+  useFileContent,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,
     useRefsType,
+    useCodeForOpRef,
   },
 };

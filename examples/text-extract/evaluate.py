@@ -32,7 +32,7 @@ class TextExtractModel(weave.Model):
 
 
 def main():
-    weave.init("wfch-text-extract6")
+    weave.init("chobj-text-extract1")
 
     dataset_rows = []
     raw_labels = json.load(open(os.path.join("example_data", "labels.json")))
@@ -49,6 +49,7 @@ def main():
         model_name="gpt-4",
         prompt_template='Extract fields ("name": <str>, "shares": <int>) from the following text, as json: {doc}',
     )
+    # asyncio.run(eval.predict_and_score(dataset_rows[0], model))
 
     asyncio.run(eval.evaluate(model))
 

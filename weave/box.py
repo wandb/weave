@@ -72,7 +72,7 @@ class BoxedDict(dict):
         assert len(path) > 1
         edge_type = path[0]
         edge_path = path[1]
-        assert edge_type == ref_util.DICT_KEY_EDGE_TYPE
+        assert edge_type == ref_util.DICT_KEY_EDGE_NAME
 
         res = self[edge_path]
         remaining_path = path[2:]
@@ -83,7 +83,7 @@ class BoxedDict(dict):
     def __getitem__(self, __key: typing.Any) -> typing.Any:
         val = super().__getitem__(__key)
         return ref_util.val_with_relative_ref(
-            self, val, [ref_util.DICT_KEY_EDGE_TYPE, str(__key)]
+            self, val, [ref_util.DICT_KEY_EDGE_NAME, str(__key)]
         )
 
 
@@ -92,7 +92,7 @@ class BoxedList(list):
         assert len(path) > 1
         edge_type = path[0]
         edge_path = path[1]
-        assert edge_type == ref_util.LIST_INDEX_EDGE_TYPE
+        assert edge_type == ref_util.LIST_INDEX_EDGE_NAME
 
         res = self[int(edge_path)]
         remaining_path = path[2:]
@@ -109,7 +109,7 @@ class BoxedList(list):
     def __getitem__(self, __index: typing.Any) -> typing.Any:
         val = super().__getitem__(__index)
         return ref_util.val_with_relative_ref(
-            self, val, [ref_util.LIST_INDEX_EDGE_TYPE, str(__index)]
+            self, val, [ref_util.LIST_INDEX_EDGE_NAME, str(__index)]
         )
 
 

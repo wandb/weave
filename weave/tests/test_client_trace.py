@@ -1,144 +1,183 @@
+import dataclasses
+from collections import namedtuple
 import datetime
 import os
 import typing
+import pytest
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import wandb
 import weave
+from weave import weave_client
+from weave.trace.vals import MissingSelfInstanceError, TraceObject
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
     generate_id,
 )
 from ..trace_server import trace_server_interface as tsi
-from ..trace_server.graph_client_trace import GraphClientTrace
+
+pytestmark = pytest.mark.trace
 
 
-def test_simple_op(trace_client):
+## Hacky interface compatibility helpers
+
+ClientType = weave_client.WeaveClient
+
+
+def get_client_trace_server(
+    client: weave_client.WeaveClient,
+) -> tsi.TraceServerInterface:
+    return client.server
+
+
+def get_client_project_id(client: weave_client.WeaveClient) -> str:
+    return client._project_id()
+
+
+## End hacky interface compatibility helpers
+
+
+def test_simple_op(client):
     @weave.op()
     def my_op(a: int) -> int:
         return a + 1
 
     assert my_op(5) == 6
 
-    op_ref = weave.obj_ref(my_op)
-    assert trace_client.ref_is_own(op_ref)
-    got_op = weave.storage.get(str(op_ref))
+    op_ref = weave_client.get_ref(my_op)
+    # assert client.ref_is_own(op_ref)
+    got_op = client.get(op_ref)
 
-    runs = trace_client.runs()
-    assert len(runs) == 1
-    fetched_call = runs[0]._call
-    assert (
-        fetched_call.name
-        == f"{TRACE_REF_SCHEME}:///{trace_client.entity}/{trace_client.project}/op/op-my_op:873a064f5e172ac4dfd1b869028d749b"
+    calls = list(client.calls())
+    assert len(calls) == 1
+    fetched_call = calls[0]
+    digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
+    expected_name = (
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
-    assert fetched_call == tsi.CallSchema(
-        project_id=f"{trace_client.entity}/{trace_client.project}",
-        id=fetched_call.id,
-        name=fetched_call.name,
+    assert fetched_call == weave_client.Call(
+        op_name=expected_name,
+        project_id=f"{client.entity}/{client.project}",
         trace_id=fetched_call.trace_id,
         parent_id=None,
-        start_datetime=fetched_call.start_datetime,
-        end_datetime=fetched_call.end_datetime,
+        id=fetched_call.id,
+        inputs={"a": 5},
         exception=None,
-        attributes={},
-        inputs={"a": 5, "_keys": ["a"]},
-        outputs={"_result": 6, "_keys": ["_result"]},
+        output=6,
         summary={},
     )
 
 
-def test_dataset(trace_client):
-    from weave.weaveflow import Dataset
+def test_dataset(client):
+    from weave.flow.dataset import Dataset
 
-    d = Dataset([{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
-    d2 = weave.storage.get(str(ref))
-    assert d2.rows == d2.rows
+    d2 = weave.ref(ref.uri()).get()
+    assert list(d2.rows) == list(d2.rows)
 
 
-def test_trace_server_call_start_and_end(clickhouse_trace_server):
+def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
-        project_id="test_entity/test_project",
+        project_id=client._project_id(),
         id=call_id,
-        name="test_name",
+        op_name="test_name",
         trace_id="test_trace_id",
         parent_id="test_parent_id",
-        start_datetime=datetime.datetime.now(tz=datetime.timezone.utc)
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
         attributes={"a": 5},
         inputs={"b": 5},
     )
-    clickhouse_trace_server.call_start(tsi.CallStartReq(start=start))
+    client.server.call_start(tsi.CallStartReq(start=start))
 
-    res = clickhouse_trace_server.call_read(
+    res = client.server.call_read(
         tsi.CallReadReq(
-            project_id="test_entity/test_project",
+            project_id=client._project_id(),
             id=call_id,
         )
     )
 
-    exp_start_datetime = datetime.datetime.fromisoformat(
-        start.start_datetime.isoformat(timespec="milliseconds")
+    exp_started_at = datetime.datetime.fromisoformat(
+        start.started_at.isoformat(timespec="milliseconds")
     )
 
+    class FuzzyDateTimeMatcher:
+        def __init__(self, dt):
+            self.dt = dt
+
+        def __eq__(self, other):
+            # Checks within 1ms
+            return abs((self.dt - other).total_seconds()) < 0.001
+
+    class MaybeStringMatcher:
+        def __init__(self, s):
+            self.s = s
+
+        def __eq__(self, other):
+            if other is None:
+                return True
+            return self.s == other
+
     assert res.call.model_dump() == {
-        "project_id": "test_entity/test_project",
+        "project_id": client._project_id(),
         "id": call_id,
-        "name": "test_name",
+        "op_name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
-        "start_datetime": exp_start_datetime,
-        "end_datetime": None,
+        "started_at": FuzzyDateTimeMatcher(start.started_at),
+        "ended_at": None,
         "exception": None,
-        "attributes": {"_keys": ["a"], "a": 5},
-        "inputs": {"_keys": ["b"], "b": 5},
-        "outputs": None,
+        "attributes": {"a": 5},
+        "inputs": {"b": 5},
+        "output": None,
         "summary": None,
-        "wb_user_id": None,
+        "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
-        project_id="test_entity/test_project",
+        project_id=client._project_id(),
         id=call_id,
-        end_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
-        outputs={"d": 5},
+        output={"d": 5},
     )
-    clickhouse_trace_server.call_end(tsi.CallEndReq(end=end))
+    client.server.call_end(tsi.CallEndReq(end=end))
 
-    res = clickhouse_trace_server.call_read(
+    res = client.server.call_read(
         tsi.CallReadReq(
-            project_id="test_entity/test_project",
+            project_id=client._project_id(),
             id=call_id,
         )
     )
 
-    exp_end_datetime = datetime.datetime.fromisoformat(
-        end.end_datetime.isoformat(timespec="milliseconds")
+    exp_ended_at = datetime.datetime.fromisoformat(
+        end.ended_at.isoformat(timespec="milliseconds")
     )
 
     assert res.call.model_dump() == {
-        "project_id": "test_entity/test_project",
+        "project_id": client._project_id(),
         "id": call_id,
-        "name": "test_name",
+        "op_name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
-        "start_datetime": exp_start_datetime,
-        "end_datetime": exp_end_datetime,
+        "started_at": FuzzyDateTimeMatcher(start.started_at),
+        "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
-        "attributes": {"_keys": ["a"], "a": 5},
-        "inputs": {"_keys": ["b"], "b": 5},
-        "outputs": {"_keys": ["d"], "d": 5},
-        "summary": {"_keys": ["c"], "c": 5},
-        "wb_user_id": None,
+        "attributes": {"a": 5},
+        "inputs": {"b": 5},
+        "output": {"d": 5},
+        "summary": {"c": 5},
+        "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
     }
 
 
-def test_graph_call_ordering(trace_client):
+def test_graph_call_ordering(client):
     @weave.op()
     def my_op(a: int) -> int:
         return a + 1
@@ -146,11 +185,11 @@ def test_graph_call_ordering(trace_client):
     for i in range(10):
         my_op(i)
 
-    runs = trace_client.runs()
-    assert len(runs) == 10
+    calls = list(client.calls())
+    assert len(calls) == 10
 
     # We want to preserve insert order
-    assert [run._call.inputs["a"] for run in runs] == list(range(10))
+    assert [call.inputs["a"] for call in calls] == list(range(10))
 
 
 class OpCallSummary(BaseModel):
@@ -165,34 +204,39 @@ class OpCallSpec(BaseModel):
     run_calls: int
 
 
-def simple_line_call_bootstrap() -> OpCallSpec:
-    @weave.type()
-    class Number:
+def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
+    # @weave.type()
+    # class Number:
+    #     value: int
+
+    class Number(BaseModel):
         value: int
 
     @weave.op()
     def adder(a: Number) -> Number:
-        return Number(a.value + a.value)
+        return Number(value=a.value + a.value)
 
     adder_v0 = adder
 
     @weave.op()
     def adder(a: Number, b) -> Number:
-        return Number(a.value + b)
+        return Number(value=a.value + b)
 
     @weave.op()
     def subtractor(a: Number, b) -> Number:
-        return Number(a.value - b)
+        return Number(value=a.value - b)
 
     @weave.op()
     def multiplier(
         a: Number, b
-    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> (
+        int
+    ):  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
     def liner(m: Number, b, x) -> Number:
-        return adder(Number(multiplier(m, x)), b)
+        return adder(Number(value=multiplier(m, x)), b)
 
     result: typing.Dict[str, OpCallSummary] = {}
     result["adder_v0"] = OpCallSummary(op=adder_v0)
@@ -205,34 +249,36 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     # Call each op a distinct number of time (allows for easier assertions later)
     num_calls = 1
     for i in range(num_calls):
-        adder_v0(Number(i))
+        adder_v0(Number(value=i))
     result["adder_v0"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 2
     for i in range(num_calls):
-        adder(Number(i), i)
+        adder(Number(value=i), i)
     result["adder"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 3
     for i in range(num_calls):
-        subtractor(Number(i), i)
+        subtractor(Number(value=i), i)
     result["subtractor"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 4
     for i in range(num_calls):
-        multiplier(Number(i), i)
+        multiplier(Number(value=i), i)
     result["multiplier"].num_calls += num_calls
     root_calls += num_calls
 
     num_calls = 5
     run_calls = 0
-    run = wandb.init()
+    if init_wandb:
+        run = wandb.init()
     for i in range(num_calls):
-        liner(Number(i), i, i)
-    run.finish()
+        liner(Number(value=i), i, i)
+    if init_wandb:
+        run.finish()
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls
@@ -250,10 +296,10 @@ def simple_line_call_bootstrap() -> OpCallSpec:
 
 
 def ref_str(op):
-    return str(weave.obj_ref(op))
+    return weave_client.get_ref(op).uri()
 
 
-def test_trace_call_query_filter_op_version_refs(trace_client):
+def test_trace_call_query_filter_op_version_refs(client):
     call_spec = simple_line_call_bootstrap()
     call_summaries = call_spec.call_summaries
 
@@ -261,51 +307,54 @@ def test_trace_call_query_filter_op_version_refs(trace_client):
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
     assert ref_str(call_summaries["adder"].op).startswith(
-        f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:"
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder:"
     )
-    wildcard_adder_ref_str = (
-        f"wandb-trace:///{trace_client.entity}/{trace_client.project}/op/op-adder:*/obj"
-    )
+    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
 
-    for op_version_refs, exp_count in [
-        # Test the None case
-        (None, call_spec.total_calls),
-        # Test the empty list case
-        ([], call_spec.total_calls),
-        # Base case of most recent version of adder
-        ([ref_str(call_summaries["adder"].op)], call_summaries["adder"].num_calls),
-        # Base case of non-recent version of adder
-        (
-            [ref_str(call_summaries["adder_v0"].op)],
-            call_summaries["adder_v0"].num_calls,
-        ),
-        # more than one op
-        (
-            [
-                ref_str(call_summaries["adder"].op),
-                ref_str(call_summaries["subtractor"].op),
-            ],
-            call_summaries["adder"].num_calls + call_summaries["subtractor"].num_calls,
-        ),
-        # Test the wildcard case
-        (
-            [wildcard_adder_ref_str],
-            call_summaries["adder"].num_calls + call_summaries["adder_v0"].num_calls,
-        ),
-        # Test the wildcard case and specific case
-        (
-            [wildcard_adder_ref_str, ref_str(call_summaries["subtractor"].op)],
-            call_summaries["adder"].num_calls
-            + call_summaries["adder_v0"].num_calls
-            + call_summaries["subtractor"].num_calls,
-        ),
-    ]:
-        res = trace_client.trace_server.calls_query(
+    for i, (op_version_refs, exp_count) in enumerate(
+        [
+            # Test the None case
+            (None, call_spec.total_calls),
+            # Test the empty list case
+            ([], call_spec.total_calls),
+            # Base case of most recent version of adder
+            ([ref_str(call_summaries["adder"].op)], call_summaries["adder"].num_calls),
+            # Base case of non-recent version of adder
+            (
+                [ref_str(call_summaries["adder_v0"].op)],
+                call_summaries["adder_v0"].num_calls,
+            ),
+            # more than one op
+            (
+                [
+                    ref_str(call_summaries["adder"].op),
+                    ref_str(call_summaries["subtractor"].op),
+                ],
+                call_summaries["adder"].num_calls
+                + call_summaries["subtractor"].num_calls,
+            ),
+            # Test the wildcard case
+            (
+                [wildcard_adder_ref_str],
+                call_summaries["adder"].num_calls
+                + call_summaries["adder_v0"].num_calls,
+            ),
+            # Test the wildcard case and specific case
+            (
+                [wildcard_adder_ref_str, ref_str(call_summaries["subtractor"].op)],
+                call_summaries["adder"].num_calls
+                + call_summaries["adder_v0"].num_calls
+                + call_summaries["subtractor"].num_calls,
+            ),
+        ]
+    ):
+        res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
-                filter=tsi._CallsFilter(op_version_refs=op_version_refs),
+                project_id=get_client_project_id(client),
+                filter=tsi._CallsFilter(op_names=op_version_refs),
             )
         )
+        print(f"TEST CASE [{i}]", op_version_refs, exp_count)
 
         assert len(res.calls) == exp_count
 
@@ -319,29 +368,25 @@ def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
 
 
 def get_all_calls_asserting_finished(
-    trace_client: GraphClientTrace, call_spec: OpCallSpec
+    client: ClientType, call_spec: OpCallSpec
 ) -> tsi.CallsQueryRes:
-    res = trace_client.trace_server.calls_query(
+    res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
-            project_id=trace_client.project_id(),
+            project_id=get_client_project_id(client),
         )
     )
     assert len(res.calls) == call_spec.total_calls
-    assert all([call.end_datetime for call in res.calls])
+    assert all([call.ended_at for call in res.calls])
     return res
 
 
-def test_trace_call_query_filter_input_object_version_refs(trace_client):
+def test_trace_call_query_filter_input_object_version_refs(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     input_object_version_refs = unique_vals(
-        [
-            ref
-            for call in res.calls
-            for ref in extract_refs_from_values(call.inputs.values())
-        ]
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
     )
     assert len(input_object_version_refs) > 3
 
@@ -358,7 +403,7 @@ def test_trace_call_query_filter_input_object_version_refs(trace_client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs.values()),
+                        extract_refs_from_values(call.inputs),
                         input_object_version_refs[:1],
                     )
                 ]
@@ -372,36 +417,30 @@ def test_trace_call_query_filter_input_object_version_refs(trace_client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs.values()),
+                        extract_refs_from_values(call.inputs),
                         input_object_version_refs[:3],
                     )
                 ]
             ),
         ),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
-                filter=tsi._CallsFilter(
-                    input_object_version_refs=input_object_version_refs
-                ),
+                project_id=get_client_project_id(client),
+                filter=tsi._CallsFilter(input_refs=input_object_version_refs),
             )
         )
 
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_output_object_version_refs(trace_client):
+def test_trace_call_query_filter_output_object_version_refs(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     output_object_version_refs = unique_vals(
-        [
-            ref
-            for call in res.calls
-            for ref in extract_refs_from_values(call.outputs.values())
-        ]
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
     )
     assert len(output_object_version_refs) > 3
 
@@ -418,7 +457,7 @@ def test_trace_call_query_filter_output_object_version_refs(trace_client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.outputs.values()),
+                        extract_refs_from_values(call.output),
                         output_object_version_refs[:1],
                     )
                 ]
@@ -432,29 +471,27 @@ def test_trace_call_query_filter_output_object_version_refs(trace_client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.outputs.values()),
+                        extract_refs_from_values(call.output),
                         output_object_version_refs[:3],
                     )
                 ]
             ),
         ),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
-                filter=tsi._CallsFilter(
-                    output_object_version_refs=output_object_version_refs
-                ),
+                project_id=get_client_project_id(client),
+                filter=tsi._CallsFilter(output_refs=output_object_version_refs),
             )
         )
 
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_parent_ids(trace_client):
+def test_trace_call_query_filter_parent_ids(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     parent_ids = unique_vals(
         [call.parent_id for call in res.calls if call.parent_id is not None]
@@ -477,9 +514,9 @@ def test_trace_call_query_filter_parent_ids(trace_client):
             len([call for call in res.calls if call.parent_id in parent_ids[:3]]),
         ),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(parent_ids=parent_ids),
             )
         )
@@ -487,10 +524,10 @@ def test_trace_call_query_filter_parent_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_trace_ids(trace_client):
+def test_trace_call_query_filter_trace_ids(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     trace_ids = [call.trace_id for call in res.calls]
 
@@ -504,9 +541,9 @@ def test_trace_call_query_filter_trace_ids(trace_client):
         # Test multiple
         (trace_ids[:3], 3),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(trace_ids=trace_ids),
             )
         )
@@ -514,10 +551,10 @@ def test_trace_call_query_filter_trace_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_call_ids(trace_client):
+def test_trace_call_query_filter_call_ids(client):
     call_spec = simple_line_call_bootstrap()
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     call_ids = [call.id for call in res.calls]
 
@@ -531,9 +568,9 @@ def test_trace_call_query_filter_call_ids(trace_client):
         # Test multiple
         (call_ids[:3], 3),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(call_ids=call_ids),
             )
         )
@@ -541,7 +578,7 @@ def test_trace_call_query_filter_call_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_trace_roots_only(trace_client):
+def test_trace_call_query_filter_trace_roots_only(client):
     call_spec = simple_line_call_bootstrap()
 
     for trace_roots_only, exp_count in [
@@ -552,9 +589,9 @@ def test_trace_call_query_filter_trace_roots_only(trace_client):
         # Test the False
         (False, call_spec.total_calls),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(trace_roots_only=trace_roots_only),
             )
         )
@@ -562,10 +599,11 @@ def test_trace_call_query_filter_trace_roots_only(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_run_ids(trace_client):
-    call_spec = simple_line_call_bootstrap()
+@pytest.mark.skip("too slow")
+def test_trace_call_query_filter_wb_run_ids(client, user_by_api_key_in_env):
+    call_spec = simple_line_call_bootstrap(init_wandb=True)
 
-    res = get_all_calls_asserting_finished(trace_client, call_spec)
+    res = get_all_calls_asserting_finished(client, call_spec)
 
     wb_run_ids = list(set([call.wb_run_id for call in res.calls]) - set([None]))
 
@@ -577,9 +615,9 @@ def test_trace_call_query_filter_wb_run_ids(trace_client):
         # Test List (of 1)
         (wb_run_ids, call_spec.run_calls),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(client),
                 filter=tsi._CallsFilter(wb_run_ids=wb_run_ids),
             )
         )
@@ -587,22 +625,397 @@ def test_trace_call_query_filter_wb_run_ids(trace_client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_limit(trace_client):
+def test_trace_call_query_limit(client):
     call_spec = simple_line_call_bootstrap()
 
     for limit, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
-        # Test the True
+        # Test limit of 1
         (1, 1),
-        # Test the False
+        # Test limit of 10
         (10, 10),
     ]:
-        inner_res = trace_client.trace_server.calls_query(
+        inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
-                project_id=trace_client.project_id(),
+                project_id=get_client_project_id(client),
                 limit=limit,
             )
         )
 
         assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_query_offset(client):
+    call_spec = simple_line_call_bootstrap()
+
+    for offset, exp_count in [
+        # Test the None case
+        (None, call_spec.total_calls),
+        # Test offset of 1
+        (1, call_spec.total_calls - 1),
+        # Test offset of 10
+        (10, call_spec.total_calls - 10),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                offset=offset,
+            )
+        )
+
+        assert len(inner_res.calls) == exp_count
+
+
+def test_ops_with_default_params(client):
+    @weave.op()
+    def op_with_default(a: int, b: int = 10) -> int:
+        return a + b
+
+    assert op_with_default(1) == 11
+    assert op_with_default(1, 5) == 6
+    assert op_with_default(1, b=5) == 6
+    assert op_with_default(a=1) == 11
+    assert op_with_default(a=1, b=5) == 6
+    assert op_with_default(b=5, a=1) == 6
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 6
+    assert inner_res.calls[0].inputs == {"a": 1, "b": 10}
+    assert inner_res.calls[1].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[2].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[3].inputs == {"a": 1, "b": 10}
+    assert inner_res.calls[4].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[5].inputs == {"a": 1, "b": 5}
+
+
+def test_root_type(client):
+    class BaseTypeA(weave.Object):
+        a: int
+
+    class BaseTypeX(weave.Object):
+        x: int
+
+    class BaseTypeB(BaseTypeA):
+        b: int
+
+    class BaseTypeC(BaseTypeB):
+        c: int
+
+    c = BaseTypeC(a=1, b=2, c=3)
+    x = BaseTypeX(x=5)
+
+    ref = weave.publish(x)
+    x2 = weave.ref(ref.uri()).get()
+    assert x2.x == 5
+
+    ref = weave.publish(c)
+    c2 = weave.ref(ref.uri()).get()
+
+    assert c2.a == 1
+    assert c2.b == 2
+    assert c2.c == 3
+
+    inner_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.objs) == 2
+
+    inner_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi._ObjectVersionFilter(
+                base_object_classes=["BaseTypeA"],
+            ),
+        )
+    )
+
+    assert len(inner_res.objs) == 1
+
+
+def test_attributes_on_ops(client):
+    @weave.op()
+    def op_with_attrs(a: int, b: int) -> int:
+        return a + b
+
+    with weave.attributes({"custom": "attribute"}):
+        op_with_attrs(1, 2)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(op_with_attrs)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].attributes == {"custom": "attribute"}
+
+
+def test_dataset_row_type(client):
+    d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[{"a": 1}, "a", "b"])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[{"a": 1}, {}])
+
+
+def test_dataclass_support(client):
+    @dataclasses.dataclass
+    class MyDataclass:
+        val: int
+
+    @weave.op()
+    def dataclass_maker(a: MyDataclass, b: MyDataclass) -> MyDataclass:
+        return MyDataclass(a.val + b.val)
+
+    a = MyDataclass(1)
+    b = MyDataclass(2)
+    act = dataclass_maker(a, b)
+    exp = MyDataclass(3)
+    assert act == exp
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(dataclass_maker)]),
+        )
+    )
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2.val == 3
+
+    assert len(res.calls) == 1
+    assert res.calls[0].inputs == {
+        "a": "weave:///shawn/test-project/object/MyDataclass:qDo5jHFme5xIM1LwgeiXXVxYoGnp4LQ9hulqkX5zunY",
+        "b": "weave:///shawn/test-project/object/MyDataclass:We1slmdrWzi2NYSWObBsLybTTNSP4M9zfQbCMf8rQMc",
+    }
+    assert (
+        res.calls[0].output
+        == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
+    )
+
+
+def test_op_retrieval(client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a + 1
+
+    assert my_op(1) == 2
+    my_op_ref = weave_client.get_ref(my_op)
+    my_op2 = my_op_ref.get()
+    assert my_op2(1) == 2
+
+
+def test_bound_op_retrieval(client):
+    class CustomType(weave.Object):
+        a: int
+
+        @weave.op()
+        def op_with_custom_type(self, v):
+            return self.a + v
+
+    obj = CustomType(a=1)
+    obj_ref = weave.publish(obj)
+    obj2 = obj_ref.get()
+    assert obj2.op_with_custom_type(1) == 2
+
+    my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref.get()
+
+
+@pytest.mark.skip("Not implemented: general bound op designation")
+def test_bound_op_retrieval_no_self(client):
+    class CustomTypeWithoutSelf(weave.Object):
+        a: int
+
+        @weave.op()
+        def op_with_custom_type(me, v):
+            return me.a + v
+
+    obj = CustomTypeWithoutSelf(a=1)
+    obj_ref = weave.publish(obj)
+    obj2 = obj_ref.get()
+    assert obj2.op_with_custom_type(1) == 2
+
+    my_op_ref = weave_client.get_ref(CustomTypeWithoutSelf.op_with_custom_type)
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref.get()
+
+
+def test_dataset_row_ref(client):
+    d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    ref = weave.publish(d)
+    d2 = weave.ref(ref.uri()).get()
+
+    inner = d2.rows[0]["a"]
+    exp_ref = "weave:///shawn/test-project/object/Dataset:aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    assert inner == 5
+    assert inner.ref.uri() == exp_ref
+    gotten = weave.ref(exp_ref).get()
+    assert gotten == 5
+
+
+def test_tuple_support(client):
+    @weave.op()
+    def tuple_maker(a, b):
+        return (a, b)
+
+    act = tuple_maker((1, 2), 3)
+    exp = ((1, 2), 3)
+    assert act == exp
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2 == [[1, 2], 3]
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].output == [[1, 2], 3]
+
+
+def test_namedtuple_support(client):
+    @weave.op()
+    def tuple_maker(a, b):
+        return (a, b)
+
+    Point = namedtuple("Point", ["x", "y"])
+    act = tuple_maker(Point(1, 2), 3)
+    exp = (Point(1, 2), 3)
+    assert act == exp
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2 == [{"x": 1, "y": 2}, 3]
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].output == [{"x": 1, "y": 2}, 3]
+
+
+def test_named_reuse(client):
+    import asyncio
+
+    d = weave.Dataset(rows=[{"x": 1}, {"x": 2}])
+    d_ref = weave.publish(d, "test_dataset")
+    dataset = weave.ref(d_ref.uri()).get()
+
+    @weave.op()
+    async def dummy_score(prediction):
+        return 1
+
+    class SimpleModel(weave.Model):
+        async def predict(self, x):
+            return {"answer": "42"}
+
+    model = SimpleModel()
+
+    evaluation = weave.Evaluation(
+        dataset=dataset,
+        scorers=[dummy_score],
+    )
+    dataset_ref = dataset.ref
+    evaluation_dataset = evaluation.dataset
+    eval_dataset_ref = evaluation_dataset.ref
+    assert dataset_ref == eval_dataset_ref
+    asyncio.run(evaluation.evaluate(model))
+
+    res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._ObjectVersionFilter(
+                is_op=False, latest_only=True, base_object_classes=["Dataset"]
+            ),
+        )
+    )
+
+    # There are a lot of additional assertions that could be made here!
+    print(res.objs)
+    assert len(res.objs) == 1
+
+
+def test_unknown_input_and_output_types(client):
+    class MyUnserializableClassA:
+        a_val: float
+
+        def __init__(self, a_val) -> None:
+            self.a_val = a_val
+
+    class MyUnserializableClassB:
+        b_val: float
+
+        def __init__(self, b_val) -> None:
+            self.b_val = b_val
+
+    @weave.op()
+    def op_with_unknown_types(
+        a: MyUnserializableClassA, b: float
+    ) -> MyUnserializableClassB:
+        return MyUnserializableClassB(a.a_val + b)
+
+    a = MyUnserializableClassA(3)
+    res = op_with_unknown_types(a, 0.14)
+
+    assert res.b_val == 3.14
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 1
+    assert inner_res.calls[0].inputs == {
+        "a": repr(a),
+        "b": 0.14,
+    }
+    assert inner_res.calls[0].output == repr(res)
+
+
+def test_unknown_attribute(client):
+    class MyUnserializableClass:
+        val: int
+
+        def __init__(self, a_val) -> None:
+            self.a_val = a_val
+
+    class MySerializableClass(weave.Object):
+        obj: MyUnserializableClass
+
+    a_obj = MyUnserializableClass(1)
+    a = MySerializableClass(obj=a_obj)
+    b_obj = MyUnserializableClass(2)
+    b = MySerializableClass(obj=b_obj)
+
+    ref_a = weave.publish(a)
+    ref_b = weave.publish(b)
+
+    a2 = weave.ref(ref_a.uri()).get()
+    b2 = weave.ref(ref_b.uri()).get()
+
+    assert a2.obj == repr(a_obj)
+    assert b2.obj == repr(b_obj)

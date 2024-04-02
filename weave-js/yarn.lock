@@ -1531,6 +1531,11 @@
   resolved "https://registry.yarnpkg.com/@datadog/browser-core/-/browser-core-4.50.1.tgz#f9014628c697c1cedfd85103094934286c4339ca"
   integrity sha512-2ypS19XngsMu6W4qUBtDwvImFz886Im+PziOnEycO1w41TVS5LH8/vWBMvjSf8Suer+CeRjRN9IOu0ocRx9BVw==
 
+"@datadog/browser-core@5.12.0":
+  version "5.12.0"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-core/-/browser-core-5.12.0.tgz#ec523732080c30e6991c9e32df56a2251de188a1"
+  integrity sha512-DVV64OqKMxfJXvHJrHjcCji0guytLGBun9jf7tugXN1ylMNurloV5sF1KW1W1Pb0BuEMiJsuyz1DEIqZHO3z0w==
+
 "@datadog/browser-logs@^4.28.1":
   version "4.50.1"
   resolved "https://registry.yarnpkg.com/@datadog/browser-logs/-/browser-logs-4.50.1.tgz#238b4562de657aed9b4804f97467c8282fb12708"
@@ -1538,20 +1543,20 @@
   dependencies:
     "@datadog/browser-core" "4.50.1"
 
-"@datadog/browser-rum-core@4.50.1":
-  version "4.50.1"
-  resolved "https://registry.yarnpkg.com/@datadog/browser-rum-core/-/browser-rum-core-4.50.1.tgz#e0f6a261808212ef00433b6065a6a1481a596055"
-  integrity sha512-ABCzEjNiBq3izapvSq6uujdx9h7L4RM44n22qDhwSIBlQY6Psf9VlzlQ5fueCALoj2LgVy4rYDj5RHfGaF/lAQ==
+"@datadog/browser-rum-core@5.12.0":
+  version "5.12.0"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-rum-core/-/browser-rum-core-5.12.0.tgz#6c93f33e3f43e944cd29f25afe916aa7f5848a4f"
+  integrity sha512-JHOH3ZBjtnFYA7TMFOE3hUQurubC9ISidhrFvZf+gxbqtYGt8HTqe7pwJpOW2xqfQn1Us3lZyui8/LHayUZLdg==
   dependencies:
-    "@datadog/browser-core" "4.50.1"
+    "@datadog/browser-core" "5.12.0"
 
-"@datadog/browser-rum@^4.29.0":
-  version "4.50.1"
-  resolved "https://registry.yarnpkg.com/@datadog/browser-rum/-/browser-rum-4.50.1.tgz#a74520a589d0cd25919503608abaff1960593bb4"
-  integrity sha512-Gcs8fMoufOr4Xlhwx0g6CHvgcXVNeCM+IyAtRAwoCBeezRhL18Jo1LALE+nsLegNKgNLO1f4vjm5TBx1WsnXWQ==
+"@datadog/browser-rum@^5.12.0":
+  version "5.12.0"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-rum/-/browser-rum-5.12.0.tgz#0b7dde9e29a0869561f4cf88c5471509d1908645"
+  integrity sha512-k6U4LoUTDozkACHwp9Wk99fTSsKdr9fGxAKAdsco9kAnlCX0QOjbkF/taIincAeMvePRf0BVK+HIUaHZQ9YVLQ==
   dependencies:
-    "@datadog/browser-core" "4.50.1"
-    "@datadog/browser-rum-core" "4.50.1"
+    "@datadog/browser-core" "5.12.0"
+    "@datadog/browser-rum-core" "5.12.0"
 
 "@emotion/babel-plugin@^11.11.0":
   version "11.11.0"
@@ -4282,6 +4287,11 @@
   version "0.1.7"
   resolved "https://registry.yarnpkg.com/@types/is-hotkey/-/is-hotkey-0.1.7.tgz#30ec6d4234895230b576728ef77e70a52962f3b3"
   integrity sha512-yB5C7zcOM7idwYZZ1wKQ3pTfjA9BbvFqRWvKB46GFddxnJtHwi/b9y84ykQtxQPg5qhdpg4Q/kWU3EGoCTmLzQ==
+
+"@types/is-url@^1.2.28":
+  version "1.2.32"
+  resolved "https://registry.yarnpkg.com/@types/is-url/-/is-url-1.2.32.tgz#2883814affd004d3a6182d4a09c135d90e4fe28c"
+  integrity sha512-46VLdbWI8Sc+hPexQ6NLNR2YpoDyDZIpASHkJQ2Yr+Kf9Giw6LdCTkwOdsnHKPQeh7xTjTmSnxbE8qpxYuCiHA==
 
 "@types/istanbul-lib-coverage@*", "@types/istanbul-lib-coverage@^2.0.0", "@types/istanbul-lib-coverage@^2.0.1":
   version "2.0.4"
@@ -10026,6 +10036,11 @@ is-upper-case@^2.0.2:
   integrity sha512-44pxmxAvnnAOwBg4tHPnkfvgjPwbc5QIsSstNU+YcJ1ovxVzCWpSGosPJOZh/a1tdl81fbgnLc9LLv+x2ywbPQ==
   dependencies:
     tslib "^2.0.3"
+
+is-url@^1.2.4:
+  version "1.2.4"
+  resolved "https://registry.yarnpkg.com/is-url/-/is-url-1.2.4.tgz#04a4df46d28c4cff3d73d01ff06abeb318a1aa52"
+  integrity sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==
 
 is-weakref@^1.0.2:
   version "1.0.2"

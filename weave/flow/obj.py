@@ -1,50 +1,34 @@
-import typing
-from typing import Optional, Type, Tuple, Dict, Any
+from typing import Optional, Any
 from pydantic import (
     ConfigDict,
     model_validator,
     ValidatorFunctionWrapHandler,
     ValidationInfo,
+    BaseModel,
 )
-from pydantic._internal._model_construction import ModelMetaclass
-import pydantic
-import inspect
 
-from weave.op_def import OpDef, BoundOpDef
-from .. import ref_util
-from .. import box
-from .. import ref_base
+# import pydantic
 
-
-class ObjectMeta(ModelMetaclass):
-    def __new__(
-        cls: Type["ObjectMeta"], name: str, bases: Tuple[type, ...], dct: Dict[str, Any]
-    ) -> "ObjectMeta":
-        # Modify an OpDef names to include the class name.
-        original_class = super(ObjectMeta, cls).__new__(cls, name, bases, dct)
-        for attr, bound_op_def in inspect.getmembers(
-            original_class, lambda x: isinstance(x, BoundOpDef)
-        ):
-            bound_op_def = typing.cast(BoundOpDef, bound_op_def)
-            unbound_op_def = bound_op_def.op_def
-            if unbound_op_def.name.startswith("op-"):
-                unbound_op_def.name = f"{name}-{unbound_op_def.name[3:]}"
-        return original_class
+from weave import box
+from weave.trace.op import Op
+from weave.trace.vals import pydantic_getattribute
+from weave.weave_client import get_ref
+from weave.trace.vals import ObjectRecord, TraceObject
 
 
-class Object(pydantic.BaseModel, metaclass=ObjectMeta):
+class Object(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
-    # Allow OpDef attributes
+    # Allow Op attributes
     model_config = ConfigDict(
-        ignored_types=(OpDef,),
+        ignored_types=(Op,),
         arbitrary_types_allowed=True,
         protected_namespaces=(),
         extra="forbid",
     )
 
-    __str__ = pydantic.BaseModel.__repr__
+    __str__ = BaseModel.__repr__
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
@@ -53,35 +37,44 @@ class Object(pydantic.BaseModel, metaclass=ObjectMeta):
     def handle_relocatable_object(
         cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
     ) -> Any:
-        if hasattr(v, "_weave_obj_fields"):
-            # This is a relocated weave object, so destructure it into a dictionary
+        if isinstance(v, TraceObject):
+            # This is a relocated object, so destructure it into a dictionary
             # so pydantic can validate it.
+            keys = v._val.__dict__.keys()
             fields = {}
-            for k in v._weave_obj_fields:
+            for k in keys:
+                if k.startswith("_"):
+                    continue
                 val = getattr(v, k)
                 if isinstance(val, box.BoxedNone):
                     val = None
                 fields[k] = val
+
             # pydantic validation will construct a new pydantic object
-            new_obj = handler(fields)
+            def is_ignored_type(v: type) -> bool:
+                return isinstance(v, cls.model_config["ignored_types"])
+
+            allowed_fields = {k: v for k, v in fields.items() if not is_ignored_type(v)}
+            new_obj = handler(allowed_fields)
+            for k, kv in fields.items():
+                if is_ignored_type(kv):
+                    new_obj.__dict__[k] = kv
+
             # transfer ref to new object
-            ref = ref_base.get_ref(v)
-            if ref is not None:
-                ref_base._put_ref(new_obj, ref)
+            # We can't attach a ref directly to pydantic objects yet.
+            # TODO: fix this. I think dedupe may make it so the user data ends up
+            #    working fine, but not setting a ref here will cause the client
+            #    to do extra work.
+            if isinstance(v, TraceObject):
+                ref = get_ref(v)
+                new_obj.__dict__["ref"] = ref
+            # return new_obj
+
             return new_obj
-        # otherwise perform standard pydantic validation
         return handler(v)
 
 
-# We don't define this directly in the class definition so that VSCode
-# doesn't try to navigate to it instead of the target attribute
-def _object_getattribute(self: Object, name: str) -> Any:
-    attribute = object.__getattribute__(self, name)
-    if name not in object.__getattribute__(self, "model_fields"):
-        return attribute
-    return ref_util.val_with_relative_ref(
-        self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
-    )
-
-
-Object.__getattribute__ = _object_getattribute  # type: ignore
+# Enable ref tracking for Weave.Object
+# We could try to do this on BaseModel, but we haven't proven that's safe.
+# So only Weave Objects will get ref tracking behavior for now.
+Object.__getattribute__ = pydantic_getattribute  # type: ignore

@@ -4,8 +4,8 @@ import string
 import time
 import typing
 import tempfile
-from weave.uris import WeaveURI
 from weave import artifact_wandb, environment
+from weave.trace.refs import parse_uri, ObjectRef
 
 try:
     from modal.config import config
@@ -56,15 +56,12 @@ def generate_modal_stub(
     secrets: typing.Optional[dict[str, str]] = None,
 ) -> str:
     """Generates a modal py file to run the weave op"""
-    uri = WeaveURI.parse(model_ref)
+    parsed_ref = parse_uri(model_ref)
     if project_name is None:
-        if not isinstance(uri, artifact_wandb.WeaveWBArtifactURI):
-            raise ValueError(f"Expected a wandb artifact ref, got {type(uri)}")
-        project_name = uri.project_name
+        if not isinstance(parsed_ref, ObjectRef):
+            raise ValueError(f"Expected a weave object uri, got {type(parsed_ref)}")
+        project_name = parsed_ref.project
 
-    parsed_ref = uri.to_ref()
-    if not isinstance(parsed_ref, artifact_wandb.WandbArtifactRef):
-        raise ValueError(f"Expected a wandb artifact ref, got {parsed_ref}")
     project = project_name or os.getenv("PROJECT_NAME")
     if project is None:
         raise ValueError(

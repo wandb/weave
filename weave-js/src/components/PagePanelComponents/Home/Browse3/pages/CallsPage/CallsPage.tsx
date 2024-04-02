@@ -1,10 +1,10 @@
-import {PivotTableChart} from '@mui/icons-material';
+// import {PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
   Checkbox,
   Chip,
   FormControl,
-  IconButton,
+  // IconButton,
   ListItem,
   ListItemButton,
   ListItemText,
@@ -13,14 +13,16 @@ import {
 import _ from 'lodash';
 import React, {FC, useCallback, useMemo} from 'react';
 
+import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
+import {Empty} from '../common/Empty';
+import {EMPTY_PROPS_TRACES} from '../common/EmptyContent';
+import {isEvaluateOp} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {truncateID, useInitializingFilter} from '../util';
-import {HackyOpCategory} from '../wfInterface/types';
-import {OP_CATEGORIES} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {
   objectVersionNiceString,
@@ -37,7 +39,6 @@ import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
-  opCategory?: HackyOpCategory | null;
   opVersionRefs?: string[];
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
@@ -63,18 +64,16 @@ export const CallsPage: FC<{
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
       const niceName = opNiceName(opName);
-      if (niceName === 'Evaluation-evaluate') {
+      if (isEvaluateOp(niceName)) {
         // Very special case for now
         if (filter.isPivot) {
           return 'Evaluation Leaderboard';
         }
       }
       return opNiceName(opName) + ' Traces';
-    } else if (filter.opCategory) {
-      return _.capitalize(filter.opCategory) + ' Traces';
     }
     return 'Traces';
-  }, [filter.isPivot, filter.opCategory, filter.opVersionRefs]);
+  }, [filter.isPivot, filter.opVersionRefs]);
 
   return (
     <SimplePageLayout
@@ -142,9 +141,6 @@ export const CallsTable: FC<{
     effectiveFilter
   );
   const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
-  const opVersion = opVersionRef
-    ? opVersionOptions[opVersionRef]?.objectVersion
-    : null;
 
   const consumesObjectVersionOptions =
     useConsumesObjectVersionOptions(effectiveFilter);
@@ -170,26 +166,24 @@ export const CallsTable: FC<{
   const parentOpDisplay = effectiveFilter.parentId
     ? parentIdOptions[effectiveFilter.parentId]
     : null;
-  const opCategoryOptions = useMemo(() => {
-    return _.sortBy(OP_CATEGORIES, _.identity);
-  }, []);
   const traceRootOptions = [true, false];
 
   const userEnabledPivot = effectiveFilter.isPivot ?? false;
-  const setUserEnabledPivot = useCallback(
-    (enabled: boolean) => {
-      setFilter({
-        ...filter,
-        isPivot: enabled,
-        // Reset the pivot dims when disabling pivot
-        pivotSpec:
-          filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
-            ? undefined
-            : filter.pivotSpec,
-      });
-    },
-    [filter, setFilter]
-  );
+  // TODO: Decide if we want to expose pivot or remove.
+  // const setUserEnabledPivot = useCallback(
+  //   (enabled: boolean) => {
+  //     setFilter({
+  //       ...filter,
+  //       isPivot: enabled,
+  //       // Reset the pivot dims when disabling pivot
+  //       pivotSpec:
+  //         filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
+  //           ? undefined
+  //           : filter.pivotSpec,
+  //     });
+  //   },
+  //   [filter, setFilter]
+  // );
   const setPivotDims = useCallback(
     (spec: Partial<WFHighLevelPivotSpec>) => {
       if (
@@ -214,10 +208,7 @@ export const CallsTable: FC<{
     );
     // Super restrictive for now - just showing pivot when
     // there is only one span name and it is the evaluation.
-    return (
-      shownSpanNames.length === 1 &&
-      shownSpanNames[0].includes('Evaluation-evaluate')
-    );
+    return shownSpanNames.length === 1 && isEvaluateOp(shownSpanNames[0]);
   }, [calls.result]);
 
   const isPivoting = userEnabledPivot && qualifiesForPivoting;
@@ -238,6 +229,23 @@ export const CallsTable: FC<{
     traceRootOptions.length <= 1 ||
     Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly');
 
+  const callsKey = useMemo(() => {
+    if (calls.loading || calls.result == null) {
+      return null;
+    }
+    return Math.random();
+  }, [calls.loading, calls.result]);
+
+  if (calls.loading) {
+    return <Loading centered />;
+  }
+
+  const spans = calls.result ?? [];
+  const isEmpty = spans.length === 0;
+  if (isEmpty) {
+    return <Empty {...EMPTY_PROPS_TRACES} />;
+  }
+
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
@@ -254,7 +262,7 @@ export const CallsTable: FC<{
       }}
       filterListItems={
         <>
-          <IconButton
+          {/* <IconButton
             style={{width: '37px', height: '37px'}}
             size="small"
             color={userEnabledPivot ? 'primary' : 'default'}
@@ -263,35 +271,7 @@ export const CallsTable: FC<{
               setUserEnabledPivot(!userEnabledPivot);
             }}>
             <PivotTableChart />
-          </IconButton>
-
-          <ListItem sx={{width: '190px', flex: '0 0 190px'}}>
-            <FormControl fullWidth>
-              <Autocomplete
-                size={'small'}
-                disabled={
-                  isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes(
-                    'opCategory'
-                  ) ||
-                  (effectiveFilter.opVersionRefs ?? []).length > 0
-                }
-                renderInput={params => {
-                  return <TextField {...params} label="Category" />;
-                }}
-                value={
-                  effectiveFilter.opCategory ?? opVersion?.category ?? null
-                }
-                onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    opCategory: newValue,
-                  });
-                }}
-                options={opCategoryOptions}
-              />
-            </FormControl>
-          </ListItem>
+          </IconButton> */}
           <ListItem sx={{minWidth: '190px'}}>
             <FormControl fullWidth>
               <Autocomplete
@@ -303,7 +283,7 @@ export const CallsTable: FC<{
                   isPivoting ||
                   Object.keys(props.frozenFilter ?? {}).includes('opVersions')
                 }
-                value={opVersion ? opVersionRef : null}
+                value={opVersionRef}
                 onChange={(event, newValue) => {
                   setFilter({
                     ...filter,
@@ -386,7 +366,7 @@ export const CallsTable: FC<{
                   traceRootsOnly: !effectiveFilter.traceRootsOnly,
                 });
               }}>
-              <ListItemText primary="Roots Only" />
+              <ListItemText primary="Roots only" />
             </ListItemButton>
           </ListItem>
         </>
@@ -407,8 +387,9 @@ export const CallsTable: FC<{
         />
       ) : (
         <RunsTable
+          key={callsKey}
           loading={calls.loading}
-          spans={calls.result ?? []}
+          spans={spans}
           clearFilters={clearFilters}
           ioColumnsOnly={props.ioColumnsOnly}
         />
@@ -421,8 +402,7 @@ const shouldForceNonTraceRootsOnly = (filter: WFHighLevelCallFilter) => {
   return (
     (filter.inputObjectVersionRefs?.length ?? 0) > 0 ||
     (filter.opVersionRefs?.length ?? 0) > 0 ||
-    filter.parentId != null ||
-    filter.opCategory != null
+    filter.parentId != null
   );
 };
 
@@ -438,9 +418,6 @@ const convertHighLevelFilterToLowLevelFilter = (
     outputObjectVersionRefs: effectiveFilter.outputObjectVersionRefs,
     parentIds: effectiveFilter.parentId
       ? [effectiveFilter.parentId]
-      : undefined,
-    opCategory: effectiveFilter.opCategory
-      ? [effectiveFilter.opCategory]
       : undefined,
   };
 };
@@ -494,17 +471,19 @@ const useOpVersionOptions = (
       });
     });
 
-    _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
-      ov => {
-        const ref = opVersionKeyToRefUri(ov);
-        result.push({
-          title: opNiceName(ov.opId) + ':v' + ov.versionIndex,
-          ref,
-          group: `Versions of ${opNiceName(currentOpId!)}`,
-          objectVersion: ov,
-        });
-      }
-    );
+    if (currentOpId) {
+      _.sortBy(currentVersions.result ?? [], ov => -ov.versionIndex).forEach(
+        ov => {
+          const ref = opVersionKeyToRefUri(ov);
+          result.push({
+            title: opNiceName(ov.opId) + ':v' + ov.versionIndex,
+            ref,
+            group: `Versions of ${opNiceName(currentOpId)}`,
+            objectVersion: ov,
+          });
+        }
+      );
+    }
 
     return _.fromPairs(result.map(r => [r.ref, r]));
   }, [currentOpId, currentVersions.result, latestVersions.result]);

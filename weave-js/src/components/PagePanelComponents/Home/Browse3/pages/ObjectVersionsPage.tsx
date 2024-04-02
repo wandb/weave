@@ -7,19 +7,28 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {Loading} from '../../../../Loading';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
+import {Empty} from './common/Empty';
+import {
+  EMPTY_PROPS_DATASETS,
+  EMPTY_PROPS_MODEL,
+  EMPTY_PROPS_OBJECTS,
+} from './common/EmptyContent';
 import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
-import {HackyTypeCategory} from './wfInterface/types';
 import {useWFHooks} from './wfReactInterface/context';
 import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
-import {ObjectVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
+import {
+  KnownBaseObjectClassType,
+  ObjectVersionSchema,
+} from './wfReactInterface/wfDataModelHooksInterface';
 
 export const ObjectVersionsPage: React.FC<{
   entity: string;
@@ -37,11 +46,11 @@ export const ObjectVersionsPage: React.FC<{
   const title = useMemo(() => {
     if (filter.objectName) {
       return 'Versions of ' + filter.objectName;
-    } else if (filter.typeCategory) {
-      return _.capitalize(filter.typeCategory) + 's';
+    } else if (filter.baseObjectClass) {
+      return _.capitalize(filter.baseObjectClass) + 's';
     }
     return 'All Objects';
-  }, [filter.objectName, filter.typeCategory]);
+  }, [filter.objectName, filter.baseObjectClass]);
 
   return (
     <SimplePageLayout
@@ -65,7 +74,7 @@ export const ObjectVersionsPage: React.FC<{
 
 export type WFHighLevelObjectVersionFilter = {
   objectName?: string | null;
-  typeCategory?: HackyTypeCategory | null;
+  baseObjectClass?: KnownBaseObjectClassType | null;
 };
 
 export const FilterableObjectVersionsTable: React.FC<{
@@ -90,8 +99,8 @@ export const FilterableObjectVersionsTable: React.FC<{
     props.entity,
     props.project,
     {
-      category: effectiveFilter.typeCategory
-        ? [effectiveFilter.typeCategory]
+      baseObjectClasses: effectiveFilter.baseObjectClass
+        ? [effectiveFilter.baseObjectClass]
         : undefined,
       objectIds: effectiveFilter.objectName
         ? [effectiveFilter.objectName]
@@ -99,6 +108,24 @@ export const FilterableObjectVersionsTable: React.FC<{
       latestOnly: effectivelyLatestOnly,
     }
   );
+
+  if (filteredObjectVersions.loading) {
+    return <Loading centered />;
+  }
+
+  // TODO: Only show the empty state if no filters other than baseObjectClass
+  const objectVersions = filteredObjectVersions.result ?? [];
+  const isEmpty = objectVersions.length === 0;
+  if (isEmpty) {
+    let propsEmpty = EMPTY_PROPS_OBJECTS;
+    const base = props.initialFilter?.baseObjectClass;
+    if ('Model' === base) {
+      propsEmpty = EMPTY_PROPS_MODEL;
+    } else if ('Dataset' === base) {
+      propsEmpty = EMPTY_PROPS_DATASETS;
+    }
+    return <Empty {...propsEmpty} />;
+  }
 
   return (
     <FilterLayoutTemplate
@@ -110,7 +137,7 @@ export const FilterableObjectVersionsTable: React.FC<{
         effectiveFilter
       )}>
       <ObjectVersionsTable
-        objectVersions={filteredObjectVersions.result ?? []}
+        objectVersions={objectVersions}
         usingLatestFilter={effectivelyLatestOnly}
       />
     </FilterLayoutTemplate>
@@ -124,14 +151,15 @@ const ObjectVersionsTable: React.FC<{
   const rows: GridRowsProp = useMemo(() => {
     return props.objectVersions.map((ov, i) => {
       return {
+        ...ov,
         id: objectVersionKeyToRefUri(ov),
+        object: `${ov.objectId}:v${ov.versionIndex}`,
         obj: ov,
-        createdAt: ov.createdAtMs,
       };
     });
   }, [props.objectVersions]);
   const columns: GridColDef[] = [
-    basicField('version', 'Object', {
+    basicField('object', 'Object', {
       hideable: false,
       renderCell: cellParams => {
         // Icon to indicate navigation to the object version
@@ -147,24 +175,29 @@ const ObjectVersionsTable: React.FC<{
         );
       },
     }),
-    basicField('typeCategory', 'Category', {
+    basicField('baseObjectClass', 'Category', {
       width: 100,
       renderCell: cellParams => {
-        const obj: ObjectVersionSchema = cellParams.row.obj;
-        return <TypeVersionCategoryChip typeCategory={obj.category} />;
+        const category = cellParams.value;
+        if (category === 'Model' || category === 'Dataset') {
+          return <TypeVersionCategoryChip baseObjectClass={category} />;
+        }
+        return null;
       },
     }),
-    basicField('createdAt', 'Created', {
+    basicField('createdAtMs', 'Created', {
       width: 100,
       renderCell: cellParams => {
-        const obj: ObjectVersionSchema = cellParams.row.obj;
-        return <Timestamp value={obj.createdAtMs / 1000} format="relative" />;
+        const createdAtMs = cellParams.value;
+        return <Timestamp value={createdAtMs / 1000} format="relative" />;
       },
     }),
     ...(props.usingLatestFilter
       ? [
           basicField('peerVersions', 'Versions', {
             width: 100,
+            sortable: false,
+            filterable: false,
             renderCell: cellParams => {
               const obj: ObjectVersionSchema = cellParams.row.obj;
               return <PeerVersionsLink obj={obj} />;
@@ -206,7 +239,7 @@ const ObjectVersionsTable: React.FC<{
       rows={rows}
       initialState={{
         sorting: {
-          sortModel: [{field: 'createdAt', sort: 'desc'}],
+          sortModel: [{field: 'createdAtMs', sort: 'desc'}],
         },
       }}
       columnHeaderHeight={40}

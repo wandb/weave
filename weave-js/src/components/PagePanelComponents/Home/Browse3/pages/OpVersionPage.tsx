@@ -1,7 +1,6 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {OpCodeViewer} from '../OpCodeViewer';
-import {CategoryChip} from './common/CategoryChip';
 import {
   CallsLink,
   opNiceName,
@@ -45,7 +44,7 @@ const OpVersionPageInner: React.FC<{
 }> = ({opVersion}) => {
   const {useOpVersions, useCalls} = useWFHooks();
   const uri = opVersionKeyToRefUri(opVersion);
-  const {entity, project, opId, versionIndex, category} = opVersion;
+  const {entity, project, opId, versionIndex} = opVersion;
 
   const opVersions = useOpVersions(entity, project, {
     opIds: [opId],
@@ -55,6 +54,12 @@ const OpVersionPageInner: React.FC<{
     opVersionRefs: [uri],
   });
   const opVersionCallCount = (calls.result ?? []).length;
+  const useOpSupported = useMemo(() => {
+    // TODO: We really want to return `True` only when
+    // the op is not a bound op. However, we don't have
+    // that data available yet.
+    return true;
+  }, []);
 
   return (
     <SimplePageLayoutWithHeader
@@ -99,11 +104,6 @@ const OpVersionPageInner: React.FC<{
               ) : (
                 <></>
               ),
-            ...(category
-              ? {
-                  Category: <CategoryChip value={category} />,
-                }
-              : {}),
           }}
         />
       }
@@ -120,10 +120,14 @@ const OpVersionPageInner: React.FC<{
             />
           ),
         },
-        {
-          label: 'Use',
-          content: <TabUseOp name={opNiceName(opId)} uri={uri} />,
-        },
+        ...(useOpSupported
+          ? [
+              {
+                label: 'Use',
+                content: <TabUseOp name={opNiceName(opId)} uri={uri} />,
+              },
+            ]
+          : []),
       ]}
     />
   );

@@ -50,6 +50,9 @@ const BoringValue = styled.div`
   background-color: ${MOON_100};
   padding: 4px 8px;
   border-radius: 0 8px 8px 0;
+  max-width: 300px;
+  display: flex;
+  align-items: center;
 `;
 BoringValue.displayName = 'S.BoringValue';
 
@@ -58,56 +61,62 @@ export const BoringColumnInfo = ({
   columns,
 }: BoringColumnInfoProps) => {
   const boring = getBoringColumns(tableStats);
-  if (boring.length === 0) {
+
+  const boringPairs = boring
+    .map((colName: string) => {
+      const {valueCounts} = tableStats.column[colName];
+      const boringValue = Object.keys(valueCounts)[0];
+      if (boringValue === 'null') {
+        return null;
+      }
+
+      const col = columns.find((c: any) => c.field === colName);
+      if (!col) {
+        return null;
+      }
+
+      let label = col.field;
+      if (!label.includes('.') && col.headerName) {
+        label = col.headerName;
+      }
+
+      let value: ReactNode = boringValue;
+      let height: number | undefined = 32;
+      if (col.renderCell) {
+        const cellParams = {value, row: {[col.field]: value}};
+        value = col.renderCell(cellParams);
+        if (typeof value === 'string') {
+          value = (
+            <BoringStringValue
+              value={value}
+              maxWidthCollapsed={300}
+              maxWidthExpanded={600}
+            />
+          );
+          height = undefined;
+        }
+      }
+
+      return (
+        <BoringPair key={colName}>
+          <BoringLabel>{label}</BoringLabel>
+          <BoringValue style={{height}}>{value}</BoringValue>
+        </BoringPair>
+      );
+    })
+    .filter(pair => pair !== null);
+
+  if (boringPairs.length === 0) {
     return null;
   }
+
   return (
     <Boring>
       <Tooltip
         content="These columns have the same value for every row"
         trigger={<Header>Common values:</Header>}
       />
-      {boring.map((colName: string) => {
-        const {valueCounts} = tableStats.column[colName];
-        const boringValue = Object.keys(valueCounts)[0];
-        if (boringValue === 'null') {
-          return null;
-        }
-
-        const col = columns.find((c: any) => c.field === colName);
-        if (!col) {
-          return null;
-        }
-
-        let label = col.field;
-        if (!label.includes('.') && col.headerName) {
-          label = col.headerName;
-        }
-
-        let value: ReactNode = boringValue;
-        let height: number | undefined = 32;
-        if (col.renderCell) {
-          const cellParams = {value, row: {[col.field]: value}};
-          value = col.renderCell(cellParams);
-          if (typeof value === 'string') {
-            value = (
-              <BoringStringValue
-                value={value}
-                maxWidthCollapsed={300}
-                maxWidthExpanded={600}
-              />
-            );
-            height = undefined;
-          }
-        }
-
-        return (
-          <BoringPair key={colName}>
-            <BoringLabel>{label}</BoringLabel>
-            <BoringValue style={{height}}>{value}</BoringValue>
-          </BoringPair>
-        );
-      })}
+      {boringPairs}
     </Boring>
   );
 };

@@ -44,8 +44,11 @@ export const ObjectVersionPage: React.FC<{
   const {useObjectVersion} = useWFHooks();
 
   const objectVersion = useObjectVersion({
+    // Blindly assume this is weave object?
+    scheme: 'weave',
     entity: props.entity,
     project: props.project,
+    weaveKind: 'object',
     objectId: props.objectName,
     versionHash: props.version,
     path: props.filePath,
@@ -75,7 +78,15 @@ const ObjectVersionPageInner: React.FC<{
     objectIds: [objectName],
   });
   const objectVersionCount = (objectVersions.result ?? []).length;
-  const objectTypeCategory = objectVersion.category;
+  const baseObjectClass = useMemo(() => {
+    if (objectVersion.baseObjectClass === 'Dataset') {
+      return 'Dataset';
+    }
+    if (objectVersion.baseObjectClass === 'Model') {
+      return 'Model';
+    }
+    return null;
+  }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
   const producingCalls = useCalls(entityName, projectName, {
@@ -108,11 +119,11 @@ const ObjectVersionPageInner: React.FC<{
               </>
             ),
             Version: <>{objectVersionIndex}</>,
-            ...(objectTypeCategory
+            ...(baseObjectClass
               ? {
                   Category: (
                     <TypeVersionCategoryChip
-                      typeCategory={objectTypeCategory}
+                      baseObjectClass={baseObjectClass}
                     />
                   ),
                 }
@@ -213,13 +224,13 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Use',
           content:
-            objectTypeCategory === 'dataset' ? (
+            baseObjectClass === 'Dataset' ? (
               <TabUseDataset
                 name={objectName}
                 uri={refUri}
                 versionIndex={objectVersionIndex}
               />
-            ) : objectTypeCategory === 'model' ? (
+            ) : baseObjectClass === 'Model' ? (
               <TabUseModel
                 name={objectName}
                 uri={refUri}

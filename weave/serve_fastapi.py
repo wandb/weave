@@ -14,12 +14,17 @@ except ImportError:
 from . import weave_types as types
 from . import op_args
 from . import weave_pydantic
-from . import op_def
 from . import cache
+from . import errors
+from . import pyfunc_type_util
 from .monitoring import monitor
 from .wandb_api import WandbApiAsync, wandb_api_context, WandbApiContext
 
 from .artifact_wandb import WandbArtifactRef
+
+from weave.trace.vals import TraceObject
+from weave.trace import op
+from weave.trace.refs import ObjectRef, OpRef
 
 key_cache: cache.LruTimeWindowCache[
     str, typing.Optional[bool]
@@ -77,26 +82,14 @@ def api_key(
 
 
 def object_method_app(
-    obj_ref: WandbArtifactRef,
+    obj_ref: ObjectRef,
     method_name: typing.Optional[str] = None,
     auth_entity: typing.Optional[str] = None,
 ) -> FastAPI:
-    # Import weaveflow to trigger eager mode and ensure we have weaveflow weave
-    # types loaded.
-    from weave import weaveflow
-
     obj = obj_ref.get()
-    obj_weave_type = types.TypeRegistry.type_of(obj)
-    if not isinstance(obj_weave_type, types.ObjectType):
-        raise ValueError(
-            f"Expected an object (created by @weave.type()), got {obj_weave_type}"
-        )
 
-    op_attrs: dict[str, op_def.OpDef] = {
-        attr: value
-        for attr, value in obj.__class__.__dict__.items()
-        if isinstance(value, op_def.OpDef)
-    }
+    attrs: dict[str, op.Op] = {attr: getattr(obj, attr) for attr in dir(obj)}
+    op_attrs = {k: v for k, v in attrs.items() if isinstance(v, op.Op)}
     if not op_attrs:
         raise ValueError("No ops found on object")
 
@@ -108,11 +101,18 @@ def object_method_app(
             )
         method_name = next(iter(op_attrs))
 
-    bound_method_op = typing.cast(op_def.OpDef, getattr(obj, method_name))
-    if not isinstance(bound_method_op, op_def.OpDef):
+    bound_method_op = typing.cast(op.Op, getattr(obj, method_name))
+    if not isinstance(bound_method_op, op.Op):
         raise ValueError(f"Expected an op, got {bound_method_op}")
 
-    bound_method_op_args = bound_method_op.input_type
+    try:
+        bound_method_op_args = pyfunc_type_util.determine_input_type(
+            bound_method_op.resolve_fn
+        )
+    except errors.WeaveDefinitionError as e:
+        raise ValueError(
+            f"Type for model's method '{method_name}' could not be determined. Did you annotate it with Python types? {e}"
+        )
     if not isinstance(bound_method_op_args, op_args.OpNamedArgs):
         raise ValueError("predict op must have named args")
 
@@ -129,7 +129,7 @@ def object_method_app(
 
     @app.post(f"/{method_name}", summary=method_name)
     async def method_route(item: Item) -> dict:  # type: ignore
-        if inspect.iscoroutinefunction(bound_method_op.raw_resolve_fn):
+        if inspect.iscoroutinefunction(bound_method_op.resolve_fn):
             result = await bound_method_op(**item.dict())  # type: ignore
         else:
             result = bound_method_op(**item.dict())  # type: ignore

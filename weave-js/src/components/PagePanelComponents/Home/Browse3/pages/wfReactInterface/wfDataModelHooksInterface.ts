@@ -10,14 +10,21 @@
  */
 
 import * as Types from '../../../../../../core/model/types';
-import {OBJECT_CATEGORIES, OP_CATEGORIES} from './constants';
+import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
-export type ObjectCategory = (typeof OBJECT_CATEGORIES)[number];
+export type KnownBaseObjectClassType =
+  (typeof KNOWN_BASE_OBJECT_CLASSES)[number];
 
 export type Loadable<T> = {
   loading: boolean;
   result: T | null;
+};
+
+export type LoadableWithError<T> = {
+  loading: boolean;
+  result: T | null;
+  error: Error | null;
 };
 
 export type CallKey = {
@@ -48,7 +55,6 @@ export type CallFilter = {
   traceId?: string;
   callIds?: string[];
   traceRootsOnly?: boolean;
-  opCategory?: OpCategory[];
   runIds?: string[];
   userIds?: string[];
 };
@@ -64,17 +70,15 @@ export type OpVersionSchema = OpVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
   createdAtMs: number;
-  category: OpCategory | null;
 };
 
 export type OpVersionFilter = {
   // Filters are ANDed across the fields and ORed within the fields
-  category?: OpCategory[];
   opIds?: string[];
   latestOnly?: boolean;
 };
 
-export type ObjectVersionKey = {
+type CommonObjectVersionKey = {
   entity: string;
   project: string;
   objectId: string;
@@ -83,23 +87,36 @@ export type ObjectVersionKey = {
   refExtra?: string;
 };
 
+type WandbArtifactObjectVersionKey = {
+  scheme: 'wandb-artifact';
+} & CommonObjectVersionKey;
+
+type WeaveObjectVersionKey = {
+  scheme: 'weave';
+  weaveKind: 'object' | 'table' | 'op';
+} & CommonObjectVersionKey;
+
+export type ObjectVersionKey =
+  | WandbArtifactObjectVersionKey
+  | WeaveObjectVersionKey;
+
 export type ObjectVersionSchema = ObjectVersionKey & {
   // TODO: Add more fields & FKs
   versionIndex: number;
-  typeName: string;
-  category: ObjectCategory | null;
+  baseObjectClass: string | null;
   createdAtMs: number;
+  val: any;
 };
 
 export type ObjectVersionFilter = {
   // Filters are ANDed across the fields and ORed within the fields
-  category?: ObjectCategory[];
+  baseObjectClasses?: KnownBaseObjectClassType[];
   objectIds?: string[];
   latestOnly?: boolean;
 };
 
 export type TableQuery = {
-  columns: string[];
+  columns?: string[];
   limit?: number;
 };
 
@@ -165,6 +182,12 @@ export type WFDataModelHooksInterface = {
   // Derived are under a subkey because they are not directly from the data model
   // and the logic should be pushed into the core APIs. This is a temporary solution
   // during the transition period.
+  useFileContent: (
+    entity: string,
+    project: string,
+    digest: string,
+    opts?: {skip?: boolean}
+  ) => Loadable<string>;
   derived: {
     useChildCallsForCompare: (
       entity: string,
@@ -177,6 +200,7 @@ export type WFDataModelHooksInterface = {
     useGetRefsType: () => (refUris: string[]) => Promise<Types.Type[]>;
     // `useRefsType` is in beta while we integrate Shawn's new Object DB
     useRefsType: (refUris: string[]) => Loadable<Types.Type[]>;
+    useCodeForOpRef: (opVersionRef: string) => Loadable<string>;
   };
 };
 

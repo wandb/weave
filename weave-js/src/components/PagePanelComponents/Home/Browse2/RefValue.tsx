@@ -4,9 +4,9 @@ import React, {useMemo} from 'react';
 import {isListLike, isObjectTypeLike, isTypedDictLike} from '../../../../core';
 import {isRef} from '../Browse3/pages/common/util';
 import {
-  DICT_KEY_EDGE_TYPE,
-  LIST_INDEX_EDGE_TYPE,
-  OBJECT_ATTRIBUTE_EDGE_TYPE,
+  DICT_KEY_EDGE_NAME,
+  LIST_INDEX_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
 } from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {CellValue} from './CellValue';
@@ -39,21 +39,21 @@ export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
     return (
       <RefValueWithExtra
         weaveRef={weaveRef}
-        attribute={DICT_KEY_EDGE_TYPE + '/' + attribute}
+        attribute={DICT_KEY_EDGE_NAME + '/' + attribute}
       />
     );
   } else if (isObjectTypeLike(getRefsType.result[0])) {
     return (
       <RefValueWithExtra
         weaveRef={weaveRef}
-        attribute={OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + attribute}
+        attribute={OBJECT_ATTR_EDGE_NAME + '/' + attribute}
       />
     );
   } else if (isListLike(getRefsType.result[0])) {
     return (
       <RefValueWithExtra
         weaveRef={weaveRef}
-        attribute={LIST_INDEX_EDGE_TYPE + '/' + attribute}
+        attribute={LIST_INDEX_EDGE_NAME + '/' + attribute}
       />
     );
   }
@@ -79,7 +79,9 @@ const RefValueWithExtra = ({weaveRef, attribute}: RefValueProps) => {
 
   const refData = refValue.result[0];
 
-  if (isRef(refData)) {
+  if (refData === null) {
+    return <NotApplicable />;
+  } else if (isRef(refData)) {
     return <SmallRef objRef={parseRef(refData)} />;
   } else if (RENDER_DIRECTLY.has(typeof refData)) {
     return <CellValue value={refData} />;

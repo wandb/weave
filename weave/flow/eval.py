@@ -1,16 +1,22 @@
 import asyncio
 import time
 import inspect
+import textwrap
 import traceback
 import typing
 from typing import Any, Callable, Optional, Union
 import numpy as np
 
 import weave
-from weave import op_def
-from weave.flow import Object, Dataset, Model
+from weave.trace.op import Op, BoundOp
+from weave.trace.errors import OpCallError
+from weave.trace.env import get_weave_parallelism
+from weave.flow.obj import Object
+from weave.flow.dataset import Dataset
+from weave.flow.model import Model
+from weave.flow.model import get_infer_method
 from weave.flow.scorer import Scorer, get_scorer_attributes, auto_summarize
-from weave.weaveflow import util
+from weave.flow import util
 
 from rich.console import Console
 from rich import print
@@ -19,11 +25,11 @@ console = Console()
 
 
 def async_call(
-    func: typing.Union[Callable, op_def.OpDef], *args: Any, **kwargs: Any
+    func: typing.Union[Callable, Op], *args: Any, **kwargs: Any
 ) -> typing.Coroutine:
     is_async = False
-    if isinstance(func, op_def.OpDef):
-        is_async = inspect.iscoroutinefunction(func.raw_resolve_fn)
+    if isinstance(func, Op):
+        is_async = inspect.iscoroutinefunction(func.resolve_fn)
     else:
         is_async = inspect.iscoroutinefunction(func)
     if is_async:
@@ -33,7 +39,7 @@ def async_call(
 
 class Evaluation(Object):
     dataset: Union[Dataset, list]
-    scorers: Optional[list[Union[Callable, op_def.OpDef, Scorer]]] = None
+    scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
 
     def model_post_init(self, __context: Any) -> None:
@@ -41,9 +47,9 @@ class Evaluation(Object):
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
-            elif callable(scorer) and not isinstance(scorer, op_def.OpDef):
+            elif callable(scorer) and not isinstance(scorer, Op):
                 scorer = weave.op()(scorer)
-            elif isinstance(scorer, op_def.OpDef):
+            elif isinstance(scorer, Op):
                 pass
             else:
                 raise ValueError(f"Invalid scorer: {scorer}")
@@ -65,12 +71,28 @@ class Evaluation(Object):
         else:
             model_input = self.preprocess_model_input(example)  # type: ignore
 
-        if isinstance(model, Model):
-            model_predict = model.get_infer_method()
-        else:
+        if callable(model):
             model_predict = model
-        predict_signature = inspect.signature(model_predict)
+        else:
+            model_predict = get_infer_method(model)
+
+        model_predict_fn_name = (
+            model_predict.name
+            if isinstance(model_predict, Op)
+            else model_predict.__name__
+        )
+
+        if isinstance(model_predict, Op):
+            predict_signature = model_predict.signature
+        else:
+            predict_signature = inspect.signature(model_predict)
         model_predict_arg_names = list(predict_signature.parameters.keys())
+        # If the op is a `BoundOp`, then the first arg is automatically added at
+        # call time and we should exclude it from the args required from the
+        # user.
+        if isinstance(model_predict, BoundOp):
+            model_predict_arg_names = model_predict_arg_names[1:]
+
         if isinstance(model_input, dict):
             model_predict_args = {
                 k: v for k, v in model_input.items() if k in model_predict_arg_names
@@ -82,20 +104,58 @@ class Evaluation(Object):
                 raise ValueError(
                     f"{model_predict} expects arguments: {model_predict_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                 )
-
         try:
             prediction = await async_call(model_predict, **model_predict_args)
+        except OpCallError as e:
+            dataset_column_names = list(example.keys())
+            dataset_column_names_str = ", ".join(dataset_column_names[:3])
+            if len(dataset_column_names) > 3:
+                dataset_column_names_str += ", ..."
+            required_arg_names = [
+                param.name
+                for param in predict_signature.parameters.values()
+                if param.default == inspect.Parameter.empty
+            ]
+            if isinstance(model_predict, BoundOp):
+                required_arg_names = required_arg_names[1:]
+
+            message = textwrap.dedent(
+                f"""
+                Call error: {e}
+
+                Options for resolving:
+                a. change {model_predict_fn_name} argument names to match a subset of dataset column names: {dataset_column_names_str}
+                b. change dataset column names to match expected {model_predict_fn_name} argument names: {required_arg_names}
+                c. construct Evaluation with a preprocess_model_input function that accepts a dataset example and returns a dict with keys expected by {model_predict_fn_name}
+                """
+            )
+            raise OpCallError(message)
         except Exception as e:
             print("Prediction failed")
             traceback.print_exc()
             prediction = None
 
         scores = {}
-        scorers = typing.cast(list[Union[op_def.OpDef, Scorer]], self.scorers or [])
+        scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
-            score_signature = inspect.signature(score_fn)
+            if isinstance(score_fn, Op):
+                score_signature = score_fn.signature
+            else:
+                score_signature = inspect.signature(score_fn)
             score_arg_names = list(score_signature.parameters.keys())
+
+            # If the op is a `BoundOp`, then the first arg is automatically added at
+            # call time and we should exclude it from the args required from the
+            # user.
+            if isinstance(score_arg_names, BoundOp):
+                score_arg_names = score_arg_names[1:]
+
+            if "prediction" not in score_arg_names:
+                raise OpCallError(
+                    f"Scorer {scorer_name} must have a 'prediction' argument, to receive the output of the model function."
+                )
+
             if isinstance(example, dict):
                 score_args = {k: v for k, v in example.items() if k in score_arg_names}
             else:
@@ -107,7 +167,32 @@ class Evaluation(Object):
                     )
             score_args["prediction"] = prediction
 
-            result = await async_call(score_fn, **score_args)
+            try:
+                result = await async_call(score_fn, **score_args)
+            except OpCallError as e:
+                dataset_column_names = list(example.keys())
+                dataset_column_names_str = ", ".join(dataset_column_names[:3])
+                if len(dataset_column_names) > 3:
+                    dataset_column_names_str += ", ..."
+                required_arg_names = [
+                    param.name
+                    for param in score_signature.parameters.values()
+                    if param.default == inspect.Parameter.empty
+                ]
+                if isinstance(score_fn, BoundOp):
+                    required_arg_names = required_arg_names[1:]
+                required_arg_names.remove("prediction")
+
+                message = textwrap.dedent(
+                    f"""
+                    Call error: {e}
+
+                    Options for resolving:
+                    a. change {scorer_name} argument names to match a subset of dataset column names ({dataset_column_names_str})
+                    b. change dataset column names to match expected {scorer_name} argument names: {required_arg_names}
+                    """
+                )
+                raise OpCallError(message)
             scores[scorer_name] = result
 
         return {
@@ -116,8 +201,10 @@ class Evaluation(Object):
         }
 
     @weave.op()
-    async def summarize(self, eval_table: weave.WeaveList) -> dict:
+    async def summarize(self, eval_table: typing.Union[weave.WeaveList, list]) -> dict:
         summary = {}
+        if not isinstance(eval_table, weave.WeaveList):
+            eval_table = weave.WeaveList(eval_table)
         prediction_summary = auto_summarize(eval_table.column("prediction"))
         if prediction_summary:
             summary["prediction"] = prediction_summary
@@ -137,6 +224,8 @@ class Evaluation(Object):
         async def eval_example(example: dict) -> dict:
             try:
                 eval_row = await self.predict_and_score(example, model)
+            except OpCallError as e:
+                raise e
             except Exception as e:
                 print("Predict and score failed")
                 traceback.print_exc()
@@ -147,13 +236,13 @@ class Evaluation(Object):
         # with console.status("Evaluating...") as status:
         dataset = typing.cast(Dataset, self.dataset)
         _rows = dataset.rows
-        async for example, eval_row in util.async_foreach(_rows, eval_example, 30):
+        async for example, eval_row in util.async_foreach(
+            _rows, eval_example, get_weave_parallelism()
+        ):
             n_complete += 1
-            # prediction_errors += int(eval_row["prediction_error"])
-            # score_errors += eval_row["score_errors"]
             duration = time.time() - start_time
             # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete] [{prediction_errors} prediction errors] [{score_errors} score errors]"
+            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
             if eval_row == None:
                 eval_row = {"prediction": None, "scores": {}}
@@ -165,9 +254,9 @@ class Evaluation(Object):
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
 
-        eval_table: weave.WeaveList = weave.WeaveList(eval_rows)
+        # eval_table: weave.WeaveList = weave.WeaveList(eval_rows)
 
-        summary = await self.summarize(eval_table)
+        summary = await self.summarize(eval_rows)
 
         print("Evaluation summary", summary)
 
@@ -181,6 +270,6 @@ def evaluate(
     preprocess_model_input: Optional[Callable] = None,
 ) -> dict:
     eval = Evaluation(
-        dataset=dataset, scores=scores, preprocess_model_input=preprocess_model_input
+        dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
     return asyncio.run(eval.evaluate(model))

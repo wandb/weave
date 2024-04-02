@@ -5,26 +5,27 @@ import typing
 import uuid
 
 from . import trace_server_interface as tsi
+from . import refs_internal
 
-TRACE_REF_SCHEME = "wandb-trace"
+TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"
-WILDCARD_ARTIFACT_VERSION_AND_PATH = ":*/obj"
+WILDCARD_ARTIFACT_VERSION_AND_PATH = ":*"
 
 
 def generate_id() -> str:
     return str(uuid.uuid4())
 
 
-# This is a quick solution but needs more thought
-def version_hash_for_object(obj: tsi.ObjSchemaForInsert) -> str:
-    hasher = hashlib.md5()
+def bytes_digest(json_val: bytes) -> str:
+    hasher = hashlib.sha256()
+    hasher.update(json_val)
+    hash_bytes = hasher.digest()
+    base64_encoded_hash = base64.urlsafe_b64encode(hash_bytes).decode("utf-8")
+    return base64_encoded_hash.replace("-", "X").replace("_", "Y").rstrip("=")
 
-    hasher.update(json.dumps(_order_dict(obj.type_dict)).encode())
-    # until updates are supported, we need to hash the metadata_dict
-    hasher.update(json.dumps(_order_dict(obj.metadata_dict)).encode())
-    hasher.update(json.dumps(_order_dict(obj.b64_file_map)).encode())
 
-    return hasher.hexdigest()
+def str_digest(json_val: str) -> str:
+    return bytes_digest(json_val.encode())
 
 
 def _order_dict(dictionary: typing.Dict) -> typing.Dict:
@@ -54,17 +55,29 @@ def decode_b64_to_bytes(contents: typing.Dict[str, str]) -> typing.Dict[str, byt
     return res
 
 
-valid_schemes = [TRACE_REF_SCHEME, ARTIFACT_REF_SCHEME]
+valid_schemes = [
+    TRACE_REF_SCHEME,
+    ARTIFACT_REF_SCHEME,
+    refs_internal.WEAVE_INTERNAL_SCHEME,
+]
 
 
 def extract_refs_from_values(
-    vals: typing.Optional[typing.List[typing.Any]],
+    vals: typing.Any,
 ) -> typing.List[str]:
     refs = []
-    if vals:
-        for val in vals:
-            if isinstance(val, str) and any(
-                val.startswith(scheme + "://") for scheme in valid_schemes
-            ):
-                refs.append(val)
+
+    def _visit(val: typing.Any) -> typing.Any:
+        if isinstance(val, dict):
+            for v in val.values():
+                _visit(v)
+        elif isinstance(val, list):
+            for v in val:
+                _visit(v)
+        elif isinstance(val, str) and any(
+            val.startswith(scheme + "://") for scheme in valid_schemes
+        ):
+            refs.append(val)
+
+    _visit(vals)
     return refs

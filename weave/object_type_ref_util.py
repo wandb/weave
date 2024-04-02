@@ -13,7 +13,7 @@ def make_object_getattribute(
         if name not in allowed_attributes:
             return attribute
         return ref_util.val_with_relative_ref(
-            self, attribute, [ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE, str(name)]
+            self, attribute, [ref_util.OBJECT_ATTR_EDGE_NAME, str(name)]
         )
 
     return object_getattribute
@@ -26,7 +26,7 @@ def make_object_lookup_path() -> (
         assert len(path) > 1
         edge_type = path[0]
         edge_path = path[1]
-        assert edge_type == ref_util.OBJECT_ATTRIBUTE_EDGE_TYPE
+        assert edge_type == ref_util.OBJECT_ATTR_EDGE_NAME
 
         res = getattr(self, edge_path)
         remaining_path = path[2:]

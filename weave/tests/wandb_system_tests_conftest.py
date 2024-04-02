@@ -207,6 +207,13 @@ def pytest_addoption(parser):
         help="Run tests in debug mode",
     )
 
+    parser.addoption(
+        "--weave-server",
+        action="store",
+        default="sqlite",
+        help="Specify the client object to use: sqlite or clickhouse",
+    )
+
 
 def random_string(length: int = 12) -> str:
     """Generate a random string of a given length.
