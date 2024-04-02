@@ -770,20 +770,20 @@ def test_dataset_row_type(client):
 
 def test_unknown_input_and_output_types(client):
     class MyUnserializableClassA:
-        a_val: int
+        a_val: float
 
         def __init__(self, a_val) -> None:
             self.a_val = a_val
 
     class MyUnserializableClassB:
-        b_val: int
+        b_val: float
 
         def __init__(self, b_val) -> None:
             self.b_val = b_val
 
     @weave.op()
     def op_with_unknown_types(
-        a: MyUnserializableClassA, b: int
+        a: MyUnserializableClassA, b: float
     ) -> MyUnserializableClassB:
         return MyUnserializableClassB(a.a_val + b)
 
