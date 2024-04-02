@@ -22,7 +22,7 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         for k, v in obj.__dict__.items():
             res[k] = to_json(v, project_id, server)
         return res
-    elif isinstance(obj, list):
+    elif isinstance(obj, (list, tuple)):
         return [to_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
         return {k: to_json(v, project_id, server) for k, v in obj.items()}

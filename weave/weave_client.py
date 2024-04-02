@@ -507,7 +507,7 @@ class WeaveClient:
         elif isinstance(obj, Table):
             table_ref = self.save_table(obj)
             obj.ref = table_ref
-        elif isinstance(obj, list):
+        elif isinstance(obj, (list, tuple)):
             for v in obj:
                 self.save_nested_objects(v)
         elif isinstance(obj, dict):
