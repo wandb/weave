@@ -23,6 +23,7 @@ from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
     ObjSchema,
+    RefsReadBatchReq,
     TraceServerInterface,
     ObjCreateReq,
     ObjSchemaForInsert,
@@ -293,7 +294,7 @@ class WeaveClient:
         try:
             read_res = self.server.obj_read(
                 ObjReadReq(
-                    project_id=self._project_id(),
+                    project_id=f"{ref.entity}/{ref.project}",
                     object_id=ref.name,
                     digest=ref.digest,
                 )
@@ -313,7 +314,26 @@ class WeaveClient:
         # here, we just directly assign the digest.
         ref.digest = read_res.obj.digest
 
-        val = from_json(read_res.obj.val, self._project_id(), self.server)
+        data = read_res.obj.val
+
+        # If there is a ref-extra, we should resolve it. Rather than walking
+        # the object, it is more efficient to directly query for the data and
+        # let the server resolve it.
+        if ref.extra:
+            try:
+                ref_read_res = self.server.refs_read_batch(
+                    RefsReadBatchReq(refs=[ref.uri()])
+                )
+            except HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                raise
+            if not ref_read_res.vals:
+                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+            data = ref_read_res.vals[0]
+
+        val = from_json(data, self._project_id(), self.server)
+
         return make_trace_obj(val, ref, self.server, None)
 
     def save_table(self, table: Table) -> TableRef:
