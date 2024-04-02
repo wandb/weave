@@ -1,3 +1,4 @@
+from collections import namedtuple
 import datetime
 import os
 import typing
@@ -768,6 +769,7 @@ def test_dataset_row_type(client):
         d = weave.Dataset(rows=[{"a": 1}, {}])
 
 
+
 def test_op_retrieval(client):
     @weave.op()
     def my_op(a: int) -> int:
@@ -814,3 +816,51 @@ def test_bound_op_retrieval_no_self(client):
     my_op_ref = weave_client.get_ref(CustomTypeWithoutSelf.op_with_custom_type)
     with pytest.raises(MissingSelfInstanceError):
         my_op2 = my_op_ref.get()
+
+def test_tuple_support(client):
+    @weave.op()
+    def tuple_maker(a, b):
+        return (a, b)
+
+    act = tuple_maker((1, 2), 3)
+    exp = ((1, 2), 3)
+    assert act == exp
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2 == [[1, 2], 3]
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].output == [[1, 2], 3]
+
+
+def test_namedtuple_support(client):
+    @weave.op()
+    def tuple_maker(a, b):
+        return (a, b)
+
+    Point = namedtuple("Point", ["x", "y"])
+    act = tuple_maker(Point(1, 2), 3)
+    exp = (Point(1, 2), 3)
+    assert act == exp
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2 == [{"x": 1, "y": 2}, 3]
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].output == [{"x": 1, "y": 2}, 3]
