@@ -390,9 +390,13 @@ def make_trace_obj(
 
     if isinstance(val, Table):
         val_ref = val.ref
-        if val_ref is None:
-            val_ref = new_ref
-            raise InternalError("Expected populated Table.ref")
+        if not isinstance(val_ref, TableRef):
+            val_table_ref = getattr(val, "table_ref", None)
+            if not isinstance(val_table_ref, TableRef):
+                raise InternalError(
+                    "Expected Table.ref or Table.table_ref to be TableRef"
+                )
+            val_ref = val_table_ref
         val = TraceTable(val_ref, new_ref, server, _TableRowFilter(), root)
     if isinstance(val, TableRef):
         val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
