@@ -16,6 +16,7 @@ from weave import run_context
 from weave.trace.op import Op
 from weave.trace.object_record import (
     ObjectRecord,
+    dataclass_object_record,
     pydantic_object_record,
     pydantic_asdict_one_level,
 )
@@ -110,6 +111,9 @@ def map_to_refs(obj: Any) -> Any:
         return obj.map_values(map_to_refs)
     elif isinstance(obj, pydantic.BaseModel):
         obj_record = pydantic_object_record(obj)
+        return obj_record.map_values(map_to_refs)
+    elif dataclasses.is_dataclass(obj):
+        obj_record = dataclass_object_record(obj)
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
         return obj.ref
@@ -521,6 +525,12 @@ class WeaveClient:
             return
         if isinstance(obj, pydantic.BaseModel):
             obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self.save_nested_objects(v)
+            ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
+            obj.__dict__["ref"] = ref
+        elif dataclasses.is_dataclass(obj):
+            obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self.save_nested_objects(v)
             ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
