@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import os
 import typing
@@ -766,3 +767,40 @@ def test_dataset_row_type(client):
         d = weave.Dataset(rows=[{"a": 1}, "a", "b"])
     with pytest.raises(ValidationError):
         d = weave.Dataset(rows=[{"a": 1}, {}])
+
+
+def test_dataclass_support(client):
+    @dataclasses.dataclass
+    class MyDataclass:
+        val: int
+
+    @weave.op()
+    def dataclass_maker(a: MyDataclass, b: MyDataclass) -> MyDataclass:
+        return MyDataclass(a.val + b.val)
+
+    a = MyDataclass(1)
+    b = MyDataclass(2)
+    act = dataclass_maker(a, b)
+    exp = MyDataclass(3)
+    assert act == exp
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(dataclass_maker)]),
+        )
+    )
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2.val == 3
+
+    assert len(res.calls) == 1
+    assert res.calls[0].inputs == {
+        "a": "weave:///shawn/test-project/object/MyDataclass:qDo5jHFme5xIM1LwgeiXXVxYoGnp4LQ9hulqkX5zunY",
+        "b": "weave:///shawn/test-project/object/MyDataclass:We1slmdrWzi2NYSWObBsLybTTNSP4M9zfQbCMf8rQMc",
+    }
+    assert (
+        res.calls[0].output
+        == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
+    )
