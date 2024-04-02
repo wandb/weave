@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 import wandb
 import weave
 from weave import weave_client
-from weave.trace.vals import TraceObject
+from weave.trace.vals import MissingSelfInstanceError, TraceObject
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -766,3 +766,32 @@ def test_dataset_row_type(client):
         d = weave.Dataset(rows=[{"a": 1}, "a", "b"])
     with pytest.raises(ValidationError):
         d = weave.Dataset(rows=[{"a": 1}, {}])
+
+
+def test_op_retrieval():
+    weave.init("timssweeney/dev_testing")
+
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a + 1
+
+    assert my_op(1) == 2
+    my_op_ref = weave_client.get_ref(my_op)
+    my_op2 = my_op_ref.get()
+    assert my_op2(1) == 2
+
+    class CustomType(weave.Object):
+        a: int
+
+        @weave.op()
+        def op_with_custom_type(self, v):
+            return self.a + v
+
+    obj = CustomType(a=1)
+    obj_ref = weave.publish(obj)
+    obj2 = obj_ref.get()
+    assert obj2.op_with_custom_type(1) == 2
+
+    my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref.get()
