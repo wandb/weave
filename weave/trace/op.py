@@ -63,7 +63,7 @@ class Op:
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
-            client.fail_run(run, e)
+            client.fail_call(run, e)
             if not parent_run:
                 print_call_link(run)
             raise
@@ -81,7 +81,7 @@ class Op:
                         print_call_link(run)
                     return output
                 except BaseException as e:
-                    client.fail_run(run, e)
+                    client.fail_call(run, e)
                     if not parent_run:
                         print_call_link(run)
                     raise

@@ -64,6 +64,7 @@ def test_simple_op(client):
         inputs={"a": 5},
         exception=None,
         output=6,
+        summary={},
     )
 
 
