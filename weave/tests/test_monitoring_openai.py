@@ -275,6 +275,7 @@ def streaming_chat_completion_messages():
 
 class MockAsyncResponse:
     """This emulates an SSE response"""
+
     def __init__(self, chunks: List):
         self._chunks = iter(chunks)
 
@@ -291,6 +292,7 @@ class MockAsyncResponse:
 class MockAsyncStream(AsyncStream):
     def __init__(self, chunks: List):
         self._chunks = iter(chunks)
+
         def _process_response_data(*, data: object, **kwargs):
             return ChatCompletionChunk.model_validate(data)
 
@@ -299,6 +301,7 @@ class MockAsyncStream(AsyncStream):
             client=Mock(_process_response_data=_process_response_data),
             response=MockAsyncResponse(chunks),
         )
+
 
 @pytest.fixture
 def async_streaming_chat_completion_messages(streaming_chat_completion_messages):
@@ -364,6 +367,7 @@ def mocked_streaming_create(streaming_chat_completion_messages):
 async def mocked_async_streaming_create(async_streaming_chat_completion_messages):
     async def mocked_create(*args, **kwargs):
         return async_streaming_chat_completion_messages
+
     return mocked_create
 
 

@@ -3,8 +3,8 @@ from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Iterator, Optional, TypeVar
 
 import tiktoken
-from openai.types.chat.chat_completion import ChatCompletion, Choice
-from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
+from openai.types.chat.chat_completion import ChatCompletion
+from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, Choice
 from openai.types.completion_usage import CompletionUsage
 
 import wandb

@@ -73,7 +73,7 @@ class WeaveAsyncStream(AsyncStream):
         async for item in self._iterator:
             self._chunks.append(item)
             yield item
-        wrapped_stream = OpenAIStream(self._chunks)
+        wrapped_stream = OpenAIStream(iter(self._chunks))
         list(wrapped_stream)
 
         result = wrapped_stream.final_response()
