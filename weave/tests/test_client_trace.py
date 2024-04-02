@@ -769,7 +769,6 @@ def test_dataset_row_type(client):
         d = weave.Dataset(rows=[{"a": 1}, {}])
 
 
-
 def test_dataset_row_ref(client):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
@@ -781,6 +780,7 @@ def test_dataset_row_ref(client):
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
     assert gotten == 5
+
 
 def test_tuple_support(client):
     @weave.op()
