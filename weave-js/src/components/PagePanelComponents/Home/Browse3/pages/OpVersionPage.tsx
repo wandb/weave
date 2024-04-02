@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {OpCodeViewer} from '../OpCodeViewer';
 import {
@@ -54,6 +54,12 @@ const OpVersionPageInner: React.FC<{
     opVersionRefs: [uri],
   });
   const opVersionCallCount = (calls.result ?? []).length;
+  const useOpSupported = useMemo(() => {
+    // TODO: We really want to return `True` only when
+    // the op is not a bound op. However, we don't have
+    // that data available yet.
+    return true;
+  }, []);
 
   return (
     <SimplePageLayoutWithHeader
@@ -114,10 +120,14 @@ const OpVersionPageInner: React.FC<{
             />
           ),
         },
-        {
-          label: 'Use',
-          content: <TabUseOp name={opNiceName(opId)} uri={uri} />,
-        },
+        ...(useOpSupported
+          ? [
+              {
+                label: 'Use',
+                content: <TabUseOp name={opNiceName(opId)} uri={uri} />,
+              },
+            ]
+          : []),
       ]}
     />
   );

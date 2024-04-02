@@ -1,5 +1,7 @@
 import typing
 
+from weave import urls
+
 if typing.TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
 
@@ -75,7 +77,6 @@ def print_init_message(
     username: typing.Optional[str],
     entity_name: str,
     project_name: str,
-    uri_host: str = "https://wandb.ai",
 ) -> None:
     try:
         _print_version_check()
@@ -85,6 +86,8 @@ def print_init_message(
     message = ""
     if username is not None:
         message += f"Logged in as W&B user {username}.\n"
-    message += f"View Weave data at {uri_host}/{entity_name}/{project_name}/weave"
+    message += (
+        f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
+    )
 
     print(message)

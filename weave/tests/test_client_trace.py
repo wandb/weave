@@ -1,4 +1,5 @@
 import dataclasses
+from collections import namedtuple
 import datetime
 import os
 import typing
@@ -8,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 import wandb
 import weave
 from weave import weave_client
-from weave.trace.vals import TraceObject
+from weave.trace.vals import MissingSelfInstanceError, TraceObject
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -804,3 +805,174 @@ def test_dataclass_support(client):
         res.calls[0].output
         == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
     )
+def test_op_retrieval(client):
+    @weave.op()
+    def my_op(a: int) -> int:
+        return a + 1
+
+    assert my_op(1) == 2
+    my_op_ref = weave_client.get_ref(my_op)
+    my_op2 = my_op_ref.get()
+    assert my_op2(1) == 2
+
+
+def test_bound_op_retrieval(client):
+    class CustomType(weave.Object):
+        a: int
+
+        @weave.op()
+        def op_with_custom_type(self, v):
+            return self.a + v
+
+    obj = CustomType(a=1)
+    obj_ref = weave.publish(obj)
+    obj2 = obj_ref.get()
+    assert obj2.op_with_custom_type(1) == 2
+
+    my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref.get()
+
+
+@pytest.mark.skip("Not implemented: general bound op designation")
+def test_bound_op_retrieval_no_self(client):
+    class CustomTypeWithoutSelf(weave.Object):
+        a: int
+
+        @weave.op()
+        def op_with_custom_type(me, v):
+            return me.a + v
+
+    obj = CustomTypeWithoutSelf(a=1)
+    obj_ref = weave.publish(obj)
+    obj2 = obj_ref.get()
+    assert obj2.op_with_custom_type(1) == 2
+
+    my_op_ref = weave_client.get_ref(CustomTypeWithoutSelf.op_with_custom_type)
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref.get()
+
+
+def test_dataset_row_ref(client):
+    d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    ref = weave.publish(d)
+    d2 = weave.ref(ref.uri()).get()
+
+    inner = d2.rows[0]["a"]
+    exp_ref = "weave:///shawn/test-project/object/Dataset:aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    assert inner == 5
+    assert inner.ref.uri() == exp_ref
+    gotten = weave.ref(exp_ref).get()
+    assert gotten == 5
+
+
+def test_tuple_support(client):
+    @weave.op()
+    def tuple_maker(a, b):
+        return (a, b)
+
+    act = tuple_maker((1, 2), 3)
+    exp = ((1, 2), 3)
+    assert act == exp
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2 == [[1, 2], 3]
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].output == [[1, 2], 3]
+
+
+def test_namedtuple_support(client):
+    @weave.op()
+    def tuple_maker(a, b):
+        return (a, b)
+
+    Point = namedtuple("Point", ["x", "y"])
+    act = tuple_maker(Point(1, 2), 3)
+    exp = (Point(1, 2), 3)
+    assert act == exp
+
+    exp_ref = weave.publish(exp)
+    exp_2 = weave.ref(exp_ref.uri()).get()
+    assert exp_2 == [{"x": 1, "y": 2}, 3]
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].output == [{"x": 1, "y": 2}, 3]
+
+
+def test_unknown_input_and_output_types(client):
+    class MyUnserializableClassA:
+        a_val: float
+
+        def __init__(self, a_val) -> None:
+            self.a_val = a_val
+
+    class MyUnserializableClassB:
+        b_val: float
+
+        def __init__(self, b_val) -> None:
+            self.b_val = b_val
+
+    @weave.op()
+    def op_with_unknown_types(
+        a: MyUnserializableClassA, b: float
+    ) -> MyUnserializableClassB:
+        return MyUnserializableClassB(a.a_val + b)
+
+    a = MyUnserializableClassA(3)
+    res = op_with_unknown_types(a, 0.14)
+
+    assert res.b_val == 3.14
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 1
+    assert inner_res.calls[0].inputs == {
+        "a": repr(a),
+        "b": 0.14,
+    }
+    assert inner_res.calls[0].output == repr(res)
+
+
+def test_unknown_attribute(client):
+    class MyUnserializableClass:
+        val: int
+
+        def __init__(self, a_val) -> None:
+            self.a_val = a_val
+
+    class MySerializableClass(weave.Object):
+        obj: MyUnserializableClass
+
+    a_obj = MyUnserializableClass(1)
+    a = MySerializableClass(obj=a_obj)
+    b_obj = MyUnserializableClass(2)
+    b = MySerializableClass(obj=b_obj)
+
+    ref_a = weave.publish(a)
+    ref_b = weave.publish(b)
+
+    a2 = weave.ref(ref_a.uri()).get()
+    b2 = weave.ref(ref_b.uri()).get()
+
+    assert a2.obj == repr(a_obj)
+    assert b2.obj == repr(b_obj)

@@ -22,7 +22,9 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         for k, v in obj.__dict__.items():
             res[k] = to_json(v, project_id, server)
         return res
-    elif isinstance(obj, list):
+    elif isinstance_namedtuple(obj):
+        return {k: to_json(v, project_id, server) for k, v in obj._asdict().items()}
+    elif isinstance(obj, (list, tuple)):
         return [to_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
         return {k: to_json(v, project_id, server) for k, v in obj.items()}
@@ -32,7 +34,7 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
-        return None
+        return fallback_encode(obj)
     file_digests = {}
     for name, val in encoded["files"].items():
         file_response = server.file_create(
@@ -44,6 +46,30 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         "weave_type": encoded["weave_type"],
         "files": file_digests,
     }
+
+
+REP_LIMIT = 1000
+
+
+def fallback_encode(obj: Any) -> Any:
+    rep = None
+    try:
+        rep = repr(obj)
+    except Exception:
+        try:
+            rep = str(obj)
+        except Exception:
+            rep = f"<{type(obj).__name__}: {id(obj)}>"
+    if isinstance(rep, str):
+        if len(rep) > REP_LIMIT:
+            rep = rep[:REP_LIMIT] + "..."
+    return rep
+
+
+def isinstance_namedtuple(obj: Any) -> bool:
+    return (
+        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
+    )
 
 
 def _load_custom_obj_files(

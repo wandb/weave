@@ -1,3 +1,4 @@
+from collections import namedtuple
 from typing import Any, Sequence, Union, Optional, TypedDict
 import dataclasses
 import typing
@@ -19,10 +20,11 @@ from weave.trace.object_record import (
     pydantic_object_record,
     pydantic_asdict_one_level,
 )
-from weave.trace.serialize import to_json, from_json
+from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
     ObjSchema,
+    RefsReadBatchReq,
     TraceServerInterface,
     ObjCreateReq,
     ObjSchemaForInsert,
@@ -150,7 +152,7 @@ class Call:
         entity, project = project_parts
         if not self.id:
             raise ValueError("Can't get URL for call without ID")
-        return urls.call_path_as_peek(entity, project, self.id)
+        return urls.redirect_call(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
@@ -296,7 +298,7 @@ class WeaveClient:
         try:
             read_res = self.server.obj_read(
                 ObjReadReq(
-                    project_id=self._project_id(),
+                    project_id=f"{ref.entity}/{ref.project}",
                     object_id=ref.name,
                     digest=ref.digest,
                 )
@@ -316,7 +318,26 @@ class WeaveClient:
         # here, we just directly assign the digest.
         ref.digest = read_res.obj.digest
 
-        val = from_json(read_res.obj.val, self._project_id(), self.server)
+        data = read_res.obj.val
+
+        # If there is a ref-extra, we should resolve it. Rather than walking
+        # the object, it is more efficient to directly query for the data and
+        # let the server resolve it.
+        if ref.extra:
+            try:
+                ref_read_res = self.server.refs_read_batch(
+                    RefsReadBatchReq(refs=[ref.uri()])
+                )
+            except HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                raise
+            if not ref_read_res.vals:
+                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+            data = ref_read_res.vals[0]
+
+        val = from_json(data, self._project_id(), self.server)
+
         return make_trace_obj(val, ref, self.server, None)
 
     def save_table(self, table: Table) -> TableRef:
@@ -517,7 +538,10 @@ class WeaveClient:
         elif isinstance(obj, Table):
             table_ref = self.save_table(obj)
             obj.ref = table_ref
-        elif isinstance(obj, list):
+        elif isinstance_namedtuple(obj):
+            for v in obj._asdict().values():
+                self.save_nested_objects(v)
+        elif isinstance(obj, (list, tuple)):
             for v in obj:
                 self.save_nested_objects(v)
         elif isinstance(obj, dict):
