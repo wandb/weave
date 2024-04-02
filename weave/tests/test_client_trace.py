@@ -816,3 +816,44 @@ def test_namedtuple_support(client):
 
     assert len(res.calls) == 1
     assert res.calls[0].output == [{"x": 1, "y": 2}, 3]
+
+
+def test_named_reuse(client):
+    import asyncio
+
+    d = weave.Dataset(rows=[{"x": 1}, {"a": 2}])
+    d_ref = weave.publish(d, "test_dataset")
+    dataset = weave.ref(d_ref.uri()).get()
+
+    @weave.op()
+    async def dummy_score(prediction):
+        return 1
+
+    class SimpleModel(weave.Model):
+        async def predict(self, x):
+            return {"answer": "42"}
+
+    model = SimpleModel()
+
+    evaluation = weave.Evaluation(
+        dataset=dataset,
+        scorers=[dummy_score],
+    )
+    dataset_ref = dataset.ref
+    evaluation_dataset = evaluation.dataset
+    eval_dataset_ref = evaluation_dataset.ref
+    assert dataset_ref == eval_dataset_ref
+    asyncio.run(evaluation.evaluate(model))
+
+    res = get_client_trace_server(client).objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._ObjectVersionFilter(
+                is_op=False, latest_only=True, base_object_classes=["Dataset"]
+            ),
+        )
+    )
+
+    # There are a lot of additional assertions that could be made here!
+    print(res.objs)
+    assert len(res.objs) == 1

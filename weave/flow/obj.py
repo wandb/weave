@@ -56,18 +56,18 @@ class Object(BaseModel):
 
             allowed_fields = {k: v for k, v in fields.items() if not is_ignored_type(v)}
             new_obj = handler(allowed_fields)
-            for k, v in fields.items():
-                if is_ignored_type(v):
-                    new_obj.__dict__[k] = v
+            for k, kv in fields.items():
+                if is_ignored_type(kv):
+                    new_obj.__dict__[k] = kv
 
             # transfer ref to new object
             # We can't attach a ref directly to pydantic objects yet.
             # TODO: fix this. I think dedupe may make it so the user data ends up
             #    working fine, but not setting a ref here will cause the client
             #    to do extra work.
-            # if isinstance(v, TraceObject):
-            #     ref = get_ref(v)
-            #     new_obj
+            if isinstance(v, TraceObject):
+                ref = get_ref(v)
+                new_obj.__dict__['ref'] = ref
             # return new_obj
 
             return new_obj
