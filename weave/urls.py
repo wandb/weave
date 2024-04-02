@@ -24,10 +24,6 @@ def project_root_url(entity_name: str, project_name: str) -> str:
         return remote_project_root_url(entity_name, project_name)
 
 
-def project_path(entity_name: str, project_name: str) -> str:
-    return project_root_url(entity_name, project_name)
-
-
 def op_version_path(
     entity_name: str, project_name: str, op_name: str, op_version: str
 ) -> str:
