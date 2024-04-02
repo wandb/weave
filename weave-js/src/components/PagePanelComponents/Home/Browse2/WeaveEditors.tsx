@@ -54,10 +54,10 @@ import {
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
 import {Link} from '../Browse3/pages/common/Links';
 import {
-  DICT_KEY_EDGE_TYPE,
-  LIST_INDEX_EDGE_TYPE,
-  OBJECT_ATTRIBUTE_EDGE_TYPE,
-  TABLE_ID_EDGE_TYPE,
+  DICT_KEY_EDGE_NAME,
+  LIST_INDEX_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
+  TABLE_ID_EDGE_NAME,
 } from '../Browse3/pages/wfReactInterface/constants';
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {TableQuery} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
@@ -110,9 +110,9 @@ const weaveEditorPathUrlPathPart = (path: WeaveEditorPathEl[]) => {
   // Return the url path for a given editor path
   return path.flatMap(pathEl => {
     if (pathEl.type === 'getattr') {
-      return [OBJECT_ATTRIBUTE_EDGE_TYPE, pathEl.key];
+      return [OBJECT_ATTR_EDGE_NAME, pathEl.key];
     } else if (pathEl.type === 'pick') {
-      return [DICT_KEY_EDGE_TYPE, pathEl.key];
+      return [DICT_KEY_EDGE_NAME, pathEl.key];
     } else {
       throw new Error('invalid pathEl type');
     }
@@ -605,7 +605,7 @@ export const WeaveEditorTypedDict: FC<{
                 <Link
                   to={makeLinkPath([
                     ...weaveEditorPathUrlPathPart(path),
-                    DICT_KEY_EDGE_TYPE,
+                    DICT_KEY_EDGE_NAME,
                     key,
                   ])}>
                   {key}
@@ -624,7 +624,7 @@ export const WeaveEditorTypedDict: FC<{
                     refUri: refUri(
                       objectRefWithExtra(
                         parseRef(refWithType.refUri),
-                        DICT_KEY_EDGE_TYPE + '/' + key
+                        DICT_KEY_EDGE_NAME + '/' + key
                       )
                     ),
                     type: propertyTypes[key] as Type,
@@ -669,7 +669,7 @@ export const WeaveEditorObject: FC<{
               <Link
                 to={makeLinkPath([
                   ...weaveEditorPathUrlPathPart(path),
-                  OBJECT_ATTRIBUTE_EDGE_TYPE,
+                  OBJECT_ATTR_EDGE_NAME,
                   key,
                 ])}>
                 {key}
@@ -683,7 +683,7 @@ export const WeaveEditorObject: FC<{
                   refUri: refUri(
                     objectRefWithExtra(
                       parseRef(refWithType.refUri),
-                      OBJECT_ATTRIBUTE_EDGE_TYPE + '/' + key
+                      OBJECT_ATTR_EDGE_NAME + '/' + key
                     )
                   ),
                   type: (refWithType.type as ObjectType)[key] as Type,
@@ -886,7 +886,7 @@ export const WeaveEditorTable: FC<{
           <Link
             to={makeLinkPath([
               ...weaveEditorPathUrlPathPart(path),
-              LIST_INDEX_EDGE_TYPE,
+              LIST_INDEX_EDGE_NAME,
               params.row._origIndex,
             ])}>
             <LinkIcon />
@@ -997,7 +997,7 @@ export const WeaveCHTable: FC<{
           <Link
             to={makeLinkPath([
               ...weaveEditorPathUrlPathPart(props.path),
-              TABLE_ID_EDGE_TYPE,
+              TABLE_ID_EDGE_NAME,
               params.row._table_row_digest,
             ])}>
             <LinkIcon />

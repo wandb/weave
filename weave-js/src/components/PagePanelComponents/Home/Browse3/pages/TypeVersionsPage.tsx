@@ -8,7 +8,6 @@ import {
   WFHighLevelDataColumn,
 } from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
 import {useWeaveflowORMContext} from './wfInterface/context';
 import {HackyTypeCategory, WFTypeVersion} from './wfInterface/types';
 
@@ -94,48 +93,6 @@ export const FilterableTypeVersionsTable: React.FC<{
         string,
         string,
         'version',
-        WFHighLevelTypeVersionFilter
-      >,
-      typeCategory: {
-        columnId: 'typeCategory',
-        gridDisplay: {
-          columnLabel: 'Type Category',
-          columnValue: ({obj}) => {
-            return obj.typeCategory();
-          },
-          gridColDefOptions: {
-            renderCell: params => {
-              return (
-                <TypeVersionCategoryChip
-                  typeCategory={params.row.obj.typeCategory()}
-                />
-              );
-            },
-          },
-        },
-        filterControls: {
-          filterPredicate: ({obj}, filter) => {
-            if (filter.typeCategory == null) {
-              return true;
-            }
-            return obj.typeCategory() === filter.typeCategory;
-          },
-          filterControlListItem: cellProps => {
-            return (
-              <TypeCategoryFilterControlListItem
-                entity={props.entity}
-                project={props.project}
-                frozenFilter={props.frozenFilter}
-                {...cellProps}
-              />
-            );
-          },
-        },
-      } as WFHighLevelDataColumn<
-        {obj: WFTypeVersion},
-        string,
-        string,
-        'typeCategory',
         WFHighLevelTypeVersionFilter
       >,
       typeName: {
@@ -408,41 +365,6 @@ export const FilterableTypeVersionsTable: React.FC<{
       initialFilter={props.initialFilter}
       onFilterUpdate={props.onFilterUpdate}
     />
-  );
-};
-
-const TypeCategoryFilterControlListItem: React.FC<{
-  entity: string;
-  project: string;
-  frozenFilter?: WFHighLevelTypeVersionFilter;
-  filter: WFHighLevelTypeVersionFilter;
-  updateFilter: (update: Partial<WFHighLevelTypeVersionFilter>) => void;
-}> = props => {
-  const orm = useWeaveflowORMContext(props.entity, props.project);
-  const options = useMemo(() => {
-    return orm.projectConnection.typeCategories();
-  }, [orm.projectConnection]);
-  return (
-    <ListItem>
-      <FormControl fullWidth>
-        <Autocomplete
-          size={'small'}
-          disabled={Object.keys(props.frozenFilter ?? {}).includes(
-            'typeCategory'
-          )}
-          renderInput={params => (
-            <TextField {...params} label="Type Category" />
-          )}
-          value={props.filter.typeCategory ?? null}
-          onChange={(event, newValue) => {
-            props.updateFilter({
-              typeCategory: newValue,
-            });
-          }}
-          options={options}
-        />
-      </FormControl>
-    </ListItem>
   );
 };
 

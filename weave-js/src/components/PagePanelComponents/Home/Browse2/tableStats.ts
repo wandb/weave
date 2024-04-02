@@ -1,4 +1,6 @@
 import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
+import stringify from 'json-stable-stringify';
+import _ from 'lodash';
 import {useState} from 'react';
 
 import {isRef} from '../Browse3/pages/common/util';
@@ -82,10 +84,20 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
             }
             colStats.refCounts[value] += 1;
           }
-          if (!(value in colStats.valueCounts)) {
-            colStats.valueCounts[value] = 0;
+          let valueStr = null;
+          if (Array.isArray(value) || _.isPlainObject(value)) {
+            try {
+              valueStr = stringify(value);
+            } catch (e) {
+              valueStr = `${value}`;
+            }
+          } else {
+            valueStr = `${value}`;
           }
-          colStats.valueCounts[value] += 1;
+          if (!(valueStr in colStats.valueCounts)) {
+            colStats.valueCounts[valueStr] = 0;
+          }
+          colStats.valueCounts[valueStr] += 1;
         }
       }
     }

@@ -3,7 +3,7 @@ import os
 import typing
 import pytest
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import wandb
 import weave
 from weave import weave_client
@@ -15,6 +15,8 @@ from ..trace_server.trace_server_interface_util import (
     generate_id,
 )
 from ..trace_server import trace_server_interface as tsi
+
+pytestmark = pytest.mark.trace
 
 
 ## Hacky interface compatibility helpers
@@ -62,6 +64,7 @@ def test_simple_op(client):
         inputs={"a": 5},
         exception=None,
         output=6,
+        summary={},
     )
 
 
@@ -74,83 +77,100 @@ def test_dataset(client):
     assert list(d2.rows) == list(d2.rows)
 
 
-def test_trace_server_call_start_and_end(clickhouse_trace_server):
+def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
-        project_id="test_entity/test_project",
+        project_id=client._project_id(),
         id=call_id,
-        name="test_name",
+        op_name="test_name",
         trace_id="test_trace_id",
         parent_id="test_parent_id",
-        start_datetime=datetime.datetime.now(tz=datetime.timezone.utc)
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
         attributes={"a": 5},
         inputs={"b": 5},
     )
-    clickhouse_trace_server.call_start(tsi.CallStartReq(start=start))
+    client.server.call_start(tsi.CallStartReq(start=start))
 
-    res = clickhouse_trace_server.call_read(
+    res = client.server.call_read(
         tsi.CallReadReq(
-            project_id="test_entity/test_project",
+            project_id=client._project_id(),
             id=call_id,
         )
     )
 
-    exp_start_datetime = datetime.datetime.fromisoformat(
-        start.start_datetime.isoformat(timespec="milliseconds")
+    exp_started_at = datetime.datetime.fromisoformat(
+        start.started_at.isoformat(timespec="milliseconds")
     )
 
+    class FuzzyDateTimeMatcher:
+        def __init__(self, dt):
+            self.dt = dt
+
+        def __eq__(self, other):
+            # Checks within 1ms
+            return abs((self.dt - other).total_seconds()) < 0.001
+
+    class MaybeStringMatcher:
+        def __init__(self, s):
+            self.s = s
+
+        def __eq__(self, other):
+            if other is None:
+                return True
+            return self.s == other
+
     assert res.call.model_dump() == {
-        "project_id": "test_entity/test_project",
+        "project_id": client._project_id(),
         "id": call_id,
-        "name": "test_name",
+        "op_name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
-        "start_datetime": exp_start_datetime,
-        "end_datetime": None,
+        "started_at": FuzzyDateTimeMatcher(start.started_at),
+        "ended_at": None,
         "exception": None,
         "attributes": {"a": 5},
         "inputs": {"b": 5},
-        "outputs": None,
+        "output": None,
         "summary": None,
-        "wb_user_id": None,
+        "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
-        project_id="test_entity/test_project",
+        project_id=client._project_id(),
         id=call_id,
-        end_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
-        outputs={"d": 5},
+        output={"d": 5},
     )
-    clickhouse_trace_server.call_end(tsi.CallEndReq(end=end))
+    client.server.call_end(tsi.CallEndReq(end=end))
 
-    res = clickhouse_trace_server.call_read(
+    res = client.server.call_read(
         tsi.CallReadReq(
-            project_id="test_entity/test_project",
+            project_id=client._project_id(),
             id=call_id,
         )
     )
 
-    exp_end_datetime = datetime.datetime.fromisoformat(
-        end.end_datetime.isoformat(timespec="milliseconds")
+    exp_ended_at = datetime.datetime.fromisoformat(
+        end.ended_at.isoformat(timespec="milliseconds")
     )
 
     assert res.call.model_dump() == {
-        "project_id": "test_entity/test_project",
+        "project_id": client._project_id(),
         "id": call_id,
-        "name": "test_name",
+        "op_name": "test_name",
         "trace_id": "test_trace_id",
         "parent_id": "test_parent_id",
-        "start_datetime": exp_start_datetime,
-        "end_datetime": exp_end_datetime,
+        "started_at": FuzzyDateTimeMatcher(start.started_at),
+        "ended_at": FuzzyDateTimeMatcher(end.ended_at),
         "exception": None,
         "attributes": {"a": 5},
         "inputs": {"b": 5},
-        "outputs": {"d": 5},
+        "output": {"d": 5},
         "summary": {"c": 5},
-        "wb_user_id": None,
+        "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
     }
 
@@ -329,7 +349,7 @@ def test_trace_call_query_filter_op_version_refs(client):
         res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(op_version_refs=op_version_refs),
+                filter=tsi._CallsFilter(op_names=op_version_refs),
             )
         )
         print(f"TEST CASE [{i}]", op_version_refs, exp_count)
@@ -354,7 +374,7 @@ def get_all_calls_asserting_finished(
         )
     )
     assert len(res.calls) == call_spec.total_calls
-    assert all([call.end_datetime for call in res.calls])
+    assert all([call.ended_at for call in res.calls])
     return res
 
 
@@ -364,11 +384,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     input_object_version_refs = unique_vals(
-        [
-            ref
-            for call in res.calls
-            for ref in extract_refs_from_values(call.inputs.values())
-        ]
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
     )
     assert len(input_object_version_refs) > 3
 
@@ -385,7 +401,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs.values()),
+                        extract_refs_from_values(call.inputs),
                         input_object_version_refs[:1],
                     )
                 ]
@@ -399,7 +415,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs.values()),
+                        extract_refs_from_values(call.inputs),
                         input_object_version_refs[:3],
                     )
                 ]
@@ -409,9 +425,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(
-                    input_object_version_refs=input_object_version_refs
-                ),
+                filter=tsi._CallsFilter(input_refs=input_object_version_refs),
             )
         )
 
@@ -424,11 +438,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     output_object_version_refs = unique_vals(
-        [
-            ref
-            for call in res.calls
-            for ref in extract_refs_from_values(call.outputs.values())
-        ]
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
     )
     assert len(output_object_version_refs) > 3
 
@@ -445,7 +455,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.outputs.values()),
+                        extract_refs_from_values(call.output),
                         output_object_version_refs[:1],
                     )
                 ]
@@ -459,7 +469,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.outputs.values()),
+                        extract_refs_from_values(call.output),
                         output_object_version_refs[:3],
                     )
                 ]
@@ -469,9 +479,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi._CallsFilter(
-                    output_object_version_refs=output_object_version_refs
-                ),
+                filter=tsi._CallsFilter(output_refs=output_object_version_refs),
             )
         )
 
@@ -657,6 +665,109 @@ def test_trace_call_query_offset(client):
         assert len(inner_res.calls) == exp_count
 
 
+def test_ops_with_default_params(client):
+    @weave.op()
+    def op_with_default(a: int, b: int = 10) -> int:
+        return a + b
+
+    assert op_with_default(1) == 11
+    assert op_with_default(1, 5) == 6
+    assert op_with_default(1, b=5) == 6
+    assert op_with_default(a=1) == 11
+    assert op_with_default(a=1, b=5) == 6
+    assert op_with_default(b=5, a=1) == 6
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 6
+    assert inner_res.calls[0].inputs == {"a": 1, "b": 10}
+    assert inner_res.calls[1].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[2].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[3].inputs == {"a": 1, "b": 10}
+    assert inner_res.calls[4].inputs == {"a": 1, "b": 5}
+    assert inner_res.calls[5].inputs == {"a": 1, "b": 5}
+
+
+def test_root_type(client):
+    class BaseTypeA(weave.Object):
+        a: int
+
+    class BaseTypeX(weave.Object):
+        x: int
+
+    class BaseTypeB(BaseTypeA):
+        b: int
+
+    class BaseTypeC(BaseTypeB):
+        c: int
+
+    c = BaseTypeC(a=1, b=2, c=3)
+    x = BaseTypeX(x=5)
+
+    ref = weave.publish(x)
+    x2 = weave.ref(ref.uri()).get()
+    assert x2.x == 5
+
+    ref = weave.publish(c)
+    c2 = weave.ref(ref.uri()).get()
+
+    assert c2.a == 1
+    assert c2.b == 2
+    assert c2.c == 3
+
+    inner_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.objs) == 2
+
+    inner_res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi._ObjectVersionFilter(
+                base_object_classes=["BaseTypeA"],
+            ),
+        )
+    )
+
+    assert len(inner_res.objs) == 1
+
+
+def test_attributes_on_ops(client):
+    @weave.op()
+    def op_with_attrs(a: int, b: int) -> int:
+        return a + b
+
+    with weave.attributes({"custom": "attribute"}):
+        op_with_attrs(1, 2)
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(op_with_attrs)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].attributes == {"custom": "attribute"}
+
+
+def test_dataset_row_type(client):
+    d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[{"a": 1}, "a", "b"])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[{"a": 1}, {}])
+
+
 def test_unknown_input_and_output_types(client):
     class MyUnserializableClassA:
         a_val: int
@@ -678,6 +789,7 @@ def test_unknown_input_and_output_types(client):
 
     a = MyUnserializableClassA(3)
     res = op_with_unknown_types(a, 0.14)
+    
     assert res.b_val == 3.14
 
     inner_res = client.server.calls_query(

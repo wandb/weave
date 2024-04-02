@@ -1,4 +1,5 @@
 import io
+import json
 import typing as t
 from pydantic import BaseModel
 import requests
@@ -23,6 +24,10 @@ class EndBatchItem(BaseModel):
 
 class Batch(BaseModel):
     batch: t.List[t.Union[StartBatchItem, EndBatchItem]]
+
+
+class ServerInfoRes(BaseModel):
+    min_required_weave_python_version: str
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
@@ -78,8 +83,23 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             raise requests.HTTPError(
                 "413 Client Error. Request too large. Try using a weave.Dataset() object."
             )
+        if r.status_code == 500:
+            reason_val = r.text
+            try:
+                reason_val = json.dumps(json.loads(reason_val), indent=2)
+            except json.JSONDecodeError:
+                reason_val = f"Reason: {reason_val}"
+            raise requests.HTTPError(
+                f"500 Server Error: Internal Server Error for url: {url}. {reason_val}",
+                response=r,
+            )
         r.raise_for_status()
         return res_model.model_validate(r.json())
+
+    def server_info(self) -> ServerInfoRes:
+        r = requests.get(self.trace_server_url + "/server_info")
+        r.raise_for_status()
+        return ServerInfoRes.model_validate(r.json())
 
     # Call API
     def call_start(

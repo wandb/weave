@@ -7,8 +7,8 @@ import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
 import {
-  LIST_INDEX_EDGE_TYPE,
-  OBJECT_ATTRIBUTE_EDGE_TYPE,
+  LIST_INDEX_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
 } from './wfReactInterface/constants';
 
 type TabUseDatasetProps = {
@@ -17,7 +17,7 @@ type TabUseDatasetProps = {
   versionIndex: number;
 };
 
-const ROW_PATH_PREFIX = `${OBJECT_ATTRIBUTE_EDGE_TYPE}/rows/${LIST_INDEX_EDGE_TYPE}/`;
+const ROW_PATH_PREFIX = `${OBJECT_ATTR_EDGE_NAME}/rows/${LIST_INDEX_EDGE_NAME}/`;
 
 export const TabUseDataset = ({
   name,

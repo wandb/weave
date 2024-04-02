@@ -1,21 +1,20 @@
-import _ from 'lodash';
 import React from 'react';
 
 import {Pill, TagColorName} from '../../../../../Tag';
-import {HackyTypeCategory} from '../wfInterface/types';
+import {KnownBaseObjectClassType} from '../wfReactInterface/wfDataModelHooksInterface';
 
-const colorMap: Record<HackyTypeCategory, TagColorName> = {
-  model: 'blue',
-  dataset: 'green',
+const colorMap: Record<KnownBaseObjectClassType, TagColorName> = {
+  Model: 'blue',
+  Dataset: 'green',
 };
 
 export const TypeVersionCategoryChip: React.FC<{
-  typeCategory: HackyTypeCategory | null;
+  baseObjectClass: KnownBaseObjectClassType | null;
 }> = props => {
-  if (props.typeCategory == null) {
+  if (props.baseObjectClass == null) {
     return <></>;
   }
-  const label = _.capitalize(props.typeCategory);
-  const color = colorMap[props.typeCategory];
+  const label = props.baseObjectClass;
+  const color = colorMap[props.baseObjectClass] ?? 'moon';
   return <Pill color={color} label={label} />;
 };

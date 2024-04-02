@@ -1,3 +1,5 @@
+import typing
+from . import init_message
 from .trace_server import remote_http_trace_server, sqlite_trace_server
 from . import context_state
 from . import errors
@@ -20,6 +22,13 @@ class InitializedClient:
         context_state._ref_tracking_enabled.reset(self.ref_tracking_token)
         context_state._eager_mode.reset(self.eager_mode_token)
         context_state._serverless_io_service.reset(self.serverless_io_service_token)
+
+
+def get_username() -> typing.Optional[str]:
+    from . import wandb_api
+
+    api = wandb_api.get_wandb_api_sync()
+    return api.username()
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
@@ -50,17 +59,24 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
 def init_weave(project_name: str) -> InitializedClient:
     from . import wandb_api
 
-    entity_name, project_name = get_entity_project_from_project_name(project_name)
-
-    remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
-    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
     wandb_api.init()
     wandb_context = wandb_api.get_wandb_api_context()
+    if wandb_context is None:
+        import wandb
+
+        wandb.login()
+        wandb_api.init()
+        wandb_context = wandb_api.get_wandb_api_context()
+
+    remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
+    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+
     if wandb_context is not None and wandb_context.api_key is not None:
         remote_server.set_auth(("api", wandb_context.api_key))
+
+    entity_name, project_name = get_entity_project_from_project_name(project_name)
 
     # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(entity_name, project_name, remote_server)
@@ -77,6 +93,22 @@ def init_weave(project_name: str) -> InitializedClient:
     # logged in local mode currently. When that's fixed, this autopatch call can be
     # moved to InitializedClient.__init__
     autopatch.autopatch()
+
+    username = get_username()
+    try:
+        min_required_version = (
+            remote_server.server_info().min_required_weave_python_version
+        )
+    # TODO: Tighten this exception to only catch the specific exception
+    # that is thrown by the server_info call.
+    except Exception:
+        # Set to a minimum version that will always pass the check
+        # In the future, we may want to throw here.
+        min_required_version = "0.0.0"
+    init_message.assert_min_weave_version(min_required_version)
+    init_message.print_init_message(
+        username, entity_name, project_name, min_required_version
+    )
 
     return init_client
 

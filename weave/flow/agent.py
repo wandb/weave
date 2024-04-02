@@ -68,8 +68,8 @@ class Agent(Object):
             LogEvents.chat_response_complete(response_message.content)
 
         new_messages = []
-        # TODO: need this to work around the fact that Weave replaces pydantic
-        # objects before they get to openai. Fix Weave!
+        # we always store the dict representations of messages in agent state
+        # instead of mixing in some pydantic objects.
         new_messages.append(response_message.model_dump(exclude_none=True))
         if response_message.tool_calls:
             new_messages.extend(

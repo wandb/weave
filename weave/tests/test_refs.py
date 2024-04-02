@@ -6,6 +6,12 @@ from .. import storage
 from .. import ops_arrow as arrow
 from weave.flow.obj import Object
 
+from weave.trace_server.refs_internal import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    OBJECT_ATTR_EDGE_NAME,
+)
+
 
 def test_laref_artifact_version_1():
     art = artifact_local.LocalArtifact("my-art", "v19")
@@ -215,7 +221,7 @@ def test_ref_extra_dict(ref_tracking):
 
     val = saved_obj["a"]
     assert val == 1
-    assert_local_ref(val, ["obj"], ["key", "a"])
+    assert_local_ref(val, ["obj"], [DICT_KEY_EDGE_NAME, "a"])
     assert storage.get(val._ref.uri) == 1
 
 
@@ -229,7 +235,7 @@ def test_ref_extra_list(ref_tracking):
 
     val = saved_obj[0]
     assert val == 1
-    assert_local_ref(val, ["obj"], ["ndx", "0"])
+    assert_local_ref(val, ["obj"], [LIST_INDEX_EDGE_NAME, "0"])
     assert storage.get(val._ref.uri) == 1
 
 
@@ -269,7 +275,7 @@ def test_ref_extra_object(ref_tracking, get_custom_object_classes):
 
     val = saved_obj.inner_a
     assert val == 1
-    assert_local_ref(val, ["obj"], ["atr", "inner_a"])
+    assert_local_ref(val, ["obj"], [OBJECT_ATTR_EDGE_NAME, "inner_a"])
     assert storage.get(val._ref.uri) == 1
 
 
@@ -328,7 +334,18 @@ def test_ref_extra_table_very_nested(ref_tracking, get_custom_object_classes):
     assert_local_ref(
         val,
         ["obj"],
-        ["row", "0", "key", "a", "row", "0", "ndx", "0", "atr", "inner_a"],
+        [
+            "row",
+            "0",
+            DICT_KEY_EDGE_NAME,
+            "a",
+            "row",
+            "0",
+            LIST_INDEX_EDGE_NAME,
+            "0",
+            OBJECT_ATTR_EDGE_NAME,
+            "inner_a",
+        ],
     )
     assert storage.get(val._ref.uri) == 1
 
@@ -348,12 +365,14 @@ def test_refs_across_artifacts(ref_tracking):
     # Non-saved children follow the same ref structure
     val = saved_outer_obj["outer"]
     assert val == inner_obj
-    assert_local_ref(val, ["obj"], ["key", "outer"])
+    assert_local_ref(val, ["obj"], [DICT_KEY_EDGE_NAME, "outer"])
     assert storage.get(val._ref.uri) == inner_obj
 
     val = saved_outer_obj["outer"]["a"]
     assert val == 1
-    assert_local_ref(val, ["obj"], ["key", "outer", "key", "a"])
+    assert_local_ref(
+        val, ["obj"], [DICT_KEY_EDGE_NAME, "outer", DICT_KEY_EDGE_NAME, "a"]
+    )
     assert storage.get(val._ref.uri) == 1
 
     # Jumping artifact boundaries uses new artifact refs
@@ -364,7 +383,7 @@ def test_refs_across_artifacts(ref_tracking):
 
     val = saved_outer_obj["inner"]["a"]
     # assert val == inner_obj
-    assert_local_ref(val, ["obj"], ["key", "a"])
+    assert_local_ref(val, ["obj"], [DICT_KEY_EDGE_NAME, "a"])
     assert storage.get(val._ref.uri) == 1
 
 
@@ -381,7 +400,7 @@ def test_ref_objects_across_artifacts_nocross(ref_tracking, get_custom_object_cl
     saved_obj_b = weave.use(weave.save(obj_b))
 
     val = saved_obj_b.inner_b
-    assert_local_ref(val, ["obj"], ["atr", "inner_b"])
+    assert_local_ref(val, ["obj"], [OBJECT_ATTR_EDGE_NAME, "inner_b"])
 
 
 @pytest.mark.parametrize(

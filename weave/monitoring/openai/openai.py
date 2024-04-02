@@ -4,13 +4,15 @@ import functools
 from contextlib import contextmanager
 from functools import partialmethod
 from typing import Callable, Type, Union
+import typing
 
 import openai
 from openai import AsyncStream, Stream
-from openai.types.chat import ChatCompletion
+from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
 
 from weave import graph_client_context, run_context
+from weave.trace.op import Op
 
 from ..monitor import _get_global_monitor
 from .models import *
@@ -18,6 +20,24 @@ from .util import *
 
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
+
+create_op_name = "openai.chat.completions.create"
+create_op: typing.Union[str, Op] = create_op_name
+try:
+    create_op = Op(old_create)
+    create_op.name = create_op_name
+except Exception as e:
+    pass
+
+
+def to_python(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: to_python(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [to_python(v) for v in obj]
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    return obj
 
 
 class partialmethod_with_self(partialmethod):
@@ -38,8 +58,7 @@ class AsyncChatCompletions:
 
     async def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
-        inputs = ChatCompletionRequest.parse_obj(named_args).dict()
-        with log_run("openai.chat.completions.create", inputs) as finish_run:
+        with log_run(create_op, named_args) as finish_run:
             result = await self._base_create(*args, **kwargs)
             finish_run(result.model_dump(exclude_unset=True))
         return result
@@ -47,26 +66,33 @@ class AsyncChatCompletions:
     async def _streaming_create(
         self, *args: Any, **kwargs: Any
     ) -> AsyncStream[ChatCompletionChunk]:
+        from weave.flow.chat_util import OpenAIStream
+
         named_args = bind_params(old_create, *args, **kwargs)
-        inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run(
-            "openai.chat.completions.create", inputs.model_dump()
-        ) as finish_run:
+        messages = to_python(named_args["messages"])
+        if not isinstance(messages, list):
+            raise ValueError("messages must be a list")
+        with log_run(create_op, named_args) as finish_run:
             # Need to put in a function so the outer function is not a
             # generator. Generators don't execute any of their body's
             # code until next() is called. But we want to create the run
             # as a child of whatever the parent is, at function call time,
             # not generator start time.
-            # TODO: need to fix this to use OpenAIStream instead of reconstruct_completion
-            # like the sync _stream_create below
             async def _stream_create_gen():  # type: ignore
                 chunks = []
                 stream = await self._base_create(*args, **kwargs)
                 async for chunk in stream:
                     chunks.append(chunk)
                     yield chunk
-                result = reconstruct_completion(inputs.messages, chunks)  # type: ignore
-                finish_run(result.model_dump(exclude_unset=True))
+                wrapped_stream = OpenAIStream(chunks)
+                list(wrapped_stream)
+
+                result = wrapped_stream.final_response()
+                result_with_usage = ChatCompletion(
+                    **result.model_dump(exclude_unset=True),
+                    usage=token_usage(messages, result.choices),
+                )
+                finish_run(result_with_usage.model_dump(exclude_unset=True))
 
         return _stream_create_gen()  # type: ignore
 
@@ -85,8 +111,7 @@ class ChatCompletions:
 
     def _create(self, *args: Any, **kwargs: Any) -> ChatCompletion:
         named_args = bind_params(old_create, *args, **kwargs)
-        inputs = ChatCompletionRequest.parse_obj(named_args).dict()
-        with log_run("openai.chat.completions.create", inputs) as finish_run:
+        with log_run(create_op, named_args) as finish_run:
             result = self._base_create(*args, **kwargs)
             finish_run(result.model_dump(exclude_unset=True))
         return result
@@ -95,10 +120,11 @@ class ChatCompletions:
         self, *args: Any, **kwargs: Any
     ) -> Stream[ChatCompletionChunk]:
         named_args = bind_params(old_create, *args, **kwargs)
-        inputs = ChatCompletionRequest.parse_obj(named_args)
-        with log_run(
-            "openai.chat.completions.create", inputs.model_dump()
-        ) as finish_run:
+        messages = to_python(named_args["messages"])
+        if not isinstance(messages, list):
+            raise ValueError("messages must be a list")
+
+        with log_run(create_op, named_args) as finish_run:
 
             def _stream_create_gen():  # type: ignore
                 stream = self._base_create(*args, **kwargs)
@@ -110,7 +136,7 @@ class ChatCompletions:
                 result = wrapped_stream.final_response()
                 result_with_usage = ChatCompletion(
                     **result.model_dump(exclude_unset=True),
-                    usage=token_usage(inputs.messages, result.choices),
+                    usage=token_usage(messages, result.choices),
                 )
                 finish_run(result_with_usage.model_dump(exclude_unset=True))
 
@@ -159,19 +185,21 @@ def unpatch() -> None:
 
 # TODO: centralize
 @contextmanager
-def log_run(call_name: str, inputs: dict[str, Any]) -> Iterator[Callable]:
+def log_run(
+    call_name: typing.Union[str, Op], inputs: dict[str, Any]
+) -> Iterator[Callable]:
     client = graph_client_context.require_graph_client()
     parent_run = run_context.get_current_run()
     # TODO: client should not need refs passed in.
-    run = client.create_run(call_name, parent_run, inputs, [])
+    run = client.create_call(call_name, parent_run, inputs)
 
     def finish_run(output: Any) -> None:
         # TODO: client should not need refs passed in.
-        client.finish_run(run, output, [])
+        client.finish_call(run, output)
 
     try:
         with run_context.current_run(run):
             yield finish_run
     except Exception as e:
-        client.fail_run(run, e)
+        client.fail_call(run, e)
         raise

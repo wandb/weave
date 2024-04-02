@@ -8,9 +8,10 @@ from weave import __version__
 # from .model_server import app
 from .urls import BROWSE3_PATH
 from . import api
-from . import uris
 from . import artifact_wandb
 from .deploy import gcp as google
+
+from weave.trace.refs import parse_uri, ObjectRef
 
 # TODO: does this work?
 os.environ["PYTHONUNBUFFERED"] = "1"
@@ -22,20 +23,21 @@ def cli() -> None:
     pass
 
 
-@cli.command("ui", help="Start the weave UI.")
-def start_ui() -> None:
-    print("Starting server...")
-    try:
-        from weave import server
-    except ModuleNotFoundError:
-        print("Run 'pip install weave[engine]' to use the local server.")
-        sys.exit(1)
-    serv = server.HttpServer(port=3000)  # type: ignore
-    serv.start()
-    print("Server started")
-    print(f"http://localhost:3000/{BROWSE3_PATH}")
-    while True:
-        time.sleep(10)
+# Not included for now.
+# @cli.command("ui", help="Start the weave UI.")
+# def start_ui() -> None:
+#     print("Starting server...")
+#     try:
+#         from weave import server
+#     except ModuleNotFoundError:
+#         print("Run 'pip install weave[engine]' to use the local server.")
+#         sys.exit(1)
+#     serv = server.HttpServer(port=3000)  # type: ignore
+#     serv.start()
+#     print("Server started")
+#     print(f"http://localhost:3000/{BROWSE3_PATH}")
+#     while True:
+#         time.sleep(10)
 
 
 @cli.command(help="Serve weave models.")
@@ -55,11 +57,10 @@ def serve(
     env: str,
     port: int,
 ) -> None:
-    parsed_uri = uris.WeaveURI.parse(model_ref)
-    if not isinstance(parsed_uri, artifact_wandb.WeaveWBArtifactURI):
-        raise ValueError(f"Expected a weave artifact uri, got {parsed_uri}")
-    parsed_ref = parsed_uri.to_ref()
-    ref_project = parsed_uri.project_name
+    parsed_ref = parse_uri(model_ref)
+    if not isinstance(parsed_ref, ObjectRef):
+        raise ValueError(f"Expected a weave artifact uri, got {parsed_ref}")
+    ref_project = parsed_ref.project
     project_override = project or os.getenv("PROJECT_NAME")
     if project_override:
         print(f"Logging to project different from {ref_project}")

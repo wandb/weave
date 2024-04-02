@@ -4,13 +4,14 @@ import {
   GridRowSelectionModel,
   GridRowsProp,
 } from '@mui/x-data-grid-pro';
-import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {Loading} from '../../../../Loading';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
-import {CategoryChip} from './common/CategoryChip';
 import {basicField} from './common/DataTable';
+import {Empty} from './common/Empty';
+import {EMPTY_PROPS_OPERATIONS} from './common/EmptyContent';
 import {
   CallsLink,
   opNiceName,
@@ -19,13 +20,11 @@ import {
 } from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {useInitializingFilter, useURLSearchParamsDict} from './util';
-import {HackyOpCategory} from './wfInterface/types';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
 
 export type WFHighLevelOpVersionFilter = {
-  opCategory?: HackyOpCategory | null;
   opName?: string | null;
 };
 
@@ -45,11 +44,9 @@ export const OpVersionsPage: React.FC<{
   const title = useMemo(() => {
     if (filter.opName) {
       return 'Implementations of ' + filter.opName;
-    } else if (filter.opCategory) {
-      return _.capitalize(filter.opCategory) + ' Operations';
     }
     return 'All Operations';
-  }, [filter.opCategory, filter.opName]);
+  }, [filter.opName]);
 
   return (
     <SimplePageLayout
@@ -87,16 +84,13 @@ export const FilterableOpVersionsTable: React.FC<{
 
   const effectivelyLatestOnly = !effectiveFilter.opName;
 
-  const filteredObjectVersions = useOpVersions(props.entity, props.project, {
-    category: effectiveFilter.opCategory
-      ? [effectiveFilter.opCategory]
-      : undefined,
+  const filteredOpVersions = useOpVersions(props.entity, props.project, {
     opIds: effectiveFilter.opName ? [effectiveFilter.opName] : undefined,
     latestOnly: effectivelyLatestOnly,
   });
 
   const rows: GridRowsProp = useMemo(() => {
-    return (filteredObjectVersions.result ?? []).map((ov, i) => {
+    return (filteredOpVersions.result ?? []).map((ov, i) => {
       return {
         ...ov,
         id: opVersionKeyToRefUri(ov),
@@ -104,7 +98,7 @@ export const FilterableOpVersionsTable: React.FC<{
         obj: ov,
       };
     });
-  }, [filteredObjectVersions.result]);
+  }, [filteredOpVersions.result]);
   const columns: GridColDef[] = [
     basicField('op', 'Op', {
       hideable: false,
@@ -130,14 +124,6 @@ export const FilterableOpVersionsTable: React.FC<{
       renderCell: cellParams => {
         const obj: OpVersionSchema = cellParams.row.obj;
         return <OpCallsLink obj={obj} />;
-      },
-    }),
-
-    basicField('category', 'Category', {
-      width: 100,
-      renderCell: cellParams => {
-        const category = cellParams.value;
-        return category && <CategoryChip value={category} />;
       },
     }),
 
@@ -190,6 +176,17 @@ export const FilterableOpVersionsTable: React.FC<{
       }
     }
   }, [rowIds, peekId]);
+
+  if (filteredOpVersions.loading) {
+    return <Loading centered />;
+  }
+
+  // TODO: Only show the empty state if unfiltered
+  const opVersions = filteredOpVersions.result ?? [];
+  const isEmpty = opVersions.length === 0;
+  if (isEmpty) {
+    return <Empty {...EMPTY_PROPS_OPERATIONS} />;
+  }
 
   return (
     <StyledDataGrid

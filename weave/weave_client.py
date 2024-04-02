@@ -4,11 +4,20 @@ import typing
 import uuid
 import pydantic
 import datetime
+import traceback
+
+
+from requests import HTTPError
 
 from weave.table import Table
 from weave import urls
+from weave import run_context
 from weave.trace.op import Op
-from weave.trace.object_record import ObjectRecord, pydantic_object_record
+from weave.trace.object_record import (
+    ObjectRecord,
+    pydantic_object_record,
+    pydantic_asdict_one_level,
+)
 from weave.trace.serialize import to_json, from_json
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
@@ -21,6 +30,7 @@ from weave.trace_server.trace_server_interface import (
     CallStartReq,
     CallsQueryReq,
     CallEndReq,
+    EndedCallSchemaForInsert,
     CallSchema,
     ObjQueryReq,
     ObjQueryRes,
@@ -31,7 +41,7 @@ from weave.trace_server.trace_server_interface import (
     _CallsFilter,
     _ObjectVersionFilter,
 )
-from weave.trace_server.refs import (
+from weave.trace.refs import (
     Ref,
     ObjectRef,
     TableRef,
@@ -39,7 +49,7 @@ from weave.trace_server.refs import (
     parse_uri,
     OpRef,
 )
-from weave.trace.vals import TraceObject, TraceTable, Tracable, make_trace_obj
+from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 
 if typing.TYPE_CHECKING:
     from . import ref_base
@@ -96,9 +106,11 @@ def map_to_refs(obj: Any) -> Any:
         return ref
     if isinstance(obj, ObjectRecord):
         return obj.map_values(map_to_refs)
-    if isinstance(obj, pydantic.BaseModel):
+    elif isinstance(obj, pydantic.BaseModel):
         obj_record = pydantic_object_record(obj)
         return obj_record.map_values(map_to_refs)
+    elif isinstance(obj, Table):
+        return obj.ref
     elif isinstance(obj, list):
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
@@ -122,6 +134,9 @@ class Call:
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
+    summary: Optional[dict] = None
+    # These are the live children during logging
+    _children: list["Call"] = dataclasses.field(default_factory=list)
 
     @property
     def ui_url(self) -> str:
@@ -133,6 +148,7 @@ class Call:
             raise ValueError("Can't get URL for call without ID")
         return urls.call_path_as_peek(entity, project, self.id)
 
+    # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
         client = graph_client_context.require_graph_client()
         if not self.id:
@@ -190,21 +206,33 @@ class CallsIter:
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
 ) -> TraceObject:
-    output = server_call.outputs
-    if isinstance(output, dict) and "_result" in output:
-        output = output["_result"]
+    output = server_call.output
     call = Call(
-        op_name=server_call.name,
+        op_name=server_call.op_name,
         project_id=server_call.project_id,
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
+        summary=server_call.summary,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
     return TraceObject(call, CallRef(entity, project, call.id), server, None)
+
+
+def sum_dict_leaves(dicts: list[dict]) -> dict:
+    # dicts is a list of dictionaries, that may or may not
+    # have nested dictionaries. Sum all the leaves that match
+    result: dict = {}
+    for d in dicts:
+        for k, v in d.items():
+            if isinstance(v, dict):
+                result[k] = sum_dict_leaves([result.get(k, {}), v])
+            else:
+                result[k] = result.get(k, 0) + v
+    return result
 
 
 class WeaveClient:
@@ -226,7 +254,7 @@ class WeaveClient:
     # This is used by tests and op_execute still, but the save() interface
     # is nicer for clients I think?
     def save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        val = self.save_nested_objects(val, name=name)
+        self.save_nested_objects(val, name=name)
         return self._save_object(val, name, branch)
 
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
@@ -239,15 +267,17 @@ class WeaveClient:
         response = self.server.obj_create(
             ObjCreateReq(
                 obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project, name=name, val=json_val
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
                 )
             )
         )
         ref: Ref
         if is_opdef:
-            ref = OpRef(self.entity, self.project, name, response.version_digest)
+            ref = OpRef(self.entity, self.project, name, response.digest)
         else:
-            ref = ObjectRef(self.entity, self.project, name, response.version_digest)
+            ref = ObjectRef(self.entity, self.project, name, response.digest)
         # TODO: Try to put a ref onto val? Or should user code use a style like
         # save instead?
         return ref
@@ -259,17 +289,29 @@ class WeaveClient:
         return self.get(ref)
 
     def get(self, ref: ObjectRef) -> Any:
-        read_res = self.server.obj_read(
-            ObjReadReq(
-                entity=self.entity,
-                project=self.project,
-                name=ref.name,
-                version_digest=ref.version,
+        try:
+            read_res = self.server.obj_read(
+                ObjReadReq(
+                    project_id=self._project_id(),
+                    object_id=ref.name,
+                    digest=ref.digest,
+                )
             )
-        )
+        except HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+            raise
+
         # Probably bad form to mutate the ref here
-        if ref.version == "latest":
-            ref.version = read_res.obj.digest
+        # At this point, `ref.digest` is one of three things:
+        # 1. "latest" - the user asked for the latest version of the object
+        # 2. "v###" - the user asked for a specific version of the object
+        # 3. The actual digest.
+        #
+        # However, we always want to resolve the ref to the digest. So
+        # here, we just directly assign the digest.
+        ref.digest = read_res.obj.digest
+
         val = from_json(read_res.obj.val, self._project_id(), self.server)
         return make_trace_obj(val, ref, self.server, None)
 
@@ -307,7 +349,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(_CallsFilter(op_version_refs=[op_ref.uri()]))
+        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
 
     def objects(self, filter: Optional[_ObjectVersionFilter] = None) -> list[ObjSchema]:
         if not filter:
@@ -326,21 +368,30 @@ class WeaveClient:
         return response.objs
 
     def _save_op(self, op: Op) -> Ref:
+        if op.ref is not None:
+            return op.ref
         op_def_ref = self._save_object(op, op.name)
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
 
     def create_call(
-        self, op: Union[str, Op], parent: Optional[Call], inputs: dict
+        self,
+        op: Union[str, Op],
+        parent: Optional[Call],
+        inputs: dict,
+        attributes: dict = {},
     ) -> Call:
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
             op_str = op
-        inputs = self.save_nested_objects(inputs)
+        self.save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
+
+        if parent is None:
+            parent = run_context.get_current_run()
 
         if parent:
             trace_id = parent.trace_id
@@ -356,89 +407,114 @@ class WeaveClient:
             id=call_id,
             inputs=inputs_with_refs,
         )
+        if parent is not None:
+            parent._children.append(call)
+
         current_wb_run_id = safe_current_wb_run_id()
         start = StartedCallSchemaForInsert(
             project_id=self._project_id(),
             id=call_id,
-            name=op_str,
+            op_name=op_str,
             trace_id=trace_id,
-            start_datetime=datetime.datetime.now(tz=datetime.timezone.utc),
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
-            attributes={},
+            attributes=attributes,
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
         return call
 
     def finish_call(self, call: Call, output: Any) -> None:
-        # TODO: not saving finished call yet
-        output = self.save_nested_objects(output)
+        self.save_nested_objects(output)
         output = map_to_refs(output)
         call.output = output
-        if not isinstance(output, dict):
-            output = {"_result": output}
+
+        # Summary handling
+        summary = {}
+        if call._children:
+            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+        elif isinstance(output, dict) and "usage" in output and "model" in output:
+            summary["usage"] = {}
+            summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
+
         self.server.call_end(
-            CallEndReq.model_validate(
-                {
-                    "end": {
-                        "project_id": self._project_id(),
-                        "id": call.id,
-                        "end_datetime": datetime.datetime.now(tz=datetime.timezone.utc),
-                        "outputs": to_json(output, self._project_id(), self.server),
-                        "summary": {},
-                    },
-                }
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=self._project_id(),
+                    id=call.id,  # type: ignore
+                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    output=to_json(output, self._project_id(), self.server),
+                    summary=summary,
+                )
             )
         )
 
-    # These are the old client interface terms, op_execute still relies
-    # on them.
-    def create_run(
-        self, op_name: str, parent_run: typing.Optional[Call], inputs: dict, refs: Any
-    ) -> Call:
-        return self.create_call(op_name, parent_run, inputs)
+        # Descendent error tracking disabled til we fix UI
+        # Add this call's summary after logging the call, so that only
+        # descendents are included in what we log
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["successes"] += 1
+        call.summary = summary
 
-    def finish_run(self, run: Call, output: Any, refs: Any) -> None:
-        self.finish_call(run, output)
+    def fail_call(self, call: Call, exception: BaseException) -> None:
+        # Full traceback disabled til we fix UI.
+        # stack_trace = "".join(
+        #     traceback.format_exception(
+        #         type(exception), exception, exception.__traceback__
+        #     )
+        # )
+        # exception_str = f"{stack_trace}\n{type(exception).__name__}: {str(exception)}"
+        exception_str = str(exception)
+        call.exception = exception_str
 
-    def fail_run(self, run: Call, exception: BaseException) -> None:
-        self.finish_call(run, str(exception))
+        # Summary handling
+        summary = {}
+        if call._children:
+            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+
+        self.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=self._project_id(),
+                    id=call.id,  # type: ignore
+                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    exception=exception_str,
+                    summary=summary,
+                )
+            )
+        )
+
+        # Descendent error tracking disabled til we fix UI
+        # Add this call's summary after logging the call, so that only
+        # descendents are included in what we log
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["errors"] += 1
+
+        call.summary = summary
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
-        if isinstance(obj, Tracable):
-            return obj
+        if get_ref(obj) is not None:
+            return
         if isinstance(obj, pydantic.BaseModel):
-            if hasattr(obj, "_trace_object"):
-                return obj._trace_object
-            obj_rec = pydantic_object_record(obj).map_values(self.save_nested_objects)
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self.save_nested_objects(v)
             ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
-            if not isinstance(ref, ObjectRef):
-                raise ValueError(f"Expected ObjectRef, got {ref}")
-            # return make_trace_obj(obj_rec, ref, client.server, None)
-            trace_obj = make_trace_obj(obj_rec, ref, self.server, None)
-            obj._trace_object = trace_obj
-            return trace_obj
+            obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
             table_ref = self.save_table(obj)
-            # Construct TraceTable with a None ref argument here. Tables must always be
-            # stored within objects. We don't want to ever expose users to TableRef.
-            # When this TraceTable is access via an outer object, it will have a ref
-            # rooted at that object.
-            return TraceTable(table_ref, None, self.server, _TableRowFilter(), None)
+            obj.ref = table_ref
         elif isinstance(obj, list):
-            return [self.save_nested_objects(v) for v in obj]
+            for v in obj:
+                self.save_nested_objects(v)
         elif isinstance(obj, dict):
-            return {k: self.save_nested_objects(v) for k, v in obj.items()}
-
-        if isinstance(obj, Op):
+            for v in obj.values():
+                self.save_nested_objects(v)
+        elif isinstance(obj, Op):
             self._save_op(obj)
-            return obj
-
-        # Leave custom objects alone. They do not need to be saved by the
-        # time user code interacts with them since they are always leaves
-        # and we don't do ref-tracking inside them.
-        return obj
 
     def ref_input_to(self, ref: "ref_base.Ref") -> Sequence[Call]:
         raise NotImplementedError()
@@ -460,6 +536,9 @@ class WeaveClient:
 
     def ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
+
+    def __repr__(self) -> str:
+        return ""
 
 
 def safe_current_wb_run_id() -> Optional[str]:
