@@ -817,6 +817,7 @@ def test_namedtuple_support(client):
     assert len(res.calls) == 1
     assert res.calls[0].output == [{"x": 1, "y": 2}, 3]
 
+
 def test_unknown_input_and_output_types(client):
     class MyUnserializableClassA:
         a_val: float
