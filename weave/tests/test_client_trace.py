@@ -3,7 +3,7 @@ import os
 import typing
 import pytest
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import wandb
 import weave
 from weave import weave_client
@@ -756,6 +756,16 @@ def test_attributes_on_ops(client):
 
     assert len(res.calls) == 1
     assert res.calls[0].attributes == {"custom": "attribute"}
+
+
+def test_dataset_row_type(client):
+    d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[{"a": 1}, "a", "b"])
+    with pytest.raises(ValidationError):
+        d = weave.Dataset(rows=[{"a": 1}, {}])
 
 
 def test_tuple_support(client):
