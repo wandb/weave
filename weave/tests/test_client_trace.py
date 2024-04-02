@@ -768,9 +768,7 @@ def test_dataset_row_type(client):
         d = weave.Dataset(rows=[{"a": 1}, {}])
 
 
-def test_op_retrieval():
-    weave.init("timssweeney/dev_testing")
-
+def test_op_retrieval(client):
     @weave.op()
     def my_op(a: int) -> int:
         return a + 1
@@ -780,6 +778,8 @@ def test_op_retrieval():
     my_op2 = my_op_ref.get()
     assert my_op2(1) == 2
 
+
+def test_bound_op_retrieval(client):
     class CustomType(weave.Object):
         a: int
 
@@ -793,5 +793,24 @@ def test_op_retrieval():
     assert obj2.op_with_custom_type(1) == 2
 
     my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
+    with pytest.raises(MissingSelfInstanceError):
+        my_op2 = my_op_ref.get()
+
+
+@pytest.mark.skip("not implemented")
+def test_bound_op_retrieval_no_self(client):
+    class CustomTypeWithoutSelf(weave.Object):
+        a: int
+
+        @weave.op()
+        def op_with_custom_type(me, v):
+            return me.a + v
+
+    obj = CustomTypeWithoutSelf(a=1)
+    obj_ref = weave.publish(obj)
+    obj2 = obj_ref.get()
+    assert obj2.op_with_custom_type(1) == 2
+
+    my_op_ref = weave_client.get_ref(CustomTypeWithoutSelf.op_with_custom_type)
     with pytest.raises(MissingSelfInstanceError):
         my_op2 = my_op_ref.get()
