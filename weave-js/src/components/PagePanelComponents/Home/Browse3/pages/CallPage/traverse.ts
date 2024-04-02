@@ -281,7 +281,7 @@ export const traversed = (
   data: any,
   filter?: (context: TraverseContext) => boolean,
   callback?: (context: TraverseContext) => CallbackResult
-  ): TraverseContext[] => {
+): TraverseContext[] => {
   const matches: TraverseContext[] = [];
   const f = filter ?? UNFILTERED;
   traverse(data, context => {

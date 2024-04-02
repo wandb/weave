@@ -96,7 +96,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       c =>
         c.depth !== 0 && !c.path.endsWith('_ref') && !c.path.endsWith('_type'),
       c => {
-        if (c.valueType === 'array') return 'skip';
+        if (c.valueType === 'array') {
+          return 'skip';
+        }
         return undefined;
       }
     );

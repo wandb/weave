@@ -21,7 +21,7 @@ import {StyledDataGrid} from '../StyledDataGrid';
 const MAX_ROWS = 1000;
 
 export const TableView: FC<{
-  data: Array<any>;
+  data: any[];
   displayKey?: string;
   loading?: boolean;
   isTruncated?: boolean;
@@ -74,7 +74,7 @@ export const TableView: FC<{
   }, [data]);
 
   const columnSpec: GridColDef[] = useMemo(() => {
-    let res: GridColDef[] = [];
+    const res: GridColDef[] = [];
     if (props.onLinkClick) {
       res.push({
         field: '_row_click',
@@ -104,7 +104,7 @@ export const TableView: FC<{
       )}
       <Box
         sx={{
-          height: height,
+          height,
           width: '100%',
         }}>
         <StyledDataGrid

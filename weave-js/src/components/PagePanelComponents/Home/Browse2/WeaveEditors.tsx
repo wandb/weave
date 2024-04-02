@@ -51,6 +51,10 @@ import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../Browse3/context';
+import {
+  TableView,
+  typeToDataGridColumnSpec,
+} from '../Browse3/dataViews/TableView';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
 import {Link} from '../Browse3/pages/common/Links';
 import {
@@ -66,10 +70,6 @@ import {flattenObject, unflattenObject} from './browse2Util';
 import {CellValue} from './CellValue';
 import {parseRefMaybe, SmallRef} from './SmallRef';
 import {useRefPageUrl} from './url';
-import {
-  TableView,
-  typeToDataGridColumnSpec,
-} from '../Browse3/dataViews/TableView';
 
 const displaysAsSingleRow = (valueType: Type) => {
   if (valueType === 'none') {
