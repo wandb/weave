@@ -44,6 +44,9 @@ class RefWithExtra(Ref):
         return self.with_extra([TABLE_ROW_ID_EDGE_NAME, f"{item_digest}"])
 
 
+from .. import trace_sentry
+
+
 @dataclasses.dataclass
 class ObjectRef(RefWithExtra):
     entity: str
@@ -58,6 +61,7 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(self.extra)
         return u
 
+    @trace_sentry.global_trace_sentry.watch()
     def get(self) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
