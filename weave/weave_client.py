@@ -303,8 +303,15 @@ class WeaveClient:
             raise
 
         # Probably bad form to mutate the ref here
-        if ref.digest == "latest":
-            ref.digest = read_res.obj.digest
+        # At this point, `ref.digest` is one of three things:
+        # 1. "latest" - the user asked for the latest version of the object
+        # 2. "v###" - the user asked for a specific version of the object
+        # 3. The actual digest.
+        #
+        # However, we always want to resolve the ref to the digest. So
+        # here, we just directly assign the digest.
+        ref.digest = read_res.obj.digest
+
         val = from_json(read_res.obj.val, self._project_id(), self.server)
         return make_trace_obj(val, ref, self.server, None)
 
