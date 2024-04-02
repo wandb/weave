@@ -293,12 +293,16 @@ class MockAsyncStream(AsyncStream):
     def __init__(self, chunks: List):
         self._chunks = iter(chunks)
 
-        def _process_response_data(*, data: object, **kwargs):
+        def process_response_data(*, data: object, **kwargs):
             return ChatCompletionChunk.model_validate(data)
+
+        def make_sse_decoder():
+            from openai._streaming import SSEDecoder
+            return SSEDecoder()
 
         super().__init__(
             cast_to=ChatCompletionChunk,
-            client=Mock(_process_response_data=_process_response_data),
+            client=Mock(_process_response_data=process_response_data, _make_sse_decoder=make_sse_decoder),
             response=MockAsyncResponse(chunks),
         )
 
