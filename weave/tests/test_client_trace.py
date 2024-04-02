@@ -805,6 +805,8 @@ def test_dataclass_support(client):
         res.calls[0].output
         == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
     )
+
+
 def test_op_retrieval(client):
     @weave.op()
     def my_op(a: int) -> int:
