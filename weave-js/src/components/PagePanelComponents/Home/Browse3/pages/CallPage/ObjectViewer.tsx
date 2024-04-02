@@ -12,7 +12,7 @@ import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
-import {mapObject, traverse, TraverseContext, traversed} from './traverse';
+import {mapObject, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
 type Data = Record<string, any>;
@@ -77,11 +77,19 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   }, [data, client, refsData.result, refs]);
 
   const rows = useMemo(() => {
-    const contexts = traversed(
-      resolvedData,
-      c =>
-        c.depth !== 0 && !c.path.endsWith('_ref') && !c.path.endsWith('_type')
-    );
+    const contexts: TraverseContext[] = [];
+    traverse(resolvedData, context => {
+      if (context.depth !== 0) {
+        // For now we'll hide all keys that start with an underscore.
+        // Eventually we might offer a user toggle to display them.
+        if (context.path.hasHiddenKey()) {
+          return 'skip';
+        }
+        contexts.push(context);
+      }
+      return true;
+    });
+
     return contexts.map((c, id) => ({id, ...c}));
   }, [resolvedData]);
 

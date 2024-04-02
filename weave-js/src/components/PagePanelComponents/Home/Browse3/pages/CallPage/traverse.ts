@@ -91,6 +91,11 @@ export class ObjectPath {
     return this.path[this.path.length - 1] === element;
   }
 
+  hasHiddenKey(): boolean {
+    const t = this.tail();
+    return typeof t === 'string' && t.startsWith('_');
+  }
+
   length(): number {
     return this.path.length;
   }
