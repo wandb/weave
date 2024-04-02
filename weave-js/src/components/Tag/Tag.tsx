@@ -102,7 +102,7 @@ export const RemovableTag: FC<RemovableTagProps> = ({
         <p
           className={twMerge(
             'max-w-[172px]', // 172px =  MAX_TAG_LABEL_WIDTH_PX + 14 (account for remove action button)
-            'whitespace-nowrap" overflow-hidden text-ellipsis'
+            'overflow-hidden text-ellipsis whitespace-nowrap'
           )}
           ref={labelRef}>
           {label}
