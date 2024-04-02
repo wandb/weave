@@ -797,7 +797,7 @@ def test_bound_op_retrieval(client):
         my_op2 = my_op_ref.get()
 
 
-@pytest.mark.skip("not implemented")
+@pytest.mark.skip("Not implemented: general bound op designation")
 def test_bound_op_retrieval_no_self(client):
     class CustomTypeWithoutSelf(weave.Object):
         a: int
