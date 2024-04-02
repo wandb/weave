@@ -95,7 +95,20 @@ def init_weave(project_name: str) -> InitializedClient:
     autopatch.autopatch()
 
     username = get_username()
-    init_message.print_init_message(username, entity_name, project_name)
+    try:
+        min_required_version = (
+            remote_server.server_info().min_required_weave_python_version
+        )
+    # TODO: Tighten this exception to only catch the specific exception
+    # that is thrown by the server_info call.
+    except Exception:
+        # Set to a minimum version that will always pass the check
+        # In the future, we may want to throw here.
+        min_required_version = "0.0.0"
+    init_message.assert_min_weave_version(min_required_version)
+    init_message.print_init_message(
+        username, entity_name, project_name, min_required_version
+    )
 
     return init_client
 

@@ -181,6 +181,9 @@ class TraceObject(Tracable):
             )
             return object.__setattr__(self._val, __name, __value)
 
+    def __dir__(self) -> list[str]:
+        return dir(self._val)
+
     def __repr__(self) -> str:
         return f"TraceObject({self._val})"
 

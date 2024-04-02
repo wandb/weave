@@ -19,3 +19,5 @@ Faker==19.6.2  # used for synthetic data generation
 pytest-dotenv
 supervisor>=4.2.5
 clickhouse_connect==0.7.0
+uvicorn>=0.27.0
+fastapi>=0.110.0

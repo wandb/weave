@@ -26,6 +26,10 @@ class Batch(BaseModel):
     batch: t.List[t.Union[StartBatchItem, EndBatchItem]]
 
 
+class ServerInfoRes(BaseModel):
+    min_required_weave_python_version: str
+
+
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
 
@@ -91,6 +95,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
         r.raise_for_status()
         return res_model.model_validate(r.json())
+
+    def server_info(self) -> ServerInfoRes:
+        r = requests.get(self.trace_server_url + "/server_info")
+        r.raise_for_status()
+        return ServerInfoRes.model_validate(r.json())
 
     # Call API
     def call_start(

@@ -4,11 +4,14 @@ import typing
 import uuid
 import pydantic
 import datetime
+import traceback
+
 
 from requests import HTTPError
 
 from weave.table import Table
 from weave import urls
+from weave import run_context
 from weave.trace.op import Op
 from weave.trace.object_record import (
     ObjectRecord,
@@ -27,6 +30,7 @@ from weave.trace_server.trace_server_interface import (
     CallStartReq,
     CallsQueryReq,
     CallEndReq,
+    EndedCallSchemaForInsert,
     CallSchema,
     ObjQueryReq,
     ObjQueryRes,
@@ -130,6 +134,9 @@ class Call:
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
+    summary: Optional[dict] = None
+    # These are the live children during logging
+    _children: list["Call"] = dataclasses.field(default_factory=list)
 
     @property
     def ui_url(self) -> str:
@@ -141,6 +148,7 @@ class Call:
             raise ValueError("Can't get URL for call without ID")
         return urls.call_path_as_peek(entity, project, self.id)
 
+    # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
         client = graph_client_context.require_graph_client()
         if not self.id:
@@ -207,10 +215,24 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
+        summary=server_call.summary,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
     return TraceObject(call, CallRef(entity, project, call.id), server, None)
+
+
+def sum_dict_leaves(dicts: list[dict]) -> dict:
+    # dicts is a list of dictionaries, that may or may not
+    # have nested dictionaries. Sum all the leaves that match
+    result: dict = {}
+    for d in dicts:
+        for k, v in d.items():
+            if isinstance(v, dict):
+                result[k] = sum_dict_leaves([result.get(k, {}), v])
+            else:
+                result[k] = result.get(k, 0) + v
+    return result
 
 
 class WeaveClient:
@@ -361,6 +383,9 @@ class WeaveClient:
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
+        if parent is None:
+            parent = run_context.get_current_run()
+
         if parent:
             trace_id = parent.trace_id
             parent_id = parent.id
@@ -375,6 +400,9 @@ class WeaveClient:
             id=call_id,
             inputs=inputs_with_refs,
         )
+        if parent is not None:
+            parent._children.append(call)
+
         current_wb_run_id = safe_current_wb_run_id()
         start = StartedCallSchemaForInsert(
             project_id=self._project_id(),
@@ -391,40 +419,74 @@ class WeaveClient:
         return call
 
     def finish_call(self, call: Call, output: Any) -> None:
-        # TODO: not saving finished call yet
         self.save_nested_objects(output)
         output = map_to_refs(output)
         call.output = output
+
+        # Summary handling
+        summary = {}
+        if call._children:
+            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+        elif isinstance(output, dict) and "usage" in output and "model" in output:
+            summary["usage"] = {}
+            summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
+
         self.server.call_end(
-            CallEndReq.model_validate(
-                {
-                    "end": {
-                        "project_id": self._project_id(),
-                        "id": call.id,
-                        "ended_at": datetime.datetime.now(tz=datetime.timezone.utc),
-                        "output": to_json(output, self._project_id(), self.server),
-                        "summary": {},
-                    },
-                }
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=self._project_id(),
+                    id=call.id,  # type: ignore
+                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    output=to_json(output, self._project_id(), self.server),
+                    summary=summary,
+                )
             )
         )
 
-    # These are the old client interface terms, op_execute still relies
-    # on them.
-    def create_run(
-        self,
-        op_name: Union[str, Op],
-        parent_run: typing.Optional[Call],
-        inputs: dict,
-        refs: Any,
-    ) -> Call:
-        return self.create_call(op_name, parent_run, inputs)
+        # Descendent error tracking disabled til we fix UI
+        # Add this call's summary after logging the call, so that only
+        # descendents are included in what we log
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["successes"] += 1
+        call.summary = summary
 
-    def finish_run(self, run: Call, output: Any, refs: Any) -> None:
-        self.finish_call(run, output)
+    def fail_call(self, call: Call, exception: BaseException) -> None:
+        # Full traceback disabled til we fix UI.
+        # stack_trace = "".join(
+        #     traceback.format_exception(
+        #         type(exception), exception, exception.__traceback__
+        #     )
+        # )
+        # exception_str = f"{stack_trace}\n{type(exception).__name__}: {str(exception)}"
+        exception_str = str(exception)
+        call.exception = exception_str
 
-    def fail_run(self, run: Call, exception: BaseException) -> None:
-        self.finish_call(run, str(exception))
+        # Summary handling
+        summary = {}
+        if call._children:
+            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+
+        self.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=self._project_id(),
+                    id=call.id,  # type: ignore
+                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    exception=exception_str,
+                    summary=summary,
+                )
+            )
+        )
+
+        # Descendent error tracking disabled til we fix UI
+        # Add this call's summary after logging the call, so that only
+        # descendents are included in what we log
+        # summary.setdefault("descendants", {}).setdefault(
+        #     call.op_name, {"successes": 0, "errors": 0}
+        # )["errors"] += 1
+
+        call.summary = summary
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
