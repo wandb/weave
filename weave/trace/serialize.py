@@ -22,6 +22,8 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         for k, v in obj.__dict__.items():
             res[k] = to_json(v, project_id, server)
         return res
+    elif isinstance_namedtuple(obj):
+        return {k: to_json(v, project_id, server) for k, v in obj._asdict().items()}
     elif isinstance(obj, (list, tuple)):
         return [to_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
@@ -44,6 +46,12 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         "weave_type": encoded["weave_type"],
         "files": file_digests,
     }
+
+
+def isinstance_namedtuple(obj: Any) -> bool:
+    return (
+        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
+    )
 
 
 def _load_custom_obj_files(

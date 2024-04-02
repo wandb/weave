@@ -1,3 +1,4 @@
+from collections import namedtuple
 import datetime
 import os
 import typing
@@ -786,3 +787,24 @@ def test_tuple_support(client):
 
     assert len(res.calls) == 1
     assert res.calls[0].output == [[1, 2], 3]
+
+
+def test_namedtuple_support(client):
+    @weave.op()
+    def tuple_maker(a, b):
+        return (a, b)
+
+    Point = namedtuple("Point", ["x", "y"])
+    act = tuple_maker(Point(1, 2), 3)
+    exp = (Point(1, 2), 3)
+    assert act == exp
+
+    res = get_client_trace_server(client).calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            filter=tsi._CallsFilter(op_names=[ref_str(tuple_maker)]),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].output == [{"x": 1, "y": 2}, 3]

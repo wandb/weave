@@ -1,3 +1,4 @@
+from collections import namedtuple
 from typing import Any, Sequence, Union, Optional, TypedDict
 import dataclasses
 import typing
@@ -18,7 +19,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
     pydantic_asdict_one_level,
 )
-from weave.trace.serialize import to_json, from_json
+from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
     ObjSchema,
@@ -507,6 +508,9 @@ class WeaveClient:
         elif isinstance(obj, Table):
             table_ref = self.save_table(obj)
             obj.ref = table_ref
+        elif isinstance_namedtuple(obj):
+            for v in obj._asdict().values():
+                self.save_nested_objects(v)
         elif isinstance(obj, (list, tuple)):
             for v in obj:
                 self.save_nested_objects(v)
