@@ -870,6 +870,8 @@ def test_named_reuse(client):
     # There are a lot of additional assertions that could be made here!
     print(res.objs)
     assert len(res.objs) == 1
+
+
 def test_unknown_input_and_output_types(client):
     class MyUnserializableClassA:
         a_val: float

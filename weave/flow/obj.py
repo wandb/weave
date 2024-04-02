@@ -67,7 +67,7 @@ class Object(BaseModel):
             #    to do extra work.
             if isinstance(v, TraceObject):
                 ref = get_ref(v)
-                new_obj.__dict__['ref'] = ref
+                new_obj.__dict__["ref"] = ref
             # return new_obj
 
             return new_obj
