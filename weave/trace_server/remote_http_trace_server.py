@@ -206,7 +206,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: t.Union[tsi.RefsReadBatchReq, t.Dict[str, t.Any]]
     ) -> tsi.RefsReadBatchRes:
         return self._generic_request(
-            "/refs/read_batch", req, tsi.TableQueryReq, tsi.TableQueryRes
+            "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
         )
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:

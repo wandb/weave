@@ -769,6 +769,19 @@ def test_dataset_row_type(client):
         d = weave.Dataset(rows=[{"a": 1}, {}])
 
 
+def test_dataset_row_ref(client):
+    d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    ref = weave.publish(d)
+    d2 = weave.ref(ref.uri()).get()
+
+    inner = d2.rows[0]["a"]
+    exp_ref = "weave:///shawn/test-project/object/Dataset:aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    assert inner == 5
+    assert inner.ref.uri() == exp_ref
+    gotten = weave.ref(exp_ref).get()
+    assert gotten == 5
+
+
 def test_tuple_support(client):
     @weave.op()
     def tuple_maker(a, b):
@@ -857,3 +870,64 @@ def test_named_reuse(client):
     # There are a lot of additional assertions that could be made here!
     print(res.objs)
     assert len(res.objs) == 1
+def test_unknown_input_and_output_types(client):
+    class MyUnserializableClassA:
+        a_val: float
+
+        def __init__(self, a_val) -> None:
+            self.a_val = a_val
+
+    class MyUnserializableClassB:
+        b_val: float
+
+        def __init__(self, b_val) -> None:
+            self.b_val = b_val
+
+    @weave.op()
+    def op_with_unknown_types(
+        a: MyUnserializableClassA, b: float
+    ) -> MyUnserializableClassB:
+        return MyUnserializableClassB(a.a_val + b)
+
+    a = MyUnserializableClassA(3)
+    res = op_with_unknown_types(a, 0.14)
+
+    assert res.b_val == 3.14
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 1
+    assert inner_res.calls[0].inputs == {
+        "a": repr(a),
+        "b": 0.14,
+    }
+    assert inner_res.calls[0].output == repr(res)
+
+
+def test_unknown_attribute(client):
+    class MyUnserializableClass:
+        val: int
+
+        def __init__(self, a_val) -> None:
+            self.a_val = a_val
+
+    class MySerializableClass(weave.Object):
+        obj: MyUnserializableClass
+
+    a_obj = MyUnserializableClass(1)
+    a = MySerializableClass(obj=a_obj)
+    b_obj = MyUnserializableClass(2)
+    b = MySerializableClass(obj=b_obj)
+
+    ref_a = weave.publish(a)
+    ref_b = weave.publish(b)
+
+    a2 = weave.ref(ref_a.uri()).get()
+    b2 = weave.ref(ref_b.uri()).get()
+
+    assert a2.obj == repr(a_obj)
+    assert b2.obj == repr(b_obj)

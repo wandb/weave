@@ -373,7 +373,7 @@ def test_save_unknown_type(client):
     ref = client.save_object(obj, "my-np-array")
     obj2 = client.get(ref)
     # Expect None for now
-    assert obj2 == None
+    assert obj2 == repr(obj)
 
 
 def test_save_model(client):

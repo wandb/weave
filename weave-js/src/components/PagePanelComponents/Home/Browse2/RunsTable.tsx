@@ -28,11 +28,7 @@ import {
   typedDictPropertyTypes,
 } from '../../../../core';
 import {useDeepMemo} from '../../../../hookUtils';
-import {
-  isWandbArtifactRef,
-  isWeaveObjectRef,
-  parseRef,
-} from '../../../../react';
+import {parseRef} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
@@ -48,7 +44,7 @@ import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 import {opVersionRefOpName} from '../Browse3/pages/wfReactInterface/utilities';
 import {
   CallSchema,
-  ObjectVersionKey,
+  OpVersionKey,
 } from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {StyledDataGrid} from '../Browse3/StyledDataGrid';
 import {flattenObject} from './browse2Util';
@@ -127,34 +123,20 @@ type OpVersionIndexTextProps = {
 };
 
 const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
-  const {useObjectVersion} = useWFHooks();
+  const {useOpVersion} = useWFHooks();
   const ref = parseRef(opVersionRef);
-  let objVersionKey: ObjectVersionKey | null = null;
-  if (isWandbArtifactRef(ref)) {
-    objVersionKey = {
-      scheme: 'wandb-artifact',
+  let opVersionKey: OpVersionKey | null = null;
+  if ('weaveKind' in ref && ref.weaveKind === 'op') {
+    opVersionKey = {
       entity: ref.entityName,
       project: ref.projectName,
-      objectId: ref.artifactName,
+      opId: ref.artifactName,
       versionHash: ref.artifactVersion,
-      path: ref.artifactPath,
-      refExtra: ref.artifactRefExtra,
-    };
-  } else if (isWeaveObjectRef(ref)) {
-    objVersionKey = {
-      scheme: 'weave',
-      entity: ref.entityName,
-      project: ref.projectName,
-      weaveKind: ref.weaveKind,
-      objectId: ref.artifactName,
-      versionHash: ref.artifactVersion,
-      path: '',
-      refExtra: ref.artifactRefExtra,
     };
   }
-  const objVersion = useObjectVersion(objVersionKey);
-  return objVersion.result ? (
-    <span>v{objVersion.result.versionIndex}</span>
+  const opVersion = useOpVersion(opVersionKey);
+  return opVersion.result ? (
+    <span>v{opVersion.result.versionIndex}</span>
   ) : null;
 };
 
@@ -680,16 +662,9 @@ export const RunsTable: FC<{
         })
       );
 
-      const outputGroup: Exclude<
-        ComponentProps<typeof DataGrid>['columnGroupingModel'],
-        undefined
-      >[number] = {
-        groupId: 'output',
-        children: [],
-      };
-
       const outputOrder = Object.keys(outputKeys);
-
+      const outputGrouping = buildTree(outputOrder, 'output');
+      colGroupingModel.push(outputGrouping);
       for (const key of outputOrder) {
         const field = 'output.' + key;
         const isExpanded = expandedRefCols.has(field);
@@ -717,58 +692,7 @@ export const RunsTable: FC<{
             return <NotApplicable />;
           },
         });
-        if (isExpanded) {
-          // This is a direct non-dry copy of the input expansion code.
-          // We should refactor this to be DRY.
-          const outputGroupChildren = [{field}];
-          const expandCols = expandedColInfo[field] ?? [];
-          for (const col of expandCols) {
-            const expandField = field + '.' + col.label;
-            cols.push({
-              flex: 1,
-              field: expandField,
-              renderHeader: headerParams => {
-                return (
-                  <CustomGroupedColumnHeader
-                    field={headerParams.field}
-                    // TODO: after merging object store stuff - re-write expansion logic. This should be grouped.
-                    titleOverride={col.label}
-                  />
-                );
-              },
-              renderCell: cellParams => {
-                const weaveRef = (cellParams.row as any)[field];
-                if (weaveRef === undefined) {
-                  return <NotApplicable />;
-                }
-                return (
-                  <ErrorBoundary>
-                    <RefValue weaveRef={weaveRef} attribute={col.path} />
-                  </ErrorBoundary>
-                );
-              },
-            });
-            outputGroupChildren.push({field: expandField});
-          }
-          outputGroup.children.push({
-            groupId: field,
-            headerName: key,
-            children: outputGroupChildren,
-            renderHeaderGroup: () => {
-              return (
-                <CollapseGroupHeader
-                  headerName={key}
-                  field={field}
-                  onCollapse={onCollapse}
-                />
-              );
-            },
-          });
-        } else {
-          outputGroup.children.push({field});
-        }
       }
-      colGroupingModel.push(outputGroup);
     }
 
     let feedbackKeys: {[key: string]: true} = {};
@@ -874,6 +798,7 @@ export const RunsTable: FC<{
       apiRef.current.restoreState(initialState);
     }
   }, [columns, initialState, apiRef]);
+
   return (
     <>
       {showVisibilityAlert && (
