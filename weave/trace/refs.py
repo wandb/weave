@@ -1,6 +1,7 @@
 from typing import Union, Any
 import dataclasses
 from ..trace_server import refs_internal
+from .. import trace_sentry
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -42,9 +43,6 @@ class RefWithExtra(Ref):
 
     def with_item(self, item_digest: str) -> "RefWithExtra":
         return self.with_extra([TABLE_ROW_ID_EDGE_NAME, f"{item_digest}"])
-
-
-from .. import trace_sentry
 
 
 @dataclasses.dataclass

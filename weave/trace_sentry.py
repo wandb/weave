@@ -15,7 +15,7 @@ import functools
 import pathlib
 import sys
 from types import TracebackType
-from typing import  Any, Callable, Dict, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Type, Union
 
 
 if sys.version_info >= (3, 8):
@@ -26,9 +26,7 @@ else:
 import sentry_sdk  # type: ignore
 import sentry_sdk.utils  # type: ignore
 
-SENTRY_DEFAULT_DSN = (
-    "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us.sentry.io/4507019311251456"
-)
+SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us.sentry.io/4507019311251456"
 
 SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
@@ -60,7 +58,7 @@ class Sentry:
         self.dsn = SENTRY_DEFAULT_DSN
 
         self.hub: Optional[sentry_sdk.hub.Hub] = None
-        
+
         self._disabled = False
 
         # ensure we always end the Sentry session
@@ -133,7 +131,8 @@ class Sentry:
         self.mark_session(status=status)
 
         client, _ = self.hub._stack[-1]  # type: ignore
-        client.flush()
+        if client is not None:
+            client.flush()
 
         return None
 
@@ -210,7 +209,9 @@ class Sentry:
                     raise
 
             return wrapper
+
         return watch_dec
+
 
 global_trace_sentry = Sentry()
 global_trace_sentry.setup()
