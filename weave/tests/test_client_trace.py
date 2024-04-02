@@ -763,7 +763,9 @@ def test_tuple_support(client):
     def tuple_maker(a, b):
         return (a, b)
 
-    assert tuple_maker(1, 2) == (1, 2)
+    act = tuple_maker((1, 2), 3)
+    exp = ((1, 2), 3)
+    assert act == exp
 
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
@@ -773,4 +775,4 @@ def test_tuple_support(client):
     )
 
     assert len(res.calls) == 1
-    assert res.calls[0].output == [1, 2]
+    assert res.calls[0].output == [[1, 2], 3]
