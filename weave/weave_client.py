@@ -147,7 +147,7 @@ class Call:
         entity, project = project_parts
         if not self.id:
             raise ValueError("Can't get URL for call without ID")
-        return urls.call_path_as_peek(entity, project, self.id)
+        return urls.redirect_call(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
     def children(self) -> "CallsIter":
