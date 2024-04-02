@@ -46,15 +46,18 @@ export const Alert = styled.div<AlertProps>`
   display: flex;
   align-items: center;
 `;
+Alert.displayName = 'S.Alert';
 
 export const Icon = styled(IconComp)`
   font-size: 20px;
   margin-right: 8px;
   flex: 0 0 auto;
 `;
+Icon.displayName = 'S.Icon';
 
 export const Message = styled.div`
   // This value chosen to make the alert the same height as our source select widgets.
   padding: 3px;
   flex: 1 1 auto;
 `;
+Message.displayName = 'S.Message';

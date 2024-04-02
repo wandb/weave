@@ -44,5 +44,11 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
     return <ValueViewPrimitive>{data.value.toString()}</ValueViewPrimitive>;
   }
 
+  if (data.valueType === 'array') {
+    // Compared to toString this keeps the square brackets.
+    // This is particularly helpful for empty lists, for which toString would return an empty string.
+    return <div>{JSON.stringify(data.value)}</div>;
+  }
+
   return <div>{data.value.toString()}</div>;
 };
