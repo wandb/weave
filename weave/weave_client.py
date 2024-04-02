@@ -293,7 +293,7 @@ class WeaveClient:
         try:
             read_res = self.server.obj_read(
                 ObjReadReq(
-                    project_id=self._project_id(),
+                    project_id=f"{ref.entity}/{ref.project}",
                     object_id=ref.name,
                     digest=ref.digest,
                 )
@@ -319,9 +319,14 @@ class WeaveClient:
         # the object, it is more efficient to directly query for the data and
         # let the server resolve it.
         if ref.extra:
-            ref_read_res = self.server.refs_read_batch(
-                RefsReadBatchReq(refs=[ref.uri()])
-            )
+            try:
+                ref_read_res = self.server.refs_read_batch(
+                    RefsReadBatchReq(refs=[ref.uri()])
+                )
+            except HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                raise
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             data = ref_read_res.vals[0]
