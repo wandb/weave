@@ -803,4 +803,29 @@ def test_unknown_input_and_output_types(client):
         "a": repr(a),
         "b": 0.14,
     }
-    assert inner_res.calls[0].outputs == {"_result": repr(res)}
+    assert inner_res.calls[0].output == repr(res)
+
+
+def test_unknown_attribute(client):
+    class MyUnserializableClass:
+        val: int
+
+        def __init__(self, a_val) -> None:
+            self.a_val = a_val
+
+    class MySerializableClass(weave.Object):
+        obj: MyUnserializableClass
+
+    a_obj = MyUnserializableClass(1)
+    a = MySerializableClass(obj=a_obj)
+    b_obj = MyUnserializableClass(2)
+    b = MySerializableClass(obj=b_obj)
+
+    ref_a = weave.publish(a)
+    ref_b = weave.publish(b)
+
+    a2 = weave.ref(ref_a.uri()).get()
+    b2 = weave.ref(ref_b.uri()).get()
+
+    assert a2.obj == repr(a_obj)
+    assert b2.obj == repr(b_obj)
