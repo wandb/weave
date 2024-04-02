@@ -95,9 +95,12 @@ const makeTraceServerEndpointHook = <
         });
     }, [getTsClient, input]);
 
-    const loadingReturn = useMemo(() =>( {loading: true, result: null, error: null}), [])
+    const loadingReturn = useMemo(
+      () => ({loading: true, result: null, error: null}),
+      []
+    );
     if (loadingInputRef.current !== input) {
-      return loadingReturn
+      return loadingReturn;
     }
     return state;
   };
