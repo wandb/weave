@@ -7,7 +7,7 @@ from weave.flow.obj import Object
 from weave.trace.vals import TraceTable
 
 
-def short_str(obj, limit: 25):
+def short_str(obj: Any, limit: int = 25) -> str:
     str_val = str(obj)
     if len(str_val) > limit:
         return str_val[:limit] + "..."
