@@ -75,7 +75,7 @@ class Sentry:
         # these match the environments for gorilla
         return "development" if is_git else "production"
 
-    # @_safe_noop
+    @_safe_noop
     def setup(self) -> None:
         """Setup Sentry SDK.
 
@@ -93,7 +93,7 @@ class Sentry:
         )
         self.hub = sentry_sdk.Hub(client)
 
-    # @_safe_noop
+    @_safe_noop
     def exception(
         self,
         exc: Union[
@@ -137,7 +137,7 @@ class Sentry:
 
         return None
 
-    # @_safe_noop
+    @_safe_noop
     def start_session(self) -> None:
         """Start a new session."""
         assert self.hub is not None
@@ -149,7 +149,7 @@ class Sentry:
         if session is None:
             self.hub.start_session()
 
-    # @_safe_noop
+    @_safe_noop
     def end_session(self) -> None:
         """End the current session."""
         assert self.hub is not None
@@ -161,7 +161,7 @@ class Sentry:
             self.hub.end_session()
             client.flush()
 
-    # @_safe_noop
+    @_safe_noop
     def mark_session(self, status: Optional["SessionStatus"] = None) -> None:
         """Mark the current session with a status."""
         assert self.hub is not None
@@ -171,7 +171,7 @@ class Sentry:
         if session is not None:
             session.update(status=status)
 
-    # @_safe_noop
+    @_safe_noop
     def configure_scope(
         self,
         tags: Optional[Dict[str, Any]] = None,
