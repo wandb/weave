@@ -769,7 +769,6 @@ def test_dataset_row_type(client):
         d = weave.Dataset(rows=[{"a": 1}, {}])
 
 
-
 def test_op_retrieval(client):
     @weave.op()
     def my_op(a: int) -> int:
@@ -816,6 +815,7 @@ def test_bound_op_retrieval_no_self(client):
     my_op_ref = weave_client.get_ref(CustomTypeWithoutSelf.op_with_custom_type)
     with pytest.raises(MissingSelfInstanceError):
         my_op2 = my_op_ref.get()
+
 
 def test_tuple_support(client):
     @weave.op()
