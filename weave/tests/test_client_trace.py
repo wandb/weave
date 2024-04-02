@@ -882,7 +882,7 @@ def test_namedtuple_support(client):
 def test_named_reuse(client):
     import asyncio
 
-    d = weave.Dataset(rows=[{"x": 1}, {"a": 2}])
+    d = weave.Dataset(rows=[{"x": 1}, {"x": 2}])
     d_ref = weave.publish(d, "test_dataset")
     dataset = weave.ref(d_ref.uri()).get()
 
