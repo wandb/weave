@@ -4,6 +4,8 @@ from unittest.mock import Mock
 
 import openai
 import pytest
+import pytest_asyncio
+from openai import AsyncStream
 from openai.types.chat.chat_completion import ChatCompletion, Choice
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceDelta
 from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
@@ -271,6 +273,38 @@ def streaming_chat_completion_messages():
     ]
 
 
+class MockAsyncResponse:
+    """This emulates an SSE response"""
+    def __init__(self, chunks: List):
+        self._chunks = iter(chunks)
+
+    async def aiter_lines(self):
+        i = 0
+        for chunk in self._chunks:
+            i += 1
+            yield f"data: {chunk.model_dump_json()}\n"
+            yield "\n"
+        yield "data: [DONE]\n"
+        yield "\n"
+
+
+class MockAsyncStream(AsyncStream):
+    def __init__(self, chunks: List):
+        self._chunks = iter(chunks)
+        def _process_response_data(*, data: object, **kwargs):
+            return ChatCompletionChunk.model_validate(data)
+
+        super().__init__(
+            cast_to=ChatCompletionChunk,
+            client=Mock(_process_response_data=_process_response_data),
+            response=MockAsyncResponse(chunks),
+        )
+
+@pytest.fixture
+def async_streaming_chat_completion_messages(streaming_chat_completion_messages):
+    return MockAsyncStream(streaming_chat_completion_messages)
+
+
 @pytest.fixture
 def reassembled_chat_completion_message():
     return ChatCompletion(
@@ -324,6 +358,13 @@ def teardown():
 def mocked_streaming_create(streaming_chat_completion_messages):
     # Mock the base create method
     return Mock(return_value=iter(streaming_chat_completion_messages))
+
+
+@pytest_asyncio.fixture
+async def mocked_async_streaming_create(async_streaming_chat_completion_messages):
+    async def mocked_create(*args, **kwargs):
+        return async_streaming_chat_completion_messages
+    return mocked_create
 
 
 @pytest.fixture
@@ -390,6 +431,37 @@ def test_log_to_span_streaming(
     )
     stream = chat_completions.create(**create_input)
     for x in stream:
+        ...
+
+    run = client.calls()[0]
+    inputs = {k: v for k, v in run.inputs.items() if not k.startswith("_")}
+    outputs = {k: v for k, v in run.output.items() if not k.startswith("_")}
+
+    inputs_expected = create_input
+    assert inputs == inputs_expected
+
+    outputs_expected = reassembled_chat_completion_message.dict(exclude_unset=True)
+    assert outputs == outputs_expected
+
+
+@pytest.mark.asyncio
+async def test_log_to_span_async_streaming(
+    user_by_api_key_in_env,
+    mocked_async_streaming_create,
+    teardown,
+    reassembled_chat_completion_message,
+    client,
+):
+    chat_completions = weave.monitoring.openai.openai.AsyncChatCompletions(
+        mocked_async_streaming_create
+    )
+    create_input = dict(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": "Tell me a joke"}],
+        stream=True,
+    )
+    stream = await chat_completions.create(**create_input)
+    async for x in stream:
         ...
 
     run = client.calls()[0]
