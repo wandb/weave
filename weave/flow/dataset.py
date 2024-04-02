@@ -20,9 +20,12 @@ class Dataset(Object):
     @field_validator("rows", mode="before")
     def convert_to_table(cls, rows: Any) -> weave.Table:
         if not isinstance(rows, weave.Table):
+            table_ref = getattr(rows, "table_ref", None)
             if isinstance(rows, TraceTable):
                 rows = list(rows)
             rows = weave.Table(rows)
+            if table_ref:
+                rows.table_ref = table_ref
         if len(rows.rows) == 0:
             raise ValueError("Attempted to construct a Dataset with an empty list.")
         for row in rows.rows:

@@ -389,9 +389,15 @@ def make_trace_obj(
         val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
 
     if isinstance(val, Table):
-        if val.ref is None:
-            raise InternalError("Expected populated Table.ref")
-        val = TraceTable(val.ref, new_ref, server, _TableRowFilter(), root)
+        val_ref = val.ref
+        if not isinstance(val_ref, TableRef):
+            val_table_ref = getattr(val, "table_ref", None)
+            if not isinstance(val_table_ref, TableRef):
+                raise InternalError(
+                    "Expected Table.ref or Table.table_ref to be TableRef"
+                )
+            val_ref = val_table_ref
+        val = TraceTable(val_ref, new_ref, server, _TableRowFilter(), root)
     if isinstance(val, TableRef):
         val = TraceTable(val, new_ref, server, _TableRowFilter(), root)
 
