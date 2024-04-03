@@ -95,8 +95,8 @@ import weave
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
 
 @weave.op()
-def fruit_name_score(target: dict, prediction: dict) -> dict:
-    return {'correct': target['fruit'] == prediction['fruit']}
+def fruit_name_score(target: dict, model_output: dict) -> dict:
+    return {'correct': target['fruit'] == model_output['fruit']}
 
 # highlight-next-line
 evaluation = weave.Evaluation(
