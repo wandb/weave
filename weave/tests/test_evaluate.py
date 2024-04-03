@@ -2,7 +2,7 @@ import asyncio
 import pytest
 import weave
 from weave import ref_base
-from weave.flow.scorer import MulticlassF1Score
+from weave.flow.scorer import MultiTaskBinaryClassificationF1
 from weave import Dataset, Model, Evaluation
 
 pytestmark = pytest.mark.webtest
@@ -149,7 +149,7 @@ def test_score_with_custom_summarize(client):
 def test_multiclass_f1_score(client):
     evaluation = Evaluation(
         dataset=[{"target": {"a": False, "b": True}, "pred": {"a": True, "b": False}}],
-        scorers=[MulticlassF1Score(class_names=["a", "b"])],
+        scorers=[MultiTaskBinaryClassificationF1(class_names=["a", "b"])],
     )
 
     @weave.op()
@@ -162,7 +162,7 @@ def test_multiclass_f1_score(client):
             "a": {"true_count": 1, "true_fraction": 1.0},
             "b": {"true_count": 0, "true_fraction": 0.0},
         },
-        "MulticlassF1Score": {
+        "MultiTaskBinaryClassificationF1": {
             "a": {"f1": 0, "precision": 0.0, "recall": 0},
             "b": {"f1": 0, "precision": 0, "recall": 0.0},
         },

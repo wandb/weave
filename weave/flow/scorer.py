@@ -105,7 +105,7 @@ def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:
     return precision, recall, f1
 
 
-class MulticlassF1Score(Scorer):
+class MultiTaskBinaryClassificationF1(Scorer):
     class_names: list[str]
 
     @weave.op()
