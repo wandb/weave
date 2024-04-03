@@ -48,7 +48,7 @@ def class_all_bases_names(cls: type) -> list[str]:
 
 def pydantic_object_record(obj: pydantic.BaseModel) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: isinstance(x, Op)):
+    for k, v in getmembers(obj, lambda x: isinstance(x, Op), lambda e: None):
         attrs[k] = v
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
@@ -73,8 +73,10 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
 
 
 # This is an exact copy of the getmembers function from the inspect module
-# with the addition of handling exceptions when calling getattr
-def getmembers(object: Any, predicate: Any = None) -> list[tuple[str, Any]]:
+# with the addition of handling exceptions when calling getattr, with an onError handler
+def getmembers(
+    object: Any, predicate: Any = None, onError: Any = None
+) -> list[tuple[str, Any]]:
     """Return all members of an object as (name, value) pairs sorted by name.
     Optionally, only return members that satisfy a given predicate."""
     if isclass(object):
@@ -115,11 +117,10 @@ def getmembers(object: Any, predicate: Any = None) -> list[tuple[str, Any]]:
 
         # This is where the modified code begins
         except Exception as e:
-            # This is for the one off case where the xmltodict library is not installed in Instructor's environment
-            if str(e) == "name 'ET' is not defined":
-                print("ImportError: cannot import xmltodict")
+            if onError:
+                onError(e)
             else:
-                print(f"Error while calling getattr: {e}")
+                raise e
         # This is where the modified code ends
 
         if not predicate or predicate(value):
