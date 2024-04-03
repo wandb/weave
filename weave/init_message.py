@@ -77,7 +77,6 @@ def print_init_message(
     username: typing.Optional[str],
     entity_name: str,
     project_name: str,
-    read_only: bool,
 ) -> None:
     try:
         _print_version_check()
@@ -90,7 +89,5 @@ def print_init_message(
     message += (
         f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
     )
-    # Cosmetically, if we are in `read_only` mode, we are not logging data, so
-    # we should not print the message about logging data.
-    if not read_only:
-        print(message)
+
+    print(message)
