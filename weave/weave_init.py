@@ -29,7 +29,10 @@ def get_username() -> typing.Optional[str]:
     from . import wandb_api
 
     api = wandb_api.get_wandb_api_sync()
-    return api.username()
+    try:
+        return api.username()
+    except AttributeError:
+        return None
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
@@ -57,7 +60,19 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     return entity_name, project_name
 
 
-def init_weave(project_name: str) -> InitializedClient:
+"""
+This is the main entrypoint for the weave library. It initializes the weave client
+and sets up the global state for the weave library.
+
+Args:
+    project_name (str): The project name to use for the weave client.
+    ensure_project_exists (bool): If True, the client will not attempt to create the project
+"""
+
+
+def init_weave(
+    project_name: str, ensure_project_exists: bool = True
+) -> InitializedClient:
     from . import wandb_api
 
     # Must init to read ensure we've read auth from the environment, in
@@ -67,20 +82,23 @@ def init_weave(project_name: str) -> InitializedClient:
     if wandb_context is None:
         import wandb
 
-        wandb.login()
+        print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
+        wandb.login(anonymous="never", force=True)
         wandb_api.init()
         wandb_context = wandb_api.get_wandb_api_context()
 
-    remote_server = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
-    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
+    api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:
-        remote_server.set_auth(("api", wandb_context.api_key))
+        api_key = wandb_context.api_key
+    remote_server = init_weave_get_server(api_key)
+    # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     entity_name, project_name = get_entity_project_from_project_name(project_name)
 
     # server = ClickHouseTraceServer(host="localhost")
-    client = weave_client.WeaveClient(entity_name, project_name, remote_server)
+    client = weave_client.WeaveClient(
+        entity_name, project_name, remote_server, ensure_project_exists
+    )
 
     init_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
@@ -107,7 +125,9 @@ def init_weave(project_name: str) -> InitializedClient:
         # In the future, we may want to throw here.
         min_required_version = "0.0.0"
     init_message.assert_min_weave_version(min_required_version)
-    init_message.print_init_message(username, entity_name, project_name)
+    init_message.print_init_message(
+        username, entity_name, project_name, read_only=not ensure_project_exists
+    )
 
     user_context = {"username": username} if username else None
     trace_sentry.global_trace_sentry.configure_scope(
@@ -119,6 +139,15 @@ def init_weave(project_name: str) -> InitializedClient:
     )
 
     return init_client
+
+
+def init_weave_get_server(
+    api_key: typing.Optional[str] = None,
+) -> remote_http_trace_server.RemoteHTTPTraceServer:
+    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
+    if api_key is not None:
+        res.set_auth(("api", api_key))
+    return res
 
 
 def init_local() -> InitializedClient:
