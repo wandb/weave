@@ -927,7 +927,7 @@ def test_named_reuse(client):
     dataset = weave.ref(d_ref.uri()).get()
 
     @weave.op()
-    async def dummy_score(prediction):
+    async def dummy_score(model_output):
         return 1
 
     class SimpleModel(weave.Model):

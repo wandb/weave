@@ -8,7 +8,7 @@ from weave import WeaveList
 
 
 class Scorer(Object):
-    def score(self, target: Any, prediction: Any) -> Any:
+    def score(self, target: Any, model_output: Any) -> Any:
         raise NotImplementedError
 
     @weave.op()
@@ -105,7 +105,7 @@ def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:
     return precision, recall, f1
 
 
-class MulticlassF1Score(Scorer):
+class MultiTaskBinaryClassificationF1(Scorer):
     class_names: list[str]
 
     @weave.op()
@@ -130,13 +130,13 @@ class MulticlassF1Score(Scorer):
         return result
 
     @weave.op()
-    def score(self, target: dict, prediction: Optional[dict]) -> dict:
+    def score(self, target: dict, model_output: Optional[dict]) -> dict:
         result = {}
         for class_name in self.class_names:
             class_label = target.get(class_name)
-            class_prediction = prediction.get(class_name) if prediction else None
+            class_model_output = model_output.get(class_name) if model_output else None
             result[class_name] = {
-                "correct": class_label == class_prediction,
-                "negative": not class_prediction,
+                "correct": class_label == class_model_output,
+                "negative": not class_model_output,
             }
         return result

@@ -7,7 +7,7 @@ import re
 import openai
 import weave
 
-from weave.flow.scorer import MulticlassF1Score
+from weave.flow.scorer import MultiTaskBinaryClassificationF1
 
 
 class TextExtractModel(weave.Model):
@@ -42,7 +42,7 @@ def main():
 
     eval = weave.Evaluation(
         dataset=dataset_rows,
-        scorers=[MulticlassF1Score(class_names=["name", "shares"])],
+        scorers=[MultiTaskBinaryClassificationF1(class_names=["name", "shares"])],
     )
 
     model = TextExtractModel(
