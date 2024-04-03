@@ -11,7 +11,7 @@ import traceback
 from requests import HTTPError
 
 from weave.table import Table
-from weave import urls
+from weave import trace_sentry, urls
 from weave import run_context
 from weave.trace.op import Op
 from weave.trace.object_record import (
@@ -276,6 +276,7 @@ class WeaveClient:
 
     # This is used by tests and op_execute still, but the save() interface
     # is nicer for clients I think?
+    @trace_sentry.global_trace_sentry.watch()
     def save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
         self.save_nested_objects(val, name=name)
         return self._save_object(val, name, branch)
@@ -305,12 +306,14 @@ class WeaveClient:
         # save instead?
         return ref
 
+    @trace_sentry.global_trace_sentry.watch()
     def save(self, val: Any, name: str, branch: str = "latest") -> Any:
         ref = self.save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise ValueError(f"Expected ObjectRef, got {ref}")
         return self.get(ref)
 
+    @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef) -> Any:
         project_id = f"{ref.entity}/{ref.project}"
         try:
@@ -358,6 +361,7 @@ class WeaveClient:
 
         return make_trace_obj(val, ref, self.server, None)
 
+    @trace_sentry.global_trace_sentry.watch()
     def save_table(self, table: Table) -> TableRef:
         response = self.server.table_create(
             TableCreateReq(
@@ -370,12 +374,14 @@ class WeaveClient:
             entity=self.entity, project=self.project, digest=response.digest
         )
 
+    @trace_sentry.global_trace_sentry.watch()
     def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
 
         return CallsIter(self.server, self._project_id(), filter)
 
+    @trace_sentry.global_trace_sentry.watch()
     def call(self, call_id: str) -> TraceObject:
         response = self.server.calls_query(
             CallsQueryReq(
@@ -388,12 +394,14 @@ class WeaveClient:
         response_call = response.calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
 
+    @trace_sentry.global_trace_sentry.watch()
     def op_calls(self, op: Op) -> CallsIter:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
         return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
 
+    @trace_sentry.global_trace_sentry.watch()
     def objects(self, filter: Optional[_ObjectVersionFilter] = None) -> list[ObjSchema]:
         if not filter:
             filter = _ObjectVersionFilter()
@@ -417,6 +425,7 @@ class WeaveClient:
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
 
+    @trace_sentry.global_trace_sentry.watch()
     def create_call(
         self,
         op: Union[str, Op],
@@ -468,6 +477,7 @@ class WeaveClient:
         self.server.call_start(CallStartReq(start=start))
         return call
 
+    @trace_sentry.global_trace_sentry.watch()
     def finish_call(self, call: Call, output: Any) -> None:
         self.save_nested_objects(output)
         output = map_to_refs(output)
@@ -501,6 +511,7 @@ class WeaveClient:
         # )["successes"] += 1
         call.summary = summary
 
+    @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
         # Full traceback disabled til we fix UI.
         # stack_trace = "".join(

@@ -37,7 +37,6 @@ from . import graph_client_context as _graph_client_context
 from weave.trace import context as trace_context
 from .trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.refs import ObjectRef
-from . import trace_sentry
 
 # exposed as part of api
 from . import weave_types as types
@@ -186,7 +185,6 @@ def local_client() -> typing.Iterator[_weave_client.WeaveClient]:
         inited_client.reset()
 
 
-@trace_sentry.global_trace_sentry.watch()
 def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.ObjectRef:
     """Save and version a python object.
 
@@ -226,7 +224,6 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     return ref
 
 
-@trace_sentry.global_trace_sentry.watch()
 def ref(location: str) -> _weave_client.ObjectRef:
     """Construct a Ref to a Weave object.
 
