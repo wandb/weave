@@ -5,9 +5,11 @@ import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {useWeaveflowCurrentRouteContext} from '../../context';
+import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
+import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallDetails} from './CallDetails';
@@ -19,7 +21,6 @@ export const CallPage: FC<{
   entity: string;
   project: string;
   callId: string;
-  showTraceTree?: boolean;
   path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
@@ -61,11 +62,16 @@ const useCallTabs = (call: CallSchema) => {
 
 const CallPageInnerVertical: FC<{
   call: CallSchema;
-  showTraceTree?: boolean;
   path?: string;
-}> = ({call, showTraceTree, path}) => {
+}> = ({call, path}) => {
   const history = useHistory();
   const currentRouter = useWeaveflowCurrentRouteContext();
+
+  const query = useURLSearchParamsDict();
+  const showTraceTree =
+    TRACETREE_PARAM in query
+      ? query[TRACETREE_PARAM] === '1'
+      : !isEvaluateOp(call.spanName);
 
   const onToggleTraceTree = useCallback(() => {
     history.replace(
