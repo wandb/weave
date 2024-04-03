@@ -8,6 +8,10 @@ from weave import WeaveList
 
 
 class Scorer(Object):
+    """Base class for scoring functions. Scoring functions take a target and a prediction and return a score. If your dataset has
+    different columns than `target`, then subclass this and override the `score` method to handle your specific case.
+    """
+
     def score(self, target: Any, prediction: Any) -> Any:
         raise NotImplementedError
 
