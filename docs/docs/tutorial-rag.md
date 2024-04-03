@@ -111,6 +111,7 @@ When there aren't simple ways to evaluate your application, one approach is to u
 As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `prediction` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. 
 
 ```python
+# highlight-next-line
 @weave.op()
 async def context_precision_score(question, prediction):
     context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output. 
@@ -148,7 +149,7 @@ questions = [
     {"question": "Which company achieved the first U.S. moon landing since 1972?"},
     {"question": "What issue did Intuitive Machines' lunar lander encounter upon landing on the moon?"}
 ]
-
+# highlight-next-line
 evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_score])
 asyncio.run(evaluation.evaluate(model))
 ```
