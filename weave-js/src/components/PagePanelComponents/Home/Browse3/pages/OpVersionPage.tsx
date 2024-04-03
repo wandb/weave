@@ -115,7 +115,7 @@ const OpVersionPageInner: React.FC<{
               entity={entity}
               project={project}
               opName={opId}
-              opVersions={(opVersions.result ?? []).slice().reverse()} // put in increasing order
+              opVersions={opVersions.result ?? []}
               currentVersionURI={uri}
             />
           ),
