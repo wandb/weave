@@ -114,6 +114,8 @@ export const OpCodeViewer = ({
     setLeftSize(left + 'px');
   };
 
+  const opVersionsDesc = opVersions.slice().reverse();
+
   let diffBar = null;
   if (isDiffAvailable) {
     diffBar = diffState.left ? (
@@ -159,7 +161,7 @@ export const OpCodeViewer = ({
           <SelectVersionBar>
             <VersionHeader style={{width: leftSize}}>
               <SelectOpVersion
-                opVersions={opVersions}
+                opVersions={opVersionsDesc}
                 valueURI={diffState.left}
                 currentVersionURI={currentVersionURI}
                 onChange={uri => onSetLeft(uri)}
@@ -174,7 +176,7 @@ export const OpCodeViewer = ({
             </VersionHeader>
             <VersionHeader>
               <SelectOpVersion
-                opVersions={opVersions}
+                opVersions={opVersionsDesc}
                 valueURI={diffState.right}
                 currentVersionURI={currentVersionURI}
                 onChange={uri => onSetRight(uri)}
