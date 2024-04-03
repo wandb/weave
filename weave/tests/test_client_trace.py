@@ -1021,17 +1021,39 @@ def test_unknown_attribute(client):
     assert b2.obj == repr(b_obj)
 
 
-def test_single_boolean_output(client):
+def test_single_primitive_output(client):
     @weave.op()
-    def single_output(a: int) -> int:
-        return a == 0
+    def single_int_output(a: int) -> int:
+        return a
 
     @weave.op()
-    def dict_output(a: int) -> int:
-        return {"res": a == 0}
+    def single_bool_output(a: int) -> bool:
+        return a == 1
 
-    single_output(1)
-    dict_output(1)
+    @weave.op()
+    def single_none_output(a: int) -> None:
+        return None
+
+    @weave.op()
+    def dict_output(a: int, b: bool, c: None) -> dict:
+        return {"a": a, "b": b, "c": c}
+
+    a = single_int_output(1)
+    b = single_bool_output(1)
+    c = single_none_output(1)
+    d = dict_output(a, b, c)
+
+    assert type(a) == int
+    assert a == 1
+    assert type(b) == bool
+    assert b == True
+    assert type(c) == type(None)
+    assert c == None
+    assert type(d) == dict
+    assert type(d["a"]) == int
+    assert type(d["b"]) == bool
+    assert type(d["c"]) == type(None)
+    assert d == {"a": 1, "b": True, "c": None}
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -1039,6 +1061,8 @@ def test_single_boolean_output(client):
         )
     )
 
-    assert len(inner_res.calls) == 2
-    assert inner_res.calls[0].output == False
-    assert inner_res.calls[1].output == {"res": False}
+    assert len(inner_res.calls) == 4
+    assert inner_res.calls[0].output == 1
+    assert inner_res.calls[1].output == True
+    assert inner_res.calls[2].output == None
+    assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
