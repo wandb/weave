@@ -80,7 +80,7 @@ class ObjectRef(RefWithExtra):
                 f"{self.entity}/{self.project}", ensure_project_exists=False
             )
             try:
-                res = gc.get(self)
+                res = init_client.client.get(self)
             finally:
                 init_client.reset()
             return res
