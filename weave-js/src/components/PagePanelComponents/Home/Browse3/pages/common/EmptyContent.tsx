@@ -24,7 +24,7 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
 };
 
 export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
-  icon: 'type-number' as const,
+  icon: 'type-boolean' as const,
   heading: 'No evaluations yet',
   description: 'Use evaluations to track model performance across datasets.',
   moreInformation: (

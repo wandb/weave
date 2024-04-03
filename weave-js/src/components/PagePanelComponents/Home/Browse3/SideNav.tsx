@@ -80,7 +80,7 @@ export const SideNav = () => {
       {
         id: 'evaluation',
         name: 'Evaluations',
-        iconName: IconNames.TypeNumber,
+        iconName: IconNames.TypeBoolean,
         path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
       },
       {
