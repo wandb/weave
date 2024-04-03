@@ -156,6 +156,22 @@ R = TypeVar("R")
 
 # The decorator!
 def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Decorator for defining a Weave Op.
+
+    A Weave Op is a versioned function that automatically logs all calls.
+    To create an Op, decorate a python function with `weave.op()`
+
+    ```python
+    @weave.op()
+    def track_me(v):
+        return v + 5
+
+    weave.init('example_project')
+    track_me(15)
+    ```
+
+    Calling an op will created a new op version if the code has changed from the last call, and log the inputs and outputs of the function.
+    Functions decorated with `@weave.op()` will behave normally (without code versioning and tracking), if you don't call `weave.init('your-project-name')` before calling them."""
     if context_state.get_loading_built_ins():
         from weave.decorator_op import op
 
