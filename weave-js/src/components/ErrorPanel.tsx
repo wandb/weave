@@ -7,7 +7,8 @@ import {Tooltip} from './Tooltip';
 
 const DEFAULT_TITLE = 'Something went wrong.';
 const DEFAULT_SUBTITLE = 'An unexpected error occurred.';
-const DEFAULT_SUBTITLE2 = 'Thank you for your patience while Weave is in beta.';
+const DEFAULT_SUBTITLE2 =
+  'This error has been logged. Thank you for your patience.';
 
 type ErrorPanelProps = {
   title?: string;
