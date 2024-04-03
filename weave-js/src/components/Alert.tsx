@@ -27,15 +27,16 @@ type AlertProps = {
   severity?: AlertSeverity;
   icon?: IconName | null;
   children: React.ReactNode;
+  style?: React.CSSProperties;
 };
 
-export const Alert = ({severity, icon, children}: AlertProps) => {
+export const Alert = ({severity, icon, children, style}: AlertProps) => {
   // User can override icon including to force it not to be shown.
   // Otherwise fallback to show the icon associated with the severity.
   const iconName =
     icon === null || icon ? icon : severity ? ICONS[severity] : null;
   return (
-    <S.Alert severity={severity ?? 'default'}>
+    <S.Alert severity={severity ?? 'default'} style={style}>
       {iconName !== null && <S.Icon name={iconName} width={16} height={16} />}
       <S.Message>{children}</S.Message>
     </S.Alert>
