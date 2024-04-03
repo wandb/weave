@@ -47,8 +47,9 @@ def class_all_bases_names(cls: type) -> list[str]:
 
 def pydantic_object_record(obj: pydantic.BaseModel) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
-    for k, v in inspect.getmembers(obj, lambda x: isinstance(x, Op)):
-        attrs[k] = v
+    # print('asdfasdfasd', flush=True)
+    # for k, v in inspect.getmembers(obj, lambda x: isinstance(x, Op)):
+    #     attrs[k] = v
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
     return ObjectRecord(attrs)
