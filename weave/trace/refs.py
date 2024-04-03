@@ -1,6 +1,7 @@
 from typing import Union, Any
 import dataclasses
 from ..trace_server import refs_internal
+from .. import trace_sentry
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -58,6 +59,7 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(self.extra)
         return u
 
+    @trace_sentry.global_trace_sentry.watch()
     def get(self) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
