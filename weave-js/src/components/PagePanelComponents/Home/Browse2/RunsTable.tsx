@@ -533,6 +533,111 @@ export const RunsTable: FC<{
       }
     }
 
+    type ColGroupChildren = Array<
+      | {field: string}
+      | {
+          groupId: string;
+          children: ColGroupChildren;
+          headerName: string;
+          renderHeaderGroup: () => JSX.Element;
+        }
+    >;
+    const getGroupChildren = (groupField: string) => {
+      const colGroupChildren: ColGroupChildren = [{field: groupField}];
+      const expandCols = expandedColInfo[groupField] ?? [];
+      for (const col of expandCols) {
+        const expandField = groupField + '.' + col.path;
+        cols.push({
+          flex: 1,
+          field: expandField,
+          renderHeader: headerParams => (
+            <CustomGroupedColumnHeader field={headerParams.field} />
+          ),
+          renderCell: cellParams => {
+            const weaveRef = (cellParams.row as any)[groupField];
+            if (weaveRef === undefined) {
+              return <NotApplicable />;
+            }
+            return (
+              <ErrorBoundary>
+                <RefValue weaveRef={weaveRef} attribute={col.path} />
+              </ErrorBoundary>
+            );
+          },
+        });
+        colGroupChildren.push({field: expandField});
+      }
+      return colGroupChildren;
+    };
+
+    const addColumnGroup = (groupName: string, colOrder: string[]) => {
+      const colGroup: GridColumnGroup = {
+        // input -> inputs, output -> outputs
+        groupId: groupName + 's',
+        children: [],
+      };
+
+      for (const key of colOrder) {
+        const field = groupName + '.' + key;
+        const fields = key.split('.');
+        const isExpanded = expandedRefCols.has(field);
+        cols.push({
+          ...(isExpanded
+            ? {
+                // if the ref is expanded we want to give the ref icon less space
+                width: 100,
+              }
+            : {
+                flex: 1,
+                minWidth: 150,
+              }),
+          field,
+          renderHeader: () => {
+            const hasExpand = columnHasRefs(tableStats, field);
+            return (
+              <ExpandHeader
+                // if the field is a flattened field, use the last key as the header 
+                headerName={isExpanded ? 'Ref' : fields.slice(-1)[0]}
+                field={field}
+                hasExpand={hasExpand && !isExpanded}
+                onExpand={onExpand}
+              />
+            );
+          },
+          renderCell: cellParams => {
+            if (field in cellParams.row) {
+              const value = (cellParams.row as any)[field];
+              return <CellValue value={value} isExpanded={isExpanded} />;
+            }
+            return <NotApplicable />;
+          },
+        });
+
+        // if ref is expanded add the children to the colGroup
+        if (isExpanded) {
+          colGroup.children.push({
+            groupId: field,
+            headerName: key,
+            // Nests all the children here
+            children: getGroupChildren(field),
+            renderHeaderGroup: () => {
+              return (
+                <CollapseGroupHeader
+                  headerName={key}
+                  field={field}
+                  onCollapse={onCollapse}
+                />
+              );
+            },
+          });
+        } else {
+          addToTree(colGroup, fields, field, 0);
+        }
+      }
+      colGroupingModel.push(colGroup);
+    };
+
+    // Add input columns
     const inputOrder = !isSingleOpVersion
       ? getInputColumns(tableStats)
       : row0.rawSpan.inputs._arg_order ??
@@ -540,97 +645,9 @@ export const RunsTable: FC<{
         Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
           k => !k.startsWith('_')
         );
-    const inputGroup: Exclude<
-      ComponentProps<typeof DataGrid>['columnGroupingModel'],
-      undefined
-    >[number] = {
-      groupId: 'inputs',
-      children: [],
-    };
-    for (const key of inputOrder) {
-      const field = 'input.' + key;
-      const isExpanded = expandedRefCols.has(field);
-      cols.push({
-        ...(isExpanded
-          ? {
-              width: 100,
-            }
-          : {
-              flex: 1,
-              minWidth: 150,
-            }),
-        field,
-        renderHeader: () => {
-          const hasExpand = columnHasRefs(tableStats, field);
-          return (
-            <ExpandHeader
-              headerName={isExpanded ? 'Ref' : key}
-              field={field}
-              hasExpand={hasExpand && !isExpanded}
-              onExpand={onExpand}
-            />
-          );
-        },
-        renderCell: cellParams => {
-          if (field in cellParams.row) {
-            const value = (cellParams.row as any)[field];
-            return <CellValue value={value} isExpanded={isExpanded} />;
-          }
-          return <NotApplicable />;
-        },
-      });
-      if (isExpanded) {
-        const inputGroupChildren = [{field}];
-        const expandCols = expandedColInfo[field] ?? [];
-        for (const col of expandCols) {
-          const expandField = field + '.' + col.label;
-          cols.push({
-            flex: 1,
-            field: expandField,
-            renderHeader: headerParams => {
-              return (
-                <CustomGroupedColumnHeader
-                  field={headerParams.field}
-                  // TODO: after merging object store stuff - re-write expansion logic. This should be grouped.
-                  titleOverride={col.label}
-                />
-              );
-            },
-            renderCell: cellParams => {
-              const weaveRef = (cellParams.row as any)[field];
-              if (weaveRef === undefined) {
-                return <NotApplicable />;
-              }
-              return (
-                <ErrorBoundary>
-                  <RefValue weaveRef={weaveRef} attribute={col.path} />
-                </ErrorBoundary>
-              );
-            },
-          });
-          inputGroupChildren.push({field: expandField});
-        }
-        inputGroup.children.push({
-          groupId: field,
-          headerName: key,
-          children: inputGroupChildren,
-          renderHeaderGroup: () => {
-            return (
-              <CollapseGroupHeader
-                headerName={key}
-                field={field}
-                onCollapse={onCollapse}
-              />
-            );
-          },
-        });
-      } else {
-        inputGroup.children.push({field});
-      }
-    }
-    colGroupingModel.push(inputGroup);
+    addColumnGroup('input', inputOrder);
 
-    // All output keys as we don't have the order key yet.
+    // Add output columns
     if (onlyOneOutputResult) {
       // If there is only one output _result, we don't need to do all the work on outputs
       cols.push({
@@ -643,6 +660,7 @@ export const RunsTable: FC<{
         },
       });
     } else {
+      // All output keys as we don't have the order key yet.
       let outputKeys: {[key: string]: true} = {};
       spans.forEach(span => {
         for (const [k, v] of Object.entries(
@@ -663,36 +681,7 @@ export const RunsTable: FC<{
       );
 
       const outputOrder = Object.keys(outputKeys);
-      const outputGrouping = buildTree(outputOrder, 'output');
-      colGroupingModel.push(outputGrouping);
-      for (const key of outputOrder) {
-        const field = 'output.' + key;
-        const isExpanded = expandedRefCols.has(field);
-        cols.push({
-          flex: 1,
-          minWidth: 150,
-          field,
-          renderHeader: () => {
-            const hasExpand = columnHasRefs(tableStats, field);
-            const tail = key.split('.').slice(-1)[0];
-            return (
-              <ExpandHeader
-                headerName={isExpanded ? 'Ref' : tail}
-                field={field}
-                hasExpand={hasExpand && !isExpanded}
-                onExpand={onExpand}
-              />
-            );
-          },
-          renderCell: cellParams => {
-            if (field in cellParams.row) {
-              const value = (cellParams.row as any)[field];
-              return <CellValue value={value} isExpanded={isExpanded} />;
-            }
-            return <NotApplicable />;
-          },
-        });
-      }
+      addColumnGroup('output', outputOrder);
     }
 
     let feedbackKeys: {[key: string]: true} = {};

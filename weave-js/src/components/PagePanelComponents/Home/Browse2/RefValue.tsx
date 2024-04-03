@@ -19,6 +19,7 @@ type RefValueProps = {
   // React key and object key
   weaveRef: string;
   attribute: string;
+  iconOnly?: boolean;
 };
 
 const RENDER_DIRECTLY = new Set([
@@ -28,7 +29,7 @@ const RENDER_DIRECTLY = new Set([
   typeof false,
 ]);
 
-export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
+export const RefValue = ({weaveRef, attribute, iconOnly = false}: RefValueProps) => {
   const {
     derived: {useRefsType},
   } = useWFHooks();
@@ -40,6 +41,7 @@ export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
       <RefValueWithExtra
         weaveRef={weaveRef}
         attribute={DICT_KEY_EDGE_NAME + '/' + attribute}
+        iconOnly={iconOnly}
       />
     );
   } else if (isObjectTypeLike(getRefsType.result[0])) {
@@ -47,6 +49,7 @@ export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
       <RefValueWithExtra
         weaveRef={weaveRef}
         attribute={OBJECT_ATTR_EDGE_NAME + '/' + attribute}
+        iconOnly={iconOnly}
       />
     );
   } else if (isListLike(getRefsType.result[0])) {
@@ -54,13 +57,14 @@ export const RefValue = ({weaveRef, attribute}: RefValueProps) => {
       <RefValueWithExtra
         weaveRef={weaveRef}
         attribute={LIST_INDEX_EDGE_NAME + '/' + attribute}
+        iconOnly={iconOnly}
       />
     );
   }
   return <>Unknown Type</>;
 };
 
-const RefValueWithExtra = ({weaveRef, attribute}: RefValueProps) => {
+const RefValueWithExtra = ({weaveRef, attribute, iconOnly = false}: RefValueProps) => {
   const {useRefsData} = useWFHooks();
   const objRef = parseRef(weaveRef);
   const objRefWithExtra = useMemo(() => {
@@ -82,10 +86,10 @@ const RefValueWithExtra = ({weaveRef, attribute}: RefValueProps) => {
   if (refData === null) {
     return <NotApplicable />;
   } else if (isRef(refData)) {
-    return <SmallRef objRef={parseRef(refData)} />;
+    return <SmallRef objRef={parseRef(refData)} iconOnly={iconOnly}/>;
   } else if (RENDER_DIRECTLY.has(typeof refData)) {
-    return <CellValue value={refData} />;
+    return <CellValue value={refData} isExpanded={iconOnly}/>;
   } else {
-    return <SmallRef objRef={objRefWithExtra} />;
+    return <SmallRef objRef={objRefWithExtra} iconOnly={iconOnly}/>;
   }
 };
