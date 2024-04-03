@@ -57,8 +57,20 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     return entity_name, project_name
 
 
+"""
+This is the main entrypoint for the weave library. It initializes the weave client
+and sets up the global state for the weave library.
+
+Args:
+    project_name (str): The project name to use for the weave client.
+    ensure_project_exists (bool): If True, the client will not attempt to create the project
+"""
+
+
 @trace_sentry.global_trace_sentry.watch()
-def init_weave(project_name: str) -> InitializedClient:
+def init_weave(
+    project_name: str, ensure_project_exists: bool = True
+) -> InitializedClient:
     from . import wandb_api
 
     # Must init to read ensure we've read auth from the environment, in
@@ -81,7 +93,9 @@ def init_weave(project_name: str) -> InitializedClient:
     entity_name, project_name = get_entity_project_from_project_name(project_name)
 
     # server = ClickHouseTraceServer(host="localhost")
-    client = weave_client.WeaveClient(entity_name, project_name, remote_server)
+    client = weave_client.WeaveClient(
+        entity_name, project_name, remote_server, ensure_project_exists
+    )
 
     init_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
@@ -108,7 +122,9 @@ def init_weave(project_name: str) -> InitializedClient:
         # In the future, we may want to throw here.
         min_required_version = "0.0.0"
     init_message.assert_min_weave_version(min_required_version)
-    init_message.print_init_message(username, entity_name, project_name)
+    init_message.print_init_message(
+        username, entity_name, project_name, read_only=not ensure_project_exists
+    )
 
     user_context = {"username": username} if username else None
     trace_sentry.global_trace_sentry.configure_scope(

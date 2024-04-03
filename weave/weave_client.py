@@ -244,12 +244,29 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
 class WeaveClient:
     server: TraceServerInterface
 
-    def __init__(self, entity: str, project: str, server: TraceServerInterface):
+    """
+    A client for interacting with the Weave trace server.
+
+    Args:
+        entity: The entity name.
+        project: The project name.
+        server: The server to use for communication.
+        ensure_project_exists: Whether to ensure the project exists on the server.
+    """
+
+    def __init__(
+        self,
+        entity: str,
+        project: str,
+        server: TraceServerInterface,
+        ensure_project_exists: bool = True,
+    ):
         self.entity = entity
         self.project = project
         self.server = server
 
-        self.server.ensure_project_exists(entity, project)
+        if ensure_project_exists:
+            self.server.ensure_project_exists(entity, project)
 
     def ref_is_own(self, ref: Ref) -> bool:
         return isinstance(ref, Ref)
@@ -295,10 +312,11 @@ class WeaveClient:
         return self.get(ref)
 
     def get(self, ref: ObjectRef) -> Any:
+        project_id = f"{ref.entity}/{ref.project}"
         try:
             read_res = self.server.obj_read(
                 ObjReadReq(
-                    project_id=f"{ref.entity}/{ref.project}",
+                    project_id=project_id,
                     object_id=ref.name,
                     digest=ref.digest,
                 )
@@ -336,7 +354,7 @@ class WeaveClient:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
             data = ref_read_res.vals[0]
 
-        val = from_json(data, self._project_id(), self.server)
+        val = from_json(data, project_id, self.server)
 
         return make_trace_obj(val, ref, self.server, None)
 
