@@ -1019,3 +1019,24 @@ def test_unknown_attribute(client):
 
     assert a2.obj == repr(a_obj)
     assert b2.obj == repr(b_obj)
+
+def test_single_boolean_output(client):
+    @weave.op()
+    def single_output(a: int) -> int:
+        return a == 0
+    
+    @weave.op()
+    def dict_output(a: int) -> int:
+        return {'res': a == 0}
+
+    single_output(1)
+    dict_output(1)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 2
+    assert inner_res.calls[0].output == 1
