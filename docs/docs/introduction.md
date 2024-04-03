@@ -9,9 +9,9 @@ hide_table_of_contents: true
 
 *🍲 This version of Weave is pre-release software. 🍲*
 
-Weave is a toolkit for developing AI-powered applications, built by [Weights & Biases](https://wandb.ai).
+Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai).
 
-Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI-based software, without introducing cognitive overhead.
+Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing Generative AI software, without introducing cognitive overhead.
 
 [Get started](/quickstart) by decorating Python functions with `@weave.op()`. 
 
@@ -25,7 +25,7 @@ You can use Weave to:
 
 ## Key concepts
 
-Weave's **core types** layer contains everything you need for organizing AI projects, with built-in lineage, tracking, and reproducibility.
+Weave's **core types** layer contains everything you need for organizing Generative AI projects, with built-in lineage, tracking, and reproducibility.
 
   - **[Datasets](/guides/core-types/datasets)**: Version, store, and share rich tabular data.
   - **[Models](/guides/core-types/models)**: Version, store, and share parameterized functions.
