@@ -533,18 +533,14 @@ export const RunsTable: FC<{
       }
     }
 
-    type ColGroupChildren = Array<
-      | {field: string}
-      | {
-          groupId: string;
-          children: ColGroupChildren;
-          headerName: string;
-          renderHeaderGroup: () => JSX.Element;
-        }
-    >;
+    // Gets the children of a expanded group field(a ref that has been expanded)
+    // returns an array of column definitions, for the children
     const getGroupChildren = (groupField: string) => {
-      const colGroupChildren: ColGroupChildren = [{field: groupField}];
+      // start children array with self
+      const colGroupChildren = [{field: groupField}];
+      // get the expanded columns for the group field
       const expandCols = expandedColInfo[groupField] ?? [];
+      // for each expanded column, add a column definition
       for (const col of expandCols) {
         const expandField = groupField + '.' + col.path;
         cols.push({
@@ -584,7 +580,7 @@ export const RunsTable: FC<{
         cols.push({
           ...(isExpanded
             ? {
-                // if the ref is expanded we want to give the ref icon less space
+                // if the ref is expanded it will only be an icon and we want to give the ref icon less column space
                 width: 100,
               }
             : {
@@ -596,7 +592,7 @@ export const RunsTable: FC<{
             const hasExpand = columnHasRefs(tableStats, field);
             return (
               <ExpandHeader
-                // if the field is a flattened field, use the last key as the header 
+                // if the field is a flattened field, use the last key as the header
                 headerName={isExpanded ? 'Ref' : fields.slice(-1)[0]}
                 field={field}
                 hasExpand={hasExpand && !isExpanded}
@@ -613,7 +609,7 @@ export const RunsTable: FC<{
           },
         });
 
-        // if ref is expanded add the children to the colGroup
+        // if ref is expanded add the ref children to the colGroup
         if (isExpanded) {
           colGroup.children.push({
             groupId: field,
@@ -631,6 +627,7 @@ export const RunsTable: FC<{
             },
           });
         } else {
+          // if ref is not expanded add the column to the colGroup
           addToTree(colGroup, fields, field, 0);
         }
       }
