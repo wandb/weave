@@ -5,6 +5,7 @@ from . import context_state
 from . import errors
 from . import autopatch
 from . import weave_client
+from . import trace_sentry
 
 
 class InitializedClient:
@@ -56,6 +57,7 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     return entity_name, project_name
 
 
+@trace_sentry.global_trace_sentry.watch()
 def init_weave(project_name: str) -> InitializedClient:
     from . import wandb_api
 
@@ -107,6 +109,15 @@ def init_weave(project_name: str) -> InitializedClient:
         min_required_version = "0.0.0"
     init_message.assert_min_weave_version(min_required_version)
     init_message.print_init_message(username, entity_name, project_name)
+
+    user_context = {"username": username} if username else None
+    trace_sentry.global_trace_sentry.configure_scope(
+        {
+            "entity_name": entity_name,
+            "project_name": project_name,
+            "user": user_context,
+        }
+    )
 
     return init_client
 

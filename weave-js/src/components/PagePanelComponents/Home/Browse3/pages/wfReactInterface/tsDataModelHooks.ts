@@ -62,6 +62,7 @@ const makeTraceServerEndpointHook = <
     ...input: Input
   ): LoadableWithError<Output> => {
     input = useDeepMemo(input);
+    const loadingInputRef = useRef<Input | null>(null);
     const getTsClient = useGetTraceServerClientContext();
     const [state, setState] = useState<LoadableWithError<Output>>({
       loading: true,
@@ -70,6 +71,7 @@ const makeTraceServerEndpointHook = <
     });
 
     useEffect(() => {
+      loadingInputRef.current = input;
       setState({loading: true, result: null, error: null});
       const req = preprocessFn(...input);
       if (req.skip) {
@@ -79,14 +81,27 @@ const makeTraceServerEndpointHook = <
       const client = getTsClient();
       client[traceServerFnName](req.params as any)
         .then(res => {
+          if (input !== loadingInputRef.current) {
+            return;
+          }
           const output = postprocessFn(res as any, ...input);
           setState({loading: false, result: output, error: null});
         })
         .catch(err => {
+          if (input !== loadingInputRef.current) {
+            return;
+          }
           setState({loading: false, result: null, error: err});
         });
     }, [getTsClient, input]);
 
+    const loadingReturn = useMemo(
+      () => ({loading: true, result: null, error: null}),
+      []
+    );
+    if (loadingInputRef.current !== input) {
+      return loadingReturn;
+    }
     return state;
   };
   return useTraceServerRequest;

@@ -8,7 +8,7 @@ from typing_extensions import ParamSpec
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
 from weave.trace.context import call_attributes
-from weave import graph_client_context
+from weave import graph_client_context, trace_sentry
 from weave import run_context
 from weave import box
 
@@ -41,6 +41,10 @@ class Op:
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        return self._watched_call(*args, **kwargs)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _watched_call(self, *args: Any, **kwargs: Any) -> Any:
         maybe_client = graph_client_context.get_graph_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
