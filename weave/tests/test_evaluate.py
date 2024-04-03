@@ -12,7 +12,7 @@ dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}
 dataset = Dataset(rows=dataset_rows)
 
 expected_eval_result = {
-    "prediction": {"mean": 9.5},
+    "model_output": {"mean": 9.5},
     "score": {"true_count": 1, "true_fraction": 0.5},
 }
 
@@ -24,8 +24,8 @@ class EvalModel(Model):
 
 
 @weave.op()
-def score(target, prediction):
-    return target == prediction
+def score(target, model_output):
+    return target == model_output
 
 
 @weave.op()
@@ -57,7 +57,7 @@ def test_predict_can_receive_other_params(client):
     )
     result = asyncio.run(evaluation.evaluate(model_predict))
     assert result == {
-        "prediction": {"mean": 18.5},
+        "model_output": {"mean": 18.5},
         "score": {"true_count": 0, "true_fraction": 0.0},
     }
 
@@ -108,8 +108,8 @@ def test_evaluate_other_model_method_names(eager_mode):
 def test_score_as_class(client):
     class MyScorer(weave.Scorer):
         @weave.op()
-        def score(self, target, prediction):
-            return target == prediction
+        def score(self, target, model_output):
+            return target == model_output
 
     evaluation = Evaluation(
         dataset=dataset_rows,
@@ -118,7 +118,7 @@ def test_score_as_class(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
-        "prediction": {"mean": 9.5},
+        "model_output": {"mean": 9.5},
         "MyScorer": {"true_count": 1, "true_fraction": 0.5},
     }
 
@@ -131,8 +131,8 @@ def test_score_with_custom_summarize(client):
             return {"awesome": 3}
 
         @weave.op()
-        def score(self, target, prediction):
-            return target == prediction
+        def score(self, target, model_output):
+            return target == model_output
 
     evaluation = Evaluation(
         dataset=dataset_rows,
@@ -141,7 +141,7 @@ def test_score_with_custom_summarize(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
-        "prediction": {"mean": 9.5},
+        "model_output": {"mean": 9.5},
         "MyScorer": {"awesome": 3},
     }
 
@@ -158,7 +158,7 @@ def test_multiclass_f1_score(client):
 
     result = asyncio.run(evaluation.evaluate(return_pred))
     assert result == {
-        "prediction": {
+        "model_output": {
             "a": {"true_count": 1, "true_fraction": 1.0},
             "b": {"true_count": 0, "true_fraction": 0.0},
         },
