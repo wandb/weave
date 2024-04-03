@@ -39,7 +39,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(self._flush_calls)
+            self.call_processor = AsyncBatchProcessor(self._flush_calls, max_batch_size=5000)
         self._auth: t.Optional[t.Tuple[str, str]] = None
 
     def ensure_project_exists(self, entity: str, project: str) -> None:

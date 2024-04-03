@@ -347,7 +347,7 @@ export class TraceServerClient {
   };
 }
 
-const MAX_CHUNK_SIZE = 10000;
+const MAX_CHUNK_SIZE = 1000;
 
 /**
  * Use this function to query calls from the trace server. This function will
