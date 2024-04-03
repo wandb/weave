@@ -117,7 +117,7 @@ def getmembers(object, predicate=None):
         except Exception as e:
             # This is for the one off case where the xmltodict library is not installed in Instructor's environment
             if str(e) == "name 'ET' is not defined":
-                print("ImportError: cannot import name xmltodict")
+                print("ImportError: cannot import xmltodict")
             else:
                 print(f"Error while calling getattr: {e}")
         # This is where the modified code ends
