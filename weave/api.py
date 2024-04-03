@@ -191,11 +191,11 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
     If an object with name already exists, and the content hash of obj does
     not match the latest version of that object, a new version will be created.
 
-    TODO: Need to document how name works with this change.
-
     Args:
         obj: The object to save and version.
-        name: The name to save the object under.
+        name: The name to save the object under. If not provided, the `name`
+            attribute of the object will be used if it exists, otherwise the
+            class name of the object will be used.
 
     Returns:
         A weave Ref to the saved object.
@@ -227,11 +227,8 @@ def publish(obj: typing.Any, name: Optional[str] = None) -> _weave_client.Object
 def ref(location: str) -> _weave_client.ObjectRef:
     """Construct a Ref to a Weave object.
 
-    TODO: what happens if obj does not exist
-
     Args:
         location: A fully-qualified weave ref URI, or if weave.init() has been called, "name:version" or just "name" ("latest" will be used for version in this case).
-
 
     Returns:
         A weave Ref to the object.

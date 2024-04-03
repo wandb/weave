@@ -59,6 +59,8 @@ class ObjectRef(RefWithExtra):
         return u
 
     def get(self) -> Any:
+        """Retrieves the object from the server."""
+
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
