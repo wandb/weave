@@ -71,8 +71,12 @@ class Op:
             if not parent_run:
                 print_call_link(run)
             raise
+        # We cannot let BoxedNone or BoxedBool escape into the user's code
+        # since they cannot pass instance checks for None or bool.
         if isinstance(res, box.BoxedNone):
             res = None
+        if isinstance(res, box.BoxedBool):
+            res = res.val
         if inspect.iscoroutine(res):
 
             async def _run_async() -> Coroutine[Any, Any, Any]:
