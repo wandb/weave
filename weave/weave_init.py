@@ -79,8 +79,16 @@ def init_weave(
     wandb_context = wandb_api.get_wandb_api_context()
     if wandb_context is None:
         import wandb
+        from wandb.sdk.lib import apikey
 
+        print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
+
+        # We need to remove the dryrun option from the login choices, because
+        # weave does not support dryrun mode.
+        orig_choices = apikey.LOGIN_CHOICES
+        apikey.LOGIN_CHOICES.remove(apikey.LOGIN_CHOICE_DRYRUN)
         wandb.login()
+        apikey.LOGIN_CHOICES = orig_choices
         wandb_api.init()
         wandb_context = wandb_api.get_wandb_api_context()
 
