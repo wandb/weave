@@ -1053,6 +1053,8 @@ def _patched_default_initializer(trace_client: weave_client.WeaveClient):
         yield
     finally:
         weave_init.init_weave_get_server = orig
+
+
 def test_single_primitive_output(client):
     @weave.op()
     def single_int_output(a: int) -> int:

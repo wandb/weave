@@ -68,6 +68,8 @@ Args:
     project_name (str): The project name to use for the weave client.
     ensure_project_exists (bool): If True, the client will not attempt to create the project
 """
+
+
 def init_weave(
     project_name: str, ensure_project_exists: bool = True
 ) -> InitializedClient:
