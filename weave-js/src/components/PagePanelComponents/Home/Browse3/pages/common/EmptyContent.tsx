@@ -30,7 +30,7 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   moreInformation: (
     <>
       Learn{' '}
-      <TargetBlank href="https://wandb.github.io/weave/guides/core-types/evaluations">
+      <TargetBlank href="https://wandb.me/weave_evals">
         evaluation basics
       </TargetBlank>{' '}
       or see how you can{' '}
