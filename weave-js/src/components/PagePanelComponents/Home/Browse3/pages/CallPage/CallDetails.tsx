@@ -91,24 +91,20 @@ export const CallDetails: FC<{
           gap: 1,
           paddingTop: '8px',
         }}>
-        {Object.keys(inputs).length > 0 && (
-          <Box
-            sx={{
-              flex: '0 0 auto',
-              p: 2,
-            }}>
-            <ObjectViewerSection title="Inputs" data={inputs} />
-          </Box>
-        )}
-        {Object.keys(output).length > 0 && (
-          <Box
-            sx={{
-              flex: '0 0 auto',
-              p: 2,
-            }}>
-            <ObjectViewerSection title="Outputs" data={output} />
-          </Box>
-        )}
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            p: 2,
+          }}>
+          <ObjectViewerSection title="Inputs" data={inputs} />
+        </Box>
+        <Box
+          sx={{
+            flex: '0 0 auto',
+            p: 2,
+          }}>
+          <ObjectViewerSection title="Outputs" data={output} />
+        </Box>
         {multipleChildCallOpRefs.map(opVersionRef => {
           const exampleCall = childCalls.result?.find(
             c => c.opVersionRef === opVersionRef
@@ -226,17 +222,13 @@ const getDisplayInputsAndOutput = (call: CallSchema) => {
   const span = call.rawSpan;
   const inputKeys =
     span.inputs._keys ??
-    Object.entries(span.inputs)
-      .filter(([k, c]) => c != null && !k.startsWith('_'))
-      .map(([k, c]) => k);
+    Object.keys(span.inputs).filter(k => !k.startsWith('_'));
   const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
 
   const callOutput = span.output ?? {};
   const outputKeys =
     callOutput._keys ??
-    Object.entries(callOutput)
-      .filter(([k, c]) => c != null && (k === '_result' || !k.startsWith('_')))
-      .map(([k, c]) => k);
+    Object.keys(callOutput).filter(k => k === '_result' || !k.startsWith('_'));
   const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
   return {inputs, output};
 };

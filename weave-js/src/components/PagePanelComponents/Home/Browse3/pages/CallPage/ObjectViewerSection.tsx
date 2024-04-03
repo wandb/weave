@@ -2,6 +2,7 @@ import {useGridApiRef} from '@mui/x-data-grid-pro';
 import React, {useCallback, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
+import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {isRef} from '../common/util';
@@ -63,7 +64,7 @@ const isSimpleData = (data: Data): boolean => {
   return isSimple;
 };
 
-export const ObjectViewerSection = ({
+const ObjectViewerSectionNonEmpty = ({
   title,
   data,
 }: ObjectViewerSectionProps) => {
@@ -72,18 +73,8 @@ export const ObjectViewerSection = ({
     isSimpleData(data) ? 'expanded' : 'collapsed'
   );
 
-  const isOneValue = '_result' in data;
-
   const body = useMemo(() => {
     if (mode === 'collapsed' || mode === 'expanded') {
-      if (isOneValue) {
-        const oneResultData = {
-          value: data._result,
-          valueType: getValueType(data._result),
-          isLeaf: true,
-        };
-        return <ValueView data={oneResultData} isExpanded={true} />;
-      }
       return (
         <ObjectViewer
           apiRef={apiRef}
@@ -102,7 +93,7 @@ export const ObjectViewerSection = ({
       );
     }
     return null;
-  }, [apiRef, mode, data, isOneValue]);
+  }, [apiRef, mode, data]);
 
   const setTreeExpanded = useCallback(
     (isExpanded: boolean) => {
@@ -167,4 +158,48 @@ export const ObjectViewerSection = ({
       {body}
     </>
   );
+};
+
+export const ObjectViewerSection = ({
+  title,
+  data,
+}: ObjectViewerSectionProps) => {
+  const numKeys = Object.keys(data).length;
+  if (numKeys === 0) {
+    return (
+      <>
+        <TitleRow>
+          <Title>{title}</Title>
+        </TitleRow>
+        <Alert>None</Alert>
+      </>
+    );
+  }
+  if (numKeys === 1 && '_result' in data) {
+    const value = data._result;
+    const valueType = getValueType(value);
+    if (
+      valueType === 'object' ||
+      (valueType === 'array' && value.length > 0) ||
+      isRef(value)
+    ) {
+      return (
+        <ObjectViewerSectionNonEmpty title={title} data={{Value: value}} />
+      );
+    }
+    const oneResultData = {
+      value,
+      valueType,
+      isLeaf: true,
+    };
+    return (
+      <>
+        <TitleRow>
+          <Title>{title}</Title>
+        </TitleRow>
+        <ValueView data={oneResultData} isExpanded={true} />
+      </>
+    );
+  }
+  return <ObjectViewerSectionNonEmpty title={title} data={data} />;
 };

@@ -71,7 +71,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       if (isRef(context.value)) {
         return refValues[context.value];
       }
-      return context.value;
+      return _.clone(context.value);
     });
     setResolvedData(resolved);
   }, [data, client, refsData.result, refs]);
