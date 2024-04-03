@@ -23,6 +23,25 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
   ),
 };
 
+export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
+  icon: 'type-number' as const,
+  heading: 'No evaluations yet',
+  description: 'Use evaluations to track model performance across datasets.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="https://wandb.github.io/weave/guides/core-types/evaluations">
+        evaluation basics
+      </TargetBlank>{' '}
+      or see how you can{' '}
+      <TargetBlank href="http://wandb.me/weave_eval_tut">
+        use models an evaluation pipeline
+      </TargetBlank>
+      .
+    </>
+  ),
+};
+
 export const EMPTY_PROPS_MODEL: EmptyProps = {
   icon: 'model' as const,
   heading: 'No models yet',
