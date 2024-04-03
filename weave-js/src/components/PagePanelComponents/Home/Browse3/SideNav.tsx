@@ -1,10 +1,11 @@
 import {IconNames} from '@wandb/weave/components/Icon';
+import _ from 'lodash';
 import React, {useMemo} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {useWeaveflowRouteContext} from './context';
+import {useEvaluationsFilter} from './pages/CallsPage/CallsPage';
 import {useURLSearchParamsDict} from './pages/util';
-// import {refDictToRefString} from './pages/wfInterface/naive';
 import {Sidebar, SidebarItem} from './Sidebar';
 
 export const SideNav = () => {
@@ -37,17 +38,18 @@ export const SideNav = () => {
       return {};
     }
   }, [query.filter]);
-  const filterCategory = useMemo(() => {
+
+  const evaluationsFilter = useEvaluationsFilter(currentEntity, currentProject);
+
+  const selectedItemId = useMemo(() => {
     const category = Object.keys(filters).find(key =>
       key.includes('baseObjectClass')
     );
-    if (category === undefined) {
-      return undefined;
+    let filterCategory;
+    if (category !== undefined) {
+      filterCategory = filters[category];
     }
-    return filters[category];
-  }, [filters]);
 
-  const selectedItemId = useMemo(() => {
     if (params.tab === 'types' || params.tab === 'type-versions') {
       return 'types';
     } else if (params.tab === 'objects' || params.tab === 'object-versions') {
@@ -60,13 +62,13 @@ export const SideNav = () => {
     } else if (params.tab === 'ops' || params.tab === 'op-versions') {
       return 'ops';
     } else if (params.tab === 'calls') {
-      if (filterCategory === 'evaluate') {
+      if (_.isEqual(filters, evaluationsFilter)) {
         return 'evaluation';
       }
       return 'calls';
     }
     return null;
-  }, [params.tab, filterCategory]);
+  }, [evaluationsFilter, filters, params.tab]);
 
   const {baseRouter} = useWeaveflowRouteContext();
   if (!currentProject || !currentEntity) {
@@ -76,32 +78,11 @@ export const SideNav = () => {
   const items: SidebarItem[][] = [
     [
       {
-        id: 'calls',
-        name: 'Traces',
-        iconName: IconNames.LayoutTabs,
-        path: baseRouter.callsUIUrl(entity, project, {
-          traceRootsOnly: true,
-        }),
+        id: 'evaluation',
+        name: 'Evaluations',
+        iconName: IconNames.TypeBoolean,
+        path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
       },
-      // {
-      //   id: 'evaluation',
-      //   name: 'Evaluations',
-      //   iconName: IconNames.TypeNumber,
-      //   path: baseRouter.callsUIUrl(entity, project, {
-      //     opCategory: 'evaluate',
-      //     opVersionRefs: [
-      //       refDictToRefString({
-      //         entity: currentEntity,
-      //         project: currentProject,
-      //         artifactName: 'Evaluation-evaluate',
-      //         versionCommitHash: '*',
-      //         filePathParts: ['obj'],
-      //         refExtraTuples: [],
-      //       }),
-      //     ],
-      //     isPivot: true,
-      //   }),
-      // },
       {
         id: 'models',
         name: 'Models',
@@ -120,6 +101,14 @@ export const SideNav = () => {
       },
     ],
     [
+      {
+        id: 'calls',
+        name: 'Traces',
+        iconName: IconNames.LayoutTabs,
+        path: baseRouter.callsUIUrl(entity, project, {
+          traceRootsOnly: true,
+        }),
+      },
       {
         id: 'ops',
         name: 'Operations',

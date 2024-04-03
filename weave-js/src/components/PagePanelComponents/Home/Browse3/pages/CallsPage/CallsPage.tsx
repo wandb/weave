@@ -17,8 +17,14 @@ import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../common/Empty';
-import {EMPTY_PROPS_TRACES} from '../common/EmptyContent';
-import {isEvaluateOp} from '../common/heuristics';
+import {
+  EMPTY_PROPS_EVALUATIONS,
+  EMPTY_PROPS_TRACES,
+} from '../common/EmptyContent';
+import {
+  EVALUATE_OP_NAME_POST_PYDANTIC,
+  isEvaluateOp,
+} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
@@ -45,6 +51,10 @@ export type WFHighLevelCallFilter = {
   parentId?: string | null;
   isPivot?: boolean;
   pivotSpec?: Partial<WFHighLevelPivotSpec>;
+  // This really doesn't belong here. We are using it to indicate that the
+  // filter is frozen and should not be updated by the user. However, this
+  // control should really be managed outside of the filter itself.
+  frozen?: boolean;
 };
 
 export const CallsPage: FC<{
@@ -60,20 +70,22 @@ export const CallsPage: FC<{
     props.onFilterUpdate
   );
 
+  const isEvaluationTable = useCurrentFilterIsEvaluationsFilter(
+    filter,
+    props.entity,
+    props.project
+  );
+
   const title = useMemo(() => {
+    if (isEvaluationTable) {
+      return 'Evaluations';
+    }
     if (filter.opVersionRefs?.length === 1) {
       const opName = opVersionRefOpName(filter.opVersionRefs[0]);
-      const niceName = opNiceName(opName);
-      if (isEvaluateOp(niceName)) {
-        // Very special case for now
-        if (filter.isPivot) {
-          return 'Evaluation Leaderboard';
-        }
-      }
       return opNiceName(opName) + ' Traces';
     }
     return 'Traces';
-  }, [filter.isPivot, filter.opVersionRefs]);
+  }, [filter.opVersionRefs, isEvaluationTable]);
 
   return (
     <SimplePageLayout
@@ -85,6 +97,7 @@ export const CallsPage: FC<{
           content: (
             <CallsTable
               {...props}
+              hideControls={filter.frozen}
               initialFilter={filter}
               onFilterUpdate={setFilter}
             />
@@ -236,6 +249,12 @@ export const CallsTable: FC<{
     return Math.random();
   }, [calls.loading, calls.result]);
 
+  const isEvaluateTable = useCurrentFilterIsEvaluationsFilter(
+    effectiveFilter,
+    props.entity,
+    props.project
+  );
+
   if (calls.loading) {
     return <Loading centered />;
   }
@@ -243,7 +262,11 @@ export const CallsTable: FC<{
   const spans = calls.result ?? [];
   const isEmpty = spans.length === 0;
   if (isEmpty) {
-    return <Empty {...EMPTY_PROPS_TRACES} />;
+    if (isEvaluateTable) {
+      return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
+    } else {
+      return <Empty {...EMPTY_PROPS_TRACES} />;
+    }
   }
 
   return (
@@ -552,4 +575,32 @@ const useParentIdOptions = (
       )})`,
     };
   }, [parentCall.loading, parentCall.result]);
+};
+
+export const useEvaluationsFilter = (
+  entity: string,
+  project: string
+): WFHighLevelCallFilter => {
+  return useMemo(() => {
+    return {
+      frozen: true,
+      opVersionRefs: [
+        opVersionKeyToRefUri({
+          entity,
+          project,
+          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+          versionHash: '*',
+        }),
+      ],
+    };
+  }, [entity, project]);
+};
+
+export const useCurrentFilterIsEvaluationsFilter = (
+  currentFilter: WFHighLevelCallFilter,
+  entity: string,
+  project: string
+) => {
+  const evaluationsFilter = useEvaluationsFilter(entity, project);
+  return _.isEqual(currentFilter, evaluationsFilter);
 };
