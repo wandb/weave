@@ -298,11 +298,15 @@ class MockAsyncStream(AsyncStream):
 
         def make_sse_decoder():
             from openai._streaming import SSEDecoder
+
             return SSEDecoder()
 
         super().__init__(
             cast_to=ChatCompletionChunk,
-            client=Mock(_process_response_data=process_response_data, _make_sse_decoder=make_sse_decoder),
+            client=Mock(
+                _process_response_data=process_response_data,
+                _make_sse_decoder=make_sse_decoder,
+            ),
             response=MockAsyncResponse(chunks),
         )
 
