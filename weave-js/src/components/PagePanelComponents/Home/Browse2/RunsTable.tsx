@@ -1,4 +1,4 @@
-import {Alert, Box, Button, Typography} from '@mui/material';
+import {Box, Typography} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -17,6 +17,7 @@ import React, {
   useState,
 } from 'react';
 import {useParams} from 'react-router-dom';
+import styled from 'styled-components';
 
 import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
@@ -29,6 +30,7 @@ import {
 } from '../../../../core';
 import {useDeepMemo} from '../../../../hookUtils';
 import {parseRef} from '../../../../react';
+import {Alert} from '../../../Alert';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
@@ -67,6 +69,19 @@ export type DataGridColumnGroupingModel = Exclude<
   ComponentProps<typeof DataGrid>['columnGroupingModel'],
   undefined
 >;
+
+const VisibilityAlert = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+VisibilityAlert.displayName = 'S.VisibilityAlert';
+
+const VisibilityAlertAction = styled.div`
+  font-weight: 600;
+  cursor: pointer;
+`;
+VisibilityAlertAction.displayName = 'S.VisibilityAlertAction';
 
 function addToTree(
   node: GridColumnGroup,
@@ -802,17 +817,13 @@ export const RunsTable: FC<{
   return (
     <>
       {showVisibilityAlert && (
-        <Alert
-          severity="info"
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              onClick={() => setForceShowAll(true)}>
+        <Alert>
+          <VisibilityAlert>
+            <div>Columns having many empty values have been hidden.</div>
+            <VisibilityAlertAction onClick={() => setForceShowAll(true)}>
               Show all
-            </Button>
-          }>
-          Columns having many empty values have been hidden.
+            </VisibilityAlertAction>
+          </VisibilityAlert>
         </Alert>
       )}
       <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
