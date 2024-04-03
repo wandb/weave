@@ -10,6 +10,7 @@ from pydantic import BaseModel, ValidationError
 import wandb
 import weave
 from weave import weave_client
+from weave import context_state
 from weave.trace.vals import MissingSelfInstanceError, TraceObject
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
@@ -1029,14 +1030,22 @@ def test_ref_get_no_client(trace_init_client):
     data_got = weave.ref(data.uri()).get()
     assert data_got == 42
 
-    # Now we will "de-init" the client
-    trace_init_client.reset()
+    # clear the graph client effectively "de-initializing it"
+    with _no_graph_client():
+        # This patching is required just to make the test path work
+        with _patched_default_initializer(trace_client):
+            # Now we will try to get the data again
+            data_got = weave.ref(data.uri()).get()
+            assert data_got == 42
 
-    # This patching is required just to make the test path work
-    with _patched_default_initializer(trace_client):
-        # Now we will try to get the data again
-        data_got = weave.ref(data.uri()).get()
-        assert data_got == 42
+
+@contextmanager
+def _no_graph_client():
+    token = context_state._graph_client.set(None)
+    try:
+        yield
+    finally:
+        context_state._graph_client.reset(token)
 
 
 @contextmanager
