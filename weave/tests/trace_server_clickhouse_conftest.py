@@ -40,7 +40,7 @@ def clickhouse_trace_server(clickhouse_server):
 
 
 @pytest.fixture()
-def trace_client(clickhouse_trace_server, user_by_api_key_in_env):
+def trace_init_client(clickhouse_trace_server, user_by_api_key_in_env):
     # Generate a random project name to avoid conflicts between tests
     # using the same shared backend server
     random_project_name = str(uuid.uuid4())
@@ -50,9 +50,14 @@ def trace_client(clickhouse_trace_server, user_by_api_key_in_env):
     inited_client = InitializedClient(graph_client)
 
     try:
-        yield graph_client
+        yield inited_client
     finally:
         inited_client.reset()
+
+
+@pytest.fixture()
+def trace_client(trace_init_client):
+    return trace_init_client.client
 
 
 def _check_server_health(

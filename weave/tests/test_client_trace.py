@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import dataclasses
 from collections import namedtuple
 import datetime
@@ -1019,3 +1020,36 @@ def test_unknown_attribute(client):
 
     assert a2.obj == repr(a_obj)
     assert b2.obj == repr(b_obj)
+
+
+# Note: this test only works with the `trace_init_client` fixture
+def test_ref_get_no_client(trace_init_client):
+    trace_client = trace_init_client.client
+    data = weave.publish(42)
+    data_got = weave.ref(data.uri()).get()
+    assert data_got == 42
+
+    # Now we will "de-init" the client
+    trace_init_client.reset()
+
+    # This patching is required just to make the test path work
+    with _patched_default_initializer(trace_client):
+        # Now we will try to get the data again
+        data_got = weave.ref(data.uri()).get()
+        assert data_got == 42
+
+
+@contextmanager
+def _patched_default_initializer(trace_client: weave_client.WeaveClient):
+    from weave import weave_init
+
+    def init_weave_get_server_patched(api_key):
+        return trace_client.server
+
+    orig = weave_init.init_weave_get_server
+    weave_init.init_weave_get_server = init_weave_get_server_patched
+
+    try:
+        yield
+    finally:
+        weave_init.init_weave_get_server = orig
