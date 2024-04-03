@@ -1043,16 +1043,16 @@ def test_single_primitive_output(client):
     c = single_none_output(1)
     d = dict_output(a, b, c)
 
-    assert type(a) == int
+    assert isinstance(a, int)
     assert a == 1
-    assert type(b) == bool
+    assert isinstance(b, bool)
     assert b == True
-    assert type(c) == type(None)
+    assert isinstance(c, type(None))
     assert c == None
-    assert type(d) == dict
-    assert type(d["a"]) == int
-    assert type(d["b"]) == bool
-    assert type(d["c"]) == type(None)
+    assert isinstance(d, dict)
+    assert isinstance(d["a"], int)
+    assert isinstance(d["b"], bool)
+    assert isinstance(d["c"], type(None))
     assert d == {"a": 1, "b": True, "c": None}
 
     inner_res = client.server.calls_query(

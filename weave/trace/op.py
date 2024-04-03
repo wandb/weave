@@ -65,14 +65,18 @@ class Op:
             with run_context.current_run(run):
                 res = self.resolve_fn(**inputs)
                 # TODO: can we get rid of this?
-                # res = box.box(res)
+                res = box.box(res)
         except BaseException as e:
             client.fail_call(run, e)
             if not parent_run:
                 print_call_link(run)
             raise
+        # We cannot let BoxedNone or BoxedBool escape into the user's code
+        # since they cannot pass instance checks for None or bool.
         if isinstance(res, box.BoxedNone):
             res = None
+        if isinstance(res, box.BoxedBool):
+            res = res.val
         if inspect.iscoroutine(res):
 
             async def _run_async() -> Coroutine[Any, Any, Any]:
