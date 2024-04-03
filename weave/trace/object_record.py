@@ -65,7 +65,7 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
     if not dataclasses.is_dataclass(obj):
         raise ValueError(f"{obj} is not a dataclass")
     attrs = dataclass_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: isinstance(x, Op)):
+    for k, v in getmembers(obj, lambda x: isinstance(x, Op), lambda e: None):
         attrs[k] = v
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
