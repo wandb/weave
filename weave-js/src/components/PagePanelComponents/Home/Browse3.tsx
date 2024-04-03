@@ -44,7 +44,6 @@ import {
   Browse3WeaveflowRouteContextProvider,
   PATH_PARAM,
   PEEK_PARAM,
-  TRACETREE_PARAM,
   useClosePeek,
   usePeekLocation,
   useWeaveflowCurrentRouteContext,
@@ -696,7 +695,6 @@ const CallPageBinding = () => {
       entity={params.entity}
       project={params.project}
       callId={params.itemName}
-      showTraceTree={query[TRACETREE_PARAM] === '1'}
       path={query[PATH_PARAM]}
     />
   );

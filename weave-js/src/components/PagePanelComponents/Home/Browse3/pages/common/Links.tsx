@@ -12,7 +12,6 @@ import styled, {css} from 'styled-components';
 import {TargetBlank} from '../../../../../../common/util/links';
 import {
   PATH_PARAM,
-  TRACETREE_PARAM,
   usePeekLocation,
   useWeaveflowRouteContext,
 } from '../../context';
@@ -21,7 +20,6 @@ import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
 import {truncateID} from '../util';
-import {isEvaluateOp} from './heuristics';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -264,21 +262,16 @@ export const CallLink: React.FC<{
   // to provide the right abstractions.
   const peekLoc = usePeekLocation();
   const peekParams = new URLSearchParams(peekLoc?.search ?? '');
-  const existingTraceTreeOpen = peekParams.get(TRACETREE_PARAM) === '1';
   const existingPath = peekParams.get(PATH_PARAM) ?? '';
-  // Don't show trace tree by default for Evaluation-evaluate when not already open
-  const tracetree =
-    props.tracetree ?? (existingTraceTreeOpen || !isEvaluateOp(opName));
   // Preserve the path only when showing trace tree
-  const path = props.preservePath && tracetree ? existingPath : null;
+  const path = props.preservePath ? existingPath : null;
 
   const to = peekingRouter.callUIUrl(
     props.entityName,
     props.projectName,
     '',
     props.callId,
-    path,
-    tracetree
+    path
   );
   const onClick = () => {
     history.push(to);
