@@ -24,8 +24,17 @@ To systematically improve your application, it's very helpful to test your chang
 
 First, define a [Dataset](/guides/core-types/datasets) or list of examples with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
 
+### Define a scoring function
+
 Then, define a list of scoring functions. Each function should take an example and a prediction, returning a dictionary with the scores. 
 
-Finally, create a model and pass this to `evaluation.evaluate`, which will run `predict` on each example and score the output with each scoring function.
+```
+def match(answer: dict, model_output: dict ) -> dict:
+    return {'match': answer['expected_text'] == model_output['generated_text']}
+```
+
+### Evaluate
+
+Finally, create a model and pass this to `evaluation.evaluate`, which will run `predict` on each example and score the output with each scoring functions.
 
 To see this in action, follow the '[Build an Evaluation pipeline](/tutorial-eval)' tutorial.
