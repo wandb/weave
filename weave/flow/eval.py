@@ -38,6 +38,23 @@ def async_call(
 
 
 class Evaluation(Object):
+    """Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using specified scoring functions.
+
+    ```python
+    from weave import Evaluation
+
+    evaluation = Evaluation(
+        dataset=dataset, scorers=[score]
+    )
+    evaluation.evaluate(model)
+    ```
+
+    Args:
+        dataset: A `Dataset` object or a list of dictionaries. Each dictionary represents a row in the dataset. The keys of the dictionary represent the column names, and the values represent the data in the row.
+        scorers: A list of scoring `Op`s or `Scorer` objects. Each scoring function should accept 0 or more arguments named the same as the keys in the dataset row dictionaries, and a final `model_output` argument that receives the output of the model function.
+        preprocess_model_input: An `Op` that accepts a dataset example and returns a dict with keys expected by the model function. This is useful when the model function expects arguments that are not present in the dataset example.
+    """
+
     dataset: Union[Dataset, list]
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None

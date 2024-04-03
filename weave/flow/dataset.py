@@ -15,6 +15,11 @@ def short_str(obj: Any, limit: int = 25) -> str:
 
 
 class Dataset(Object):
+    """Datasets enable you to collect examples for evaluation and automatically track versions for accurate comparisons. Easily update datasets with the UI and download the latest version locally with a simple API.
+
+    When constructing a Dataset, you can pass in a list of dictionaries. Each dictionary represents a row in the dataset. The keys of the dictionary represent the column names, and the values represent the data in the row.
+    """
+
     rows: weave.Table
 
     @field_validator("rows", mode="before")
