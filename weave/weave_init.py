@@ -57,7 +57,6 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     return entity_name, project_name
 
 
-@trace_sentry.global_trace_sentry.watch()
 def init_weave(project_name: str) -> InitializedClient:
     from . import wandb_api
 
