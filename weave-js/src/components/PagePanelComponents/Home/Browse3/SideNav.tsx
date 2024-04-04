@@ -78,11 +78,21 @@ export const SideNav = () => {
   const items: SidebarItem[][] = [
     [
       {
+        id: 'calls',
+        name: 'Traces',
+        iconName: IconNames.LayoutTabs,
+        path: baseRouter.callsUIUrl(entity, project, {
+          traceRootsOnly: true,
+        }),
+      },
+      {
         id: 'evaluation',
         name: 'Evaluations',
         iconName: IconNames.TypeBoolean,
         path: baseRouter.callsUIUrl(entity, project, evaluationsFilter),
       },
+    ],
+    [
       {
         id: 'models',
         name: 'Models',
@@ -97,16 +107,6 @@ export const SideNav = () => {
         iconName: IconNames.Table,
         path: baseRouter.objectVersionsUIUrl(entity, project, {
           baseObjectClass: 'Dataset',
-        }),
-      },
-    ],
-    [
-      {
-        id: 'calls',
-        name: 'Traces',
-        iconName: IconNames.LayoutTabs,
-        path: baseRouter.callsUIUrl(entity, project, {
-          traceRootsOnly: true,
         }),
       },
       {
