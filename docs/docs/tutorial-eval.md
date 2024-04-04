@@ -52,6 +52,8 @@ class ExtractFruitsModel(weave.Model):
 You can instantiate `Model` objects as normal like this:
 
 ```python
+import asyncio
+
 model = ExtractFruitsModel(model_name='gpt-3.5-turbo-1106',
                           prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor": <str>) from the following text, as json: {sentence}')
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."

@@ -10,6 +10,8 @@ A Weave op is a versioned function that automatically logs all calls.
 To create an op, decorate a python function with `weave.op()`
 
 ```python
+import weave
+
 @weave.op()
 def track_me(v):
     return v + 5
