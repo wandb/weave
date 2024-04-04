@@ -52,7 +52,7 @@ sentence = "There are many fruits that were found on the recently discovered pla
 extract_fruit(sentence)
 ```
 
-Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code. 
+Now, every time you call this function, weave will automatically capture the input & output data and log any changes to the code.
 Run this application and your console will output a link to view it within W&B.
 
 :::note
