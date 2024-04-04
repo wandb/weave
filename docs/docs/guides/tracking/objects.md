@@ -11,7 +11,7 @@ Weave's serialization layer saves and versions Python objects.
 
 ```python
 import weave
-# Initialize tracking to the project 'cat-project'
+# Initialize tracking to the project 'intro-example'
 weave.init('intro-example')
 # Save a list, giving it the name 'cat-names'
 weave.publish(['felix', 'jimbo', 'billie'], 'cat-names')
