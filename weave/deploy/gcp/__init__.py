@@ -238,8 +238,8 @@ def deploy(
     """Deploy the weave application."""
     enforce_login()
     if region is None:
-        region = gcloud(["config", "get", "compute/region", "--format=json"])
-        if region is []:
+        region = gcloud(["config", "get", "functions/region", "--format=json"])
+        if region == []:
             raise ValueError(
                 "No default region set. Run `gcloud config set functions/region <region>` or set the region argument."
             )
