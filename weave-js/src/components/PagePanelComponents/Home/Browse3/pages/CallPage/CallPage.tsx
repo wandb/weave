@@ -117,7 +117,7 @@ const CallPageInnerVertical: FC<{
       headerExtra={
         <Box
           sx={{
-            height: '47px',
+            height: '41px',
           }}>
           <Button
             icon="layout-tabs"
