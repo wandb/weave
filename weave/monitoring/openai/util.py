@@ -1,4 +1,5 @@
 import inspect
+from math import ceil
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Iterator, Optional, TypeVar
 
@@ -30,20 +31,43 @@ def update_combined_choice(
 
 def token_usage(
     input_messages: List[dict], response_choices: list[Choice]
-) -> CompletionUsage:
-    prompt_tokens = num_tokens_from_messages(input_messages)
-    completion_tokens = 0
-    for choice in response_choices:
-        message = choice.message
-        completion_tokens += num_tokens_from_messages([message.model_dump()])
+) -> Optional[CompletionUsage]:
+    try:
+        prompt_tokens = num_tokens_from_messages(input_messages)
+        completion_tokens = 0
+        for choice in response_choices:
+            message = choice.message
+            completion_tokens += num_tokens_from_messages([message.model_dump()])
 
-    total_tokens = prompt_tokens + completion_tokens
-    return CompletionUsage(
-        prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-        total_tokens=total_tokens,
-    )
+        total_tokens = prompt_tokens + completion_tokens
+        return CompletionUsage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+        )
+    except Exception as e:
+        print(f"Error: unable to calculate token usage {e}")
+        return None
 
+
+def calculate_image_tokens(width: int, height: int):
+    if width > 2048 or height > 2048:
+        aspect_ratio = width / height
+        if aspect_ratio > 1:
+            width, height = 2048, int(2048 / aspect_ratio)
+        else:
+            width, height = int(2048 * aspect_ratio), 2048
+
+    if width >= height and height > 768:
+        width, height = int((768 / height) * width), 768
+    elif height > width and width > 768:
+        width, height = 768, int((768 / width) * height)
+
+    tiles_width = ceil(width / 512)
+    tiles_height = ceil(height / 512)
+    total_tokens = 85 + 170 * (tiles_width * tiles_height)
+
+    return total_tokens
 
 def num_tokens_from_messages(
     messages: List[dict], model: str = "gpt-3.5-turbo-0613"
@@ -85,7 +109,19 @@ def num_tokens_from_messages(
     for message in messages:
         num_tokens += config.per_message
         if message.get("content") is not None:
-            num_tokens += len(encoding.encode(message["content"]))
+            if isinstance(message["content"], list):
+                for content in message["content"]:
+                    if content.get("type") == "text" and isinstance(content.get("text"), str):
+                        num_tokens += len(encoding.encode(content["text"]))
+                    elif content.get("type") == "image_url":
+                        # TODO: actually extract the width and height of the image, just assuming 1024 now
+                        num_tokens += calculate_image_tokens(1024, 1024)
+                    else:
+                        print(f"Warning: couldn't calculate tokens from content with type {type(content.get('type'))}")
+            elif isinstance(message["content"], str):
+                num_tokens += len(encoding.encode(message["content"]))
+            else:
+                print(f"Warning: couldn't calculate tokens from content with type {type(message['content'])}")            
         if message["role"] == "user":
             num_tokens += config.per_name
 

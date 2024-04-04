@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from functools import partialmethod
 from typing import Callable, Type, Union, AsyncIterator
 import typing
+from types import TracebackType
 
 import openai
 from openai import AsyncStream, Stream
@@ -82,6 +83,16 @@ class WeaveAsyncStream(AsyncStream):
             usage=token_usage(self._messages, result.choices),
         )
         self._finish_run(result_with_usage.model_dump(exclude_unset=True))
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        await super().__aexit__(exc_type, exc, exc_tb)
+        if exc:
+            raise exc
 
 
 class AsyncChatCompletions:

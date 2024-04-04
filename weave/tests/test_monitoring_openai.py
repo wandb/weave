@@ -469,7 +469,24 @@ async def test_log_to_span_async_streaming(
     )
     create_input = dict(
         model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "Tell me a joke"}],
+        messages=[
+            {"role": "system", "content": "Tell me a joke"},
+            {
+				"role": "user",
+				"content": [
+					{
+						"type": "text",
+						"text": "make it really funny like this image"
+					},
+					{
+						"type": "image_url",
+						"image_url": {
+							"url": ""
+						}
+					}
+				]
+			}
+        ],
         stream=True,
     )
     stream = await chat_completions.create(**create_input)
