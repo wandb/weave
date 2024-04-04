@@ -52,6 +52,11 @@ class ExtractFruitsModel(weave.Model):
 You can instantiate `Model` objects as normal like this:
 
 ```python
+import asyncio
+import weave
+
+weave.init('intro-example')
+
 model = ExtractFruitsModel(model_name='gpt-3.5-turbo-1106',
                           prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor": <str>) from the following text, as json: {sentence}')
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
@@ -94,9 +99,11 @@ Here `sentence` is passed to the model's predict function, and `target` is used 
 import weave
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
 
+weave.init('intro-example')
+
 @weave.op()
-def fruit_name_score(target: dict, prediction: dict) -> dict:
-    return {'correct': target['fruit'] == prediction['fruit']}
+def fruit_name_score(target: dict, model_output: dict) -> dict:
+    return {'correct': target['fruit'] == model_output['fruit']}
 
 # highlight-next-line
 evaluation = weave.Evaluation(
@@ -173,8 +180,8 @@ examples = [
 
 # We define a scoring functions to compare our model predictions with a ground truth label.
 @weave.op()
-def fruit_name_score(target: dict, prediction: dict) -> dict:
-    return {'correct': target['fruit'] == prediction['fruit']}
+def fruit_name_score(target: dict, model_output: dict) -> dict:
+    return {'correct': target['fruit'] == model_output['fruit']}
 
 # Finally, we run an evaluation of this model.
 # This will generate a prediction for each input example, and then score it with each scoring function.
