@@ -57,7 +57,7 @@ def pokedex(name: str, prompt: str) -> str:
     return response.choices[0].message.content
 
 # highlight-next-line
-weave.init('pokedex')
+weave.init('intro-example')
 # Get data for a specific Pokémon
 pokemon_data = pokedex(random.choice(POKEMON), PROMPT)
 ```

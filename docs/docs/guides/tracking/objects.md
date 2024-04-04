@@ -12,7 +12,7 @@ Weave's serialization layer saves and versions Python objects.
 ```python
 import weave
 # Initialize tracking to the project 'cat-project'
-weave.init('cat-project')
+weave.init('intro-example')
 # Save a list, giving it the name 'cat-names'
 weave.publish(['felix', 'jimbo', 'billie'], 'cat-names')
 ```
@@ -26,7 +26,7 @@ Saving an object with a name will create the first version of that object if it 
 You can construct a ref and then fetch the object back.
 
 ```python
-weave.init('cat-project')
+weave.init('intro-example')
 cat_names = weave.ref('cat-names').get()
 ```
 
