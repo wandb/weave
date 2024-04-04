@@ -51,9 +51,9 @@ Weave will take each example, pass it through your application and score the out
 
 First, define a [Dataset](/guides/core-types/datasets) or list of dictionaries with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
 
-### Define a scoring function
+### Defining scoring functions
 
-Then, define a list of scoring functions. Each function should take an example and a `model_output`, and return a dictionary with the scores. 
+Then, create a list of scoring functions. These are used to score each example. Each function should have a `model_output` and optionally, other inputs from your examples, and return a dictionary with the scores.
 
 Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the neccessary keys by using a dictionary key based on the argument name.
 
@@ -61,6 +61,14 @@ This will take `expected` from the dictionary for scoring.
 
 ```python
 import weave
+
+# Collect your examples
+examples = [
+    {"question": "What is the capital of France?", "expected": "Paris"},
+    {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    {"question": "What is the square root of 64?", "expected": "8"},
+]
+
 # Define any custom scoring function
 @weave.op()
 def match_score1(expected: dict, model_output: dict) -> dict:
@@ -68,33 +76,43 @@ def match_score1(expected: dict, model_output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 ```
 
-### Configuring the input argument to the model or function being evaluated
+### Defining a Model to evaluate
 
 To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in weave.
 
 ```python
-from weave import Model
-class MyModel(Model)
+from weave import Model, Evaluation
+import asyncio 
+
+class MyModel(Model):
     prompt: str
 
     @weave.op()
-    def predict(question: str):
+    def predict(self, question: str):
         # here's where you would add your LLM call and return the output
         return {'generated_text': 'Hello, ' + self.prompt}
 
 model = MyModel(prompt='World')
-evaluation.evaluate(model)
+
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1]
+)
+weave.init('intro-example') # begin tracking results with weave
+asyncio.run(evaluation.evaluate(model))
 ```
 This will run `predict` on each example and score the output with each scoring functions.
 
-You can also evaluate a function that is wrapped in a `@weave.op()`.
+### Defining a function to evaluate
+
+Alternatively, you can also evaluate a function that is wrapped in a `@weave.op()`.
+
 ```python
 @weave.op()
 def function_to_evaluate(question: str):
     # here's where you would add your LLM call and return the output
     return  {'generated_text': 'some response'}
 
-evaluation.evaluate(function_to_evaluate)
+asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
 
 ### Pulling it all together
