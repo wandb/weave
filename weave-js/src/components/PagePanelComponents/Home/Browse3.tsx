@@ -383,7 +383,7 @@ const MainPeekingLayout: FC = () => {
                   headerSuffix: (
                     <Box
                       sx={{
-                        height: '47px',
+                        height: '41px',
                         flex: '0 0 auto',
                       }}>
                       <FullPageButton

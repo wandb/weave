@@ -8,7 +8,6 @@ import React, {FC, useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {Button} from '../../../../../Button';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CallStatusType} from '../common/StatusChip';
@@ -18,31 +17,10 @@ import {CustomGridTreeDataGroupingCell} from './CustomGridTreeDataGroupingCell';
 import {scorePathSimilarity, updatePath} from './pathPreservation';
 
 const CallTrace = styled.div`
-  display: flex;
-  flex-direction: column;
+  overflow: auto;
   height: 100%;
 `;
 CallTrace.displayName = 'S.CallTrace';
-
-const CallTraceTree = styled.div`
-  overflow: auto;
-  flex: 1 1 auto;
-`;
-CallTraceTree.displayName = 'S.CallTraceTree';
-
-const CallTraceHeader = styled.div`
-  display: flex;
-  align-items: center;
-  padding: 8px 4px 8px 16px;
-`;
-CallTraceHeader.displayName = 'S.CallTraceHeader';
-
-const CallTraceHeaderTitle = styled.div`
-  font-weight: 600;
-  font-size: 18px;
-  flex: 1 1 auto;
-`;
-CallTraceHeaderTitle.displayName = 'S.CallTraceHeaderTitle';
 
 export const CallTraceView: FC<{
   call: CallSchema;
@@ -228,27 +206,6 @@ export const CallTraceView: FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiRef, callId]);
 
-  const onCloseTraceTree = useCallback(() => {
-    history.replace(
-      currentRouter.callUIUrl(
-        call.entity,
-        call.project,
-        call.traceId,
-        call.callId,
-        path,
-        false
-      )
-    );
-  }, [
-    call.callId,
-    call.entity,
-    call.project,
-    call.traceId,
-    path,
-    currentRouter,
-    history,
-  ]);
-
   // This is used because when we first load the trace view in a drawer, the animation cant handle all the rows
   // so we delay for the first render
   const [animationBuffer, setAnimationBuffer] = useState(true);
@@ -260,37 +217,26 @@ export const CallTraceView: FC<{
 
   return (
     <CallTrace>
-      <CallTraceHeader>
-        <CallTraceHeaderTitle>Trace tree</CallTraceHeaderTitle>
-        <Button
-          icon="close"
-          variant="ghost"
-          onClick={onCloseTraceTree}
-          tooltip="Hide trace tree"
+      <ErrorBoundary>
+        <DataGridPro
+          apiRef={apiRef}
+          rowHeight={38}
+          columnHeaderHeight={0}
+          treeData
+          loading={animationBuffer}
+          onRowClick={onRowClick}
+          onRowDoubleClick={onRowDoubleClick}
+          rows={animationBuffer ? [] : rows}
+          columns={[]}
+          getTreeDataPath={getTreeDataPath}
+          groupingColDef={groupingColDef}
+          isGroupExpandedByDefault={isGroupExpandedByDefault}
+          getRowClassName={getRowClassName}
+          hideFooter
+          rowSelection={false}
+          sx={sx}
         />
-      </CallTraceHeader>
-      <CallTraceTree>
-        <ErrorBoundary>
-          <DataGridPro
-            apiRef={apiRef}
-            rowHeight={38}
-            columnHeaderHeight={0}
-            treeData
-            loading={animationBuffer}
-            onRowClick={onRowClick}
-            onRowDoubleClick={onRowDoubleClick}
-            rows={animationBuffer ? [] : rows}
-            columns={[]}
-            getTreeDataPath={getTreeDataPath}
-            groupingColDef={groupingColDef}
-            isGroupExpandedByDefault={isGroupExpandedByDefault}
-            getRowClassName={getRowClassName}
-            hideFooter
-            rowSelection={false}
-            sx={sx}
-          />
-        </ErrorBoundary>
-      </CallTraceTree>
+      </ErrorBoundary>
     </CallTrace>
   );
 };

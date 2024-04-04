@@ -9,6 +9,7 @@ hide_table_of_contents: true
 Easily update datasets with the UI and download the latest version locally with a simple API.
 
 This guide will show you how to:
+
 - Publish `Dataset`s to W&B
 - Download the latest version
 - Iterate over examples

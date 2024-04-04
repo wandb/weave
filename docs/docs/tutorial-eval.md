@@ -52,10 +52,15 @@ class ExtractFruitsModel(weave.Model):
 You can instantiate `Model` objects as normal like this:
 
 ```python
+import asyncio
+import weave
+
+weave.init('intro-example')
+
 model = ExtractFruitsModel(model_name='gpt-3.5-turbo-1106',
                           prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor": <str>) from the following text, as json: {sentence}')
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
-print(asyncio.run(model.predict(sentence))) 
+print(asyncio.run(model.predict(sentence)))
 # if you're in a Jupyter Notebook, run:
 # await model.predict(sentence)
 ```
@@ -64,12 +69,11 @@ print(asyncio.run(model.predict(sentence)))
 Checkout the [Models](/guides/core-types/models) guide to learn more.
 :::
 
-
 ### Collect some examples
 
 ```python
-sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.", 
-"Pounits are a bright green color and are more savory than sweet.", 
+sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
+"Pounits are a bright green color and are more savory than sweet.",
 "Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them."]
 labels = [
     {'fruit': 'neoskizzles', 'color': 'purple', 'flavor': 'candy'},
@@ -87,22 +91,24 @@ examples = [
 
 `Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions.
 
-Here, we'll use a default scoring function `MulticlassF1Score` and we'll also define our own `fruit_name_score`. 
+Here, we'll use a default scoring function `MultiTaskBinaryClassificationF1` and we'll also define our own `fruit_name_score`.
 
-Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. 
+Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions.
 
 ```python
 import weave
-from weave.flow.scorer import MulticlassF1Score
+from weave.flow.scorer import MultiTaskBinaryClassificationF1
+
+weave.init('intro-example')
 
 @weave.op()
-def fruit_name_score(target: dict, prediction: dict) -> dict:
-    return {'correct': target['fruit'] == prediction['fruit']}
+def fruit_name_score(target: dict, model_output: dict) -> dict:
+    return {'correct': target['fruit'] == model_output['fruit']}
 
 # highlight-next-line
 evaluation = weave.Evaluation(
     # highlight-next-line
-    dataset=examples, scorers=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
+    dataset=examples, scorers=[MultiTaskBinaryClassificationF1(class_names=["fruit", "color", "flavor"]), fruit_name_score],
 # highlight-next-line
 )
 # highlight-next-line
@@ -119,10 +125,10 @@ import asyncio
 # highlight-next-line
 import weave
 # highlight-next-line
-from weave.flow.scorer import MulticlassF1Score
+from weave.flow.scorer import MultiTaskBinaryClassificationF1
 import openai
 
-# We create a model class with one predict function. 
+# We create a model class with one predict function.
 # All inputs, predictions and parameters are automatically captured for easy inspection.
 
 # highlight-next-line
@@ -154,10 +160,10 @@ weave.init('intro-example')
 
 # We create our model with our system prompt.
 model = ExtractFruitsModel(name='gpt4',
-                           model_name='gpt-4-0125-preview', 
+                           model_name='gpt-4-0125-preview',
                            prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: {sentence}')
-sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.", 
-"Pounits are a bright green color and are more savory than sweet.", 
+sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
+"Pounits are a bright green color and are more savory than sweet.",
 "Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them."]
 labels = [
     {'fruit': 'neoskizzles', 'color': 'purple', 'flavor': 'candy'},
@@ -174,16 +180,16 @@ examples = [
 
 # We define a scoring functions to compare our model predictions with a ground truth label.
 @weave.op()
-def fruit_name_score(target: dict, prediction: dict) -> dict:
-    return {'correct': target['fruit'] == prediction['fruit']}
+def fruit_name_score(target: dict, model_output: dict) -> dict:
+    return {'correct': target['fruit'] == model_output['fruit']}
 
-# Finally, we run an evaluation of this model. 
+# Finally, we run an evaluation of this model.
 # This will generate a prediction for each input example, and then score it with each scoring function.
 # highlight-next-line
 evaluation = weave.Evaluation(
     name='fruit_eval',
     # highlight-next-line
-    dataset=examples, scorers=[MulticlassF1Score(class_names=["fruit", "color", "flavor"]), fruit_name_score],
+    dataset=examples, scorers=[MultiTaskBinaryClassificationF1(class_names=["fruit", "color", "flavor"]), fruit_name_score],
 # highlight-next-line
 )
 print(asyncio.run(evaluation.evaluate(model)))

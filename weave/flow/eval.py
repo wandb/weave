@@ -105,7 +105,7 @@ class Evaluation(Object):
                     f"{model_predict} expects arguments: {model_predict_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                 )
         try:
-            prediction = await async_call(model_predict, **model_predict_args)
+            model_output = await async_call(model_predict, **model_predict_args)
         except OpCallError as e:
             dataset_column_names = list(example.keys())
             dataset_column_names_str = ", ".join(dataset_column_names[:3])
@@ -131,9 +131,9 @@ class Evaluation(Object):
             )
             raise OpCallError(message)
         except Exception as e:
-            print("Prediction failed")
+            print("model_output failed")
             traceback.print_exc()
-            prediction = None
+            model_output = None
 
         scores = {}
         scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
@@ -151,9 +151,9 @@ class Evaluation(Object):
             if isinstance(score_arg_names, BoundOp):
                 score_arg_names = score_arg_names[1:]
 
-            if "prediction" not in score_arg_names:
+            if "model_output" not in score_arg_names:
                 raise OpCallError(
-                    f"Scorer {scorer_name} must have a 'prediction' argument, to receive the output of the model function."
+                    f"Scorer {scorer_name} must have a 'model_output' argument, to receive the output of the model function."
                 )
 
             if isinstance(example, dict):
@@ -165,7 +165,7 @@ class Evaluation(Object):
                     raise ValueError(
                         f"{score_fn} expects arguments: {score_arg_names}, provide a preprocess_model_input function that returns a dict with those keys."
                     )
-            score_args["prediction"] = prediction
+            score_args["model_output"] = model_output
 
             try:
                 result = await async_call(score_fn, **score_args)
@@ -181,7 +181,7 @@ class Evaluation(Object):
                 ]
                 if isinstance(score_fn, BoundOp):
                     required_arg_names = required_arg_names[1:]
-                required_arg_names.remove("prediction")
+                required_arg_names.remove("model_output")
 
                 message = textwrap.dedent(
                     f"""
@@ -196,7 +196,7 @@ class Evaluation(Object):
             scores[scorer_name] = result
 
         return {
-            "prediction": prediction,
+            "model_output": model_output,
             "scores": scores,
         }
 
@@ -205,9 +205,9 @@ class Evaluation(Object):
         summary = {}
         if not isinstance(eval_table, weave.WeaveList):
             eval_table = weave.WeaveList(eval_table)
-        prediction_summary = auto_summarize(eval_table.column("prediction"))
-        if prediction_summary:
-            summary["prediction"] = prediction_summary
+        model_output_summary = auto_summarize(eval_table.column("model_output"))
+        if model_output_summary:
+            summary["model_output"] = model_output_summary
         scorers = self.scorers or []
         for scorer in scorers:
             scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
@@ -229,7 +229,7 @@ class Evaluation(Object):
             except Exception as e:
                 print("Predict and score failed")
                 traceback.print_exc()
-                return {"prediction": None, "scores": {}}
+                return {"model_output": None, "scores": {}}
             return eval_row
 
         n_complete = 0
@@ -245,7 +245,7 @@ class Evaluation(Object):
             #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
             # )
             if eval_row == None:
-                eval_row = {"prediction": None, "scores": {}}
+                eval_row = {"model_output": None, "scores": {}}
             if eval_row["scores"] == None:
                 eval_row["scores"] = {}
             for scorer in self.scorers or []:

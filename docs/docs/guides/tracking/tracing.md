@@ -57,14 +57,14 @@ def pokedex(name: str, prompt: str) -> str:
     return response.choices[0].message.content
 
 # highlight-next-line
-weave.init('pokedex')
+weave.init('intro-example')
 # Get data for a specific Pokémon
 pokemon_data = pokedex(random.choice(POKEMON), PROMPT)
 ```
 
 ## Add additional attributes
 
-When calling tracked functions, you can add additional metadata to the call by using the `weave.attributes` context manager. 
+When calling tracked functions, you can add additional metadata to the call by using the `weave.attributes` context manager.
 
 For example, you can add a `user_id` to each call and then filter calls by user. In the example below, any function called within the context manager will have the `user_id` attribute set to `lukas` and `env` attribute set to `production`.
 

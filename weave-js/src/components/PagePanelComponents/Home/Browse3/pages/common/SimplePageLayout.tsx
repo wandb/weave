@@ -77,7 +77,7 @@ export const SimplePageLayout: FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          height: 65, // manual to match sidebar
+          height: 55, // manual to match sidebar
 
           borderBottom: '1px solid #e0e0e0',
           display: 'flex',
@@ -88,8 +88,8 @@ export const SimplePageLayout: FC<{
         }}>
         <Box
           sx={{
-            height: 65, // manual to match sidebar
-            flex: '0 0 65px',
+            height: 55, // manual to match sidebar
+            flex: '0 0 55px',
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'flex-end',
@@ -210,8 +210,8 @@ export const SimplePageLayoutWithHeader: FC<{
       }}>
       <Box
         sx={{
-          height: 65, // manual to match sidebar
-          flex: '0 0 65px',
+          height: 55, // manual to match sidebar
+          flex: '0 0 55px',
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'flex-end',
@@ -272,6 +272,7 @@ export const SimplePageLayoutWithHeader: FC<{
                   overflow: 'auto',
                   borderBottom: '1px solid #e0e0e0',
                   p: 1,
+                  alignContent: 'center',
                 }}>
                 {props.headerContent}
               </Box>
@@ -324,7 +325,7 @@ const ActionMenu: FC<{
   return (
     <Box
       sx={{
-        height: '47px',
+        height: '41px',
         flex: '0 0 auto',
       }}>
       <IconButton
