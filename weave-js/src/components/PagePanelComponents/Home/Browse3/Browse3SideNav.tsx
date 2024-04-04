@@ -238,7 +238,7 @@ const Browse3ProjectSideNav: FC<Browse3ProjectSideNavProps> = props => {
           pr: 1,
           pt: 2,
           pb: 2,
-          height: 65, // manual to match sidebar
+          height: 55, // manual to match sidebar
           borderBottom: '1px solid #e0e0e0',
           display: 'flex',
           alignItems: 'center',
