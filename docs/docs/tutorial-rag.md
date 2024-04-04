@@ -1,6 +1,6 @@
-# Example: Model Based Evaluation on RAG applications
+# Example: Model-Based Evaluation of RAG applications
 
-Retrieval Augmented Generation (RAG) is a common approach of building Generative AI applications that have access to custom knowledge bases. 
+Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases. 
 
 In this example, we'll show an example that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
 We'll also show how to evaluate it using an LLM judge.
@@ -44,7 +44,7 @@ article_embeddings = docs_to_embeddings(articles) # Note: you would typically do
 
 ## Create a RAG app
 
-Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op()` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and ouputs of our functions for later inspection.
+Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op()` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and outputs of our functions for later inspection.
 
 ```python
 # highlight-next-line
@@ -108,12 +108,12 @@ When there aren't simple ways to evaluate your application, one approach is to u
 
 ### Defining a scoring function
 
-As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `prediction` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. 
+As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `model_output` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. We're using `async` functions so they run fast in parallel. If you need a quick introduction to async, you can find one [here](https://docs.python.org/3/library/asyncio.html).
 
 ```python
 # highlight-next-line
 @weave.op()
-async def context_precision_score(question, prediction):
+async def context_precision_score(question, model_output):
     context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output. 
     Output in only valid JSON format.
 
@@ -125,8 +125,8 @@ async def context_precision_score(question, prediction):
 
     prompt = context_precision_prompt.format(
         question=question,
-        context=prediction['context'],
-        answer=prediction['answer'],
+        context=model_output['context'],
+        answer=model_output['answer'],
     )
 
     response = client.chat.completions.create(
@@ -239,7 +239,7 @@ model = RAGModel(
 )
 
 @weave.op()
-async def context_precision_score(question, prediction):
+async def context_precision_score(question, model_output):
     context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output. 
     Output in only valid JSON format.
 
@@ -251,8 +251,8 @@ async def context_precision_score(question, prediction):
 
     prompt = context_precision_prompt.format(
         question=question,
-        context=prediction['context'],
-        answer=prediction['answer'],
+        context=model_output['context'],
+        answer=model_output['answer'],
     )
 
     response = client.chat.completions.create(
@@ -277,11 +277,10 @@ questions = [
 ]
 
 evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_score])
-import asyncio 
 asyncio.run(evaluation.evaluate(model))
 ```
 
 # Conclusion
 
 We've learned how to build observability into different steps of our applications, like the retrieval step in this example.
-We've also learned how to build more complex scoring functions, like an LLM judge, for doing automatical evaluation of application responses.
+We've also learned how to build more complex scoring functions, like an LLM judge, for doing automatic evaluation of application responses.
