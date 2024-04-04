@@ -142,6 +142,9 @@ export const browse2Context = {
   ) => {
     return `/${entityName}/${projectName}/OpDef/${opName}/${opVersionHash}`;
   },
+  tracesUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
   callsUIUrl: (
     entityName: string,
     projectName: string,
@@ -336,6 +339,9 @@ export const browse3ContextGen = (
       }
       return url;
     },
+    tracesUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/traces`;
+    },
     callsUIUrl: (
       entityName: string,
       projectName: string,
@@ -466,6 +472,7 @@ type RouteType = {
     path?: string | null,
     tracetree?: boolean
   ) => string;
+  tracesUIUrl: (entityName: string, projectName: string) => string;
   callsUIUrl: (
     entityName: string,
     projectName: string,
@@ -572,6 +579,9 @@ const useMakePeekingRouter = (): RouteType => {
     },
     callUIUrl: (...args: Parameters<typeof baseContext.callUIUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.callUIUrl(...args));
+    },
+    tracesUIUrl: (...args: Parameters<typeof baseContext.tracesUIUrl>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.tracesUIUrl(...args));
     },
     callsUIUrl: (...args: Parameters<typeof baseContext.callsUIUrl>) => {
       return setSearchParam(PEEK_PARAM, baseContext.callsUIUrl(...args));

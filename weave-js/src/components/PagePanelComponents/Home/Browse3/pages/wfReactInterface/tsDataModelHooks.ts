@@ -248,7 +248,9 @@ const useCalls = (
         result: [],
       };
     }
-    const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
+    const allResults = (callRes?.calls ?? [])
+      .filter(isValidTraceCall)
+      .map(traceCallToUICallSchema);
     const result = allResults;
 
     if (callRes == null || loadingRef.current) {
@@ -1014,6 +1016,11 @@ const traceCallToLegacySpan = (
 const projectIdToParts = (projectId: string) => {
   const [entity, project] = projectId.split('/');
   return {entity, project};
+};
+
+// Hack - underlying client should be updated to handle deleted projects better.
+const isValidTraceCall = (callRes: traceServerClient.TraceCallSchema) => {
+  return !('detail' in callRes);
 };
 
 const traceCallToUICallSchema = (
