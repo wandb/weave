@@ -817,7 +817,7 @@ export const RunsTable: FC<{
   return (
     <>
       {showVisibilityAlert && (
-        <Alert>
+        <Alert style={{borderRadius: 0}}>
           <VisibilityAlert>
             <div>Columns having many empty values have been hidden.</div>
             <VisibilityAlertAction onClick={() => setForceShowAll(true)}>
@@ -840,6 +840,9 @@ export const RunsTable: FC<{
         rowSelectionModel={rowSelectionModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
+        sx={{
+          borderRadius: 0,
+        }}
         slots={{
           noRowsOverlay: () => {
             return (
