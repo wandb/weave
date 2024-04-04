@@ -53,6 +53,9 @@ You can instantiate `Model` objects as normal like this:
 
 ```python
 import asyncio
+import weave
+
+weave.init('intro-example')
 
 model = ExtractFruitsModel(model_name='gpt-3.5-turbo-1106',
                           prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor": <str>) from the following text, as json: {sentence}')
@@ -95,6 +98,8 @@ Here `sentence` is passed to the model's predict function, and `target` is used 
 ```python
 import weave
 from weave.flow.scorer import MultiTaskBinaryClassificationF1
+
+weave.init('intro-example')
 
 @weave.op()
 def fruit_name_score(target: dict, model_output: dict) -> dict:
