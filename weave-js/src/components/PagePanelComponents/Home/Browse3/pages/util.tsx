@@ -45,6 +45,7 @@ export const renderCell = (value: any) => {
       </Box>
     );
   }
+  console.log(value);
   return value;
 };
 

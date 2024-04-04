@@ -1,15 +1,19 @@
 export const flattenObject = (
   obj: {[key: string]: any},
   parentKey: string = '',
-  result: {[key: string]: any} = {}
+  result: {[key: string]: any} = {},
+  predicate?: (key: string, value: any) => boolean
 ) => {
-  if (typeof obj !== 'object' || obj === null) {
+  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
     return obj;
   }
   const keys = Object.keys(obj);
   keys.sort();
   keys.forEach(key => {
     if (!obj.hasOwnProperty(key)) {
+      return;
+    }
+    if (predicate && !predicate(key, obj[key])) {
       return;
     }
     const newKey = parentKey ? `${parentKey}.${key}` : key;
