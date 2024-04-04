@@ -313,7 +313,9 @@ export const CallsTable: FC<{
                     opVersionRefs: newValue ? [newValue] : [],
                   });
                 }}
-                renderInput={params => <TextField {...params} label="Op" />}
+                renderInput={params => (
+                  <TextField {...params} label="Op" sx={{maxWidth: '350px'}} />
+                )}
                 getOptionLabel={option => {
                   return opVersionOptions[option]?.title ?? 'loading...';
                 }}
