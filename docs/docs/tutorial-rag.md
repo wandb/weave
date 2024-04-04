@@ -47,6 +47,12 @@ article_embeddings = docs_to_embeddings(articles) # Note: you would typically do
 Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op()` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and outputs of our functions for later inspection.
 
 ```python
+from openai import OpenAI
+import weave
+from weave import Model
+import numpy as np
+import asyncio
+
 # highlight-next-line
 @weave.op()
 def get_most_relevant_document(query):
@@ -111,6 +117,10 @@ When there aren't simple ways to evaluate your application, one approach is to u
 As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `model_output` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. We're using `async` functions so they run fast in parallel. If you need a quick introduction to async, you can find one [here](https://docs.python.org/3/library/asyncio.html).
 
 ```python
+from openai import OpenAI
+import weave
+import asyncio
+
 # highlight-next-line
 @weave.op()
 async def context_precision_score(question, model_output):
@@ -151,10 +161,20 @@ questions = [
 ]
 # highlight-next-line
 evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_score])
-asyncio.run(evaluation.evaluate(model))
+# highlight-next-line
+asyncio.run(evaluation.evaluate(model)) # note: you'll need to define a model to evaluate
 ```
 
 # Pulling it all together
+
+To get the same result for your RAG apps:
+- Wrap LLM calls & retrieval step functions with `weave.op()`
+- (optional) Create a `Model` subclass with `predict` function and app details
+- Collect examples to evaluate
+- Create scoring functions that score one example
+- Use `Evaluation` class to run evaluations on your examples
+
+Here, we show the code in it's entirety.
 
 ```python
 from openai import OpenAI
@@ -164,6 +184,7 @@ import numpy as np
 import json
 import asyncio 
 
+# Examples we've gathered that we want to use for evaluations
 articles = [
     "Novo Nordisk and Eli Lilly rival soars 32 percent after promising weight loss drug results Shares of Denmarks Zealand Pharma shot 32 percent higher in morning trade, after results showed success in its liver disease treatment survodutide, which is also on trial as a drug to treat obesity. The trial “tells us that the 6mg dose is safe, which is the top dose used in the ongoing [Phase 3] obesity trial too,” one analyst said in a note. The results come amid feverish investor interest in drugs that can be used for weight loss.",
     "Berkshire shares jump after big profit gain as Buffetts conglomerate nears $1 trillion valuation Berkshire Hathaway shares rose on Monday after Warren Buffetts conglomerate posted strong earnings for the fourth quarter over the weekend. Berkshires Class A and B shares jumped more than 1.5%, each. Class A shares are higher by more than 17% this year, while Class B have gained more than 18%. Berkshire was last valued at $930.1 billion, up from $905.5 billion where it closed on Friday, according to FactSet. Berkshire on Saturday posted fourth-quarter operating earnings of $8.481 billion, about 28 percent higher than the $6.625 billion from the year-ago period, driven by big gains in its insurance business. Operating earnings refers to profits from businesses across insurance, railroads and utilities. Meanwhile, Berkshires cash levels also swelled to record levels. The conglomerate held $167.6 billion in cash in the fourth quarter, surpassing the $157.2 billion record the conglomerate held in the prior quarter.",
@@ -188,7 +209,8 @@ def docs_to_embeddings(docs: list) -> list:
 
 article_embeddings = docs_to_embeddings(articles) # Note: you would typically do this once with your articles and put the embeddings & metadata in a database
 
-
+# We've added a decorator to our retrieval step
+# highlight-next-line
 @weave.op()
 def get_most_relevant_document(query):
     openai = OpenAI()
@@ -206,11 +228,15 @@ def get_most_relevant_document(query):
     most_relevant_doc_index = np.argmax(similarities)
     return articles[most_relevant_doc_index]
 
+# We create a Model subclass with some details about our app, along with a predict function that produces a response
+# highlight-next-line
 class RAGModel(Model):
     system_message: str
     model_name: str = "gpt-3.5-turbo-1106"
 
+# highlight-next-line
     @weave.op()
+# highlight-next-line
     def predict(self, question: str) -> dict: # note: `question` will be used later to select data from our evaluation rows
         from openai import OpenAI
         context = get_most_relevant_document(question)
@@ -233,12 +259,17 @@ class RAGModel(Model):
         answer = response.choices[0].message.content
         return {'answer': answer, 'context': context}
 
+# highlight-next-line
 weave.init('rag-qa')
+# highlight-next-line
 model = RAGModel(
     system_message="You are an expert in finance and answer questions related to finance, financial services, and financial markets. When responding based on provided information, be sure to cite the source."
 )
 
+# Here is our scoring function uses our question and model_output to product a score
+# highlight-next-line
 @weave.op()
+# highlight-next-line
 async def context_precision_score(question, model_output):
     context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output. 
     Output in only valid JSON format.
@@ -276,7 +307,10 @@ questions = [
     {"question": "What issue did Intuitive Machines' lunar lander encounter upon landing on the moon?"}
 ]
 
+# We define an Evaluation object and pass our example questions along with scoring functions
+# highlight-next-line
 evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_score])
+# highlight-next-line
 asyncio.run(evaluation.evaluate(model))
 ```
 
