@@ -366,8 +366,8 @@ export const RunsTable: FC<{
   }, [expandedRefCols, client, tableStats]);
 
   const {allShown, columnVisibilityModel, forceShowAll, setForceShowAll} =
-    useColumnVisibility(tableStats);
-  const showVisibilityAlert = !isSingleOpVersion && !allShown && !forceShowAll;
+    useColumnVisibility(tableStats, isSingleOpVersion);
+  const showVisibilityAlert = !allShown && !forceShowAll;
 
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
