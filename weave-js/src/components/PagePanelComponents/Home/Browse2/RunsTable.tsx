@@ -32,6 +32,7 @@ import {useDeepMemo} from '../../../../hookUtils';
 import {parseRef} from '../../../../react';
 import {Alert} from '../../../Alert';
 import {ErrorBoundary} from '../../../ErrorBoundary';
+import {LoadingDots} from '../../../LoadingDots';
 import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
@@ -150,6 +151,9 @@ const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
     };
   }
   const opVersion = useOpVersion(opVersionKey);
+  if (opVersion.loading) {
+    return <LoadingDots />;
+  }
   return opVersion.result ? (
     <span>v{opVersion.result.versionIndex}</span>
   ) : null;
