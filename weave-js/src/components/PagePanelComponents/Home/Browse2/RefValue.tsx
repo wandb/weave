@@ -2,6 +2,7 @@ import {objectRefWithExtra, parseRef, refUri} from '@wandb/weave/react';
 import React, {useMemo} from 'react';
 
 import {isListLike, isObjectTypeLike, isTypedDictLike} from '../../../../core';
+import {LoadingDots} from '../../../LoadingDots';
 import {isRef} from '../Browse3/pages/common/util';
 import {
   DICT_KEY_EDGE_NAME,
@@ -69,7 +70,7 @@ const RefValueWithExtra = ({weaveRef, attribute}: RefValueProps) => {
   const refValue = useRefsData([refUri(objRefWithExtra)]);
 
   if (refValue.loading) {
-    return <>loading...</>;
+    return <LoadingDots />;
   }
 
   if (refValue.result == null || refValue.result.length === 0) {

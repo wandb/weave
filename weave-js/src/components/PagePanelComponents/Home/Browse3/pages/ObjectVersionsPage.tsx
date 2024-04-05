@@ -8,6 +8,7 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {Loading} from '../../../../Loading';
+import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
 import {StyledDataGrid} from '../StyledDataGrid';
@@ -270,6 +271,9 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
     },
     100
   );
+  if (objectVersionsNode.loading) {
+    return <LoadingDots />;
+  }
   const countValue = objectVersionsNode.result?.length ?? 0;
   return (
     <ObjectVersionsLink
