@@ -7,6 +7,7 @@ import {
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {Loading} from '../../../../Loading';
+import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
@@ -223,6 +224,10 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
     },
     100
   );
+  if (ops.loading) {
+    return <LoadingDots />;
+  }
+
   const versionCount = ops?.result?.length ?? 0;
 
   return (
@@ -259,6 +264,9 @@ const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
     },
     100
   );
+  if (calls.loading) {
+    return <LoadingDots />;
+  }
 
   const callCount = calls?.result?.length ?? 0;
 
