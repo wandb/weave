@@ -1,5 +1,6 @@
+from collections import defaultdict
 import numpy as np
-from typing import Union, Callable, Optional, Tuple, Any
+from typing import List, Union, Callable, Optional, Tuple, Any
 import weave
 from weave.trace.isinstance import weave_isinstance
 from weave.flow.obj import Object
@@ -106,6 +107,7 @@ def p_r_f1(tp: int, fp: int, fn: int) -> Tuple[float, float, float]:
 
 
 class MultiTaskBinaryClassificationF1(Scorer):
+    # a list specifying which average functions to apply to the F1 score (binary, macro, micro, weighted)
     class_names: list[str]
 
     @weave.op()
@@ -139,4 +141,111 @@ class MultiTaskBinaryClassificationF1(Scorer):
                 "correct": class_label == class_model_output,
                 "negative": not class_model_output,
             }
+        return result
+
+class MultiTaskAccuracy(Scorer):
+    """A MultiTask version of accuracy where the input is a dict of different 
+    outputs, with each task defined by a unique key.
+    """
+    @weave.op()
+    def score(self, target: Union[str, dict], model_output: dict) -> dict:
+        result = {}
+        for task_key in target.keys():
+            ground_truth_label = target.get(task_key)
+            model_output_label = model_output.get(task_key) if model_output else None
+            result[task_key] = {
+                "correct": ground_truth_label == model_output_label,
+            }
+        return result
+
+    @weave.op()
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        result = {}
+        for task_key in score_rows.keys():
+            task_scores = [row.get(task_key) for row in score_rows]
+            result[task_key] = sum(
+               score["correct"] for score in task_scores
+            ) / len(task_scores)
+        return result
+    
+
+class MultiTaskF1Score(Scorer):
+    # a list specifying which average functions to apply to the F1 score (binary, macro, micro, weighted)
+    average: List[str]
+
+    @weave.op()
+    def score(self, target: dict, model_output: dict) -> dict:
+        result = {}
+        for task_key in target.keys():
+            ground_truth_label = target.get(task_key)
+            model_output_label = model_output.get(task_key) if model_output else None
+            result[task_key] = {
+                # force them to be strings as otherwise it becomes a reference of some sort and not so easy to compare
+                "ground_truth_label": str(ground_truth_label), 
+                "model_output_label": str(model_output_label)
+            }
+        return result
+
+    @weave.op()
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        from sklearn.metrics import f1_score
+        from sklearn.preprocessing import OrdinalEncoder
+
+        result = defaultdict(dict)
+        for task_key in score_rows.keys():
+            # use OrdinalEncoder rather than LabelEncoder as LLMs can generate labels not in the training set
+            le = OrdinalEncoder(handle_unknown='use_encoded_value',
+                                 unknown_value=-1)                        
+            ground_truths = np.array([row[task_key]['ground_truth_label'] for row in score_rows]).reshape(-1, 1)
+            model_outputs = np.array([row[task_key]['model_output_label'] for row in score_rows]).reshape(-1, 1)
+
+            le.fit(ground_truths)
+            y = le.transform(ground_truths)
+            y_pred = le.transform(model_outputs)
+            
+            for avg in self.average:
+                result[task_key][avg] = f1_score(y, y_pred, average=avg)
+        return result
+
+class Accuracy(Scorer):
+    @weave.op()
+    def score(self, target: str, model_output: dict) -> dict:
+        return {
+            "correct": target == model_output,
+        }
+
+    @weave.op()
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+       return sum(
+            score["correct"] for score in score_rows
+        ) / len(score_rows)
+       
+    
+
+class F1Score(Scorer):
+    average: List[str]
+
+    @weave.op()
+    def score(self, target: str, model_output: dict) -> dict:
+        return {
+            "ground_truth_label": str(target), 
+            "model_output_label": str(model_output)
+        }
+
+    @weave.op()
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        from sklearn.metrics import f1_score
+        from sklearn.preprocessing import OrdinalEncoder
+        # use OrdinalEncoder rather than LabelEncoder as LLMs can generate labels not in the training set
+        le = OrdinalEncoder(handle_unknown='use_encoded_value',
+                                unknown_value=-1)                        
+        ground_truths = np.array([row['ground_truth_label'] for row in score_rows]).reshape(-1, 1)
+        model_outputs = np.array([row['model_output_label'] for row in score_rows]).reshape(-1, 1)
+        
+        le.fit(ground_truths)
+        y = le.transform(ground_truths)
+        y_pred = le.transform(model_outputs)
+        result = {}
+        for avg in self.average:
+            result[avg] = f1_score(y, y_pred, average=avg)
         return result
