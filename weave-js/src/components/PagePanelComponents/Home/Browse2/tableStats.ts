@@ -109,8 +109,20 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   return stats;
 };
 
-export const useColumnVisibility = (tableStats: TableStats) => {
+export const useColumnVisibility = (
+  tableStats: TableStats,
+  isSingleOpVersion: boolean
+) => {
   const [forceShowAll, setForceShowAll] = useState(false);
+  if (isSingleOpVersion) {
+    return {
+      allShown: true,
+      columnVisibilityModel: {},
+      forceShowAll: true,
+      setForceShowAll,
+    };
+  }
+
   const boringColumns = getBoringColumns(tableStats);
 
   const model: GridColumnVisibilityModel = {};
