@@ -21,7 +21,7 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Getting Started",
-      items: ["introduction", "quickstart", "tutorial-eval"],
+      items: ["introduction", "quickstart", "tutorial-eval", "tutorial-rag"],
     },
     {
       type: "category",

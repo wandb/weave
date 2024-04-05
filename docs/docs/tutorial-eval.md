@@ -196,3 +196,7 @@ print(asyncio.run(evaluation.evaluate(model)))
 # if you're in a Jupyter Notebook, run:
 # await evaluation.evaluate(model)
 ```
+
+## What's next?
+
+- Follow the [Model-Based Evaluation of RAG applications](/tutorial-rag) to evaluate a RAG app using an LLM judge.
