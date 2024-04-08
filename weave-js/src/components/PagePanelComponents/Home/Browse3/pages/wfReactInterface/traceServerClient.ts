@@ -170,9 +170,8 @@ export class TraceServerClient {
         req
       );
     };
-    callsSteamQuery: (
-      req: TraceCallsQueryReq
-    ) => Promise<TraceCallsQueryRes> = req => {
+  callsSteamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
+    req => {
       const res = this.makeRequest<TraceCallsQueryReq, string>(
         '/calls/stream_query',
         req,
@@ -181,8 +180,7 @@ export class TraceServerClient {
       return new Promise((resolve, reject) => {
         res
           .then(content => {
-           const res = JSON.parse(content)
-            resolve(res);
+            resolve(JSON.parse(content));
           })
           .catch(err => {
             reject(err);
@@ -401,13 +399,13 @@ export const chunkedCallsQuery = (
   const fetchCalls = async () => {
     const userRequestedLimit = req.limit ?? Infinity;
     const userRequestedOffset = req.offset ?? 0;
-    const shouldPage = false; // userRequestedLimit > MAX_CHUNK_SIZE;
+    const shouldPage = userRequestedLimit > MAX_CHUNK_SIZE;
     if (!shouldPage) {
       // If the user requested less than the max chunk size, we can just
       // make a single request.
       let page: TraceCallsQueryRes;
       try {
-        page = await client.callsSteamQuery(req);
+        page = await client.callsQuery(req);
       } catch (err) {
         safeOnError(err);
         return;
@@ -431,7 +429,7 @@ export const chunkedCallsQuery = (
         };
         let page: TraceCallsQueryRes;
         try {
-        page = await client.callsSteamQuery(pageReq);
+          page = await client.callsQuery(pageReq);
         } catch (err) {
           safeOnError(err);
           return;
