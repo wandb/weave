@@ -80,9 +80,14 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     const contexts: TraverseContext[] = [];
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
-        // For now we'll hide all keys that start with an underscore.
+        const contextTail = context.path.tail();
+        const isNullDescription =
+          typeof contextTail === 'string' &&
+          contextTail === 'description' &&
+          context.valueType === 'null';
+        // For now we'll hide all keys that start with an underscore, is a name field, or is a null description.
         // Eventually we might offer a user toggle to display them.
-        if (context.path.hasHiddenKey()) {
+        if (context.path.hasHiddenKey() || isNullDescription) {
           return 'skip';
         }
         contexts.push(context);
