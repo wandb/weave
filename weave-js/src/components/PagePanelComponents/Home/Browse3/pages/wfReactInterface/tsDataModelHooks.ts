@@ -197,17 +197,12 @@ const useCalls = (
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
-  const currentCancelRef = useRef<() => void>();
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
   useEffect(() => {
     if (opts?.skip) {
       return;
-    }
-    if (currentCancelRef.current) {
-      currentCancelRef.current();
-      currentCancelRef.current = undefined;
     }
     setCallRes(null);
     loadingRef.current = true;
@@ -235,14 +230,7 @@ const useCalls = (
       console.error(e);
       setCallRes({calls: []});
     };
-    const {cancel} = traceServerClient.chunkedCallsQuery(
-      getTsClient(),
-      req,
-      onSuccess,
-      onError
-    );
-    currentCancelRef.current = cancel;
-    return cancel;
+    getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
   }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
 
   return useMemo(() => {

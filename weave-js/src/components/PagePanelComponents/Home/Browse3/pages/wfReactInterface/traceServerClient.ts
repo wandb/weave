@@ -170,6 +170,34 @@ export class TraceServerClient {
         req
       );
     };
+  callsSteamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
+    req => {
+      const res = this.makeRequest<TraceCallsQueryReq, string>(
+        '/calls/stream_query',
+        req,
+        true
+      );
+      return new Promise((resolve, reject) => {
+        res
+          .then(content => {
+            // `content` is jsonl string, we need to parse it.
+            if (!content) {
+              resolve({calls: []});
+            }
+            if (content.endsWith('\n')) {
+              content = content.slice(0, -1);
+            }
+            if (content === '') {
+              resolve({calls: []});
+            }
+            const calls = content.split('\n').map(line => JSON.parse(line));
+            resolve({calls});
+          })
+          .catch(err => {
+            reject(err);
+          });
+      });
+    };
   callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = req => {
     return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
       '/call/read',
@@ -346,96 +374,3 @@ export class TraceServerClient {
     );
   };
 }
-
-const MAX_CHUNK_SIZE = 250;
-
-/**
- * Use this function to query calls from the trace server. This function will
- * handle chunking the results if the user requests more than `MAX_CHUNK_SIZE`
- * calls. This is to protect the server from returning too much data at once.
- *
- * Note: we should probably roll this into the `callsQuery` directly, but I don't
- * want to change the API right now to support cancelation.
- */
-export const chunkedCallsQuery = (
-  client: TraceServerClient,
-  req: TraceCallsQueryReq,
-  onSuccess: (res: TraceCallsQueryRes) => void,
-  onError: (err: any) => void
-): {
-  cancel: () => void;
-} => {
-  let cancelled = false;
-
-  const safeOnSuccess = (res: TraceCallsQueryRes) => {
-    if (!cancelled) {
-      onSuccess(res);
-    }
-  };
-
-  const safeOnError = (err: any) => {
-    if (!cancelled) {
-      onError(err);
-    }
-  };
-
-  const fetchCalls = async () => {
-    const userRequestedLimit = req.limit ?? Infinity;
-    const userRequestedOffset = req.offset ?? 0;
-    const shouldPage = userRequestedLimit > MAX_CHUNK_SIZE;
-    if (!shouldPage) {
-      // If the user requested less than the max chunk size, we can just
-      // make a single request.
-      let page: TraceCallsQueryRes;
-      try {
-        page = await client.callsQuery(req);
-      } catch (err) {
-        safeOnError(err);
-        return;
-      }
-      safeOnSuccess(page);
-    } else {
-      const allCallResults: TraceCallSchema[] = [];
-      let effectiveOffset = userRequestedOffset;
-      let effectiveRemainingLimit = userRequestedLimit;
-
-      // Keep paging until we have all the results requested.
-      while (effectiveRemainingLimit > 0) {
-        const effectiveLimit = Math.min(
-          effectiveRemainingLimit,
-          MAX_CHUNK_SIZE
-        );
-        const pageReq = {
-          ...req,
-          limit: effectiveLimit,
-          offset: effectiveOffset,
-        };
-        let page: TraceCallsQueryRes;
-        try {
-          page = await client.callsQuery(pageReq);
-        } catch (err) {
-          safeOnError(err);
-          return;
-        }
-        allCallResults.push(...page.calls);
-        effectiveRemainingLimit -= page.calls.length;
-        effectiveOffset += page.calls.length;
-
-        // Break if we have less than the requested limit.
-        if (page.calls.length < effectiveLimit) {
-          break;
-        }
-      }
-
-      safeOnSuccess({
-        calls: allCallResults,
-      });
-    }
-  };
-  fetchCalls();
-  return {
-    cancel: () => {
-      cancelled = true;
-    },
-  };
-};
