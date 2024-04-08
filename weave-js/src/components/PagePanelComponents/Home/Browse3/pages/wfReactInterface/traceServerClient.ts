@@ -181,8 +181,8 @@ export class TraceServerClient {
       return new Promise((resolve, reject) => {
         res
           .then(content => {
-           const calls = JSON.parse(content)
-            resolve({calls});
+           const res = JSON.parse(content)
+            resolve(res);
           })
           .catch(err => {
             reject(err);
@@ -401,7 +401,7 @@ export const chunkedCallsQuery = (
   const fetchCalls = async () => {
     const userRequestedLimit = req.limit ?? Infinity;
     const userRequestedOffset = req.offset ?? 0;
-    const shouldPage = userRequestedLimit > MAX_CHUNK_SIZE;
+    const shouldPage = false; // userRequestedLimit > MAX_CHUNK_SIZE;
     if (!shouldPage) {
       // If the user requested less than the max chunk size, we can just
       // make a single request.
