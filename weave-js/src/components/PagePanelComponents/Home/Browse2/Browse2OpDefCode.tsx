@@ -1,4 +1,5 @@
 import Editor from '@monaco-editor/react';
+import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC} from 'react';
 
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
@@ -8,6 +9,9 @@ export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
     derived: {useCodeForOpRef},
   } = useWFHooks();
   const text = useCodeForOpRef(uri);
+  if (text.loading) {
+    return <Loading centered />;
+  }
 
   return (
     <Editor

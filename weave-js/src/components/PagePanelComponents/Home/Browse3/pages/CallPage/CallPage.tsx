@@ -1,7 +1,7 @@
 import {Box} from '@material-ui/core';
+import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
-import {Loader} from 'semantic-ui-react';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
@@ -109,7 +109,7 @@ const CallPageInnerVertical: FC<{
   const callTabs = useCallTabs(selectedCall);
 
   if (loading && !assumeCallIsSelectedCall) {
-    return <Loader active />;
+    return <Loading centered />;
   }
 
   return (
@@ -132,7 +132,7 @@ const CallPageInnerVertical: FC<{
       headerContent={<CallOverview call={selectedCall} />}
       leftSidebar={
         loading ? (
-          <Loader active />
+          <Loading centered />
         ) : (
           <CallTraceView
             call={call}
