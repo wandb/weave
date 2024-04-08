@@ -661,7 +661,15 @@ export const WeaveEditorObject: FC<{
   return (
     <Table>
       {Object.entries(refWithType.type)
-        .filter(([key, value]) => key !== 'type' && !key.startsWith('_'))
+        .filter(
+          ([key, value]) =>
+            key !== 'type' &&
+            !key.startsWith('_') &&
+            // Hide name because its in the tab already
+            key !== 'name' &&
+            // Hide description if it's none
+            (key !== 'description' || value !== 'none')
+        )
         .flatMap(([key, valueType]) => {
           const singleRow = displaysAsSingleRow(valueType);
           const label = (

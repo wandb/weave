@@ -93,7 +93,7 @@ export class ObjectPath {
 
   hasHiddenKey(): boolean {
     const t = this.tail();
-    return typeof t === 'string' && t.startsWith('_');
+    return typeof t === 'string' && (t.startsWith('_') || t === 'name');
   }
 
   length(): number {
