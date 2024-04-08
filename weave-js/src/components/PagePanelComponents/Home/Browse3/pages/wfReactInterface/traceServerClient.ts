@@ -180,7 +180,18 @@ export class TraceServerClient {
       return new Promise((resolve, reject) => {
         res
           .then(content => {
-            resolve(JSON.parse(content));
+            // `content` is jsonl string, we need to parse it.
+            if (!content) {
+              resolve({calls: []});
+            }
+            if (content.endsWith('\n')) {
+              content = content.slice(0, -1);
+            }
+            if (content === '') {
+              resolve({calls: []});
+            }
+            const calls = content.split('\n').map(line => JSON.parse(line));
+            resolve({calls});
           })
           .catch(err => {
             reject(err);
