@@ -170,6 +170,25 @@ export class TraceServerClient {
         req
       );
     };
+    callsSteamQuery: (
+      req: TraceCallsQueryReq
+    ) => Promise<TraceCallsQueryRes> = req => {
+      const res = this.makeRequest<TraceCallsQueryReq, string>(
+        '/calls/stream_query',
+        req,
+        true
+      );
+      return new Promise((resolve, reject) => {
+        res
+          .then(content => {
+           const calls = JSON.parse(content)
+            resolve({calls});
+          })
+          .catch(err => {
+            reject(err);
+          });
+      });
+    };
   callRead: (req: TraceCallReadReq) => Promise<TraceCallReadRes> = req => {
     return this.makeRequest<TraceCallReadReq, TraceCallReadRes>(
       '/call/read',
@@ -388,7 +407,7 @@ export const chunkedCallsQuery = (
       // make a single request.
       let page: TraceCallsQueryRes;
       try {
-        page = await client.callsQuery(req);
+        page = await client.callsSteamQuery(req);
       } catch (err) {
         safeOnError(err);
         return;
@@ -412,7 +431,7 @@ export const chunkedCallsQuery = (
         };
         let page: TraceCallsQueryRes;
         try {
-          page = await client.callsQuery(pageReq);
+        page = await client.callsSteamQuery(pageReq);
         } catch (err) {
           safeOnError(err);
           return;
