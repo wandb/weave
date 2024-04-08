@@ -561,6 +561,10 @@ export const RunsTable: FC<{
       const expandCols = expandedColInfo[groupField] ?? [];
       // for each expanded column, add a column definition
       for (const col of expandCols) {
+        // Dont show name or description column for expanded refs
+        if (col.path === 'name' || col.path === 'description') {
+          continue;
+        }
         const expandField = groupField + '.' + col.path;
         cols.push({
           flex: 1,
