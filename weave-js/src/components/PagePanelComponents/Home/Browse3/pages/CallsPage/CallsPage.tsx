@@ -136,7 +136,10 @@ export const CallsTable: FC<{
 
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
-    if (!ALLOW_ALL_CALLS_UNFILTERED) {
+    if (
+      !ALLOW_ALL_CALLS_UNFILTERED &&
+      !shouldForceNonTraceRootsOnly(workingFilter)
+    ) {
       workingFilter.traceRootsOnly = true;
     }
     return workingFilter;
