@@ -1,10 +1,9 @@
+import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {
-  WeaveEditor,
-  WeaveEditorSourceContext,
-} from '../../Browse2/WeaveEditors';
+import {WeaveEditorSourceContext} from '../../Browse2/WeaveEditors';
+import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
 import {
   CallLink,
@@ -66,7 +65,7 @@ export const ObjectVersionPage: React.FC<{
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
-  const {useRootObjectVersions, useCalls} = useWFHooks();
+  const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const objectVersionHash = objectVersion.versionHash;
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
@@ -95,6 +94,10 @@ const ObjectVersionPageInner: React.FC<{
   const consumingCalls = useCalls(entityName, projectName, {
     inputObjectVersionRefs: [refUri],
   });
+  const data = useRefsData([refUri]);
+  const viewerData = useMemo(() => {
+    return data.result?.[0] ?? {};
+  }, [data.result]);
 
   return (
     <SimplePageLayoutWithHeader
@@ -212,11 +215,12 @@ const ObjectVersionPageInner: React.FC<{
                 refExtra: refExtra?.split('/'),
               }}>
               <ScrollableTabContent>
-                <WeaveEditor
-                  objType={objectName}
-                  objectRefUri={refUri}
-                  disableEdits
-                />
+                <Box
+                  sx={{
+                    flex: '0 0 auto',
+                  }}>
+                  <ObjectViewerSection title="" data={viewerData} />
+                </Box>
               </ScrollableTabContent>
             </WeaveEditorSourceContext.Provider>
           ),

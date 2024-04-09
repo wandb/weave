@@ -5,9 +5,10 @@ import {
   GridRowHeightParams,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
-import {useWeaveContext} from '../../../../../../context';
+import {useDeepMemo} from '../../../../../../hookUtils';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -36,12 +37,30 @@ const getRefs = (data: Data): string[] => {
 
 type RefValues = Record<string, any>; // ref URI to value
 
+const refIsExpandable = (ref: string): boolean => {
+  const parsed = parseRef(ref);
+  if (isWeaveObjectRef(parsed)) {
+    return (
+      parsed.weaveKind === 'object' ||
+      (parsed.weaveKind === 'table' &&
+        parsed.artifactRefExtra != null &&
+        parsed.artifactRefExtra.length > 0)
+    );
+  }
+  return false;
+};
+
 export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
-  const weave = useWeaveContext();
   const {useRefsData} = useWFHooks();
-  const {client} = weave;
   const [resolvedData, setResolvedData] = useState<Data>(data);
-  const refs = useMemo(() => getRefs(data), [data]);
+  const dataRefs = useMemo(() => getRefs(data).filter(refIsExpandable), [data]);
+  const [expandedRefs, setExpandedRefs] = useState<string[]>([]);
+  const addExpandedRef = useCallback((ref: string) => {
+    setExpandedRefs(eRefs => [...eRefs, ref]);
+  }, []);
+  const refs = useMemo(() => {
+    return Array.from(new Set([...dataRefs, ...expandedRefs]));
+  }, [dataRefs, expandedRefs]);
   const refsData = useRefsData(refs);
 
   useEffect(() => {
@@ -67,14 +86,24 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       }
       refValues[r] = val;
     }
-    const resolved = mapObject(data, context => {
-      if (isRef(context.value)) {
-        return refValues[context.value];
+    let resolved = data;
+    let dirty = true;
+    const mapper = (context: TraverseContext) => {
+      if (isRef(context.value) && refValues[context.value] != null) {
+        dirty = true;
+        const res = refValues[context.value];
+        delete refValues[context.value];
+        return res;
       }
       return _.clone(context.value);
-    });
+    };
+    while (dirty) {
+      dirty = false;
+      resolved = mapObject(resolved, mapper);
+    }
+    console.log(resolved);
     setResolvedData(resolved);
-  }, [data, client, refsData.result, refs]);
+  }, [data, refs, refsData.result]);
 
   const rows = useMemo(() => {
     const contexts: TraverseContext[] = [];
@@ -91,41 +120,98 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           return 'skip';
         }
         contexts.push(context);
+        if (
+          isRef(context.value) &&
+          // comment out testing only
+          !expandedRefs.includes(context.value) &&
+          context.depth > 1
+        ) {
+          if (refIsExpandable(context.value)) {
+            // These are possibly expandable refs.
+            contexts.push({
+              depth: context.depth + 1,
+              isLeaf: true,
+              path: context.path.plus(''),
+              value: 'loading...',
+              valueType: 'string',
+            });
+          }
+        }
       }
       return true;
     });
 
-    return contexts.map((c, id) => ({id, ...c}));
-  }, [resolvedData]);
+    return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
+  }, [expandedRefs, resolvedData]);
 
-  const columns: GridColDef[] = [
-    {
-      field: 'value',
-      headerName: 'Value',
-      flex: 1,
-      sortable: false,
-      renderCell: ({row}) => {
-        return <ValueView data={row} isExpanded={isExpanded} />;
+  const columns: GridColDef[] = useMemo(() => {
+    return [
+      {
+        field: 'value',
+        headerName: 'Value',
+        flex: 1,
+        sortable: false,
+        renderCell: ({row}) => {
+          return <ValueView data={row} isExpanded={isExpanded} />;
+        },
       },
-    },
-  ];
+    ];
+  }, [isExpanded]);
+
+  const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
 
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
       headerName: 'Path',
       hideDescendantCount: true,
-      renderCell: params => <ObjectViewerGroupingCell {...params} />,
+      renderCell: params => {
+        const refToExpand = params.row.value;
+        return (
+          <ObjectViewerGroupingCell
+            {...params}
+            onClick={() => {
+              setExpandedIds(eIds => {
+                if (eIds.includes(params.row.id)) {
+                  return eIds.filter(id => id !== params.row.id);
+                }
+                return [...eIds, params.row.id];
+              });
+              if (isRef(refToExpand)) {
+                addExpandedRef(refToExpand);
+              }
+            }}
+          />
+        );
+      },
     }),
-    []
+    [addExpandedRef]
   );
 
-  return (
-    <div style={{overflow: 'hidden'}}>
+  const deepRows = useDeepMemo(rows);
+
+  const updateRowExpand = useCallback(() => {
+    expandedIds.forEach(id => {
+      const children = apiRef.current.getRowGroupChildren({groupId: id});
+      if (children.length === 0) {
+        return;
+      }
+      apiRef.current.setRowChildrenExpansion(id, true);
+    });
+  }, [apiRef, expandedIds]);
+
+  useEffect(() => {
+    return apiRef.current.subscribeEvent('rowsSet', () => {
+      updateRowExpand();
+    });
+  }, [apiRef, expandedIds, updateRowExpand]);
+
+  const inner = useMemo(() => {
+    return (
       <StyledDataGrid
         apiRef={apiRef}
         treeData
         getTreeDataPath={row => row.path.toStringArray()}
-        rows={rows}
+        rows={deepRows}
         columns={columns}
         defaultGroupingExpansionDepth={isExpanded ? -1 : 0}
         columnHeaderHeight={38}
@@ -148,6 +234,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           },
         }}
       />
-    </div>
-  );
+    );
+  }, [apiRef, columns, deepRows, groupingColDef, isExpanded]);
+  return <div style={{overflow: 'hidden'}}>{inner}</div>;
 };
