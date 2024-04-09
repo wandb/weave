@@ -107,11 +107,11 @@ export const CallsPage: FC<{
 
 const ALL_TRACES_REF_KEY = '__all_traces__';
 const ALL_CALLS_REF_KEY = '__all_calls__';
-const OP_FILTER_GROUP_HEADER = 'Op Filter';
+const OP_FILTER_GROUP_HEADER = 'Op';
 const ANY_OP_GROUP_HEADER = '';
-const ALL_TRACES_TITLE = 'Any Op (Trace Roots Only)';
+const ALL_TRACES_TITLE = 'All Ops';
 const ALL_CALLS_TITLE = 'All Calls';
-const OP_GROUP_HEADER = 'Specific Ops';
+const OP_GROUP_HEADER = 'Ops';
 const OP_VERSION_GROUP_HEADER = (currentOpId: string) =>
   `Specific Versions of ${opNiceName(currentOpId)}`;
 const ALLOW_ALL_CALLS_UNFILTERED = false;
