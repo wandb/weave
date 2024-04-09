@@ -191,11 +191,11 @@ export class TraceServerClient {
               resolve({calls: []});
             }
             const calls: TraceCallSchema[] = [];
-            const lines = content.split('\n')
+            const lines = content.split('\n');
 
             lines.forEach((line, lineIndex) => {
               try {
-                calls.push(JSON.parse(line))
+                calls.push(JSON.parse(line));
               } catch (err) {
                 if (lineIndex === lines.length - 1 && lineIndex > 0) {
                   // This is a very special case where the last line is not a
@@ -207,9 +207,11 @@ export class TraceServerClient {
                   const newReq = {...req};
                   const origOffset = req.offset || 0;
                   newReq.offset = origOffset + lineIndex;
-                  console.debug(`Early stream termination, performing a new request resuming from ${newReq.offset}`)
+                  console.debug(
+                    `Early stream termination, performing a new request resuming from ${newReq.offset}`
+                  );
                   this.callsSteamQuery(newReq)
-                    .then((innerRes) => {
+                    .then(innerRes => {
                       calls.push(...innerRes.calls);
                       resolve({calls});
                     })
@@ -218,13 +220,14 @@ export class TraceServerClient {
                     });
                   return;
                 } else {
-                  console.error(`Error parsing line ${lineIndex} of ${lines.length}: ${line}`)
+                  console.error(
+                    `Error parsing line ${lineIndex} of ${lines.length}: ${line}`
+                  );
                 }
               }
             });
-            
-            resolve({calls});
 
+            resolve({calls});
           })
           .catch(err => {
             reject(err);
