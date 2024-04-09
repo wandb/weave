@@ -1,13 +1,10 @@
 // import {PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
-  Checkbox,
   Chip,
   FormControl,
   // IconButton,
   ListItem,
-  ListItemButton,
-  ListItemText,
   TextField,
 } from '@mui/material';
 import _ from 'lodash';
@@ -108,6 +105,17 @@ export const CallsPage: FC<{
   );
 };
 
+const ALL_TRACES_REF_KEY = '__all_traces__';
+const ALL_CALLS_REF_KEY = '__all_calls__';
+const OP_FILTER_GROUP_HEADER = 'Op Filter';
+const ANY_OP_GROUP_HEADER = '';
+const ALL_TRACES_TITLE = 'Any Op (Trace Roots Only)';
+const ALL_CALLS_TITLE = 'All Calls';
+const OP_GROUP_HEADER = 'Specific Ops';
+const OP_VERSION_GROUP_HEADER = (currentOpId: string) =>
+  `Specific Versions of ${opNiceName(currentOpId)}`;
+const ALLOW_ALL_CALLS_UNFILTERED = false;
+
 export const CallsTable: FC<{
   entity: string;
   project: string;
@@ -127,7 +135,11 @@ export const CallsTable: FC<{
   );
 
   const effectiveFilter = useMemo(() => {
-    return {...filter, ...props.frozenFilter};
+    const workingFilter = {...filter, ...props.frozenFilter};
+    if (!ALLOW_ALL_CALLS_UNFILTERED) {
+      workingFilter.traceRootsOnly = true;
+    }
+    return workingFilter;
   }, [filter, props.frozenFilter]);
 
   if ((effectiveFilter.opVersionRefs?.length ?? 0) > 1) {
@@ -153,7 +165,39 @@ export const CallsTable: FC<{
     props.project,
     effectiveFilter
   );
+  const opVersionOptionsWithRoots: {
+    [ref: string]: {
+      title: string;
+      ref: string;
+      group: string;
+      objectVersion?: OpVersionSchema;
+    };
+  } = useMemo(() => {
+    return {
+      [ALL_TRACES_REF_KEY]: {
+        title: ALL_TRACES_TITLE,
+        ref: '',
+        group: ANY_OP_GROUP_HEADER,
+      },
+      ...(ALLOW_ALL_CALLS_UNFILTERED
+        ? {
+            [ALL_CALLS_REF_KEY]: {
+              title: ALL_CALLS_TITLE,
+              ref: '',
+              group: ANY_OP_GROUP_HEADER,
+            },
+          }
+        : {}),
+      ...opVersionOptions,
+    };
+  }, [opVersionOptions]);
   const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
+  const opVersionRefOrAllTitle = useMemo(() => {
+    return (
+      opVersionRef ??
+      (effectiveFilter.traceRootsOnly ? ALL_TRACES_REF_KEY : ALL_CALLS_REF_KEY)
+    );
+  }, [opVersionRef, effectiveFilter.traceRootsOnly]);
 
   const consumesObjectVersionOptions =
     useConsumesObjectVersionOptions(effectiveFilter);
@@ -179,7 +223,6 @@ export const CallsTable: FC<{
   const parentOpDisplay = effectiveFilter.parentId
     ? parentIdOptions[effectiveFilter.parentId]
     : null;
-  const traceRootOptions = [true, false];
 
   const userEnabledPivot = effectiveFilter.isPivot ?? false;
   // TODO: Decide if we want to expose pivot or remove.
@@ -232,15 +275,6 @@ export const CallsTable: FC<{
     }
     return null;
   }, [filter, setFilter]);
-
-  const forcingNonTraceRootsOnly =
-    shouldForceNonTraceRootsOnly(effectiveFilter);
-
-  const rootsOnlyDisabled =
-    forcingNonTraceRootsOnly ||
-    isPivoting ||
-    traceRootOptions.length <= 1 ||
-    Object.keys(props.frozenFilter ?? {}).includes('traceRootsOnly');
 
   const callsKey = useMemo(() => {
     if (calls.loading || calls.result == null) {
@@ -306,21 +340,41 @@ export const CallsTable: FC<{
                   isPivoting ||
                   Object.keys(props.frozenFilter ?? {}).includes('opVersions')
                 }
-                value={opVersionRef}
+                value={opVersionRefOrAllTitle}
                 onChange={(event, newValue) => {
-                  setFilter({
-                    ...filter,
-                    opVersionRefs: newValue ? [newValue] : [],
-                  });
+                  if (newValue === ALL_TRACES_REF_KEY) {
+                    setFilter({
+                      ...filter,
+                      traceRootsOnly: true,
+                      opVersionRefs: [],
+                    });
+                  } else if (newValue === ALL_CALLS_REF_KEY) {
+                    setFilter({
+                      ...filter,
+                      traceRootsOnly: false,
+                      opVersionRefs: [],
+                    });
+                  } else {
+                    setFilter({
+                      ...filter,
+                      opVersionRefs: newValue ? [newValue] : [],
+                    });
+                  }
                 }}
                 renderInput={params => (
-                  <TextField {...params} label="Op" sx={{maxWidth: '350px'}} />
+                  <TextField
+                    {...params}
+                    label={OP_FILTER_GROUP_HEADER}
+                    sx={{maxWidth: '350px'}}
+                  />
                 )}
                 getOptionLabel={option => {
-                  return opVersionOptions[option]?.title ?? 'loading...';
+                  return (
+                    opVersionOptionsWithRoots[option]?.title ?? 'loading...'
+                  );
                 }}
-                groupBy={option => opVersionOptions[option]?.group}
-                options={Object.keys(opVersionOptions)}
+                groupBy={option => opVersionOptionsWithRoots[option]?.group}
+                options={Object.keys(opVersionOptionsWithRoots)}
               />
             </FormControl>
           </ListItem>
@@ -357,43 +411,6 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          <ListItem
-            sx={{
-              width: '190px',
-              flex: '0 0 190px',
-            }}
-            secondaryAction={
-              <Checkbox
-                edge="end"
-                checked={
-                  !forcingNonTraceRootsOnly && !!effectiveFilter.traceRootsOnly
-                }
-                onClick={() => {
-                  if (rootsOnlyDisabled) {
-                    return;
-                  }
-                  setFilter({
-                    ...filter,
-                    traceRootsOnly: !effectiveFilter.traceRootsOnly,
-                  });
-                }}
-              />
-            }
-            disabled={rootsOnlyDisabled}
-            disablePadding>
-            <ListItemButton
-              onClick={() => {
-                if (rootsOnlyDisabled) {
-                  return;
-                }
-                setFilter({
-                  ...filter,
-                  traceRootsOnly: !effectiveFilter.traceRootsOnly,
-                });
-              }}>
-              <ListItemText primary="Roots only" />
-            </ListItemButton>
-          </ListItem>
         </>
       }>
       {isPivoting ? (
@@ -492,7 +509,7 @@ const useOpVersionOptions = (
       result.push({
         title: opNiceName(ov.opId),
         ref,
-        group: 'Ops',
+        group: OP_GROUP_HEADER,
       });
     });
 
@@ -503,7 +520,7 @@ const useOpVersionOptions = (
           result.push({
             title: opNiceName(ov.opId) + ':v' + ov.versionIndex,
             ref,
-            group: `Versions of ${opNiceName(currentOpId)}`,
+            group: OP_VERSION_GROUP_HEADER(currentOpId),
             objectVersion: ov,
           });
         }
