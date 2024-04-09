@@ -2,7 +2,8 @@ import React from 'react';
 import styled from 'styled-components';
 
 import {Alert} from '../../../../../Alert';
-import {CallId, opNiceName} from '../common/Links';
+import {CallId} from '../common/CallId';
+import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
@@ -33,7 +34,6 @@ export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
   const opName = opNiceName(call.spanName);
-  const truncatedId = call.callId.slice(-4);
 
   const statusCode = call.rawSpan.status_code;
 
@@ -41,7 +41,7 @@ export const CallOverview: React.FC<{
     <>
       <Overview>
         <CallName>{opName}</CallName>
-        <CallId>{truncatedId}</CallId>
+        <CallId callId={call.callId} />
         <StatusChip value={statusCode} iconOnly />
       </Overview>
       {call.rawSpan.exception && (
