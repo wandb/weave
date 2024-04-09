@@ -190,7 +190,43 @@ export class TraceServerClient {
             if (content === '') {
               resolve({calls: []});
             }
-            const calls = content.split('\n').map(line => JSON.parse(line));
+            const calls: TraceCallSchema[] = [];
+            const lines = content.split('\n');
+
+            lines.forEach((line, lineIndex) => {
+              try {
+                calls.push(JSON.parse(line));
+              } catch (err) {
+                if (lineIndex === lines.length - 1 && lineIndex > 0) {
+                  // This is a very special case where the last line is not a
+                  // complete json object. This can happen if the stream is
+                  // terminated early. Instead of just failing, we can make a
+                  // new request to the server to resume the stream from the
+                  // last line. This should only occur projects with massive
+                  // trace data (> 150MB per my own testing)
+                  const newReq = {...req};
+                  const origOffset = req.offset || 0;
+                  newReq.offset = origOffset + lineIndex;
+                  console.debug(
+                    `Early stream termination, performing a new request resuming from ${newReq.offset}`
+                  );
+                  this.callsSteamQuery(newReq)
+                    .then(innerRes => {
+                      calls.push(...innerRes.calls);
+                      resolve({calls});
+                    })
+                    .catch(err => {
+                      reject(err);
+                    });
+                  return;
+                } else {
+                  console.error(
+                    `Error parsing line ${lineIndex} of ${lines.length}: ${line}`
+                  );
+                }
+              }
+            });
+
             resolve({calls});
           })
           .catch(err => {
