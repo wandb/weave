@@ -7,6 +7,8 @@ hide_table_of_contents: true
 
 ## Installation
 
+Weave requires Python 3.9+.
+
 `pip install weave`
 
 ## Track inputs & outputs of functions
