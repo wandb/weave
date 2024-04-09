@@ -2,15 +2,19 @@ import {Box, Typography} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
+  DataGridProProps,
   GridColDef,
   GridColumnGroup,
+  GridFilterModel,
   GridRowSelectionModel,
+  GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import * as _ from 'lodash';
 import React, {
   ComponentProps,
   FC,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -216,6 +220,11 @@ const getPeekId = (peekPath: string | null): string | null => {
   return pathname.split('/').pop() ?? null;
 };
 
+const NO_SORT_NO_FILTER = {
+  sortable: false,
+  filterable: false,
+};
+
 export const RunsTable: FC<{
   loading: boolean;
   spans: CallSchema[];
@@ -415,6 +424,8 @@ export const RunsTable: FC<{
         minWidth: 100,
         width: 250,
         hideable: false,
+        pinnable: false,
+        disableColumnMenu: true,
         renderCell: rowParams => {
           const opVersion = rowParams.row.call.opVersionRef;
           if (opVersion == null) {
@@ -431,6 +442,8 @@ export const RunsTable: FC<{
             />
           );
         },
+
+        ...NO_SORT_NO_FILTER,
       },
       ...(isSingleOp && !isSingleOpVersion
         ? [
@@ -440,12 +453,11 @@ export const RunsTable: FC<{
               type: 'number',
               align: 'right' as const,
               disableColumnMenu: true,
-              sortable: false,
-              filterable: false,
               resizable: false,
               renderCell: (cellParams: any) => (
                 <OpVersionIndexText opVersionRef={cellParams.row.opVersion} />
               ),
+              ...NO_SORT_NO_FILTER,
             },
           ]
         : []),
@@ -476,7 +488,6 @@ export const RunsTable: FC<{
       {
         field: 'status_code',
         headerName: 'Status',
-        sortable: false,
         disableColumnMenu: true,
         resizable: false,
         width: 70,
@@ -489,6 +500,7 @@ export const RunsTable: FC<{
             </div>
           );
         },
+        ...NO_SORT_NO_FILTER,
       },
       ...(!ioColumnsOnly
         ? [
@@ -506,6 +518,7 @@ export const RunsTable: FC<{
                   />
                 );
               },
+              ...NO_SORT_NO_FILTER,
             },
           ]
         : []),
@@ -548,6 +561,7 @@ export const RunsTable: FC<{
           renderCell: cellParams => {
             return renderCell((cellParams.row as any)['attributes.' + key]);
           },
+          ...NO_SORT_NO_FILTER,
         });
       }
     }
@@ -583,6 +597,7 @@ export const RunsTable: FC<{
               </ErrorBoundary>
             );
           },
+          ...NO_SORT_NO_FILTER,
         });
         colGroupChildren.push({field: expandField});
       }
@@ -630,6 +645,7 @@ export const RunsTable: FC<{
             }
             return <NotApplicable />;
           },
+          ...NO_SORT_NO_FILTER,
         });
 
         // if ref is expanded add the ref children to the colGroup
@@ -741,6 +757,7 @@ export const RunsTable: FC<{
             />
           );
         },
+        ...NO_SORT_NO_FILTER,
       });
 
       // if ref is expanded add the ref children to the colGroup
@@ -781,6 +798,7 @@ export const RunsTable: FC<{
         renderCell: cellParams => {
           return renderCell((cellParams.row as any)['feedback.' + key]);
         },
+        ...NO_SORT_NO_FILTER,
       });
     }
 
@@ -793,6 +811,7 @@ export const RunsTable: FC<{
       renderCell: cellParams => {
         return monthRoundedTime(cellParams.row.latency);
       },
+      ...NO_SORT_NO_FILTER,
     });
 
     return {cols, colGroupingModel};
@@ -838,6 +857,9 @@ export const RunsTable: FC<{
         columns: {
           columnVisibilityModel,
         },
+        pagination: {
+          paginationModel: {pageSize: 25, page: 0},
+        },
       };
     }, [loading, columnVisibilityModel]);
 
@@ -854,6 +876,73 @@ export const RunsTable: FC<{
     }
   }, [columns, initialState, apiRef]);
 
+  const [syntheticLoading, setSyntheticLoading] = React.useState(loading);
+  const [rows, setRows] = React.useState<any[]>([]);
+  const [sortModel, setSortModel] = React.useState<GridSortModel>([]);
+  const [filterModel, setFilterModel] = React.useState<GridFilterModel>({
+    items: [],
+  });
+
+  const fetchRows = useCallback(
+    async ({
+      fromIndex,
+      toIndex,
+      sortModel,
+      filterModel,
+    }: {
+      fromIndex: number;
+      toIndex: number;
+      sortModel: GridSortModel;
+      filterModel: GridFilterModel;
+    }) => {
+      return new Promise<any[]>(resolve => {
+        setTimeout(() => {
+          console.log('hjere', tableData.slice(fromIndex, toIndex));
+          resolve(tableData.slice(fromIndex, toIndex));
+        }, 500);
+      });
+    },
+    [tableData]
+  );
+
+  const handleOnRowsScrollEnd = React.useCallback<
+    NonNullable<DataGridProProps['onRowsScrollEnd']>
+  >(
+    async params => {
+      setSyntheticLoading(true);
+      const fetchedRows = await fetchRows({
+        fromIndex: rows.length,
+        toIndex: rows.length + params.viewportPageSize * 2,
+        sortModel,
+        filterModel,
+      });
+      setSyntheticLoading(false);
+      setRows(prevRows => prevRows.concat(fetchedRows));
+    },
+    [fetchRows, rows.length, sortModel, filterModel]
+  );
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setSyntheticLoading(true);
+      const fetchedRows = await fetchRows({
+        fromIndex: 0,
+        toIndex: 200,
+        sortModel,
+        filterModel,
+      });
+      if (mounted) {
+        setSyntheticLoading(false);
+        setRows(fetchedRows);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [sortModel, filterModel, fetchRows]);
+
   return (
     <>
       {showVisibilityAlert && (
@@ -868,10 +957,11 @@ export const RunsTable: FC<{
       )}
       <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
       <StyledDataGrid
+        // autoPageSize
         columnHeaderHeight={40}
         apiRef={apiRef}
-        loading={loading}
-        rows={tableData}
+        loading={syntheticLoading}
+        rows={rows}
         initialState={initialState}
         rowHeight={38}
         columns={columns.cols as any}
@@ -880,6 +970,14 @@ export const RunsTable: FC<{
         rowSelectionModel={rowSelectionModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
+        onRowsScrollEnd={handleOnRowsScrollEnd}
+        scrollEndThreshold={200}
+        sortingMode="server"
+        sortModel={sortModel}
+        onSortModelChange={setSortModel}
+        filterMode="server"
+        filterModel={filterModel}
+        onFilterModelChange={setFilterModel}
         sx={{
           borderRadius: 0,
         }}
