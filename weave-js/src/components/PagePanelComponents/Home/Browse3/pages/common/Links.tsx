@@ -1,5 +1,4 @@
 import {
-  MOON_150,
   MOON_200,
   MOON_700,
   TEAL_500,
@@ -20,6 +19,7 @@ import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
 import {truncateID} from '../util';
+import {CallId} from './CallId';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -70,18 +70,6 @@ const CallLinkOp = styled.div<{fullWidth?: boolean}>`
   overflow: hidden;
 `;
 CallLinkOp.displayName = 'S.CallLinkOp';
-
-export const CallId = styled.div`
-  padding: 0 4px;
-  background-color: ${MOON_150};
-  border-radius: 4px;
-  margin-left: 4px;
-  font-weight: 600;
-  font-family: monospace;
-  font-size: 10px;
-  line-height: 20px;
-`;
-CallId.displayName = 'S.CallId';
 
 export const docUrl = (path: string): string => {
   return 'https://wandb.github.io/weave/' + path;
@@ -254,7 +242,6 @@ export const CallLink: React.FC<{
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   const opName = opNiceName(props.opName);
-  const truncatedId = props.callId.slice(-4);
 
   // Custom logic to calculate path and tracetree here is not good. Shows
   // a leak of abstraction. We should not be reaching into the peek location and
@@ -284,7 +271,7 @@ export const CallLink: React.FC<{
           {opName}
         </Link>
       </CallLinkOp>
-      <CallId className="callId">{truncatedId}</CallId>
+      <CallId callId={props.callId} />
     </CallLinkWrapper>
   );
 };
