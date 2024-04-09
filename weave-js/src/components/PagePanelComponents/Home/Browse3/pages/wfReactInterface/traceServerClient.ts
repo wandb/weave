@@ -183,14 +183,14 @@ export class TraceServerClient {
             // `content` is jsonl string, we need to parse it.
             if (!content) {
               resolve({calls: []});
-              return
+              return;
             }
             if (content.endsWith('\n')) {
               content = content.slice(0, -1);
             }
             if (content === '') {
               resolve({calls: []});
-              return
+              return;
             }
             const calls: TraceCallSchema[] = [];
             const lines = content.split('\n');
