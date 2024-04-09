@@ -376,6 +376,10 @@ export const CallsTable: FC<{
                     opVersionOptionsWithRoots[option]?.title ?? 'loading...'
                   );
                 }}
+                disableClearable={
+                  opVersionRefOrAllTitle === ALL_TRACES_REF_KEY ||
+                  opVersionRefOrAllTitle === ALL_CALLS_REF_KEY
+                }
                 groupBy={option => opVersionOptionsWithRoots[option]?.group}
                 options={Object.keys(opVersionOptionsWithRoots)}
               />
