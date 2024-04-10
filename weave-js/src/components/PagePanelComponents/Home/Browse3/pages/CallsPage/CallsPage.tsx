@@ -138,8 +138,12 @@ export const CallsTable: FC<{
     const workingFilter = {...filter, ...props.frozenFilter};
     if (
       !ALLOW_ALL_CALLS_UNFILTERED &&
-      !shouldForceNonTraceRootsOnly(workingFilter)
+      !currentFilterShouldUseNonTraceRoots(workingFilter)
     ) {
+      // If we are not allowing all calls unfiltered (meaning the totally
+      // unfiltered list of all calls is disabled) and the current filter
+      // settings do not call for non-trace roots only, then we should force
+      // trace roots only.
       workingFilter.traceRootsOnly = true;
     }
     return workingFilter;
@@ -447,7 +451,7 @@ export const CallsTable: FC<{
   );
 };
 
-const shouldForceNonTraceRootsOnly = (filter: WFHighLevelCallFilter) => {
+const currentFilterShouldUseNonTraceRoots = (filter: WFHighLevelCallFilter) => {
   return (
     (filter.inputObjectVersionRefs?.length ?? 0) > 0 ||
     (filter.opVersionRefs?.length ?? 0) > 0 ||
@@ -459,7 +463,7 @@ const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
   const forcingNonTraceRootsOnly =
-    shouldForceNonTraceRootsOnly(effectiveFilter);
+    currentFilterShouldUseNonTraceRoots(effectiveFilter);
   return {
     traceRootsOnly: !forcingNonTraceRootsOnly && effectiveFilter.traceRootsOnly,
     opVersionRefs: effectiveFilter.opVersionRefs,
