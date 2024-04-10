@@ -107,7 +107,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   }, [data, refs, refsData.result]);
 
   const rows = useMemo(() => {
-    const contexts: TraverseContext[] = [];
+    const contexts: (TraverseContext & {
+      isExpandableRef?: boolean;
+    })[] = [];
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
@@ -120,23 +122,29 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         if (context.path.hasHiddenKey() || isNullDescription) {
           return 'skip';
         }
-        contexts.push(context);
         if (
           isRef(context.value) &&
-          // comment out testing only
           !expandedRefs.includes(context.value) &&
-          context.depth > 1
+          context.depth > 1 &&
+          refIsExpandable(context.value)
         ) {
-          if (refIsExpandable(context.value)) {
-            // These are possibly expandable refs.
-            contexts.push({
-              depth: context.depth + 1,
-              isLeaf: true,
-              path: context.path.plus(''),
-              value: 'loading...',
-              valueType: 'string',
-            });
-          }
+          // if (refIsExpandable(context.value)) {
+          // These are possibly expandable refs.
+          contexts.push({
+            ...context,
+            isExpandableRef: true,
+          });
+          // contexts.push({
+          //   depth: context.depth + 1,
+          //   isLeaf: true,
+          //   isExpandableRef: true,
+          //   path: context.path.plus(''),
+          //   value: '',
+          //   valueType: 'string',
+          // });
+          // }
+        } else {
+          contexts.push(context);
         }
       }
       if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
@@ -156,6 +164,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         flex: 1,
         sortable: false,
         renderCell: ({row}) => {
+          // if (row.isExpandableRef) {
+          //   return <Button>Expand</Button>;
+          // }
           return <ValueView data={row} isExpanded={isExpanded} />;
         },
       },
@@ -203,6 +214,26 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         apiRef.current.setRowChildrenExpansion(id, true);
       }
     });
+    // apiRef.current.getAllRowIds().forEach(id => {
+    //   if (expandedIds.includes(id)) {
+    //     const children = apiRef.current.getRowGroupChildren({groupId: id});
+    //     if (children.length === 0) {
+    //       return;
+    //     }
+    //     apiRef.current.setRowChildrenExpansion(id, true);
+    //   }
+    //   console.log({id}, !expandedIds.includes(id), !isExpanded);
+    //   if (!expandedIds.includes(id) && !isExpanded) {
+    //     return;
+    //   }
+    //   const children = apiRef.current.getRowGroupChildren({groupId: id});
+    //   if (children.length === 0) {
+    //     return;
+    //   }
+    //   const row = apiRef.current.getRow(id);
+    //   console.log({row});
+    //   // apiRef.current.setRowChildrenExpansion(id, true);
+    // });
   }, [apiRef, expandedIds]);
 
   useEffect(() => {
