@@ -2,7 +2,6 @@ import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {WeaveEditorSourceContext} from '../../Browse2/WeaveEditors';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
 import {
@@ -66,12 +65,10 @@ const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
   const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
-  const objectVersionHash = objectVersion.versionHash;
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
-  const objectFilePath = objectVersion.path;
   const refExtra = objectVersion.refExtra;
   const objectVersions = useRootObjectVersions(entityName, projectName, {
     objectIds: [objectName],
@@ -204,25 +201,25 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Values',
           content: (
-            <WeaveEditorSourceContext.Provider
-              key={refUri}
-              value={{
-                entityName,
-                projectName,
-                objectName,
-                objectVersionHash,
-                filePath: objectFilePath,
-                refExtra: refExtra?.split('/'),
-              }}>
-              <ScrollableTabContent>
-                <Box
-                  sx={{
-                    flex: '0 0 auto',
-                  }}>
-                  <ObjectViewerSection title="" data={viewerData} />
-                </Box>
-              </ScrollableTabContent>
-            </WeaveEditorSourceContext.Provider>
+            // <WeaveEditorSourceContext.Provider
+            //   key={refUri}
+            //   value={{
+            //     entityName,
+            //     projectName,
+            //     objectName,
+            //     objectVersionHash,
+            //     filePath: objectFilePath,
+            //     refExtra: refExtra?.split('/'),
+            //   }}>
+            <ScrollableTabContent>
+              <Box
+                sx={{
+                  flex: '0 0 auto',
+                }}>
+                <ObjectViewerSection title="" data={viewerData} />
+              </Box>
+            </ScrollableTabContent>
+            // </WeaveEditorSourceContext.Provider>
           ),
         },
         {

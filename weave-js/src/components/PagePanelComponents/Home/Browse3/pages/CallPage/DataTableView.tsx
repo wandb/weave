@@ -10,13 +10,105 @@ import {
   typedDict,
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
-import React, {FC, useContext, useEffect, useMemo} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import {useHistory} from 'react-router-dom';
 
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {toWeaveType} from '../../../../../Panel2/toWeaveType';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
-import {WeaveflowPeekContext} from '../../context';
+import {
+  useWeaveflowCurrentRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
+import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
+
+interface WeaveEditorPathElObject {
+  type: 'getattr';
+  key: string;
+}
+
+interface WeaveEditorPathElTypedDict {
+  type: 'pick';
+  key: string;
+}
+
+type WeaveEditorPathEl = WeaveEditorPathElObject | WeaveEditorPathElTypedDict;
+
+const MAX_ROWS = 1000;
+
+export const WeaveCHTable: FC<{
+  tableRefUri: string;
+  path: WeaveEditorPathEl[];
+  baseRef?: string;
+}> = props => {
+  const fetchQuery = useValueOfRefUri(props.tableRefUri, {
+    limit: MAX_ROWS + 1,
+  });
+  const [isTruncated, setIsTruncated] = useState(false);
+  const [sourceRows, setSourceRows] = useState<any[] | undefined>();
+  const history = useHistory();
+  const onClickEnabled = props.baseRef != null;
+  const router = useWeaveflowCurrentRouteContext();
+  const onClick = useCallback(
+    val => {
+      const ref = parseRef(props.baseRef!);
+      if (isWeaveObjectRef(ref)) {
+        let extra = ref.artifactRefExtra ?? '';
+        if (extra !== '') {
+          extra += '/';
+        }
+        extra += 'atr/' + props.path.join('/atr/');
+        if (extra !== '') {
+          extra += '/';
+        }
+        extra += TABLE_ID_EDGE_NAME + '/' + val.digest;
+
+        const target = router.objectVersionUIUrl(
+          ref.entityName,
+          ref.projectName,
+          ref.artifactName,
+          ref.artifactVersion,
+          'obj',
+          extra
+        );
+
+        history.push(target);
+      }
+    },
+    [history, props.baseRef, props.path, router]
+  );
+  useEffect(() => {
+    if (sourceRows != null) {
+      return;
+    }
+    if (fetchQuery.loading) {
+      return;
+    }
+    setIsTruncated((fetchQuery.result ?? []).length > MAX_ROWS);
+    setSourceRows((fetchQuery.result ?? []).slice(0, MAX_ROWS));
+  }, [sourceRows, fetchQuery]);
+
+  return (
+    <DataTableView
+      data={sourceRows ?? []}
+      loading={fetchQuery.loading}
+      isTruncated={isTruncated}
+      displayKey="val"
+      onLinkClick={onClickEnabled ? onClick : undefined}
+    />
+  );
+};
 
 export const DataTableView: FC<{
   data: Array<{[key: string]: any}>;
@@ -159,8 +251,6 @@ export const typeToDataGridColumnSpec = (
   disableEdits?: boolean,
   parentKey?: string
 ): GridColDef[] => {
-  //   const cols: GridColDef[] = [];
-  //   const colGrouping: GridColumnGroup[] = [];
   if (isAssignableTo(type, {type: 'typedDict', propertyTypes: {}})) {
     const maxWidth = window.innerWidth * (isPeeking ? 0.5 : 0.75);
     const propertyTypes = typedDictPropertyTypes(type);
@@ -220,10 +310,31 @@ export const typeToDataGridColumnSpec = (
       return valTypeCols.map(col => ({
         ...col,
         maxWidth,
-        // field: `${key}.${col.field}`,
-        // headerName: `${key}.${col.field}`,
       }));
     });
   }
   return [];
+};
+
+const useValueOfRefUri = (refUriStr: string, tableQuery?: TableQuery) => {
+  const {useRefsData} = useWFHooks();
+  const data = useRefsData([refUriStr], tableQuery);
+  return useMemo(() => {
+    if (data.loading) {
+      return {
+        loading: true,
+        result: undefined,
+      };
+    }
+    if (data.result == null || data.result.length === 0) {
+      return {
+        loading: true,
+        result: undefined,
+      };
+    }
+    return {
+      loading: false,
+      result: data.result[0],
+    };
+  }, [data]);
 };

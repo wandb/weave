@@ -2,9 +2,8 @@ import React, {useMemo} from 'react';
 
 import {parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
-import {WeaveCHTable} from '../../../Browse2/WeaveEditors';
 import {isRef} from '../common/util';
-import {DataTableView} from './DataTableView';
+import {DataTableView, WeaveCHTable} from './DataTableView';
 import {ValueViewNumber} from './ValueViewNumber';
 import {ValueViewPrimitive} from './ValueViewPrimitive';
 import {ValueViewString} from './ValueViewString';
