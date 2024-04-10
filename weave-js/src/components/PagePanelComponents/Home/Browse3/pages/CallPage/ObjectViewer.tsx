@@ -221,13 +221,13 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         defaultGroupingExpansionDepth={isExpanded ? -1 : 0}
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
-          if (
-            (params.model.valueType === 'string' &&
-              isRef(params.model.value) &&
-              (parseRefMaybe(params.model.value) as any).weaveKind ===
-                'table') ||
-            params.model.valueType === 'array'
-          ) {
+          const isNonRefString =
+            params.model.valueType === 'string' && !isRef(params.model.value);
+          const isArray = params.model.valueType === 'array';
+          const isTableRef =
+            isRef(params.model.value) &&
+            (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+          if (isNonRefString || isArray || isTableRef) {
             return 'auto';
           }
           return 38;
