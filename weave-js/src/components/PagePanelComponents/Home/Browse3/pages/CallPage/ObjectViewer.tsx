@@ -13,6 +13,7 @@ import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
+import {USE_TABLE_FOR_ARRAYS} from './DataTableView';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
 import {mapObject, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
@@ -138,7 +139,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           }
         }
       }
-      if (context.valueType === 'array') {
+      if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
         return 'skip';
       }
       return true;
@@ -227,7 +228,11 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           const isTableRef =
             isRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
-          if (isNonRefString || isArray || isTableRef) {
+          if (
+            isNonRefString ||
+            (isArray && USE_TABLE_FOR_ARRAYS) ||
+            isTableRef
+          ) {
             return 'auto';
           }
           return 38;
