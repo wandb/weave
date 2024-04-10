@@ -5,13 +5,23 @@ import {
   GridRowHeightParams,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
+import {
+  LIST_INDEX_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
+} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {
   USE_TABLE_FOR_ARRAYS,
@@ -110,9 +120,11 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   }, [data, refs, refsData.result]);
 
   const rows = useMemo(() => {
-    const contexts: (TraverseContext & {
-      isExpandableRef?: boolean;
-    })[] = [];
+    const contexts: Array<
+      TraverseContext & {
+        isExpandableRef?: boolean;
+      }
+    > = [];
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
@@ -159,6 +171,8 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
   }, [expandedRefs, resolvedData]);
 
+  const currentRefContext = useContext(WeaveCHTableSourceRefContext);
+
   const columns: GridColDef[] = useMemo(() => {
     return [
       {
@@ -169,14 +183,18 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         renderCell: ({row}) => {
           let baseRef: string | undefined;
           const path: ObjectPath = row.path;
-          for (let i = path.length() - 1; i >= 0; i--) {
+          if (currentRefContext) {
+            baseRef = buildBaseRef(currentRefContext, path, path.length());
+          }
+          for (let i = 0; i < path.length(); i++) {
             const ancestorPath = path.ancestor(-i);
             const ancestorExpandedRef = expandedRefs[ancestorPath.toString()];
             if (ancestorExpandedRef) {
-              baseRef = ancestorExpandedRef;
+              baseRef = buildBaseRef(ancestorExpandedRef, path, i);
               break;
             }
           }
+
           const inner = <ValueView data={row} isExpanded={isExpanded} />;
           if (baseRef) {
             return (
@@ -309,4 +327,24 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     );
   }, [apiRef, columns, deepRows, groupingColDef, isExpanded]);
   return <div style={{overflow: 'hidden'}}>{inner}</div>;
+};
+
+const buildBaseRef = (
+  baseRef: string,
+  path: ObjectPath,
+  startIndex: number
+) => {
+  if (startIndex !== 0) {
+    const parts = path.toPath().slice(-startIndex);
+    parts.forEach(part => {
+      if (typeof part === 'string') {
+        baseRef += '/' + OBJECT_ATTR_EDGE_NAME + '/' + part;
+      } else if (typeof part === 'number') {
+        baseRef += '/' + LIST_INDEX_EDGE_NAME + '/' + part.toString();
+      } else {
+        console.error('Invalid path part:', part);
+      }
+    });
+  }
+  return baseRef;
 };
