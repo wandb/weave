@@ -32,24 +32,46 @@ import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
 
+// Controls the maximum number of rows to display in the table
 const MAX_ROWS = 1000;
+
+// Controls whether to use a table for arrays or not. Currently we disable this,
+// but I suspect it will make sense in many cases. I didn't want to change the
+// default behavior for now, but we can revisit this later.
 export const USE_TABLE_FOR_ARRAYS = false;
 
-// Create a context that can be consumed by ObjectViewerSection
+// Callers are responsible for setting the source ref context. This is because
+// by the time the WeaveCHTable is rendered, the ref is already resolved to be a
+// table ref. However, that is just an implementation detail. The user-facing
+// contract is in terms of the the object ref, so we need to have the later in
+// order to render links.
 export const WeaveCHTableSourceRefContext = React.createContext<
   string | undefined
 >(undefined);
 
+// This component is designed to be used to render weave `tables`.
 export const WeaveCHTable: FC<{
   tableRefUri: string;
   fullHeight?: boolean;
 }> = props => {
+  // Gets the source of this Table (set by a few levels up)
   const sourceRef = useContext(WeaveCHTableSourceRefContext);
+
+  // Retrieves the data for the table, with a limit of MAX_ROWS + 1
   const fetchQuery = useValueOfRefUri(props.tableRefUri, {
     limit: MAX_ROWS + 1,
   });
+
+  // Determines if the table itself is truncated
   const [isTruncated, setIsTruncated] = useState(false);
+
+  // `sourceRows` are the effective rows to display. If the table is truncated,
+  // we only display the first MAX_ROWS rows.
   const [sourceRows, setSourceRows] = useState<any[] | undefined>();
+
+  // In this block, we setup a click handler. The underlying datatable is more general
+  // and not aware of the nuances of our links and ref model. Therefore, we handle
+  // the click in this component and navigate to the appropriate page.
   const history = useHistory();
   const onClickEnabled = sourceRef != null;
   const router = useWeaveflowCurrentRouteContext();
@@ -77,6 +99,8 @@ export const WeaveCHTable: FC<{
     },
     [history, sourceRef, router]
   );
+
+  // Here we update the sourceRows when the fetchQuery is done loading
   useEffect(() => {
     if (sourceRows != null) {
       return;
@@ -93,6 +117,8 @@ export const WeaveCHTable: FC<{
       data={sourceRows ?? []}
       loading={fetchQuery.loading}
       isTruncated={isTruncated}
+      // Display key is "val" as the resulting rows have metadata/ref
+      // information outside of the actual data
       displayKey="val"
       onLinkClick={onClickEnabled ? onClick : undefined}
       fullHeight={props.fullHeight}
@@ -100,6 +126,7 @@ export const WeaveCHTable: FC<{
   );
 };
 
+// This is a general purpose table view that can be used to render any data.
 export const DataTableView: FC<{
   data: Array<{[key: string]: any}>;
   fullHeight?: boolean;
@@ -111,6 +138,9 @@ export const DataTableView: FC<{
   const apiRef = useGridApiRef();
   const {isPeeking} = useContext(WeaveflowPeekContext);
 
+  // First, we convert the data to a list of dictionaries, since that is the
+  // format expected by the rest of the logic. We also flatten any nested
+  // objects so the keys are always dot-separated paths.
   const dataAsListOfDict = useMemo(() => {
     return props.data.map(row => {
       let val = row;
@@ -126,6 +156,7 @@ export const DataTableView: FC<{
     });
   }, [props.data, props.displayKey]);
 
+  // Next, we add an id to each row (index-based)
   const gridRows = useMemo(
     () =>
       (dataAsListOfDict ?? []).map((row, i) => ({
@@ -135,7 +166,9 @@ export const DataTableView: FC<{
     [dataAsListOfDict]
   );
 
-  // Autosize when rows change
+  // This effect will resize the columns after the table is rendered. We use a
+  // timeout to ensure that the table has been rendered before we resize the
+  // columns.
   useEffect(() => {
     let mounted = true;
     const timeoutId = setTimeout(() => {
@@ -153,6 +186,10 @@ export const DataTableView: FC<{
     };
   }, [gridRows, apiRef]);
 
+  // Next, we determine the type of the data. Previously, we used the WeaveJS
+  // `Type` system to determine the type of the data. However, this is way to
+  // slow for big tables and too detailed for our purposes. We just need to know
+  // if each column is a string, number, boolean, or list. (or mixed)
   const objectType = useMemo(() => {
     if (dataAsListOfDict == null) {
       return list(typedDict({}));
@@ -209,6 +246,8 @@ export const DataTableView: FC<{
     return typedDict(propertyTypes);
   }, [dataAsListOfDict]);
 
+  // Here we define the column spec for the table. It is based on
+  // the type of the data and if we have a link or not.
   const columnSpec: GridColDef[] = useMemo(() => {
     const res: GridColDef[] = [];
     if (props.onLinkClick) {
@@ -228,6 +267,8 @@ export const DataTableView: FC<{
     }
     return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
   }, [props.onLinkClick, props.data, objectType, isPeeking]);
+
+  // Finally, we do some math to determine the height of the table.
   const isSingleColumn =
     USE_TABLE_FOR_ARRAYS &&
     columnSpec.length === 1 &&
