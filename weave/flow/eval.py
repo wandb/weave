@@ -216,7 +216,7 @@ class Evaluation(Object):
         return summary
 
     @weave.op()
-    async def evaluate(self, model: Union[Callable, Model]) -> dict:
+    async def evaluate(self, model: Union[Callable, Model], parallelism: Optional[int] = None) -> dict:
         eval_rows = []
 
         start_time = time.time()
@@ -233,28 +233,23 @@ class Evaluation(Object):
             return eval_row
 
         n_complete = 0
-        # with console.status("Evaluating...") as status:
         dataset = typing.cast(Dataset, self.dataset)
         _rows = dataset.rows
+        parallelism_value = parallelism if parallelism is not None else get_weave_parallelism()
         async for example, eval_row in util.async_foreach(
-            _rows, eval_example, get_weave_parallelism()
+            _rows, eval_example, parallelism_value
         ):
             n_complete += 1
             duration = time.time() - start_time
-            # status.update(
-            #     f"Evaluating... {duration:.2f}s [{n_complete} / {len(self.dataset.rows)} complete]"  # type:ignore
-            # )
-            if eval_row == None:
+            if eval_row is None:
                 eval_row = {"model_output": None, "scores": {}}
-            if eval_row["scores"] == None:
+            if eval_row["scores"] is None:
                 eval_row["scores"] = {}
             for scorer in self.scorers or []:
                 scorer_name, _, _ = get_scorer_attributes(scorer)
                 if scorer_name not in eval_row["scores"]:
                     eval_row["scores"][scorer_name] = {}
             eval_rows.append(eval_row)
-
-        # eval_table: weave.WeaveList = weave.WeaveList(eval_rows)
 
         summary = await self.summarize(eval_rows)
 
@@ -268,8 +263,9 @@ def evaluate(
     model: Union[Callable, Model],
     scores: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[Callable] = None,
+    parallelism: Optional[int] = None,
 ) -> dict:
     eval = Evaluation(
         dataset=dataset, scorers=scores, preprocess_model_input=preprocess_model_input
     )
-    return asyncio.run(eval.evaluate(model))
+    return asyncio.run(eval.evaluate(model, parallelism=parallelism))
