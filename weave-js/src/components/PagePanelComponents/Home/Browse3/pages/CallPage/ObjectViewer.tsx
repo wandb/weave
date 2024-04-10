@@ -15,6 +15,7 @@ import React, {
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {LoadingDots} from '../../../../../LoadingDots';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
@@ -79,6 +80,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   const refsData = useRefsData(refs);
 
   useEffect(() => {
+    if (refsData.loading) {
+      return;
+    }
     const resolvedRefData = refsData.result;
 
     const refValues: RefValues = {};
@@ -117,12 +121,13 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       resolved = mapObject(resolved, mapper);
     }
     setResolvedData(resolved);
-  }, [data, refs, refsData.result]);
+  }, [data, refs, refsData.loading, refsData.result]);
 
   const rows = useMemo(() => {
     const contexts: Array<
       TraverseContext & {
         isExpandableRef?: boolean;
+        isLoader?: boolean;
       }
     > = [];
     traverse(resolvedData, context => {
@@ -139,25 +144,22 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         }
         if (
           isRef(context.value) &&
-          expandedRefs[context.path.toString()] == null &&
           context.depth > 1 &&
           refIsExpandable(context.value)
         ) {
-          // if (refIsExpandable(context.value)) {
           // These are possibly expandable refs.
           contexts.push({
             ...context,
             isExpandableRef: true,
           });
-          // contexts.push({
-          //   depth: context.depth + 1,
-          //   isLeaf: true,
-          //   isExpandableRef: true,
-          //   path: context.path.plus(''),
-          //   value: '',
-          //   valueType: 'string',
-          // });
-          // }
+          contexts.push({
+            depth: context.depth + 1,
+            isLeaf: true,
+            path: context.path.plus(''),
+            isLoader: true,
+            value: '',
+            valueType: 'undefined',
+          });
         } else {
           contexts.push(context);
         }
@@ -169,7 +171,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     });
 
     return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
-  }, [expandedRefs, resolvedData]);
+  }, [resolvedData]);
   const deepRows = useDeepMemo(rows);
 
   const currentRefContext = useContext(WeaveCHTableSourceRefContext);
@@ -182,6 +184,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         flex: 1,
         sortable: false,
         renderCell: ({row}) => {
+          if (row.isLoader) {
+            return <LoadingDots />;
+          }
           let baseRef: string | undefined;
           const path: ObjectPath = row.path;
           if (currentRefContext) {
@@ -243,35 +248,15 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     expandedIds.forEach(id => {
       if (apiRef.current.getRow(id)) {
         const children = apiRef.current.getRowGroupChildren({groupId: id});
-        if (children.length === 0) {
-          return;
+        if (children.length !== 0) {
+          apiRef.current.setRowChildrenExpansion(id, true);
         }
-        apiRef.current.setRowChildrenExpansion(id, true);
       }
     });
-    // apiRef.current.getAllRowIds().forEach(id => {
-    //   if (expandedIds.includes(id)) {
-    //     const children = apiRef.current.getRowGroupChildren({groupId: id});
-    //     if (children.length === 0) {
-    //       return;
-    //     }
-    //     apiRef.current.setRowChildrenExpansion(id, true);
-    //   }
-    //   console.log({id}, !expandedIds.includes(id), !isExpanded);
-    //   if (!expandedIds.includes(id) && !isExpanded) {
-    //     return;
-    //   }
-    //   const children = apiRef.current.getRowGroupChildren({groupId: id});
-    //   if (children.length === 0) {
-    //     return;
-    //   }
-    //   const row = apiRef.current.getRow(id);
-    //   console.log({row});
-    //   // apiRef.current.setRowChildrenExpansion(id, true);
-    // });
   }, [apiRef, expandedIds]);
 
   useEffect(() => {
+    updateRowExpand();
     return apiRef.current.subscribeEvent('rowsSet', () => {
       updateRowExpand();
     });
