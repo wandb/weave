@@ -17,7 +17,7 @@ class Scorer(Object):
 
 
 def stderr(data: Sequence[Union[int, float]]) -> float:
-    if data:
+    if len(data) > 1:
         sample_variance = np.var(data, ddof=1)
         return float(np.sqrt(sample_variance / len(data)))
     else:
