@@ -94,8 +94,11 @@ const ObjectVersionPageInner: React.FC<{
   });
   const data = useRefsData([refUri]);
   const viewerData = useMemo(() => {
+    if (data.loading) {
+      return {};
+    }
     return data.result?.[0] ?? {};
-  }, [data.result]);
+  }, [data.loading, data.result]);
 
   return (
     <SimplePageLayoutWithHeader
@@ -212,7 +215,12 @@ const ObjectVersionPageInner: React.FC<{
                   <CenteredAnimatedLoader />
                 ) : (
                   <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <ObjectViewerSection title="" data={viewerData} noHide />
+                    <ObjectViewerSection
+                      title=""
+                      data={viewerData}
+                      noHide
+                      isExpanded
+                    />
                   </WeaveCHTableSourceRefContext.Provider>
                 )}
               </Box>

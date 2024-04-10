@@ -35,10 +35,8 @@ import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
 // Controls the maximum number of rows to display in the table
 const MAX_ROWS = 1000;
 
-// Controls whether to use a table for arrays or not. Currently we disable this,
-// but I suspect it will make sense in many cases. I didn't want to change the
-// default behavior for now, but we can revisit this later.
-export const USE_TABLE_FOR_ARRAYS = false;
+// Controls whether to use a table for arrays or not.
+export const USE_TABLE_FOR_ARRAYS = true;
 
 // Callers are responsible for setting the source ref context. This is because
 // by the time the WeaveCHTable is rendered, the ref is already resolved to be a

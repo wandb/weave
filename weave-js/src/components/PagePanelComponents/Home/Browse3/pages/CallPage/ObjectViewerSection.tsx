@@ -21,6 +21,7 @@ type ObjectViewerSectionProps = {
   title: string;
   data: Data;
   noHide?: boolean;
+  isExpanded?: boolean;
 };
 
 const TitleRow = styled.div`
@@ -74,10 +75,11 @@ const ObjectViewerSectionNonEmpty = ({
   title,
   data,
   noHide,
+  isExpanded,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
   const [mode, setMode] = useState(
-    isSimpleData(data) ? 'expanded' : 'collapsed'
+    isSimpleData(data) || isExpanded ? 'expanded' : 'collapsed'
   );
 
   const body = useMemo(() => {
@@ -103,12 +105,12 @@ const ObjectViewerSectionNonEmpty = ({
   }, [apiRef, mode, data]);
 
   const setTreeExpanded = useCallback(
-    (isExpanded: boolean) => {
+    (setIsExpanded: boolean) => {
       const rowIds = apiRef.current.getAllRowIds();
       rowIds.forEach(rowId => {
         const rowNode = apiRef.current.getRowNode(rowId);
         if (rowNode && rowNode.type === 'group') {
-          apiRef.current.setRowChildrenExpansion(rowId, isExpanded);
+          apiRef.current.setRowChildrenExpansion(rowId, setIsExpanded);
         }
       });
     },
@@ -173,6 +175,7 @@ export const ObjectViewerSection = ({
   title,
   data,
   noHide,
+  isExpanded,
 }: ObjectViewerSectionProps) => {
   const numKeys = Object.keys(data).length;
   const currentRef = useContext(WeaveCHTableSourceRefContext);
@@ -196,7 +199,12 @@ export const ObjectViewerSection = ({
       isRef(value)
     ) {
       return (
-        <ObjectViewerSectionNonEmpty title={title} data={{Value: value}} />
+        <ObjectViewerSectionNonEmpty
+          title={title}
+          data={{Value: value}}
+          noHide={noHide}
+          isExpanded={isExpanded}
+        />
       );
     }
     const oneResultData = {
@@ -244,5 +252,12 @@ export const ObjectViewerSection = ({
       return inner;
     }
   }
-  return <ObjectViewerSectionNonEmpty title={title} data={data} noHide />;
+  return (
+    <ObjectViewerSectionNonEmpty
+      title={title}
+      data={data}
+      noHide={noHide}
+      isExpanded={isExpanded}
+    />
+  );
 };
