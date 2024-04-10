@@ -771,13 +771,12 @@ const typeToDataGridColumnSpec = (
               field: innerKey,
               headerName: innerKey,
               renderCell: params => {
-                return (
-                  // <Typography>
-                  params.row[innerKey] == null
-                    ? '-'
-                    : `[${params.row[innerKey].length} item list]`
-                  // </Typography>
-                );
+                const listValue = params.row[innerKey];
+                if (listValue == null) {
+                  return '-';
+                }
+                const listLen = listValue.length;
+                return `[${listLen} item list]`;
               },
             },
           ];
@@ -944,10 +943,6 @@ export const WeaveCHTable: FC<{
   path: WeaveEditorPathEl[];
   baseRef?: string;
 }> = props => {
-  // const apiRef = useGridApiRef();
-  // const {isPeeking} = useContext(WeaveflowPeekContext);
-
-  // const makeLinkPath = useObjectVersionLinkPathForPath();
   const fetchQuery = useValueOfRefUri(props.tableRefUri, {
     limit: MAX_ROWS + 1,
   });
@@ -1065,7 +1060,6 @@ export const DataTableView: FC<{
     if (dataAsListOfDict.length === 0) {
       return list(typedDict({}));
     }
-    // console.log(dataAsListOfDict, toWeaveType(dataAsListOfDict));
     return listObjectType(toWeaveType(dataAsListOfDict));
   }, [dataAsListOfDict]);
 
@@ -1118,13 +1112,13 @@ export const DataTableView: FC<{
         }}>
         <StyledDataGrid
           hideFooter={hideFooter}
-          slots={
-            hideHeader
+          slots={{
+            ...(hideHeader
               ? {
                   columnHeaders: () => null,
                 }
-              : {}
-          }
+              : {}),
+          }}
           autoPageSize={true}
           keepBorders={false}
           apiRef={apiRef}
@@ -1132,21 +1126,10 @@ export const DataTableView: FC<{
           experimentalFeatures={{columnGrouping: true}}
           rows={gridRows}
           columns={columnSpec}
-          initialState={
-            {
-              // pagination: {
-              //   paginationModel: {
-              //     pageSize: 10,
-              //   },
-              // },
-            }
-          }
           loading={props.loading}
           disableRowSelectionOnClick
           sx={{
-            // '& .MuiDataGrid-withBorderColor': {
             border: 'none',
-            // },
           }}
         />
       </Box>
@@ -1167,8 +1150,7 @@ const WeaveViewSmallRef: FC<{
     return <div>loading</div>;
   } else if (opDefRef != null) {
     if (opDefRef.scheme === 'weave' && opDefRef.weaveKind === 'table') {
-      return <></>;
-      // return <WeaveCHTable refUri={opDefQuery.result} path={path} />;
+      return <WeaveCHTable tableRefUri={opDefQuery.result} path={path} />;
     }
     return <SmallRef objRef={opDefRef} />;
   } else {
