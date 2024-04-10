@@ -170,6 +170,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
 
     return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
   }, [expandedRefs, resolvedData]);
+  const deepRows = useDeepMemo(rows);
 
   const currentRefContext = useContext(WeaveCHTableSourceRefContext);
 
@@ -237,8 +238,6 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     }),
     [addExpandedRef]
   );
-
-  const deepRows = useDeepMemo(rows);
 
   const updateRowExpand = useCallback(() => {
     expandedIds.forEach(id => {

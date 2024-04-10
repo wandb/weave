@@ -620,21 +620,31 @@ const useRefsData = (
   } else if (tableRefUris.length === 1) {
     const tableRef = refUriToObjectVersionKey(tableRefUris[0]);
     tableUriProjectId = tableRef.entity + '/' + tableRef.project;
-    // console.log(tableUris[0].ref)
     tableUriDigest = tableRef.objectId;
   }
   const tableQueryFilter = useMemo(() => {
     // TODO: tableQuery
     return {};
   }, []);
+
+  const tableRefKey = useMemo(() => {
+    return (
+      tableRefUris[0] +
+      JSON.stringify(tableQueryFilter) +
+      tableQuery?.limit?.toString()
+    );
+  }, [tableQuery?.limit, tableQueryFilter, tableRefUris]);
+
+  const cachedTableResult = refDataCache.get(tableRefKey);
+
   const tableValsResult = useTableQuery(
     tableUriProjectId,
     tableUriDigest,
     tableQueryFilter,
     tableQuery?.limit,
-    {skip: tableRefUris.length === 0}
+    {skip: tableRefUris.length === 0 || cachedTableResult != null}
   );
-  // console.log(tableValsResult);
+
   return useMemo(() => {
     if (refUris.length === 0) {
       return {
@@ -651,7 +661,7 @@ const useRefsData = (
       };
     }
     const sRes = simpleValsResult.result;
-    const tRes = tableValsResult.result;
+    const tRes = cachedTableResult || tableValsResult.result;
 
     const valueMap = new Map<string, any>();
     if (sRes != null) {
@@ -662,7 +672,7 @@ const useRefsData = (
     }
     if (tRes != null) {
       valueMap.set(tableRefUris[0], tRes);
-      // Don't cache table results (since there could be a filter)
+      refDataCache.set(tableRefKey, tRes);
     }
     Object.entries(cachedSimpleUriResults).forEach(([uri, val]) => {
       valueMap.set(uri, val);
@@ -680,9 +690,11 @@ const useRefsData = (
     simpleValsResult.result,
     tableValsResult.loading,
     tableValsResult.result,
+    cachedTableResult,
     cachedSimpleUriResults,
     neededSimpleUris,
     tableRefUris,
+    tableRefKey,
   ]);
 };
 

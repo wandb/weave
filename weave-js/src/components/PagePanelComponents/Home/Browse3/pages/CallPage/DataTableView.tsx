@@ -4,12 +4,12 @@ import {GridColDef, useGridApiRef} from '@mui/x-data-grid-pro';
 import {
   isAssignableTo,
   list,
-  listObjectType,
   maybe,
   Type,
   typedDict,
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
+import _ from 'lodash';
 import React, {
   FC,
   useCallback,
@@ -21,7 +21,6 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {toWeaveType} from '../../../../../Panel2/toWeaveType';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
 import {
@@ -121,7 +120,7 @@ export const DataTableView: FC<{
       if (val == null) {
         return {};
       } else if (typeof val === 'object' && !Array.isArray(val)) {
-        return val;
+        return flattenObject(val);
       }
       return {'': val};
     });
@@ -131,7 +130,8 @@ export const DataTableView: FC<{
     () =>
       (dataAsListOfDict ?? []).map((row, i) => ({
         id: i,
-        ...flattenObject(row),
+        ...row,
+        // ...flattenObject(row),
       })),
     [dataAsListOfDict]
   );
@@ -160,7 +160,52 @@ export const DataTableView: FC<{
     if (dataAsListOfDict.length === 0) {
       return list(typedDict({}));
     }
-    return listObjectType(toWeaveType(dataAsListOfDict));
+
+    const propertyTypes: {[col: string]: Type} = {};
+    dataAsListOfDict.forEach(row => {
+      Object.keys(row).forEach(col => {
+        if (propertyTypes[col] == null) {
+          if (row[col] == null) {
+            // Do nothing
+          } else if (typeof row[col] === 'boolean') {
+            if (
+              propertyTypes[col] != null &&
+              propertyTypes[col] !== 'boolean'
+            ) {
+              propertyTypes[col] = 'any';
+            } else {
+              propertyTypes[col] = 'boolean';
+            }
+          } else if (typeof row[col] === 'string') {
+            if (propertyTypes[col] != null && propertyTypes[col] !== 'string') {
+              propertyTypes[col] = 'any';
+            } else {
+              propertyTypes[col] = 'string';
+            }
+          } else if (typeof row[col] === 'number') {
+            if (propertyTypes[col] != null && propertyTypes[col] !== 'number') {
+              propertyTypes[col] = 'any';
+            } else {
+              propertyTypes[col] = 'number';
+            }
+          } else if (Array.isArray(row[col])) {
+            if (
+              propertyTypes[col] != null &&
+              !_.isEqual(propertyTypes[col], {type: 'list', objectType: 'any'})
+            ) {
+              propertyTypes[col] = 'any';
+            } else {
+              propertyTypes[col] = {type: 'list', objectType: 'any'};
+            }
+          } else {
+            propertyTypes[col] = 'any';
+          }
+        }
+      });
+    });
+    return typedDict(propertyTypes);
+
+    // const ot = listObjectType(toWeaveType(dataAsListOfDict));
   }, [dataAsListOfDict]);
 
   const columnSpec: GridColDef[] = useMemo(() => {
@@ -305,7 +350,15 @@ export const typeToDataGridColumnSpec = (
             field: innerKey,
             headerName: innerKey,
             renderCell: params => {
-              return <CellValue value={params.row[innerKey] ?? ''} />;
+              const data = params.row[innerKey];
+              // if (Array.isArray(data)) {
+              //   if (data == null) {
+              //     return '-';
+              //   }
+              //   const listLen = data.length;
+              //   return `[${listLen} item list]`;
+              // }
+              return <CellValue value={data ?? ''} />;
             },
           },
         ];
