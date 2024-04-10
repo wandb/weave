@@ -772,11 +772,11 @@ const typeToDataGridColumnSpec = (
               headerName: innerKey,
               renderCell: params => {
                 return (
-                  <Typography>
-                    {params.row[innerKey] == null
-                      ? '-'
-                      : `[${params.row[innerKey].length} item list]`}
-                  </Typography>
+                  // <Typography>
+                  params.row[innerKey] == null
+                    ? '-'
+                    : `[${params.row[innerKey].length} item list]`
+                  // </Typography>
                 );
               },
             },
@@ -940,18 +940,51 @@ export const WeaveEditorTable: FC<{
 };
 
 export const WeaveCHTable: FC<{
-  refUri: string;
+  tableRefUri: string;
   path: WeaveEditorPathEl[];
+  baseRef?: string;
 }> = props => {
-  const apiRef = useGridApiRef();
-  const {isPeeking} = useContext(WeaveflowPeekContext);
+  // const apiRef = useGridApiRef();
+  // const {isPeeking} = useContext(WeaveflowPeekContext);
 
-  const makeLinkPath = useObjectVersionLinkPathForPath();
-  const fetchQuery = useValueOfRefUri(props.refUri, {
+  // const makeLinkPath = useObjectVersionLinkPathForPath();
+  const fetchQuery = useValueOfRefUri(props.tableRefUri, {
     limit: MAX_ROWS + 1,
   });
   const [isTruncated, setIsTruncated] = useState(false);
   const [sourceRows, setSourceRows] = useState<any[] | undefined>();
+  const history = useHistory();
+  const onClickEnabled = props.baseRef != null;
+  const router = useWeaveflowCurrentRouteContext();
+  const onClick = useCallback(
+    val => {
+      const ref = parseRef(props.baseRef!);
+      if (isWeaveObjectRef(ref)) {
+        let extra = ref.artifactRefExtra ?? '';
+        if (extra !== '') {
+          extra += '/';
+        }
+        extra += 'atr/' + props.path.join('/atr/');
+        if (extra !== '') {
+          extra += '/';
+        }
+        extra += TABLE_ID_EDGE_NAME + '/' + val.digest;
+
+        const target = router.objectVersionUIUrl(
+          ref.entityName,
+          ref.projectName,
+          ref.artifactName,
+          ref.artifactVersion,
+          'obj',
+          extra
+        );
+        console.log({target, ref, baseRef: props.baseRef, extra});
+
+        history.push(target);
+      }
+    },
+    [history, props.baseRef, props.path, router]
+  );
   useEffect(() => {
     if (sourceRows != null) {
       return;
@@ -963,14 +996,49 @@ export const WeaveCHTable: FC<{
     setSourceRows((fetchQuery.result ?? []).slice(0, MAX_ROWS));
   }, [sourceRows, fetchQuery]);
 
+  return (
+    <DataTableView
+      data={sourceRows ?? []}
+      loading={fetchQuery.loading}
+      isTruncated={isTruncated}
+      displayKey="val"
+      onLinkClick={onClickEnabled ? onClick : undefined}
+    />
+  );
+};
+
+export const DataTableView: FC<{
+  data: Array<{[key: string]: any}>;
+  loading?: boolean;
+  displayKey?: string;
+  isTruncated?: boolean;
+  onLinkClick?: (row: any) => void;
+}> = props => {
+  const apiRef = useGridApiRef();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+
+  const dataAsListOfDict = useMemo(() => {
+    return props.data.map(row => {
+      let val = row;
+      if (props.displayKey) {
+        val = row[props.displayKey];
+      }
+      if (val == null) {
+        return {};
+      } else if (typeof val === 'object' && !Array.isArray(val)) {
+        return val;
+      }
+      return {'': val};
+    });
+  }, [props.data, props.displayKey]);
+
   const gridRows = useMemo(
     () =>
-      (sourceRows ?? []).map((row: {[key: string]: any}, i: number) => ({
-        _table_row_digest: row.digest,
+      (dataAsListOfDict ?? []).map((row, i) => ({
         id: i,
-        ...flattenObject(row.val),
+        ...flattenObject(row),
       })),
-    [sourceRows]
+    [dataAsListOfDict]
   );
 
   // Autosize when rows change
@@ -987,65 +1055,102 @@ export const WeaveCHTable: FC<{
   }, [gridRows, apiRef]);
 
   const objectType = useMemo(() => {
-    if (fetchQuery.result == null) {
+    if (dataAsListOfDict == null) {
       return list(typedDict({}));
     }
-    return typedDictPropertyTypes(
-      listObjectType(toWeaveType(fetchQuery.result))
-    ).val;
-  }, [fetchQuery.result]);
+    if (!Array.isArray(dataAsListOfDict)) {
+      // Is this right here?
+      return list(typedDict({}));
+    }
+    if (dataAsListOfDict.length === 0) {
+      return list(typedDict({}));
+    }
+    // console.log(dataAsListOfDict, toWeaveType(dataAsListOfDict));
+    return listObjectType(toWeaveType(dataAsListOfDict));
+  }, [dataAsListOfDict]);
 
   const columnSpec: GridColDef[] = useMemo(() => {
-    return [
-      {
-        field: '_table_row_digest',
+    const res: GridColDef[] = [];
+    if (props.onLinkClick) {
+      res.push({
+        field: '_row_click',
         headerName: '',
         width: 50,
         renderCell: params => (
-          <Link
-            to={makeLinkPath([
-              ...weaveEditorPathUrlPathPart(props.path),
-              TABLE_ID_EDGE_NAME,
-              params.row._table_row_digest,
-            ])}>
-            <LinkIcon />
-          </Link>
+          <LinkIcon
+            style={{
+              cursor: 'pointer',
+            }}
+            onClick={() =>
+              props.onLinkClick!(dataAsListOfDict[params.id as number])
+            }
+          />
         ),
-      },
-      ...typeToDataGridColumnSpec(objectType, isPeeking, true),
-    ];
-  }, [objectType, isPeeking, makeLinkPath, props.path]);
+      });
+    }
+    return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
+  }, [props.onLinkClick, dataAsListOfDict, objectType, isPeeking]);
+  const isSingleColumn = columnSpec.length === 1 && columnSpec[0].field === '';
+  if (isSingleColumn) {
+    columnSpec[0].flex = 1;
+  }
+  const hideHeader = isSingleColumn;
+  const displayRows = 10;
+  const hideFooter = gridRows.length <= displayRows;
+  const headerHeight = 40;
+  const footerHeight = 52;
+  const rowHeight = 36;
+  const height =
+    (hideHeader ? 0 : headerHeight) +
+    (hideFooter ? 0 : footerHeight) +
+    rowHeight * Math.min(displayRows, gridRows.length);
   return (
-    <>
-      {isTruncated && (
+    <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
+      {props.isTruncated && (
         <Alert severity="warning">
           Showing {MAX_ROWS.toLocaleString()} rows only.
         </Alert>
       )}
       <Box
         sx={{
-          height: 460,
+          height,
           width: '100%',
         }}>
         <StyledDataGrid
-          keepBorders
+          hideFooter={hideFooter}
+          slots={
+            hideHeader
+              ? {
+                  columnHeaders: () => null,
+                }
+              : {}
+          }
+          autoPageSize={true}
+          keepBorders={false}
           apiRef={apiRef}
           density="compact"
           experimentalFeatures={{columnGrouping: true}}
           rows={gridRows}
           columns={columnSpec}
-          initialState={{
-            pagination: {
-              paginationModel: {
-                pageSize: 10,
-              },
-            },
-          }}
-          loading={fetchQuery.loading}
+          initialState={
+            {
+              // pagination: {
+              //   paginationModel: {
+              //     pageSize: 10,
+              //   },
+              // },
+            }
+          }
+          loading={props.loading}
           disableRowSelectionOnClick
+          sx={{
+            // '& .MuiDataGrid-withBorderColor': {
+            border: 'none',
+            // },
+          }}
         />
       </Box>
-    </>
+    </div>
   );
 };
 
@@ -1062,7 +1167,8 @@ const WeaveViewSmallRef: FC<{
     return <div>loading</div>;
   } else if (opDefRef != null) {
     if (opDefRef.scheme === 'weave' && opDefRef.weaveKind === 'table') {
-      return <WeaveCHTable refUri={opDefQuery.result} path={path} />;
+      return <></>;
+      // return <WeaveCHTable refUri={opDefQuery.result} path={path} />;
     }
     return <SmallRef objRef={opDefRef} />;
   } else {

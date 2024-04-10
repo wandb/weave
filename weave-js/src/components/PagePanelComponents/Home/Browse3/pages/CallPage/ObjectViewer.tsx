@@ -9,6 +9,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -101,7 +102,6 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       dirty = false;
       resolved = mapObject(resolved, mapper);
     }
-    console.log(resolved);
     setResolvedData(resolved);
   }, [data, refs, refsData.result]);
 
@@ -137,6 +137,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
             });
           }
         }
+      }
+      if (context.valueType === 'array') {
+        return 'skip';
       }
       return true;
     });
@@ -191,11 +194,13 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
 
   const updateRowExpand = useCallback(() => {
     expandedIds.forEach(id => {
-      const children = apiRef.current.getRowGroupChildren({groupId: id});
-      if (children.length === 0) {
-        return;
+      if (apiRef.current.getRow(id)) {
+        const children = apiRef.current.getRowGroupChildren({groupId: id});
+        if (children.length === 0) {
+          return;
+        }
+        apiRef.current.setRowChildrenExpansion(id, true);
       }
-      apiRef.current.setRowChildrenExpansion(id, true);
     });
   }, [apiRef, expandedIds]);
 
@@ -217,8 +222,11 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           if (
-            params.model.valueType === 'string' &&
-            !isRef(params.model.value)
+            (params.model.valueType === 'string' &&
+              isRef(params.model.value) &&
+              (parseRefMaybe(params.model.value) as any).weaveKind ===
+                'table') ||
+            params.model.valueType === 'array'
           ) {
             return 'auto';
           }
@@ -229,8 +237,18 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         disableColumnMenu={true}
         groupingColDef={groupingColDef}
         sx={{
+          borderRadius: '0px',
           '& .MuiDataGrid-row:hover': {
             backgroundColor: 'inherit',
+          },
+          '& > div > div > div > div > .MuiDataGrid-row > .MuiDataGrid-cell': {
+            paddingRight: '0px',
+            // Consider removing this - might screw up other things
+            paddingLeft: '0px',
+            // only the first cell
+            '&:first-child': {
+              paddingRight: '8px',
+            },
           },
         }}
       />
