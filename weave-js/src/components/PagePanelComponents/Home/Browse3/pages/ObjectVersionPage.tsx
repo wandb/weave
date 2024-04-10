@@ -216,7 +216,11 @@ const ObjectVersionPageInner: React.FC<{
                 sx={{
                   flex: '0 0 auto',
                 }}>
-                <ObjectViewerSection title="" data={viewerData} />
+                {data.loading ? (
+                  <CenteredAnimatedLoader />
+                ) : (
+                  <ObjectViewerSection title="" data={viewerData} />
+                )}
               </Box>
             </ScrollableTabContent>
             // </WeaveEditorSourceContext.Provider>

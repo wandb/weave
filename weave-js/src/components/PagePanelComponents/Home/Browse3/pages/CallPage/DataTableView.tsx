@@ -46,6 +46,7 @@ interface WeaveEditorPathElTypedDict {
 type WeaveEditorPathEl = WeaveEditorPathElObject | WeaveEditorPathElTypedDict;
 
 const MAX_ROWS = 1000;
+export const USE_TABLE_FOR_ARRAYS = false;
 
 export const WeaveCHTable: FC<{
   tableRefUri: string;
@@ -192,20 +193,25 @@ export const DataTableView: FC<{
     }
     return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
   }, [props.onLinkClick, dataAsListOfDict, objectType, isPeeking]);
-  const isSingleColumn = columnSpec.length === 1 && columnSpec[0].field === '';
+  const isSingleColumn =
+    USE_TABLE_FOR_ARRAYS &&
+    columnSpec.length === 1 &&
+    columnSpec[0].field === '';
   if (isSingleColumn) {
     columnSpec[0].flex = 1;
   }
   const hideHeader = isSingleColumn;
   const displayRows = 10;
-  const hideFooter = gridRows.length <= displayRows;
+  const hideFooter = USE_TABLE_FOR_ARRAYS && gridRows.length <= displayRows;
   const headerHeight = 40;
   const footerHeight = 52;
   const rowHeight = 36;
+  const contentHeight = rowHeight * Math.min(displayRows, gridRows.length);
+  const loadingHeight = 100;
   const height =
     (hideHeader ? 0 : headerHeight) +
     (hideFooter ? 0 : footerHeight) +
-    rowHeight * Math.min(displayRows, gridRows.length);
+    (props.loading ? loadingHeight : contentHeight);
   return (
     <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
       {props.isTruncated && (

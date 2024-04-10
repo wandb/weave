@@ -3,7 +3,11 @@ import React, {useMemo} from 'react';
 import {parseRef} from '../../../../../../react';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {isRef} from '../common/util';
-import {DataTableView, WeaveCHTable} from './DataTableView';
+import {
+  DataTableView,
+  USE_TABLE_FOR_ARRAYS,
+  WeaveCHTable,
+} from './DataTableView';
 import {ValueViewNumber} from './ValueViewNumber';
 import {
   isProbablyTimestamp,
@@ -26,7 +30,7 @@ export const ValueView = ({data, isExpanded, baseRef}: ValueViewProps) => {
     if (data.valueType === 'object' && '_ref' in data.value) {
       return <SmallRef objRef={parseRef(data.value._ref)} />;
     }
-    if (data.valueType === 'array') {
+    if (USE_TABLE_FOR_ARRAYS && data.valueType === 'array') {
       return <DataTableView data={data.value} />;
     }
     return null;
