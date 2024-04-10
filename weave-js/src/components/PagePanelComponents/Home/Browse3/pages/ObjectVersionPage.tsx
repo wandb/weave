@@ -212,10 +212,11 @@ const ObjectVersionPageInner: React.FC<{
             //     filePath: objectFilePath,
             //     refExtra: refExtra?.split('/'),
             //   }}>
-            <ScrollableTabContent>
+            <ScrollableTabContent sx={{pb: 0}}>
               <Box
                 sx={{
                   flex: '0 0 auto',
+                  height: '100%',
                 }}>
                 {data.loading ? (
                   <CenteredAnimatedLoader />

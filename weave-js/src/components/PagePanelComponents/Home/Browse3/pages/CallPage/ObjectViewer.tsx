@@ -195,19 +195,19 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
             }
           }
 
-          const inner = <ValueView data={row} isExpanded={isExpanded} />;
+          const colInner = <ValueView data={row} isExpanded={isExpanded} />;
           if (baseRef) {
             return (
               <WeaveCHTableSourceRefContext.Provider value={baseRef}>
-                {inner}
+                {colInner}
               </WeaveCHTableSourceRefContext.Provider>
             );
           }
-          return inner;
+          return colInner;
         },
       },
     ];
-  }, [expandedRefs, isExpanded]);
+  }, [currentRefContext, expandedRefs, isExpanded]);
 
   const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
 

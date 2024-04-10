@@ -43,6 +43,7 @@ export const WeaveCHTableSourceRefContext = React.createContext<
 
 export const WeaveCHTable: FC<{
   tableRefUri: string;
+  fullHeight?: boolean;
 }> = props => {
   const sourceRef = useContext(WeaveCHTableSourceRefContext);
   const fetchQuery = useValueOfRefUri(props.tableRefUri, {
@@ -95,12 +96,14 @@ export const WeaveCHTable: FC<{
       isTruncated={isTruncated}
       displayKey="val"
       onLinkClick={onClickEnabled ? onClick : undefined}
+      fullHeight={props.fullHeight}
     />
   );
 };
 
 export const DataTableView: FC<{
   data: Array<{[key: string]: any}>;
+  fullHeight?: boolean;
   loading?: boolean;
   displayKey?: string;
   isTruncated?: boolean;
@@ -199,7 +202,13 @@ export const DataTableView: FC<{
     (hideFooter ? 0 : footerHeight) +
     (props.loading ? loadingHeight : contentHeight);
   return (
-    <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: props.fullHeight ? '100%' : 'inherit',
+      }}>
       {props.isTruncated && (
         <Alert severity="warning">
           Showing {dataAsListOfDict.length.toLocaleString()} rows only.
@@ -207,7 +216,9 @@ export const DataTableView: FC<{
       )}
       <Box
         sx={{
-          height,
+          height: props.fullHeight
+            ? `calc(100% - ${props.isTruncated ? '48px' : '0px'})`
+            : height,
           width: '100%',
         }}>
         <StyledDataGrid

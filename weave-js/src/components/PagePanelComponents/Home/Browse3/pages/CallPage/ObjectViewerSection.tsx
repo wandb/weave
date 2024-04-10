@@ -1,3 +1,4 @@
+import {Box} from '@material-ui/core';
 import {useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
@@ -8,11 +9,11 @@ import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {isRef} from '../common/util';
+import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
-import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
 
 type Data = Record<string, any>;
 
@@ -220,7 +221,15 @@ export const ObjectViewerSection = ({
   ) {
     const parsed = parseRef(data.rows);
     if (isWeaveObjectRef(parsed) && parsed.weaveKind === 'table') {
-      const inner = <WeaveCHTable tableRefUri={data.rows} />;
+      const inner = (
+        <Box
+          sx={{
+            height: '100%',
+            overflow: 'hidden',
+          }}>
+          <WeaveCHTable tableRefUri={data.rows} fullHeight />
+        </Box>
+      );
       if (currentRef != null) {
         return (
           <WeaveCHTableSourceRefContext.Provider
