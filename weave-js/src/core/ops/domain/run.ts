@@ -328,7 +328,7 @@ export const opRunHistoryKeyInfo = makeRunOp({
     'run'
   )}`,
   returnType: inputTypes => TypeHelpers.typedDict({}),
-  resolver: ({run}) => run.historyKeys ?? {keys: {}, sets: []},
+  resolver: ({run}) => run.historyKeys ?? {keys: {}},
 });
 
 const opRunHistoryTypeResolver = async (run: any, engine: () => Engine) => {

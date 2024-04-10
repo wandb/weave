@@ -156,7 +156,7 @@ class ExternalVariableFinder(ast.NodeVisitor):
 
     def visit_ExceptHandler(self, node: ExceptHandler) -> None:
         if node.name is None:
-            raise NotImplementedError("ExceptHandler with no name")
+            return
         self.scope_stack[-1].add(node.name)
         self.generic_visit(node)
 
