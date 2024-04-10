@@ -138,13 +138,18 @@ export const DataTableView: FC<{
 
   // Autosize when rows change
   useEffect(() => {
+    let mounted = true;
     const timeoutId = setTimeout(() => {
+      if (!mounted) {
+        return;
+      }
       apiRef.current.autosizeColumns({
         includeHeaders: true,
         includeOutliers: true,
       });
     }, 0);
     return () => {
+      mounted = false;
       clearInterval(timeoutId);
     };
   }, [gridRows, apiRef]);

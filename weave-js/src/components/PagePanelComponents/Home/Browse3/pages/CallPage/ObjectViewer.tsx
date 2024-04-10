@@ -317,7 +317,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
             // Consider removing this - might screw up other things
             paddingLeft: '0px',
             // only the first cell
-            '&:first-child': {
+            '&:first-of-type': {
               paddingRight: '8px',
             },
           },
