@@ -13,7 +13,6 @@ import React, {
   useState,
 } from 'react';
 
-import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
@@ -199,11 +198,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
   }, [resolvedData]);
 
-  // Here we deep memo the rows. This is important to reduce the number of re-renders
-  // when the data changes.
-  const deepRows = useDeepMemo(rows);
-
-  // Next, we setup wht columns. In our case, there is just one column: Value.
+  // Next, we setup the columns. In our case, there is just one column: Value.
   // In most cases, we just render the generic `ValueView` component. However,
   // in the case that we have an expanded ref, then we want to set the base
   // ref context such that nested table links work correctly.
@@ -311,7 +306,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         apiRef={apiRef}
         treeData
         getTreeDataPath={row => row.path.toStringArray()}
-        rows={deepRows}
+        rows={rows}
         columns={columns}
         defaultGroupingExpansionDepth={isExpanded ? -1 : 0}
         columnHeaderHeight={38}
@@ -351,7 +346,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         }}
       />
     );
-  }, [apiRef, columns, deepRows, groupingColDef, isExpanded]);
+  }, [apiRef, columns, rows, groupingColDef, isExpanded]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
   return <div style={{overflow: 'hidden'}}>{inner}</div>;
