@@ -202,16 +202,6 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Values',
           content: (
-            // <WeaveEditorSourceContext.Provider
-            //   key={refUri}
-            //   value={{
-            //     entityName,
-            //     projectName,
-            //     objectName,
-            //     objectVersionHash,
-            //     filePath: objectFilePath,
-            //     refExtra: refExtra?.split('/'),
-            //   }}>
             <ScrollableTabContent sx={{pb: 0}}>
               <Box
                 sx={{
@@ -227,7 +217,6 @@ const ObjectVersionPageInner: React.FC<{
                 )}
               </Box>
             </ScrollableTabContent>
-            // </WeaveEditorSourceContext.Provider>
           ),
         },
         {

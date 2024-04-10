@@ -299,9 +299,8 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           },
           '& > div > div > div > div > .MuiDataGrid-row > .MuiDataGrid-cell': {
             paddingRight: '0px',
-            // Consider removing this - might screw up other things
             paddingLeft: '0px',
-            // only the first cell
+            // only the first column
             '&:first-of-type': {
               paddingRight: '8px',
             },

@@ -131,7 +131,6 @@ export const DataTableView: FC<{
       (dataAsListOfDict ?? []).map((row, i) => ({
         id: i,
         ...row,
-        // ...flattenObject(row),
       })),
     [dataAsListOfDict]
   );
@@ -159,8 +158,7 @@ export const DataTableView: FC<{
       return list(typedDict({}));
     }
     if (!Array.isArray(dataAsListOfDict)) {
-      // Is this right here?
-      return list(typedDict({}));
+      throw new Error('Expected array, got ' + typeof dataAsListOfDict);
     }
     if (dataAsListOfDict.length === 0) {
       return list(typedDict({}));
@@ -209,8 +207,6 @@ export const DataTableView: FC<{
       });
     });
     return typedDict(propertyTypes);
-
-    // const ot = listObjectType(toWeaveType(dataAsListOfDict));
   }, [dataAsListOfDict]);
 
   const columnSpec: GridColDef[] = useMemo(() => {
@@ -356,13 +352,6 @@ export const typeToDataGridColumnSpec = (
             headerName: innerKey,
             renderCell: params => {
               const data = params.row[innerKey];
-              // if (Array.isArray(data)) {
-              //   if (data == null) {
-              //     return '-';
-              //   }
-              //   const listLen = data.length;
-              //   return `[${listLen} item list]`;
-              // }
               return <CellValue value={data ?? ''} />;
             },
           },
