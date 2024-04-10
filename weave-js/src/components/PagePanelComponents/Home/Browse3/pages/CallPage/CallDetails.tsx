@@ -1,5 +1,6 @@
 import {Box} from '@material-ui/core';
 import {Typography} from '@mui/material';
+import _ from 'lodash';
 import React, {FC, useContext, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
@@ -88,6 +89,7 @@ export const CallDetails: FC<{
           flexDirection: 'column',
           height: '100%',
           gap: 1,
+          paddingTop: '8px',
         }}>
         <Box
           sx={{
@@ -216,43 +218,18 @@ export const CallDetails: FC<{
   );
 };
 
-export const removeHiddenProperties = (data: any) => {
-  if (data == null) {
-    return data;
-  }
-  if (typeof data !== 'object') {
-    return data;
-  }
-  if (Array.isArray(data)) {
-    return data;
-  }
-  return Object.fromEntries(
-    Object.entries(data ?? {}).filter(([k, v]) => !k.startsWith('_'))
-  );
-};
-
-const processOutput = (output: any) => {
-  if (
-    typeof output === 'object' &&
-    output !== null &&
-    !Array.isArray(output) &&
-    output._result
-  ) {
-    return {
-      _result: removeHiddenProperties(output._result),
-    };
-  }
-  return removeHiddenProperties(output);
-};
-
-const processInputs = (inputs: any) => {
-  return removeHiddenProperties(inputs);
-};
-
 const getDisplayInputsAndOutput = (call: CallSchema) => {
   const span = call.rawSpan;
-  const inputs = processInputs(span.inputs);
-  const output = processOutput(span.output);
+  const inputKeys =
+    span.inputs._keys ??
+    Object.keys(span.inputs).filter(k => !k.startsWith('_'));
+  const inputs = _.fromPairs(inputKeys.map(k => [k, span.inputs[k]]));
+
+  const callOutput = span.output ?? {};
+  const outputKeys =
+    callOutput._keys ??
+    Object.keys(callOutput).filter(k => k === '_result' || !k.startsWith('_'));
+  const output = _.fromPairs(outputKeys.map(k => [k, callOutput[k]]));
   return {inputs, output};
 };
 
