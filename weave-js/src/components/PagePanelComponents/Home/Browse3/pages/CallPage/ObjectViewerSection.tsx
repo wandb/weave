@@ -214,6 +214,9 @@ export const ObjectViewerSection = ({
     );
   }
 
+  // Here we have a very special case for when the section is viewing a dataset.
+  // Instead of rending the generic renderer, we directly render a full-screen
+  // data table.
   if (
     data._type === 'Dataset' &&
     data._class_name === 'Dataset' &&

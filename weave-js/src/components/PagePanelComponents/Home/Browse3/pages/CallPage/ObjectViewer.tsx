@@ -66,19 +66,39 @@ const refIsExpandable = (ref: string): boolean => {
   return false;
 };
 
+// This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
+
+  // `resolvedData` holds ref-resolved data.
   const [resolvedData, setResolvedData] = useState<Data>(data);
+
+  // `dataRefs` are the refs contained in the data, filtered to only include expandable refs.
   const dataRefs = useMemo(() => getRefs(data).filter(refIsExpandable), [data]);
+
+  // Expanded refs are the explicit set of refs that have been expanded by the user. Note that
+  // this might contain nested refs not in the `dataRefs` set. The keys are refs and the values
+  // are the paths at which the refs were expanded.
   const [expandedRefs, setExpandedRefs] = useState<{[ref: string]: string}>({});
+
+  // `addExpandedRef` is a function that can be used to add an expanded ref to the `expandedRefs` state.
   const addExpandedRef = useCallback((path: string, ref: string) => {
     setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
   }, []);
+
+  // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
   const refs = useMemo(() => {
     return Array.from(new Set([...dataRefs, ...Object.values(expandedRefs)]));
   }, [dataRefs, expandedRefs]);
+
+  // finally, we get the ref data for all refs. This function is highly memoized and
+  // cached. Therefore, we only ever make network calls for new refs in the list.
   const refsData = useRefsData(refs);
 
+  // This effect is responsible for resolving the refs in the data. It iteratively
+  // replaces refs with their resolved values. It also adds a `_ref` key to the resolved
+  // value to indicate the original ref URI. It is ultimately responsible for setting
+  // `resolvedData`.
   useEffect(() => {
     if (refsData.loading) {
       return;
@@ -123,6 +143,8 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     setResolvedData(resolved);
   }, [data, refs, refsData.loading, refsData.result]);
 
+  // `rows` are the data-grid friendly rows that we will render. This method traverses
+  // the data, hiding certain keys and adding loader rows for expandable refs.
   const rows = useMemo(() => {
     const contexts: Array<
       TraverseContext & {
@@ -147,7 +169,11 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           context.depth > 1 &&
           refIsExpandable(context.value)
         ) {
-          // These are possibly expandable refs.
+          // These are possibly expandable refs. When we encounter an expandable ref, we
+          // indicate that it is expandable and add a loader row. The effect is that the
+          // group header will show the expansion icon when `isExpandableRef` is true. Also,
+          // until the ref data is actually resolved, we will show a loader in place of the
+          // expanded data.
           contexts.push({
             ...context,
             isExpandableRef: true,
@@ -172,10 +198,16 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
 
     return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
   }, [resolvedData]);
+
+  // Here we deep memo the rows. This is important to reduce the number of re-renders
+  // when the data changes.
   const deepRows = useDeepMemo(rows);
 
+  // Next, we setup wht columns. In our case, there is just one column: Value.
+  // In most cases, we just render the generic `ValueView` component. However,
+  // in the case that we have an expanded ref, then we want to set the base
+  // ref context such that nested table links work correctly.
   const currentRefContext = useContext(WeaveCHTableSourceRefContext);
-
   const columns: GridColDef[] = useMemo(() => {
     return [
       {
@@ -215,8 +247,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     ];
   }, [currentRefContext, expandedRefs, isExpanded]);
 
+  // Here, we setup the `Path` column which acts as a grouping column. This
+  // column is responsible for showing the expand/collapse icons and handling
+  // the expansion. Importantly, when the column is clicked, we do some
+  // bookkeeping to add the expanded ref to the `expandedRefs` state. This
+  // triggers a set of state updates to populate the expanded data.
   const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
-
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
       headerName: 'Path',
@@ -244,6 +280,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     [addExpandedRef]
   );
 
+  // Next we define a function that updates the row expansion state. This
+  // function is responsible for setting the expansion state of rows that have
+  // been expanded by the user. It is bound to the `rowsSet` event so that it is
+  // called whenever the rows are updated. The MUI data grid will rerender and
+  // close all expanded rows when the rows are updated. This function is
+  // responsible for re-expanding the rows that were previously expanded.
   const updateRowExpand = useCallback(() => {
     expandedIds.forEach(id => {
       if (apiRef.current.getRow(id)) {
@@ -254,7 +296,6 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       }
     });
   }, [apiRef, expandedIds]);
-
   useEffect(() => {
     updateRowExpand();
     return apiRef.current.subscribeEvent('rowsSet', () => {
@@ -262,6 +303,8 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     });
   }, [apiRef, expandedIds, updateRowExpand]);
 
+  // Finally, we memoize the inner data grid component. This is important to
+  // reduce the number of re-renders when the data changes.
   const inner = useMemo(() => {
     return (
       <StyledDataGrid
@@ -309,9 +352,13 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       />
     );
   }, [apiRef, columns, deepRows, groupingColDef, isExpanded]);
+
+  // Return the inner data grid wrapped in a div with overflow hidden.
   return <div style={{overflow: 'hidden'}}>{inner}</div>;
 };
 
+// Helper function to build the base ref for a given path. This function is used
+// to construct the base ref for nested table links.
 const buildBaseRef = (
   baseRef: string,
   path: ObjectPath,
