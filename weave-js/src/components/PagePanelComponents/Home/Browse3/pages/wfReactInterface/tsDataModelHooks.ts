@@ -579,10 +579,12 @@ const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
 ): Loadable<any[]> => {
+  const refUrisDeep = useDeepMemo(refUris);
+
   const [nonTableRefUris, tableRefUris] = useMemo(() => {
     const sUris: string[] = [];
     const tUris: string[] = [];
-    refUris
+    refUrisDeep
       .map(uri => ({uri, ref: refUriToObjectVersionKey(uri)}))
       .forEach(({uri, ref}, ndx) => {
         if (ref.scheme === 'weave' && ref.weaveKind === 'table') {
@@ -592,7 +594,7 @@ const useRefsData = (
         }
       });
     return [sUris, tUris];
-  }, [refUris]);
+  }, [refUrisDeep]);
 
   const [neededSimpleUris, cachedSimpleUriResults] = useMemo(() => {
     const needed: string[] = [];
