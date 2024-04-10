@@ -16,7 +16,6 @@ import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
-import {ExceptionDetails, getExceptionInfo} from './Exceptions';
 
 export const CallPage: FC<{
   entity: string;
@@ -41,7 +40,6 @@ export const CallPage: FC<{
 
 const useCallTabs = (call: CallSchema) => {
   const codeURI = call.opVersionRef;
-  const excInfo = getExceptionInfo(call.rawSpan.exception);
   return [
     {
       label: 'Call',
@@ -59,14 +57,6 @@ const useCallTabs = (call: CallSchema) => {
       label: 'Summary',
       content: <CallSummary call={call} />,
     },
-    ...('traceback' in excInfo
-      ? [
-          {
-            label: 'Error details',
-            content: <ExceptionDetails exceptionInfo={excInfo} />,
-          },
-        ]
-      : []),
   ];
 };
 

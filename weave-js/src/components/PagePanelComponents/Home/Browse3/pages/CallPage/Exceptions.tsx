@@ -9,7 +9,6 @@ const AlertExceptionType = styled.span`
 AlertExceptionType.displayName = 'S.AlertExceptionType';
 
 const Traceback = styled.div`
-  padding: 8px;
   font-family: monospace;
   white-space: nowrap;
   overflow: auto;
