@@ -221,7 +221,7 @@ const ObjectVersionPageInner: React.FC<{
                   <CenteredAnimatedLoader />
                 ) : (
                   <WeaveCHTableSourceRefContext.Provider value={refUri}>
-                    <ObjectViewerSection title="" data={viewerData} />
+                    <ObjectViewerSection title="" data={viewerData} noHide />
                   </WeaveCHTableSourceRefContext.Provider>
                 )}
               </Box>
