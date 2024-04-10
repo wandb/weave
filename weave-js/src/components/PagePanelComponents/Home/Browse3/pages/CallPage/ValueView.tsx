@@ -5,6 +5,10 @@ import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {isRef} from '../common/util';
 import {DataTableView, WeaveCHTable} from './DataTableView';
 import {ValueViewNumber} from './ValueViewNumber';
+import {
+  isProbablyTimestamp,
+  ValueViewNumberTimestamp,
+} from './ValueViewNumberTimestamp';
 import {ValueViewPrimitive} from './ValueViewPrimitive';
 import {ValueViewString} from './ValueViewString';
 
@@ -56,6 +60,9 @@ export const ValueView = ({data, isExpanded, baseRef}: ValueViewProps) => {
   }
 
   if (data.valueType === 'number') {
+    if (isProbablyTimestamp(data.value)) {
+      return <ValueViewNumberTimestamp value={data.value} />;
+    }
     return <ValueViewNumber value={data.value} />;
   }
 
