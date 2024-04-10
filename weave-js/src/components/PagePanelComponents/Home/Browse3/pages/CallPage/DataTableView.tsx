@@ -33,43 +33,31 @@ import {TABLE_ID_EDGE_NAME} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
 
-interface WeaveEditorPathElObject {
-  type: 'getattr';
-  key: string;
-}
-
-interface WeaveEditorPathElTypedDict {
-  type: 'pick';
-  key: string;
-}
-
-type WeaveEditorPathEl = WeaveEditorPathElObject | WeaveEditorPathElTypedDict;
-
 const MAX_ROWS = 1000;
 export const USE_TABLE_FOR_ARRAYS = false;
 
+// Create a context that can be consumed by ObjectViewerSection
+export const WeaveCHTableSourceRefContext = React.createContext<
+  string | undefined
+>(undefined);
+
 export const WeaveCHTable: FC<{
   tableRefUri: string;
-  path: WeaveEditorPathEl[];
-  baseRef?: string;
 }> = props => {
+  const sourceRef = useContext(WeaveCHTableSourceRefContext);
   const fetchQuery = useValueOfRefUri(props.tableRefUri, {
     limit: MAX_ROWS + 1,
   });
   const [isTruncated, setIsTruncated] = useState(false);
   const [sourceRows, setSourceRows] = useState<any[] | undefined>();
   const history = useHistory();
-  const onClickEnabled = props.baseRef != null;
+  const onClickEnabled = sourceRef != null;
   const router = useWeaveflowCurrentRouteContext();
   const onClick = useCallback(
     val => {
-      const ref = parseRef(props.baseRef!);
+      const ref = parseRef(sourceRef!);
       if (isWeaveObjectRef(ref)) {
         let extra = ref.artifactRefExtra ?? '';
-        if (extra !== '') {
-          extra += '/';
-        }
-        extra += 'atr/' + props.path.join('/atr/');
         if (extra !== '') {
           extra += '/';
         }
@@ -87,7 +75,7 @@ export const WeaveCHTable: FC<{
         history.push(target);
       }
     },
-    [history, props.baseRef, props.path, router]
+    [history, sourceRef, router]
   );
   useEffect(() => {
     if (sourceRows != null) {
@@ -184,15 +172,13 @@ export const DataTableView: FC<{
             style={{
               cursor: 'pointer',
             }}
-            onClick={() =>
-              props.onLinkClick!(dataAsListOfDict[params.id as number])
-            }
+            onClick={() => props.onLinkClick!(props.data[params.id as number])}
           />
         ),
       });
     }
     return [...res, ...typeToDataGridColumnSpec(objectType, isPeeking, true)];
-  }, [props.onLinkClick, dataAsListOfDict, objectType, isPeeking]);
+  }, [props.onLinkClick, props.data, objectType, isPeeking]);
   const isSingleColumn =
     USE_TABLE_FOR_ARRAYS &&
     columnSpec.length === 1 &&

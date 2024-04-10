@@ -2,6 +2,7 @@ import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
+import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
 import {
@@ -219,7 +220,9 @@ const ObjectVersionPageInner: React.FC<{
                 {data.loading ? (
                   <CenteredAnimatedLoader />
                 ) : (
-                  <ObjectViewerSection title="" data={viewerData} />
+                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                    <ObjectViewerSection title="" data={viewerData} />
+                  </WeaveCHTableSourceRefContext.Provider>
                 )}
               </Box>
             </ScrollableTabContent>

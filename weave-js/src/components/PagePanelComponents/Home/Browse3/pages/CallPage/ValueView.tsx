@@ -21,10 +21,9 @@ type ValueData = Record<string, any>;
 type ValueViewProps = {
   data: ValueData;
   isExpanded: boolean;
-  baseRef?: string;
 };
 
-export const ValueView = ({data, isExpanded, baseRef}: ValueViewProps) => {
+export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   const opDefRef = useMemo(() => parseRefMaybe(data.value ?? ''), [data.value]);
   if (!data.isLeaf) {
     if (data.valueType === 'object' && '_ref' in data.value) {
@@ -48,13 +47,7 @@ export const ValueView = ({data, isExpanded, baseRef}: ValueViewProps) => {
       opDefRef.scheme === 'weave' &&
       opDefRef.weaveKind === 'table'
     ) {
-      return (
-        <WeaveCHTable
-          tableRefUri={data.value}
-          path={data.path.path}
-          baseRef={baseRef}
-        />
-      );
+      return <WeaveCHTable tableRefUri={data.value} />;
     }
     return <SmallRef objRef={parseRef(data.value)} />;
   }

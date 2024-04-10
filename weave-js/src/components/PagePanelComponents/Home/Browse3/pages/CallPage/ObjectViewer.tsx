@@ -13,9 +13,12 @@ import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
-import {USE_TABLE_FOR_ARRAYS} from './DataTableView';
+import {
+  USE_TABLE_FOR_ARRAYS,
+  WeaveCHTableSourceRefContext,
+} from './DataTableView';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
-import {mapObject, traverse, TraverseContext} from './traverse';
+import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
 type Data = Record<string, any>;
@@ -56,12 +59,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
   const [resolvedData, setResolvedData] = useState<Data>(data);
   const dataRefs = useMemo(() => getRefs(data).filter(refIsExpandable), [data]);
-  const [expandedRefs, setExpandedRefs] = useState<string[]>([]);
-  const addExpandedRef = useCallback((ref: string) => {
-    setExpandedRefs(eRefs => [...eRefs, ref]);
+  const [expandedRefs, setExpandedRefs] = useState<{[ref: string]: string}>({});
+  const addExpandedRef = useCallback((path: string, ref: string) => {
+    setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
   }, []);
   const refs = useMemo(() => {
-    return Array.from(new Set([...dataRefs, ...expandedRefs]));
+    return Array.from(new Set([...dataRefs, ...Object.values(expandedRefs)]));
   }, [dataRefs, expandedRefs]);
   const refsData = useRefsData(refs);
 
@@ -124,7 +127,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         }
         if (
           isRef(context.value) &&
-          !expandedRefs.includes(context.value) &&
+          expandedRefs[context.path.toString()] == null &&
           context.depth > 1 &&
           refIsExpandable(context.value)
         ) {
@@ -164,14 +167,29 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         flex: 1,
         sortable: false,
         renderCell: ({row}) => {
-          // if (row.isExpandableRef) {
-          //   return <Button>Expand</Button>;
-          // }
-          return <ValueView data={row} isExpanded={isExpanded} />;
+          let baseRef: string | undefined;
+          const path: ObjectPath = row.path;
+          for (let i = path.length() - 1; i >= 0; i--) {
+            const ancestorPath = path.ancestor(-i);
+            const ancestorExpandedRef = expandedRefs[ancestorPath.toString()];
+            if (ancestorExpandedRef) {
+              baseRef = ancestorExpandedRef;
+              break;
+            }
+          }
+          const inner = <ValueView data={row} isExpanded={isExpanded} />;
+          if (baseRef) {
+            return (
+              <WeaveCHTableSourceRefContext.Provider value={baseRef}>
+                {inner}
+              </WeaveCHTableSourceRefContext.Provider>
+            );
+          }
+          return inner;
         },
       },
     ];
-  }, [isExpanded]);
+  }, [expandedRefs, isExpanded]);
 
   const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
 
@@ -192,7 +210,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
                 return [...eIds, params.row.id];
               });
               if (isRef(refToExpand)) {
-                addExpandedRef(refToExpand);
+                addExpandedRef(params.row.id, refToExpand);
               }
             }}
           />
