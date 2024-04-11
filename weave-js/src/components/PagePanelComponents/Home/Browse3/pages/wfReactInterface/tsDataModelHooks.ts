@@ -12,7 +12,12 @@ import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 // import {refStringToRefDict} from '../wfInterface/naive';
-import {callCache, objectVersionCache, opVersionCache, refDataCache} from './cache';
+import {
+  callCache,
+  objectVersionCache,
+  opVersionCache,
+  refDataCache,
+} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -329,7 +334,9 @@ const useOpVersion = (
   }, [cachedOpVersion, key, opVersionRes]);
 };
 
-const convertTraceServerObjectVersionToOpSchema = (obj: traceServerClient.TraceObjSchema): OpVersionSchema => {
+const convertTraceServerObjectVersionToOpSchema = (
+  obj: traceServerClient.TraceObjSchema
+): OpVersionSchema => {
   const [entity, project] = obj.project_id.split('/');
   return {
     entity,
@@ -339,7 +346,7 @@ const convertTraceServerObjectVersionToOpSchema = (obj: traceServerClient.TraceO
     createdAtMs: convertISOToDate(obj.created_at).getTime(),
     versionIndex: obj.version_index,
   };
-}
+};
 
 const useOpVersions = makeTraceServerEndpointHook<
   'objsQuery',
