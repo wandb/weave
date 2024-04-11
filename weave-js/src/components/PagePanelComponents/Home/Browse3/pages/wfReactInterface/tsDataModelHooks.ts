@@ -357,23 +357,32 @@ const useObjectVersion = (
   // Null value skips
   key: ObjectVersionKey | null
 ): Loadable<ObjectVersionSchema | null> => {
-  const cached = useMemo(() => {
-    if (key == null) {
-      return null;
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const cachedObjectVersion = key ? objectVersionCache.get(key) : null;
+  const [objectVersionRes, setObjectVersionRes] =
+    useState<traceServerClient.TraceObjReadRes | null>(null);
+  const deepKey = useDeepMemo(key);
+  useEffect(() => {
+    if (deepKey) {
+      setObjectVersionRes(null);
+      loadingRef.current = true;
+      getTsClient()
+        .objRead({
+          project_id: projectIdFromParts({
+            entity: deepKey?.entity ?? '',
+            project: deepKey?.project ?? '',
+          }),
+          object_id: deepKey?.objectId ?? '',
+          digest: deepKey?.versionHash ?? '',
+        })
+        .then(res => {
+          loadingRef.current = false;
+          setObjectVersionRes(res);
+        });
     }
-    return objectVersionCache.get(key);
-  }, [key]);
-  const result = useRootObjectVersions(
-    key?.entity ?? '',
-    key?.project ?? '',
-    {
-      objectIds: [key?.objectId ?? ''],
-    },
-    undefined,
-    {
-      skip: key == null || cached != null,
-    }
-  );
+  }, [deepKey, getTsClient]);
+
   return useMemo(() => {
     if (key == null) {
       return {
@@ -381,37 +390,48 @@ const useObjectVersion = (
         result: null,
       };
     }
-    if (cached != null) {
+    if (cachedObjectVersion != null) {
       return {
         loading: false,
-        result: cached,
+        result: cachedObjectVersion,
       };
     }
-    if (result.loading || result.result == null) {
+    if (objectVersionRes == null || loadingRef.current) {
       return {
         loading: true,
         result: null,
       };
     }
-    const found = result.result.find(
-      obj => obj.versionHash === key?.versionHash
-    );
-    if (!found) {
-      return {
-        loading: false,
-        result: null,
-      };
-    }
-    const cachableResult = {
+
+    const cachableResult: ObjectVersionSchema = {
       ...key,
-      ...found,
-    } as ObjectVersionSchema;
+      ...convertTraceServerObjectVersionToSchema(objectVersionRes.obj),
+    };
     objectVersionCache.set(key, cachableResult);
     return {
-      loading: result.loading,
+      loading: false,
       result: cachableResult,
     };
-  }, [cached, key, result.loading, result.result]);
+  }, [cachedObjectVersion, key, objectVersionRes]);
+};
+
+const convertTraceServerObjectVersionToSchema = (
+  obj: traceServerClient.TraceObjSchema
+): ObjectVersionSchema => {
+  const [entity, project] = obj.project_id.split('/');
+  return {
+    scheme: 'weave' as const,
+    entity,
+    project,
+    weaveKind: 'object' as const,
+    objectId: obj.object_id,
+    versionHash: obj.digest,
+    path: 'obj',
+    createdAtMs: convertISOToDate(obj.created_at).getTime(),
+    baseObjectClass: obj.base_object_class ?? null,
+    versionIndex: obj.version_index,
+    val: obj.val,
+  };
 };
 
 const useRootObjectVersions = makeTraceServerEndpointHook(
@@ -442,23 +462,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
     limit,
     opts
   ): ObjectVersionSchema[] =>
-    res.objs.map(obj => {
-      const [entity, project] = obj.project_id.split('/');
-      return {
-        scheme: 'weave' as const,
-        entity,
-        project,
-        weaveKind: 'object' as const,
-        objectId: obj.object_id,
-        versionHash: obj.digest,
-        name: obj.object_id,
-        path: 'obj',
-        createdAtMs: convertISOToDate(obj.created_at).getTime(),
-        baseObjectClass: obj.base_object_class ?? null,
-        versionIndex: obj.version_index,
-        val: obj.val,
-      };
-    })
+    res.objs.map(convertTraceServerObjectVersionToSchema)
 );
 
 const useRefsReadBatch = makeTraceServerEndpointHook<
