@@ -54,16 +54,16 @@ def auto_summarize(data: WeaveList) -> Optional[dict]:
         }
     elif data.is_boolean():
         valid_data = [x for x in data if x is not None]
-        # count_true = list(valid_data).count(True)
+        count_true = list(valid_data).count(True)
         int_data = [int(x) for x in valid_data]
         sample_mean = np.mean(int_data) if int_data else 0
         # standard error
         # sample_variance = np.var(int_data) if int_data else 0
         # sample_error = np.sqrt(sample_variance / len(int_data)) if int_data else 0
         return {
-            # "true_count": count_true,
-            "mean": sample_mean,
-            "stderr": stderr(int_data),
+            "true_count": count_true,
+            "true_fraction": sample_mean,
+            # "stderr": stderr(int_data),
             # "none_fraction": (len(data) - len(valid_data)) / len(data),
         }
     elif data.is_dict():

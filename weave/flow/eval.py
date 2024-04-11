@@ -219,7 +219,7 @@ class Evaluation(Object):
             summary[scorer_name] = summarize_fn(scorer_scores)  # type: ignore
         summary["model_latency"] = {
             "mean": float(np.mean(eval_table.column("model_latency"))),
-            "stderr": stderr(list(eval_table.column("model_latency"))),
+            # "stderr": stderr(list(eval_table.column("model_latency"))),
         }
         return summary
 
