@@ -151,7 +151,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         isLoader?: boolean;
       }
     > = [];
-    const expandablePaths = new Set<string>();
+    const expandablePathsInner = new Set<string>();
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
@@ -174,7 +174,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           // group header will show the expansion icon when `isExpandableRef` is true. Also,
           // until the ref data is actually resolved, we will show a loader in place of the
           // expanded data.
-          expandablePaths.add(context.path.toString());
+          expandablePathsInner.add(context.path.toString());
           contexts.push({
             ...context,
             isExpandableRef: true,
@@ -196,8 +196,8 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       }
       return true;
     });
-    const rows = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
-    return {rows, expandablePaths};
+    const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
+    return {rows: rowsInner, expandablePaths: expandablePathsInner};
   }, [resolvedData]);
 
   // Next, we setup the columns. In our case, there is just one column: Value.
@@ -361,7 +361,15 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         }}
       />
     );
-  }, [apiRef, columns, rows, groupingColDef, isExpanded]);
+  }, [
+    apiRef,
+    rows,
+    columns,
+    groupingColDef,
+    isExpanded,
+    expandedIds,
+    expandablePaths,
+  ]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
   return <div style={{overflow: 'hidden'}}>{inner}</div>;
