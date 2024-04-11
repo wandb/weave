@@ -25,6 +25,15 @@ type LinkProps = {
   $variant?: LinkVariant;
 };
 
+export const A = styled.a<LinkProps>`
+  font-weight: 600;
+  color: ${p => (p.$variant === 'secondary' ? MOON_700 : TEAL_600)};
+  &:hover {
+    color: ${TEAL_500};
+  }
+`;
+A.displayName = 'S.A';
+
 export const Link = styled(LinkComp)<LinkProps>`
   font-weight: 600;
   color: ${p => (p.$variant === 'secondary' ? MOON_700 : TEAL_600)};
