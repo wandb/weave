@@ -17,14 +17,13 @@ export const ObjectViewerGroupingCell: FC<
 > = props => {
   const {id, field, rowNode, row} = props;
   const isGroup = rowNode.type === 'group';
+  const isExpandableRef = row.isExpandableRef;
   const apiRef = useGridApiContext();
   const onClick: ButtonProps['onClick'] = event => {
-    if (!isGroup) {
-      return;
+    if (isGroup) {
+      apiRef.current.setRowChildrenExpansion(id, !rowNode.childrenExpanded);
+      apiRef.current.setCellFocus(id, field);
     }
-
-    apiRef.current.setRowChildrenExpansion(id, !rowNode.childrenExpanded);
-    apiRef.current.setCellFocus(id, field);
 
     if (props.onClick) {
       props.onClick(event);
@@ -36,7 +35,7 @@ export const ObjectViewerGroupingCell: FC<
   const tooltipContent = row.path.toString();
   const box = (
     <CursorBox
-      $isClickable={isGroup}
+      $isClickable={isGroup || isExpandableRef}
       onClick={onClick}
       sx={{
         height: '100%',
@@ -72,10 +71,14 @@ export const ObjectViewerGroupingCell: FC<
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        {rowNode.type === 'group' ? (
+        {isGroup || isExpandableRef ? (
           <Button
             variant="quiet"
-            icon={rowNode.childrenExpanded ? 'chevron-down' : 'chevron-next'}
+            icon={
+              isGroup && rowNode.childrenExpanded
+                ? 'chevron-down'
+                : 'chevron-next'
+            }
           />
         ) : (
           <Box

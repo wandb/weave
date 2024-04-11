@@ -1,11 +1,16 @@
+import {Box} from '@material-ui/core';
 import {useGridApiRef} from '@mui/x-data-grid-pro';
-import React, {useCallback, useMemo, useState} from 'react';
+import _ from 'lodash';
+import React, {useCallback, useContext, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {Alert} from '../../../../../Alert';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {isRef} from '../common/util';
+import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
+import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
 import {ObjectViewer} from './ObjectViewer';
 import {getValueType, traverse} from './traverse';
 import {ValueView} from './ValueView';
@@ -15,6 +20,8 @@ type Data = Record<string, any>;
 type ObjectViewerSectionProps = {
   title: string;
   data: Data;
+  noHide?: boolean;
+  isExpanded?: boolean;
 };
 
 const TitleRow = styled.div`
@@ -67,10 +74,12 @@ const isSimpleData = (data: Data): boolean => {
 const ObjectViewerSectionNonEmpty = ({
   title,
   data,
+  noHide,
+  isExpanded,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
   const [mode, setMode] = useState(
-    isSimpleData(data) ? 'expanded' : 'collapsed'
+    isSimpleData(data) || isExpanded ? 'expanded' : 'collapsed'
   );
 
   const body = useMemo(() => {
@@ -96,12 +105,12 @@ const ObjectViewerSectionNonEmpty = ({
   }, [apiRef, mode, data]);
 
   const setTreeExpanded = useCallback(
-    (isExpanded: boolean) => {
+    (setIsExpanded: boolean) => {
       const rowIds = apiRef.current.getAllRowIds();
       rowIds.forEach(rowId => {
         const rowNode = apiRef.current.getRowNode(rowId);
         if (rowNode && rowNode.type === 'group') {
-          apiRef.current.setRowChildrenExpansion(rowId, isExpanded);
+          apiRef.current.setRowChildrenExpansion(rowId, setIsExpanded);
         }
       });
     },
@@ -147,13 +156,15 @@ const ObjectViewerSectionNonEmpty = ({
           onClick={() => setMode('json')}
           tooltip="View as JSON"
         />
-        <Button
-          variant="quiet"
-          icon="hide-hidden"
-          active={mode === 'hidden'}
-          onClick={() => setMode('hidden')}
-          tooltip="Hide"
-        />
+        {!noHide && (
+          <Button
+            variant="quiet"
+            icon="hide-hidden"
+            active={mode === 'hidden'}
+            onClick={() => setMode('hidden')}
+            tooltip="Hide"
+          />
+        )}
       </TitleRow>
       {body}
     </>
@@ -163,8 +174,12 @@ const ObjectViewerSectionNonEmpty = ({
 export const ObjectViewerSection = ({
   title,
   data,
+  noHide,
+  isExpanded,
 }: ObjectViewerSectionProps) => {
   const numKeys = Object.keys(data).length;
+  const currentRef = useContext(WeaveCHTableSourceRefContext);
+
   if (numKeys === 0) {
     return (
       <>
@@ -184,7 +199,12 @@ export const ObjectViewerSection = ({
       isRef(value)
     ) {
       return (
-        <ObjectViewerSectionNonEmpty title={title} data={{Value: value}} />
+        <ObjectViewerSectionNonEmpty
+          title={title}
+          data={{Value: value}}
+          noHide={noHide}
+          isExpanded={isExpanded}
+        />
       );
     }
     const oneResultData = {
@@ -201,5 +221,43 @@ export const ObjectViewerSection = ({
       </>
     );
   }
-  return <ObjectViewerSectionNonEmpty title={title} data={data} />;
+
+  // Here we have a very special case for when the section is viewing a dataset.
+  // Instead of rending the generic renderer, we directly render a full-screen
+  // data table.
+  if (
+    data._type === 'Dataset' &&
+    data._class_name === 'Dataset' &&
+    _.isEqual(data._bases, ['Object', 'BaseModel'])
+  ) {
+    const parsed = parseRef(data.rows);
+    if (isWeaveObjectRef(parsed) && parsed.weaveKind === 'table') {
+      const inner = (
+        <Box
+          sx={{
+            height: '100%',
+            overflow: 'hidden',
+          }}>
+          <WeaveCHTable tableRefUri={data.rows} fullHeight />
+        </Box>
+      );
+      if (currentRef != null) {
+        return (
+          <WeaveCHTableSourceRefContext.Provider
+            value={currentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/rows'}>
+            {inner}
+          </WeaveCHTableSourceRefContext.Provider>
+        );
+      }
+      return inner;
+    }
+  }
+  return (
+    <ObjectViewerSectionNonEmpty
+      title={title}
+      data={data}
+      noHide={noHide}
+      isExpanded={isExpanded}
+    />
+  );
 };

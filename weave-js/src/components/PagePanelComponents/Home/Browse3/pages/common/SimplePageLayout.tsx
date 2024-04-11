@@ -1,5 +1,5 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {Box, ListItemText, MenuList} from '@mui/material';
+import {Box, ListItemText, MenuList, SxProps, Theme} from '@mui/material';
 // import {Menu} from '@mui/base/Menu';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
@@ -8,7 +8,6 @@ import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
   createContext,
-  CSSProperties,
   FC,
   MouseEvent,
   ReactNode,
@@ -358,7 +357,7 @@ const ActionMenu: FC<{
 };
 
 export const ScrollableTabContent: FC<{
-  sx?: CSSProperties;
+  sx?: SxProps<Theme>;
 }> = props => {
   return (
     <Box

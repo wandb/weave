@@ -1,10 +1,9 @@
+import {Box} from '@material-ui/core';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
-import {
-  WeaveEditor,
-  WeaveEditorSourceContext,
-} from '../../Browse2/WeaveEditors';
+import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
+import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
 import {
   CallLink,
@@ -66,13 +65,11 @@ export const ObjectVersionPage: React.FC<{
 const ObjectVersionPageInner: React.FC<{
   objectVersion: ObjectVersionSchema;
 }> = ({objectVersion}) => {
-  const {useRootObjectVersions, useCalls} = useWFHooks();
-  const objectVersionHash = objectVersion.versionHash;
+  const {useRootObjectVersions, useCalls, useRefsData} = useWFHooks();
   const entityName = objectVersion.entity;
   const projectName = objectVersion.project;
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
-  const objectFilePath = objectVersion.path;
   const refExtra = objectVersion.refExtra;
   const objectVersions = useRootObjectVersions(entityName, projectName, {
     objectIds: [objectName],
@@ -95,6 +92,13 @@ const ObjectVersionPageInner: React.FC<{
   const consumingCalls = useCalls(entityName, projectName, {
     inputObjectVersionRefs: [refUri],
   });
+  const data = useRefsData([refUri]);
+  const viewerData = useMemo(() => {
+    if (data.loading) {
+      return {};
+    }
+    return data.result?.[0] ?? {};
+  }, [data.loading, data.result]);
 
   return (
     <SimplePageLayoutWithHeader
@@ -201,24 +205,26 @@ const ObjectVersionPageInner: React.FC<{
         {
           label: 'Values',
           content: (
-            <WeaveEditorSourceContext.Provider
-              key={refUri}
-              value={{
-                entityName,
-                projectName,
-                objectName,
-                objectVersionHash,
-                filePath: objectFilePath,
-                refExtra: refExtra?.split('/'),
-              }}>
-              <ScrollableTabContent>
-                <WeaveEditor
-                  objType={objectName}
-                  objectRefUri={refUri}
-                  disableEdits
-                />
-              </ScrollableTabContent>
-            </WeaveEditorSourceContext.Provider>
+            <ScrollableTabContent sx={{pb: 0}}>
+              <Box
+                sx={{
+                  flex: '0 0 auto',
+                  height: '100%',
+                }}>
+                {data.loading ? (
+                  <CenteredAnimatedLoader />
+                ) : (
+                  <WeaveCHTableSourceRefContext.Provider value={refUri}>
+                    <ObjectViewerSection
+                      title=""
+                      data={viewerData}
+                      noHide
+                      isExpanded
+                    />
+                  </WeaveCHTableSourceRefContext.Provider>
+                )}
+              </Box>
+            </ScrollableTabContent>
           ),
         },
         {
