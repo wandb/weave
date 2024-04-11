@@ -144,13 +144,14 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
 
   // `rows` are the data-grid friendly rows that we will render. This method traverses
   // the data, hiding certain keys and adding loader rows for expandable refs.
-  const rows = useMemo(() => {
+  const {rows, expandablePaths} = useMemo(() => {
     const contexts: Array<
       TraverseContext & {
         isExpandableRef?: boolean;
         isLoader?: boolean;
       }
     > = [];
+    const expandablePaths = new Set<string>();
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
@@ -173,6 +174,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           // group header will show the expansion icon when `isExpandableRef` is true. Also,
           // until the ref data is actually resolved, we will show a loader in place of the
           // expanded data.
+          expandablePaths.add(context.path.toString());
           contexts.push({
             ...context,
             isExpandableRef: true,
@@ -194,8 +196,8 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       }
       return true;
     });
-
-    return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
+    const rows = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
+    return {rows, expandablePaths};
   }, [resolvedData]);
 
   // Next, we setup the columns. In our case, there is just one column: Value.
@@ -308,7 +310,20 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         getTreeDataPath={row => row.path.toStringArray()}
         rows={rows}
         columns={columns}
-        defaultGroupingExpansionDepth={isExpanded ? -1 : 0}
+        isGroupExpandedByDefault={node => {
+          console.log(node);
+          if (!isExpanded) {
+            return node.depth === 0;
+          } else {
+            // We do not want to auto-expand the expandable refs as this:
+            // a) requires a network call
+            // b) can be endlessly recursive.
+            return (
+              expandedIds.includes(node.id) ||
+              !expandablePaths.has(node.id.toString())
+            );
+          }
+        }}
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =
