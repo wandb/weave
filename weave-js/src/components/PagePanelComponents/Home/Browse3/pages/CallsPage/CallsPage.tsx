@@ -5,7 +5,6 @@ import {
   FormControl,
   // IconButton,
   ListItem,
-  TextField,
 } from '@mui/material';
 import _ from 'lodash';
 import React, {FC, useCallback, useMemo} from 'react';
@@ -13,6 +12,8 @@ import React, {FC, useCallback, useMemo} from 'react';
 import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
+import {StyledPaper} from '../../StyledAutocomplete';
+import {StyledTextField} from '../../StyledTextField';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -339,7 +340,8 @@ export const CallsTable: FC<{
           <ListItem sx={{minWidth: '190px'}}>
             <FormControl fullWidth>
               <Autocomplete
-                size={'small'}
+                PaperComponent={StyledPaper}
+                size="small"
                 // Temp disable multiple for simplicity - may want to re-enable
                 // multiple
                 limitTags={1}
@@ -369,7 +371,7 @@ export const CallsTable: FC<{
                   }
                 }}
                 renderInput={params => (
-                  <TextField
+                  <StyledTextField
                     {...params}
                     label={OP_FILTER_GROUP_HEADER}
                     sx={{maxWidth: '350px'}}
