@@ -311,7 +311,6 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         rows={rows}
         columns={columns}
         isGroupExpandedByDefault={node => {
-          console.log(node);
           if (!isExpanded) {
             return node.depth === 0;
           } else {
