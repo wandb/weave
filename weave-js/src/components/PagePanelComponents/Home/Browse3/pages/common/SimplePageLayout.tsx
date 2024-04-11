@@ -247,7 +247,7 @@ export const SimplePageLayoutWithHeader: FC<{
         {props.headerExtra}
         {simplePageLayoutContextValue.headerSuffix}
       </Box>
-      <div style={{marginLeft: 4, flex: '1 1 auto', overflow: 'hidden'}}>
+      <div style={{flex: '1 1 auto', overflow: 'hidden'}}>
         <SplitPanel
           minWidth={150}
           defaultWidth={200}
