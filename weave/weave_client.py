@@ -5,11 +5,11 @@ import typing
 import uuid
 import pydantic
 import datetime
-import traceback
 
 
 from requests import HTTPError
 
+from weave.exception import exception_to_json_str
 from weave.table import Table
 from weave import trace_sentry, urls
 from weave import run_context
@@ -513,14 +513,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
-        # Full traceback disabled til we fix UI.
-        # stack_trace = "".join(
-        #     traceback.format_exception(
-        #         type(exception), exception, exception.__traceback__
-        #     )
-        # )
-        # exception_str = f"{stack_trace}\n{type(exception).__name__}: {str(exception)}"
-        exception_str = str(exception)
+        exception_str = exception_to_json_str(exception)
         call.exception = exception_str
 
         # Summary handling

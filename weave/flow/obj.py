@@ -10,7 +10,7 @@ from pydantic import (
 # import pydantic
 
 from weave import box
-from weave.trace.op import Op
+from weave.trace.op import Op, ObjectRef
 from weave.trace.vals import pydantic_getattribute
 from weave.weave_client import get_ref
 from weave.trace.vals import ObjectRecord, TraceObject
@@ -37,6 +37,8 @@ class Object(BaseModel):
     def handle_relocatable_object(
         cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
     ) -> Any:
+        if isinstance(v, ObjectRef):
+            return v.get()
         if isinstance(v, TraceObject):
             # This is a relocated object, so destructure it into a dictionary
             # so pydantic can validate it.

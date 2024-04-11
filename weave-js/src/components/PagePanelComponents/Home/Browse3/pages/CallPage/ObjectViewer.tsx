@@ -5,14 +5,30 @@ import {
   GridRowHeightParams,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
-import {useWeaveContext} from '../../../../../../context';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
+import {
+  LIST_INDEX_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
+} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
+import {
+  USE_TABLE_FOR_ARRAYS,
+  WeaveCHTableSourceRefContext,
+} from './DataTableView';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
-import {mapObject, traverse, TraverseContext} from './traverse';
+import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
 type Data = Record<string, any>;
@@ -36,15 +52,56 @@ const getRefs = (data: Data): string[] => {
 
 type RefValues = Record<string, any>; // ref URI to value
 
+const refIsExpandable = (ref: string): boolean => {
+  const parsed = parseRef(ref);
+  if (isWeaveObjectRef(parsed)) {
+    return (
+      parsed.weaveKind === 'object' ||
+      (parsed.weaveKind === 'table' &&
+        parsed.artifactRefExtra != null &&
+        parsed.artifactRefExtra.length > 0)
+    );
+  }
+  return false;
+};
+
+// This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
-  const weave = useWeaveContext();
   const {useRefsData} = useWFHooks();
-  const {client} = weave;
+
+  // `resolvedData` holds ref-resolved data.
   const [resolvedData, setResolvedData] = useState<Data>(data);
-  const refs = useMemo(() => getRefs(data), [data]);
+
+  // `dataRefs` are the refs contained in the data, filtered to only include expandable refs.
+  const dataRefs = useMemo(() => getRefs(data).filter(refIsExpandable), [data]);
+
+  // Expanded refs are the explicit set of refs that have been expanded by the user. Note that
+  // this might contain nested refs not in the `dataRefs` set. The keys are refs and the values
+  // are the paths at which the refs were expanded.
+  const [expandedRefs, setExpandedRefs] = useState<{[ref: string]: string}>({});
+
+  // `addExpandedRef` is a function that can be used to add an expanded ref to the `expandedRefs` state.
+  const addExpandedRef = useCallback((path: string, ref: string) => {
+    setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
+  }, []);
+
+  // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
+  const refs = useMemo(() => {
+    return Array.from(new Set([...dataRefs, ...Object.values(expandedRefs)]));
+  }, [dataRefs, expandedRefs]);
+
+  // finally, we get the ref data for all refs. This function is highly memoized and
+  // cached. Therefore, we only ever make network calls for new refs in the list.
   const refsData = useRefsData(refs);
 
+  // This effect is responsible for resolving the refs in the data. It iteratively
+  // replaces refs with their resolved values. It also adds a `_ref` key to the resolved
+  // value to indicate the original ref URI. It is ultimately responsible for setting
+  // `resolvedData`.
   useEffect(() => {
+    if (refsData.loading) {
+      return;
+    }
     const resolvedRefData = refsData.result;
 
     const refValues: RefValues = {};
@@ -67,17 +124,33 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       }
       refValues[r] = val;
     }
-    const resolved = mapObject(data, context => {
-      if (isRef(context.value)) {
-        return refValues[context.value];
+    let resolved = data;
+    let dirty = true;
+    const mapper = (context: TraverseContext) => {
+      if (isRef(context.value) && refValues[context.value] != null) {
+        dirty = true;
+        const res = refValues[context.value];
+        delete refValues[context.value];
+        return res;
       }
       return _.clone(context.value);
-    });
+    };
+    while (dirty) {
+      dirty = false;
+      resolved = mapObject(resolved, mapper);
+    }
     setResolvedData(resolved);
-  }, [data, client, refsData.result, refs]);
+  }, [data, refs, refsData.loading, refsData.result]);
 
+  // `rows` are the data-grid friendly rows that we will render. This method traverses
+  // the data, hiding certain keys and adding loader rows for expandable refs.
   const rows = useMemo(() => {
-    const contexts: TraverseContext[] = [];
+    const contexts: Array<
+      TraverseContext & {
+        isExpandableRef?: boolean;
+        isLoader?: boolean;
+      }
+    > = [];
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
@@ -90,37 +163,145 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         if (context.path.hasHiddenKey() || isNullDescription) {
           return 'skip';
         }
-        contexts.push(context);
+        if (
+          isRef(context.value) &&
+          context.depth > 1 &&
+          refIsExpandable(context.value)
+        ) {
+          // These are possibly expandable refs. When we encounter an expandable ref, we
+          // indicate that it is expandable and add a loader row. The effect is that the
+          // group header will show the expansion icon when `isExpandableRef` is true. Also,
+          // until the ref data is actually resolved, we will show a loader in place of the
+          // expanded data.
+          contexts.push({
+            ...context,
+            isExpandableRef: true,
+          });
+          contexts.push({
+            depth: context.depth + 1,
+            isLeaf: true,
+            path: context.path.plus(''),
+            isLoader: true,
+            value: '',
+            valueType: 'undefined',
+          });
+        } else {
+          contexts.push(context);
+        }
+      }
+      if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
+        return 'skip';
       }
       return true;
     });
 
-    return contexts.map((c, id) => ({id, ...c}));
+    return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
   }, [resolvedData]);
 
-  const columns: GridColDef[] = [
-    {
-      field: 'value',
-      headerName: 'Value',
-      flex: 1,
-      sortable: false,
-      renderCell: ({row}) => {
-        return <ValueView data={row} isExpanded={isExpanded} />;
-      },
-    },
-  ];
+  // Next, we setup the columns. In our case, there is just one column: Value.
+  // In most cases, we just render the generic `ValueView` component. However,
+  // in the case that we have an expanded ref, then we want to set the base
+  // ref context such that nested table links work correctly.
+  const currentRefContext = useContext(WeaveCHTableSourceRefContext);
+  const columns: GridColDef[] = useMemo(() => {
+    return [
+      {
+        field: 'value',
+        headerName: 'Value',
+        flex: 1,
+        sortable: false,
+        renderCell: ({row}) => {
+          if (row.isLoader) {
+            return <LoadingDots />;
+          }
+          let baseRef: string | undefined;
+          const path: ObjectPath = row.path;
+          if (currentRefContext) {
+            baseRef = buildBaseRef(currentRefContext, path, path.length());
+          }
+          for (let i = 0; i < path.length(); i++) {
+            const ancestorPath = path.ancestor(-i);
+            const ancestorExpandedRef = expandedRefs[ancestorPath.toString()];
+            if (ancestorExpandedRef) {
+              baseRef = buildBaseRef(ancestorExpandedRef, path, i);
+              break;
+            }
+          }
 
+          const colInner = <ValueView data={row} isExpanded={isExpanded} />;
+          if (baseRef) {
+            return (
+              <WeaveCHTableSourceRefContext.Provider value={baseRef}>
+                {colInner}
+              </WeaveCHTableSourceRefContext.Provider>
+            );
+          }
+          return colInner;
+        },
+      },
+    ];
+  }, [currentRefContext, expandedRefs, isExpanded]);
+
+  // Here, we setup the `Path` column which acts as a grouping column. This
+  // column is responsible for showing the expand/collapse icons and handling
+  // the expansion. Importantly, when the column is clicked, we do some
+  // bookkeeping to add the expanded ref to the `expandedRefs` state. This
+  // triggers a set of state updates to populate the expanded data.
+  const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
       headerName: 'Path',
       hideDescendantCount: true,
-      renderCell: params => <ObjectViewerGroupingCell {...params} />,
+      renderCell: params => {
+        const refToExpand = params.row.value;
+        return (
+          <ObjectViewerGroupingCell
+            {...params}
+            onClick={() => {
+              setExpandedIds(eIds => {
+                if (eIds.includes(params.row.id)) {
+                  return eIds.filter(id => id !== params.row.id);
+                }
+                return [...eIds, params.row.id];
+              });
+              if (isRef(refToExpand)) {
+                addExpandedRef(params.row.id, refToExpand);
+              }
+            }}
+          />
+        );
+      },
     }),
-    []
+    [addExpandedRef]
   );
 
-  return (
-    <div style={{overflow: 'hidden'}}>
+  // Next we define a function that updates the row expansion state. This
+  // function is responsible for setting the expansion state of rows that have
+  // been expanded by the user. It is bound to the `rowsSet` event so that it is
+  // called whenever the rows are updated. The MUI data grid will rerender and
+  // close all expanded rows when the rows are updated. This function is
+  // responsible for re-expanding the rows that were previously expanded.
+  const updateRowExpand = useCallback(() => {
+    expandedIds.forEach(id => {
+      if (apiRef.current.getRow(id)) {
+        const children = apiRef.current.getRowGroupChildren({groupId: id});
+        if (children.length !== 0) {
+          apiRef.current.setRowChildrenExpansion(id, true);
+        }
+      }
+    });
+  }, [apiRef, expandedIds]);
+  useEffect(() => {
+    updateRowExpand();
+    return apiRef.current.subscribeEvent('rowsSet', () => {
+      updateRowExpand();
+    });
+  }, [apiRef, expandedIds, updateRowExpand]);
+
+  // Finally, we memoize the inner data grid component. This is important to
+  // reduce the number of re-renders when the data changes.
+  const inner = useMemo(() => {
+    return (
       <StyledDataGrid
         apiRef={apiRef}
         treeData
@@ -130,9 +311,16 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         defaultGroupingExpansionDepth={isExpanded ? -1 : 0}
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
+          const isNonRefString =
+            params.model.valueType === 'string' && !isRef(params.model.value);
+          const isArray = params.model.valueType === 'array';
+          const isTableRef =
+            isRef(params.model.value) &&
+            (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
           if (
-            params.model.valueType === 'string' &&
-            !isRef(params.model.value)
+            isNonRefString ||
+            (isArray && USE_TABLE_FOR_ARRAYS) ||
+            isTableRef
           ) {
             return 'auto';
           }
@@ -143,11 +331,45 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         disableColumnMenu={true}
         groupingColDef={groupingColDef}
         sx={{
+          borderRadius: '0px',
           '& .MuiDataGrid-row:hover': {
             backgroundColor: 'inherit',
           },
+          '& > div > div > div > div > .MuiDataGrid-row > .MuiDataGrid-cell': {
+            paddingRight: '0px',
+            paddingLeft: '0px',
+            // only the first column
+            '&:first-of-type': {
+              paddingRight: '8px',
+            },
+          },
         }}
       />
-    </div>
-  );
+    );
+  }, [apiRef, columns, rows, groupingColDef, isExpanded]);
+
+  // Return the inner data grid wrapped in a div with overflow hidden.
+  return <div style={{overflow: 'hidden'}}>{inner}</div>;
+};
+
+// Helper function to build the base ref for a given path. This function is used
+// to construct the base ref for nested table links.
+const buildBaseRef = (
+  baseRef: string,
+  path: ObjectPath,
+  startIndex: number
+) => {
+  if (startIndex !== 0) {
+    const parts = path.toPath().slice(-startIndex);
+    parts.forEach(part => {
+      if (typeof part === 'string') {
+        baseRef += '/' + OBJECT_ATTR_EDGE_NAME + '/' + part;
+      } else if (typeof part === 'number') {
+        baseRef += '/' + LIST_INDEX_EDGE_NAME + '/' + part.toString();
+      } else {
+        console.error('Invalid path part:', part);
+      }
+    });
+  }
+  return baseRef;
 };
