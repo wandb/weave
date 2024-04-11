@@ -22,8 +22,8 @@ class Nearly:
 
 expected_eval_result = {
     "model_output": {"mean": 9.5},
-    "score": {"mean": 0.5, "stderr": 0.5},
-    "model_latency": {"mean": Nearly(0), "stderr": Nearly(0)},
+    "score": {"true_count": 1, "true_fraction": 0.5},
+    "model_latency": {"mean": Nearly(0)},
 }
 
 
@@ -68,10 +68,9 @@ def test_predict_can_receive_other_params(client):
     result = asyncio.run(evaluation.evaluate(model_predict))
     assert result == {
         "model_output": {"mean": 18.5},
-        "score": {"mean": 0, "stderr": 0.0},
+        "score": {"true_count": 0, "true_fraction": 0.0},
         "model_latency": {
             "mean": Nearly(0),
-            "stderr": Nearly(0),
         },
     }
 
@@ -133,10 +132,9 @@ def test_score_as_class(client):
     result = asyncio.run(evaluation.evaluate(model))
     assert result == {
         "model_output": {"mean": 9.5},
-        "MyScorer": {"mean": 0.5, "stderr": 0.5},
+        "MyScorer": {"true_count": 1, "true_fraction": 0.5},
         "model_latency": {
             "mean": Nearly(0),
-            "stderr": Nearly(0),
         },
     }
 
@@ -163,7 +161,6 @@ def test_score_with_custom_summarize(client):
         "MyScorer": {"awesome": 3},
         "model_latency": {
             "mean": Nearly(0),
-            "stderr": Nearly(0),
         },
     }
 
@@ -181,8 +178,8 @@ def test_multiclass_f1_score(client):
     result = asyncio.run(evaluation.evaluate(return_pred))
     assert result == {
         "model_output": {
-            "a": {"mean": 1.0, "stderr": 0.0},
-            "b": {"mean": 0.0, "stderr": 0.0},
+            "a": {"true_count": 1, "true_fraction": 1.0},
+            "b": {"true_count": 0, "true_fraction": 0.0},
         },
         "MultiTaskBinaryClassificationF1": {
             "a": {"f1": 0, "precision": 0.0, "recall": 0},
@@ -190,6 +187,5 @@ def test_multiclass_f1_score(client):
         },
         "model_latency": {
             "mean": Nearly(0),
-            "stderr": Nearly(0),
         },
     }
