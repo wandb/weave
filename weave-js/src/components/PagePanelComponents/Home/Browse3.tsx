@@ -30,7 +30,6 @@ import {
   useParams,
 } from 'react-router-dom';
 
-import {MOON_200} from '../../../common/css/color.styles';
 import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
@@ -350,9 +349,8 @@ const MainPeekingLayout: FC = () => {
               zIndex: 1,
               width: `${drawerWidthPct}%`,
               height: '100%',
-              boxShadow:
-                'rgba(15, 15, 15, 0.04) 0px 0px 0px 1px, rgba(15, 15, 15, 0.03) 0px 3px 6px, rgba(15, 15, 15, 0.06) 0px 9px 24px',
-              borderLeft: `1px solid ${MOON_200}`,
+              boxShadow: '0px 0px 40px 0px rgba(0, 0, 0, 0.16)',
+              borderLeft: 0,
               position: 'absolute',
             },
           }}
@@ -367,7 +365,7 @@ const MainPeekingLayout: FC = () => {
               position: 'absolute',
               inset: '0 auto 0 0',
               zIndex: 2,
-              backgroundColor: '#f4f7f9',
+              backgroundColor: 'transparent',
               cursor: 'col-resize',
               width: '5px',
             }}
