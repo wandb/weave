@@ -791,6 +791,11 @@ export const RunsTable: FC<{
       minWidth: 100,
       maxWidth: 100,
       renderCell: cellParams => {
+        if (cellParams.row.status_code === 'UNSET') {
+          // Call is still in progress, latency will be 0.
+          // Displaying nothing seems preferable to being misleading.
+          return null;
+        }
         return monthRoundedTime(cellParams.row.latency);
       },
     });
