@@ -168,6 +168,9 @@ export const CallTraceView: FC<{
         '& div div div div >.MuiDataGrid-cell': {
           borderBottom: 'none',
         },
+        '& div div div div >.MuiDataGrid-cell:focus': {
+          outline: 'none',
+        },
       },
       '& .MuiDataGrid-columnHeaders': {
         borderBottom: 'none',
