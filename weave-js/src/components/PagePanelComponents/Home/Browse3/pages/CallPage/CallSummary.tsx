@@ -35,7 +35,7 @@ export const CallSummary: React.FC<{
               span.name
             ),
           Called: <Timestamp value={span.timestamp / 1000} format="relative" />,
-          ...(span.summary.latency_s != null
+          ...(span.summary.latency_s != null && span.status_code !== 'UNSET'
             ? {
                 Latency: span.summary.latency_s.toFixed(3) + 's',
               }
