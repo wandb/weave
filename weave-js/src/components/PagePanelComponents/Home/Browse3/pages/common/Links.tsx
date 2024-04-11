@@ -17,8 +17,6 @@ import {
 import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
-import {WFHighLevelTypeVersionFilter} from '../TypeVersionsPage';
-import {truncateID} from '../util';
 import {CallId} from './CallId';
 
 type LinkVariant = 'primary' | 'secondary';
@@ -93,30 +91,6 @@ export const TypeLink: React.FC<{
         props.typeName
       )}>
       {props.typeName}
-    </Link>
-  );
-};
-
-export const TypeVersionLink: React.FC<{
-  entityName: string;
-  projectName: string;
-  typeName: string;
-  version: string;
-  hideName?: boolean;
-}> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
-  const text = props.hideName
-    ? props.version
-    : props.typeName + ': ' + truncateID(props.version);
-  return (
-    <Link
-      to={peekingRouter.typeVersionUIUrl(
-        props.entityName,
-        props.projectName,
-        props.typeName,
-        props.version
-      )}>
-      {text}
     </Link>
   );
 };
@@ -341,25 +315,6 @@ export const OpVersionsLink: React.FC<{
       {props.versionCount}
       {props.countIsLimited ? '+' : ''} version
       {props.versionCount !== 1 ? 's' : ''}
-    </Link>
-  );
-};
-
-export const TypeVersionsLink: React.FC<{
-  entity: string;
-  project: string;
-  versionCount: number;
-  filter?: WFHighLevelTypeVersionFilter;
-}> = props => {
-  const {peekingRouter} = useWeaveflowRouteContext();
-  return (
-    <Link
-      to={peekingRouter.typeVersionsUIUrl(
-        props.entity,
-        props.project,
-        props.filter
-      )}>
-      {props.versionCount} version{props.versionCount !== 1 ? 's' : ''}
     </Link>
   );
 };

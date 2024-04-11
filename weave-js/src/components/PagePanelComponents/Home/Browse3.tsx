@@ -68,10 +68,6 @@ import {OpVersionPage} from './Browse3/pages/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpVersionsPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
-import {TypePage} from './Browse3/pages/TypePage';
-import {TypesPage} from './Browse3/pages/TypesPage';
-import {TypeVersionPage} from './Browse3/pages/TypeVersionPage';
-import {TypeVersionsPage} from './Browse3/pages/TypeVersionsPage';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
   useWFHooks,
@@ -453,19 +449,6 @@ const Browse3ProjectRoot: FC<{
         overflowX: 'hidden',
       }}>
       <Switch location={customLocation}>
-        {/* TYPES */}
-        <Route path={`${projectRoot}/types/:itemName/versions/:version?`}>
-          <TypeVersionRoutePageBinding />
-        </Route>
-        <Route path={`${projectRoot}/types/:itemName`}>
-          <TypePageBinding />
-        </Route>
-        <Route path={`${projectRoot}/types`}>
-          <TypesPageBinding />
-        </Route>
-        <Route path={`${projectRoot}/type-versions`}>
-          <TypeVersionsPageBinding />
-        </Route>
         {/* OBJECTS */}
         <Route
           path={`${projectRoot}/objects/:itemName/versions/:version?/:refExtra*`}>
@@ -596,40 +579,6 @@ const OpVersionRoutePageBinding = () => {
       entity={params.entity}
       project={params.project}
       opName={params.itemName}
-      version={params.version}
-    />
-  );
-};
-
-// TODO(tim/weaveflow_improved_nav): Generalize this
-const TypeVersionRoutePageBinding = () => {
-  const params = useParams<Browse3TabItemVersionParams>();
-
-  const history = useHistory();
-  const routerContext = useWeaveflowCurrentRouteContext();
-  useEffect(() => {
-    if (!params.version) {
-      history.replace(
-        routerContext.typeUIUrl(params.entity, params.project, params.itemName)
-      );
-    }
-  }, [
-    history,
-    params.version,
-    params.entity,
-    params.project,
-    params.itemName,
-    routerContext,
-  ]);
-
-  if (!params.version) {
-    return <>Redirecting...</>;
-  }
-  return (
-    <TypeVersionPage
-      entity={params.entity}
-      project={params.project}
-      typeName={params.itemName}
       version={params.version}
     />
   );
@@ -798,42 +747,6 @@ const ObjectVersionsPageBinding = () => {
 };
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
-const TypeVersionsPageBinding = () => {
-  const params = useParams<Browse3TabParams>();
-
-  const query = useURLSearchParamsDict();
-  const filters = useMemo(() => {
-    if (query.filter === undefined) {
-      return {};
-    }
-    try {
-      return JSON.parse(query.filter);
-    } catch (e) {
-      console.log(e);
-      return {};
-    }
-  }, [query.filter]);
-  const history = useHistory();
-  const routerContext = useWeaveflowCurrentRouteContext();
-  const onFilterUpdate = useCallback(
-    filter => {
-      history.push(
-        routerContext.typeVersionsUIUrl(params.entity, params.project, filter)
-      );
-    },
-    [history, params.entity, params.project, routerContext]
-  );
-  return (
-    <TypeVersionsPage
-      entity={params.entity}
-      project={params.project}
-      initialFilter={filters}
-      onFilterUpdate={onFilterUpdate}
-    />
-  );
-};
-
-// TODO(tim/weaveflow_improved_nav): Generalize this
 const OpVersionsPageBinding = () => {
   const params = useParams<Browse3TabParams>();
 
@@ -904,24 +817,6 @@ const OpPageBinding = () => {
       opName={params.itemName}
     />
   );
-};
-
-const TypePageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
-
-  return (
-    <TypePage
-      entity={params.entity}
-      project={params.project}
-      typeName={params.itemName}
-    />
-  );
-};
-
-const TypesPageBinding = () => {
-  const params = useParams<Browse3TabItemParams>();
-
-  return <TypesPage entity={params.entity} project={params.project} />;
 };
 
 const OpsPageBinding = () => {
