@@ -316,33 +316,6 @@ const ObjectVersionPageInner: React.FC<{
               },
             ]
           : []),
-
-        // ...((producingCalls.result?.length ?? 0) > 0
-        //       ? {
-        //           [maybePluralizeWord(
-        //             producingCalls.result!.length,
-        //             'Producing Call'
-        //           )]: (
-        //             <ObjectVersionProducingCallsItem
-        //               producingCalls={producingCalls.result!}
-        //               refUri={refUri}
-        //             />
-        //           ),
-        //         }
-        //       : {}),
-        //     ...((consumingCalls.result?.length ?? 0) > 0
-        //       ? {
-        //           [maybePluralizeWord(
-        //             consumingCalls.result!.length,
-        //             'Consuming Call'
-        //           )]: (
-        //             <ObjectVersionConsumingCallsItem
-        //               consumingCalls={consumingCalls.result!}
-        //               refUri={refUri}
-        //             />
-        //           ),
-        //         }
-        //       : {}),
       ]}
     />
   );
