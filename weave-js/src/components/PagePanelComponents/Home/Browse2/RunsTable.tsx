@@ -38,7 +38,7 @@ import {Timestamp} from '../../../Timestamp';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
 import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
-import {StatusChip} from '../Browse3/pages/common/StatusChip';
+import {STATUS_INFO, StatusChip} from '../Browse3/pages/common/StatusChip';
 import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
 import {
   DICT_KEY_EDGE_NAME,
@@ -416,6 +416,7 @@ export const RunsTable: FC<{
         headerName: 'Trace',
         minWidth: 100,
         width: 250,
+        cellClassName: 'span-id-cell',
         hideable: false,
         renderCell: rowParams => {
           const opVersion = rowParams.row.call.opVersionRef;
@@ -423,14 +424,32 @@ export const RunsTable: FC<{
             return rowParams.row.call.spanName;
           }
           return (
-            <CallLink
-              entityName={params.entity}
-              projectName={params.project}
-              opName={opVersionRefOpName(opVersion)}
-              callId={rowParams.row.id}
-              fullWidth={true}
-              preservePath={preservePath}
-            />
+            <Box
+              sx={{
+                height: '100%',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}>
+              <Box
+                sx={{
+                  m: '2px',
+                  borderRadius: '2px',
+                  height: 'calc(100% - 4px)',
+                  width: '4px',
+                  backgroundColor: STATUS_INFO[rowParams.row.status_code].color,
+                  marginRight: '6px',
+                }}></Box>
+              <CallLink
+                entityName={params.entity}
+                projectName={params.project}
+                opName={opVersionRefOpName(opVersion)}
+                callId={rowParams.row.id}
+                fullWidth={true}
+                preservePath={preservePath}
+              />
+            </Box>
           );
         },
       },
@@ -451,16 +470,7 @@ export const RunsTable: FC<{
             },
           ]
         : []),
-      {
-        field: 'userId',
-        headerName: 'User',
-        width: 50,
-        align: 'center',
-        sortable: false,
-        resizable: false,
-        disableColumnMenu: true,
-        renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
-      },
+
       // {
       //   field: 'run_id',
       //   headerName: 'Run',
@@ -472,43 +482,22 @@ export const RunsTable: FC<{
       //       </div>
       //     );
       //   },
+      // {
+      //   field: 'status_code',
+      //   headerName: 'Status',
+      //   headerAlign: 'center',
+      //   sortable: false,
+      //   disableColumnMenu: true,
+      //   resizable: false,
+      //   width: 60,
+      //   renderCell: cellParams => {
+      //     return (
+      //       <div style={{margin: 'auto'}}>
+      //         <StatusChip value={cellParams.row.status_code} iconOnly />
+      //       </div>
+      //     );
+      //   },
       // },
-      {
-        field: 'status_code',
-        headerName: 'Status',
-        sortable: false,
-        disableColumnMenu: true,
-        resizable: false,
-        width: 70,
-        minWidth: 70,
-        maxWidth: 70,
-        renderCell: cellParams => {
-          return (
-            <div style={{margin: 'auto'}}>
-              <StatusChip value={cellParams.row.status_code} iconOnly />
-            </div>
-          );
-        },
-      },
-      ...(!ioColumnsOnly
-        ? [
-            {
-              field: 'timestampMs',
-              headerName: 'Called',
-              width: 100,
-              minWidth: 100,
-              maxWidth: 100,
-              renderCell: (cellParams: any) => {
-                return (
-                  <Timestamp
-                    value={cellParams.row.timestampMs / 1000}
-                    format="relative"
-                  />
-                );
-              },
-            },
-          ]
-        : []),
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = spans[0];
@@ -787,6 +776,36 @@ export const RunsTable: FC<{
     }
 
     cols.push({
+      field: 'userId',
+      headerName: 'User',
+      headerAlign: 'center',
+      width: 50,
+      align: 'center',
+      sortable: false,
+      resizable: false,
+      disableColumnMenu: true,
+      renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
+    });
+
+    if (!ioColumnsOnly) {
+      cols.push({
+        field: 'timestampMs',
+        headerName: 'Called',
+        width: 100,
+        minWidth: 100,
+        maxWidth: 100,
+        renderCell: (cellParams: any) => {
+          return (
+            <Timestamp
+              value={cellParams.row.timestampMs / 1000}
+              format="relative"
+            />
+          );
+        },
+      });
+    }
+
+    cols.push({
       field: 'latency',
       headerName: 'Latency',
       width: 100,
@@ -908,6 +927,9 @@ export const RunsTable: FC<{
         hideFooterSelectedRowCount
         sx={{
           borderRadius: 0,
+          '& .span-id-cell': {
+            paddingLeft: 0,
+          },
         }}
         slots={{
           noRowsOverlay: () => {
