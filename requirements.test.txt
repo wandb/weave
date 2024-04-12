@@ -21,3 +21,6 @@ supervisor>=4.2.5
 clickhouse_connect==0.7.0
 uvicorn>=0.27.0
 fastapi>=0.110.0
+
+## weave/tests/library_integration_tests requirements
+instructor==1.1.0
