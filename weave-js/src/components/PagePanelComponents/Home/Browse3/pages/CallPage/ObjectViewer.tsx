@@ -233,9 +233,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
               <Box
                 sx={{
                   width: '100%',
-                  height: '400px',
+                  height: '100%',
                 }}>
-                <Browse2OpDefCode uri={row.value} />
+                <Browse2OpDefCode uri={row.value} maxRowsInView={20} />
               </Box>
             );
           }
