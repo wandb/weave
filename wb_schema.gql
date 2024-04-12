@@ -14,6 +14,10 @@ directive @constraints(
   max: Int
   pattern: String
 ) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+directive @accessibleIf(
+  cond: String
+  restrictEvenAdmins: Boolean
+) on FIELD_DEFINITION
 
 type Query {
   user(id: ID, userName: String): User
@@ -161,6 +165,9 @@ type User implements Node {
   id: ID!
   name: String!
   username: String
+  email: String @accessibleIf(cond: "viewerCanReadEmail")
+  photoUrl: String
+  deletedAt: DateTime
   teams(before: String, after: String, first: Int, last: Int): EntityConnection
 }
 
