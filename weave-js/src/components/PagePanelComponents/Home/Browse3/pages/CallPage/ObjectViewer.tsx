@@ -312,14 +312,17 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         columns={columns}
         isGroupExpandedByDefault={node => {
           if (!isExpanded) {
-            return node.depth === 0;
+            return expandedIds.includes(node.id);
           } else {
             // We do not want to auto-expand the expandable refs as this:
             // a) requires a network call
             // b) can be endlessly recursive.
+            // Note: Shawn does not like auto-expanding top-level refs.
+            const isTopRef = node.depth === 0 && isRef(data[node.id]);
             return (
-              expandedIds.includes(node.id) ||
-              !expandablePaths.has(node.id.toString())
+              !isTopRef &&
+              (expandedIds.includes(node.id) ||
+                !expandablePaths.has(node.id.toString()))
             );
           }
         }}
@@ -367,6 +370,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     groupingColDef,
     isExpanded,
     expandedIds,
+    data,
     expandablePaths,
   ]);
 
