@@ -454,7 +454,10 @@ export const RunsTable: FC<{
       {
         field: 'userId',
         headerName: 'User',
-        width: 150,
+        width: 50,
+        align: 'center',
+        sortable: false,
+        resizable: false,
         disableColumnMenu: true,
         renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
       },

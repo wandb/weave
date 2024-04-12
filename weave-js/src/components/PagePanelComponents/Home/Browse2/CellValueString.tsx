@@ -18,6 +18,7 @@ import {
   DraggableGrow,
   PoppedBody,
   StyledTooltip,
+  TooltipHint,
 } from '../../../DraggablePopups';
 
 const isJSON = (value: string): boolean => {
@@ -59,13 +60,6 @@ const TooltipText = styled.div<{isJSON: boolean}>`
   ${props => props.isJSON && 'font-family: monospace;'}
 `;
 TooltipText.displayName = 'S.TooltipText';
-
-const TooltipHint = styled.div`
-  color: ${Colors.MOON_500};
-  text-align: center;
-  font-size: 0.8em;
-`;
-TooltipHint.displayName = 'S.TooltipHint';
 
 const Popped = styled.div`
   border-radius: 4px;

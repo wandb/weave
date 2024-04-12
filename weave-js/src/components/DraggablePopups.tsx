@@ -39,6 +39,13 @@ export const StyledTooltip = styled(
   },
 }));
 
+export const TooltipHint = styled.div`
+  color: ${Colors.MOON_500};
+  text-align: center;
+  font-size: 0.8em;
+`;
+TooltipHint.displayName = 'S.TooltipHint';
+
 export const DraggableWrapper = ({children, ...other}: any) => {
   return (
     <Draggable handle=".handle">

@@ -7,7 +7,12 @@ import React, {useEffect, useRef, useState} from 'react';
 import styled from 'styled-components';
 
 import {Button} from './Button';
-import {DraggableGrow, Popped, StyledTooltip} from './DraggablePopups';
+import {
+  DraggableGrow,
+  Popped,
+  StyledTooltip,
+  TooltipHint,
+} from './DraggablePopups';
 import {LoadingDots} from './LoadingDots';
 import {A, Link} from './PagePanelComponents/Home/Browse3/pages/common/Links';
 
@@ -130,15 +135,17 @@ const UserContent = ({user, mode, onClose}: UserContentProps) => {
           <div>{email}</div>
         </Grid>
       </UserContentBody>
+      {!isPopover && <TooltipHint>Click to open card</TooltipHint>}
     </>
   );
 };
 
 type UserInnerProps = {
   user: UserInfo;
+  includeName?: boolean;
   placement?: TooltipProps['placement'];
 };
-const UserInner = ({user, placement}: UserInnerProps) => {
+const UserInner = ({user, includeName, placement}: UserInnerProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -171,12 +178,14 @@ const UserInner = ({user, placement}: UserInnerProps) => {
             src={user.photoUrl}
             sx={{width: size, height: size, marginRight: '4px'}}
           />
-          <Link
-            to={`/${user.username}`}
-            onClick={onClickDoNothing}
-            $variant="secondary">
-            {user.name}
-          </Link>
+          {includeName && (
+            <Link
+              to={`/${user.username}`}
+              onClick={onClickDoNothing}
+              $variant="secondary">
+              {user.name}
+            </Link>
+          )}
         </UserTrigger>
       </StyledTooltip>
       <Popover
@@ -204,10 +213,11 @@ const UserInner = ({user, placement}: UserInnerProps) => {
 
 type UserLinkProps = {
   username: string | null;
+  includeName?: boolean; // Default is to show avatar image only.
   placement?: TooltipProps['placement'];
 };
 
-export const UserLink = ({username, placement}: UserLinkProps) => {
+export const UserLink = ({username, includeName, placement}: UserLinkProps) => {
   const [user, setUser] = useState<UserResult>(username ? 'load' : 'NA');
   useEffect(
     () => {
@@ -250,5 +260,7 @@ export const UserLink = ({username, placement}: UserLinkProps) => {
   if (user === 'error') {
     return <div>{username}</div>;
   }
-  return <UserInner user={user} placement={placement} />;
+  return (
+    <UserInner user={user} placement={placement} includeName={includeName} />
+  );
 };

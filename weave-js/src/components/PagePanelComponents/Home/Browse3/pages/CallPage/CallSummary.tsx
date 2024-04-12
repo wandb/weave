@@ -35,7 +35,13 @@ export const CallSummary: React.FC<{
             ) : (
               span.name
             ),
-          User: <UserLink username={call.userId} placement="bottom-start" />,
+          User: (
+            <UserLink
+              username={call.userId}
+              placement="bottom-start"
+              includeName
+            />
+          ),
           Called: <Timestamp value={span.timestamp / 1000} format="relative" />,
           ...(span.summary.latency_s != null && span.status_code !== 'UNSET'
             ? {
