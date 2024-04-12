@@ -287,6 +287,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
             limit=req.limit,
             offset=req.offset,
+            order_by=None
+            if not req.sort_by
+            else [(s.field, s.direction) for s in req.sort_by],
         )
         calls = [
             _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
@@ -840,20 +843,43 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions_part = " AND ".join(conditions)
 
         order_by_part = "ORDER BY started_at ASC"
-        # if order_by != None:
-        #     order_by = typing.cast(typing.List[typing.Tuple[str, str]], order_by)
-        #     for field, direction in order_by:
-        #         assert (
-        #             field in all_call_select_columns
-        #         ), f"Invalid order_by field: {field}"
-        #         assert direction in [
-        #             "ASC",
-        #             "DESC",
-        #         ], f"Invalid order_by direction: {direction}"
-        #     order_by_part = ", ".join(
-        #         [f"{field} {direction}" for field, direction in order_by]
-        #     )
-        #     order_by_part = f"ORDER BY {order_by_part}"
+        if order_by is not None:
+            order_parts = []
+            for field, direction in order_by:
+                json_path: typing.Optional[str] = None
+                if field.startswith("inputs"):
+                    field = "inputs_dump" + field[len("inputs") :]
+                    if field.startswith("inputs_dump."):
+                        field = "inputs_dump"
+                        json_path = field[len("inputs_dump.") :]
+                elif field.startswith("output"):
+                    field = "output_dump" + field[len("output") :]
+                    if field.startswith("output_dump."):
+                        field = "output_dump"
+                        json_path = field[len("output_dump.") :]
+                elif field.startswith("attributes"):
+                    field = "attributes_dump" + field[len("attributes") :]
+                elif field.startswith("summary"):
+                    field = "summary_dump" + field[len("summary") :]
+                elif field == ("latency"):
+                    field = "ended_at - started_at"
+
+                assert (
+                    field in all_call_select_columns
+                ), f"Invalid order_by field: {field}"
+                assert direction in [
+                    "ASC",
+                    "DESC",
+                    "asc",
+                    "desc",
+                ], f"Invalid order_by direction: {direction}"
+                if json_path:
+                    # TODO: Block injection
+                    field = f"JSON_VALUE({field}, '$.{json_path}')"
+                order_parts.append(f"{field} {direction}")
+
+            order_by_part = ", ".join(order_parts)
+            order_by_part = f"ORDER BY {order_by_part}"
 
         offset_part = ""
         if offset != None:
