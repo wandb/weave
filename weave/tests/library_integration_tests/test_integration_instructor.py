@@ -33,7 +33,8 @@ def run_user_code():
 
 
 def test_instructor(client):
-    # TODO: Move this to a fixture
+    # TODO: Move this to a fixture, currently the `client` fixture does
+    # not call `weave_init` directly so the autopatching is not done.
     autopatch.autopatch()
     run_user_code()
 
