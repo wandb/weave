@@ -307,22 +307,22 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         // Start Column Menu
         // ColumnMenu is only needed when we have other actions
         // such as filtering.
-        disableColumnMenu
+        disableColumnMenu={true}
         // In this context, we don't need to filter columns. I suppose
         // we can add this in the future, but we should be intentional
         // about what we enable.
-        disableColumnFilter
-        disableMultipleColumnsFiltering
+        disableColumnFilter={true}
+        disableMultipleColumnsFiltering={true}
         // ColumnPinning seems to be required in DataGridPro, else it crashes.
-        // disableColumnPinning
+        disableColumnPinning={false}
         // There is no need to reorder the 2 columns in this context.
-        disableColumnReorder
+        disableColumnReorder={true}
         // Resizing columns might be helpful to show more data
-        // disableColumnResize
+        disableColumnResize={false}
         // There are only 2 columns, let's not confuse the user.
-        disableColumnSelector
+        disableColumnSelector={true}
         // We don't need to sort multiple columns.
-        disableMultipleColumnsSorting
+        disableMultipleColumnsSorting={true}
         // End Column Menu
         treeData
         getTreeDataPath={row => row.path.toStringArray()}

@@ -240,20 +240,20 @@ const ObjectVersionsTable: React.FC<{
       // Start Column Menu
       // ColumnMenu is only needed when we have other actions
       // such as filtering.
-      disableColumnMenu
+      disableColumnMenu={true}
       // We don't have enough columns to justify filtering
-      disableColumnFilter
-      disableMultipleColumnsFiltering
+      disableColumnFilter={true}
+      disableMultipleColumnsFiltering={true}
       // ColumnPinning seems to be required in DataGridPro, else it crashes.
-      // disableColumnPinning
+      disableColumnPinning={false}
       // We don't have enough columns to justify re-ordering
-      disableColumnReorder
+      disableColumnReorder={true}
       // The columns are fairly simple, so we don't need to resize them.
-      // disableColumnResize
+      disableColumnResize={false}
       // We don't have enough columns to justify hiding some of them.
-      disableColumnSelector
+      disableColumnSelector={true}
       // We don't have enough columns to justify sorting by multiple columns.
-      disableMultipleColumnsSorting
+      disableMultipleColumnsSorting={true}
       // End Column Menu
       rows={rows}
       initialState={{

@@ -877,22 +877,22 @@ export const RunsTable: FC<{
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
-        // disableColumnMenu
+        disableColumnMenu={false}
         // We will likely enable column filtering in soon, but for
         // now let's keep it simple and disable.
-        disableColumnFilter
-        disableMultipleColumnsFiltering
+        disableColumnFilter={true}
+        disableMultipleColumnsFiltering={true}
         // ColumnPinning seems to be required in DataGridPro, else it crashes.
         // However, in this case it is also useful.
-        // disableColumnPinning
+        disableColumnPinning={false}
         // ColumnReorder is definitely useful
-        // disableColumnReorder
+        disableColumnReorder={false}
         // ColumnResize is definitely useful
-        // disableColumnResize
+        disableColumnResize={false}
         // Disable the column selector for now, however, i could see it being useful
         // in the near future.
-        disableColumnSelector
-        disableMultipleColumnsSorting
+        disableColumnSelector={true}
+        disableMultipleColumnsSorting={true}
         // End Column Menu
         columnHeaderHeight={40}
         apiRef={apiRef}

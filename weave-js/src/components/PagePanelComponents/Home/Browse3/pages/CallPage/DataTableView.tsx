@@ -311,19 +311,19 @@ export const DataTableView: FC<{
           // We need the ColumnMenu to support Pinning.
           // disableColumnMenu
           // Let's disable Filters on Object Data for now
-          disableColumnFilter
-          disableMultipleColumnsFiltering
+          disableColumnFilter={true}
+          disableMultipleColumnsFiltering={true}
           // ColumnPinning seems to be required in DataGridPro, else it crashes.
           // However, in this case it is also useful.
-          // disableColumnPinning
+          disableColumnPinning={false}
           // ColumnReorder is useful for large datasets
-          // disableColumnReorder
+          disableColumnReorder={false}
           // ColumnResize is useful for large datasets
-          // disableColumnResize
+          disableColumnResize={false}
           // Column Selector might be overkill for now, disable it.
-          disableColumnSelector
+          disableColumnSelector={true}
           // No need for sorting on multiple columns MVP
-          disableMultipleColumnsSorting
+          disableMultipleColumnsSorting={true}
           // End Column Menu
           hideFooter={hideFooter}
           slots={{
