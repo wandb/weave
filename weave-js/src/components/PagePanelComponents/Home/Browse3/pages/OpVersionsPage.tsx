@@ -191,6 +191,24 @@ export const FilterableOpVersionsTable: React.FC<{
 
   return (
     <StyledDataGrid
+      // Start Column Menu
+      // ColumnMenu is only needed when we have other actions
+      // such as filtering.
+      disableColumnMenu
+      // We don't have enough columns to justify filtering
+      disableColumnFilter
+      disableMultipleColumnsFiltering
+      // ColumnPinning seems to be required in DataGridPro, else it crashes.
+      // disableColumnPinning
+      // We don't have enough columns to justify re-ordering
+      disableColumnReorder
+      // The columns are fairly simple, so we don't need to resize them.
+      // disableColumnResize
+      // We don't have enough columns to justify hiding some of them.
+      disableColumnSelector
+      // We don't have enough columns to justify sorting by multiple columns.
+      disableMultipleColumnsSorting
+      // End Column Menu
       rows={rows}
       initialState={{
         sorting: {
