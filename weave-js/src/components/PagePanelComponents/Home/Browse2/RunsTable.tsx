@@ -569,6 +569,8 @@ export const RunsTable: FC<{
         cols.push({
           flex: 1,
           field: expandField,
+          // Sorting on expanded ref columns is not supported
+          sortable: false,
           renderHeader: headerParams => (
             <CustomGroupedColumnHeader field={headerParams.field} />
           ),
@@ -873,6 +875,25 @@ export const RunsTable: FC<{
       )}
       <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
       <StyledDataGrid
+        // Start Column Menu
+        // ColumnMenu is needed to support pinning and column visibility
+        disableColumnMenu={false}
+        // We will likely enable column filtering in soon, but for
+        // now let's keep it simple and disable.
+        disableColumnFilter={true}
+        disableMultipleColumnsFiltering={true}
+        // ColumnPinning seems to be required in DataGridPro, else it crashes.
+        // However, in this case it is also useful.
+        disableColumnPinning={false}
+        // ColumnReorder is definitely useful
+        disableColumnReorder={false}
+        // ColumnResize is definitely useful
+        disableColumnResize={false}
+        // Disable the column selector for now, however, i could see it being useful
+        // in the near future.
+        disableColumnSelector={true}
+        disableMultipleColumnsSorting={true}
+        // End Column Menu
         columnHeaderHeight={40}
         apiRef={apiRef}
         loading={loading}

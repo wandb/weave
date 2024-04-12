@@ -306,6 +306,26 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     return (
       <StyledDataGrid
         apiRef={apiRef}
+        // Start Column Menu
+        // ColumnMenu is only needed when we have other actions
+        // such as filtering.
+        disableColumnMenu={true}
+        // In this context, we don't need to filter columns. I suppose
+        // we can add this in the future, but we should be intentional
+        // about what we enable.
+        disableColumnFilter={true}
+        disableMultipleColumnsFiltering={true}
+        // ColumnPinning seems to be required in DataGridPro, else it crashes.
+        disableColumnPinning={false}
+        // There is no need to reorder the 2 columns in this context.
+        disableColumnReorder={true}
+        // Resizing columns might be helpful to show more data
+        disableColumnResize={false}
+        // There are only 2 columns, let's not confuse the user.
+        disableColumnSelector={true}
+        // We don't need to sort multiple columns.
+        disableMultipleColumnsSorting={true}
+        // End Column Menu
         treeData
         getTreeDataPath={row => row.path.toStringArray()}
         rows={rows}
@@ -345,7 +365,6 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         }}
         hideFooter
         rowSelection={false}
-        disableColumnMenu={true}
         groupingColDef={groupingColDef}
         sx={{
           borderRadius: '0px',
