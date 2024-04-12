@@ -23,4 +23,4 @@ uvicorn>=0.27.0
 fastapi>=0.110.0
 
 ## weave/tests/library_integration_tests requirements
-instructor==1.1.0
+instructor
