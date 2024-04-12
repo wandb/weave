@@ -874,8 +874,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
                 if json_path:
-                    # TODO: Block injection
-                    field = f"JSON_VALUE({field}, '$.{json_path}')"
+                    key = f"order_field_{field}"
+                    field = f"JSON_VALUE({field}, '$.{{{key}: String}}')"
+                    parameters[key] = json_path
                 order_parts.append(f"{field} {direction}")
 
             order_by_part = ", ".join(order_parts)
