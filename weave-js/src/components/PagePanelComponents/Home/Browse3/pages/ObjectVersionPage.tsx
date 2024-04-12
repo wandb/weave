@@ -92,6 +92,11 @@ const ObjectVersionPageInner: React.FC<{
   const consumingCalls = useCalls(entityName, projectName, {
     inputObjectVersionRefs: [refUri],
   });
+  const showCallsTab =
+    !(producingCalls.loading || consumingCalls.loading) &&
+    (producingCalls.result?.length ?? 0) +
+      (consumingCalls.result?.length ?? 0) >
+      0;
   const data = useRefsData([refUri]);
   const viewerData = useMemo(() => {
     if (data.loading) {
@@ -132,7 +137,6 @@ const ObjectVersionPageInner: React.FC<{
                   ),
                 }
               : {}),
-
             ...(refExtra
               ? {
                   Subpath: refExtra,
@@ -146,32 +150,6 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            ...((producingCalls.result?.length ?? 0) > 0
-              ? {
-                  [maybePluralizeWord(
-                    producingCalls.result!.length,
-                    'Producing Call'
-                  )]: (
-                    <ObjectVersionProducingCallsItem
-                      producingCalls={producingCalls.result!}
-                      refUri={refUri}
-                    />
-                  ),
-                }
-              : {}),
-            ...((consumingCalls.result?.length ?? 0) > 0
-              ? {
-                  [maybePluralizeWord(
-                    consumingCalls.result!.length,
-                    'Consuming Call'
-                  )]: (
-                    <ObjectVersionConsumingCallsItem
-                      consumingCalls={consumingCalls.result!}
-                      refUri={refUri}
-                    />
-                  ),
-                }
-              : {}),
           }}
         />
       }
@@ -297,6 +275,47 @@ const ObjectVersionPageInner: React.FC<{
         //     />
         //   ),
         // },
+        ...(showCallsTab
+          ? [
+              {
+                label: 'Calls',
+                content: (
+                  <Box sx={{p: 2}}>
+                    <SimpleKeyValueTable
+                      data={{
+                        ...(producingCalls.result!.length > 0
+                          ? {
+                              [maybePluralizeWord(
+                                producingCalls.result!.length,
+                                'Producing Call'
+                              )]: (
+                                <ObjectVersionProducingCallsItem
+                                  producingCalls={producingCalls.result ?? []}
+                                  refUri={refUri}
+                                />
+                              ),
+                            }
+                          : {}),
+                        ...(consumingCalls.result!.length
+                          ? {
+                              [maybePluralizeWord(
+                                consumingCalls.result!.length,
+                                'Consuming Call'
+                              )]: (
+                                <ObjectVersionConsumingCallsItem
+                                  consumingCalls={consumingCalls.result ?? []}
+                                  refUri={refUri}
+                                />
+                              ),
+                            }
+                          : {}),
+                      }}
+                    />
+                  </Box>
+                ),
+              },
+            ]
+          : []),
       ]}
     />
   );
