@@ -51,7 +51,12 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   };
 
   // Determine set of possible columns and value types
-  const colPatterns: RegExp[] = [/opCategory/, /input\.*/, /output\.*/];
+  const colPatterns: RegExp[] = [
+    /^userId$/,
+    /^opCategory$/,
+    /^input\.*$/,
+    /^output\.*$/,
+  ];
   for (const row of table) {
     stats.rowCount++;
     for (const colName of Object.keys(row)) {
