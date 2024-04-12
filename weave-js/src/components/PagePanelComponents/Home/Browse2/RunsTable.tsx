@@ -7,6 +7,7 @@ import {
   GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
   ComponentProps,
@@ -313,6 +314,7 @@ export const RunsTable: FC<{
         trace_id: call.traceId,
         status_code: call.rawSpan.status_code,
         timestampMs: call.rawSpan.timestamp,
+        userId: call.userId,
         latency: call.rawSpan.summary.latency_s,
         ..._.mapKeys(
           _.omitBy(args, v => v == null),
@@ -449,18 +451,16 @@ export const RunsTable: FC<{
             },
           ]
         : []),
-      // {
-      //   field: 'user_id',
-      //   headerName: 'User',
-      //   disableColumnMenu: true,
-      //   renderCell: cellParams => {
-      //     return (
-      //       <div style={{margin: 'auto'}}>
-      //         {cellParams.row.call.userId ?? <NotApplicable />}
-      //       </div>
-      //     );
-      //   },
-      // },
+      {
+        field: 'userId',
+        headerName: 'User',
+        width: 50,
+        align: 'center',
+        sortable: false,
+        resizable: false,
+        disableColumnMenu: true,
+        renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
+      },
       // {
       //   field: 'run_id',
       //   headerName: 'Run',
