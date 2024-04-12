@@ -1,3 +1,4 @@
+import {Box} from '@material-ui/core';
 import {
   DataGridProProps,
   GridApiPro,
@@ -15,6 +16,7 @@ import React, {
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
+import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
@@ -57,6 +59,7 @@ const refIsExpandable = (ref: string): boolean => {
   if (isWeaveObjectRef(parsed)) {
     return (
       parsed.weaveKind === 'object' ||
+      parsed.weaveKind === 'op' ||
       (parsed.weaveKind === 'table' &&
         parsed.artifactRefExtra != null &&
         parsed.artifactRefExtra.length > 0)
@@ -149,6 +152,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       TraverseContext & {
         isExpandableRef?: boolean;
         isLoader?: boolean;
+        isCode?: boolean;
       }
     > = [];
     const expandablePathsInner = new Set<string>();
@@ -194,6 +198,17 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
         return 'skip';
       }
+      if (context.value?._ref && context.value?.weave_type?.type === 'Op') {
+        contexts.push({
+          depth: context.depth + 1,
+          isLeaf: true,
+          path: context.path.plus('code'),
+          isCode: true,
+          value: context.value?._ref,
+          valueType: 'undefined',
+        });
+        return 'skip';
+      }
       return true;
     });
     const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
@@ -213,6 +228,17 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         flex: 1,
         sortable: false,
         renderCell: ({row}) => {
+          if (row.isCode) {
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '400px',
+                }}>
+                <Browse2OpDefCode uri={row.value} />
+              </Box>
+            );
+          }
           if (row.isLoader) {
             return <LoadingDots />;
           }
@@ -354,10 +380,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           const isTableRef =
             isRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+          const isCode = params.model.isCode;
           if (
             isNonRefString ||
             (isArray && USE_TABLE_FOR_ARRAYS) ||
-            isTableRef
+            isTableRef ||
+            isCode
           ) {
             return 'auto';
           }
