@@ -288,6 +288,10 @@ class MockAsyncResponse:
         yield "data: [DONE]\n"
         yield "\n"
 
+    async def aiter_bytes(self):
+        async for line in self.aiter_lines():
+            yield line.encode("utf-8")
+
 
 class MockAsyncStream(AsyncStream):
     def __init__(self, chunks: List):
