@@ -1,10 +1,14 @@
+import {Box} from '@material-ui/core';
 import Editor from '@monaco-editor/react';
 import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC} from 'react';
 
 import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
 
-export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
+export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
+  uri,
+  maxRowsInView,
+}) => {
   const {
     derived: {useCodeForOpRef},
   } = useWFHooks();
@@ -13,7 +17,7 @@ export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
     return <Loading centered />;
   }
 
-  return (
+  const inner = (
     <Editor
       height={'100%'}
       defaultLanguage="python"
@@ -27,4 +31,13 @@ export const Browse2OpDefCode: FC<{uri: string}> = ({uri}) => {
       }}
     />
   );
+  if (maxRowsInView) {
+    const totalLines = text.result?.split('\n').length ?? 0;
+    const showLines = Math.min(totalLines, maxRowsInView);
+    const lineHeight = 18;
+    const padding = 20;
+    const height = showLines * lineHeight + padding + 'px';
+    return <Box sx={{height}}>{inner}</Box>;
+  }
+  return inner;
 };
