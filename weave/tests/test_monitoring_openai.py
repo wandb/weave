@@ -468,7 +468,6 @@ async def test_log_to_span_async_streaming(
     reassembled_chat_completion_message,
     client,
 ):
-    weave.init("dev_test")
     chat_completions = weave.monitoring.openai.openai.AsyncChatCompletions(
         mocked_async_streaming_create
     )
