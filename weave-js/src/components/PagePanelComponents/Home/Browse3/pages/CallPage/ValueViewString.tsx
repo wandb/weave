@@ -55,7 +55,6 @@ const Scrolling = styled.div`
   display: flex;
   align-items: center;
   overflow: auto;
-  white-space: break-spaces;
 `;
 Scrolling.displayName = 'S.Scrolling';
 
@@ -65,10 +64,13 @@ const ScrollingInner = styled.div`
 `;
 ScrollingInner.displayName = 'S.ScrollingInner';
 
-const Full = styled.div`
+const Full = styled.div``;
+Full.displayName = 'S.Full';
+
+const PreserveWrapping = styled.div`
   white-space: break-spaces;
 `;
-Full.displayName = 'S.Full';
+PreserveWrapping.displayName = 'S.PreserveWrapping';
 
 export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
   const trimmed = value.trim();
@@ -168,6 +170,8 @@ export const ValueViewString = ({value, isExpanded}: ValueViewStringProps) => {
     content = <CodeEditor value={trimmed} readOnly />;
   } else if (isUrl(trimmed)) {
     content = <TargetBlank href={trimmed}>{trimmed}</TargetBlank>;
+  } else if (mode !== 0) {
+    content = <PreserveWrapping>{content}</PreserveWrapping>;
   } else {
     content = value;
   }
