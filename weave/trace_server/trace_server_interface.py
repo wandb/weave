@@ -147,11 +147,20 @@ class _CallsFilter(BaseModel):
     wb_run_ids: typing.Optional[typing.List[str]] = None
 
 
+class _SortBy(BaseModel):
+    # Field should be a key of `CallSchema`. For dictionary fields (`attributes`, `inputs`, `outputs`, `summary`), the field can be dot-separated.
+    field: str
+    # Direction should be either 'asc' or 'desc'
+    direction: str
+
+
 class CallsQueryReq(BaseModel):
     project_id: str
     filter: typing.Optional[_CallsFilter] = None
     limit: typing.Optional[int] = None
     offset: typing.Optional[int] = None
+    # Sort by multiple fields
+    sort_by: typing.Optional[typing.List[_SortBy]] = None
 
 
 class CallsQueryRes(BaseModel):
