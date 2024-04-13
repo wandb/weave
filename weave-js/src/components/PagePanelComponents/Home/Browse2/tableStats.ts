@@ -54,8 +54,8 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   const colPatterns: RegExp[] = [
     /^userId$/,
     /^opCategory$/,
-    /^input\.*$/,
-    /^output\.*$/,
+    /^input\..*$/,
+    /^output\..*$/,
   ];
   for (const row of table) {
     stats.rowCount++;
