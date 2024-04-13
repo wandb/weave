@@ -669,6 +669,37 @@ def test_trace_call_query_offset(client):
         assert len(inner_res.calls) == exp_count
 
 
+def test_trace_call_sort(client):
+    @weave.op()
+    def basic_op(in_val: dict, delay) -> dict:
+        import time
+
+        time.sleep(delay)
+        return in_val
+
+    for i in range(3):
+        basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
+
+    for (first, last, sort_by) in [
+        (2, 0, [tsi._SortBy(field="started_at", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="output.prim", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="output.list.0", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="output.dict.inner", direction="desc")]),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=sort_by,
+            )
+        )
+
+        assert inner_res.calls[0].inputs["in_val"]["prim"] == first
+        assert inner_res.calls[2].inputs["in_val"]["prim"] == last
+
+
 def test_ops_with_default_params(client):
     @weave.op()
     def op_with_default(a: int, b: int = 10) -> int:
