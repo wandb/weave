@@ -32,17 +32,11 @@ export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
     />
   );
   if (maxRowsInView) {
-    let height = '100%';
     const totalLines = text.result?.split('\n').length ?? 0;
+    const showLines = Math.min(totalLines, maxRowsInView);
     const lineHeight = 18;
     const padding = 20;
-    const maxHeight = maxRowsInView * lineHeight + padding;
-    const targetHeight = totalLines * lineHeight + padding;
-    if (targetHeight > maxHeight) {
-      height = `${maxHeight}px`;
-    } else {
-      height = `${targetHeight}px`;
-    }
+    const height = showLines * lineHeight + padding + 'px';
     return <Box sx={{height}}>{inner}</Box>;
   }
   return inner;

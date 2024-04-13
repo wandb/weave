@@ -380,7 +380,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           const isTableRef =
             isRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
-          const isCode = params.model.isCode;
+          const {isCode} = params.model;
           if (
             isNonRefString ||
             (isArray && USE_TABLE_FOR_ARRAYS) ||
