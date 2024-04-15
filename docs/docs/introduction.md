@@ -7,9 +7,9 @@ hide_table_of_contents: true
 
 # Introduction
 
-Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai).
+Weave is a lightweight toolkit for tracking and evaluating LLM applications, built by Weights & Biases.
 
-Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing Generative AI software, without introducing cognitive overhead.
+Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI applications, without introducing cognitive overhead.
 
 [Get started](/quickstart) by decorating Python functions with `@weave.op()`. 
 
