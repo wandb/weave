@@ -102,7 +102,6 @@ export type AdditionalProps = {
   errorState?: boolean;
   groupDivider?: boolean;
   cursor?: string;
-  isDarkMode?: boolean;
 };
 
 // Toggle icon when open
@@ -167,12 +166,15 @@ const getStyles = <
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
 >(
-  props: StylesProps & {isDarkMode?: boolean}
+  props: StylesProps
 ) => {
   const errorState = props.errorState ?? false;
   const size = props.size ?? 'medium';
-  const isDarkMode = props.isDarkMode;
-  console.log(isDarkMode);
+  const controlStyles = {
+    base: `border rounded bg-white hover:cursor-pointer hover:dark:border-teal-650 hover:border-teal-350`,
+    focus: 'border-teal-350 ring-1 ring-primary-500',
+    nonFocus: 'border-gray-300',
+  };
   return {
     // No vertical line to left of dropdown indicator
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
@@ -211,41 +213,39 @@ const getStyles = <
         height,
       };
     },
-    control: (baseStyles, state) => {
-      const colorBorderDefault = MOON_250;
-      const colorBorderHover = hexToRGB(TEAL_500, 0.4);
-      const colorBorderOpen = errorState
-        ? hexToRGB(RED_550, 0.64)
-        : hexToRGB(TEAL_500, 0.64);
-      const height = HEIGHTS[size];
-      const minHeight = MIN_HEIGHTS[size] ?? height;
-      const lineHeight = LINE_HEIGHTS[size];
-      const fontSize = FONT_SIZES[size];
-      return {
-        ...baseStyles,
-        height,
-        minHeight,
-        lineHeight,
-        fontSize,
-        cursor: props.cursor ?? 'default',
-        border: 0,
-        backgroundColor: isDarkMode ? MOON_900 : WHITE,
-        boxShadow: isDarkMode
-          ? `0 0 0 2px ${WHITE}`
-          : state.menuIsOpen
-          ? `0 0 0 2px ${colorBorderOpen}`
-          : state.isFocused
-          ? `0 0 0 2px ${colorBorderOpen}`
-          : `inset 0 0 0 1px ${colorBorderDefault}`,
-        '&:hover': {
-          // border: `2px solid ${TEAL_350}`,
 
-          boxShadow: state.menuIsOpen
-            ? `0 0 0 2px ${colorBorderOpen}`
-            : `0 0 0 2px ${colorBorderHover}`,
-        },
-      };
-    },
+    // control: (baseStyles, state) => {
+    //   const colorBorderDefault = MOON_250;
+    //   const colorBorderHover = hexToRGB(TEAL_500, 0.4);
+    //   const colorBorderOpen = errorState
+    //     ? hexToRGB(RED_550, 0.64)
+    //     : hexToRGB(TEAL_500, 0.64);
+    //   const height = HEIGHTS[size];
+    //   const minHeight = MIN_HEIGHTS[size] ?? height;
+    //   const lineHeight = LINE_HEIGHTS[size];
+    //   const fontSize = FONT_SIZES[size];
+    //   return {
+    //     ...baseStyles,
+    //     height,
+    //     minHeight,
+    //     lineHeight,
+    //     fontSize,
+    //     cursor: props.cursor ?? 'default',
+    //     border: 0,
+    //     boxShadow: state.menuIsOpen
+    //       ? `0 0 0 2px ${colorBorderOpen}`
+    //       : state.isFocused
+    //       ? `0 0 0 2px ${colorBorderOpen}`
+    //       : `inset 0 0 0 1px ${colorBorderDefault}`,
+    //     '&:hover': {
+    //       // border: `2px solid ${TEAL_350}`,
+
+    //       boxShadow: state.menuIsOpen
+    //         ? `0 0 0 2px ${colorBorderOpen}`
+    //         : `0 0 0 2px ${colorBorderHover}`,
+    //     },
+    //   };
+    // },
     menu: baseStyles => ({
       ...baseStyles,
       // TODO: Semantic-UI based dropdowns have their z-index set to 3,
@@ -315,7 +315,7 @@ export const Select = <
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `border rounded-lg bg-white hover:cursor-pointer hover:dark:border-teal-650 hover:border-teal-350`,
+    base: `border rounded bg-white hover:cursor-pointer hover:dark:border-teal-650 hover:border-teal-350`,
     focus: 'border-teal-350 ring-1 ring-primary-500',
     nonFocus: 'border-gray-300',
   };
@@ -327,31 +327,17 @@ export const Select = <
           {DropdownIndicator, GroupHeading},
           props.components
         )}
-        styles={{
-          input: base => ({
-            ...base,
-            'input:focus': {
-              boxShadow: 'none',
-            },
-          }),
-          // On mobile, the label will truncate automatically, so we want to
-          // override that behaviour.
-          multiValueLabel: base => ({
-            ...base,
-            whiteSpace: 'normal',
-            overflow: 'visible',
-          }),
-          control: base => ({
-            ...base,
-            transition: 'none',
-          }),
-        }}
+        // styles={{
+        //   indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
+        // }}
+        styles={styles}
         classNames={{
           control: ({isFocused}) =>
             classNames(
               isFocused ? controlStyles.focus : controlStyles.nonFocus,
               controlStyles.base
             ),
+          // indicatorSeparator: () => 'none',
         }}
       />
     </Tailwind>
