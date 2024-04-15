@@ -6,11 +6,11 @@ import {twMerge} from 'tailwind-merge';
 import {Tailwind} from '../Tailwind';
 
 /**
- * {@link https://www.radix-ui.com/docs/primitives/components/tooltip#trigger}
+ * {@link https://www.radix-ui.com/docs/primitives/components/tooltip#provider}
  */
 export const Provider = (props: RadixTooltip.TooltipProviderProps) => (
   <RadixTooltip.Provider
-    delayDuration={250}
+    delayDuration={400}
     skipDelayDuration={100}
     {...props}
   />
