@@ -322,7 +322,8 @@ const useOpVersion = (
       };
     }
 
-    const cachableResult: OpVersionSchema = convertTraceServerObjectVersionToOpSchema(opVersionRes.obj)
+    const cachableResult: OpVersionSchema =
+      convertTraceServerObjectVersionToOpSchema(opVersionRes.obj);
 
     if (key.opId !== cachableResult.opId) {
       return {
@@ -453,7 +454,8 @@ const useObjectVersion = (
       };
     }
 
-    const cachableResult: ObjectVersionSchema = convertTraceServerObjectVersionToSchema(objectVersionRes.obj)
+    const cachableResult: ObjectVersionSchema =
+      convertTraceServerObjectVersionToSchema(objectVersionRes.obj);
     if (key.objectId !== cachableResult.objectId) {
       return {
         loading: true,
