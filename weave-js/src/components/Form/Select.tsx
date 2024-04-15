@@ -315,9 +315,9 @@ export const Select = <
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `rounded bg-white hover:cursor-pointer hover:dark:shadow-blue-50 hover:shadow-blue-50`,
+    base: `rounded bg-white hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
     focus: 'shadow-sm shadow-black ring-1 ring-primary-500',
-    nonFocus: 'border-none	shadow-[0_0_0_1px] shadow-[#b6b6b6]',
+    nonFocus: 'border-none	shadow-[0_0_0_1px] shadow-moon-250',
   };
   return (
     <Tailwind>
