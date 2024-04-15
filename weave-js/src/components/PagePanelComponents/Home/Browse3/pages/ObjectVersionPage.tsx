@@ -92,6 +92,11 @@ const ObjectVersionPageInner: React.FC<{
   const consumingCalls = useCalls(entityName, projectName, {
     inputObjectVersionRefs: [refUri],
   });
+  const showCallsTab =
+    !(producingCalls.loading || consumingCalls.loading) &&
+    (producingCalls.result?.length ?? 0) +
+      (consumingCalls.result?.length ?? 0) >
+      0;
   const data = useRefsData([refUri]);
   const viewerData = useMemo(() => {
     if (data.loading) {
@@ -99,6 +104,19 @@ const ObjectVersionPageInner: React.FC<{
     }
     return data.result?.[0] ?? {};
   }, [data.loading, data.result]);
+
+  const viewerDataAsObject = useMemo(() => {
+    const dataIsPrimitive =
+      typeof viewerData !== 'object' ||
+      viewerData === null ||
+      Array.isArray(viewerData);
+    if (dataIsPrimitive) {
+      // _result is a special key that is automatically removed by the
+      // ObjectViewerSection component.
+      return {_result: viewerData};
+    }
+    return viewerData;
+  }, [viewerData]);
 
   return (
     <SimplePageLayoutWithHeader
@@ -132,7 +150,6 @@ const ObjectVersionPageInner: React.FC<{
                   ),
                 }
               : {}),
-
             ...(refExtra
               ? {
                   Subpath: refExtra,
@@ -146,32 +163,6 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
-            ...((producingCalls.result?.length ?? 0) > 0
-              ? {
-                  [maybePluralizeWord(
-                    producingCalls.result!.length,
-                    'Producing Call'
-                  )]: (
-                    <ObjectVersionProducingCallsItem
-                      producingCalls={producingCalls.result!}
-                      refUri={refUri}
-                    />
-                  ),
-                }
-              : {}),
-            ...((consumingCalls.result?.length ?? 0) > 0
-              ? {
-                  [maybePluralizeWord(
-                    consumingCalls.result!.length,
-                    'Consuming Call'
-                  )]: (
-                    <ObjectVersionConsumingCallsItem
-                      consumingCalls={consumingCalls.result!}
-                      refUri={refUri}
-                    />
-                  ),
-                }
-              : {}),
           }}
         />
       }
@@ -217,7 +208,7 @@ const ObjectVersionPageInner: React.FC<{
                   <WeaveCHTableSourceRefContext.Provider value={refUri}>
                     <ObjectViewerSection
                       title=""
-                      data={viewerData}
+                      data={viewerDataAsObject}
                       noHide
                       isExpanded
                     />
@@ -297,6 +288,47 @@ const ObjectVersionPageInner: React.FC<{
         //     />
         //   ),
         // },
+        ...(showCallsTab
+          ? [
+              {
+                label: 'Calls',
+                content: (
+                  <Box sx={{p: 2}}>
+                    <SimpleKeyValueTable
+                      data={{
+                        ...(producingCalls.result!.length > 0
+                          ? {
+                              [maybePluralizeWord(
+                                producingCalls.result!.length,
+                                'Producing Call'
+                              )]: (
+                                <ObjectVersionProducingCallsItem
+                                  producingCalls={producingCalls.result ?? []}
+                                  refUri={refUri}
+                                />
+                              ),
+                            }
+                          : {}),
+                        ...(consumingCalls.result!.length
+                          ? {
+                              [maybePluralizeWord(
+                                consumingCalls.result!.length,
+                                'Consuming Call'
+                              )]: (
+                                <ObjectVersionConsumingCallsItem
+                                  consumingCalls={consumingCalls.result ?? []}
+                                  refUri={refUri}
+                                />
+                              ),
+                            }
+                          : {}),
+                      }}
+                    />
+                  </Box>
+                ),
+              },
+            ]
+          : []),
       ]}
     />
   );

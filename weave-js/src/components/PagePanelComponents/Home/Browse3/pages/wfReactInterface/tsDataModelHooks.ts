@@ -12,7 +12,12 @@ import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 // import {refStringToRefDict} from '../wfInterface/naive';
-import {callCache, objectVersionCache, refDataCache} from './cache';
+import {
+  callCache,
+  objectVersionCache,
+  opVersionCache,
+  refDataCache,
+} from './cache';
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -271,22 +276,81 @@ const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
 ): Loadable<OpVersionSchema | null> => {
-  const result = useOpVersions(
-    key?.entity ?? '',
-    key?.project ?? '',
-    {
-      opIds: [key?.opId ?? ''],
-    },
-    undefined,
-    {
-      skip: key == null,
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const cachedOpVersion = key ? opVersionCache.get(key) : null;
+  const [opVersionRes, setOpVersionRes] =
+    useState<traceServerClient.TraceObjReadRes | null>(null);
+  const deepKey = useDeepMemo(key);
+  useEffect(() => {
+    if (deepKey) {
+      setOpVersionRes(null);
+      loadingRef.current = true;
+      getTsClient()
+        .objRead({
+          project_id: projectIdFromParts({
+            entity: deepKey?.entity ?? '',
+            project: deepKey?.project ?? '',
+          }),
+          object_id: deepKey?.opId ?? '',
+          digest: deepKey?.versionHash ?? '',
+        })
+        .then(res => {
+          loadingRef.current = false;
+          setOpVersionRes(res);
+        });
     }
-  );
+  }, [deepKey, getTsClient]);
+
+  return useMemo(() => {
+    if (key == null) {
+      return {
+        loading: false,
+        result: null,
+      };
+    }
+    if (cachedOpVersion != null) {
+      return {
+        loading: false,
+        result: cachedOpVersion,
+      };
+    }
+    if (opVersionRes == null || loadingRef.current) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+
+    const cachableResult: OpVersionSchema =
+      convertTraceServerObjectVersionToOpSchema(opVersionRes.obj);
+
+    if (key.opId !== cachableResult.opId) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+
+    opVersionCache.set(key, cachableResult);
+    return {
+      loading: false,
+      result: cachableResult,
+    };
+  }, [cachedOpVersion, key, opVersionRes]);
+};
+
+const convertTraceServerObjectVersionToOpSchema = (
+  obj: traceServerClient.TraceObjSchema
+): OpVersionSchema => {
+  const [entity, project] = obj.project_id.split('/');
   return {
-    loading: result.loading,
-    result: result.result?.find(
-      obj => obj.versionHash === key?.versionHash
-    ) as OpVersionSchema | null,
+    entity,
+    project,
+    opId: obj.object_id,
+    versionHash: obj.digest,
+    createdAtMs: convertISOToDate(obj.created_at).getTime(),
+    versionIndex: obj.version_index,
   };
 };
 
@@ -316,20 +380,7 @@ const useOpVersions = makeTraceServerEndpointHook<
     skip: opts?.skip,
   }),
   (res): OpVersionSchema[] =>
-    res.objs.map(obj => {
-      const [entity, project] = obj.project_id.split('/');
-      return {
-        entity,
-        project,
-        opId: obj.object_id,
-        versionHash: obj.digest,
-        name: obj.object_id,
-        path: 'obj',
-        createdAtMs: convertISOToDate(obj.created_at).getTime(),
-        versionIndex: obj.version_index,
-        value: obj.val,
-      };
-    })
+    res.objs.map(convertTraceServerObjectVersionToOpSchema)
 );
 
 const useFileContent = makeTraceServerEndpointHook<
@@ -403,10 +454,15 @@ const useObjectVersion = (
       };
     }
 
-    const cachableResult: ObjectVersionSchema = {
-      ...key,
-      ...convertTraceServerObjectVersionToSchema(objectVersionRes.obj),
-    };
+    const cachableResult: ObjectVersionSchema =
+      convertTraceServerObjectVersionToSchema(objectVersionRes.obj);
+    if (key.objectId !== cachableResult.objectId) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+
     objectVersionCache.set(key, cachableResult);
     return {
       loading: false,

@@ -1,3 +1,4 @@
+import {Box} from '@material-ui/core';
 import {
   DataGridProProps,
   GridApiPro,
@@ -15,6 +16,7 @@ import React, {
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
+import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
@@ -53,10 +55,14 @@ const getRefs = (data: Data): string[] => {
 type RefValues = Record<string, any>; // ref URI to value
 
 const refIsExpandable = (ref: string): boolean => {
+  if (!isRef(ref)) {
+    return false;
+  }
   const parsed = parseRef(ref);
   if (isWeaveObjectRef(parsed)) {
     return (
       parsed.weaveKind === 'object' ||
+      parsed.weaveKind === 'op' ||
       (parsed.weaveKind === 'table' &&
         parsed.artifactRefExtra != null &&
         parsed.artifactRefExtra.length > 0)
@@ -120,6 +126,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
             ...v,
             _ref: r,
           };
+        } else {
+          // This makes it so that runs pointing to primitives can still be expanded in the table.
+          val = {
+            '': v,
+            _ref: r,
+          };
         }
       }
       refValues[r] = val;
@@ -144,11 +156,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
 
   // `rows` are the data-grid friendly rows that we will render. This method traverses
   // the data, hiding certain keys and adding loader rows for expandable refs.
-  const rows = useMemo(() => {
+  const {rows} = useMemo(() => {
     const contexts: Array<
       TraverseContext & {
         isExpandableRef?: boolean;
         isLoader?: boolean;
+        isCode?: boolean;
       }
     > = [];
     traverse(resolvedData, context => {
@@ -163,11 +176,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         if (context.path.hasHiddenKey() || isNullDescription) {
           return 'skip';
         }
-        if (
-          isRef(context.value) &&
-          context.depth > 1 &&
-          refIsExpandable(context.value)
-        ) {
+        if (refIsExpandable(context.value)) {
           // These are possibly expandable refs. When we encounter an expandable ref, we
           // indicate that it is expandable and add a loader row. The effect is that the
           // group header will show the expansion icon when `isExpandableRef` is true. Also,
@@ -192,10 +201,21 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
         return 'skip';
       }
+      if (context.value?._ref && context.value?.weave_type?.type === 'Op') {
+        contexts.push({
+          depth: context.depth + 1,
+          isLeaf: true,
+          path: context.path.plus('code'),
+          isCode: true,
+          value: context.value?._ref,
+          valueType: 'undefined',
+        });
+        return 'skip';
+      }
       return true;
     });
-
-    return contexts.map((c, id) => ({id: c.path.toString(), ...c}));
+    const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
+    return {rows: rowsInner};
   }, [resolvedData]);
 
   // Next, we setup the columns. In our case, there is just one column: Value.
@@ -211,6 +231,17 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         flex: 1,
         sortable: false,
         renderCell: ({row}) => {
+          if (row.isCode) {
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                }}>
+                <Browse2OpDefCode uri={row.value} maxRowsInView={20} />
+              </Box>
+            );
+          }
           if (row.isLoader) {
             return <LoadingDots />;
           }
@@ -247,7 +278,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   // the expansion. Importantly, when the column is clicked, we do some
   // bookkeeping to add the expanded ref to the `expandedRefs` state. This
   // triggers a set of state updates to populate the expanded data.
-  const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
+  const [expandedIds, setExpandedIds] = useState<Array<string | number>>(
+    isExpanded ? rows.filter(r => !r.isExpandableRef).map(r => r.id) : []
+  );
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
       headerName: 'Path',
@@ -304,11 +337,33 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     return (
       <StyledDataGrid
         apiRef={apiRef}
+        // Start Column Menu
+        // ColumnMenu is only needed when we have other actions
+        // such as filtering.
+        disableColumnMenu={true}
+        // In this context, we don't need to filter columns. I suppose
+        // we can add this in the future, but we should be intentional
+        // about what we enable.
+        disableColumnFilter={true}
+        disableMultipleColumnsFiltering={true}
+        // ColumnPinning seems to be required in DataGridPro, else it crashes.
+        disableColumnPinning={false}
+        // There is no need to reorder the 2 columns in this context.
+        disableColumnReorder={true}
+        // Resizing columns might be helpful to show more data
+        disableColumnResize={false}
+        // There are only 2 columns, let's not confuse the user.
+        disableColumnSelector={true}
+        // We don't need to sort multiple columns.
+        disableMultipleColumnsSorting={true}
+        // End Column Menu
         treeData
         getTreeDataPath={row => row.path.toStringArray()}
         rows={rows}
         columns={columns}
-        defaultGroupingExpansionDepth={isExpanded ? -1 : 0}
+        isGroupExpandedByDefault={node => {
+          return expandedIds.includes(node.id);
+        }}
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
           const isNonRefString =
@@ -317,10 +372,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           const isTableRef =
             isRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+          const {isCode} = params.model;
           if (
             isNonRefString ||
             (isArray && USE_TABLE_FOR_ARRAYS) ||
-            isTableRef
+            isTableRef ||
+            isCode
           ) {
             return 'auto';
           }
@@ -328,7 +385,6 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         }}
         hideFooter
         rowSelection={false}
-        disableColumnMenu={true}
         groupingColDef={groupingColDef}
         sx={{
           borderRadius: '0px',
@@ -346,7 +402,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         }}
       />
     );
-  }, [apiRef, columns, rows, groupingColDef, isExpanded]);
+  }, [apiRef, rows, columns, groupingColDef, expandedIds]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
   return <div style={{overflow: 'hidden'}}>{inner}</div>;

@@ -51,7 +51,12 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   };
 
   // Determine set of possible columns and value types
-  const colPatterns: RegExp[] = [/opCategory/, /input\.*/, /output\.*/];
+  const colPatterns: RegExp[] = [
+    /^userId$/,
+    /^opCategory$/,
+    /^input\..*$/,
+    /^output\..*$/,
+  ];
   for (const row of table) {
     stats.rowCount++;
     for (const colName of Object.keys(row)) {
@@ -114,26 +119,17 @@ export const useColumnVisibility = (
   isSingleOpVersion: boolean
 ) => {
   const [forceShowAll, setForceShowAll] = useState(false);
-  if (isSingleOpVersion) {
-    return {
-      allShown: true,
-      columnVisibilityModel: {},
-      forceShowAll: true,
-      setForceShowAll,
-    };
-  }
 
   const boringColumns = getBoringColumns(tableStats);
 
   const model: GridColumnVisibilityModel = {};
   for (const colName in tableStats.column) {
-    if (forceShowAll) {
-      // This will include columns that are entirely empty,
-      // but that seemed less confusing than a "Show all" not actually
-      // showing all?
-      model[colName] = true;
-    } else if (boringColumns.includes(colName)) {
+    if (boringColumns.includes(colName)) {
       model[colName] = false;
+    } else if (forceShowAll) {
+      model[colName] = true;
+    } else if (isSingleOpVersion) {
+      model[colName] = true;
     } else {
       const colStats = tableStats.column[colName];
       if (colStats.typeCounts.null === tableStats.rowCount) {

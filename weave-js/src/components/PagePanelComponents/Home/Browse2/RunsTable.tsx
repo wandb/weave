@@ -7,6 +7,7 @@ import {
   GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
   ComponentProps,
@@ -313,6 +314,7 @@ export const RunsTable: FC<{
         trace_id: call.traceId,
         status_code: call.rawSpan.status_code,
         timestampMs: call.rawSpan.timestamp,
+        userId: call.userId,
         latency: call.rawSpan.summary.latency_s,
         ..._.mapKeys(
           _.omitBy(args, v => v == null),
@@ -413,6 +415,9 @@ export const RunsTable: FC<{
         field: 'span_id',
         headerName: 'Trace',
         minWidth: 100,
+        // This filter should be controlled by the custom filter
+        // in the header
+        filterable: false,
         width: 250,
         hideable: false,
         renderCell: rowParams => {
@@ -450,18 +455,6 @@ export const RunsTable: FC<{
           ]
         : []),
       // {
-      //   field: 'user_id',
-      //   headerName: 'User',
-      //   disableColumnMenu: true,
-      //   renderCell: cellParams => {
-      //     return (
-      //       <div style={{margin: 'auto'}}>
-      //         {cellParams.row.call.userId ?? <NotApplicable />}
-      //       </div>
-      //     );
-      //   },
-      // },
-      // {
       //   field: 'run_id',
       //   headerName: 'Run',
       //   disableColumnMenu: true,
@@ -476,12 +469,14 @@ export const RunsTable: FC<{
       {
         field: 'status_code',
         headerName: 'Status',
+        headerAlign: 'center',
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
-        width: 70,
-        minWidth: 70,
-        maxWidth: 70,
+        // Again, the underlying value is not obvious to the user,
+        // so the default free-form filter is likely more confusing than helpful.
+        filterable: false,
+        width: 59,
         renderCell: cellParams => {
           return (
             <div style={{margin: 'auto'}}>
@@ -490,25 +485,6 @@ export const RunsTable: FC<{
           );
         },
       },
-      ...(!ioColumnsOnly
-        ? [
-            {
-              field: 'timestampMs',
-              headerName: 'Called',
-              width: 100,
-              minWidth: 100,
-              maxWidth: 100,
-              renderCell: (cellParams: any) => {
-                return (
-                  <Timestamp
-                    value={cellParams.row.timestampMs / 1000}
-                    format="relative"
-                  />
-                );
-              },
-            },
-          ]
-        : []),
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = spans[0];
@@ -516,7 +492,7 @@ export const RunsTable: FC<{
       return {cols: [], colGroupingModel: []};
     }
 
-    let attributesKeys: {[key: string]: true} = {};
+    const attributesKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(
         flattenObject(span.rawSpan.attributes ?? {})
@@ -526,14 +502,6 @@ export const RunsTable: FC<{
         }
       }
     });
-    // sort shallowest keys first
-    attributesKeys = _.fromPairs(
-      Object.entries(attributesKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
 
     const attributesOrder = Object.keys(attributesKeys);
     const attributesGrouping = buildTree(attributesOrder, 'attributes');
@@ -569,6 +537,10 @@ export const RunsTable: FC<{
         cols.push({
           flex: 1,
           field: expandField,
+          // Sorting on expanded ref columns is not supported
+          sortable: false,
+          // Filtering on expanded ref columns is not supported
+          filterable: false,
           renderHeader: headerParams => (
             <CustomGroupedColumnHeader field={headerParams.field} />
           ),
@@ -670,7 +642,7 @@ export const RunsTable: FC<{
     // Add output columns
     if (!onlyOneOutputResult) {
       // All output keys as we don't have the order key yet.
-      let outputKeys: {[key: string]: true} = {};
+      const outputKeys: {[key: string]: true} = {};
       spans.forEach(span => {
         for (const [k, v] of Object.entries(
           flattenObject(span.rawSpan.output ?? {})
@@ -680,14 +652,6 @@ export const RunsTable: FC<{
           }
         }
       });
-      // sort shallowest keys first
-      outputKeys = _.fromPairs(
-        Object.entries(outputKeys).sort((a, b) => {
-          const aDepth = a[0].split('.').length;
-          const bDepth = b[0].split('.').length;
-          return aDepth - bDepth;
-        })
-      );
 
       const outputOrder = Object.keys(outputKeys);
       addColumnGroup('output', outputOrder);
@@ -750,7 +714,7 @@ export const RunsTable: FC<{
       colGroupingModel.push(colGroup);
     }
 
-    let feedbackKeys: {[key: string]: true} = {};
+    const feedbackKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(
         flattenObject(span.rawFeedback ?? {})
@@ -760,14 +724,6 @@ export const RunsTable: FC<{
         }
       }
     });
-    // sort shallowest keys first
-    feedbackKeys = _.fromPairs(
-      Object.entries(feedbackKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
 
     const feedbackOrder = Object.keys(feedbackKeys);
     const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
@@ -785,11 +741,48 @@ export const RunsTable: FC<{
     }
 
     cols.push({
+      field: 'userId',
+      headerName: 'User',
+      headerAlign: 'center',
+      width: 50,
+      // Might be confusing to enable as-is, because the user sees name /
+      // email but the underlying data is userId.
+      filterable: false,
+      align: 'center',
+      sortable: false,
+      resizable: false,
+      disableColumnMenu: true,
+      renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
+    });
+
+    if (!ioColumnsOnly) {
+      cols.push({
+        field: 'timestampMs',
+        headerName: 'Called',
+        // Should have custom timestamp filter here.
+        filterable: false,
+        width: 100,
+        minWidth: 100,
+        maxWidth: 100,
+        renderCell: (cellParams: any) => {
+          return (
+            <Timestamp
+              value={cellParams.row.timestampMs / 1000}
+              format="relative"
+            />
+          );
+        },
+      });
+    }
+
+    cols.push({
       field: 'latency',
       headerName: 'Latency',
       width: 100,
       minWidth: 100,
       maxWidth: 100,
+      // Should probably have a custom filter here.
+      filterable: false,
       renderCell: cellParams => {
         if (cellParams.row.status_code === 'UNSET') {
           // Call is still in progress, latency will be 0.
@@ -873,6 +866,23 @@ export const RunsTable: FC<{
       )}
       <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
       <StyledDataGrid
+        // Start Column Menu
+        // ColumnMenu is needed to support pinning and column visibility
+        disableColumnMenu={false}
+        // ColumnFilter is definitely useful
+        disableColumnFilter={false}
+        disableMultipleColumnsFiltering={false}
+        // ColumnPinning seems to be required in DataGridPro, else it crashes.
+        // However, in this case it is also useful.
+        disableColumnPinning={false}
+        // ColumnReorder is definitely useful
+        disableColumnReorder={false}
+        // ColumnResize is definitely useful
+        disableColumnResize={false}
+        // ColumnSelector is definitely useful
+        disableColumnSelector={false}
+        disableMultipleColumnsSorting={true}
+        // End Column Menu
         columnHeaderHeight={40}
         apiRef={apiRef}
         loading={loading}

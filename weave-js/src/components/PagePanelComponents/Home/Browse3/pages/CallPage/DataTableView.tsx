@@ -36,7 +36,7 @@ import {TableQuery} from '../wfReactInterface/wfDataModelHooksInterface';
 const MAX_ROWS = 1000;
 
 // Controls whether to use a table for arrays or not.
-export const USE_TABLE_FOR_ARRAYS = true;
+export const USE_TABLE_FOR_ARRAYS = false;
 
 // Callers are responsible for setting the source ref context. This is because
 // by the time the WeaveCHTable is rendered, the ref is already resolved to be a
@@ -307,6 +307,24 @@ export const DataTableView: FC<{
           width: '100%',
         }}>
         <StyledDataGrid
+          // Start Column Menu
+          // We need the ColumnMenu to support Pinning.
+          // disableColumnMenu
+          // Let's disable Filters on Object Data for now
+          disableColumnFilter={true}
+          disableMultipleColumnsFiltering={true}
+          // ColumnPinning seems to be required in DataGridPro, else it crashes.
+          // However, in this case it is also useful.
+          disableColumnPinning={false}
+          // ColumnReorder is useful for large datasets
+          disableColumnReorder={false}
+          // ColumnResize is useful for large datasets
+          disableColumnResize={false}
+          // Column Selector might be overkill for now, disable it.
+          disableColumnSelector={true}
+          // No need for sorting on multiple columns MVP
+          disableMultipleColumnsSorting={true}
+          // End Column Menu
           hideFooter={hideFooter}
           slots={{
             ...(hideHeader
