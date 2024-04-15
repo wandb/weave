@@ -315,9 +315,9 @@ export const Select = <
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `rounded bg-white hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
-    focus: 'shadow-sm shadow-black ring-1 ring-primary-500',
-    nonFocus: 'border-none	shadow-[0_0_0_1px] shadow-moon-250',
+    base: `rounded night-aware bg-white hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
+    focus: 'åring-1 ring-primary-500',
+    nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250',
   };
   return (
     <Tailwind>
@@ -332,6 +332,7 @@ export const Select = <
         // }}
         styles={styles}
         className="night-aware"
+        classNamePrefix="react-select"
         classNames={{
           control: ({isFocused}) =>
             classNames(
