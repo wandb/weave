@@ -61,7 +61,7 @@ export const Content = React.forwardRef(
       <RadixTooltip.Content
         className={twMerge(
           'night-aware',
-          'rounded text-sm shadow-md',
+          'rounded text-sm leading-[140%] shadow-md',
           'bg-moon-900 p-12 text-moon-200 dark:bg-moon-50 dark:text-moon-800'
         )}
         sideOffset={5}
