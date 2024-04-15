@@ -527,7 +527,7 @@ export const RunsTable: FC<{
       return {cols: [], colGroupingModel: []};
     }
 
-    let attributesKeys: {[key: string]: true} = {};
+    const attributesKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(
         flattenObject(span.rawSpan.attributes ?? {})
@@ -537,14 +537,6 @@ export const RunsTable: FC<{
         }
       }
     });
-    // sort shallowest keys first
-    attributesKeys = _.fromPairs(
-      Object.entries(attributesKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
 
     const attributesOrder = Object.keys(attributesKeys);
     const attributesGrouping = buildTree(attributesOrder, 'attributes');
@@ -685,7 +677,7 @@ export const RunsTable: FC<{
     // Add output columns
     if (!onlyOneOutputResult) {
       // All output keys as we don't have the order key yet.
-      let outputKeys: {[key: string]: true} = {};
+      const outputKeys: {[key: string]: true} = {};
       spans.forEach(span => {
         for (const [k, v] of Object.entries(
           flattenObject(span.rawSpan.output ?? {})
@@ -695,14 +687,6 @@ export const RunsTable: FC<{
           }
         }
       });
-      // sort shallowest keys first
-      outputKeys = _.fromPairs(
-        Object.entries(outputKeys).sort((a, b) => {
-          const aDepth = a[0].split('.').length;
-          const bDepth = b[0].split('.').length;
-          return aDepth - bDepth;
-        })
-      );
 
       const outputOrder = Object.keys(outputKeys);
       addColumnGroup('output', outputOrder);
@@ -765,7 +749,7 @@ export const RunsTable: FC<{
       colGroupingModel.push(colGroup);
     }
 
-    let feedbackKeys: {[key: string]: true} = {};
+    const feedbackKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(
         flattenObject(span.rawFeedback ?? {})
@@ -775,14 +759,6 @@ export const RunsTable: FC<{
         }
       }
     });
-    // sort shallowest keys first
-    feedbackKeys = _.fromPairs(
-      Object.entries(feedbackKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
 
     const feedbackOrder = Object.keys(feedbackKeys);
     const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
