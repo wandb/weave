@@ -527,7 +527,7 @@ export const RunsTable: FC<{
       return {cols: [], colGroupingModel: []};
     }
 
-    let attributesKeys: {[key: string]: true} = {};
+    const attributesKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(
         flattenObject(span.rawSpan.attributes ?? {})
@@ -677,7 +677,7 @@ export const RunsTable: FC<{
     // Add output columns
     if (!onlyOneOutputResult) {
       // All output keys as we don't have the order key yet.
-      let outputKeys: {[key: string]: true} = {};
+      const outputKeys: {[key: string]: true} = {};
       spans.forEach(span => {
         for (const [k, v] of Object.entries(
           flattenObject(span.rawSpan.output ?? {})
@@ -749,7 +749,7 @@ export const RunsTable: FC<{
       colGroupingModel.push(colGroup);
     }
 
-    let feedbackKeys: {[key: string]: true} = {};
+    const feedbackKeys: {[key: string]: true} = {};
     spans.forEach(span => {
       for (const [k, v] of Object.entries(
         flattenObject(span.rawFeedback ?? {})
