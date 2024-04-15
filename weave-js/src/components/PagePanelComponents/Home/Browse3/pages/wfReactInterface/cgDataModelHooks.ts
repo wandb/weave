@@ -90,6 +90,7 @@ import {
   CallFilter,
   CallKey,
   CallSchema,
+  FilterBy,
   Loadable,
   ObjectVersionFilter,
   ObjectVersionKey,
@@ -100,6 +101,7 @@ import {
   RawSpanFromStreamTableEra,
   RawSpanFromStreamTableEraWithFeedback,
   RefMutation,
+  SortBy,
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
@@ -157,6 +159,10 @@ const useCalls = (
   project: string,
   filter: CallFilter,
   limit?: number,
+  offset?: number,
+  sortBy?: SortBy[],
+  filterBy?: FilterBy,
+  expandPaths?: string[],
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   let runsNode = fnRunsNode(

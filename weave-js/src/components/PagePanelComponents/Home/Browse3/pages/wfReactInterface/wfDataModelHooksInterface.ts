@@ -145,6 +145,38 @@ type AppendRefMutation = {
 
 export type RefMutation = SetRefMutation | AppendRefMutation;
 
+export type SortBy = {
+  field: string;
+  direction: 'asc' | 'desc';
+};
+
+type ValueOperand = {
+  type: 'value';
+  value: any;
+};
+
+type FieldOperand = {
+  type: 'field';
+  field: string;
+};
+
+type Operand = ValueOperand | FieldOperand;
+
+type Operation = 'contains';
+
+type FilterOperation = {
+  left: Operand;
+  operation: Operation;
+  right: Operand;
+};
+
+type FilterByOrGroup = {
+  any: FilterOperation[];
+};
+
+export type FilterBy = {
+  all: FilterByOrGroup[];
+};
 export type WFDataModelHooksInterface = {
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
@@ -152,6 +184,10 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: CallFilter,
     limit?: number,
+    offset?: number,
+    sortBy?: SortBy[],
+    filterBy?: FilterBy,
+    expandPaths?: string[],
     opts?: {skip?: boolean}
   ) => Loadable<CallSchema[]>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;

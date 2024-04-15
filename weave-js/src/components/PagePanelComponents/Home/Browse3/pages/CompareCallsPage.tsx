@@ -48,6 +48,10 @@ export const CompareCallsPage: FC<{
       parentIds: props.callIds ?? [],
     },
     undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
     {
       skip: !props.callIds,
     }

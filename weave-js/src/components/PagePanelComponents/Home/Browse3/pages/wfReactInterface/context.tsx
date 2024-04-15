@@ -111,9 +111,19 @@ export const useProjectHasTraceServerCalls = (
   project: string
 ) => {
   const hasTraceServer = useHasTraceServerClientContext();
-  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
-    skip: !hasTraceServer,
-  });
+  const calls = tsWFDataModelHooks.useCalls(
+    entity,
+    project,
+    {},
+    1,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      skip: !hasTraceServer,
+    }
+  );
   const loading = calls.loading;
   return {
     loading,
@@ -140,9 +150,19 @@ export const useProjectHasTraceServerData = (
     }
   );
 
-  const calls = tsWFDataModelHooks.useCalls(entity, project, {}, 1, {
-    skip: !hasTraceServer,
-  });
+  const calls = tsWFDataModelHooks.useCalls(
+    entity,
+    project,
+    {},
+    1,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      skip: !hasTraceServer,
+    }
+  );
   const loading = objs.loading || calls.loading;
   return {
     loading,

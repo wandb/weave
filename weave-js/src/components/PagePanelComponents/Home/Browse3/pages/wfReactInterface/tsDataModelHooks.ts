@@ -26,6 +26,7 @@ import {
   CallFilter,
   CallKey,
   CallSchema,
+  FilterBy,
   Loadable,
   LoadableWithError,
   ObjectVersionFilter,
@@ -36,6 +37,7 @@ import {
   OpVersionSchema,
   RawSpanFromStreamTableEra,
   RefMutation,
+  SortBy,
   TableQuery,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
@@ -198,6 +200,10 @@ const useCalls = (
   project: string,
   filter: CallFilter,
   limit?: number,
+  offset?: number,
+  sortBy?: SortBy[],
+  filterBy?: FilterBy,
+  expandPaths?: string[],
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -582,6 +588,10 @@ const useChildCallsForCompare = (
         : [],
     },
     undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
     {skip: skipParent}
   );
 
@@ -599,6 +609,10 @@ const useChildCallsForCompare = (
       parentIds: subParentCallIds,
       opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
     },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
     undefined,
     {skip: skipChild}
   );
