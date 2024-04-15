@@ -903,9 +903,8 @@ export const RunsTable: FC<{
         disableColumnReorder={false}
         // ColumnResize is definitely useful
         disableColumnResize={false}
-        // Disable the column selector for now, however, i could see it being useful
-        // in the near future.
-        disableColumnSelector={true}
+        // ColumnSelector is definitely useful
+        disableColumnSelector={false}
         disableMultipleColumnsSorting={true}
         // End Column Menu
         columnHeaderHeight={40}
