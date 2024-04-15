@@ -339,8 +339,6 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     });
   }, [apiRef, expandedIds, updateRowExpand]);
 
-  console.log(expandedIds);
-
   // Finally, we memoize the inner data grid component. This is important to
   // reduce the number of re-renders when the data changes.
   const inner = useMemo(() => {
@@ -372,7 +370,6 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         rows={rows}
         columns={columns}
         isGroupExpandedByDefault={node => {
-          console.log(node, node.id, data[node.id]);
           if (!isExpanded) {
             return expandedIds.includes(node.id);
           } else {
