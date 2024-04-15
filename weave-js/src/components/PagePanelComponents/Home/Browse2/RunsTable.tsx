@@ -526,14 +526,6 @@ export const RunsTable: FC<{
         }
       }
     });
-    // sort shallowest keys first
-    attributesKeys = _.fromPairs(
-      Object.entries(attributesKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
 
     const attributesOrder = Object.keys(attributesKeys);
     const attributesGrouping = buildTree(attributesOrder, 'attributes');
@@ -682,14 +674,6 @@ export const RunsTable: FC<{
           }
         }
       });
-      // sort shallowest keys first
-      outputKeys = _.fromPairs(
-        Object.entries(outputKeys).sort((a, b) => {
-          const aDepth = a[0].split('.').length;
-          const bDepth = b[0].split('.').length;
-          return aDepth - bDepth;
-        })
-      );
 
       const outputOrder = Object.keys(outputKeys);
       addColumnGroup('output', outputOrder);
@@ -762,14 +746,6 @@ export const RunsTable: FC<{
         }
       }
     });
-    // sort shallowest keys first
-    feedbackKeys = _.fromPairs(
-      Object.entries(feedbackKeys).sort((a, b) => {
-        const aDepth = a[0].split('.').length;
-        const bDepth = b[0].split('.').length;
-        return aDepth - bDepth;
-      })
-    );
 
     const feedbackOrder = Object.keys(feedbackKeys);
     const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
