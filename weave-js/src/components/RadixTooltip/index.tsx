@@ -10,7 +10,7 @@ import {Tailwind} from '../Tailwind';
  */
 export const Provider = (props: RadixTooltip.TooltipProviderProps) => (
   <RadixTooltip.Provider
-    delayDuration={400}
+    delayDuration={500} // this value has been approved by design
     skipDelayDuration={100}
     {...props}
   />
