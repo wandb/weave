@@ -315,7 +315,7 @@ export const Select = <
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `border rounded-lg bg-white hover:cursor-pointer hover:dark:border-teal-350`,
+    base: `border rounded-lg bg-white hover:cursor-pointer hover:dark:border-teal-650 hover:border-teal-350`,
     focus: 'border-teal-350 ring-1 ring-primary-500',
     nonFocus: 'border-gray-300',
   };
