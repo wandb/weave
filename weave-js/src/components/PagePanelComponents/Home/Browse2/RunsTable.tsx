@@ -415,6 +415,9 @@ export const RunsTable: FC<{
         field: 'span_id',
         headerName: 'Trace',
         minWidth: 100,
+        // This filter should be controlled by the custom filter
+        // in the header
+        filterable: false,
         width: 250,
         hideable: false,
         renderCell: rowParams => {
@@ -455,6 +458,9 @@ export const RunsTable: FC<{
         field: 'userId',
         headerName: 'User',
         width: 50,
+        // Might be confusing to enable as-is, because the user sees name /
+        // email but the underlying data is userId.
+        filterable: false,
         align: 'center',
         sortable: false,
         resizable: false,
@@ -479,6 +485,9 @@ export const RunsTable: FC<{
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
+        // Again, the underlying value is not obvious to the user,
+        // so the default free-form filter is likely more confusing than helpful.
+        filterable: false,
         width: 70,
         minWidth: 70,
         maxWidth: 70,
@@ -495,6 +504,8 @@ export const RunsTable: FC<{
             {
               field: 'timestampMs',
               headerName: 'Called',
+              // Should have custom timestamp filter here.
+              filterable: false,
               width: 100,
               minWidth: 100,
               maxWidth: 100,
@@ -571,6 +582,8 @@ export const RunsTable: FC<{
           field: expandField,
           // Sorting on expanded ref columns is not supported
           sortable: false,
+          // Filtering on expanded ref columns is not supported
+          filterable: false,
           renderHeader: headerParams => (
             <CustomGroupedColumnHeader field={headerParams.field} />
           ),
@@ -792,6 +805,8 @@ export const RunsTable: FC<{
       width: 100,
       minWidth: 100,
       maxWidth: 100,
+      // Should probably have a custom filter here.
+      filterable: false,
       renderCell: cellParams => {
         if (cellParams.row.status_code === 'UNSET') {
           // Call is still in progress, latency will be 0.
@@ -878,10 +893,9 @@ export const RunsTable: FC<{
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
         disableColumnMenu={false}
-        // We will likely enable column filtering in soon, but for
-        // now let's keep it simple and disable.
-        disableColumnFilter={true}
-        disableMultipleColumnsFiltering={true}
+        // ColumnFilter is definitely useful
+        disableColumnFilter={false}
+        disableMultipleColumnsFiltering={false}
         // ColumnPinning seems to be required in DataGridPro, else it crashes.
         // However, in this case it is also useful.
         disableColumnPinning={false}
@@ -889,9 +903,8 @@ export const RunsTable: FC<{
         disableColumnReorder={false}
         // ColumnResize is definitely useful
         disableColumnResize={false}
-        // Disable the column selector for now, however, i could see it being useful
-        // in the near future.
-        disableColumnSelector={true}
+        // ColumnSelector is definitely useful
+        disableColumnSelector={false}
         disableMultipleColumnsSorting={true}
         // End Column Menu
         columnHeaderHeight={40}
