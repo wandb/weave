@@ -105,6 +105,19 @@ const ObjectVersionPageInner: React.FC<{
     return data.result?.[0] ?? {};
   }, [data.loading, data.result]);
 
+  const viewerDataAsObject = useMemo(() => {
+    const dataIsPrimitive =
+      typeof viewerData !== 'object' ||
+      viewerData === null ||
+      Array.isArray(viewerData);
+    if (dataIsPrimitive) {
+      // _result is a special key that is automatically removed by the
+      // ObjectViewerSection component.
+      return {_result: viewerData};
+    }
+    return viewerData;
+  }, [viewerData]);
+
   return (
     <SimplePageLayoutWithHeader
       title={objectVersionText(objectName, objectVersionIndex)}
@@ -195,7 +208,7 @@ const ObjectVersionPageInner: React.FC<{
                   <WeaveCHTableSourceRefContext.Provider value={refUri}>
                     <ObjectViewerSection
                       title=""
-                      data={viewerData}
+                      data={viewerDataAsObject}
                       noHide
                       isExpanded
                     />
