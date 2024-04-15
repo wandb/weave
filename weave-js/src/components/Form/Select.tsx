@@ -269,36 +269,36 @@ const getStyles = <
         textTransform: 'none',
       };
     },
-    option: (baseStyles, state) => {
-      return {
-        ...baseStyles,
-        cursor: state.isDisabled ? 'default' : 'pointer',
-        // TODO: Should icon be translucent?
-        color: state.isDisabled
-          ? MOON_350
-          : state.isSelected
-          ? TEAL_600
-          : MOON_800,
-        padding: '6px 10px',
-        margin: '0 6px',
-        borderRadius: '4px',
-        width: 'auto',
-        backgroundColor: state.isDisabled
-          ? undefined
-          : state.isSelected
-          ? hexToRGB(TEAL_300, 0.32)
-          : state.isFocused
-          ? MOON_100
-          : undefined,
-        ':active': {
-          // mousedown
-          ...baseStyles[':active'],
-          backgroundColor: !state.isDisabled
-            ? hexToRGB(TEAL_300, 0.32)
-            : undefined,
-        },
-      };
-    },
+    // option: (baseStyles, state) => {
+    //   return {
+    //     ...baseStyles,
+    //     cursor: state.isDisabled ? 'default' : 'pointer',
+    //     // TODO: Should icon be translucent?
+    //     color: state.isDisabled
+    //       ? MOON_350
+    //       : state.isSelected
+    //       ? TEAL_600
+    //       : MOON_800,
+    //     padding: '6px 10px',
+    //     margin: '0 6px',
+    //     borderRadius: '4px',
+    //     width: 'auto',
+    //     backgroundColor: state.isDisabled
+    //       ? undefined
+    //       : state.isSelected
+    //       ? hexToRGB(TEAL_300, 0.32)
+    //       : state.isFocused
+    //       ? MOON_100
+    //       : undefined,
+    //     ':active': {
+    //       // mousedown
+    //       ...baseStyles[':active'],
+    //       backgroundColor: !state.isDisabled
+    //         ? hexToRGB(TEAL_300, 0.32)
+    //         : undefined,
+    //     },
+    //   };
+    // },
   } as StylesConfig<Option, IsMulti, Group>;
 };
 
@@ -316,8 +316,14 @@ export const Select = <
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
     base: `rounded night-aware bg-white hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
-    focus: 'åring-1 ring-primary-500',
+    focus: 'ring-1 ring-primary-500',
     nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250',
+  };
+  const optionStyles = {
+    base: `cursor-pointer text-moon-800 dark:text-white dark:bg-moon-900`,
+    focus: 'bg-moon-100',
+    isSelected: 'text-teal-600 bg-teal-300/[0.32]',
+    isDisabled: 'cursor-default text-moon-350',
   };
   return (
     <Tailwind>
@@ -327,9 +333,6 @@ export const Select = <
           {DropdownIndicator, GroupHeading},
           props.components
         )}
-        // styles={{
-        //   indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
-        // }}
         styles={styles}
         className="night-aware"
         classNamePrefix="react-select"
@@ -339,7 +342,36 @@ export const Select = <
               isFocused ? controlStyles.focus : controlStyles.nonFocus,
               controlStyles.base
             ),
-          // indicatorSeparator: () => 'none',
+          option: ({isFocused, isDisabled, isSelected}) =>
+            classNames(
+              isFocused
+                ? optionStyles.focus
+                : isDisabled
+                ? optionStyles.isDisabled
+                : isSelected
+                ? optionStyles.isSelected
+                : optionStyles.base,
+              optionStyles.base
+            ),
+
+          // padding: '6px 10px',
+          // margin: '0 6px',
+          // borderRadius: '4px',
+          // width: 'auto',
+          // backgroundColor: state.isDisabled
+          //   ? undefined
+          //   : state.isSelected
+          //   ? hexToRGB(TEAL_300, 0.32)
+          //   : state.isFocused
+          //   ? MOON_100
+          //   : undefined,
+          // ':active': {
+          //   // mousedown
+          //   ...baseStyles[':active'],
+          //   backgroundColor: !state.isDisabled
+          //     ? hexToRGB(TEAL_300, 0.32)
+          //     : undefined,
+          // },
         }}
       />
     </Tailwind>
