@@ -174,10 +174,7 @@ const UserInner = ({user, includeName, placement}: UserInnerProps) => {
         placement={placement ?? 'right'}
         padding={0}>
         <UserTrigger ref={ref} onClick={onClick}>
-          <Avatar
-            src={user.photoUrl}
-            sx={{width: size, height: size, marginRight: '4px'}}
-          />
+          <Avatar src={user.photoUrl} sx={{width: size, height: size}} />
           {includeName && (
             <Link
               to={`/${user.username}`}
@@ -234,6 +231,7 @@ export const UserLink = ({username, includeName, placement}: UserLinkProps) => {
         })
         .then(result => {
           const {edges} = result.data.users;
+          console.log('result', result);
           if (edges.length > 0) {
             const u = edges[0].node;
             setUser({
