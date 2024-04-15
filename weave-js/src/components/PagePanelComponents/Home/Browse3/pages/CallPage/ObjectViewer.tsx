@@ -55,6 +55,9 @@ const getRefs = (data: Data): string[] => {
 type RefValues = Record<string, any>; // ref URI to value
 
 const refIsExpandable = (ref: string): boolean => {
+  if (!isRef(ref)) {
+    return false;
+  }
   const parsed = parseRef(ref);
   if (isWeaveObjectRef(parsed)) {
     return (
@@ -174,11 +177,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         if (context.path.hasHiddenKey() || isNullDescription) {
           return 'skip';
         }
-        if (
-          isRef(context.value) &&
-          context.depth > 1 &&
-          refIsExpandable(context.value)
-        ) {
+        if (context.depth > 1 && refIsExpandable(context.value)) {
           // These are possibly expandable refs. When we encounter an expandable ref, we
           // indicate that it is expandable and add a loader row. The effect is that the
           // group header will show the expansion icon when `isExpandableRef` is true. Also,
@@ -198,6 +197,14 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
             valueType: 'undefined',
           });
         } else {
+          // This mini condition is fired for  already-expanded refs.
+          if (
+            context.value._ref &&
+            context.depth > 1 &&
+            refIsExpandable(context.value._ref)
+          ) {
+            expandablePathsInner.add(context.path.toString());
+          }
           contexts.push(context);
         }
       }
@@ -332,6 +339,8 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
     });
   }, [apiRef, expandedIds, updateRowExpand]);
 
+  console.log(expandedIds);
+
   // Finally, we memoize the inner data grid component. This is important to
   // reduce the number of re-renders when the data changes.
   const inner = useMemo(() => {
@@ -363,6 +372,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         rows={rows}
         columns={columns}
         isGroupExpandedByDefault={node => {
+          console.log(node, node.id, data[node.id]);
           if (!isExpanded) {
             return expandedIds.includes(node.id);
           } else {
@@ -370,12 +380,21 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
             // a) requires a network call
             // b) can be endlessly recursive.
             // Note: Shawn does not like auto-expanding top-level refs.
-            const isTopRef = node.depth === 0 && isRef(data[node.id]);
-            return (
-              !isTopRef &&
-              (expandedIds.includes(node.id) ||
-                !expandablePaths.has(node.id.toString()))
+            const isExplicitlyExpanded = expandedIds.includes(node.id);
+            if (isExplicitlyExpanded) {
+              return true;
+            }
+            const isNestedExpandableRef = expandablePaths.has(
+              node.id.toString()
             );
+            if (isNestedExpandableRef) {
+              return false;
+            }
+            const isTopLevelRef = node.depth === 0 && isRef(data[node.id]);
+            if (isTopLevelRef) {
+              return false;
+            }
+            return true;
           }
         }}
         columnHeaderHeight={38}
