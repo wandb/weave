@@ -123,6 +123,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
             ...v,
             _ref: r,
           };
+        } else {
+          // This makes it so that runs pointing to primitives can still be expanded in the table.
+          val = {
+            '': v,
+            _ref: r,
+          };
         }
       }
       refValues[r] = val;
