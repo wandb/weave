@@ -6,6 +6,7 @@
  * It doesn't match the spec completely yet; waiting on UI framework decisions before investing
  * more time in alignment.
  */
+import classNames from 'classnames';
 
 import {
   hexToRGB,
@@ -13,11 +14,15 @@ import {
   MOON_250,
   MOON_350,
   MOON_500,
+  MOON_750,
   MOON_800,
+  MOON_900,
   RED_550,
   TEAL_300,
+  TEAL_350,
   TEAL_500,
   TEAL_600,
+  WHITE,
 } from '@wandb/weave/common/css/globals.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import React from 'react';
@@ -33,6 +38,7 @@ import AsyncSelect, {AsyncProps} from 'react-select/async';
 import AsyncCreatableSelect, {
   AsyncCreatableProps,
 } from 'react-select/async-creatable';
+import {Tailwind} from '../Tailwind';
 
 export const SelectSizes = {
   Small: 'small',
@@ -96,6 +102,7 @@ export type AdditionalProps = {
   errorState?: boolean;
   groupDivider?: boolean;
   cursor?: string;
+  isDarkMode?: boolean;
 };
 
 // Toggle icon when open
@@ -160,10 +167,12 @@ const getStyles = <
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
 >(
-  props: StylesProps
+  props: StylesProps & {isDarkMode?: boolean}
 ) => {
   const errorState = props.errorState ?? false;
   const size = props.size ?? 'medium';
+  const isDarkMode = props.isDarkMode;
+  console.log(isDarkMode);
   return {
     // No vertical line to left of dropdown indicator
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
@@ -220,12 +229,17 @@ const getStyles = <
         fontSize,
         cursor: props.cursor ?? 'default',
         border: 0,
-        boxShadow: state.menuIsOpen
+        backgroundColor: isDarkMode ? MOON_900 : WHITE,
+        boxShadow: isDarkMode
+          ? `0 0 0 2px ${WHITE}`
+          : state.menuIsOpen
           ? `0 0 0 2px ${colorBorderOpen}`
           : state.isFocused
           ? `0 0 0 2px ${colorBorderOpen}`
           : `inset 0 0 0 1px ${colorBorderDefault}`,
         '&:hover': {
+          // border: `2px solid ${TEAL_350}`,
+
           boxShadow: state.menuIsOpen
             ? `0 0 0 2px ${colorBorderOpen}`
             : `0 0 0 2px ${colorBorderHover}`,
@@ -300,16 +314,47 @@ export const Select = <
   const size = props.size ?? 'medium';
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
-
+  const controlStyles = {
+    base: `border rounded-lg bg-white hover:cursor-pointer hover:dark:border-teal-350`,
+    focus: 'border-teal-350 ring-1 ring-primary-500',
+    nonFocus: 'border-gray-300',
+  };
   return (
-    <ReactSelect
-      {...props}
-      components={Object.assign(
-        {DropdownIndicator, GroupHeading},
-        props.components
-      )}
-      styles={styles}
-    />
+    <Tailwind>
+      <ReactSelect
+        {...props}
+        components={Object.assign(
+          {DropdownIndicator, GroupHeading},
+          props.components
+        )}
+        styles={{
+          input: base => ({
+            ...base,
+            'input:focus': {
+              boxShadow: 'none',
+            },
+          }),
+          // On mobile, the label will truncate automatically, so we want to
+          // override that behaviour.
+          multiValueLabel: base => ({
+            ...base,
+            whiteSpace: 'normal',
+            overflow: 'visible',
+          }),
+          control: base => ({
+            ...base,
+            transition: 'none',
+          }),
+        }}
+        classNames={{
+          control: ({isFocused}) =>
+            classNames(
+              isFocused ? controlStyles.focus : controlStyles.nonFocus,
+              controlStyles.base
+            ),
+        }}
+      />
+    </Tailwind>
   );
 };
 
@@ -331,6 +376,7 @@ export const SelectAsync = <
         {DropdownIndicator, GroupHeading},
         props.components
       )}
+      // className="night-aware"
       styles={styles}
     />
   );
@@ -354,6 +400,7 @@ export const SelectAsyncCreatable = <
         {DropdownIndicator, GroupHeading},
         props.components
       )}
+      className="night-aware"
       styles={styles}
     />
   );
