@@ -9,6 +9,7 @@ import {
   WHITE,
 } from '../common/css/globals.styles';
 
+/** @deprecated */
 export const Tooltip = styled(Popup).attrs({
   basic: true, // This removes the pointing arrow.
   mouseEnterDelay: 500,

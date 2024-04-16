@@ -7,7 +7,13 @@ import React, {useState} from 'react';
 import * as RadixTooltip from './index';
 
 export type TooltipProps = {
+  /**
+   * the trigger component needs to be wrapped in RadixTooltip.Trigger
+   */
   trigger: React.ReactNode;
+  /**
+   * the content component needs to be wrapped in RadixTooltip.Content
+   */
   content: React.ReactNode | string;
   tooltipProps?: RadixTooltipProps;
   portalProps?: RadixTooltipPortalProps;
@@ -22,10 +28,8 @@ export const Tooltip = ({trigger, content}: TooltipProps) => {
 
   return (
     <RadixTooltip.Root open={isOpen} onOpenChange={setIsOpen}>
-      <RadixTooltip.Trigger>{trigger}</RadixTooltip.Trigger>
-      <RadixTooltip.Portal>
-        <RadixTooltip.Content>{content}</RadixTooltip.Content>
-      </RadixTooltip.Portal>
+      {trigger}
+      <RadixTooltip.Portal>{content}</RadixTooltip.Portal>
     </RadixTooltip.Root>
   );
 };
