@@ -54,12 +54,14 @@ export const DraggableWrapper = ({children, ...other}: any) => {
   );
 };
 
-export const DraggableGrow = ({children, ...other}: any) => {
-  return (
-    <Grow {...other} timeout={0}>
-      <div>
-        <DraggableWrapper>{children}</DraggableWrapper>
-      </div>
-    </Grow>
-  );
-};
+export const DraggableGrow = React.forwardRef(
+  ({children, ...other}: any, ref) => {
+    return (
+      <Grow ref={ref} {...other} timeout={0}>
+        <div>
+          <DraggableWrapper>{children}</DraggableWrapper>
+        </div>
+      </Grow>
+    );
+  }
+);
