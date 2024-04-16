@@ -1,4 +1,4 @@
-import {Input} from '@material-ui/core';
+import Input from '@mui/material/Input';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import {
   callOpVeryUnsafe,

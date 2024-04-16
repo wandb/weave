@@ -67,6 +67,15 @@ def get_cache_prefix_context() -> typing.Optional[str]:
     return context_state._cache_prefix_context.get()
 
 
+def delete_cache_item(directory_path: str, item: str) -> None:
+    try:
+        item_path = os.path.join(directory_path, item)
+        shutil.rmtree(item_path)
+        logger.info(f"Deleted {item}.")
+    except:
+        logger.info(f"Error deleting {item}.")
+
+
 def clear_cache() -> None:
     # Read the directory address and threshold from the environment variable
     directory_path = environment.weave_filesystem_dir()
@@ -86,14 +95,17 @@ def clear_cache() -> None:
     # for each cache in the directory, check if its expired past the buffer
     for item in os.listdir(directory_path):
         try:
+            # If parsable timestamp, delete if expired
             item_timestamp = int(item)
-            item_path = os.path.join(directory_path, item)
 
             # If the item is expired and we are past the buffer, delete it
             if item_timestamp + buffer < now:
-                # Delete the data
-                shutil.rmtree(item_path)
-                logger.info(f"Deleted {item}.")
+                delete_cache_item(directory_path, item)
+
+        except ValueError:
+            # If not parsable timestamp, delete the item, because we have now moved to only timestamped cache directories
+            delete_cache_item(directory_path, item)
+
         except:
             logger.info(f"Error deleting {item}.")
             continue
