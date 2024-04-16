@@ -246,7 +246,7 @@ const useCalls = (
       setCallRes({calls: []});
     };
     getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
+  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient, offset, sortBy, filterBy, expandPaths]);
 
   return useMemo(() => {
     if (opts?.skip) {

@@ -5,6 +5,7 @@ import {
   GridColDef,
   GridColumnGroup,
   GridFilterModel,
+  GridPaginationModel,
   GridRowSelectionModel,
   GridSortModel,
   useGridApiRef,
@@ -222,9 +223,10 @@ const getPeekId = (peekPath: string | null): string | null => {
 export const RunsTable: FC<{
   loading: boolean;
   spans: CallSchema[];
+  onPageUpdate: (pageIndex: number) => void;
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+}> = ({loading, spans, clearFilters, ioColumnsOnly, onPageUpdate}) => {
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
@@ -838,6 +840,13 @@ export const RunsTable: FC<{
         columns: {
           columnVisibilityModel,
         },
+        pagination: {
+          paginationModel: {
+            // pageSize: 25,
+            pageSize: 200,
+            page: 0,
+          },
+        },
       };
     }, [loading, columnVisibilityModel]);
 
@@ -859,6 +868,11 @@ export const RunsTable: FC<{
   ]);
   const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
 
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    pageSize: 200,
+    page: 0,
+  });
+
   return (
     <>
       {showVisibilityAlert && (
@@ -871,7 +885,7 @@ export const RunsTable: FC<{
           </VisibilityAlert>
         </Alert>
       )}
-      <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
+      {/* <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} /> */}
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
@@ -902,6 +916,9 @@ export const RunsTable: FC<{
         rowSelectionModel={rowSelectionModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
+        // onRowsScrollEnd={(params, event) => {
+        //   onRequestNextBatch();
+        // }}
         sortingMode="server"
         sortModel={sortModel}
         onSortModelChange={newModel => {
@@ -913,6 +930,16 @@ export const RunsTable: FC<{
         onFilterModelChange={newModel => {
           console.log('newModel', newModel);
           setFilterModel(newModel);
+        }}
+        pagination
+        autoPageSize
+        paginationMode="server"
+        rowCount={1000}
+        paginationModel={paginationModel}
+        onPaginationModelChange={newModel => {
+          console.log('pageModel', newModel);
+          onPageUpdate(newModel.page);
+          // setPaginationModel(newModel);
         }}
         sx={{
           borderRadius: 0,

@@ -37,7 +37,9 @@ import {
 } from '../wfReactInterface/utilities';
 import {
   CallFilter,
+  FilterBy,
   OpVersionSchema,
+  SortBy,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
@@ -166,7 +168,24 @@ export const CallsTable: FC<{
     return convertHighLevelFilterToLowLevelFilter(effectiveFilter);
   }, [effectiveFilter]);
 
-  const calls = useCalls(props.entity, props.project, lowLevelFilter);
+  const pageSize = 200;
+  const [page, setPage] = React.useState<number>(0);
+  const [sort, setSort] = React.useState<SortBy[]>([]);
+  const [columnFilter, setColumnFilter] = React.useState<
+    FilterBy | undefined
+  >();
+  const [expand, setExpand] = React.useState<string[]>([]);
+  console.log('expand', page * pageSize);
+  const calls = useCalls(
+    props.entity,
+    props.project,
+    lowLevelFilter,
+    pageSize,
+    page * pageSize,
+    sort,
+    columnFilter,
+    expand
+  );
 
   const opVersionOptions = useOpVersionOptions(
     props.entity,
@@ -297,13 +316,13 @@ export const CallsTable: FC<{
     props.project
   );
 
-  if (calls.loading) {
-    return <Loading centered />;
-  }
+  // if (calls.loading) {
+  //   return <Loading centered />;
+  // }
 
   const spans = calls.result ?? [];
   const isEmpty = spans.length === 0;
-  if (isEmpty) {
+  if (!calls.loading && isEmpty) {
     if (isEvaluateTable) {
       return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
     } else {
@@ -442,7 +461,10 @@ export const CallsTable: FC<{
         />
       ) : (
         <RunsTable
-          key={callsKey}
+          // key={callsKey}
+          onPageUpdate={(newPageIndex: number) => {
+            setPage(newPageIndex);
+          }}
           loading={calls.loading}
           spans={spans}
           clearFilters={clearFilters}
