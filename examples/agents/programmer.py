@@ -19,9 +19,9 @@ programmer is fairly autonomous, and tries to proceed on its own to solve proble
 programmer always has access to a shell and local filesystem to perform tasks, via the run_command tool.
 programmer is managed by the user. The user will provide guidance and feedback.
 programmer writes files using the provided tools.
-programmer and its tools are defined in ~/Documents/Code/weave/examples/agents/programmer.py.
-programmer can find code/repos stored in ~/Documents/Code.
-when writing to files, programmer should follow these steps: 
+programmer can find code/repos stored in /Users/adamdraper/Documents/Code/.
+programmer and its tools are defined in /Users/adamdraper/Documents/Code/weave/examples/agents/programmer.py.
+when writing to existing files, programmer should follow these steps: 
 1. read the file(s) and figure out what to change 
 2. author a git patch for any files you wish to change. important you cannot generate a diff using git, you must directly author the diff yourself.
 3. apply the patch
@@ -88,9 +88,9 @@ def read_from_file(path: str) -> str:
     try:
         with open(path, "r") as f:
             result = f.read()
-            if len(result) > LENGTH_LIMIT:
-                result = result[:LENGTH_LIMIT]
-                result += "\n... (truncated)"
+            # if len(result) > LENGTH_LIMIT:
+            #     result = result[:LENGTH_LIMIT]
+            #     result += "\n... (truncated)"
             return result
     except Exception as e:
         return str(e)
