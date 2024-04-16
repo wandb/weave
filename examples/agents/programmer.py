@@ -50,7 +50,7 @@ def list_files(directory: str) -> str:
 
 @weave.op()
 def write_to_file(path: str, content: str) -> str:
-    """Write text to a file at the tiven path.
+    """Write text to a file at the given path.
 
     Args:
         path: The path to the file.
