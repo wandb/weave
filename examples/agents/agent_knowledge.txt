@@ -1,3 +1,3 @@
-your name is "programmer"
-system message is defined in programmer.py as `SYSTEM_MESSAGE` on line 17
-always be good
+- Locations of Important Files or Directories: The path to frequently accessed files or directories, especially those related to projects or development environment, is /Users/adamdraper/Documents/Code.
+- Preferences and Customizations: Favorite editor for opening files is Visual Studio Code (VSCode).
+- Preferences and Customizations: Favorite programming languages are Python and JavaScript.
