@@ -279,6 +279,43 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if conditions_part:
             query += f" AND {conditions_part}"
 
+        order_by = (
+            None if not req.sort_by else [(s.field, s.direction) for s in req.sort_by]
+        )
+        if order_by is not None:
+            order_parts = []
+            for field, direction in order_by:
+                json_path: Optional[str] = None
+                if field.startswith("inputs"):
+                    field = "inputs" + field[len("inputs") :]
+                    if field.startswith("inputs."):
+                        field = "inputs"
+                        json_path = field[len("inputs.") :]
+                elif field.startswith("output"):
+                    field = "output" + field[len("output") :]
+                    if field.startswith("output."):
+                        field = "output"
+                        json_path = field[len("output.") :]
+                elif field.startswith("attributes"):
+                    field = "attributes_dump" + field[len("attributes") :]
+                elif field.startswith("summary"):
+                    field = "summary_dump" + field[len("summary") :]
+                elif field == ("latency"):
+                    field = "ended_at - started_at"
+
+                assert direction in [
+                    "ASC",
+                    "DESC",
+                    "asc",
+                    "desc",
+                ], f"Invalid order_by direction: {direction}"
+                if json_path:
+                    field = f"json_extract({field}, '$.{json_path}')"
+                order_parts.append(f"{field} {direction}")
+
+            order_by_part = ", ".join(order_parts)
+            query += f"ORDER BY {order_by_part}"
+
         limit = req.limit or -1
         if limit:
             query += f" LIMIT {limit}"

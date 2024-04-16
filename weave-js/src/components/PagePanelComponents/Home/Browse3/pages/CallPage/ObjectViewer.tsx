@@ -1,3 +1,4 @@
+import {Box} from '@material-ui/core';
 import {
   DataGridProProps,
   GridApiPro,
@@ -15,6 +16,7 @@ import React, {
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
+import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {isRef} from '../common/util';
@@ -53,10 +55,14 @@ const getRefs = (data: Data): string[] => {
 type RefValues = Record<string, any>; // ref URI to value
 
 const refIsExpandable = (ref: string): boolean => {
+  if (!isRef(ref)) {
+    return false;
+  }
   const parsed = parseRef(ref);
   if (isWeaveObjectRef(parsed)) {
     return (
       parsed.weaveKind === 'object' ||
+      parsed.weaveKind === 'op' ||
       (parsed.weaveKind === 'table' &&
         parsed.artifactRefExtra != null &&
         parsed.artifactRefExtra.length > 0)
@@ -120,6 +126,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
             ...v,
             _ref: r,
           };
+        } else {
+          // This makes it so that runs pointing to primitives can still be expanded in the table.
+          val = {
+            '': v,
+            _ref: r,
+          };
         }
       }
       refValues[r] = val;
@@ -144,14 +156,14 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
 
   // `rows` are the data-grid friendly rows that we will render. This method traverses
   // the data, hiding certain keys and adding loader rows for expandable refs.
-  const {rows, expandablePaths} = useMemo(() => {
+  const {rows} = useMemo(() => {
     const contexts: Array<
       TraverseContext & {
         isExpandableRef?: boolean;
         isLoader?: boolean;
+        isCode?: boolean;
       }
     > = [];
-    const expandablePathsInner = new Set<string>();
     traverse(resolvedData, context => {
       if (context.depth !== 0) {
         const contextTail = context.path.tail();
@@ -164,17 +176,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         if (context.path.hasHiddenKey() || isNullDescription) {
           return 'skip';
         }
-        if (
-          isRef(context.value) &&
-          context.depth > 1 &&
-          refIsExpandable(context.value)
-        ) {
+        if (refIsExpandable(context.value)) {
           // These are possibly expandable refs. When we encounter an expandable ref, we
           // indicate that it is expandable and add a loader row. The effect is that the
           // group header will show the expansion icon when `isExpandableRef` is true. Also,
           // until the ref data is actually resolved, we will show a loader in place of the
           // expanded data.
-          expandablePathsInner.add(context.path.toString());
           contexts.push({
             ...context,
             isExpandableRef: true,
@@ -194,10 +201,21 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
       if (USE_TABLE_FOR_ARRAYS && context.valueType === 'array') {
         return 'skip';
       }
+      if (context.value?._ref && context.value?.weave_type?.type === 'Op') {
+        contexts.push({
+          depth: context.depth + 1,
+          isLeaf: true,
+          path: context.path.plus('code'),
+          isCode: true,
+          value: context.value?._ref,
+          valueType: 'undefined',
+        });
+        return 'skip';
+      }
       return true;
     });
     const rowsInner = contexts.map((c, id) => ({id: c.path.toString(), ...c}));
-    return {rows: rowsInner, expandablePaths: expandablePathsInner};
+    return {rows: rowsInner};
   }, [resolvedData]);
 
   // Next, we setup the columns. In our case, there is just one column: Value.
@@ -213,6 +231,17 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         flex: 1,
         sortable: false,
         renderCell: ({row}) => {
+          if (row.isCode) {
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                }}>
+                <Browse2OpDefCode uri={row.value} maxRowsInView={20} />
+              </Box>
+            );
+          }
           if (row.isLoader) {
             return <LoadingDots />;
           }
@@ -249,7 +278,9 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   // the expansion. Importantly, when the column is clicked, we do some
   // bookkeeping to add the expanded ref to the `expandedRefs` state. This
   // triggers a set of state updates to populate the expanded data.
-  const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
+  const [expandedIds, setExpandedIds] = useState<Array<string | number>>(
+    isExpanded ? rows.filter(r => !r.isExpandableRef).map(r => r.id) : []
+  );
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
       headerName: 'Path',
@@ -331,20 +362,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         rows={rows}
         columns={columns}
         isGroupExpandedByDefault={node => {
-          if (!isExpanded) {
-            return expandedIds.includes(node.id);
-          } else {
-            // We do not want to auto-expand the expandable refs as this:
-            // a) requires a network call
-            // b) can be endlessly recursive.
-            // Note: Shawn does not like auto-expanding top-level refs.
-            const isTopRef = node.depth === 0 && isRef(data[node.id]);
-            return (
-              !isTopRef &&
-              (expandedIds.includes(node.id) ||
-                !expandablePaths.has(node.id.toString()))
-            );
-          }
+          return expandedIds.includes(node.id);
         }}
         columnHeaderHeight={38}
         getRowHeight={(params: GridRowHeightParams) => {
@@ -354,10 +372,12 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           const isTableRef =
             isRef(params.model.value) &&
             (parseRefMaybe(params.model.value) as any).weaveKind === 'table';
+          const {isCode} = params.model;
           if (
             isNonRefString ||
             (isArray && USE_TABLE_FOR_ARRAYS) ||
-            isTableRef
+            isTableRef ||
+            isCode
           ) {
             return 'auto';
           }
@@ -382,16 +402,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         }}
       />
     );
-  }, [
-    apiRef,
-    rows,
-    columns,
-    groupingColDef,
-    isExpanded,
-    expandedIds,
-    data,
-    expandablePaths,
-  ]);
+  }, [apiRef, rows, columns, groupingColDef, expandedIds]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
   return <div style={{overflow: 'hidden'}}>{inner}</div>;

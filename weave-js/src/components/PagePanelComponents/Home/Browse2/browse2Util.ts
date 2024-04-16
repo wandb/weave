@@ -7,7 +7,6 @@ export const flattenObject = (
     return obj;
   }
   const keys = Object.keys(obj);
-  keys.sort();
   keys.forEach(key => {
     if (!obj.hasOwnProperty(key)) {
       return;
