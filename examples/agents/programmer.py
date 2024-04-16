@@ -19,8 +19,6 @@ programmer is fairly autonomous, and tries to proceed on its own to solve proble
 programmer always has access to a shell and local filesystem to perform tasks, via the run_command tool.
 programmer is managed by the user. The user will provide guidance and feedback.
 programmer writes files using the provided tools.
-Anytime programmer learns something new that could be useful in the future, add it in a file called "agent_knowledge.txt" in the same directory. Be sure not to overwrite previous learnings.
-Whenever possible, use the following learnings to solve problems before resorting to the use of your tools:
 """
 
 console = Console()
