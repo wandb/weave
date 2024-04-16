@@ -454,19 +454,6 @@ export const RunsTable: FC<{
             },
           ]
         : []),
-      {
-        field: 'userId',
-        headerName: 'User',
-        width: 50,
-        // Might be confusing to enable as-is, because the user sees name /
-        // email but the underlying data is userId.
-        filterable: false,
-        align: 'center',
-        sortable: false,
-        resizable: false,
-        disableColumnMenu: true,
-        renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
-      },
       // {
       //   field: 'run_id',
       //   headerName: 'Run',
@@ -482,15 +469,14 @@ export const RunsTable: FC<{
       {
         field: 'status_code',
         headerName: 'Status',
+        headerAlign: 'center',
         sortable: false,
         disableColumnMenu: true,
         resizable: false,
         // Again, the underlying value is not obvious to the user,
         // so the default free-form filter is likely more confusing than helpful.
         filterable: false,
-        width: 70,
-        minWidth: 70,
-        maxWidth: 70,
+        width: 59,
         renderCell: cellParams => {
           return (
             <div style={{margin: 'auto'}}>
@@ -499,27 +485,6 @@ export const RunsTable: FC<{
           );
         },
       },
-      ...(!ioColumnsOnly
-        ? [
-            {
-              field: 'timestampMs',
-              headerName: 'Called',
-              // Should have custom timestamp filter here.
-              filterable: false,
-              width: 100,
-              minWidth: 100,
-              maxWidth: 100,
-              renderCell: (cellParams: any) => {
-                return (
-                  <Timestamp
-                    value={cellParams.row.timestampMs / 1000}
-                    format="relative"
-                  />
-                );
-              },
-            },
-          ]
-        : []),
     ];
     const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = spans[0];
@@ -771,6 +736,41 @@ export const RunsTable: FC<{
         headerName: key.split('.').slice(-1)[0],
         renderCell: cellParams => {
           return renderCell((cellParams.row as any)['feedback.' + key]);
+        },
+      });
+    }
+
+    cols.push({
+      field: 'userId',
+      headerName: 'User',
+      headerAlign: 'center',
+      width: 50,
+      // Might be confusing to enable as-is, because the user sees name /
+      // email but the underlying data is userId.
+      filterable: false,
+      align: 'center',
+      sortable: false,
+      resizable: false,
+      disableColumnMenu: true,
+      renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
+    });
+
+    if (!ioColumnsOnly) {
+      cols.push({
+        field: 'timestampMs',
+        headerName: 'Called',
+        // Should have custom timestamp filter here.
+        filterable: false,
+        width: 100,
+        minWidth: 100,
+        maxWidth: 100,
+        renderCell: (cellParams: any) => {
+          return (
+            <Timestamp
+              value={cellParams.row.timestampMs / 1000}
+              format="relative"
+            />
+          );
         },
       });
     }
