@@ -1,4 +1,3 @@
 - Locations of Important Files or Directories: The path to frequently accessed files or directories, especially those related to projects or development environment, is /Users/adamdraper/Documents/Code.
 - Preferences and Customizations: Favorite editor for opening files is Visual Studio Code (VSCode).
 - Preferences and Customizations: Favorite programming languages are Python and JavaScript.
-- Learning and Feedback: Always show the git diff to the user after editing a file before committing.
