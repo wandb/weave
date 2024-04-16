@@ -281,21 +281,177 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conditions.append("wb_run_id IN {wb_run_ids: Array(String)}")
                 parameters["wb_run_ids"] = req.filter.wb_run_ids
 
+        # Here, we want to check to verify that we do not have any sorting or filtering
+        # on expanded paths - this is not supported
+        if req.expand_paths:
+            for path in req.expand_paths:
+                if req.sort_by:
+                    for sort in req.sort_by:
+                        if sort.field.startswith(path):
+                            raise ValueError(
+                                f"Sorting by expanded path {path} is not supported"
+                            )
+                if req.filter_by:
+                    for all_filter in req.filter_by.all:
+                        for any_filter in all_filter.any:
+                            if any_filter.left.type == "field":
+                                if any_filter.left.field.startswith(path):
+                                    raise ValueError(
+                                        f"Filtering by expanded path {path} is not supported"
+                                    )
+                            if any_filter.right.type == "field":
+                                if any_filter.right.field.startswith(path):
+                                    raise ValueError(
+                                        f"Filtering by expanded path {path} is not supported"
+                                    )
+
+        order_by = None
+        if req.sort_by:
+            order_by = []
+            for field, direction in req.sort_by:
+                json_path: typing.Optional[str] = None
+                if field.startswith("inputs"):
+                    field = "inputs_dump" + field[len("inputs") :]
+                    if field.startswith("inputs_dump."):
+                        field = "inputs_dump"
+                        json_path = field[len("inputs_dump.") :]
+                elif field.startswith("output"):
+                    field = "output_dump" + field[len("output") :]
+                    if field.startswith("output_dump."):
+                        field = "output_dump"
+                        json_path = field[len("output_dump.") :]
+                elif field.startswith("attributes"):
+                    field = "attributes_dump" + field[len("attributes") :]
+                elif field.startswith("summary"):
+                    field = "summary_dump" + field[len("summary") :]
+                elif field == ("latency"):
+                    field = "ended_at - started_at"
+
+                assert (
+                    field in all_call_select_columns
+                ), f"Invalid order_by field: {field}"
+                assert direction in [
+                    "ASC",
+                    "DESC",
+                    "asc",
+                    "desc",
+                ], f"Invalid order_by direction: {direction}"
+                if json_path:
+                    key = f"order_field_{field}"
+                    field = f"JSON_VALUE({field}, '$.{{{key}: String}}')"
+                    parameters[key] = json_path
+                order_by.append(f"{field} {direction}")
+
+        if req.filter_by:
+            raise ValueError(
+                "Filtering not yet supported"
+            )
+
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
             conditions=conditions,
             parameters=parameters,
             limit=req.limit,
             offset=req.offset,
-            order_by=None
-            if not req.sort_by
-            else [(s.field, s.direction) for s in req.sort_by],
+            order_by=order_by,
         )
         calls = [
             _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
         ]
-        return tsi.CallsQueryRes(calls=calls)
+        
+        if req.expand_paths:
+            self._in_place_expand_calls(calls, req.expand_paths)
 
+        return tsi.CallsQueryRes(calls=calls)
+    
+    def _in_place_expand_calls(self, calls: list[tsi.CallSchema], expand_paths: list[str]) -> None:
+        ref_cache: dict[str, typing.Any] = {}
+        calls_possibly_needing_expansion = calls
+
+        def _get_value_at_path(obj: typing.Any, path: str) -> typing.Any:
+            parts = path.split(".", 1)
+            curr_path = parts[0]
+            next_obj = None
+
+            if (obj == None):
+                return None
+
+            if (isinstance(obj, list)):
+                try:
+                    curr_path_index = int(curr_path)
+                    if len(obj) < curr_path_index:
+                        return None
+                    next_obj = obj[curr_path_index]
+                except:
+                    return None
+            else:
+                try:
+                    next_obj = obj.get(curr_path)
+                except:
+                    return None
+            
+            if len(parts) == 2:
+                return _get_value_at_path(next_obj, parts[1])    
+            return next_obj
+        
+
+        def _set_value_at_path(obj: typing.Any, path: str,new_val: typing.Any) -> typing.Any:
+            parts = path.split(".", 1)
+            curr_path = parts[0]
+            next_obj = None
+
+            if (obj == None):
+                return None
+
+            if (isinstance(obj, list)):
+                try:
+                    curr_path_index = int(curr_path)
+                    if len(obj) < curr_path_index:
+                        return None
+                    obj[curr_path_index] = new_val
+                except:
+                    return None
+            else:
+                try:
+                    obj[curr_path] = new_val
+                except:
+                    return None
+            
+            if len(parts) == 2:
+                return _get_value_at_path(next_obj, parts[1])    
+            return next_obj
+        
+        def _cache_contains_ref_value(ref: str) -> typing.Any:
+            return ref in ref_cache
+        
+        def _get_cached_val(ref: str) -> typing.Any:
+            return ref_cache[ref]
+        
+        def _set_ref_cache(ref: str, val: typing.Any) -> None:
+            ref_cache[ref] = val
+
+        while calls_possibly_needing_expansion:
+            next_calls_possibly_needing_expansion = []
+            refs_needed = set([])
+            for call in calls_possibly_needing_expansion:
+                call_is_dirty = False
+
+                for path in expand_paths:
+                    val = _get_value_at_path(call, path)
+                    if isinstance(val, str) and val.startswith(refs_internal.WEAVE_INTERNAL_SCHEME):
+                        if _cache_contains_ref_value(val):
+                            _set_value_at_path(call, path, _get_cached_val(val))
+                        else:
+                            refs_needed.add(val)
+                        call_is_dirty = True
+                if call_is_dirty:
+                    next_calls_possibly_needing_expansion.append(call)
+            
+            vals = self.refs_read_batch(tsi.RefsReadBatchReq(refs=list(refs_needed)))
+            for ref, val in zip(refs_needed, vals.vals):
+                _set_ref_cache(ref, val)
+            calls_possibly_needing_expansion = next_calls_possibly_needing_expansion
+                    
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
 
@@ -782,7 +938,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
         conditions: typing.Optional[typing.List[str]] = None,
-        order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
+        order_by: typing.Optional[typing.List[str]] = None,
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
@@ -806,7 +962,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
         conditions: typing.Optional[typing.List[str]] = None,
-        order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
+        order_by: typing.Optional[typing.List[str]] = None,
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
@@ -844,42 +1000,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         order_by_part = "ORDER BY started_at ASC"
         if order_by is not None:
-            order_parts = []
-            for field, direction in order_by:
-                json_path: typing.Optional[str] = None
-                if field.startswith("inputs"):
-                    field = "inputs_dump" + field[len("inputs") :]
-                    if field.startswith("inputs_dump."):
-                        field = "inputs_dump"
-                        json_path = field[len("inputs_dump.") :]
-                elif field.startswith("output"):
-                    field = "output_dump" + field[len("output") :]
-                    if field.startswith("output_dump."):
-                        field = "output_dump"
-                        json_path = field[len("output_dump.") :]
-                elif field.startswith("attributes"):
-                    field = "attributes_dump" + field[len("attributes") :]
-                elif field.startswith("summary"):
-                    field = "summary_dump" + field[len("summary") :]
-                elif field == ("latency"):
-                    field = "ended_at - started_at"
-
-                assert (
-                    field in all_call_select_columns
-                ), f"Invalid order_by field: {field}"
-                assert direction in [
-                    "ASC",
-                    "DESC",
-                    "asc",
-                    "desc",
-                ], f"Invalid order_by direction: {direction}"
-                if json_path:
-                    key = f"order_field_{field}"
-                    field = f"JSON_VALUE({field}, '$.{{{key}: String}}')"
-                    parameters[key] = json_path
-                order_parts.append(f"{field} {direction}")
-
-            order_by_part = ", ".join(order_parts)
+            order_by_part = ", ".join(order_by)
             order_by_part = f"ORDER BY {order_by_part}"
 
         offset_part = ""

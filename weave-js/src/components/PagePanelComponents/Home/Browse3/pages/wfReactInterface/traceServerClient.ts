@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
+import { FilterBy, SortBy } from './wfDataModelHooksInterface';
+
 export type KeyedDictType = {
   [key: string]: any;
   _keys?: string[];
@@ -68,6 +70,9 @@ export type TraceCallsQueryReq = {
   filter?: TraceCallsFilter;
   limit?: number;
   offset?: number;
+  sort_by?: SortBy[];
+  filter_by?: FilterBy;
+  expand_paths?: string[];
 };
 
 export type TraceCallsQueryRes = {

@@ -4,7 +4,9 @@ import {
   DataGridPro,
   GridColDef,
   GridColumnGroup,
+  GridFilterModel,
   GridRowSelectionModel,
+  GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import {UserLink} from '@wandb/weave/components/UserLink';
@@ -852,6 +854,11 @@ export const RunsTable: FC<{
     }
   }, [columns, initialState, apiRef]);
 
+  const [sortModel, setSortModel] = useState<GridSortModel>([
+    {field: 'timestampMs', sort: 'desc'},
+  ]);
+  const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
+
   return (
     <>
       {showVisibilityAlert && (
@@ -895,6 +902,18 @@ export const RunsTable: FC<{
         rowSelectionModel={rowSelectionModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
+        sortingMode="server"
+        sortModel={sortModel}
+        onSortModelChange={newModel => {
+          console.log('newModel', newModel);
+          setSortModel(newModel);
+        }}
+        filterMode="server"
+        filterModel={filterModel}
+        onFilterModelChange={newModel => {
+          console.log('newModel', newModel);
+          setFilterModel(newModel);
+        }}
         sx={{
           borderRadius: 0,
         }}

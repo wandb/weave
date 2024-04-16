@@ -153,6 +153,28 @@ class _SortBy(BaseModel):
     # Direction should be either 'asc' or 'desc'
     direction: str
 
+class _ValueOperand(BaseModel):
+    type: typing.Literal['value']
+    value: typing.Any
+
+class _FieldOperand(BaseModel):
+    type: typing.Literal['field']
+    field: str
+
+_Operand = typing.Union[_ValueOperand, _FieldOperand]
+
+_Operation = typing.Union[typing.Literal['contains']]
+
+class _FilterOperation(BaseModel):
+    left: _Operand
+    operation: _Operation
+    right: _Operand
+
+class _FilterByOrGroup(BaseModel):
+    any: typing.List[_FilterOperation]
+
+class _FilterBy(BaseModel):
+    all: typing.List[_FilterByOrGroup]
 
 class CallsQueryReq(BaseModel):
     project_id: str
@@ -161,6 +183,8 @@ class CallsQueryReq(BaseModel):
     offset: typing.Optional[int] = None
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
+    filter_by: typing.Optional[_FilterBy] = None
+    expand_paths: typing.Optional[typing.List[str]] = None
 
 
 class CallsQueryRes(BaseModel):

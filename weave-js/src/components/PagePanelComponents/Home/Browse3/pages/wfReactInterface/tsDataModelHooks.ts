@@ -231,6 +231,10 @@ const useCalls = (
         wb_user_ids: deepFilter.userIds,
       },
       limit,
+      offset,
+      sort_by: sortBy,
+      filter_by: filterBy,
+      expand_paths: expandPaths,
     };
     const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -252,7 +256,6 @@ const useCalls = (
       };
     }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
-    const result = allResults;
 
     if (callRes == null || loadingRef.current) {
       return {
@@ -270,6 +273,26 @@ const useCalls = (
           call
         );
       });
+
+      let result = allResults;
+      // Apply logic that should be pushed down to the server:
+      if (expandPaths) {
+        // TODO: Implement expansion
+      }
+
+      if (filterBy) {
+        // TODO: Implement filtering
+      }
+
+      if (sortBy) {
+        // TODO: Implement sorting
+      }
+
+      if (offset) {
+        // TODO: Implement offset
+      }
+
+
       return {
         loading: false,
         result,
