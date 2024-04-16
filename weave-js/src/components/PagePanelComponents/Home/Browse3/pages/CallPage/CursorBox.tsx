@@ -1,4 +1,4 @@
-import {Box} from '@material-ui/core';
+import Box from '@mui/material/Box';
 import styled from 'styled-components';
 
 // MUI Box doesn't support cursor

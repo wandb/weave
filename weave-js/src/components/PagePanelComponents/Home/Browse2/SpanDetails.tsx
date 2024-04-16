@@ -1,5 +1,5 @@
-import {Paper} from '@material-ui/core';
 import {Box, Button, Grid, Typography} from '@mui/material';
+import Paper from '@mui/material/Paper';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import * as _ from 'lodash';
 import React, {FC} from 'react';

@@ -1,6 +1,7 @@
-import {Box, Button as MuiButton} from '@material-ui/core';
 import {ExpandMore, KeyboardArrowRight} from '@mui/icons-material';
 import {ButtonProps} from '@mui/material';
+import Box from '@mui/material/Box';
+import MuiButton from '@mui/material/Button';
 import {GridRenderCellParams, useGridApiContext} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {FC, MouseEvent, useMemo} from 'react';

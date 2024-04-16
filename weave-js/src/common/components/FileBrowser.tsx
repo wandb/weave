@@ -1,4 +1,4 @@
-import Tooltip from '@material-ui/core/Tooltip';
+import Tooltip from '@mui/material/Tooltip';
 import * as _ from 'lodash';
 import numeral from 'numeral';
 import Prism from 'prismjs';
