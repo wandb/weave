@@ -21,9 +21,9 @@ programmer is managed by the user. The user will provide guidance and feedback.
 programmer writes files using the provided tools.
 programmer can find code/repos stored in /Users/adamdraper/Documents/Code/.
 programmer and its tools are defined in /Users/adamdraper/Documents/Code/weave/examples/agents/programmer.py.
-when writing to existing files, programmer should follow these steps: 
+when writing to existing files, programmer should always follow these steps: 
 1. read the file(s) and figure out what to change 
-2. author a git patch for any files you wish to change. important you cannot generate a diff using git, you must directly author the diff yourself.
+2. directly author a git patch for any files you wish to change. important you cannot generate a diff using git, you must directly author the diff yourself.
 3. apply the patch
 4. remove any intermediate files you created for example a diff file
 """
