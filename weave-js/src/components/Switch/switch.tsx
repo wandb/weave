@@ -14,42 +14,50 @@ export type SwitchProps = Omit<
   mode?: SwitchMode;
 };
 
+const SWITCH_SIZE_STYLES = {
+  small: 'h-[16px] w-[28px] rounded-[14px]',
+  large: 'h-[24px] w-[44px] rounded-[22px]',
+};
+
+const SWITCH_MODE_STYLES = {
+  light: 'bg-moon-350',
+  dark: 'bg-moon-650',
+};
+
+const SWITCH_THUMB_STYLES = {
+  small: 'h-[14px] w-[14px] rounded-[14px]',
+  large: 'h-[22px] w-[22px] rounded-[22px]',
+};
+
+const SWITCH_THUMB_TRANSITION = {
+  small: 'translate-x-12',
+  large: 'translate-x-20',
+};
+
 export const Switch = ({
   checked,
   className,
   size = 'small',
   mode = 'light',
   ...props
-}: SwitchProps) => {
-  const isSmall = size === 'small';
-  const isLightMode = mode === 'light';
-  return (
-    <RadixSwitch.Root
+}: SwitchProps) => (
+  <RadixSwitch.Root
+    className={twMerge(
+      'flex items-center p-[1px] transition-colors duration-100 ease-out',
+      'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
+      SWITCH_SIZE_STYLES[size],
+      checked ? 'bg-teal-500' : SWITCH_MODE_STYLES[mode],
+      className
+    )}
+    {...props}>
+    <RadixSwitch.Thumb
       className={twMerge(
-        'flex items-center p-[1px] transition-colors duration-100 ease-out',
-        isSmall
-          ? 'h-[16px] w-[28px] rounded-[14px]'
-          : 'h-[24px] w-[44px] rounded-[22px]',
-        'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
-        checked ? 'bg-teal-500' : isLightMode ? 'bg-moon-350' : 'bg-moon-650',
+        'rounded-full bg-white transition-transform duration-100 ease-out',
+        SWITCH_THUMB_STYLES[size],
+        checked ? SWITCH_THUMB_TRANSITION[size] : 'translate-x-0',
         className
       )}
-      {...props}>
-      <RadixSwitch.Thumb
-        className={twMerge(
-          'rounded-full bg-white transition-transform duration-100 ease-out',
-          isSmall
-            ? 'h-[14px] w-[14px] rounded-[14px]'
-            : 'h-[22px] w-[22px] rounded-[22px]',
-          checked
-            ? isSmall
-              ? 'translate-x-12'
-              : 'translate-x-20'
-            : 'translate-x-0',
-          className
-        )}
-        {...props}
-      />
-    </RadixSwitch.Root>
-  );
-};
+      {...props}
+    />
+  </RadixSwitch.Root>
+);
