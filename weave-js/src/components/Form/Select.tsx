@@ -24,13 +24,14 @@ import {
   TEAL_600,
   WHITE,
 } from '@wandb/weave/common/css/globals.styles';
-import {Icon} from '@wandb/weave/components/Icon';
+import {Icon, IconName, IconSearch} from '@wandb/weave/components/Icon';
 import React from 'react';
 import ReactSelect, {
   components,
   DropdownIndicatorProps,
   GroupBase,
   GroupHeadingProps,
+  PlaceholderProps,
   Props,
   StylesConfig,
 } from 'react-select';
@@ -58,7 +59,7 @@ export type AdditionalProps = {
   groupDivider?: boolean;
   cursor?: string;
   isDarkMode?: boolean;
-  iconName?: string;
+  iconName?: IconName;
   iconType?: IconType;
 };
 
@@ -77,6 +78,43 @@ const DropdownIndicator = <
     <components.DropdownIndicator {...indicatorProps}>
       <Icon name={iconName} width={16} height={16} color={MOON_500} />
     </components.DropdownIndicator>
+  );
+};
+
+interface ExtendedPlaceholderProps<
+  Option,
+  IsMulti extends boolean,
+  Group extends GroupBase<Option>
+> extends PlaceholderProps<Option, IsMulti, Group> {
+  iconName?: IconName;
+}
+const CustomPlaceholder = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: ExtendedPlaceholderProps<Option, IsMulti, Group>
+) => (
+  <components.Placeholder {...props}>
+    {props.iconName && <Icon name={props.iconName} />}
+    {props.children}
+  </components.Placeholder>
+);
+const Placeholder = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  placeholderProps: PlaceholderProps<Option, IsMulti, Group>
+) => {
+  console.log('HERE', placeholderProps);
+  // const iconName = indicatorProps.selectProps.menuIsOpen
+  //   ? 'chevron-up'
+  //   : 'chevron-down';
+  return (
+    <components.Placeholder {...placeholderProps}>
+      <Icon name={'search'} width={16} height={16} color={MOON_500} />
+    </components.Placeholder>
   );
 };
 
@@ -303,7 +341,18 @@ export const Select = <
         // menuIsOpen={true}
         {...props}
         components={Object.assign(
-          {DropdownIndicator, GroupHeading},
+          {
+            DropdownIndicator,
+            GroupHeading,
+            Placeholder: (
+              placeholderProps: PlaceholderProps<Option, IsMulti, Group>
+            ) => (
+              <CustomPlaceholder
+                {...placeholderProps}
+                iconName={props.iconName}
+              />
+            ),
+          },
           props.components
         )}
         styles={styles}
@@ -326,7 +375,7 @@ export const Select = <
           menu: () => menuStyles,
           valueContainer: () => valueContainerStyles,
           singleValue: () => singleValueStyles,
-          placeholder: () => placeHolderStyles,
+          // placeholder: () => placeHolderStyles,
         }}
       />
     </Tailwind>
