@@ -5,6 +5,8 @@ import {twMerge} from 'tailwind-merge';
 
 import {Tailwind} from '../Tailwind';
 
+export {Tooltip as NewTooltip} from './Tooltip';
+
 /**
  * {@link https://www.radix-ui.com/docs/primitives/components/tooltip#provider}
  */
@@ -41,10 +43,12 @@ export const Trigger = ({
   className,
   ...props
 }: RadixTooltip.TooltipTriggerProps) => (
-  <RadixTooltip.Trigger
-    className={twMerge(classNames('cursor-default', className))}
-    {...props}
-  />
+  <Tailwind>
+    <RadixTooltip.Trigger
+      className={twMerge(classNames('cursor-default', className))}
+      {...props}
+    />
+  </Tailwind>
 );
 
 /**
