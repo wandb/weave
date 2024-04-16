@@ -159,7 +159,6 @@ const ALLOWED_CJS_MODULES = [
   'react-is',
   'react-measure',
   'react-string-replace',
-  'react-table',
   'react-textarea-autosize',
   'react-use-measure',
   'react-virtualized-auto-sizer',
