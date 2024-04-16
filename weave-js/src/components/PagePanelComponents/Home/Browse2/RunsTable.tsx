@@ -231,7 +231,7 @@ export const RunsTable: FC<{
   } = useWFHooks();
   const {client} = weave;
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
-    new Set<string>().add('input.example')
+    new Set<string>().add('inputs.example')
   );
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
@@ -317,10 +317,8 @@ export const RunsTable: FC<{
         userId: call.userId,
         latency: call.rawSpan.summary.latency_s,
         ..._.mapKeys(
-          _.omitBy(args, v => v == null),
-          (v, k) => {
-            return 'input.' + k;
-          }
+          flattenObject(call.rawSpan.inputs ?? {}),
+          (v, k) => 'inputs.' + k
         ),
         ..._.mapKeys(
           _.omitBy(
@@ -563,8 +561,7 @@ export const RunsTable: FC<{
 
     const addColumnGroup = (groupName: string, colOrder: string[]) => {
       const colGroup: GridColumnGroup = {
-        // input -> inputs, output -> outputs
-        groupId: groupName + 's',
+        groupId: groupName,
         children: [],
       };
 
@@ -637,7 +634,7 @@ export const RunsTable: FC<{
         Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
           k => !k.startsWith('_')
         );
-    addColumnGroup('input', inputOrder);
+    addColumnGroup('inputs', inputOrder);
 
     // Add output columns
     if (!onlyOneOutputResult) {

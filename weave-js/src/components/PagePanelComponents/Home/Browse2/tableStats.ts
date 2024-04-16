@@ -54,7 +54,7 @@ export const computeTableStats = (table: Array<Record<string, any>>) => {
   const colPatterns: RegExp[] = [
     /^userId$/,
     /^opCategory$/,
-    /^input\..*$/,
+    /^inputs\..*$/,
     /^output\..*$/,
   ];
   for (const row of table) {
@@ -152,8 +152,8 @@ export const useColumnVisibility = (
 
 export const getInputColumns = (tableStats: TableStats): string[] => {
   return Object.keys(tableStats.column)
-    .filter(colName => colName.startsWith('input.'))
-    .map(colName => colName.substring(6));
+    .filter(colName => colName.startsWith('inputs.'))
+    .map(colName => colName.substring(7));
 };
 
 // Get a list of "boring" columns.
