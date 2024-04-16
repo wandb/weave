@@ -136,6 +136,28 @@ def run_command(command: str) -> str:
         result += f"STDOUT\n{stdout}\n"
     return result
 
+@weave.op()
+def find_text_line_numbers(path: str, search_text: str) -> list:
+    """Find line numbers of all occurrences of a text in a file.
+
+    Args:
+        path: The path to the file.
+        search_text: The text to search for in the file.
+
+    Returns:
+        A list of line numbers where the text is found. Line numbers start at 1.
+    """
+    line_numbers = []
+    try:
+        with open(path, 'r') as file:
+            for i, line in enumerate(file, start=1):
+                if search_text in line:
+                    line_numbers.append(i)
+    except Exception as e:
+        return [str(e)]  # In a real implementation, you might want to handle the error differently.
+
+    return line_numbers
+
 
 @weave.op()
 def run(state: AgentState):
@@ -164,7 +186,7 @@ if __name__ == "__main__":
         model_name="gpt-4-0125-preview",
         temperature=0.3,
         system_message=SYSTEM_MESSAGE,
-        tools=[list_files, write_to_file, read_from_file, run_command],
+        tools=[list_files, write_to_file, read_from_file, run_command, find_text_line_numbers]
     )
 
     if len(sys.argv) < 2:
