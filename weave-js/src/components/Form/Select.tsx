@@ -315,15 +315,16 @@ export const Select = <
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `rounded night-aware bg-white hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
+    base: `dark:bg-black rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
     focus: 'ring-1 ring-primary-500',
-    nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250',
+    nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-black',
   };
   const optionStyles = {
-    base: `cursor-pointer text-moon-800 dark:text-white dark:bg-moon-900`,
-    focus: 'bg-moon-100',
-    isSelected: 'text-teal-600 bg-teal-300/[0.32]',
-    isDisabled: 'cursor-default text-moon-350',
+    base: 'night-aware cursor-pointer text-moon-800 dark:bg-black',
+    focus: 'night-aware bg-moon-100 dark:bg-black',
+    selected: 'night-aware text-teal-600 bg-teal-300/[0.32]',
+    nonFocus: 'night-aware dark:bg-red',
+    // isDisabled: 'cursor-default text-moon-350 ',
   };
   return (
     <Tailwind>
@@ -346,12 +347,9 @@ export const Select = <
             classNames(
               isFocused
                 ? optionStyles.focus
-                : isDisabled
-                ? optionStyles.isDisabled
                 : isSelected
-                ? optionStyles.isSelected
-                : optionStyles.base,
-              optionStyles.base
+                ? optionStyles.selected
+                : optionStyles.nonFocus
             ),
 
           // padding: '6px 10px',
