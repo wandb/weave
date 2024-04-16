@@ -192,10 +192,10 @@ const getStyles = <
         margin: 0,
       };
     },
-    valueContainer: baseStyles => {
-      const padding = PADDING[size];
-      return {...baseStyles, padding};
-    },
+    // valueContainer: baseStyles => {
+    //   const padding = PADDING[size];
+    //   return {...baseStyles, padding};
+    // },
     multiValueLabel: baseStyles => {
       const fontSize = FONT_SIZES[size];
       return {
@@ -322,7 +322,7 @@ export const Select = <
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `dark:bg-red rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
+    base: `dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
     focus: 'ring-1 ring-primary-500',
     nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red',
   };
@@ -333,19 +333,20 @@ export const Select = <
     nonFocus: 'dark:bg-moon-900 dark:text-white	z-50',
     // isDisabled: 'cursor-default text-moon-350 ',
   };
-  const menuStyles = 'dark:bg-moon-900';
+  const menuStyles = 'night-aware dark:bg-moon-900';
+  const singleValueStyles = 'dark:text-white';
 
   return (
     <Tailwind>
       <ReactSelect
-        menuIsOpen={true}
+        // menuIsOpen={true}
         {...props}
         components={Object.assign(
           {DropdownIndicator, GroupHeading},
           props.components
         )}
         styles={styles}
-        className="night-aware"
+        // className="night-aware"
         classNamePrefix="react-select"
         classNames={{
           control: ({isFocused}) =>
@@ -362,6 +363,8 @@ export const Select = <
                 : optionStyles.nonFocus
             ),
           menu: () => menuStyles,
+          // valueContainer: () => valueContainerStyles,
+          singleValue: () => singleValueStyles,
         }}
       />
     </Tailwind>
