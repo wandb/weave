@@ -134,7 +134,7 @@ def find_text_line_numbers(path: str, search_text: str) -> list:
 
     Args:
         path: The path to the file.
-        search_text: The text to search for in the file.
+        search_text: The text to searc for in the file.
 
     Returns:
         A list of line numbers where the text is found. Line numbers start at 1.
