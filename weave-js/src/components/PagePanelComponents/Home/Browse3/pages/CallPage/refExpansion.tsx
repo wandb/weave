@@ -9,7 +9,10 @@ import {mapObject, traverse, TraverseContext} from './traverse';
 type Rows = Array<Row>;
 type Row = Record<string, any>;
 
-export const useRowsWithExpandedRefs = (rows: Rows) => {
+export const useRowsWithExpandedRefs = (
+  rows: Rows,
+  shouldAutoExpand: boolean
+) => {
   const {useRefsData} = useWFHooks();
 
   // `resolvedRows` holds ref-resolved data.
@@ -39,8 +42,10 @@ export const useRowsWithExpandedRefs = (rows: Rows) => {
   // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
   const refs = useMemo(() => {
     const allRefs = new Set<string>([]);
-    for (const ref of dataRefs) {
-      allRefs.add(ref);
+    if (shouldAutoExpand) {
+      for (const ref of dataRefs) {
+        allRefs.add(ref);
+      }
     }
     for (const path of Object.keys(expandedRefs)) {
       for (const ref of expandedRefs[path]) {
@@ -48,7 +53,7 @@ export const useRowsWithExpandedRefs = (rows: Rows) => {
       }
     }
     return Array.from(allRefs);
-  }, [dataRefs, expandedRefs]);
+  }, [dataRefs, expandedRefs, shouldAutoExpand]);
 
   // finally, we get the ref data for all refs. This function is highly memoized and
   // cached. Therefore, we only ever make network calls for new refs in the list.

@@ -27,7 +27,7 @@ import {
   WeaveCHTableSourceRefContext,
 } from './DataTableView';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
-import {refIsExpandable, useRowsWithExpandedRefs} from './RefExpander';
+import {refIsExpandable, useRowsWithExpandedRefs} from './refExpansion';
 import {ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
@@ -44,8 +44,10 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   const dataAsRows = useMemo(() => {
     return [data];
   }, [data]);
-  const {resolvedRows, expandedRefs, addExpandedRef} =
-    useRowsWithExpandedRefs(dataAsRows);
+  const {resolvedRows, expandedRefs, addExpandedRef} = useRowsWithExpandedRefs(
+    dataAsRows,
+    true
+  );
   const resolvedData = resolvedRows[0];
 
   // `rows` are the data-grid friendly rows that we will render. This method traverses

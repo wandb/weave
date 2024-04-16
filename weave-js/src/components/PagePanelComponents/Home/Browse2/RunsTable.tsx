@@ -66,6 +66,7 @@ import {
   getInputColumns,
   useColumnVisibility,
 } from './tableStats';
+import {useRowsWithExpandedRefs} from '../Browse3/pages/CallPage/refExpansion';
 
 export type DataGridColumnGroupingModel = Exclude<
   ComponentProps<typeof DataGrid>['columnGroupingModel'],
@@ -222,7 +223,22 @@ export const RunsTable: FC<{
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+}> = ({loading, spans: nonExpandedSpans, clearFilters, ioColumnsOnly}) => {
+  const expandableSpans = useMemo(() => {
+    return nonExpandedSpans.map(span => span.rawSpan);
+  }, [nonExpandedSpans]);
+  const {resolvedRows, expandedRefs, addExpandedRef} = useRowsWithExpandedRefs(
+    expandableSpans,
+    false
+  );
+  const spans = useMemo(() => {
+    return nonExpandedSpans.map((span, i) => ({
+      ...span,
+      rawSpan: resolvedRows[i],
+    }));
+  }, [nonExpandedSpans, resolvedRows]);
+  console.log('spans', spans, 'nonExpandedSpans', nonExpandedSpans);
+
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
@@ -259,14 +275,14 @@ export const RunsTable: FC<{
   const apiRef = useGridApiRef();
   // Have to add _result when null, even though we try to do this in the python
   // side
-  spans = useMemo(
-    () =>
-      spans.map(s => ({
-        ...s,
-        output: s.rawSpan.output == null ? {_result: null} : s.rawSpan.output,
-      })),
-    [spans]
-  );
+  // spans = useMemo(
+  //   () =>
+  //     spans.map(s => ({
+  //       ...s,
+  //       output: s.rawSpan.output == null ? {_result: null} : s.rawSpan.output,
+  //     })),
+  //   [spans]
+  // );
   const params = useParams<Browse2RootObjectVersionItemParams>();
 
   let onlyOneOutputResult = true;
