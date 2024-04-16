@@ -57,7 +57,9 @@ export const DraggableWrapper = ({children, ...other}: any) => {
 export const DraggableGrow = ({children, ...other}: any) => {
   return (
     <Grow {...other} timeout={0}>
-      <DraggableWrapper>{children}</DraggableWrapper>
+      <div>
+        <DraggableWrapper>{children}</DraggableWrapper>
+      </div>
     </Grow>
   );
 };
