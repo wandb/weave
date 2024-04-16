@@ -5,7 +5,6 @@ import {
   GridColDef,
   GridRowHeightParams,
 } from '@mui/x-data-grid-pro';
-import _ from 'lodash';
 import React, {
   useCallback,
   useContext,
@@ -14,7 +13,6 @@ import React, {
   useState,
 } from 'react';
 
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {parseRefMaybe} from '../../../Browse2/SmallRef';
@@ -24,13 +22,13 @@ import {
   LIST_INDEX_EDGE_NAME,
   OBJECT_ATTR_EDGE_NAME,
 } from '../wfReactInterface/constants';
-import {useWFHooks} from '../wfReactInterface/context';
 import {
   USE_TABLE_FOR_ARRAYS,
   WeaveCHTableSourceRefContext,
 } from './DataTableView';
 import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
-import {mapObject, ObjectPath, traverse, TraverseContext} from './traverse';
+import {refIsExpandable, useRowsWithExpandedRefs} from './RefExpander';
+import {ObjectPath, traverse, TraverseContext} from './traverse';
 import {ValueView} from './ValueView';
 
 type Data = Record<string, any>;
@@ -41,118 +39,14 @@ type ObjectViewerProps = {
   isExpanded: boolean;
 };
 
-// Traverse the data and find all ref URIs.
-const getRefs = (data: Data): string[] => {
-  const refs = new Set<string>();
-  traverse(data, (context: TraverseContext) => {
-    if (isRef(context.value)) {
-      refs.add(context.value);
-    }
-  });
-  return Array.from(refs);
-};
-
-type RefValues = Record<string, any>; // ref URI to value
-
-const refIsExpandable = (ref: string): boolean => {
-  if (!isRef(ref)) {
-    return false;
-  }
-  const parsed = parseRef(ref);
-  if (isWeaveObjectRef(parsed)) {
-    return (
-      parsed.weaveKind === 'object' ||
-      parsed.weaveKind === 'op' ||
-      (parsed.weaveKind === 'table' &&
-        parsed.artifactRefExtra != null &&
-        parsed.artifactRefExtra.length > 0)
-    );
-  }
-  return false;
-};
-
 // This is a general purpose object viewer that can be used to view any object.
 export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
-  const {useRefsData} = useWFHooks();
-
-  // `resolvedData` holds ref-resolved data.
-  const [resolvedData, setResolvedData] = useState<Data>(data);
-
-  // `dataRefs` are the refs contained in the data, filtered to only include expandable refs.
-  const dataRefs = useMemo(() => getRefs(data).filter(refIsExpandable), [data]);
-
-  // Expanded refs are the explicit set of refs that have been expanded by the user. Note that
-  // this might contain nested refs not in the `dataRefs` set. The keys are refs and the values
-  // are the paths at which the refs were expanded.
-  const [expandedRefs, setExpandedRefs] = useState<{[ref: string]: string}>({});
-
-  // `addExpandedRef` is a function that can be used to add an expanded ref to the `expandedRefs` state.
-  const addExpandedRef = useCallback((path: string, ref: string) => {
-    setExpandedRefs(eRefs => ({...eRefs, [path]: ref}));
-  }, []);
-
-  // `refs` is the union of `dataRefs` and the refs in `expandedRefs`.
-  const refs = useMemo(() => {
-    return Array.from(new Set([...dataRefs, ...Object.values(expandedRefs)]));
-  }, [dataRefs, expandedRefs]);
-
-  // finally, we get the ref data for all refs. This function is highly memoized and
-  // cached. Therefore, we only ever make network calls for new refs in the list.
-  const refsData = useRefsData(refs);
-
-  // This effect is responsible for resolving the refs in the data. It iteratively
-  // replaces refs with their resolved values. It also adds a `_ref` key to the resolved
-  // value to indicate the original ref URI. It is ultimately responsible for setting
-  // `resolvedData`.
-  useEffect(() => {
-    if (refsData.loading) {
-      return;
-    }
-    const resolvedRefData = refsData.result;
-
-    const refValues: RefValues = {};
-    for (const [r, v] of _.zip(refs, resolvedRefData)) {
-      if (!r || !v) {
-        // Shouldn't be possible
-        continue;
-      }
-      let val = r;
-      if (v == null) {
-        console.error('Error resolving ref', r);
-      } else {
-        val = v;
-        if (typeof val === 'object' && val !== null) {
-          val = {
-            ...v,
-            _ref: r,
-          };
-        } else {
-          // This makes it so that runs pointing to primitives can still be expanded in the table.
-          val = {
-            '': v,
-            _ref: r,
-          };
-        }
-      }
-      refValues[r] = val;
-    }
-    let resolved = data;
-    let dirty = true;
-    const mapper = (context: TraverseContext) => {
-      if (isRef(context.value) && refValues[context.value] != null) {
-        dirty = true;
-        const res = refValues[context.value];
-        delete refValues[context.value];
-        return res;
-      }
-      return _.clone(context.value);
-    };
-    while (dirty) {
-      dirty = false;
-      resolved = mapObject(resolved, mapper);
-    }
-    setResolvedData(resolved);
-  }, [data, refs, refsData.loading, refsData.result]);
+  const dataAsRows = useMemo(() => {
+    return [data];
+  }, [data]);
+  const {resolvedRows, expandedRefs, addExpandedRef} =
+    useRowsWithExpandedRefs(dataAsRows);
+  const resolvedData = resolvedRows[0];
 
   // `rows` are the data-grid friendly rows that we will render. This method traverses
   // the data, hiding certain keys and adding loader rows for expandable refs.
@@ -252,8 +146,11 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
           }
           for (let i = 0; i < path.length(); i++) {
             const ancestorPath = path.ancestor(-i);
-            const ancestorExpandedRef = expandedRefs[ancestorPath.toString()];
-            if (ancestorExpandedRef) {
+            const ancestorExpandedRefSet =
+              expandedRefs[ancestorPath.toString()];
+
+            if (ancestorExpandedRefSet && ancestorExpandedRefSet.size === 1) {
+              const ancestorExpandedRef = Array.from(ancestorExpandedRefSet)[0];
               baseRef = buildBaseRef(ancestorExpandedRef, path, i);
               break;
             }
