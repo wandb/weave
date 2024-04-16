@@ -12,6 +12,7 @@ import {
   TEAL_300,
   WHITE,
 } from '../../../../common/css/globals.styles';
+import {Loading} from '../../../Loading';
 
 // TODO: Handle night mode
 const backgroundColorHovered = hexToRGB(OBLIVION, 0.04);
@@ -21,13 +22,20 @@ const backgroundColorHoveredSelected = Color.fromHex(WHITE)
   .blend(Color.fromHex(OBLIVION, 0.04))
   .toString();
 
+// Use our custom loading component that matches our palette.
+const LoadingOverlay = () => <Loading centered />;
+
 export const StyledDataGrid = styled(
   ({
     keepBorders,
     ...otherProps
-  }: DataGridProProps & {keepBorders?: boolean}) => (
-    <DataGridPro {...otherProps} />
-  )
+  }: DataGridProProps & {keepBorders?: boolean}) => {
+    const slots = otherProps.slots ?? {};
+    if (!slots.loadingOverlay) {
+      slots.loadingOverlay = LoadingOverlay;
+    }
+    return <DataGridPro slots={slots} {...otherProps} />;
+  }
 )(({keepBorders}) => ({
   ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
 
