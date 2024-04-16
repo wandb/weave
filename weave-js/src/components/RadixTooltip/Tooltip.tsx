@@ -1,7 +1,3 @@
-import {
-  TooltipPortalProps as RadixTooltipPortalProps,
-  TooltipProps as RadixTooltipProps,
-} from '@radix-ui/react-tooltip';
 import React, {useState} from 'react';
 
 import * as RadixTooltip from './index';
