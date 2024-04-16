@@ -41,61 +41,16 @@ import AsyncCreatableSelect, {
 import {Tailwind} from '../Tailwind';
 
 export const SelectSizes = {
-  Small: 'small',
   Medium: 'medium',
   Large: 'large',
-  Variable: 'variable',
 } as const;
 export type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
-const HEIGHTS: Record<SelectSize, number | undefined> = {
-  small: 24,
-  medium: 32,
-  large: 40,
-  variable: undefined,
+export const SelectIconTypes = {
+  Semantic: 'semantic',
+  Action: 'action',
 } as const;
-
-const MIN_HEIGHTS: Record<SelectSize, number | undefined> = {
-  small: undefined,
-  medium: undefined,
-  large: undefined,
-  variable: 40,
-} as const;
-
-const LINE_HEIGHTS: Record<SelectSize, string | undefined> = {
-  small: '20px',
-  medium: '24px',
-  large: '24px',
-  variable: undefined,
-} as const;
-
-const FONT_SIZES: Record<SelectSize, string> = {
-  small: '14px',
-  medium: '16px',
-  large: '16px',
-  variable: '14px',
-} as const;
-
-const PADDING: Record<SelectSize, string> = {
-  small: '2px 8px',
-  medium: '4px 12px',
-  large: '8px 12px',
-  variable: '2px 8px',
-} as const;
-
-const OUTWARD_MARGINS: Record<SelectSize, string> = {
-  small: '-8px',
-  medium: '-12px',
-  large: '-12px',
-  variable: '-8px',
-} as const;
-
-const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
-  small: 2,
-  medium: 6,
-  large: 8,
-  variable: 2,
-} as const;
+export type IconType = (typeof SelectIconTypes)[keyof typeof SelectIconTypes];
 
 export type AdditionalProps = {
   size?: SelectSize;
@@ -103,6 +58,8 @@ export type AdditionalProps = {
   groupDivider?: boolean;
   cursor?: string;
   isDarkMode?: boolean;
+  iconName?: string;
+  iconType?: IconType;
 };
 
 // Toggle icon when open
@@ -143,7 +100,7 @@ const getGroupHeading = <
             style={{
               backgroundColor: MOON_250,
               height: '1px',
-              margin: `0 ${OUTWARD_MARGINS[size]} 6px ${OUTWARD_MARGINS[size]}`,
+              // margin: `0 ${OUTWARD_MARGINS[size]} 6px ${OUTWARD_MARGINS[size]}`,
             }}
           />
         )}
@@ -177,7 +134,7 @@ const getStyles = <
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
     clearIndicator: baseStyles => ({
       ...baseStyles,
-      padding: CLEAR_INDICATOR_PADDING[size],
+      // padding: CLEAR_INDICATOR_PADDING[size],
       cursor: 'pointer',
     }),
     // input: baseStyles => {
@@ -192,10 +149,10 @@ const getStyles = <
     //   return {...baseStyles, padding};
     // },
     multiValueLabel: baseStyles => {
-      const fontSize = FONT_SIZES[size];
+      // const fontSize = FONT_SIZES[size];
       return {
         ...baseStyles,
-        fontSize,
+        // fontSize,
       };
     },
     multiValueRemove: baseStyles => ({
@@ -204,10 +161,10 @@ const getStyles = <
     }),
     dropdownIndicator: baseStyles => ({...baseStyles, padding: '0 8px 0 0'}),
     container: baseStyles => {
-      const height = HEIGHTS[size];
+      // const height = HEIGHTS[size];
       return {
         ...baseStyles,
-        height,
+        // height,
         // zIndex: 5,
       };
     },
@@ -314,10 +271,14 @@ export const Select = <
 ) => {
   const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
   const size = props.size ?? 'medium';
+
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `leading-[22.4px] text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
+    base: classNames(
+      `leading-[22.4px] text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
+      // size === 'medium' ? 'py-4' : 'py-8'
+    ),
     focus: 'ring-1 ring-primary-500',
     nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red',
   };
@@ -325,12 +286,16 @@ export const Select = <
     base: 'text-base cursor-pointer text-moon-800',
     focus: 'bg-moon-100 dark:bg-moon-350',
     selected: 'text-teal-600 bg-teal-300/[0.32]',
-    nonFocus: 'dark:bg-moon-900 dark:text-white',
+    nonFocus: 'dark:bg-moon-900 dark:text-white	z-50',
     // isDisabled: 'cursor-default text-moon-350 ',
   };
   const menuStyles = 'night-aware dark:bg-moon-900';
   const singleValueStyles = 'dark:text-white';
   const placeHolderStyles = 'text-moon-500';
+  const valueContainerStyles = classNames(
+    size === 'medium' ? 'py-4' : 'py-8',
+    'pr-6 space-x-8'
+  );
 
   return (
     <Tailwind>
@@ -359,7 +324,7 @@ export const Select = <
                 : optionStyles.nonFocus
             ),
           menu: () => menuStyles,
-          // valueContainer: () => valueContainerStyles,
+          valueContainer: () => valueContainerStyles,
           singleValue: () => singleValueStyles,
           placeholder: () => placeHolderStyles,
         }}

@@ -94,6 +94,6 @@ export const SelectMultiple = <Option,>(props: SelectMultipleProps<Option>) => {
   return props.sortable ? (
     <SelectMultipleSortable {...props} />
   ) : (
-    <Select {...props} size="variable" isMulti />
+    <Select {...props} size="medium" isMulti />
   );
 };
