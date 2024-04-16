@@ -1,4 +1,4 @@
-import {Box} from '@material-ui/core';
+import Box from '@mui/material/Box';
 import {
   DataGridProProps,
   GridApiPro,

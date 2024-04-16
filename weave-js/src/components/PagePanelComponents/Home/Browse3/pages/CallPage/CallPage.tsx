@@ -1,4 +1,4 @@
-import {Box} from '@material-ui/core';
+import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
