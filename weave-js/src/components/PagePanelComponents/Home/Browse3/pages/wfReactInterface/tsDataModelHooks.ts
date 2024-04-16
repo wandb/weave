@@ -322,9 +322,9 @@ const useOpVersion = (
       };
     }
 
-    const returnedResult  =
-      convertTraceServerObjectVersionToOpSchema(opVersionRes.obj);
-
+    const returnedResult = convertTraceServerObjectVersionToOpSchema(
+      opVersionRes.obj
+    );
 
     if (
       key.entity !== returnedResult.entity ||
@@ -340,8 +340,8 @@ const useOpVersion = (
 
     const cachableResult: OpVersionSchema = {
       ...key,
-      ...returnedResult
-    }
+      ...returnedResult,
+    };
 
     opVersionCache.set(key, cachableResult);
     return {
