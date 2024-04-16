@@ -13,6 +13,12 @@ from weave.flow.tools import chat_call_tool_params, perform_tool_calls
 from weave.flow.console import LogEvents
 from weave.flow.chat_util import OpenAIStream
 
+def get_knowledge():
+    knowledge_path = "agent_knowledge.txt"
+    with open(knowledge_path, "r") as f:
+        knowledge_content = f.read()
+    return knowledge_content
+
 
 class AgentState(Object):
     # TODO: want openai types here.
@@ -21,7 +27,7 @@ class AgentState(Object):
 
 class Agent(Object):
     model_name: str = "gpt-3.5-turbo"
-    temperature: float = 0.7
+    temperature: float = 0.3
     system_message: str
     tools: list[Any] = Field(default_factory=list)
 
@@ -39,7 +45,7 @@ class Agent(Object):
         LogEvents.step_start("agent", "green")
 
         messages: list[ChatCompletionMessageParam] = [
-            {"role": "system", "content": self.system_message},
+            {"role": "system", "content": self.system_message + get_knowledge()},
         ]
         messages += state.history
 
@@ -83,6 +89,8 @@ class Agent(Object):
             if state.history[-(distance + 1)]["role"] == "system":
                 break
         if distance > 10:
-            new_messages.append({"role": "system", "content": self.system_message})
+            new_messages.append({"role": "system", "content": get_knowledge()})
 
         return AgentState(history=state.history + new_messages)
+    
+    
