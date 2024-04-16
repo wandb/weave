@@ -172,11 +172,6 @@ const getStyles = <
 ) => {
   const errorState = props.errorState ?? false;
   const size = props.size ?? 'medium';
-  const controlStyles = {
-    base: `border rounded bg-white hover:cursor-pointer hover:dark:border-teal-650 hover:border-teal-350`,
-    focus: 'border-teal-350 ring-1 ring-primary-500',
-    nonFocus: 'border-gray-300',
-  };
   return {
     // No vertical line to left of dropdown indicator
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
@@ -185,13 +180,13 @@ const getStyles = <
       padding: CLEAR_INDICATOR_PADDING[size],
       cursor: 'pointer',
     }),
-    input: baseStyles => {
-      return {
-        ...baseStyles,
-        padding: 0,
-        margin: 0,
-      };
-    },
+    // input: baseStyles => {
+    //   return {
+    //     ...baseStyles,
+    //     padding: 0,
+    //     margin: 0,
+    //   };
+    // },
     // valueContainer: baseStyles => {
     //   const padding = PADDING[size];
     //   return {...baseStyles, padding};
@@ -322,19 +317,20 @@ export const Select = <
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
+    base: `leading-[22.4px] text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
     focus: 'ring-1 ring-primary-500',
     nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red',
   };
   const optionStyles = {
-    base: 'cursor-pointer text-moon-800',
+    base: 'text-base cursor-pointer text-moon-800',
     focus: 'bg-moon-100 dark:bg-moon-350',
     selected: 'text-teal-600 bg-teal-300/[0.32]',
-    nonFocus: 'dark:bg-moon-900 dark:text-white	z-50',
+    nonFocus: 'dark:bg-moon-900 dark:text-white',
     // isDisabled: 'cursor-default text-moon-350 ',
   };
   const menuStyles = 'night-aware dark:bg-moon-900';
   const singleValueStyles = 'dark:text-white';
+  const placeHolderStyles = 'text-moon-500';
 
   return (
     <Tailwind>
@@ -365,6 +361,7 @@ export const Select = <
           menu: () => menuStyles,
           // valueContainer: () => valueContainerStyles,
           singleValue: () => singleValueStyles,
+          placeholder: () => placeHolderStyles,
         }}
       />
     </Tailwind>
