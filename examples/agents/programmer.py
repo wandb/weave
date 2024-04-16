@@ -156,6 +156,7 @@ if __name__ == "__main__":
 
     agent = Agent(
         model_name="gpt-4-0125-preview",
+        temperature=0.3,
         system_message=SYSTEM_MESSAGE,
         tools=[list_files, write_to_file, read_from_file, run_command],
     )
