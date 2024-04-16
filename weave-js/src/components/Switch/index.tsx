@@ -1,4 +1,4 @@
-import * as Switch from '@radix-ui/react-switch';
+import * as RadixSwitch from '@radix-ui/react-switch';
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
 export * from './Switch';
@@ -6,8 +6,8 @@ export * from './Switch';
 export const Root = ({
   className,
   ...props
-}: React.ComponentProps<typeof Switch.Root>) => (
-  <Switch.Root
+}: React.ComponentProps<typeof RadixSwitch.Root>) => (
+  <RadixSwitch.Root
     className={twMerge(
       'flex h-[24px] w-[44px] items-center rounded-[12px] p-[1px] transition-colors duration-100 ease-out',
       'focus-visible:outline focus-visible:outline-[2px] focus-visible:outline-teal-500',
@@ -21,8 +21,8 @@ export const Root = ({
 export const Thumb = ({
   className,
   ...props
-}: React.ComponentProps<typeof Switch.Thumb> & {checked: boolean}) => (
-  <Switch.Thumb
+}: React.ComponentProps<typeof RadixSwitch.Thumb> & {checked: boolean}) => (
+  <RadixSwitch.Thumb
     className={twMerge(
       'h-[22px] w-[22px] rounded-full bg-white transition-transform duration-100 ease-out',
       props.checked ? 'translate-x-20' : 'translate-x-0',
