@@ -5,7 +5,7 @@ import {twMerge} from 'tailwind-merge';
 
 import {Tailwind} from '../Tailwind';
 
-export {Tooltip as NewTooltip} from './Tooltip';
+export {Tooltip} from './Tooltip';
 
 /**
  * {@link https://www.radix-ui.com/docs/primitives/components/tooltip#provider}
