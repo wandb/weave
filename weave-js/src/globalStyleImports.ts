@@ -25,7 +25,6 @@ import 'katex/dist/katex.css';
 import 'react-base-table/styles.css';
 import 'react-datetime/css/react-datetime.css';
 import 'react-resizable/css/styles.css';
-import 'react-table/react-table.css';
 import 'react-toastify/dist/ReactToastify.min.css';
 import '@wandb/semantic/semantic.min.css';
 import '@wandb/weave/common/css/SemanticOverride.less';
