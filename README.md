@@ -1,4 +1,5 @@
 # **Weave by Weights & Biases**
+
 Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
 
 ---
@@ -11,7 +12,9 @@ You can use Weave to:
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing Generative AI software, without introducing cognitive overhead.
 
-<img src="./docs/static/weave-ui-example.jpg" width="400">
+<div align="center">
+  <img src="./docs/static/weave-ui-example.jpg" width="400">
+</div>
 
 ## Documentation
 
@@ -24,7 +27,8 @@ pip install weave
 
 ## Usage
 
-You can trace any function using `weave.op()` - from api calls to OpenAI, Anthropic, Google AI Studio etc to generation calls in Hugging Face and other open source models to any other functions or transformations you'd like to keep track of.
+### Tracing
+You can trace any function using `weave.op()` - from api calls to OpenAI, Anthropic, Google AI Studio etc to generation calls from Hugging Face and other open source models to any other validation functions or data transformations in your code you'd like to keep track of.
 
 Decorate all the functions you want to trace, this will generate a trace tree of the inputs and outputs of all your functions:
 
@@ -51,7 +55,7 @@ main()
 
 ### Fuller Example 
 
-```
+```python
 import weave
 import json
 from openai import OpenAI
@@ -79,13 +83,14 @@ def extract_fruit(sentence: str) -> dict:
     return json.loads(extracted)
 
 weave.init('intro-example')
+
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
+
 extract_fruit(sentence)
 ```
 
 
-
-## The code base
+## Contributing
 
 Interested in pulling back the hood or contributing? Awesome, before you dive in, here's what you need to know.
 
@@ -94,10 +99,3 @@ We're in the process of 🧹 cleaning up 🧹. This codebase contains a large am
 The Weave Tracing code is mostly in: `weave/trace` and `weave/trace_server`.
 
 The Weave Evaluations code is mostly in `weave/flow`.
-
-
-
-
-
-
-https://github.com/wandb/weave.git
