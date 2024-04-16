@@ -211,6 +211,7 @@ const getStyles = <
       return {
         ...baseStyles,
         height,
+        // zIndex: 30000,
       };
     },
 
@@ -252,12 +253,13 @@ const getStyles = <
       //       which causes their selected value to appear in front of the
       //       react-select popup. We should remove this hack once we've
       //       eliminated Semantic-UI based dropdowns.
-      zIndex: 4,
+      zIndex: 80,
     }),
     menuList: baseStyles => {
       return {
         ...baseStyles,
         padding: '6px 0',
+        // zIndex: 5,
       };
     },
     groupHeading: (baseStyles, state) => {
@@ -315,15 +317,15 @@ export const Select = <
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
-    base: `dark:bg-black rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
+    base: `dark:bg-red rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`,
     focus: 'ring-1 ring-primary-500',
-    nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-black',
+    nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red',
   };
   const optionStyles = {
-    base: 'night-aware cursor-pointer text-moon-800 dark:bg-black',
-    focus: 'night-aware bg-moon-100 dark:bg-black',
+    base: 'night-aware cursor-pointer text-moon-800 dark:bg-red',
+    focus: 'night-aware bg-moon-100 dark:bg-red',
     selected: 'night-aware text-teal-600 bg-teal-300/[0.32]',
-    nonFocus: 'night-aware dark:bg-red',
+    nonFocus: 'night-aware dark:bg-moon-350',
     // isDisabled: 'cursor-default text-moon-350 ',
   };
   return (
