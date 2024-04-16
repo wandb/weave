@@ -102,6 +102,7 @@ export type AdditionalProps = {
   errorState?: boolean;
   groupDivider?: boolean;
   cursor?: string;
+  isDarkMode?: boolean;
 };
 
 // Toggle icon when open
@@ -156,6 +157,7 @@ type StylesProps = {
   size?: SelectSize;
   errorState?: boolean;
   cursor?: string;
+  isDarkMode?: boolean;
 };
 
 // Override styling to come closer to design spec.
@@ -211,10 +213,9 @@ const getStyles = <
       return {
         ...baseStyles,
         height,
-        // zIndex: 30000,
+        // zIndex: 5,
       };
     },
-
     // control: (baseStyles, state) => {
     //   const colorBorderDefault = MOON_250;
     //   const colorBorderHover = hexToRGB(TEAL_500, 0.4);
@@ -247,19 +248,21 @@ const getStyles = <
     //     },
     //   };
     // },
-    menu: baseStyles => ({
-      ...baseStyles,
-      // TODO: Semantic-UI based dropdowns have their z-index set to 3,
-      //       which causes their selected value to appear in front of the
-      //       react-select popup. We should remove this hack once we've
-      //       eliminated Semantic-UI based dropdowns.
-      zIndex: 80,
-    }),
+    // menu: baseStyles => ({
+    //   ...baseStyles,
+    //   // TODO: Semantic-UI based dropdowns have their z-index set to 3,
+    //   //       which causes their selected value to appear in front of the
+    //   //       react-select popup. We should remove this hack once we've
+    //   //       eliminated Semantic-UI based dropdowns.
+    //   // zIndex: 9999,
+
+    // }),
+
     menuList: baseStyles => {
       return {
         ...baseStyles,
         padding: '6px 0',
-        // zIndex: 5,
+        // zIndex: 99999,
       };
     },
     groupHeading: (baseStyles, state) => {
@@ -285,7 +288,9 @@ const getStyles = <
     //     margin: '0 6px',
     //     borderRadius: '4px',
     //     width: 'auto',
-    //     backgroundColor: state.isDisabled
+    //     backgroundColor: props.isDarkMode
+    //       ? MOON_900
+    //       : state.isDisabled
     //       ? undefined
     //       : state.isSelected
     //       ? hexToRGB(TEAL_300, 0.32)
@@ -299,7 +304,7 @@ const getStyles = <
     //         ? hexToRGB(TEAL_300, 0.32)
     //         : undefined,
     //     },
-    //   };
+    // };
     // },
   } as StylesConfig<Option, IsMulti, Group>;
 };
@@ -322,15 +327,18 @@ export const Select = <
     nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red',
   };
   const optionStyles = {
-    base: 'night-aware cursor-pointer text-moon-800 dark:bg-red',
-    focus: 'night-aware bg-moon-100 dark:bg-red',
-    selected: 'night-aware text-teal-600 bg-teal-300/[0.32]',
-    nonFocus: 'night-aware dark:bg-moon-350',
+    base: 'cursor-pointer text-moon-800',
+    focus: 'bg-moon-100 dark:bg-moon-350',
+    selected: 'text-teal-600 bg-teal-300/[0.32]',
+    nonFocus: 'dark:bg-moon-900 dark:text-white	z-50',
     // isDisabled: 'cursor-default text-moon-350 ',
   };
+  const menuStyles = 'dark:bg-moon-900';
+
   return (
     <Tailwind>
       <ReactSelect
+        menuIsOpen={true}
         {...props}
         components={Object.assign(
           {DropdownIndicator, GroupHeading},
@@ -353,25 +361,7 @@ export const Select = <
                 ? optionStyles.selected
                 : optionStyles.nonFocus
             ),
-
-          // padding: '6px 10px',
-          // margin: '0 6px',
-          // borderRadius: '4px',
-          // width: 'auto',
-          // backgroundColor: state.isDisabled
-          //   ? undefined
-          //   : state.isSelected
-          //   ? hexToRGB(TEAL_300, 0.32)
-          //   : state.isFocused
-          //   ? MOON_100
-          //   : undefined,
-          // ':active': {
-          //   // mousedown
-          //   ...baseStyles[':active'],
-          //   backgroundColor: !state.isDisabled
-          //     ? hexToRGB(TEAL_300, 0.32)
-          //     : undefined,
-          // },
+          menu: () => menuStyles,
         }}
       />
     </Tailwind>
