@@ -328,7 +328,7 @@ export const Select = <
   return (
     <Tailwind>
       <ReactSelect
-        // menuIsOpen={true}
+        menuIsOpen={true}
         {...props}
         components={Object.assign(
           {
