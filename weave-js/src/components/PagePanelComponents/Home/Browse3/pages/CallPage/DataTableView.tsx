@@ -10,14 +10,7 @@ import {
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {
-  FC,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
