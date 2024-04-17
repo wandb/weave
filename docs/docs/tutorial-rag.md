@@ -165,6 +165,56 @@ evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_scor
 asyncio.run(evaluation.evaluate(model)) # note: you'll need to define a model to evaluate
 ```
 
+### Defining a `Scorer` class
+In some applications we want to create custom evaluation classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. In order to do that Weave defines a list of ready-to-use `Scorer` classes and also makes it easy to create a custom `Scorer` - in the following we'll see how to create a custom `class LLMJudge(Scorer)`. 
+
+On a high-level the steps to create custom Scorer are quite simple: 
+1. Define a custom class that inherits from `weave.flow.scorer.Scorer`
+2. Overwrite the `score` function and add a `@weave.op()` if you want to track each call of the function
+3. *Optional:* Overwrite the `summarize` function to customize the calculation of the aggregate score. By default Weave uses the `weave.flow.scorer.auto_summarize` function if you don't define a custom function.
+
+```python
+from weave.flow.scorer import Scorer
+
+class CorrectnessLLMJudge(Scorer):
+    prompt: str
+    model_name: str
+    device: str
+
+    @weave.op()
+    async def score(self, model_output: dict, query: str, answer: str) -> Any:
+        """Score the correctness of the predictions by comparing the query, target answer and pred answer.
+           Args:
+            - model_output: the dict that will be provided by the model that is evaluated
+            - query: the question asked - as defined in the dataset
+            - answer: the target answer - as defined in the dataset"""
+
+        # get_model is defined as general model getter based on provided params (OpenAI,HF...)
+        eval_model = get_model(
+            model_name = self.model_name,
+            prompt = self.prompt
+            device = self.device,
+        )
+        # evaluation of single example
+        grade = await eval_model.async_predict(
+            {
+                "query": query,
+                "answer": answer,
+                "result": model_output["result"],
+            }
+        )
+        # output parsing - could be done more reobustly with pydantic
+        evaluation = "incorrect" not in grade["text"].strip().lower()
+
+        # the column name displayed in Weave
+        return {"answer correct": evaluation}
+
+    @weave.op()
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        return auto_summarize(score_rows)
+
+```
+
 # Pulling it all together
 
 To get the same result for your RAG apps:
