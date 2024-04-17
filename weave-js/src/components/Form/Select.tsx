@@ -104,23 +104,6 @@ const CustomPlaceholder = <
     </div>
   </components.Placeholder>
 );
-const Placeholder = <
-  Option,
-  IsMulti extends boolean = false,
-  Group extends GroupBase<Option> = GroupBase<Option>
->(
-  placeholderProps: PlaceholderProps<Option, IsMulti, Group>
-) => {
-  console.log('HERE', placeholderProps);
-  // const iconName = indicatorProps.selectProps.menuIsOpen
-  //   ? 'chevron-up'
-  //   : 'chevron-down';
-  return (
-    <components.Placeholder {...placeholderProps}>
-      <Icon name={'search'} width={16} height={16} color={MOON_500} />
-    </components.Placeholder>
-  );
-};
 
 const getGroupHeading = <
   Option,
@@ -187,8 +170,8 @@ const getStyles = <
     //   };
     // },
     // valueContainer: baseStyles => {
-    //   const padding = PADDING[size];
-    //   return {...baseStyles, padding};
+    //   // const padding = PADDING[size];
+    //   return {...baseStyles};
     // },
     multiValueLabel: baseStyles => {
       // const fontSize = FONT_SIZES[size];
@@ -319,7 +302,6 @@ export const Select = <
   const controlStyles = {
     base: classNames(
       `leading-[22.4px] text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
-      // size === 'medium' ? 'py-4' : 'py-8'
     ),
     focus: 'ring-1 ring-primary-500',
     nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red',
@@ -334,9 +316,12 @@ export const Select = <
   const menuStyles = 'night-aware dark:bg-moon-900';
   const singleValueStyles = 'dark:text-white';
   const placeHolderStyles = 'text-moon-500';
+  const inputContainerStyles = 'p-0';
+
   const valueContainerStyles = classNames(
     size === 'medium' ? 'py-4' : 'py-8',
-    'pr-6 space-x-8'
+    'pr-6',
+    props.iconType === SelectIconTypes.Semantic ? 'pl-8' : 'pl-12'
   );
 
   return (
@@ -377,8 +362,11 @@ export const Select = <
                 : optionStyles.nonFocus
             ),
           menu: () => menuStyles,
-          valueContainer: () => valueContainerStyles,
+          container: () => inputContainerStyles,
           singleValue: () => singleValueStyles,
+          input: () => inputContainerStyles,
+          valueContainer: () => valueContainerStyles,
+
           // placeholder: () => placeHolderStyles,
         }}
       />
