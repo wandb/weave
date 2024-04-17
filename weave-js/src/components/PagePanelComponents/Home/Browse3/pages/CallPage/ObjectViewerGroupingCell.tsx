@@ -1,4 +1,4 @@
-import {Box, ButtonProps} from '@mui/material';
+import {Box, BoxProps} from '@mui/material';
 import {GridRenderCellParams, useGridApiContext} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {FC, MouseEvent} from 'react';
@@ -19,7 +19,7 @@ export const ObjectViewerGroupingCell: FC<
   const isGroup = rowNode.type === 'group';
   const isExpandableRef = row.isExpandableRef;
   const apiRef = useGridApiContext();
-  const onClick: ButtonProps['onClick'] = event => {
+  const onClick: BoxProps['onClick'] = event => {
     if (isGroup) {
       apiRef.current.setRowChildrenExpansion(id, !rowNode.childrenExpanded);
       apiRef.current.setCellFocus(id, field);

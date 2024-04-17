@@ -1,5 +1,5 @@
-import {Box} from '@material-ui/core';
 import Editor from '@monaco-editor/react';
+import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC} from 'react';
 
@@ -14,7 +14,15 @@ export const Browse2OpDefCode: FC<{uri: string; maxRowsInView?: number}> = ({
   } = useWFHooks();
   const text = useCodeForOpRef(uri);
   if (text.loading) {
-    return <Loading centered />;
+    return (
+      <Box
+        sx={{
+          height: '38px',
+          width: '100%',
+        }}>
+        <Loading centered size={25} />
+      </Box>
+    );
   }
 
   const inner = (

@@ -322,10 +322,27 @@ const useOpVersion = (
       };
     }
 
+    const returnedResult = convertTraceServerObjectVersionToOpSchema(
+      opVersionRes.obj
+    );
+
+    if (
+      key.entity !== returnedResult.entity ||
+      key.project !== returnedResult.project ||
+      key.opId !== returnedResult.opId ||
+      key.versionHash !== returnedResult.versionHash
+    ) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+
     const cachableResult: OpVersionSchema = {
       ...key,
-      ...convertTraceServerObjectVersionToOpSchema(opVersionRes.obj),
+      ...returnedResult,
     };
+
     opVersionCache.set(key, cachableResult);
     return {
       loading: false,
@@ -448,10 +465,26 @@ const useObjectVersion = (
       };
     }
 
+    const returnedResult: ObjectVersionSchema =
+      convertTraceServerObjectVersionToSchema(objectVersionRes.obj);
+
+    if (
+      key.entity !== returnedResult.entity ||
+      key.project !== returnedResult.project ||
+      key.objectId !== returnedResult.objectId ||
+      key.versionHash !== returnedResult.versionHash
+    ) {
+      return {
+        loading: true,
+        result: null,
+      };
+    }
+
     const cachableResult: ObjectVersionSchema = {
       ...key,
-      ...convertTraceServerObjectVersionToSchema(objectVersionRes.obj),
+      ...returnedResult,
     };
+
     objectVersionCache.set(key, cachableResult);
     return {
       loading: false,

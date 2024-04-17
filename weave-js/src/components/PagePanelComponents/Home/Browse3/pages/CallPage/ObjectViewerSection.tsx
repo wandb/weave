@@ -1,4 +1,4 @@
-import {Box} from '@material-ui/core';
+import Box from '@mui/material/Box';
 import {useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useState} from 'react';

@@ -1,4 +1,4 @@
-import {Box} from '@material-ui/core';
+import Box from '@mui/material/Box';
 import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';

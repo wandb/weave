@@ -174,10 +174,7 @@ const UserInner = ({user, includeName, placement}: UserInnerProps) => {
         placement={placement ?? 'right'}
         padding={0}>
         <UserTrigger ref={ref} onClick={onClick}>
-          <Avatar
-            src={user.photoUrl}
-            sx={{width: size, height: size, marginRight: '4px'}}
-          />
+          <Avatar src={user.photoUrl} sx={{width: size, height: size}} />
           {includeName && (
             <Link
               to={`/${user.username}`}
