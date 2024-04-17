@@ -219,10 +219,17 @@ const getStyles = <
     //     }`,
     //   },
     // }),
-    // option: (provided, state) => ({
-    //   ...provided,
-    //   ':hover': state.isSelected ? {} : {backgroundColor: 'blue'}, // Adjust hover for non-selected items
-    // }),
+    option: (provided, state) => ({
+      ...provided,
+      ':active': {
+        // Apply active styles or maintain current styles if selected
+        className: `${optionStyles.base} ${
+          state.isSelected
+            ? optionStyles.selected
+            : 'bg-teal-300/[0.32] dark:bg-teal-700/[0.32]'
+        }`,
+      },
+    }),
   } as StylesConfig<Option, IsMulti, Group>;
 };
 
@@ -249,15 +256,15 @@ export const Select = <
   };
   const optionStyles = {
     base: 'text-base cursor-pointer text-moon-800',
-    focus: 'bg-moon-100 dark:bg-moon-800 dark:text-white rounded',
-    selected: 'text-teal-400 bg-teal-700/[0.32] rounded',
-    nonFocus: 'dark:bg-moon-850 dark:text-white',
+    focus:
+      'bg-moon-100 bg-teal-300/[0.32] dark:bg-moon-800 dark:text-white rounded',
+    selected:
+      'bg-teal-300/[0.32] text-teal-600 dark:text-teal-400 dark:bg-teal-700/[0.32] rounded',
+    nonFocus: 'bg-white dark:bg-moon-850 dark:text-white',
   };
   const menuStyles =
     'night-aware dark:bg-moon-900 dark:border dark:border-moon-750 shadow-custom dark:shadow-custom-dark';
-  //drop-shadow-[0_24px_48px_rgba(0,0,0,0.16)] dark:drop-shadow-[0_24px_48px_rgba(0,0,0,0.48)]
   const singleValueStyles = 'dark:text-white';
-  const placeHolderStyles = 'text-moon-500';
   const inputContainerStyles = 'p-0';
 
   const valueContainerStyles = classNames(
