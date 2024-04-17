@@ -49,8 +49,8 @@ def list_files(directory: str) -> str:
 
 
 @weave.op()
-def write_to_file(path: str, content: str) -> str:
-    """Write text to a file at the given path.
+def write_to_file(path: str, content: str, mode: str = "write") -> None:
+    """Write text to a file at the given path, with options to append, prepend, or overwrite.
 
     Args:
         path: The path to the file.
