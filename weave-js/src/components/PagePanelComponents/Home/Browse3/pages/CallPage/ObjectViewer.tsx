@@ -44,7 +44,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   const dataAsRows = useMemo(() => {
     return [data];
   }, [data]);
-  const {resolvedRows, expandedRefs, addExpandedRef} = useRowsWithExpandedRefs(
+  const {resolvedRows, expandedRefs, addExpandedRefs} = useRowsWithExpandedRefs(
     dataAsRows,
     true
   );
@@ -197,14 +197,14 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
                 return [...eIds, params.row.id];
               });
               if (isRef(refToExpand)) {
-                addExpandedRef(params.row.id, refToExpand);
+                addExpandedRefs([{path: params.row.id, ref: refToExpand}]);
               }
             }}
           />
         );
       },
     }),
-    [addExpandedRef]
+    [addExpandedRefs]
   );
 
   // Next we define a function that updates the row expansion state. This

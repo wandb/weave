@@ -156,6 +156,12 @@ export const getInputColumns = (tableStats: TableStats): string[] => {
     .map(colName => colName.substring(7));
 };
 
+export const getOutputColumns = (tableStats: TableStats): string[] => {
+  return Object.keys(tableStats.column)
+    .filter(colName => colName.startsWith('output.'))
+    .map(colName => colName.substring(7));
+};
+
 // Get a list of "boring" columns.
 // Boring columns are those that have the same value for every row.
 export const getBoringColumns = (tableStats: TableStats): string[] => {
