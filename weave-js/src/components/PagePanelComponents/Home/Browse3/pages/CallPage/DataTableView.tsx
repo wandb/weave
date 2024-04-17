@@ -10,14 +10,7 @@ import {
   typedDictPropertyTypes,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {
-  FC,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
@@ -61,11 +54,15 @@ export const WeaveCHTable: FC<{
   });
 
   // Determines if the table itself is truncated
-  const [isTruncated, setIsTruncated] = useState(false);
+  const isTruncated = useMemo(() => {
+    return (fetchQuery.result ?? []).length > MAX_ROWS;
+  }, [fetchQuery.result]);
 
   // `sourceRows` are the effective rows to display. If the table is truncated,
   // we only display the first MAX_ROWS rows.
-  const [sourceRows, setSourceRows] = useState<any[] | undefined>();
+  const sourceRows = useMemo(() => {
+    return (fetchQuery.result ?? []).slice(0, MAX_ROWS);
+  }, [fetchQuery.result]);
 
   // In this block, we setup a click handler. The underlying datatable is more general
   // and not aware of the nuances of our links and ref model. Therefore, we handle
@@ -97,18 +94,6 @@ export const WeaveCHTable: FC<{
     },
     [history, sourceRef, router]
   );
-
-  // Here we update the sourceRows when the fetchQuery is done loading
-  useEffect(() => {
-    if (sourceRows != null) {
-      return;
-    }
-    if (fetchQuery.loading) {
-      return;
-    }
-    setIsTruncated((fetchQuery.result ?? []).length > MAX_ROWS);
-    setSourceRows((fetchQuery.result ?? []).slice(0, MAX_ROWS));
-  }, [sourceRows, fetchQuery]);
 
   return (
     <DataTableView
