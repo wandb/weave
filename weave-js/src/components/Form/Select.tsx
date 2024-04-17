@@ -9,20 +9,9 @@
 import classNames from 'classnames';
 
 import {
-  hexToRGB,
-  MOON_100,
   MOON_250,
-  MOON_350,
   MOON_500,
-  MOON_750,
   MOON_800,
-  MOON_900,
-  RED_550,
-  TEAL_300,
-  TEAL_350,
-  TEAL_500,
-  TEAL_600,
-  WHITE,
 } from '@wandb/weave/common/css/globals.styles';
 import {Icon, IconName, IconSearch} from '@wandb/weave/components/Icon';
 import React from 'react';
@@ -125,7 +114,6 @@ const getGroupHeading = <
             style={{
               backgroundColor: MOON_250,
               height: '1px',
-              // margin: `0 ${OUTWARD_MARGINS[size]} 6px ${OUTWARD_MARGINS[size]}`,
             }}
           />
         )}
@@ -197,28 +185,6 @@ const getStyles = <
         textTransform: 'none',
       };
     },
-    // option: (provided, state) => ({
-    //   ...provided,
-    //   // Applying Tailwind classes directly from optionStyles
-    //   className: `${optionStyles.base} ${
-    //     state.isSelected
-    //       ? optionStyles.selected
-    //       : state.isFocused
-    //       ? optionStyles.focus
-    //       : optionStyles.nonFocus
-    //   }`,
-    //   // Handling hover styles within the same structure to prevent style changes when selected
-    //   ':hover': {
-    //     // Override default hover styles by reapplying the current state styles
-    //     className: `${optionStyles.base} ${
-    //       state.isSelected
-    //         ? optionStyles.selected
-    //         : state.isFocused
-    //         ? optionStyles.focus
-    //         : optionStyles.nonFocus
-    //     }`,
-    //   },
-    // }),
     option: (provided, state) => ({
       ...provided,
       ':active': {
@@ -315,7 +281,6 @@ export const Select = <
           singleValue: () => singleValueStyles,
           input: () => inputContainerStyles,
           valueContainer: () => valueContainerStyles,
-          // placeholder: () => placeHolderStyles,
         }}
       />
     </Tailwind>
