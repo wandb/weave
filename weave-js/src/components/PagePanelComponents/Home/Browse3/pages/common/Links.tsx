@@ -43,7 +43,7 @@ export const Link = styled(LinkComp)<LinkProps>`
 `;
 Link.displayName = 'S.Link';
 
-const CallLinkWrapper = styled.div<{fullWidth?: boolean}>`
+const LinkWrapper = styled.div<{fullWidth?: boolean}>`
   ${p =>
     p.fullWidth &&
     css`
@@ -64,9 +64,9 @@ const CallLinkWrapper = styled.div<{fullWidth?: boolean}>`
     }
   }
 `;
-CallLinkWrapper.displayName = 'S.CallLinkWrapper';
+LinkWrapper.displayName = 'S.LinkWrapper';
 
-const CallLinkOp = styled.div<{fullWidth?: boolean}>`
+const LinkTruncater = styled.div<{fullWidth?: boolean}>`
   ${p =>
     p.fullWidth &&
     css`
@@ -76,7 +76,7 @@ const CallLinkOp = styled.div<{fullWidth?: boolean}>`
   text-overflow: ellipsis;
   overflow: hidden;
 `;
-CallLinkOp.displayName = 'S.CallLinkOp';
+LinkTruncater.displayName = 'S.LinkTruncater';
 
 export const docUrl = (path: string): string => {
   return 'https://wandb.github.io/weave/' + path;
@@ -136,7 +136,9 @@ export const ObjectVersionLink: React.FC<{
   versionIndex: number;
   filePath?: string;
   refExtra?: string;
+  fullWidth?: boolean;
 }> = props => {
+  const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   // const text = props.hideName
   //   ? props.version
@@ -150,7 +152,17 @@ export const ObjectVersionLink: React.FC<{
     props.filePath,
     props.refExtra
   );
-  return <Link to={to}>{text}</Link>;
+  const onClick = () => {
+    history.push(to);
+  };
+
+  return (
+    <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
+      <LinkTruncater>
+        <Link to={to}>{text}</Link>
+      </LinkTruncater>
+    </LinkWrapper>
+  );
 };
 
 export const OpLink: React.FC<{
@@ -248,14 +260,14 @@ export const CallLink: React.FC<{
   };
 
   return (
-    <CallLinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
-      <CallLinkOp fullWidth={props.fullWidth}>
+    <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
+      <LinkTruncater fullWidth={props.fullWidth}>
         <Link $variant={props.variant} to={to}>
           {opName}
         </Link>
-      </CallLinkOp>
+      </LinkTruncater>
       <CallId callId={props.callId} />
-    </CallLinkWrapper>
+    </LinkWrapper>
   );
 };
 
