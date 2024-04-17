@@ -1,6 +1,6 @@
 import StringUtil from 'lodash';
 
-// Splits a string on the first occurence of delim. If delim isn't present, returns [s, null]
+// Splits a string on the first occurrence of delim. If delim isn't present, returns [s, null]
 export function splitOnce(s: string, delim: string): [string, string | null] {
   const delimLoc = StringUtil.indexOf(s, delim);
   if (delimLoc === -1) {

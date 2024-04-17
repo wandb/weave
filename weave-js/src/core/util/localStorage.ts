@@ -138,7 +138,7 @@ export function getStorage(storage: Storage | null) {
  * LocalStorage will fail in certain environments (like private mode) and those
  * failed operations should no-op instead of throwing errors.
  *
- * These functions work indentically to the standard localStorage API.
+ * These functions work identically to the standard localStorage API.
  * ```
  * import localStorage from './localStorage';
  * localStorage.setItem('foo', 'bar');
