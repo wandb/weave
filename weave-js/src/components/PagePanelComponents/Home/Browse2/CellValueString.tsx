@@ -123,7 +123,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
     '' // Suppress tooltip when popper is open.
   ) : (
     <TooltipContent onClick={onClick}>
-      <TooltipText isJSON={json}>{value}</TooltipText>
+      <TooltipText isJSON={json}>{trimmed}</TooltipText>
       <TooltipHint>Cilck for more details</TooltipHint>
     </TooltipContent>
   );
