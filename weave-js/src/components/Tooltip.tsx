@@ -9,7 +9,10 @@ import {
   WHITE,
 } from '../common/css/globals.styles';
 
-/** @deprecated */
+/**
+ * @deprecated
+ * We want to move off of semantic components, so start using the RadixTooltip!
+ */
 export const Tooltip = styled(Popup).attrs({
   basic: true, // This removes the pointing arrow.
   mouseEnterDelay: 500,
