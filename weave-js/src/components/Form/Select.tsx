@@ -154,30 +154,22 @@ const getStyles = <
 ) => {
   const errorState = props.errorState ?? false;
   const size = props.size ?? 'medium';
+  const optionStyles = {
+    base: 'text-base cursor-pointer text-moon-800',
+    focus: 'bg-moon-100 dark:bg-moon-800 dark:text-white rounded',
+    selected: 'text-teal-400 bg-teal-700/[0.32] rounded',
+    nonFocus: 'dark:bg-moon-850 dark:text-white',
+  };
   return {
     // No vertical line to left of dropdown indicator
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
     clearIndicator: baseStyles => ({
       ...baseStyles,
-      // padding: CLEAR_INDICATOR_PADDING[size],
       cursor: 'pointer',
     }),
-    // input: baseStyles => {
-    //   return {
-    //     ...baseStyles,
-    //     padding: 0,
-    //     margin: 0,
-    //   };
-    // },
-    // valueContainer: baseStyles => {
-    //   // const padding = PADDING[size];
-    //   return {...baseStyles};
-    // },
     multiValueLabel: baseStyles => {
-      // const fontSize = FONT_SIZES[size];
       return {
         ...baseStyles,
-        // fontSize,
       };
     },
     multiValueRemove: baseStyles => ({
@@ -186,60 +178,14 @@ const getStyles = <
     }),
     dropdownIndicator: baseStyles => ({...baseStyles, padding: '0 8px 0 0'}),
     container: baseStyles => {
-      // const height = HEIGHTS[size];
       return {
         ...baseStyles,
-        // height,
-        // zIndex: 5,
       };
     },
-    // control: (baseStyles, state) => {
-    //   const colorBorderDefault = MOON_250;
-    //   const colorBorderHover = hexToRGB(TEAL_500, 0.4);
-    //   const colorBorderOpen = errorState
-    //     ? hexToRGB(RED_550, 0.64)
-    //     : hexToRGB(TEAL_500, 0.64);
-    //   const height = HEIGHTS[size];
-    //   const minHeight = MIN_HEIGHTS[size] ?? height;
-    //   const lineHeight = LINE_HEIGHTS[size];
-    //   const fontSize = FONT_SIZES[size];
-    //   return {
-    //     ...baseStyles,
-    //     height,
-    //     minHeight,
-    //     lineHeight,
-    //     fontSize,
-    //     cursor: props.cursor ?? 'default',
-    //     border: 0,
-    //     boxShadow: state.menuIsOpen
-    //       ? `0 0 0 2px ${colorBorderOpen}`
-    //       : state.isFocused
-    //       ? `0 0 0 2px ${colorBorderOpen}`
-    //       : `inset 0 0 0 1px ${colorBorderDefault}`,
-    //     '&:hover': {
-    //       // border: `2px solid ${TEAL_350}`,
-
-    //       boxShadow: state.menuIsOpen
-    //         ? `0 0 0 2px ${colorBorderOpen}`
-    //         : `0 0 0 2px ${colorBorderHover}`,
-    //     },
-    //   };
-    // },
-    // menu: baseStyles => ({
-    //   ...baseStyles,
-    //   // TODO: Semantic-UI based dropdowns have their z-index set to 3,
-    //   //       which causes their selected value to appear in front of the
-    //   //       react-select popup. We should remove this hack once we've
-    //   //       eliminated Semantic-UI based dropdowns.
-    //   // zIndex: 9999,
-
-    // }),
-
     menuList: baseStyles => {
       return {
         ...baseStyles,
-        padding: '6px 0',
-        // zIndex: 99999,
+        padding: '6px 6px',
       };
     },
     groupHeading: (baseStyles, state) => {
@@ -251,38 +197,32 @@ const getStyles = <
         textTransform: 'none',
       };
     },
-    // option: (baseStyles, state) => {
-    //   return {
-    //     ...baseStyles,
-    //     cursor: state.isDisabled ? 'default' : 'pointer',
-    //     // TODO: Should icon be translucent?
-    //     color: state.isDisabled
-    //       ? MOON_350
-    //       : state.isSelected
-    //       ? TEAL_600
-    //       : MOON_800,
-    //     padding: '6px 10px',
-    //     margin: '0 6px',
-    //     borderRadius: '4px',
-    //     width: 'auto',
-    //     backgroundColor: props.isDarkMode
-    //       ? MOON_900
-    //       : state.isDisabled
-    //       ? undefined
-    //       : state.isSelected
-    //       ? hexToRGB(TEAL_300, 0.32)
+    // option: (provided, state) => ({
+    //   ...provided,
+    //   // Applying Tailwind classes directly from optionStyles
+    //   className: `${optionStyles.base} ${
+    //     state.isSelected
+    //       ? optionStyles.selected
     //       : state.isFocused
-    //       ? MOON_100
-    //       : undefined,
-    //     ':active': {
-    //       // mousedown
-    //       ...baseStyles[':active'],
-    //       backgroundColor: !state.isDisabled
-    //         ? hexToRGB(TEAL_300, 0.32)
-    //         : undefined,
-    //     },
-    // };
-    // },
+    //       ? optionStyles.focus
+    //       : optionStyles.nonFocus
+    //   }`,
+    //   // Handling hover styles within the same structure to prevent style changes when selected
+    //   ':hover': {
+    //     // Override default hover styles by reapplying the current state styles
+    //     className: `${optionStyles.base} ${
+    //       state.isSelected
+    //         ? optionStyles.selected
+    //         : state.isFocused
+    //         ? optionStyles.focus
+    //         : optionStyles.nonFocus
+    //     }`,
+    //   },
+    // }),
+    // option: (provided, state) => ({
+    //   ...provided,
+    //   ':hover': state.isSelected ? {} : {backgroundColor: 'blue'}, // Adjust hover for non-selected items
+    // }),
   } as StylesConfig<Option, IsMulti, Group>;
 };
 
@@ -301,7 +241,7 @@ export const Select = <
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
     base: classNames(
-      `leading-[22.4px] border-none text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
+      `leading-[22.4px] border-none text-base dark:bg-moon-850 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
     ),
     focus: 'shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600',
     nonFocus:
@@ -309,12 +249,13 @@ export const Select = <
   };
   const optionStyles = {
     base: 'text-base cursor-pointer text-moon-800',
-    focus: 'bg-moon-100 dark:bg-moon-350',
-    selected: 'text-teal-600 bg-teal-300/[0.32]',
-    nonFocus: 'dark:bg-moon-900 dark:text-white	z-50',
-    // isDisabled: 'cursor-default text-moon-350 ',
+    focus: 'bg-moon-100 dark:bg-moon-800 dark:text-white rounded',
+    selected: 'text-teal-400 bg-teal-700/[0.32] rounded',
+    nonFocus: 'dark:bg-moon-850 dark:text-white',
   };
-  const menuStyles = 'night-aware dark:bg-moon-900';
+  const menuStyles =
+    'night-aware dark:bg-moon-900 dark:border dark:border-moon-750 shadow-custom dark:shadow-custom-dark';
+  //drop-shadow-[0_24px_48px_rgba(0,0,0,0.16)] dark:drop-shadow-[0_24px_48px_rgba(0,0,0,0.48)]
   const singleValueStyles = 'dark:text-white';
   const placeHolderStyles = 'text-moon-500';
   const inputContainerStyles = 'p-0';
@@ -356,10 +297,10 @@ export const Select = <
             ),
           option: ({isFocused, isDisabled, isSelected}) =>
             classNames(
-              isFocused
-                ? optionStyles.focus
-                : isSelected
+              isSelected
                 ? optionStyles.selected
+                : isFocused
+                ? optionStyles.focus
                 : optionStyles.nonFocus
             ),
           menu: () => menuStyles,
@@ -367,7 +308,6 @@ export const Select = <
           singleValue: () => singleValueStyles,
           input: () => inputContainerStyles,
           valueContainer: () => valueContainerStyles,
-
           // placeholder: () => placeHolderStyles,
         }}
       />
@@ -393,7 +333,6 @@ export const SelectAsync = <
         {DropdownIndicator, GroupHeading},
         props.components
       )}
-      // className="night-aware"
       styles={styles}
     />
   );
@@ -417,7 +356,6 @@ export const SelectAsyncCreatable = <
         {DropdownIndicator, GroupHeading},
         props.components
       )}
-      className="night-aware"
       styles={styles}
     />
   );
