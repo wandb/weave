@@ -222,8 +222,7 @@ export const Select = <
   };
   const optionStyles = {
     base: 'text-base cursor-pointer text-moon-800',
-    focus:
-      'bg-moon-100 bg-teal-300/[0.32] dark:bg-moon-800 dark:text-white rounded',
+    focus: 'bg-moon-100  dark:bg-moon-800 dark:text-white rounded',
     selected:
       'bg-teal-300/[0.32] text-teal-600 dark:text-teal-400 dark:bg-teal-700/[0.32] rounded',
     nonFocus: 'bg-white dark:bg-moon-900 dark:text-white',
