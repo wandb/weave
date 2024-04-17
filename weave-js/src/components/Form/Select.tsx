@@ -214,7 +214,7 @@ export const Select = <
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
     base: classNames(
-      `leading-[22.4px] border-none text-base dark:bg-moon-850 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
+      `leading-[22.4px] border-none text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
     ),
     focus: 'shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600',
     nonFocus:
@@ -226,10 +226,10 @@ export const Select = <
       'bg-moon-100 bg-teal-300/[0.32] dark:bg-moon-800 dark:text-white rounded',
     selected:
       'bg-teal-300/[0.32] text-teal-600 dark:text-teal-400 dark:bg-teal-700/[0.32] rounded',
-    nonFocus: 'bg-white dark:bg-moon-850 dark:text-white',
+    nonFocus: 'bg-white dark:bg-moon-900 dark:text-white',
   };
   const menuStyles =
-    'night-aware dark:bg-moon-900 dark:border dark:border-moon-750 shadow-custom dark:shadow-custom-dark';
+    'night-aware dark:bg-moon-900 dark:border dark:border-moon-750 shadow-custom dark:shadow-custom-dark mt-2';
   const singleValueStyles = 'dark:text-white';
   const inputContainerStyles = 'p-0';
 
@@ -242,7 +242,7 @@ export const Select = <
   return (
     <Tailwind>
       <ReactSelect
-        menuIsOpen={true}
+        // menuIsOpen={true}
         {...props}
         components={Object.assign(
           {
@@ -260,7 +260,6 @@ export const Select = <
           props.components
         )}
         styles={styles}
-        // className="night-aware"
         classNamePrefix="react-select"
         classNames={{
           control: ({isFocused}) =>
@@ -268,7 +267,7 @@ export const Select = <
               isFocused ? controlStyles.focus : controlStyles.nonFocus,
               controlStyles.base
             ),
-          option: ({isFocused, isDisabled, isSelected}) =>
+          option: ({isFocused, isSelected}) =>
             classNames(
               isSelected
                 ? optionStyles.selected
