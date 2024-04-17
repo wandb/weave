@@ -49,18 +49,19 @@ def list_files(directory: str) -> str:
 
 
 @weave.op()
-def write_to_file(path: str, content: str) -> str:
-    """Write text to a file at the given path.
+def write_to_file(path: str, content: str, mode: str = "w") -> str:
+    """Write text to a file at the given path, with an option to append.
 
     Args:
         path: The path to the file.
         content: The content to write to the file.
+        mode: The mode in which to open the file ('w' for overwrite, 'a' for append).
 
     Returns:
         A message indicating whether the file was written successfully.
     """
     try:
-        with open(path, "w") as f:
+        with open(path, mode) as f:
             f.write(content)
         return "File written successfully."
     except Exception as e:
