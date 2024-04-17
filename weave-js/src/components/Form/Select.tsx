@@ -96,8 +96,12 @@ const CustomPlaceholder = <
   props: ExtendedPlaceholderProps<Option, IsMulti, Group>
 ) => (
   <components.Placeholder {...props}>
-    {props.iconName && <Icon name={props.iconName} />}
-    {props.children}
+    <div className="flex items-center">
+      {props.iconName && (
+        <Icon className="mr-8" width={18} height={18} name={props.iconName} />
+      )}
+      {props.children}
+    </div>
   </components.Placeholder>
 );
 const Placeholder = <
