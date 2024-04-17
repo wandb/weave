@@ -204,23 +204,31 @@ export const OpVersionLink: React.FC<{
   version: string;
   versionIndex: number;
   variant?: LinkVariant;
+  fullWidth?: boolean;
 }> = props => {
+  const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   // const text = props.hideName
   //   ? props.version
   //   : props.opName + ': ' + truncateID(props.version);
   const text = opVersionText(props.opName, props.versionIndex);
+  const to = peekingRouter.opVersionUIUrl(
+    props.entityName,
+    props.projectName,
+    props.opName,
+    props.version
+  );
+  const onClick = () => {
+    history.push(to);
+  };
   return (
-    <Link
-      $variant={props.variant}
-      to={peekingRouter.opVersionUIUrl(
-        props.entityName,
-        props.projectName,
-        props.opName,
-        props.version
-      )}>
-      {text}
-    </Link>
+    <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
+      <LinkTruncater fullWidth={props.fullWidth}>
+        <Link $variant={props.variant} to={to}>
+          {text}
+        </Link>
+      </LinkTruncater>
+    </LinkWrapper>
   );
 };
 
