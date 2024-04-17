@@ -214,7 +214,7 @@ export const Select = <
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
     base: classNames(
-      `leading-[22.4px] border-none text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
+      `leading-[22.4px] border-none dark:text-white text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
     ),
     focus: 'shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600',
     nonFocus:
@@ -231,7 +231,7 @@ export const Select = <
   const menuStyles =
     'night-aware dark:bg-moon-900 dark:border dark:border-moon-750 shadow-custom dark:shadow-custom-dark mt-2';
   const singleValueStyles = 'dark:text-white';
-  const inputContainerStyles = 'p-0';
+  const inputContainerStyles = 'p-0 dark:text-white';
 
   const valueContainerStyles = classNames(
     size === 'medium' ? 'py-4' : 'py-8',
@@ -239,23 +239,25 @@ export const Select = <
     props.iconType === SelectIconTypes.Semantic ? 'pl-8' : 'pl-12'
   );
 
+  const placeholderStyles = 'text-moon-500 dark:text-moon-600';
+
   return (
     <Tailwind>
       <ReactSelect
-        // menuIsOpen={true}
+        menuIsOpen={true}
         {...props}
         components={Object.assign(
           {
             DropdownIndicator,
             GroupHeading,
-            Placeholder: (
-              placeholderProps: PlaceholderProps<Option, IsMulti, Group>
-            ) => (
-              <CustomPlaceholder
-                {...placeholderProps}
-                iconName={props.iconName}
-              />
-            ),
+            // Placeholder: (
+            //   placeholderProps: PlaceholderProps<Option, IsMulti, Group>
+            // ) => (
+            //   <CustomPlaceholder
+            //     {...placeholderProps}
+            //     iconName={props.iconName}
+            //   />
+            // ),
           },
           props.components
         )}
@@ -280,6 +282,7 @@ export const Select = <
           singleValue: () => singleValueStyles,
           input: () => inputContainerStyles,
           valueContainer: () => valueContainerStyles,
+          placeholder: () => placeholderStyles,
         }}
       />
     </Tailwind>
