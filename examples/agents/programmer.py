@@ -69,7 +69,7 @@ def write_to_file(path: str, content: str) -> str:
 
 @weave.op()
 def read_from_file(path: str) -> str:
-    """Read text from a file at the tiven path.
+    """Read text from a file at the given path.
 
     Args:
         path: The path to the file.
