@@ -14,7 +14,15 @@ from weave.flow.console import LogEvents
 from weave.flow.chat_util import OpenAIStream
 
 def get_knowledge():
-    knowledge_prefix = """Anytime programmer learns something new that could be useful in the future, automatically save that information in a file called "agent_knowledge.txt" in the same directory.
+    knowledge_message = """
+    Whenever possible, programmer should use the following learnings to solve problems before resorting to the use of tools:
+    """
+
+    knowledge_path = "agent_knowledge.txt"
+    with open(knowledge_path, "r") as f:
+        knowledge_content = f.read()
+
+    knowledge_instructions = """Anytime programmer learns something new that could be useful in the future, automatically save that information in a file called "agent_knowledge.txt" in the same directory.
     When saving, rewrite the whole file, but make sure not to lose any previous knowledge.
     Types of information worth remembering:
     - Preferences and Customizations: How certain tasks should be performed.
@@ -23,13 +31,9 @@ def get_knowledge():
     - Project-Specific Information: Details specific to your projects, such as architecture decisions, important variables, or custom scripts, that are crucial for development and maintenance.
     - Best Practices and Guidelines: Any best practices or guidelines you follow in your work, which could be related to coding standards, security measures, or project management.
     - Learning and Feedback: Insights or feedback from completed tasks that could improve how future tasks are approached or executed.
-    
-    Whenever possible, use the following learnings to solve problems before resorting to the use of tools:"""
+    """    
 
-    knowledge_path = "agent_knowledge.txt"
-    with open(knowledge_path, "r") as f:
-        knowledge_content = f.read()
-    return f'{knowledge_prefix}\n{knowledge_content}'
+    return f'{knowledge_message}\n```{knowledge_content}```\n{knowledge_instructions}'
 
 
 class AgentState(Object):

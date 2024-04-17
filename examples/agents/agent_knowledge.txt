@@ -1,4 +1,7 @@
 - Locations of Important Files or Directories: The path to frequently accessed files or directories, especially those related to projects or development environment, is /Users/adamdraper/Documents/Code.
 - Preferences and Customizations: Favorite editor for opening files is Visual Studio Code (VSCode).
 - Preferences and Customizations: Favorite programming languages are Python and JavaScript.
-- Best Practices and Guidelines: Always review and confirm changes (e.g., via git diff) before committing to ensure accuracy and prevent unintended modifications.
+- Best Practices and Guidelines: After making changes, show the git diff for the change to the user for confirmation before committing.
+- Best Practices and Guidelines: In case the directory is not a Git repository, inform the user and provide alternatives or ask for further instructions.
+- Common Errors and Their Solutions: If encountering a "fatal: not a git repository" error when attempting to commit changes, ensure the command is executed within a Git repository.
+- Best Practices and Guidelines: Whenever encountering a path issue, try the current working directory (cwd) as well.
