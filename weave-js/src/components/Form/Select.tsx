@@ -301,10 +301,11 @@ export const Select = <
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
     base: classNames(
-      `leading-[22.4px] text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
+      `leading-[22.4px] border-none text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
     ),
-    focus: 'ring-1 ring-primary-500',
-    nonFocus: 'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red',
+    focus: 'shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600',
+    nonFocus:
+      'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red border-none',
   };
   const optionStyles = {
     base: 'text-base cursor-pointer text-moon-800',
