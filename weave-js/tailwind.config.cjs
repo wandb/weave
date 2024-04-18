@@ -192,7 +192,7 @@ module.exports = {
       },
     },
   },
-  plugins: [require('tailwindcss-radix')],
+  plugins: [require('tailwindcss-radix'), require('tailwindcss-animate')],
   corePlugins: {
     /*
     we disable preflight since it resets CSS styles for base html elements, and that will mess with
@@ -207,6 +207,6 @@ module.exports = {
      in their parent hierarchy */
   important: '.tw-style',
   experimental: {
-    optimizeUniversalDefaults: true
+    optimizeUniversalDefaults: true,
   },
 };
