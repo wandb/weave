@@ -214,7 +214,10 @@ export const Select = <
   const GroupHeading = getGroupHeading(size, showDivider);
   const controlStyles = {
     base: classNames(
-      `leading-[22.4px] border-none dark:text-white text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:dark:shadow-teal-650 hover:shadow-teal-350 hover:shadow-[0_0_0_2px]`
+      props.errorState
+        ? 'shadow-[0_0_0_2px] shadow-red-450 dark:shadow-red-550 shadow-[0_0_0_2px] hover:shadow-red-450 hover:dark:shadow-red-550'
+        : 'hover:dark:shadow-teal-650 hover:shadow-teal-350',
+      `leading-[22.4px] border-none dark:text-white text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:shadow-[0_0_0_2px]`
     ),
     focus: 'shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600',
     nonFocus:
@@ -222,7 +225,7 @@ export const Select = <
   };
   const optionStyles = {
     base: 'text-base cursor-pointer text-moon-800',
-    focus: 'bg-moon-100  dark:bg-moon-800 dark:text-white rounded',
+    focus: 'bg-moon-100 dark:bg-moon-800 dark:text-white rounded',
     selected:
       'bg-teal-300/[0.32] text-teal-600 dark:text-teal-400 dark:bg-teal-700/[0.32] rounded',
     nonFocus: 'bg-white dark:bg-moon-900 dark:text-white',
@@ -243,7 +246,7 @@ export const Select = <
   return (
     <Tailwind>
       <ReactSelect
-        menuIsOpen={true}
+        menuIsOpen={props.menuIsOpen}
         {...props}
         components={Object.assign(
           {
