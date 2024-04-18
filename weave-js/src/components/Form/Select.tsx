@@ -20,6 +20,7 @@ import ReactSelect, {
   DropdownIndicatorProps,
   GroupBase,
   GroupHeadingProps,
+  OptionProps,
   PlaceholderProps,
   Props,
   StylesConfig,
@@ -92,6 +93,37 @@ const CustomPlaceholder = <
       {props.children}
     </div>
   </components.Placeholder>
+);
+
+interface ExtendedOptionProps<
+  Option,
+  IsMulti extends boolean,
+  Group extends GroupBase<Option>
+> extends OptionProps<Option, IsMulti, Group> {
+  iconName?: IconName;
+}
+
+const CustomOption = (props: any) => (
+  <>
+    <components.Option {...props}>
+      <div className="flex flex-col">
+        <div className="flex items-center">
+          {props.data.icon && (
+            <Icon
+              className="mr-8 self-start"
+              width={18}
+              height={18}
+              name={props.data.icon}
+            />
+          )}
+          <div className="flex flex-col">
+            <div className="self-start">{props.data.label}</div>
+            {props.data.description && <div>{props.data.description}</div>}{' '}
+          </div>
+        </div>
+      </div>
+    </components.Option>
+  </>
 );
 
 const getGroupHeading = <
@@ -185,17 +217,17 @@ const getStyles = <
         textTransform: 'none',
       };
     },
-    option: (provided, state) => ({
-      ...provided,
-      ':active': {
-        // Apply active styles or maintain current styles if selected
-        className: `${optionStyles.base} ${
-          state.isSelected
-            ? optionStyles.selected
-            : 'bg-teal-300/[0.32] dark:bg-teal-700/[0.32]'
-        }`,
-      },
-    }),
+    // option: (provided, state) => ({
+    //   ...provided,
+    //   ':active': {
+    //     // Apply active styles or maintain current styles if selected
+    //     className: `${optionStyles.base} ${
+    //       state.isSelected
+    //         ? optionStyles.selected
+    //         : 'bg-teal-300/[0.32] dark:bg-teal-700/[0.32]'
+    //     }`,
+    //   },
+    // }),
   } as StylesConfig<Option, IsMulti, Group>;
 };
 
@@ -246,23 +278,13 @@ export const Select = <
   return (
     <Tailwind>
       <ReactSelect
-        menuIsOpen={props.menuIsOpen}
+        menuIsOpen={true}
         {...props}
-        components={Object.assign(
-          {
-            DropdownIndicator,
-            GroupHeading,
-            // Placeholder: (
-            //   placeholderProps: PlaceholderProps<Option, IsMulti, Group>
-            // ) => (
-            //   <CustomPlaceholder
-            //     {...placeholderProps}
-            //     iconName={props.iconName}
-            //   />
-            // ),
-          },
-          props.components
-        )}
+        components={Object.assign({}, props.components, {
+          DropdownIndicator,
+          GroupHeading,
+          Option: CustomOption,
+        })}
         styles={styles}
         classNamePrefix="react-select"
         classNames={{
