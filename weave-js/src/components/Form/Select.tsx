@@ -7,6 +7,8 @@
  * more time in alignment.
  */
 import classNames from 'classnames';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {IconOnlyPill} from '@wandb/weave/components/Tag';
 
 import {
   MOON_250,
@@ -106,43 +108,36 @@ interface ExtendedOptionProps<
 const CustomOption = (props: any) => (
   <>
     <components.Option {...props}>
-      {/* <div className="flex items-start">
-        <div className="flex">
-          {props.data.icon && (
-            <Icon
-              className="mr-4 flex-shrink-0"
-              width={18}
-              height={18}
-              name={props.data.icon}
-            />
-          )}
-          <div className="flex flex-col justify-center">
-            <div>{props.data.label}</div>
-            {props.data.description && (
-              <div className="mt-2">{props.data.description}</div>
-            )}
-          </div>
-        </div>
-      </div> */}
       <div className="flex items-center">
         {props.data.icon && <Icon name={props.data.icon} />}
         <span
           data-test="project-access-option"
           className="ml-8 flex items-center font-medium">
           {props.data.label}
-          {/* {showPremiumFeatureIcon && (
-              <Tooltip
-                position="top center"
-                trigger={
-                  <div className="night-aware ml-5">
-                    <IconOnlyPill color="purple" icon="crown-pro" />
-                  </div>
-                }>
-                <PremiumFeatureToolTipText
-                  isPremiumFeatureDisabled={!premiumFeatureEnabled}
+          {props.data.rightIconName && (
+            <Tooltip
+              position="top center"
+              trigger={
+                <div className="night-aware ml-5">
+                  {props.data.rightIconIsPill ? (
+                    <IconOnlyPill
+                      color="purple"
+                      icon={props.data.rightIconName}
+                    />
+                  ) : (
+                    <Icon color="purple" name={props.data.rightIconName} />
+                  )}
+                </div>
+              }>
+              <div className="flex">
+                <Icon
+                  name={props.data.rightIconName}
+                  className="night-aware mr-5"
                 />
-              </Tooltip>
-            )} */}
+                {props.data.tooltipText}
+              </div>
+            </Tooltip>
+          )}
         </span>
       </div>
       <div className="ml-28">
