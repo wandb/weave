@@ -226,6 +226,26 @@ const getStyles = <
         ...baseStyles,
       };
     },
+    input: baseStyles => {
+      return {
+        ...baseStyles,
+        padding: 0,
+        margin: 0,
+        '&:selection': {
+          className: `dark:text-white`,
+        },
+      };
+    },
+    control: (baseStyles, state) => {
+      return {
+        ...baseStyles,
+        padding: 0,
+        margin: 0,
+        '&:selection': {
+          className: `dark:text-white`,
+        },
+      };
+    },
     multiValueRemove: baseStyles => ({
       ...baseStyles,
       cursor: 'pointer',
@@ -285,9 +305,10 @@ export const SelectNew = <
         : 'hover:dark:shadow-teal-650 hover:shadow-teal-350',
       `leading-[22.4px] border-none dark:text-white text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:shadow-[0_0_0_2px]`
     ),
-    focus: 'shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600',
+    focus:
+      'dark:text-white shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600 night-aware',
     nonFocus:
-      'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red border-none',
+      'night-aware dark:text-white border-none shadow-[0_0_0_1px] shadow-moon-250 border-none',
   };
   const optionStyles = {
     base: 'text-base cursor-pointer text-moon-800',
@@ -299,7 +320,7 @@ export const SelectNew = <
   const menuStyles =
     'night-aware dark:bg-moon-900 dark:border dark:border-moon-750 shadow-custom dark:shadow-custom-dark mt-2';
   const singleValueStyles = 'dark:text-white';
-  const inputContainerStyles = 'p-0 dark:text-white';
+  const inputContainerStyles = 'p-0 dark:text-white dark:selection:text-white';
 
   const valueContainerStyles = classNames(
     size === 'medium' ? 'py-4' : 'py-8',
@@ -333,7 +354,8 @@ export const SelectNew = <
                 ? optionStyles.selected
                 : isFocused
                 ? optionStyles.focus
-                : optionStyles.nonFocus
+                : optionStyles.nonFocus,
+              optionStyles.base
             ),
           menu: () => menuStyles,
           container: () => inputContainerStyles,
