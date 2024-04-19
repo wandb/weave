@@ -108,38 +108,52 @@ interface ExtendedOptionProps<
 const CustomOption = (props: any) => (
   <>
     <components.Option {...props}>
-      <div className="flex items-center">
-        {props.data.icon && <Icon name={props.data.icon} />}
-        <span
-          data-test="project-access-option"
-          className="ml-8 flex items-center font-medium">
-          {props.data.label}
-          {props.data.rightIconName && (
-            <Tooltip
-              position="top center"
-              trigger={
-                <div className="night-aware ml-5">
-                  {props.data.rightIconIsPill ? (
-                    <IconOnlyPill
-                      color="purple"
-                      icon={props.data.rightIconName}
+      <div className="flex w-full items-center justify-between">
+        {/* Left-aligned section with Icon */}
+        <div className="flex items-center">
+          {props.data.icon && <Icon name={props.data.icon} />}
+          <div className="ml-8">{props.data.label}</div>
+        </div>
+
+        {/* Right-aligned Tooltip Icons */}
+        {props.data.rightIconName && (
+          <Tooltip
+            position="top center"
+            open={true}
+            content={
+              <Tailwind>
+                <div className="flex">
+                  <div className="mr-5">
+                    <Icon
+                      name={props.data.rightIconName}
+                      width={18}
+                      height={18}
+                      className="align-middle"
                     />
-                  ) : (
-                    <Icon color="purple" name={props.data.rightIconName} />
-                  )}
+                  </div>
+                  <span className="align-middle">{props.data.tooltipText}</span>
                 </div>
-              }>
-              <div className="flex">
-                <Icon
-                  name={props.data.rightIconName}
-                  className="night-aware mr-5"
-                />
-                {props.data.tooltipText}
+              </Tailwind>
+            }
+            trigger={
+              <div className="night-aware ml-5 flex items-center">
+                {props.data.rightIconIsPill ? (
+                  <IconOnlyPill
+                    color="purple"
+                    icon={props.data.rightIconName}
+                  />
+                ) : (
+                  <Icon
+                    color="purple"
+                    name={props.data.rightIconName}
+                    className="night-aware"
+                  />
+                )}
               </div>
-            </Tooltip>
-          )}
-        </span>
+            }></Tooltip>
+        )}
       </div>
+
       <div className="ml-28">
         <span className="text-sm text-moon-500">{props.data.description}</span>
       </div>
