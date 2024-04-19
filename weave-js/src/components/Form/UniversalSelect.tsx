@@ -85,7 +85,6 @@ export const UniversalSelect = <
       | undefined,
   };
 
-  // Decide which Select component to render based on selectType prop
   switch (selectType) {
     case SelectTypes.ASYNC:
       return (
