@@ -243,17 +243,17 @@ const getStyles = <
         textTransform: 'none',
       };
     },
-    // option: (provided, state) => ({
-    //   ...provided,
-    //   ':active': {
-    //     // Apply active styles or maintain current styles if selected
-    //     className: `${optionStyles.base} ${
-    //       state.isSelected
-    //         ? optionStyles.selected
-    //         : 'bg-teal-300/[0.32] dark:bg-teal-700/[0.32]'
-    //     }`,
-    //   },
-    // }),
+    option: (provided, state) => ({
+      ...provided,
+      ':active': {
+        // Apply active styles or maintain current styles if selected
+        className: `${optionStyles.base} ${
+          state.isSelected
+            ? optionStyles.selected
+            : 'bg-teal-300/[0.32] dark:bg-teal-700/[0.32]'
+        }`,
+      },
+    }),
   } as StylesConfig<Option, IsMulti, Group>;
 };
 
