@@ -1,5 +1,5 @@
 /* This does all the histogram logic with Weave ops, so it scales
-   much better than PanelStringHistgram. But it does not include all the
+   much better than PanelStringHistogram. But it does not include all the
    color features of PanelStringHistogram.
 
    TODO: Implement PanelStringHistogram body using PanelPlot!

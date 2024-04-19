@@ -1,4 +1,4 @@
-import {Typography} from '@material-ui/core';
+import Typography from '@mui/material/Typography';
 import {useNodeValue} from '@wandb/weave/react';
 import React, {FC, useMemo} from 'react';
 import {useParams} from 'react-router-dom';

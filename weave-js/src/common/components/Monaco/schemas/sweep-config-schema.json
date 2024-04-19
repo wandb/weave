@@ -701,7 +701,7 @@
         },
         "strict": {
           "type": "boolean",
-          "description": "Use a more aggresive condition for termination, stops more runs",
+          "description": "Use a more aggressive condition for termination, stops more runs",
           "default": false
         }
       }

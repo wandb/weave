@@ -1,5 +1,5 @@
-import {Box} from '@material-ui/core';
 import Editor from '@monaco-editor/react';
+import Box from '@mui/material/Box';
 import {Loading} from '@wandb/weave/components/Loading';
 import React, {FC} from 'react';
 

@@ -2,7 +2,7 @@
  * Support for a preview tooltip combined with a draggable popup on click.
  */
 
-import Grow from '@material-ui/core/Grow';
+import Grow from '@mui/material/Grow';
 import Tooltip, {tooltipClasses, TooltipProps} from '@mui/material/Tooltip';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import React from 'react';
@@ -54,10 +54,14 @@ export const DraggableWrapper = ({children, ...other}: any) => {
   );
 };
 
-export const DraggableGrow = ({children, ...other}: any) => {
-  return (
-    <Grow {...other} timeout={0}>
-      <DraggableWrapper>{children}</DraggableWrapper>
-    </Grow>
-  );
-};
+export const DraggableGrow = React.forwardRef(
+  ({children, ...other}: any, ref) => {
+    return (
+      <Grow ref={ref} {...other} timeout={0}>
+        <div>
+          <DraggableWrapper>{children}</DraggableWrapper>
+        </div>
+      </Grow>
+    );
+  }
+);

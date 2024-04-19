@@ -105,10 +105,6 @@ export const GRAYS = {
 /**
  * @deprecated
  */
-export const GRAY_PAGE_BG = GRAY_25;
-/**
- * @deprecated
- */
 export const TEAL_TRANSPARENT = 'rgba(0, 150, 173, 0.10)'; // Deprecated, use hexToRGB
 /**
  * @deprecated
@@ -139,14 +135,6 @@ export const TEALS = {
 /**
  * @deprecated
  */
-export const GREEN_TRANSPARENT = 'rgba(0, 163, 104, 0.15)'; // Deprecated, use hexToRGB
-/**
- * @deprecated
- */
-export const GREEN_LIGHT2 = '#5ed686';
-/**
- * @deprecated
- */
 export const GREEN_LIGHT = '#0fb863';
 /**
  * @deprecated
@@ -155,25 +143,10 @@ export const GREEN = '#00a368';
 /**
  * @deprecated
  */
-export const GREEN_DARK = '#008f5d';
-/**
- * @deprecated
- */
 export const GREENS = {
-  GREEN_TRANSPARENT,
-  GREEN_LIGHT2,
   GREEN_LIGHT,
   GREEN,
-  GREEN_DARK,
 } as const;
-/**
- * @deprecated
- */
-export const GOLD_DARK_TRANSPARENT = 'rgba(245, 155, 20, 0.14)'; // Deprecated, use hexToRGB
-/**
- * @deprecated
- */
-export const GOLD_LIGHT2 = '#ffd95c';
 /**
  * @deprecated
  */
@@ -185,31 +158,10 @@ export const GOLD = '#fcb119';
 /**
  * @deprecated
  */
-export const GOLD_DARK = '#f59b14';
-/**
- * @deprecated
- */
-export const GOLD_DARK2 = '#c77905';
-/**
- * @deprecated
- */
-export const GOLD_DARK3 = '#c17401';
-/**
- * @deprecated
- */
 export const GOLDS = {
-  GOLD_DARK_TRANSPARENT,
-  GOLD_LIGHT2,
   GOLD_LIGHT,
   GOLD,
-  GOLD_DARK,
-  GOLD_DARK2,
-  GOLD_DARK3,
 } as const;
-/**
- * @deprecated
- */
-export const SIENNA_TRANSPARENT = 'rgba(229, 122, 83, 0.16)'; // Deprecated, use hexToRGB
 /**
  * @deprecated
  */
@@ -230,20 +182,11 @@ export const SIENNA_DARK = '#bf6448';
  * @deprecated
  */
 export const SIENNAS = {
-  SIENNA_TRANSPARENT,
   SIENNA_LIGHT2,
   SIENNA_LIGHT,
   SIENNA,
   SIENNA_DARK,
 } as const;
-/**
- * @deprecated
- */
-export const RED_LIGHT_TRANSPARENT = 'rgba(252, 86, 97, 0.16)'; // Deprecated, use hexToRGB
-/**
- * @deprecated
- */
-export const RED_LIGHT2 = '#ff8585';
 /**
  * @deprecated
  */
@@ -260,41 +203,10 @@ export const RED_DARK = '#eb1c45';
  * @deprecated
  */
 export const REDS = {
-  RED_LIGHT_TRANSPARENT,
-  RED_LIGHT2,
   RED_LIGHT,
   RED,
   RED_DARK,
 } as const;
-/**
- * @deprecated
- */
-export const CACTUS_LIGHT2 = '#BFE573';
-/**
- * @deprecated
- */
-export const CACTUS_LIGHT = '#A3CC52';
-/**
- * @deprecated
- */
-export const CACTUS = '#84B043';
-/**
- * @deprecated
- */
-export const CACTUS_DARK = '#669432';
-/**
- * @deprecated
- */
-export const CACTUSES = {
-  CACTUS_LIGHT2,
-  CACTUS_LIGHT,
-  CACTUS,
-  CACTUS_DARK,
-} as const;
-/**
- * @deprecated
- */
-export const MAGENTA_LIGHT2 = '#E07AFF';
 /**
  * @deprecated
  */
@@ -306,65 +218,9 @@ export const MAGENTA = '#B948E0';
 /**
  * @deprecated
  */
-export const MAGENTA_DARK = '#9E36C2';
-/**
- * @deprecated
- */
 export const MAGENTAS = {
-  MAGENTA_LIGHT2,
   MAGENTA_LIGHT,
   MAGENTA,
-  MAGENTA_DARK,
-} as const;
-/**
- * @deprecated
- */
-export const PURPLE_LIGHT2 = '#BCA5FA';
-/**
- * @deprecated
- */
-export const PURPLE_LIGHT = '#A690F0';
-/**
- * @deprecated
- */
-export const PURPLE = '#9278EB';
-/**
- * @deprecated
- */
-export const PURPLE_DARK = '#775CD1';
-/**
- * @deprecated
- */
-export const PURPLES = {
-  PURPLE_LIGHT2,
-  PURPLE_LIGHT,
-  PURPLE,
-  PURPLE_DARK,
-} as const;
-/**
- * @deprecated
- */
-export const BLUE_LIGHT2 = '#7CB1F7';
-/**
- * @deprecated
- */
-export const BLUE_LIGHT = '#559AFA';
-/**
- * @deprecated
- */
-export const BLUE = '#3E84ED';
-/**
- * @deprecated
- */
-export const BLUE_DARK = '#2D69E0';
-/**
- * @deprecated
- */
-export const BLUES = {
-  BLUE_LIGHT2,
-  BLUE_LIGHT,
-  BLUE,
-  BLUE_DARK,
 } as const;
 /**
  * @deprecated
@@ -381,10 +237,7 @@ export const Colors = {
   ...GOLDS,
   ...SIENNAS,
   ...REDS,
-  ...CACTUSES,
   ...MAGENTAS,
-  ...PURPLES,
-  ...BLUES,
 } as const;
 /**
  * @deprecated
@@ -427,33 +280,11 @@ export const TEAL_LIGHT_2 = TEAL_LIGHT2;
 /**
  * @deprecated
  */
-export const GREEN_LIGHT_2 = GREEN_LIGHT2;
-/**
- * @deprecated
- */
 export const SIENNA_LIGHT_TRANSPARENT_30 = 'rgba(250, 167, 125, 30%)';
 /**
  * @deprecated
  */
 export const SIENNA_LIGHT_2 = SIENNA_LIGHT2;
-/**
- * @deprecated
- */
-export const GOLD_DARK_2 = GOLD_DARK2;
-/**
- * @deprecated
- */
-export const RED_TRANSPARENT = RED_LIGHT_TRANSPARENT;
-/**
- * @deprecated
- */
-export const RED_LIGHT_2 = RED_LIGHT2;
-
-/* Spacing */
-/**
- * @deprecated
- */
-export const SPU = '0.5rem'; // standard spacing unit = 8px
 
 /* Responsive styling standards */
 /** @deprecated use MEDIUM_BREAKPOINT instead */
@@ -469,7 +300,6 @@ export const SMALL_TABLET_WIDTH = 1000;
 export const MOBILE_WIDTH = 600;
 
 /* Borders */
-export const BORDER_RADIUS_STANDARD = '4px';
 export const BORDER_COLOR_FOCUSED = hexToRGB(TEAL_LIGHT2, 0.6);
 
 /* Typography */
@@ -485,20 +315,6 @@ export const MENU_SHADOW_LIGHT_MODE = `0px 16px 32px 0px rgba(14,16,20,0.16)`;
  * @deprecated
  */
 export const MENU_SHADOW_NIGHT_MODE = `0px 16px 32px 0px rgba(14,16,20,0.6)`;
-/**
- * @deprecated
- */
-export const MODAL_SHADOW_LIGHT_MODE = `0px 24px 48px 0px ${hexToRGB(
-  OBLIVION,
-  0.24
-)}`;
-/**
- * @deprecated
- */
-export const MODAL_SHADOW_NIGHT_MODE = `0px 24px 48px 0px ${hexToRGB(
-  OBLIVION,
-  0.48
-)}`;
 /**
  * @deprecated
  */
@@ -1166,22 +982,6 @@ export const largeStandardSpacingUnit = `10px`;
  * @deprecated
  */
 export const largeSpu = largeStandardSpacingUnit;
-
-// Night Mode
-// Need contrast and brightness adjustments, otherwise very dark gray merges with black.
-/**
- * @deprecated
- */
-export const nightModeFilter = `invert(100%) hue-rotate(180deg) contrast(80%) brightness(120%)`;
-// Need to re-apply filter to images to revert them.
-/**
- * @deprecated
- */
-export const nightModeFilterRevert = `brightness(83.3333%) contrast(125%) hue-rotate(180deg) invert(100%)`;
-/**
- * @deprecated
- */
-export const nightModeTransition = `filter 2s`;
 
 // Functional Color Rules
 // These should wrap the above colors with semantic names

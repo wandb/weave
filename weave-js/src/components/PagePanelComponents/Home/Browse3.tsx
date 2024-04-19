@@ -1,4 +1,3 @@
-import {LinearProgress} from '@material-ui/core';
 import {Home} from '@mui/icons-material';
 import {
   AppBar,
@@ -10,6 +9,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
+import LinearProgress from '@mui/material/LinearProgress';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import _ from 'lodash';
@@ -361,7 +361,6 @@ const MainPeekingLayout: FC = () => {
             id="dragger"
             onMouseDown={handleMousedown}
             style={{
-              borderTop: '1px solid #ddd',
               position: 'absolute',
               inset: '0 auto 0 0',
               zIndex: 2,

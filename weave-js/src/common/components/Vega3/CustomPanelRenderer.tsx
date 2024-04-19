@@ -184,7 +184,7 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
       return data;
     } else if (
       // viewed run change just changes the filtered data
-      // becuase it does not require a new query
+      // because it does not require a new query
       !viewedRun ||
       !showRunSelector ||
       (viewedRun && viewedRun === VIEW_ALL_RUNS)
