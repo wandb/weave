@@ -179,7 +179,7 @@ export function editDraftVariables(
 /**
  * Returns the variables for an UpsertReport mutation that
  * creates a new draft from a published report.
- * @param report The publised report to start a new draft for
+ * @param report The published report to start a new draft for
  * @param slateNode The node to add to the new report draft
  */
 export function newDraftVariables(
