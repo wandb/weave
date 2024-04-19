@@ -119,7 +119,6 @@ const CustomOption = (props: any) => (
         {props.data.rightIconName && (
           <Tooltip
             position="top center"
-            open={true}
             content={
               <Tailwind>
                 <div className="flex">
@@ -313,7 +312,7 @@ export const Select = <
   return (
     <Tailwind>
       <ReactSelect
-        menuIsOpen={true}
+        menuIsOpen={props.menuIsOpen}
         {...props}
         components={Object.assign({}, props.components, {
           DropdownIndicator,
