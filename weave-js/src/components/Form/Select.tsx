@@ -106,21 +106,47 @@ interface ExtendedOptionProps<
 const CustomOption = (props: any) => (
   <>
     <components.Option {...props}>
-      <div className="flex flex-col">
-        <div className="flex items-center">
+      {/* <div className="flex items-start">
+        <div className="flex">
           {props.data.icon && (
             <Icon
-              className="mr-8 self-start"
+              className="mr-4 flex-shrink-0"
               width={18}
               height={18}
               name={props.data.icon}
             />
           )}
-          <div className="flex flex-col">
-            <div className="self-start">{props.data.label}</div>
-            {props.data.description && <div>{props.data.description}</div>}{' '}
+          <div className="flex flex-col justify-center">
+            <div>{props.data.label}</div>
+            {props.data.description && (
+              <div className="mt-2">{props.data.description}</div>
+            )}
           </div>
         </div>
+      </div> */}
+      <div className="flex items-center">
+        {props.data.icon && <Icon name={props.data.icon} />}
+        <span
+          data-test="project-access-option"
+          className="ml-8 flex items-center font-medium">
+          {props.data.label}
+          {/* {showPremiumFeatureIcon && (
+              <Tooltip
+                position="top center"
+                trigger={
+                  <div className="night-aware ml-5">
+                    <IconOnlyPill color="purple" icon="crown-pro" />
+                  </div>
+                }>
+                <PremiumFeatureToolTipText
+                  isPremiumFeatureDisabled={!premiumFeatureEnabled}
+                />
+              </Tooltip>
+            )} */}
+        </span>
+      </div>
+      <div className="ml-28">
+        <span className="text-sm text-moon-500">{props.data.description}</span>
       </div>
     </components.Option>
   </>
