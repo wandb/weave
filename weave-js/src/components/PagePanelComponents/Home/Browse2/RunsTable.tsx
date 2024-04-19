@@ -7,6 +7,7 @@ import {
   GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
+import * as Colors from '@wandb/weave/common/css/color.styles';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
@@ -20,6 +21,7 @@ import React, {
 import {useParams} from 'react-router-dom';
 import styled from 'styled-components';
 
+import {hexToRGB} from '../../../../common/css/utils';
 import {A, TargetBlank} from '../../../../common/util/links';
 import {monthRoundedTime} from '../../../../common/util/time';
 import {useWeaveContext} from '../../../../context';
@@ -31,7 +33,6 @@ import {
 } from '../../../../core';
 import {useDeepMemo} from '../../../../hookUtils';
 import {parseRef} from '../../../../react';
-import {Alert} from '../../../Alert';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {LoadingDots} from '../../../LoadingDots';
 import {Timestamp} from '../../../Timestamp';
@@ -73,15 +74,30 @@ export type DataGridColumnGroupingModel = Exclude<
 >;
 
 const VisibilityAlert = styled.div`
+  background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
+  color: ${Colors.MOON_800};
+  padding: 6px 12px;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 20px;
   display: flex;
   align-items: center;
   gap: 8px;
 `;
 VisibilityAlert.displayName = 'S.VisibilityAlert';
 
+const VisibilityAlertText = styled.div`
+  white-space: nowrap;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+VisibilityAlertText.displayName = 'S.VisibilityAlertText';
+
 const VisibilityAlertAction = styled.div`
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 `;
 VisibilityAlertAction.displayName = 'S.VisibilityAlertAction';
 
@@ -855,14 +871,14 @@ export const RunsTable: FC<{
   return (
     <>
       {showVisibilityAlert && (
-        <Alert style={{borderRadius: 0}}>
-          <VisibilityAlert>
-            <div>Columns having many empty values have been hidden.</div>
-            <VisibilityAlertAction onClick={() => setForceShowAll(true)}>
-              Show all
-            </VisibilityAlertAction>
-          </VisibilityAlert>
-        </Alert>
+        <VisibilityAlert>
+          <VisibilityAlertText>
+            Columns having many empty values have been hidden.
+          </VisibilityAlertText>
+          <VisibilityAlertAction onClick={() => setForceShowAll(true)}>
+            Show all
+          </VisibilityAlertAction>
+        </VisibilityAlert>
       )}
       <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
       <StyledDataGrid
