@@ -113,6 +113,7 @@ export const FilterableOpVersionsTable: React.FC<{
             opName={obj.opId}
             version={obj.versionHash}
             versionIndex={obj.versionIndex}
+            fullWidth={true}
           />
         );
       },
