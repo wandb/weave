@@ -6,24 +6,26 @@
  * It doesn't match the spec completely yet; waiting on UI framework decisions before investing
  * more time in alignment.
  */
-import classNames from 'classnames';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
-import {IconOnlyPill} from '@wandb/weave/components/Tag';
 
 import {
+  hexToRGB,
+  MOON_100,
   MOON_250,
+  MOON_350,
   MOON_500,
   MOON_800,
+  RED_550,
+  TEAL_300,
+  TEAL_500,
+  TEAL_600,
 } from '@wandb/weave/common/css/globals.styles';
-import {Icon, IconName, IconSearch} from '@wandb/weave/components/Icon';
+import {Icon} from '@wandb/weave/components/Icon';
 import React from 'react';
 import ReactSelect, {
   components,
   DropdownIndicatorProps,
   GroupBase,
   GroupHeadingProps,
-  OptionProps,
-  PlaceholderProps,
   Props,
   StylesConfig,
 } from 'react-select';
@@ -31,28 +33,69 @@ import AsyncSelect, {AsyncProps} from 'react-select/async';
 import AsyncCreatableSelect, {
   AsyncCreatableProps,
 } from 'react-select/async-creatable';
-import {Tailwind} from '../Tailwind';
 
 export const SelectSizes = {
+  Small: 'small',
   Medium: 'medium',
   Large: 'large',
+  Variable: 'variable',
 } as const;
 export type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
-export const SelectIconTypes = {
-  Semantic: 'semantic',
-  Action: 'action',
+const HEIGHTS: Record<SelectSize, number | undefined> = {
+  small: 24,
+  medium: 32,
+  large: 40,
+  variable: undefined,
 } as const;
-export type IconType = (typeof SelectIconTypes)[keyof typeof SelectIconTypes];
+
+const MIN_HEIGHTS: Record<SelectSize, number | undefined> = {
+  small: undefined,
+  medium: undefined,
+  large: undefined,
+  variable: 40,
+} as const;
+
+const LINE_HEIGHTS: Record<SelectSize, string | undefined> = {
+  small: '20px',
+  medium: '24px',
+  large: '24px',
+  variable: undefined,
+} as const;
+
+const FONT_SIZES: Record<SelectSize, string> = {
+  small: '14px',
+  medium: '16px',
+  large: '16px',
+  variable: '14px',
+} as const;
+
+const PADDING: Record<SelectSize, string> = {
+  small: '2px 8px',
+  medium: '4px 12px',
+  large: '8px 12px',
+  variable: '2px 8px',
+} as const;
+
+const OUTWARD_MARGINS: Record<SelectSize, string> = {
+  small: '-8px',
+  medium: '-12px',
+  large: '-12px',
+  variable: '-8px',
+} as const;
+
+const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
+  small: 2,
+  medium: 6,
+  large: 8,
+  variable: 2,
+} as const;
 
 export type AdditionalProps = {
   size?: SelectSize;
   errorState?: boolean;
   groupDivider?: boolean;
   cursor?: string;
-  isDarkMode?: boolean;
-  iconName?: IconName;
-  iconType?: IconType;
 };
 
 // Toggle icon when open
@@ -72,93 +115,6 @@ const DropdownIndicator = <
     </components.DropdownIndicator>
   );
 };
-
-interface ExtendedPlaceholderProps<
-  Option,
-  IsMulti extends boolean,
-  Group extends GroupBase<Option>
-> extends PlaceholderProps<Option, IsMulti, Group> {
-  iconName?: IconName;
-}
-const CustomPlaceholder = <
-  Option,
-  IsMulti extends boolean = false,
-  Group extends GroupBase<Option> = GroupBase<Option>
->(
-  props: ExtendedPlaceholderProps<Option, IsMulti, Group>
-) => (
-  <components.Placeholder {...props}>
-    <div className="flex items-center">
-      {props.iconName && (
-        <Icon className="mr-8" width={18} height={18} name={props.iconName} />
-      )}
-      {props.children}
-    </div>
-  </components.Placeholder>
-);
-
-interface ExtendedOptionProps<
-  Option,
-  IsMulti extends boolean,
-  Group extends GroupBase<Option>
-> extends OptionProps<Option, IsMulti, Group> {
-  iconName?: IconName;
-}
-
-const CustomOption = (props: any) => (
-  <>
-    <components.Option {...props}>
-      <div className="flex w-full items-center justify-between">
-        {/* Left-aligned section with Icon */}
-        <div className="flex items-center">
-          {props.data.icon && <Icon name={props.data.icon} />}
-          <div className="ml-8">{props.data.label}</div>
-        </div>
-
-        {/* Right-aligned Tooltip Icons */}
-        {props.data.rightIconName && (
-          <Tooltip
-            position="top center"
-            content={
-              <Tailwind>
-                <div className="flex">
-                  <div className="mr-5">
-                    <Icon
-                      name={props.data.rightIconName}
-                      width={18}
-                      height={18}
-                      className="align-middle"
-                    />
-                  </div>
-                  <span className="align-middle">{props.data.tooltipText}</span>
-                </div>
-              </Tailwind>
-            }
-            trigger={
-              <div className="night-aware ml-5 flex items-center">
-                {props.data.rightIconIsPill ? (
-                  <IconOnlyPill
-                    color="purple"
-                    icon={props.data.rightIconName}
-                  />
-                ) : (
-                  <Icon
-                    color="purple"
-                    name={props.data.rightIconName}
-                    className="night-aware"
-                  />
-                )}
-              </div>
-            }></Tooltip>
-        )}
-      </div>
-
-      <div className="ml-28">
-        <span className="text-sm text-moon-500">{props.data.description}</span>
-      </div>
-    </components.Option>
-  </>
-);
 
 const getGroupHeading = <
   Option,
@@ -180,6 +136,7 @@ const getGroupHeading = <
             style={{
               backgroundColor: MOON_250,
               height: '1px',
+              margin: `0 ${OUTWARD_MARGINS[size]} 6px ${OUTWARD_MARGINS[size]}`,
             }}
           />
         )}
@@ -193,7 +150,6 @@ type StylesProps = {
   size?: SelectSize;
   errorState?: boolean;
   cursor?: string;
-  isDarkMode?: boolean;
 };
 
 // Override styling to come closer to design spec.
@@ -208,22 +164,30 @@ const getStyles = <
 ) => {
   const errorState = props.errorState ?? false;
   const size = props.size ?? 'medium';
-  const optionStyles = {
-    base: 'text-base cursor-pointer text-moon-800',
-    focus: 'bg-moon-100 dark:bg-moon-800 dark:text-white rounded',
-    selected: 'text-teal-400 bg-teal-700/[0.32] rounded',
-    nonFocus: 'dark:bg-moon-850 dark:text-white',
-  };
   return {
     // No vertical line to left of dropdown indicator
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
     clearIndicator: baseStyles => ({
       ...baseStyles,
+      padding: CLEAR_INDICATOR_PADDING[size],
       cursor: 'pointer',
     }),
-    multiValueLabel: baseStyles => {
+    input: baseStyles => {
       return {
         ...baseStyles,
+        padding: 0,
+        margin: 0,
+      };
+    },
+    valueContainer: baseStyles => {
+      const padding = PADDING[size];
+      return {...baseStyles, padding};
+    },
+    multiValueLabel: baseStyles => {
+      const fontSize = FONT_SIZES[size];
+      return {
+        ...baseStyles,
+        fontSize,
       };
     },
     multiValueRemove: baseStyles => ({
@@ -232,14 +196,54 @@ const getStyles = <
     }),
     dropdownIndicator: baseStyles => ({...baseStyles, padding: '0 8px 0 0'}),
     container: baseStyles => {
+      const height = HEIGHTS[size];
       return {
         ...baseStyles,
+        height,
       };
     },
+    control: (baseStyles, state) => {
+      const colorBorderDefault = MOON_250;
+      const colorBorderHover = hexToRGB(TEAL_500, 0.4);
+      const colorBorderOpen = errorState
+        ? hexToRGB(RED_550, 0.64)
+        : hexToRGB(TEAL_500, 0.64);
+      const height = HEIGHTS[size];
+      const minHeight = MIN_HEIGHTS[size] ?? height;
+      const lineHeight = LINE_HEIGHTS[size];
+      const fontSize = FONT_SIZES[size];
+      return {
+        ...baseStyles,
+        height,
+        minHeight,
+        lineHeight,
+        fontSize,
+        cursor: props.cursor ?? 'default',
+        border: 0,
+        boxShadow: state.menuIsOpen
+          ? `0 0 0 2px ${colorBorderOpen}`
+          : state.isFocused
+          ? `0 0 0 2px ${colorBorderOpen}`
+          : `inset 0 0 0 1px ${colorBorderDefault}`,
+        '&:hover': {
+          boxShadow: state.menuIsOpen
+            ? `0 0 0 2px ${colorBorderOpen}`
+            : `0 0 0 2px ${colorBorderHover}`,
+        },
+      };
+    },
+    menu: baseStyles => ({
+      ...baseStyles,
+      // TODO: Semantic-UI based dropdowns have their z-index set to 3,
+      //       which causes their selected value to appear in front of the
+      //       react-select popup. We should remove this hack once we've
+      //       eliminated Semantic-UI based dropdowns.
+      zIndex: 4,
+    }),
     menuList: baseStyles => {
       return {
         ...baseStyles,
-        padding: '6px 6px',
+        padding: '6px 0',
       };
     },
     groupHeading: (baseStyles, state) => {
@@ -251,17 +255,36 @@ const getStyles = <
         textTransform: 'none',
       };
     },
-    option: (provided, state) => ({
-      ...provided,
-      ':active': {
-        // Apply active styles or maintain current styles if selected
-        className: `${optionStyles.base} ${
-          state.isSelected
-            ? optionStyles.selected
-            : 'bg-teal-300/[0.32] dark:bg-teal-700/[0.32]'
-        }`,
-      },
-    }),
+    option: (baseStyles, state) => {
+      return {
+        ...baseStyles,
+        cursor: state.isDisabled ? 'default' : 'pointer',
+        // TODO: Should icon be translucent?
+        color: state.isDisabled
+          ? MOON_350
+          : state.isSelected
+          ? TEAL_600
+          : MOON_800,
+        padding: '6px 10px',
+        margin: '0 6px',
+        borderRadius: '4px',
+        width: 'auto',
+        backgroundColor: state.isDisabled
+          ? undefined
+          : state.isSelected
+          ? hexToRGB(TEAL_300, 0.32)
+          : state.isFocused
+          ? MOON_100
+          : undefined,
+        ':active': {
+          // mousedown
+          ...baseStyles[':active'],
+          backgroundColor: !state.isDisabled
+            ? hexToRGB(TEAL_300, 0.32)
+            : undefined,
+        },
+      };
+    },
   } as StylesConfig<Option, IsMulti, Group>;
 };
 
@@ -275,75 +298,18 @@ export const Select = <
 ) => {
   const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
   const size = props.size ?? 'medium';
-
   const showDivider = props.groupDivider ?? false;
   const GroupHeading = getGroupHeading(size, showDivider);
-  const controlStyles = {
-    base: classNames(
-      props.errorState
-        ? 'shadow-[0_0_0_2px] shadow-red-450 dark:shadow-red-550 shadow-[0_0_0_2px] hover:shadow-red-450 hover:dark:shadow-red-550'
-        : 'hover:dark:shadow-teal-650 hover:shadow-teal-350',
-      `leading-[22.4px] border-none dark:text-white text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:shadow-[0_0_0_2px]`
-    ),
-    focus: 'shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600',
-    nonFocus:
-      'border-none shadow-[0_0_0_1px] shadow-moon-250 dark:bg-red border-none',
-  };
-  const optionStyles = {
-    base: 'text-base cursor-pointer text-moon-800',
-    focus: 'bg-moon-100 dark:bg-moon-800 dark:text-white rounded',
-    selected:
-      'bg-teal-300/[0.32] text-teal-600 dark:text-teal-400 dark:bg-teal-700/[0.32] rounded',
-    nonFocus: 'bg-white dark:bg-moon-900 dark:text-white',
-  };
-  const menuStyles =
-    'night-aware dark:bg-moon-900 dark:border dark:border-moon-750 shadow-custom dark:shadow-custom-dark mt-2';
-  const singleValueStyles = 'dark:text-white';
-  const inputContainerStyles = 'p-0 dark:text-white';
-
-  const valueContainerStyles = classNames(
-    size === 'medium' ? 'py-4' : 'py-8',
-    'pr-6',
-    props.iconType === SelectIconTypes.Semantic ? 'pl-8' : 'pl-12'
-  );
-
-  const placeholderStyles = 'text-moon-500 dark:text-moon-600';
 
   return (
-    <Tailwind>
-      <ReactSelect
-        menuIsOpen={props.menuIsOpen}
-        {...props}
-        components={Object.assign({}, props.components, {
-          DropdownIndicator,
-          GroupHeading,
-          Option: CustomOption,
-        })}
-        styles={styles}
-        classNamePrefix="react-select"
-        classNames={{
-          control: ({isFocused}) =>
-            classNames(
-              isFocused ? controlStyles.focus : controlStyles.nonFocus,
-              controlStyles.base
-            ),
-          option: ({isFocused, isSelected}) =>
-            classNames(
-              isSelected
-                ? optionStyles.selected
-                : isFocused
-                ? optionStyles.focus
-                : optionStyles.nonFocus
-            ),
-          menu: () => menuStyles,
-          container: () => inputContainerStyles,
-          singleValue: () => singleValueStyles,
-          input: () => inputContainerStyles,
-          valueContainer: () => valueContainerStyles,
-          placeholder: () => placeholderStyles,
-        }}
-      />
-    </Tailwind>
+    <ReactSelect
+      {...props}
+      components={Object.assign(
+        {DropdownIndicator, GroupHeading},
+        props.components
+      )}
+      styles={styles}
+    />
   );
 };
 
