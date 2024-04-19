@@ -29,12 +29,6 @@ export const SelectSizes = {
 } as const;
 export type SelectSize = (typeof SelectSizes)[keyof typeof SelectSizes];
 
-export const SelectIconTypes = {
-  Semantic: 'semantic',
-  Action: 'action',
-} as const;
-export type IconType = (typeof SelectIconTypes)[keyof typeof SelectIconTypes];
-
 export type AdditionalProps = {
   size?: SelectSize;
   errorState?: boolean;
@@ -42,14 +36,13 @@ export type AdditionalProps = {
   cursor?: string;
   isDarkMode?: boolean;
   iconName?: IconName;
-  iconType?: IconType;
+};
+
+export type AdditionalCustomOptionPropsData = {
+  data: AdditionalCustomOptionProps;
 };
 
 export type AdditionalCustomOptionProps = {
-  data: AdditionalCustomOptionProps2;
-};
-
-export type AdditionalCustomOptionProps2 = {
   icon: IconName;
   description: string;
   label: string;
@@ -81,7 +74,7 @@ export const CustomOption = <
   IsMulti extends boolean,
   Group extends GroupBase<Option>
 >(
-  props: OptionProps<Option, IsMulti, Group> & AdditionalCustomOptionProps
+  props: OptionProps<Option, IsMulti, Group> & AdditionalCustomOptionPropsData
 ): JSX.Element => (
   <>
     <components.Option {...props}>
