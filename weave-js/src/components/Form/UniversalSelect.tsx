@@ -4,7 +4,6 @@ import ReactSelect, {
   GroupBase,
   StylesConfig,
   ClassNamesConfig,
-  SelectComponentsConfig,
 } from 'react-select';
 import AsyncSelect, {AsyncProps as AsyncSelectProps} from 'react-select/async';
 import AsyncCreatableSelect, {
@@ -12,15 +11,14 @@ import AsyncCreatableSelect, {
 } from 'react-select/async-creatable';
 import {Tailwind} from '../Tailwind';
 
-// Common styles and components imports
 import {
   getStyles,
   DropdownIndicator,
   getGroupHeading,
   CustomOption,
   getClassNames,
-} from './SelectNew';
-import {Icon, IconName, IconSearch} from '@wandb/weave/components/Icon';
+} from './UniversalSelectUtil';
+import {IconName} from '@wandb/weave/components/Icon';
 
 export const SelectSizes = {
   Medium: 'medium',
@@ -41,7 +39,7 @@ export enum SelectTypes {
 }
 
 type AdditionalProps = {
-  selectType?: SelectTypes; // Now explicitly included in the additional props
+  selectType?: SelectTypes;
   size?: SelectSize;
   errorState?: boolean;
   groupDivider?: boolean;
@@ -50,8 +48,6 @@ type AdditionalProps = {
   iconName?: IconName;
   iconType?: IconType;
 };
-
-// Define a generic interface for the props of the UniversalSelect component
 
 export const UniversalSelect = <
   Option,
@@ -76,18 +72,7 @@ export const UniversalSelect = <
     Option: CustomOption,
     ...props.components,
   };
-  const components = Object.assign({}, props.components, {
-    DropdownIndicator,
-    GroupHeading,
-    Option: CustomOption,
-  }) as SelectComponentsConfig<Option, IsMulti, Group>;
 
-  // const selectProps = {
-  //   ...props,
-  //   components: customComponents,
-  //   styles: getStyles(props),
-  //   classNames: getClassNames(props),
-  // };
   const styles: StylesConfig<Option, IsMulti, Group> = getStyles(
     props
   ) as StylesConfig<Option, IsMulti, Group>;
