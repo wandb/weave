@@ -20,7 +20,7 @@ export type TagColorName = (typeof TAG_HUE_WHEEL)[number];
 
 /**
  * The order of these colors are intentional!
- * This list can be used where we need to render mulitple labels in a page because
+ * This list can be used where we need to render multiple labels in a page because
  * this order will optimize contrast.
  */
 export const TAG_COLOR_CONTRAST_WHEEL: TagColorName[] = [

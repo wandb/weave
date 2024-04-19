@@ -690,7 +690,7 @@ export const PanelGroupItem: React.FC<{
     (newName: string) => {
       updateConfig(
         produce(config, draft => {
-          // this updates the key of the item while mantaining the order, since it matters
+          // this updates the key of the item while maintaining the order, since it matters
           draft.items = Object.fromEntries(
             Object.entries(draft.items).map(([key, value]) => [
               key === name ? newName : key,
