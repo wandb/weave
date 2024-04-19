@@ -18,6 +18,7 @@ import {
 import {Icon, IconName, IconSearch} from '@wandb/weave/components/Icon';
 import React from 'react';
 import ReactSelect, {
+  ClassNamesConfig,
   components,
   DropdownIndicatorProps,
   GroupBase,
@@ -25,6 +26,7 @@ import ReactSelect, {
   OptionProps,
   PlaceholderProps,
   Props,
+  SelectComponentsConfig,
   StylesConfig,
 } from 'react-select';
 import AsyncSelect, {AsyncProps} from 'react-select/async';
@@ -55,14 +57,27 @@ export type AdditionalProps = {
   iconType?: IconType;
 };
 
+export type AdditionalCustomOptionProps = {
+  data: AdditionalCustomOptionProps2;
+};
+
+export type AdditionalCustomOptionProps2 = {
+  icon: IconName;
+  description: string;
+  label: string;
+  rightIconName: IconName | null;
+  tooltipText: string;
+  rightIconIsPill: boolean;
+};
+
 // Toggle icon when open
-const DropdownIndicator = <
+export const DropdownIndicator = <
   Option,
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
 >(
   indicatorProps: DropdownIndicatorProps<Option, IsMulti, Group>
-) => {
+): JSX.Element => {
   const iconName = indicatorProps.selectProps.menuIsOpen
     ? 'chevron-up'
     : 'chevron-down';
@@ -105,7 +120,13 @@ interface ExtendedOptionProps<
   iconName?: IconName;
 }
 
-const CustomOption = (props: any) => (
+export const CustomOption = <
+  Option,
+  IsMulti extends boolean,
+  Group extends GroupBase<Option>
+>(
+  props: OptionProps<Option, IsMulti, Group> & AdditionalCustomOptionProps
+): JSX.Element => (
   <>
     <components.Option {...props}>
       <div className="flex w-full items-center justify-between">
@@ -160,7 +181,7 @@ const CustomOption = (props: any) => (
   </>
 );
 
-const getGroupHeading = <
+export const getGroupHeading = <
   Option,
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
@@ -199,7 +220,7 @@ type StylesProps = {
 // Override styling to come closer to design spec.
 // See: https://react-select.com/home#custom-styles
 // See: https://github.com/JedWatson/react-select/issues/2728
-const getStyles = <
+export const getStyles = <
   Option,
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
@@ -265,6 +286,68 @@ const getStyles = <
   } as StylesConfig<Option, IsMulti, Group>;
 };
 
+export const getClassNames = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: StylesProps
+) => {
+  const size = props.size ?? 'medium';
+  const controlStyles = {
+    base: classNames(
+      props.errorState
+        ? 'shadow-[0_0_0_2px] shadow-red-450 dark:shadow-red-550 shadow-[0_0_0_2px] hover:shadow-red-450 hover:dark:shadow-red-550'
+        : 'hover:dark:shadow-teal-650 hover:shadow-teal-350',
+      `leading-[22.4px] border-none dark:text-white text-base dark:bg-moon-900 dark:shadow-moon-750 rounded night-aware hover:cursor-pointer hover:shadow-[0_0_0_2px]`
+    ),
+    focus:
+      'dark:text-white shadow-[0_0_0_2px] shadow-teal-400 dark:shadow-teal-600 night-aware',
+    nonFocus:
+      'night-aware dark:text-white border-none shadow-[0_0_0_1px] shadow-moon-250 border-none',
+  };
+  const optionStyles = {
+    base: 'text-base cursor-pointer text-moon-800',
+    focus: 'bg-moon-100 dark:bg-moon-800 dark:text-white rounded',
+    selected:
+      'bg-teal-300/[0.32] text-teal-600 dark:text-teal-400 dark:bg-teal-700/[0.32] rounded',
+    nonFocus: 'bg-white dark:bg-moon-900 dark:text-white',
+  };
+  const menuStyles =
+    'night-aware dark:bg-moon-900 dark:border dark:border-moon-750 shadow-custom dark:shadow-custom-dark mt-2';
+  const singleValueStyles = 'dark:text-white';
+  const inputContainerStyles = 'p-0 dark:text-white dark:selection:text-white';
+
+  const valueContainerStyles = classNames(
+    size === 'medium' ? 'py-4' : 'py-8',
+    'pr-6'
+  );
+
+  const placeholderStyles = 'text-moon-500 dark:text-moon-600';
+  return {
+    control: ({isFocused}) =>
+      classNames(
+        isFocused ? controlStyles.focus : controlStyles.nonFocus,
+        controlStyles.base
+      ),
+    option: ({isFocused, isSelected}) =>
+      classNames(
+        isSelected
+          ? optionStyles.selected
+          : isFocused
+          ? optionStyles.focus
+          : optionStyles.nonFocus,
+        optionStyles.base
+      ),
+    menu: () => menuStyles,
+    container: () => inputContainerStyles,
+    singleValue: () => singleValueStyles,
+    input: () => inputContainerStyles,
+    valueContainer: () => valueContainerStyles,
+    placeholder: () => placeholderStyles,
+  } as ClassNamesConfig<Option, IsMulti, Group>;
+};
+
 // See: https://react-select.com/typescript
 export const SelectNew = <
   Option,
@@ -273,7 +356,9 @@ export const SelectNew = <
 >(
   props: Props<Option, IsMulti, Group> & AdditionalProps
 ) => {
-  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
+  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(
+    props
+  ) as StylesConfig<Option, IsMulti, Group>;
   const size = props.size ?? 'medium';
 
   const showDivider = props.groupDivider ?? false;
@@ -313,13 +398,15 @@ export const SelectNew = <
   return (
     <Tailwind>
       <ReactSelect
-        menuIsOpen={true} //menuIsOpen={props.menuIsOpen}
+        menuIsOpen={props.menuIsOpen} //menuIsOpen={true}
         {...props}
-        components={Object.assign({}, props.components, {
-          DropdownIndicator,
-          GroupHeading,
-          Option: CustomOption,
-        })}
+        components={
+          Object.assign({}, props.components, {
+            DropdownIndicator,
+            GroupHeading,
+            Option: CustomOption,
+          }) as SelectComponentsConfig<Option, IsMulti, Group>
+        }
         styles={styles}
         classNamePrefix="react-select"
         classNames={{
@@ -346,5 +433,51 @@ export const SelectNew = <
         }}
       />
     </Tailwind>
+  );
+};
+
+export const SelectAsyncNew = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: AsyncProps<Option, IsMulti, Group> & AdditionalProps
+) => {
+  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
+  const size = props.size ?? 'medium';
+  const showDivider = props.groupDivider ?? false;
+  const GroupHeading = getGroupHeading(size, showDivider);
+  return (
+    <AsyncSelect
+      {...props}
+      components={Object.assign(
+        {DropdownIndicator, GroupHeading},
+        props.components
+      )}
+      styles={styles}
+    />
+  );
+};
+
+export const SelectAsyncCreatableNew = <
+  Option,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<Option> = GroupBase<Option>
+>(
+  props: AsyncCreatableProps<Option, IsMulti, Group> & AdditionalProps
+) => {
+  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
+  const size = props.size ?? 'medium';
+  const showDivider = props.groupDivider ?? false;
+  const GroupHeading = getGroupHeading(size, showDivider);
+  return (
+    <AsyncCreatableSelect
+      {...props}
+      components={Object.assign(
+        {DropdownIndicator, GroupHeading},
+        props.components
+      )}
+      styles={styles}
+    />
   );
 };
