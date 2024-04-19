@@ -1,4 +1,4 @@
-import {Autocomplete, TextField} from '@mui/material';
+import {Autocomplete} from '@mui/material';
 import {MOON_500} from '@wandb/weave/common/css/globals.styles';
 import React from 'react';
 import styled from 'styled-components';
@@ -7,6 +7,8 @@ import {Pill} from '../../../Tag';
 import {Timestamp} from '../../../Timestamp';
 import {opVersionKeyToRefUri} from './pages/wfReactInterface/utilities';
 import {OpVersionSchema} from './pages/wfReactInterface/wfDataModelHooksInterface';
+import {StyledPaper} from './StyledAutocomplete';
+import {StyledTextField} from './StyledTextField';
 
 const Option = styled.li`
   display: flex;
@@ -55,7 +57,8 @@ export const SelectOpVersion = ({
       size="small"
       sx={{width: 260}}
       disableClearable
-      renderInput={params => <TextField {...params} />}
+      renderInput={params => <StyledTextField {...params} />}
+      PaperComponent={paperProps => <StyledPaper {...paperProps} />}
       value={value}
       onChange={(_, newValue) => {
         onChange(newValue.id);
