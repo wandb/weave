@@ -1253,7 +1253,7 @@ def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
 
 
 def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
-    if operator not in ["AND", "OR"]:
+    if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
     combined = f" {operator} ".join([f"({c})" for c in conditions])
     return f"({combined})"
