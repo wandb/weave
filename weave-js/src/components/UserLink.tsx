@@ -73,10 +73,11 @@ const Grid = styled.div`
 `;
 Grid.displayName = 'S.Grid';
 
-const Th = styled.th`
+const Label = styled.div`
   text-align: right;
+  font-weight: 600;
 `;
-Th.displayName = 'S.Th';
+Label.displayName = 'S.Label';
 
 type UserInfo = {
   id: string;
@@ -129,9 +130,9 @@ const UserContent = ({user, mode, onClose}: UserContentProps) => {
       <UserContentBody style={bodyStyle}>
         <Avatar src={user.photoUrl} sx={{width: imgSize, height: imgSize}} />
         <Grid>
-          <Th>Username</Th>
+          <Label>Username</Label>
           <div>{username}</div>
-          <Th>Email</Th>
+          <Label>Email</Label>
           <div>{email}</div>
         </Grid>
       </UserContentBody>
