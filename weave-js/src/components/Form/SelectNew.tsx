@@ -266,7 +266,7 @@ const getStyles = <
 };
 
 // See: https://react-select.com/typescript
-export const Select = <
+export const SelectNew = <
   Option,
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
@@ -344,51 +344,5 @@ export const Select = <
         }}
       />
     </Tailwind>
-  );
-};
-
-export const SelectAsync = <
-  Option,
-  IsMulti extends boolean = false,
-  Group extends GroupBase<Option> = GroupBase<Option>
->(
-  props: AsyncProps<Option, IsMulti, Group> & AdditionalProps
-) => {
-  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
-  const size = props.size ?? 'medium';
-  const showDivider = props.groupDivider ?? false;
-  const GroupHeading = getGroupHeading(size, showDivider);
-  return (
-    <AsyncSelect
-      {...props}
-      components={Object.assign(
-        {DropdownIndicator, GroupHeading},
-        props.components
-      )}
-      styles={styles}
-    />
-  );
-};
-
-export const SelectAsyncCreatable = <
-  Option,
-  IsMulti extends boolean = false,
-  Group extends GroupBase<Option> = GroupBase<Option>
->(
-  props: AsyncCreatableProps<Option, IsMulti, Group> & AdditionalProps
-) => {
-  const styles: StylesConfig<Option, IsMulti, Group> = getStyles(props);
-  const size = props.size ?? 'medium';
-  const showDivider = props.groupDivider ?? false;
-  const GroupHeading = getGroupHeading(size, showDivider);
-  return (
-    <AsyncCreatableSelect
-      {...props}
-      components={Object.assign(
-        {DropdownIndicator, GroupHeading},
-        props.components
-      )}
-      styles={styles}
-    />
   );
 };
