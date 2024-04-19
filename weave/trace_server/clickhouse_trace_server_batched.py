@@ -248,7 +248,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     parameters[param_name] = like_name
 
                 if or_conditions:
-                    conditions.append("(" + " OR ".join(or_conditions) + ")")
+                    conditions.append(_combine_conditions(or_conditions, "OR"))
 
             if req.filter.input_refs:
                 parameters["input_refs"] = req.filter.input_refs
@@ -475,7 +475,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if conditions:
             conds.extend(conditions)
 
-        predicate = " AND ".join(conds)
+        predicate = _combine_conditions(conds, "AND")
         query = f"""
                 SELECT tr.digest, tr.val_dump
                 FROM (
@@ -556,7 +556,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters[version_param_key] = ref.version
 
             if len(conds) > 0:
-                conditions = [" OR ".join(conds)]
+                conditions = [_combine_conditions(conds, "OR")]
                 objs = self._select_objs_query(
                     ref.project_id, conditions=conditions, parameters=parameters
                 )
@@ -862,7 +862,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not conditions:
             conditions = ["1 = 1"]
 
-        conditions_part = " AND ".join(conditions)
+        conditions_part = _combine_conditions(conditions, "AND")
 
         order_by_part = "ORDER BY started_at ASC"
         if order_by is not None:
@@ -943,7 +943,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not conditions:
             conditions = ["1 = 1"]
 
-        conditions_part = " AND ".join(conditions)
+        conditions_part = _combine_conditions(conditions, "AND")
 
         limit_part = ""
         if limit != None:
@@ -1250,3 +1250,10 @@ def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
         return (True, int(digest[1:]))
     except ValueError:
         return (False, -1)
+
+
+def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
+    if operator not in ["AND", "OR"]:
+        raise ValueError(f"Invalid operator: {operator}")
+    combined = f" {operator} ".join([f"({c})" for c in conditions])
+    return f"({combined})"
