@@ -154,7 +154,7 @@ const CustomOption = (props: any) => (
       </div>
 
       <div className="ml-28">
-        <span className="text-sm text-moon-500">{props.data.description}</span>
+        <span className="text-sm">{props.data.description}</span>
       </div>
     </components.Option>
   </>
@@ -224,26 +224,6 @@ const getStyles = <
     multiValueLabel: baseStyles => {
       return {
         ...baseStyles,
-      };
-    },
-    input: baseStyles => {
-      return {
-        ...baseStyles,
-        padding: 0,
-        margin: 0,
-        '&:selection': {
-          className: `dark:text-white`,
-        },
-      };
-    },
-    control: (baseStyles, state) => {
-      return {
-        ...baseStyles,
-        padding: 0,
-        margin: 0,
-        '&:selection': {
-          className: `dark:text-white`,
-        },
       };
     },
     multiValueRemove: baseStyles => ({
@@ -333,7 +313,7 @@ export const SelectNew = <
   return (
     <Tailwind>
       <ReactSelect
-        menuIsOpen={props.menuIsOpen}
+        menuIsOpen={true} //menuIsOpen={props.menuIsOpen}
         {...props}
         components={Object.assign({}, props.components, {
           DropdownIndicator,
