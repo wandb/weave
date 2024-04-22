@@ -37,11 +37,11 @@ const overlayClassName = classNames(
 export const Overlay = React.forwardRef(
   ({className, children, ...props}: RadixDialog.DialogOverlayProps, ref) => (
     <Tailwind>
-      <RadixDialog.Content
+      <RadixDialog.Overlay
         className={twMerge(overlayClassName, className)}
         {...props}>
         {children}
-      </RadixDialog.Content>
+      </RadixDialog.Overlay>
     </Tailwind>
   )
 );
