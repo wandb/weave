@@ -1,10 +1,10 @@
 import React, {createElement, FC} from 'react';
 import {
+  Slide,
   toast as toastify,
   ToastContainer as ToastifyContainer,
   ToastContent,
   ToastOptions,
-  Slide,
 } from 'react-toastify';
 
 import {LegacyWBIcon} from './LegacyWBIcon';
