@@ -1050,7 +1050,7 @@ const refUnderlyingArtifactNode = (uri: string) => {
 const opDefCodeNode = (uri: string) => {
   const artifactVersionNode = refUnderlyingArtifactNode(uri);
   const objPyFileNode = opArtifactVersionFile({
-    artifactVersin: artifactVersionNode,
+    artifactVersion: artifactVersionNode,
     path: constString('obj.py'),
   });
   return opFileContents({file: objPyFileNode});

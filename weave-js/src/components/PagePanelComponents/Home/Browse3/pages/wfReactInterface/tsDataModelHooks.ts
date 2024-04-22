@@ -338,15 +338,15 @@ const useOpVersion = (
       };
     }
 
-    const cachableResult: OpVersionSchema = {
+    const cacheableResult: OpVersionSchema = {
       ...key,
       ...returnedResult,
     };
 
-    opVersionCache.set(key, cachableResult);
+    opVersionCache.set(key, cacheableResult);
     return {
       loading: false,
-      result: cachableResult,
+      result: cacheableResult,
     };
   }, [cachedOpVersion, key, opVersionRes]);
 };
@@ -480,15 +480,15 @@ const useObjectVersion = (
       };
     }
 
-    const cachableResult: ObjectVersionSchema = {
+    const cacheableResult: ObjectVersionSchema = {
       ...key,
       ...returnedResult,
     };
 
-    objectVersionCache.set(key, cachableResult);
+    objectVersionCache.set(key, cacheableResult);
     return {
       loading: false,
-      result: cachableResult,
+      result: cacheableResult,
     };
   }, [cachedObjectVersion, key, objectVersionRes]);
 };
@@ -924,7 +924,7 @@ const weaveTypeOf = (o: any): Types.Type => {
   } else if (_.isBoolean(o)) {
     return 'boolean';
   }
-  throw new Error('Type conversion not implemeneted for value: ' + o);
+  throw new Error('Type conversion not implemented for value: ' + o);
 };
 
 const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {

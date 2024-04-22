@@ -248,7 +248,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     parameters[param_name] = like_name
 
                 if or_conditions:
-                    conditions.append("(" + " OR ".join(or_conditions) + ")")
+                    conditions.append(_combine_conditions(or_conditions, "OR"))
 
             if req.filter.input_refs:
                 parameters["input_refs"] = req.filter.input_refs
@@ -475,7 +475,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if conditions:
             conds.extend(conditions)
 
-        predicate = " AND ".join(conds)
+        predicate = _combine_conditions(conds, "AND")
         query = f"""
                 SELECT tr.digest, tr.val_dump
                 FROM (
@@ -527,31 +527,43 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         root_val_cache: typing.Dict[str, typing.Any] = {}
 
-        def get_object_ref_root_val(r: refs_internal.InternalObjectRef) -> typing.Any:
-            cache_key = f"{r.project_id}/{r.name}/{r.version}"
-            if cache_key in root_val_cache:
-                val = root_val_cache[cache_key]
-            else:
-                if r.version == "latest":
-                    raise NotFoundError("Reading refs with `latest` is not supported")
-                else:
-                    conds = [
-                        "object_id = {object_id: String}",
-                        "digest = {version: String}",
-                    ]
-                    parameters = {
-                        "object_id": r.name,
-                        "version": r.version,
-                    }
-                objs = self._select_objs_query(
-                    r.project_id, conditions=conds, parameters=parameters
+        def make_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
+            return f"{ref.project_id}/{ref.name}/{ref.version}"
+
+        def make_obj_cache_key(obj: SelectableCHObjSchema) -> str:
+            return f"{obj.project_id}/{obj.object_id}/{obj.digest}"
+
+        def get_object_refs_root_val(
+            refs: list[refs_internal.InternalObjectRef],
+        ) -> typing.Any:
+            conds = []
+            parameters = {}
+            for ref_index, ref in enumerate(refs):
+                if ref.version == "latest":
+                    raise ValueError("Reading refs with `latest` is not supported")
+
+                cache_key = make_ref_cache_key(ref)
+
+                if cache_key in root_val_cache:
+                    continue
+
+                object_id_param_key = "object_id_" + str(ref_index)
+                version_param_key = "version_" + str(ref_index)
+                conds.append(
+                    f"object_id = {{{object_id_param_key}: String}} AND digest = {{{version_param_key}: String}}"
                 )
-                if len(objs) == 0:
-                    raise NotFoundError(f"Obj {r.name}:{r.version} not found")
-                obj = objs[0]
-                val = json.loads(obj.val_dump)
-                root_val_cache[cache_key] = val
-            return val
+                parameters[object_id_param_key] = ref.name
+                parameters[version_param_key] = ref.version
+
+            if len(conds) > 0:
+                conditions = [_combine_conditions(conds, "OR")]
+                objs = self._select_objs_query(
+                    ref.project_id, conditions=conditions, parameters=parameters
+                )
+                for obj in objs:
+                    root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
+
+            return [root_val_cache[make_ref_cache_key(ref)] for ref in refs]
 
         # Represents work left to do for resolving a ref
         @dataclasses.dataclass
@@ -626,11 +638,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             or any(r.remaining_extra for r in extra_results)
         ):
             # Resolve any unresolved object refs
-            # TODO: this part could be sped up, it resolves one object at a time,
-            # but should be able to easily load all objects in one query now.
+            needed_extra_results: list[typing.Tuple[int, PartialRefResult]] = []
             for i, extra_result in enumerate(extra_results):
                 if extra_result.unresolved_obj_ref is not None:
-                    obj_root = get_object_ref_root_val(extra_result.unresolved_obj_ref)
+                    needed_extra_results.append((i, extra_result))
+
+            if len(needed_extra_results) > 0:
+                refs: list[refs_internal.InternalObjectRef] = []
+                for i, extra_result in needed_extra_results:
+                    if extra_result.unresolved_obj_ref is None:
+                        raise ValueError("Expected unresolved obj ref")
+                    refs.append(extra_result.unresolved_obj_ref)
+                obj_roots = get_object_refs_root_val(refs)
+                for (i, extra_result), obj_root in zip(needed_extra_results, obj_roots):
+                    if extra_result.unresolved_obj_ref is None:
+                        raise ValueError("Expected unresolved obj ref")
                     extra_results[i] = PartialRefResult(
                         remaining_extra=extra_result.unresolved_obj_ref.extra,
                         val=obj_root,
@@ -840,7 +862,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not conditions:
             conditions = ["1 = 1"]
 
-        conditions_part = " AND ".join(conditions)
+        conditions_part = _combine_conditions(conditions, "AND")
 
         order_by_part = "ORDER BY started_at ASC"
         if order_by is not None:
@@ -921,7 +943,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not conditions:
             conditions = ["1 = 1"]
 
-        conditions_part = " AND ".join(conditions)
+        conditions_part = _combine_conditions(conditions, "AND")
 
         limit_part = ""
         if limit != None:
@@ -1228,3 +1250,10 @@ def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
         return (True, int(digest[1:]))
     except ValueError:
         return (False, -1)
+
+
+def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
+    if operator not in ("AND", "OR"):
+        raise ValueError(f"Invalid operator: {operator}")
+    combined = f" {operator} ".join([f"({c})" for c in conditions])
+    return f"({combined})"

@@ -433,7 +433,7 @@ export const mapPanels = (
     // TODO: not yet handled
   }
   // TODO: This doesn't create "input" variables like ChildPanel does. But I think that's ok
-  // becuase it only happens at render time?
+  // because it only happens at render time?
 
   return fn(withMappedChildren, stack);
 };
@@ -493,7 +493,7 @@ export const mapPanelsAsync = async (
     // TODO: not yet handled
   }
   // TODO: This doesn't create "input" variables like ChildPanel does. But I think that's ok
-  // becuase it only happens at render time?
+  // because it only happens at render time?
 
   return fn(withMappedChildren, stack);
 };

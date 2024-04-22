@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
+import {LoadingDots} from '../../../../LoadingDots';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
@@ -126,18 +127,25 @@ const ObjectVersionPageInner: React.FC<{
           data={{
             [refExtra ? 'Parent Object' : 'Name']: (
               <>
-                {objectName} [
-                <ObjectVersionsLink
-                  entity={entityName}
-                  project={projectName}
-                  filter={{
-                    objectName,
-                  }}
-                  versionCount={objectVersionCount}
-                  neverPeek
-                  variant="secondary"
-                />
-                ]
+                {objectName}{' '}
+                {objectVersions.loading ? (
+                  <LoadingDots />
+                ) : (
+                  <>
+                    [
+                    <ObjectVersionsLink
+                      entity={entityName}
+                      project={projectName}
+                      filter={{
+                        objectName,
+                      }}
+                      versionCount={objectVersionCount}
+                      neverPeek
+                      variant="secondary"
+                    />
+                    ]
+                  </>
+                )}
               </>
             ),
             Version: <>{objectVersionIndex}</>,

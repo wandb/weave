@@ -440,7 +440,7 @@ export const opScatterSelected = makeOp({
     self: {type: 'Scatter'} as any,
   },
   returnType: inputTypes => {
-    // Note ! Somethign is wrong here. self is a ConstNode,
+    // Note ! Something is wrong here. self is a ConstNode,
     // not a type!
     // TODO: FIX!
     return inputTypes.self.type.input_node.outputType;
@@ -457,7 +457,7 @@ export const opGeoSelected = makeOp({
     self: {type: 'Geo'} as any,
   },
   returnType: inputTypes => {
-    // Note ! Somethign is wrong here. self is a ConstNode,
+    // Note ! Something is wrong here. self is a ConstNode,
     // not a type!
     // TODO: FIX!
     return inputTypes.self.type.input_node.outputType;
@@ -479,7 +479,7 @@ export const opFacetSelected = makeOp({
     self: {type: 'Facet'} as any,
   },
   returnType: inputTypes => {
-    // Note ! Somethign is wrong here. self is a ConstNode,
+    // Note ! Something is wrong here. self is a ConstNode,
     // not a type!
     // TODO: FIX!
     return inputTypes.self.type.input_node.outputType;
