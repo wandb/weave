@@ -189,6 +189,23 @@ def _apply_fn_defaults_to_inputs(
 def _transform_inputs_to_args(
     fn: typing.Callable, inputs: Mapping[str, typing.Any]
 ) -> tuple[list, dict]:
+    """
+    Transforms the inputs dictionary into positional and keyword arguments
+    based on the function's signature.
+
+    Args:
+        fn (typing.Callable): The function to transform inputs for.
+        inputs (Mapping[str, typing.Any]): The inputs dictionary.
+
+    Returns:
+        tuple[list, dict]: A tuple containing the positional arguments and
+        keyword arguments.
+
+    Raises:
+        ValueError: If the input value does not match the expected type for
+        a parameter.
+
+    """
     pos_args = []
     kw_args = {}
 
