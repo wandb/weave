@@ -186,7 +186,9 @@ def _apply_fn_defaults_to_inputs(
     return inputs
 
 
-def _transform_inputs_to_args(fn: typing.Callable, inputs: Mapping[str, typing.Any]):
+def _transform_inputs_to_args(
+    fn: typing.Callable, inputs: Mapping[str, typing.Any]
+) -> tuple[list, dict]:
     pos_args = []
     kw_args = {}
 
@@ -203,7 +205,7 @@ def _transform_inputs_to_args(fn: typing.Callable, inputs: Mapping[str, typing.A
             if input_val is None:
                 continue
             if not isinstance(input_val, tuple):
-                raise ...
+                raise ValueError(f"Expected tuple for {param_name}, got {input_val}")
             for item in input_val:
                 pos_args.append(item)
         elif param.kind == inspect.Parameter.KEYWORD_ONLY:
@@ -212,9 +214,9 @@ def _transform_inputs_to_args(fn: typing.Callable, inputs: Mapping[str, typing.A
             if input_val is None:
                 continue
             if not isinstance(input_val, dict):
-                raise ...
+                raise ValueError(f"Expected dict for {param_name}, got {input_val}")
             for key, val in input_val.items():
                 kw_args[key] = val
         else:
-            raise ...
+            raise ValueError(f"Unexpected parameter kind {param.kind} for {param_name}")
     return pos_args, kw_args
