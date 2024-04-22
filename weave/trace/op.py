@@ -41,9 +41,6 @@ class Op:
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self._watched_call(*args, **kwargs)
-
-    def _watched_call(self, *args: Any, **kwargs: Any) -> Any:
         maybe_client = graph_client_context.get_graph_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
@@ -62,8 +59,7 @@ class Op:
         )
         try:
             with run_context.current_run(run):
-                pos_args, kw_args = _transform_inputs_to_args(self.resolve_fn, inputs)
-                res = self.resolve_fn(*pos_args, **kw_args)
+                res = self.resolve_fn(*args, **kwargs)
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
@@ -184,56 +180,3 @@ def _apply_fn_defaults_to_inputs(
             elif param.kind == inspect.Parameter.VAR_KEYWORD:
                 inputs[param_name] = dict()
     return inputs
-
-
-def _transform_inputs_to_args(
-    fn: typing.Callable, inputs: Mapping[str, typing.Any]
-) -> tuple[list, dict]:
-    """
-    Transforms the inputs dictionary into positional and keyword arguments
-    based on the function's signature.
-
-    Args:
-        fn (typing.Callable): The function to transform inputs for.
-        inputs (Mapping[str, typing.Any]): The inputs dictionary.
-
-    Returns:
-        tuple[list, dict]: A tuple containing the positional arguments and
-        keyword arguments.
-
-    Raises:
-        ValueError: If the input value does not match the expected type for
-        a parameter.
-
-    """
-    pos_args = []
-    kw_args = {}
-
-    sig = inspect.signature(fn)
-    for param_name, param in sig.parameters.items():
-        if param_name not in inputs:
-            continue
-        input_val = inputs[param_name]
-        if param.kind == inspect.Parameter.POSITIONAL_ONLY:
-            pos_args.append(input_val)
-        elif param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-            pos_args.append(input_val)
-        elif param.kind == inspect.Parameter.VAR_POSITIONAL:
-            if input_val is None:
-                continue
-            if not isinstance(input_val, tuple):
-                raise ValueError(f"Expected tuple for {param_name}, got {input_val}")
-            for item in input_val:
-                pos_args.append(item)
-        elif param.kind == inspect.Parameter.KEYWORD_ONLY:
-            kw_args[param_name] = input_val
-        elif param.kind == inspect.Parameter.VAR_KEYWORD:
-            if input_val is None:
-                continue
-            if not isinstance(input_val, dict):
-                raise ValueError(f"Expected dict for {param_name}, got {input_val}")
-            for key, val in input_val.items():
-                kw_args[key] = val
-        else:
-            raise ValueError(f"Unexpected parameter kind {param.kind} for {param_name}")
-    return pos_args, kw_args
