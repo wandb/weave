@@ -185,9 +185,8 @@ def _apply_fn_defaults_to_inputs(
                 inputs[param_name] = dict()
     return inputs
 
-def _transform_inputs_to_args(
-    fn: typing.Callable, inputs: Mapping[str, typing.Any]
-):
+
+def _transform_inputs_to_args(fn: typing.Callable, inputs: Mapping[str, typing.Any]):
     pos_args = []
     kw_args = {}
 
