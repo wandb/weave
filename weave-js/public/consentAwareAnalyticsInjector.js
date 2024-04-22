@@ -358,35 +358,37 @@ function enableZendeskChat() {
     'https://static.zdassets.com/ekr/snippet.js?key=a0a3439e-c6f9-4864-8d97-4bc7bef38531';
   // the zendesk chat script explicitly needs the 'ze-snippet' ID set on the element
   // before the script loads, otherwise it doesn't work.
-  return insertScript(src, {id: 'ze-snippet'})
-    .then(() => {
-      const scriptEl = document.querySelector(`script[src="${src}"]`);
-      if (scriptEl != null) {
-        // create custom launcher
-        const customLauncher = document.createElement('div');
-        customLauncher.id = 'zendesk-launcher';
-        customLauncher.className = 'wbic-ic-chat-fill';
-        customLauncher.onclick = () => openWidget();
-        // hide default launcher and set custom launcher behavior
-        const customLauncherScript = document.createElement('script');
-        customLauncherScript.type = 'text/javascript';
-        customLauncherScript.innerHTML = `zE('webWidget', 'hide')
-      function openWidget() {
-        zE('webWidget', 'show');
-        zE('webWidget', 'open');
-        document.querySelector('#zendesk-launcher').style.display = 'none';
-      }
-      zE('webWidget:on', 'close', function() {
-        zE('webWidget', 'hide');
-        document.querySelector('#zendesk-launcher').style.display = 'block'
-      })`;
-        // include launcher and behavior after zendesk chat script loads
-        scriptEl.after(customLauncher, customLauncherScript);
-      }
-    })
-    .then(() => {
-      debugLog('Zendesk Chat initialized');
-    });
+  return (
+    insertScript(src, {id: 'ze-snippet'})
+      // .then(() => {
+      //   const scriptEl = document.querySelector(`script[src="${src}"]`);
+      //   if (scriptEl != null) {
+      //     // create custom launcher
+      //     const customLauncher = document.createElement('div');
+      //     customLauncher.id = 'zendesk-launcher';
+      //     customLauncher.className = 'wbic-ic-chat-fill';
+      //     customLauncher.onclick = () => openWidget();
+      //     // hide default launcher and set custom launcher behavior
+      //     const customLauncherScript = document.createElement('script');
+      //     customLauncherScript.type = 'text/javascript';
+      //     customLauncherScript.innerHTML = `zE('webWidget', 'hide')
+      //   function openWidget() {
+      //     zE('webWidget', 'show');
+      //     zE('webWidget', 'open');
+      //     document.querySelector('#zendesk-launcher').style.display = 'none';
+      //   }
+      //   zE('webWidget:on', 'close', function() {
+      //     zE('webWidget', 'hide');
+      //     document.querySelector('#zendesk-launcher').style.display = 'block'
+      //   })`;
+      //     // include launcher and behavior after zendesk chat script loads
+      //     scriptEl.after(customLauncher, customLauncherScript);
+      //   }
+      // })
+      .then(() => {
+        debugLog('Zendesk Chat initialized');
+      })
+  );
 }
 
 function privateAnalyticsMain() {
