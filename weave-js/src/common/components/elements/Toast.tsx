@@ -4,6 +4,7 @@ import {
   ToastContainer as ToastifyContainer,
   ToastContent,
   ToastOptions,
+  Slide,
 } from 'react-toastify';
 
 import {LegacyWBIcon} from './LegacyWBIcon';
@@ -19,6 +20,7 @@ export const ToastContainer: FC = React.memo(() => {
       hideProgressBar={true}
       className="toast-container"
       toastClassName="toast"
+      transition={Slide}
       closeButton={createElement(({closeToast}: CloseButtonProps) => (
         <LegacyWBIcon
           name="close"
