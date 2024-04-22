@@ -62,7 +62,8 @@ class Op:
         )
         try:
             with run_context.current_run(run):
-                res = self.resolve_fn(**inputs)
+                pos_args, kw_args = _transform_inputs_to_args(self.resolve_fn, inputs)
+                res = self.resolve_fn(*pos_args, **kw_args)
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
@@ -178,4 +179,43 @@ def _apply_fn_defaults_to_inputs(
         if param_name not in inputs:
             if param.default != inspect.Parameter.empty:
                 inputs[param_name] = param.default
+            if param.kind == inspect.Parameter.VAR_POSITIONAL:
+                inputs[param_name] = tuple()
+            elif param.kind == inspect.Parameter.VAR_KEYWORD:
+                inputs[param_name] = dict()
     return inputs
+
+def _transform_inputs_to_args(
+    fn: typing.Callable, inputs: Mapping[str, typing.Any]
+):
+    pos_args = []
+    kw_args = {}
+
+    sig = inspect.signature(fn)
+    for param_name, param in sig.parameters.items():
+        if param_name not in inputs:
+            continue
+        input_val = inputs[param_name]
+        if param.kind == inspect.Parameter.POSITIONAL_ONLY:
+            pos_args.append(input_val)
+        elif param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+            pos_args.append(input_val)
+        elif param.kind == inspect.Parameter.VAR_POSITIONAL:
+            if input_val is None:
+                continue
+            if not isinstance(input_val, tuple):
+                raise ...
+            for item in input_val:
+                pos_args.append(item)
+        elif param.kind == inspect.Parameter.KEYWORD_ONLY:
+            kw_args[param_name] = input_val
+        elif param.kind == inspect.Parameter.VAR_KEYWORD:
+            if input_val is None:
+                continue
+            if not isinstance(input_val, dict):
+                raise ...
+            for key, val in input_val.items():
+                kw_args[key] = val
+        else:
+            raise ...
+    return pos_args, kw_args
