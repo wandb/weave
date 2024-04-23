@@ -1,3 +1,4 @@
+import collections
 from types import AsyncGeneratorType, GeneratorType
 from typing import Callable, Any, Mapping, Optional
 import inspect
@@ -185,6 +186,96 @@ class Op:
                         finish_with_output(self.iterations)
 
             return WeaveGenerator(res)
+        elif isinstance(res, collections.abc.Iterable):
+            # Ok, here we have to somehow wrap the iterable
+            # so that we can accumulate the iterations before
+            # finishing the call. The exit conditions are:
+            # * The iterable is exhausted
+            # * The iterable raises an exception
+            # * The iterable is GC'd (early break)
+            # * The iterable is closed (early break)
+            class WeaveIterable(type(res)):  # type: ignore
+                def __init__(self, wrapped: collections.abc.Iterable) -> None:
+                    self.iterable = wrapped
+                    self.iterations: list[Any] = []
+                    self.finished = False
+
+                def __iter__(self) -> "WeaveIterable":
+                    return self
+
+                def __next__(self) -> Any:  # type: ignore
+                    try:
+                        next_val = next(self.iterable)  # type: ignore
+                        self.iterations.append(next_val)
+                        return next_val
+                    except StopIteration as e:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+                        raise e
+                    except BaseException as e:
+                        self.finished = True
+                        fail_with_partial_output(self.iterations, e)
+                        raise e
+
+                def close(self) -> None:
+                    if not self.finished:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+
+                def __del__(self) -> None:
+                    if not self.finished:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+
+                def __getattr__(self, name: str) -> Any:
+                    return getattr(self.iterable, name)
+
+            return WeaveIterable(res)
+        elif isinstance(res, collections.abc.AsyncIterable):  # type: ignore
+            # Ok, here we have to somehow wrap the iterable
+            # so that we can accumulate the iterations before
+            # finishing the call. The exit conditions are:
+            # * The iterable is exhausted
+            # * The iterable raises an exception
+            # * The iterable is GC'd (early break)
+            # * The iterable is closed (early break)
+            class WeaveAsyncIterable(type(res)):  # type: ignore
+                def __init__(self, wrapped: collections.abc.AsyncIterable) -> None:
+                    self.iterable = wrapped
+                    self.iterations: list[Any] = []
+                    self.finished = False
+
+                def __aiter__(self) -> "WeaveAsyncIterable":
+                    return self
+
+                async def __anext__(self) -> Any:  # type: ignore
+                    try:
+                        next_val = await anext(self.iterable)  # type: ignore
+                        self.iterations.append(next_val)
+                        return next_val
+                    except StopAsyncIteration as e:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+                        raise e
+                    except BaseException as e:
+                        self.finished = True
+                        fail_with_partial_output(self.iterations, e)
+                        raise e
+
+                def close(self) -> None:
+                    if not self.finished:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+
+                def __del__(self) -> None:
+                    if not self.finished:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+
+                def __getattr__(self, name: str) -> Any:
+                    return getattr(self.iterable, name)
+
+            return WeaveAsyncIterable(res)
         else:
             finish_with_output(res)
 
