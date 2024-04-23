@@ -14,32 +14,32 @@ from ..trace_server import trace_server_interface as tsi
 #                        rather than using default values ---\
 #                                                            |
 #                                                            |
-# | Example Stub                    | PosArg  | VarArg   | KwArg   | VarKwArg | Variants | Test Name                        |
-# |---------------------------------|---------|----------|---------|----------|----------|----------------------------------|
-# | fn()                            |   NO    |    NO    |  NO     |   NO     |    1     | test_fn_pos_0_var_0_kw_0_varkw_0 |
-# | fn(**kwargs)                    |   NO    |    NO    |  NO     |   YES    |    2     | test_fn_pos_0_var_0_kw_0_varkw_1 |
-# | fn(y=0)                         |   NO    |    NO    |  YES    |   NO     |    2     | test_fn_pos_0_var_0_kw_1_varkw_0 |
-# | fn(*, y)                        |   NO    |    NO    |  YES*   |   NO     |    1     | test_fn_pos_0_var_0_kw_2_varkw_0 |
-# | fn(y=0, **kwargs)               |   NO    |    NO    |  YES    |   YES    |    4 + 2 | test_fn_pos_0_var_0_kw_1_varkw_1 |
-# | fn(*, y, **kwargs)              |   NO    |    NO    |  YES*   |   YES    |    2     | test_fn_pos_0_var_0_kw_2_varkw_1 |
-# | fn(*args)                       |   NO    |    YES   |  NO     |   NO     |    2     | test_fn_pos_0_var_1_kw_0_varkw_0 |
-# | fn(*args, **kwargs)             |   NO    |    YES   |  NO     |   YES    |    4     | test_fn_pos_0_var_1_kw_0_varkw_1 |
-# | fn(*args, y=0)                  |   NO    |    YES   |  YES    |   NO     |    4     | test_fn_pos_0_var_1_kw_1_varkw_0 |
-# | fn(*args, y)                    |   NO    |    YES   |  YES*   |   NO     |    2     | test_fn_pos_0_var_1_kw_2_varkw_0 |
-# | fn(*args, y=0, **kwargs)        |   NO    |    YES   |  YES    |   YES    |    8     | test_fn_pos_0_var_1_kw_1_varkw_1 |
-# | fn(*args, y, **kwargs)          |   NO    |    YES   |  YES*   |   YES    |    4     | test_fn_pos_0_var_1_kw_2_varkw_1 |
-# | fn(x)                           |   YES   |    NO    |  NO     |   NO     |    2     | test_fn_pos_1_var_0_kw_0_varkw_0 |
-# | fn(x, **kwargs)                 |   YES   |    NO    |  NO     |   YES    |    4     | test_fn_pos_1_var_0_kw_0_varkw_1 |
-# | fn(x, y=0)                      |   YES   |    NO    |  YES    |   NO     |    4 + 1 | test_fn_pos_1_var_0_kw_1_varkw_0 |
-# | fn(x, *, y)                     |   YES   |    NO    |  YES*   |   NO     |    2     | test_fn_pos_1_var_0_kw_2_varkw_0 |
-# | fn(x, y=0, **kwargs)            |   YES   |    NO    |  YES    |   YES    |    8     | test_fn_pos_1_var_0_kw_1_varkw_1 |
-# | fn(x, *, y, **kwargs)           |   YES   |    NO    |  YES*   |   YES    |    4     | test_fn_pos_1_var_0_kw_2_varkw_1 |
-# | fn(x, *args)                    |   YES   |    YES   |  NO     |   NO     |    4 - 1 | test_fn_pos_1_var_1_kw_0_varkw_0 |
-# | fn(x, *args, **kwargs)          |   YES   |    YES   |  NO     |   YES    |    8 - 2 | test_fn_pos_1_var_1_kw_0_varkw_1 |
-# | fn(x, *args, y=0)               |   YES   |    YES   |  YES    |   NO     |    8 - 2 | test_fn_pos_1_var_1_kw_1_varkw_0 |
-# | fn(x, *args, y)                 |   YES   |    YES   |  YES*   |   NO     |    4 - 1 | test_fn_pos_1_var_1_kw_2_varkw_0 |
-# | fn(x, *args, y=0, **kwargs)     |   YES   |    YES   |  YES    |   YES    |    16 - 4| test_fn_pos_1_var_1_kw_1_varkw_1 |
-# | fn(x, *args, y, **kwargs)       |   YES   |    YES   |  YES*   |   YES    |    8 - 2 | test_fn_pos_1_var_1_kw_2_varkw_1 |
+# | Example Stub                    | PosArg  | VarArg   | KwArg   | VarKwArg | Variants |
+# |---------------------------------|---------|----------|---------|----------|----------|
+# | fn()                            |   NO    |    NO    |  NO     |   NO     |    1     |
+# | fn(**kwargs)                    |   NO    |    NO    |  NO     |   YES    |    2     |
+# | fn(y=0)                         |   NO    |    NO    |  YES    |   NO     |    2     |
+# | fn(*, y)                        |   NO    |    NO    |  YES*   |   NO     |    1     |
+# | fn(y=0, **kwargs)               |   NO    |    NO    |  YES    |   YES    |    4 + 2 |
+# | fn(*, y, **kwargs)              |   NO    |    NO    |  YES*   |   YES    |    2     |
+# | fn(*args)                       |   NO    |    YES   |  NO     |   NO     |    2     |
+# | fn(*args, **kwargs)             |   NO    |    YES   |  NO     |   YES    |    4     |
+# | fn(*args, y=0)                  |   NO    |    YES   |  YES    |   NO     |    4     |
+# | fn(*args, y)                    |   NO    |    YES   |  YES*   |   NO     |    2     |
+# | fn(*args, y=0, **kwargs)        |   NO    |    YES   |  YES    |   YES    |    8     |
+# | fn(*args, y, **kwargs)          |   NO    |    YES   |  YES*   |   YES    |    4     |
+# | fn(x)                           |   YES   |    NO    |  NO     |   NO     |    2     |
+# | fn(x, **kwargs)                 |   YES   |    NO    |  NO     |   YES    |    4     |
+# | fn(x, y=0)                      |   YES   |    NO    |  YES    |   NO     |    4 + 1 |
+# | fn(x, *, y)                     |   YES   |    NO    |  YES*   |   NO     |    2     |
+# | fn(x, y=0, **kwargs)            |   YES   |    NO    |  YES    |   YES    |    8     |
+# | fn(x, *, y, **kwargs)           |   YES   |    NO    |  YES*   |   YES    |    4     |
+# | fn(x, *args)                    |   YES   |    YES   |  NO     |   NO     |    4 - 1 |
+# | fn(x, *args, **kwargs)          |   YES   |    YES   |  NO     |   YES    |    8 - 2 |
+# | fn(x, *args, y=0)               |   YES   |    YES   |  YES    |   NO     |    8 - 2 |
+# | fn(x, *args, y)                 |   YES   |    YES   |  YES*   |   NO     |    4 - 1 |
+# | fn(x, *args, y=0, **kwargs)     |   YES   |    YES   |  YES    |   YES    |    16 - 4|
+# | fn(x, *args, y, **kwargs)       |   YES   |    YES   |  YES*   |   YES    |    8 - 2 |
 #
 # Within each stub, we will have the following variants:
 # * PosArg: If YES, 2x: both with and without keyword
@@ -56,14 +56,14 @@ from ..trace_server import trace_server_interface as tsi
 @pytest.mark.parametrize(
     "fn, arg_variations",
     [
-        # | fn()                            |   NO    |    NO    |  NO     |   NO     |    1     | test_fn_pos_0_var_0_kw_0_varkw_0 |
+        # | fn()                            |   NO    |    NO    |  NO     |   NO     |    1     |
         (
             (lambda: {}),
             [
                 ((), {}),
             ],
         ),
-        # | fn(**kwargs)                    |   NO    |    NO    |  NO     |   YES    |    2     | test_fn_pos_0_var_0_kw_0_varkw_1 |
+        # | fn(**kwargs)                    |   NO    |    NO    |  NO     |   YES    |    2     |
         (
             (lambda **kwargs: {"kwargs": kwargs}),
             [
@@ -71,7 +71,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((), {"a": 1}),
             ],
         ),
-        # | fn(y=0)                         |   NO    |    NO    |  YES    |   NO     |    2     | test_fn_pos_0_var_0_kw_1_varkw_0 |
+        # | fn(y=0)                         |   NO    |    NO    |  YES    |   NO     |    2     |
         (
             (lambda y=0: {"y": y}),
             [
@@ -79,14 +79,14 @@ from ..trace_server import trace_server_interface as tsi
                 ((), {"y": 1}),
             ],
         ),
-        # | fn(*, y)                        |   NO    |    NO    |  YES*   |   NO     |    1     | test_fn_pos_0_var_0_kw_2_varkw_0 |
+        # | fn(*, y)                        |   NO    |    NO    |  YES*   |   NO     |    1     |
         (
             (lambda *, y=0: {"y": y}),
             [
                 ((), {"y": 1}),
             ],
         ),
-        # | fn(y=0, **kwargs)               |   NO    |    NO    |  YES    |   YES    |    4 + 2 | test_fn_pos_0_var_0_kw_1_varkw_1 |
+        # | fn(y=0, **kwargs)               |   NO    |    NO    |  YES    |   YES    |    4 + 2 |
         (
             (lambda y=0, **kwargs: {"y": y, "kwargs": kwargs}),
             [
@@ -98,7 +98,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((), {"y": 1, "a": 2}),
             ],
         ),
-        # | fn(*, y, **kwargs)              |   NO    |    NO    |  YES*   |   YES    |    2     | test_fn_pos_0_var_0_kw_2_varkw_1 |
+        # | fn(*, y, **kwargs)              |   NO    |    NO    |  YES*   |   YES    |    2     |
         (
             (lambda *, y, **kwargs: {"y": y, "kwargs": kwargs}),
             [
@@ -106,7 +106,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((), {"y": 1, "a": 2}),
             ],
         ),
-        # | fn(*args)                       |   NO    |    YES   |  NO     |   NO     |    2     | test_fn_pos_0_var_1_kw_0_varkw_0 |
+        # | fn(*args)                       |   NO    |    YES   |  NO     |   NO     |    2     |
         (
             (lambda *args: {"args": list(args)}),
             [
@@ -114,7 +114,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {}),
             ],
         ),
-        # | fn(*args, **kwargs)             |   NO    |    YES   |  NO     |   YES    |    4     | test_fn_pos_0_var_1_kw_0_varkw_1 |
+        # | fn(*args, **kwargs)             |   NO    |    YES   |  NO     |   YES    |    4     |
         (
             (lambda *args, **kwargs: {"args": list(args), "kwargs": kwargs}),
             [
@@ -124,7 +124,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"a": 2}),
             ],
         ),
-        # | fn(*args, y=0)                  |   NO    |    YES   |  YES    |   NO     |    4     | test_fn_pos_0_var_1_kw_1_varkw_0 |
+        # | fn(*args, y=0)                  |   NO    |    YES   |  YES    |   NO     |    4     |
         (
             (lambda *args, y=0: {"args": list(args), "y": y}),
             [
@@ -134,7 +134,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"y": 2}),
             ],
         ),
-        # | fn(*args, y)                    |   NO    |    YES   |  YES*   |   NO     |    2     | test_fn_pos_0_var_1_kw_2_varkw_0 |
+        # | fn(*args, y)                    |   NO    |    YES   |  YES*   |   NO     |    2     |
         (
             (lambda *args, y: {"args": list(args), "y": y}),
             [
@@ -142,7 +142,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"y": 2}),
             ],
         ),
-        # | fn(*args, y=0, **kwargs)        |   NO    |    YES   |  YES    |   YES    |    8     | test_fn_pos_0_var_1_kw_1_varkw_1 |
+        # | fn(*args, y=0, **kwargs)        |   NO    |    YES   |  YES    |   YES    |    8     |
         (
             (
                 lambda *args, y=0, **kwargs: {
@@ -162,7 +162,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"y": 2, "a": 2}),
             ],
         ),
-        # | fn(*args, y, **kwargs)          |   NO    |    YES   |  YES*   |   YES    |    4     | test_fn_pos_0_var_1_kw_2_varkw_1 |
+        # | fn(*args, y, **kwargs)          |   NO    |    YES   |  YES*   |   YES    |    4     |
         (
             (
                 lambda *args, y, **kwargs: {
@@ -178,7 +178,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"y": 2, "a": 3}),
             ],
         ),
-        # | fn(x)                           |   YES   |    NO    |  NO     |   NO     |    2     | test_fn_pos_1_var_0_kw_0_varkw_0 |
+        # | fn(x)                           |   YES   |    NO    |  NO     |   NO     |    2     |
         (
             (lambda x: {"x": x}),
             [
@@ -186,7 +186,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {}),
             ],
         ),
-        # | fn(x, **kwargs)                 |   YES   |    NO    |  NO     |   YES    |    4     | test_fn_pos_1_var_0_kw_0_varkw_1 |
+        # | fn(x, **kwargs)                 |   YES   |    NO    |  NO     |   YES    |    4     |
         (
             (lambda x, **kwargs: {"x": x, "kwargs": kwargs}),
             [
@@ -196,7 +196,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"a": 2}),
             ],
         ),
-        # | fn(x, y=0)                      |   YES   |    NO    |  YES    |   NO     |    4 + 1 | test_fn_pos_1_var_0_kw_1_varkw_0 |
+        # | fn(x, y=0)                      |   YES   |    NO    |  YES    |   NO     |    4 + 1 |
         (
             (lambda x, y=0: {"x": x, "y": y}),
             [
@@ -207,7 +207,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"y": 2}),
             ],
         ),
-        # | fn(x, *, y)                     |   YES   |    NO    |  YES*   |   NO     |    2     | test_fn_pos_1_var_0_kw_2_varkw_0 |
+        # | fn(x, *, y)                     |   YES   |    NO    |  YES*   |   NO     |    2     |
         (
             (lambda x, *, y: {"x": x, "y": y}),
             [
@@ -215,7 +215,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"y": 2}),
             ],
         ),
-        # | fn(x, y=0, **kwargs)            |   YES   |    NO    |  YES    |   YES    |    8     | test_fn_pos_1_var_0_kw_1_varkw_1 |
+        # | fn(x, y=0, **kwargs)            |   YES   |    NO    |  YES    |   YES    |    8     |
         (
             (lambda x, y=0, **kwargs: {"x": x, "y": y, "kwargs": kwargs}),
             [
@@ -229,7 +229,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"y": 2, "a": 3}),
             ],
         ),
-        # | fn(x, *, y, **kwargs)           |   YES   |    NO    |  YES*   |   YES    |    4     | test_fn_pos_1_var_0_kw_2_varkw_1 |
+        # | fn(x, *, y, **kwargs)           |   YES   |    NO    |  YES*   |   YES    |    4     |
         (
             (lambda x, *, y, **kwargs: {"x": x, "y": y, "kwargs": kwargs}),
             [
@@ -239,7 +239,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1,), {"y": 2, "a": 3}),
             ],
         ),
-        # | fn(x, *args)                    |   YES   |    YES   |  NO     |   NO     |    4 - 1  | test_fn_pos_1_var_1_kw_0_varkw_0 |
+        # | fn(x, *args)                    |   YES   |    YES   |  NO     |   NO     |    4 - 1 |
         (
             (lambda x, *args: {"x": x, "args": list(args)}),
             [
@@ -255,7 +255,7 @@ from ..trace_server import trace_server_interface as tsi
                 ),
             ],
         ),
-        # | fn(x, *args, **kwargs)          |   YES   |    YES   |  NO     |   YES    |    8 - 2  | test_fn_pos_1_var_1_kw_0_varkw_1 |
+        # | fn(x, *args, **kwargs)          |   YES   |    YES   |  NO     |   YES    |    8 - 2 |
         (
             (lambda x, *args, **kwargs: {"x": x, "args": list(args), "kwargs": kwargs}),
             [
@@ -275,7 +275,7 @@ from ..trace_server import trace_server_interface as tsi
                 ((1, 2), {"a": 3}),
             ],
         ),
-        # | fn(x, *args, y=0)               |   YES   |    YES   |  YES    |   NO     |    8 - 2  | test_fn_pos_1_var_1_kw_1_varkw_0 |
+        # | fn(x, *args, y=0)               |   YES   |    YES   |  YES    |   NO     |    8 - 2 |
         (
             (lambda x, *args, y=0: {"x": x, "args": list(args), "y": y}),
             [
@@ -301,7 +301,7 @@ from ..trace_server import trace_server_interface as tsi
                 ),
             ],
         ),
-        # | fn(x, *args, y)                 |   YES   |    YES   |  YES*   |   NO     |    4 - 1  | test_fn_pos_1_var_1_kw_2_varkw_0 |
+        # | fn(x, *args, y)                 |   YES   |    YES   |  YES*   |   NO     |    4 - 1 |
         (
             (lambda x, *args, y: {"x": x, "args": list(args), "y": y}),
             [
@@ -317,7 +317,7 @@ from ..trace_server import trace_server_interface as tsi
                 ),
             ],
         ),
-        # | fn(x, *args, y=0, **kwargs)     |   YES   |    YES   |  YES    |   YES    |    16 - 4 | test_fn_pos_1_var_1_kw_1_varkw_1 |
+        # | fn(x, *args, y=0, **kwargs)     |   YES   |    YES   |  YES    |   YES    |    16 - 4|
         (
             (
                 lambda x, *args, y=0, **kwargs: {
@@ -330,7 +330,7 @@ from ..trace_server import trace_server_interface as tsi
             [
                 ((), {"x": 1}),
                 ((1,), {}),
-                # ((1,), {"x": 2}),
+                # ((1,), {"x": 2}), # Invalid
                 (
                     (
                         1,
@@ -340,7 +340,7 @@ from ..trace_server import trace_server_interface as tsi
                 ),
                 ((), {"x": 1, "y": 2}),
                 ((1,), {"y": 2}),
-                # ((1,), {"x": 2, "y": 3}),
+                # ((1,), {"x": 2, "y": 3}), # Invalid
                 (
                     (
                         1,
@@ -350,7 +350,7 @@ from ..trace_server import trace_server_interface as tsi
                 ),
                 ((), {"x": 1, "a": 2}),
                 ((1,), {"a": 2}),
-                # ((1,), {"x": 2, "a": 3}),
+                # ((1,), {"x": 2, "a": 3}), # Invalid
                 (
                     (
                         1,
@@ -360,7 +360,7 @@ from ..trace_server import trace_server_interface as tsi
                 ),
                 ((), {"x": 1, "y": 2, "a": 3}),
                 ((1,), {"y": 2, "a": 3}),
-                # ((1,), {"x": 2, "y": 3, "a": 4}),
+                # ((1,), {"x": 2, "y": 3, "a": 4}), # Invalid
                 (
                     (
                         1,
@@ -370,7 +370,7 @@ from ..trace_server import trace_server_interface as tsi
                 ),
             ],
         ),
-        # | fn(x, *args, y, **kwargs)       |   YES   |    YES   |  YES*   |   YES    |    8 - 2 | test_fn_pos_1_var_1_kw_2_varkw_1 |
+        # | fn(x, *args, y, **kwargs)       |   YES   |    YES   |  YES*   |   YES    |    8 - 2|
         (
             (
                 lambda x, *args, y, **kwargs: {
@@ -383,7 +383,7 @@ from ..trace_server import trace_server_interface as tsi
             [
                 ((), {"x": 1, "y": 2}),
                 ((1,), {"y": 2}),
-                # ((1,), {"x": 2, "y": 3}),
+                # ((1,), {"x": 2, "y": 3}), # Invalid
                 (
                     (
                         1,
@@ -393,7 +393,7 @@ from ..trace_server import trace_server_interface as tsi
                 ),
                 ((), {"x": 1, "y": 2, "a": 3}),
                 ((1,), {"y": 2, "a": 3}),
-                # ((1,), {"x": 2, "y": 3, "a": 4}),
+                # ((1,), {"x": 2, "y": 3, "a": 4}), # Invalid
                 (
                     (
                         1,
@@ -427,6 +427,7 @@ def test_general_arg_variations(client, fn, arg_variations):
         assert len(res.calls) == ndx + 1
         assert res.calls[ndx].inputs == fn_res
         assert res.calls[ndx].output == fn_res
+
 
 # Below are specific tests for each of the 24 stubs
 # While the above test is more general and cover all possible variations, the below tests are more specific and
