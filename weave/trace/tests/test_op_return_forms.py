@@ -479,9 +479,11 @@ def test_op_return_sync_iterator_exception(client):
     def fn():
         return MyIterator()
 
-    for item in fn():
-        if item == 5:
-            break
+    try:
+        for item in fn():
+            pass
+    except Exception:
+        pass
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -515,9 +517,11 @@ async def test_op_return_async_iterator_exception(client):
     def fn():
         return MyAsyncIterator()
 
-    async for item in fn():
-        if item == 5:
-            break
+    try:
+        async for item in fn():
+            pass
+    except Exception:
+        pass
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
