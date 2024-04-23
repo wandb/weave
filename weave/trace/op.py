@@ -1,3 +1,4 @@
+from types import GeneratorType
 from typing import Callable, Any, Mapping, Optional
 import inspect
 import functools
@@ -57,15 +58,29 @@ class Op:
         run = client.create_call(
             self, parent_run, inputs_with_defaults, attributes=attributes
         )
+
+        def finish_with_output(output: Any) -> None:
+            client.finish_call(run, output)
+            if not parent_run:
+                print_call_link(run)
+
+        def fail_with_error(error: BaseException) -> None:
+            client.fail_call(run, error)
+            if not parent_run:
+                print_call_link(run)
+
+        def fail_with_partial_output(output: Any, error: BaseException) -> None:
+            client.finish_call(run, output, error)
+            if not parent_run:
+                print_call_link(run)
+
         try:
             with run_context.current_run(run):
                 res = self.resolve_fn(*args, **kwargs)
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
-            client.fail_call(run, e)
-            if not parent_run:
-                print_call_link(run)
+            fail_with_error(e)
             raise
         # We cannot let BoxedNone or BoxedBool escape into the user's code
         # since they cannot pass instance checks for None or bool.
@@ -77,24 +92,58 @@ class Op:
 
             async def _run_async() -> Coroutine[Any, Any, Any]:
                 try:
-                    awaited_res = res
                     with run_context.current_run(run):
-                        output = await awaited_res
-                    client.finish_call(run, output)
-                    if not parent_run:
-                        print_call_link(run)
-                    return output
+                        output = await res
                 except BaseException as e:
-                    client.fail_call(run, e)
-                    if not parent_run:
-                        print_call_link(run)
+                    fail_with_error(e)
                     raise
+                finish_with_output(output)
+                return output
 
             return _run_async()
+        elif inspect.isgenerator(res):
+            # We want to accumulate the iterations of the generator
+            # before finishing the call. The exit conditions are:
+            # * The generator is exhausted
+            # * The generator raises an exception
+            # * The generator is GC'd (early break)
+            # * The generator is closed (early break)
+            class WeaveGenerator:
+                def __init__(self, gen: GeneratorType) -> None:
+                    self.gen = gen
+                    self.iterations: list[Any] = []
+                    self.finished = False
+
+                def __iter__(self) -> "WeaveGenerator":
+                    return self
+
+                def __next__(self) -> Any:
+                    try:
+                        next_val = next(self.gen)
+                        self.iterations.append(next_val)
+                        return next_val
+                    except StopIteration as e:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+                        raise e
+                    except BaseException as e:
+                        self.finished = True
+                        fail_with_partial_output(self.iterations, e)
+                        raise e
+
+                def close(self) -> None:
+                    if not self.finished:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+
+                def __del__(self) -> None:
+                    if not self.finished:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+
+            return WeaveGenerator(res)
         else:
-            client.finish_call(run, res)
-            if not parent_run:
-                print_call_link(run)
+            finish_with_output(res)
 
         return res
 

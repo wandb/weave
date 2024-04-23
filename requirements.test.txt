@@ -7,6 +7,7 @@ pytest-timeout>=2.1.0
 pytest-xdist>=3.1.0
 pytest-rerunfailures>=11.1.2
 pytest-timestamper>=0.0.9
+pytest-asyncio>=0.23.6
 plotly>=5.13.0
 nbmake>=0.5
 bokeh==3.0.3 # pinning to help speed up CI

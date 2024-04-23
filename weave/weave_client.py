@@ -478,7 +478,25 @@ class WeaveClient:
         return call
 
     @trace_sentry.global_trace_sentry.watch()
-    def finish_call(self, call: Call, output: Any) -> None:
+    def finish_call(
+        self,
+        call: Call,
+        output: Any,
+        exception: typing.Optional[BaseException] = None,
+    ) -> None:
+        """
+        Finish a call and update the call's output, exception, and summary.
+
+        Args:
+            call (Call): The call object representing the finished call.
+            output (Any): The output of the call.
+            exception (Optional[BaseException]): The exception raised during the call, if any. Defaults to None.
+                    This is almost always None. Most of the time, you want to use `fail_call` instead, however
+                    sometimes you have a partial output (such as when a generator fails after some initial iterations)
+
+        Returns:
+            None
+        """
         self.save_nested_objects(output)
         output = map_to_refs(output)
         call.output = output
@@ -491,6 +509,11 @@ class WeaveClient:
             summary["usage"] = {}
             summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
 
+        exception_str = None
+        if exception:
+            exception_str = exception_to_json_str(exception)
+            call.exception = exception_str
+
         self.server.call_end(
             CallEndReq(
                 end=EndedCallSchemaForInsert(
@@ -498,6 +521,7 @@ class WeaveClient:
                     id=call.id,  # type: ignore
                     ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
                     output=to_json(output, self._project_id(), self.server),
+                    exception=exception_str,
                     summary=summary,
                 )
             )
