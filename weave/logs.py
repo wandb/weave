@@ -225,7 +225,7 @@ def configure_logger() -> None:
         return
     # Disable ddtrace logs, not sure why they're turned on.
     ddtrace_logs = logging.getLogger("ddtrace")
-    ddtrace_logs.setLevel(logging.ERROR)
+    ddtrace_logs.setLevel(logging.INFO)
 
     logger = logging.getLogger("root")
     logger.setLevel(env_log_level())
