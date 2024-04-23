@@ -4,13 +4,14 @@ import weave
 
 from ...trace_server import trace_server_interface as tsi
 
+
 def test_op_return_sync_empty(client):
     @weave.op()
     def fn():
         return
-    
+
     fn()
-    
+
     res = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
@@ -20,15 +21,16 @@ def test_op_return_sync_empty(client):
     assert res.calls[0].op_name == fn.ref.uri()
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == None
+
 
 @pytest.mark.asyncio
 async def test_op_return_async_empty(client):
     @weave.op()
     async def fn():
         return
-    
+
     await fn()
-    
+
     res = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
@@ -39,13 +41,14 @@ async def test_op_return_async_empty(client):
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == None
 
+
 def test_op_return_sync_obj(client):
     @weave.op()
     def fn():
         return 1
-    
+
     fn()
-    
+
     res = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
@@ -55,15 +58,16 @@ def test_op_return_sync_obj(client):
     assert res.calls[0].op_name == fn.ref.uri()
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == 1
+
 
 @pytest.mark.asyncio
 async def test_op_return_async_obj(client):
     @weave.op()
     async def fn():
         return 1
-    
+
     await fn()
-    
+
     res = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
@@ -73,6 +77,7 @@ async def test_op_return_async_obj(client):
     assert res.calls[0].op_name == fn.ref.uri()
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == 1
+
 
 def test_op_return_sync_iterator(client):
     ...
@@ -81,7 +86,7 @@ def test_op_return_sync_iterator(client):
 
     #     def __iter__(self):
     #         return self
-        
+
     #     def __next__(self):
     #         if self.size == 0:
     #             raise StopIteration
@@ -91,9 +96,9 @@ def test_op_return_sync_iterator(client):
     # @weave.op()
     # def fn():
     #     return MyIterator()
-    
+
     # fn()
-    
+
     # res = client.server.calls_query(
     #     tsi.CallsQueryReq(
     #         project_id=client._project_id(),
@@ -104,8 +109,10 @@ def test_op_return_sync_iterator(client):
     # assert res.calls[0].inputs == {}
     # assert res.calls[0].output == list(range(9, -1, -1))
 
+
 def test_op_return_async_iterator():
     ...
+
 
 def test_op_return_sync_generator(client):
     @weave.op()
@@ -114,10 +121,10 @@ def test_op_return_sync_generator(client):
         while size > 0:
             size -= 1
             yield size
-    
+
     for item in fn():
         pass
-    
+
     res = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
@@ -128,6 +135,30 @@ def test_op_return_sync_generator(client):
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
+
+@pytest.mark.asyncio
+async def test_op_return_async_generator(client):
+    @weave.op()
+    async def fn():
+        size = 10
+        while size > 0:
+            size -= 1
+            yield size
+
+    async for item in fn():
+        pass
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert res.calls[0].op_name == fn.ref.uri()
+    assert res.calls[0].inputs == {}
+    assert res.calls[0].output == list(range(9, -1, -1))
+
+
 def test_op_return_sync_generator_never_iter(client):
     @weave.op()
     def fn():
@@ -135,9 +166,9 @@ def test_op_return_sync_generator_never_iter(client):
         while size > 0:
             size -= 1
             yield size
-    
+
     fn()
-    
+
     res = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
@@ -148,6 +179,29 @@ def test_op_return_sync_generator_never_iter(client):
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == []
 
+
+@pytest.mark.asyncio
+async def test_op_return_async_generator_never_iter(client):
+    @weave.op()
+    async def fn():
+        size = 10
+        while size > 0:
+            size -= 1
+            yield size
+
+    fn()
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert res.calls[0].op_name == fn.ref.uri()
+    assert res.calls[0].inputs == {}
+    assert res.calls[0].output == []
+
+
 def test_op_return_sync_generator_partial(client):
     @weave.op()
     def fn():
@@ -155,11 +209,11 @@ def test_op_return_sync_generator_partial(client):
         while size > 0:
             size -= 1
             yield size
-    
+
     for item in fn():
         if item == 5:
             break
-    
+
     res = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
@@ -170,6 +224,31 @@ def test_op_return_sync_generator_partial(client):
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
+
+@pytest.mark.asyncio
+async def test_op_return_async_generator_partial(client):
+    @weave.op()
+    async def fn():
+        size = 10
+        while size > 0:
+            size -= 1
+            yield size
+
+    async for item in fn():
+        if item == 5:
+            break
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert res.calls[0].op_name == fn.ref.uri()
+    assert res.calls[0].inputs == {}
+    assert res.calls[0].output == list(range(9, 4, -1))
+
+
 def test_op_return_sync_generator_exception(client):
     @weave.op()
     def fn():
@@ -179,14 +258,13 @@ def test_op_return_sync_generator_exception(client):
             yield size
             if size == 5:
                 raise Exception("test")
-            
-    
+
     try:
         for item in fn():
             pass
     except Exception:
         pass
-    
+
     res = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
@@ -198,5 +276,31 @@ def test_op_return_sync_generator_exception(client):
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception != None
 
-def test_op_return_async_generator():
-    ...
+
+@pytest.mark.asyncio
+async def test_op_return_async_generator_exception(client):
+    @weave.op()
+    async def fn():
+        size = 10
+        while size > 0:
+            size -= 1
+            yield size
+            if size == 5:
+                raise Exception("test")
+
+    try:
+        async for item in fn():
+            pass
+    except Exception:
+        pass
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert res.calls[0].op_name == fn.ref.uri()
+    assert res.calls[0].inputs == {}
+    assert res.calls[0].output == list(range(9, 4, -1))
+    assert res.calls[0].exception != None

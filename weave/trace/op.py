@@ -1,4 +1,4 @@
-from types import GeneratorType
+from types import AsyncGeneratorType, GeneratorType
 from typing import Callable, Any, Mapping, Optional
 import inspect
 import functools
@@ -101,6 +101,48 @@ class Op:
                 return output
 
             return _run_async()
+        elif inspect.isasyncgen(res):
+            # We want to accumulate the iterations of the async generator
+            # before finishing the call. The exit conditions are:
+            # * The generator is exhausted
+            # * The generator raises an exception
+            # * The generator is GC'd (early break)
+            # * The generator is closed (early break)
+            class WeaveAsyncGenerator:
+                def __init__(self, gen: AsyncGeneratorType) -> None:
+                    self.gen = gen
+                    self.iterations: list[Any] = []
+                    self.finished = False
+
+                def __aiter__(self) -> "WeaveAsyncGenerator":
+                    return self
+
+                async def __anext__(self) -> Any:
+                    try:
+                        with run_context.current_run(run):
+                            next_val = await self.gen.__anext__()
+                        self.iterations.append(next_val)
+                        return next_val
+                    except StopAsyncIteration as e:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+                        raise e
+                    except BaseException as e:
+                        self.finished = True
+                        fail_with_partial_output(self.iterations, e)
+                        raise e
+
+                def close(self) -> None:
+                    if not self.finished:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+
+                def __del__(self) -> None:
+                    if not self.finished:
+                        self.finished = True
+                        finish_with_output(self.iterations)
+
+            return WeaveAsyncGenerator(res)
         elif inspect.isgenerator(res):
             # We want to accumulate the iterations of the generator
             # before finishing the call. The exit conditions are:
@@ -119,7 +161,8 @@ class Op:
 
                 def __next__(self) -> Any:
                     try:
-                        next_val = next(self.gen)
+                        with run_context.current_run(run):
+                            next_val = next(self.gen)
                         self.iterations.append(next_val)
                         return next_val
                     except StopIteration as e:
