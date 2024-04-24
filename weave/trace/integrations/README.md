@@ -7,9 +7,13 @@ This directory contains various integrations for Weave. As of this writing, ther
 **Patch Methods**
 
 - `autopatching`: autopatching is done automatically for the user when initializing Weave.
-- Notes:
-  - we might want to expose an `autopatch` method that can be called indpendent of initialization for better code ergonomics.
-  - we will likely (but have not) exposed a way to configure the autopatcher (similar to DataDog's `patch` method) \* `manual`: When patching is not sufficient (or possible), we can expose utilities for the user. For example, with an orchestration framework such as `Langchain`, we will provide a callback to fit into their program architecture more cleanly.
+
+  - Notes:
+
+    - we might want to expose an `autopatch` method that can be called indpendent of initialization for better code ergonomics.
+    - we will likely (but have not) exposed a way to configure the autopatcher (similar to DataDog's `patch` method)
+
+- `manual`: When patching is not sufficient (or possible), we can expose utilities for the user. For example, with an orchestration framework such as `Langchain`, we will provide a callback to fit into their program architecture more cleanly.
 
 **Library Style**
 
