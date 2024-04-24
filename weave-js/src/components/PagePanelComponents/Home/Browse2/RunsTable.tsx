@@ -4,6 +4,7 @@ import {
   DataGridPro,
   GridColDef,
   GridColumnGroup,
+  GridColumnVisibilityModel,
   GridRowSelectionModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
@@ -387,8 +388,19 @@ export const RunsTable: FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedRefCols, client, tableStats]);
 
-  const {allShown, columnVisibilityModel, forceShowAll, setForceShowAll} =
+  const [forceShowAll, setForceShowAll] = useState(false);
+  const {allShown, columnVisibilityModel: defaultVisibilityModel} =
     useColumnVisibility(tableStats, isSingleOpVersion);
+  const [columnVisibilityModel, setColumnVisibilityModel] =
+    useState<GridColumnVisibilityModel>(defaultVisibilityModel);
+
+  useEffect(() => {
+    if (forceShowAll) {
+      // If not specified, columns default to visible.
+      setColumnVisibilityModel({});
+    }
+  }, [forceShowAll]);
+
   const showVisibilityAlert = !allShown && !forceShowAll;
 
   // Highlight table row if it matches peek drawer.
@@ -849,11 +861,8 @@ export const RunsTable: FC<{
         sorting: {
           sortModel: [{field: 'timestampMs', sort: 'desc'}],
         },
-        columns: {
-          columnVisibilityModel,
-        },
       };
-    }, [loading, columnVisibilityModel]);
+    }, [loading]);
 
   // Various interactions (correctly) cause new data to be loaded, which causes
   // a trickle of state updates. However, if the ultimate state is the same,
@@ -904,6 +913,10 @@ export const RunsTable: FC<{
         loading={loading}
         rows={tableData}
         initialState={initialState}
+        onColumnVisibilityModelChange={newModel =>
+          setColumnVisibilityModel(newModel)
+        }
+        columnVisibilityModel={columnVisibilityModel}
         rowHeight={38}
         columns={columns.cols as any}
         experimentalFeatures={{columnGrouping: true}}
