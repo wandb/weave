@@ -176,6 +176,6 @@ def _apply_fn_defaults_to_inputs(
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
         if param_name not in inputs:
-            if param.default != inspect.Parameter.empty:
+            if param.default != inspect.Parameter.empty and param.default is not None:
                 inputs[param_name] = param.default
     return inputs

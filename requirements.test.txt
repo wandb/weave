@@ -21,3 +21,7 @@ supervisor>=4.2.5
 clickhouse_connect==0.7.0
 uvicorn>=0.27.0
 fastapi>=0.110.0
+
+# Integrations
+pytest-recording==0.13.1
+mistralai>=0.1.8

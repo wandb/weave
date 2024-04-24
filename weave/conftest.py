@@ -306,6 +306,7 @@ def strict_op_saving():
 
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+    inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
     tsi: trace_server_interface.TraceServerInterface
     if weave_server_flag == "sqlite":
@@ -328,9 +329,12 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
             weave_server_flag
         )
         tsi = remote_server
+    elif weave_server_flag == ("prod"):
+        inited_client = weave_init.init_weave("dev_testing")
 
-    client = weave_client.WeaveClient("shawn", "test-project", tsi)
-    inited_client = weave_init.InitializedClient(client)
+    if inited_client is None:
+        client = weave_client.WeaveClient("shawn", "test-project", tsi)
+        inited_client = weave_init.InitializedClient(client)
     try:
         yield inited_client.client
     finally:
