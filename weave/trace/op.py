@@ -41,9 +41,6 @@ class Op:
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self._watched_call(*args, **kwargs)
-
-    def _watched_call(self, *args: Any, **kwargs: Any) -> Any:
         maybe_client = graph_client_context.get_graph_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
@@ -62,7 +59,7 @@ class Op:
         )
         try:
             with run_context.current_run(run):
-                res = self.resolve_fn(**inputs)
+                res = self.resolve_fn(*args, **kwargs)
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
@@ -178,4 +175,8 @@ def _apply_fn_defaults_to_inputs(
         if param_name not in inputs:
             if param.default != inspect.Parameter.empty:
                 inputs[param_name] = param.default
+            if param.kind == inspect.Parameter.VAR_POSITIONAL:
+                inputs[param_name] = tuple()
+            elif param.kind == inspect.Parameter.VAR_KEYWORD:
+                inputs[param_name] = dict()
     return inputs
