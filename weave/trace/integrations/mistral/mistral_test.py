@@ -8,9 +8,6 @@ from .mistral import mistral_patcher
 
 from typing import Generator
 
-# Add to some docs, to re-record, and run:
-# `MISTRAL_API_KEY=... pytest --weave-server=prod --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart`
-
 
 @pytest.fixture(scope="module")
 def patch_mistral() -> Generator[None, None, None]:

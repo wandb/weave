@@ -1,23 +1,29 @@
 from typing import Any, Callable, Optional
 
-class Patcher():
-    def attempt_patch(self):
-        pass
 
-    def undo_patch(self):
-        pass
+class Patcher:
+    def attempt_patch(self) -> bool:
+        raise NotImplementedError()
+
+    def undo_patch(self) -> bool:
+        raise NotImplementedError()
+
 
 class MultiPatcher(Patcher):
     def __init__(self, patchers: list[Patcher]) -> None:
         self.patchers = patchers
 
-    def attempt_patch(self) -> None:
+    def attempt_patch(self) -> bool:
+        all_successful = True
         for patcher in self.patchers:
-            patcher.attempt_patch()
+            all_successful = all_successful and patcher.attempt_patch()
+        return all_successful
 
-    def undo_patch(self) -> None:
+    def undo_patch(self) -> bool:
+        all_successful = True
         for patcher in self.patchers:
-            patcher.undo_patch()
+            all_successful = all_successful and patcher.undo_patch()
+        return all_successful
 
 
 class _SymbolTarget:
@@ -26,7 +32,7 @@ class _SymbolTarget:
         self.attr = attr
 
 
-class SymbolPatcher:
+class SymbolPatcher(Patcher):
     _get_base_symbol: Callable
     _attribute_name: str
     _make_new_value: Callable

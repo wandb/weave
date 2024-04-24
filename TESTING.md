@@ -1,0 +1,1 @@
+Some tests use the `@pytest.mark.vcr` decorator provided by the `pytest-recording` library. It is used to "record" network activity in order to mock network responses. In order to re-record, make sure your API keys are set in environment (eg. `OPENAI_API_KEY` and `MISTRAL_API_KEY`) and run: `pytest --weave-server=prod --record-mode=rewrite <test_file>::<test_name>`.
