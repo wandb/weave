@@ -9,7 +9,7 @@ from .mistral import mistral_patcher
 from typing import Generator
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def patch_mistral() -> Generator[None, None, None]:
     mistral_patcher.attempt_patch()
     yield
@@ -34,6 +34,5 @@ def test_mistral_quickstart(
     )
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-
     assert len(res.calls) == 1
     # Probably should do some other more robust testing here
