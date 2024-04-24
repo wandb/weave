@@ -1,7 +1,6 @@
 import {GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
 import stringify from 'json-stable-stringify';
 import _ from 'lodash';
-import {useState} from 'react';
 
 import {isRef} from '../Browse3/pages/common/util';
 
@@ -118,16 +117,12 @@ export const useColumnVisibility = (
   tableStats: TableStats,
   isSingleOpVersion: boolean
 ) => {
-  const [forceShowAll, setForceShowAll] = useState(false);
-
   const boringColumns = getBoringColumns(tableStats);
 
   const model: GridColumnVisibilityModel = {};
   for (const colName in tableStats.column) {
     if (boringColumns.includes(colName)) {
       model[colName] = false;
-    } else if (forceShowAll) {
-      model[colName] = true;
     } else if (isSingleOpVersion) {
       model[colName] = true;
     } else {
@@ -145,8 +140,6 @@ export const useColumnVisibility = (
   return {
     allShown,
     columnVisibilityModel: model,
-    forceShowAll,
-    setForceShowAll,
   };
 };
 
