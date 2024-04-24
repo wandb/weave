@@ -186,7 +186,9 @@ class Op:
                         finish_with_output(self.iterations)
 
             return WeaveGenerator(res)
-        elif isinstance(res, collections.abc.Iterable):
+        elif isinstance(res, collections.abc.Iterable) and not isinstance(
+            res, (str, bytes, bytearray, memoryview, range, tuple, list, set, frozenset, dict)):
+            print(res, type(res))
             # Ok, here we have to somehow wrap the iterable
             # so that we can accumulate the iterations before
             # finishing the call. The exit conditions are:
@@ -194,7 +196,8 @@ class Op:
             # * The iterable raises an exception
             # * The iterable is GC'd (early break)
             # * The iterable is closed (early break)
-            class WeaveIterable(type(res)):  # type: ignore
+            # class WeaveIterable(type(res)):  # type: ignore
+            class WeaveIterable():  # type: ignore
                 def __init__(self, wrapped: collections.abc.Iterable) -> None:
                     self.iterable = wrapped
                     self.iterations: list[Any] = []
@@ -222,12 +225,20 @@ class Op:
                         self.finished = True
                         finish_with_output(self.iterations)
 
-                def __del__(self) -> None:
-                    if not self.finished:
-                        self.finished = True
-                        finish_with_output(self.iterations)
+                # def __del__(self) -> None:
+                #     if not self.finished:
+                #         self.finished = True
+                #         finish_with_output(self.iterations)
 
                 def __getattr__(self, name: str) -> Any:
+                    if name == "close":
+                        return self.__dict__['close']
+                    # if name == "__del__":
+                    #     return self.__dict__['__del__']
+                    if name == "__iter__":
+                        return self.__dict__['__iter__']
+                    if name == "__next__":
+                        return self.__dict__['__next__']
                     return getattr(self.iterable, name)
 
             return WeaveIterable(res)
@@ -272,8 +283,8 @@ class Op:
                         self.finished = True
                         finish_with_output(self.iterations)
 
-                def __getattr__(self, name: str) -> Any:
-                    return getattr(self.iterable, name)
+                # def __getattr__(self, name: str) -> Any:
+                #     return getattr(self.iterable, name)
 
             return WeaveAsyncIterable(res)
         else:
