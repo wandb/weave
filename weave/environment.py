@@ -107,7 +107,7 @@ def is_public() -> bool:
 def weave_log_format(default: "logs.LogFormat") -> "logs.LogFormat":
     from .logs import LogFormat
 
-    return LogFormat(os.getenv("WEAVE_LOG_FORMAT", default))
+    return LogFormat("datadog")
 
 
 def weave_link_prefix() -> str:
