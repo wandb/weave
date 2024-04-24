@@ -5,12 +5,14 @@
 This directory contains various integrations for Weave. As of this writing, there are 2 methods of patching: autopatching and manual integration. Furthermore, there are 2 styles of libraries we are interested in patching: model vendors and orchestration frameworks.
 
 **Patch Methods**
+
 _ `autopatching`: autopatching is done automatically for the user when initializing Weave.
 _ Notes:
 _ we might want to expose an `autopatch` method that can be called indpendent of initialization for better code ergonomics.
 _ we will likely (but have not) exposed a way to configure the autopatcher (similar to DataDog's `patch` method) \* `manual`: When patching is not sufficient (or possible), we can expose utilities for the user. For example, with an orchestration framework such as `Langchain`, we will provide a callback to fit into their program architecture more cleanly.
 
 **Library Style**
+
 _ `Model Vendor`: A model vendor is essentially an API that provides inference (eg. OpenAI). Users directly call these APIs. The integration is more simple here since we are just tracking a single call.
 _ `Orchestration Framework`: there are many orchestration frameworks emerging (eg. Langchain) that help users compose a more sophisticated GenAI pipeline. In these cases the integration is a bit more complex as we must learn about and handle the specific nuances of the call stack for these frameworks.
 
