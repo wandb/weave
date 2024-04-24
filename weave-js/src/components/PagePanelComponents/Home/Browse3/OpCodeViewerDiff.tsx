@@ -1,6 +1,7 @@
 import {DiffEditor, Monaco} from '@monaco-editor/react';
 import React from 'react';
 
+import {Loading} from '../../../Loading';
 import {useWFHooks} from './pages/wfReactInterface/context';
 
 type OpCodeViewerDiffProps = {
@@ -32,6 +33,10 @@ export const OpCodeViewerDiff = ({
       });
     }
   };
+
+  if (loading) {
+    return <Loading centered size={25} />;
+  }
 
   return (
     <DiffEditor
