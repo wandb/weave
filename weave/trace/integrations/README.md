@@ -14,7 +14,7 @@ _ we will likely (but have not) exposed a way to configure the autopatcher (simi
 _ `Model Vendor`: A model vendor is essentially an API that provides inference (eg. OpenAI). Users directly call these APIs. The integration is more simple here since we are just tracking a single call.
 _ `Orchestration Framework`: there are many orchestration frameworks emerging (eg. Langchain) that help users compose a more sophisticated GenAI pipeline. In these cases the integration is a bit more complex as we must learn about and handle the specific nuances of the call stack for these frameworks.
 
-## Developing an Integration:
+## Developing an Autopatch Vendor Integration
 
 1. Create a folder under with the name of the library/vendor
 2. Add the following files:
@@ -67,5 +67,61 @@ _ `Orchestration Framework`: there are many orchestration frameworks emerging (e
    assert len(res.calls) == 1
    ```
 
-4. At this point, you should be able to run the unit test and see a failure at the `assert len(res.calls) == 1` line. If you see any different errors, fix them before moving forward. Note, to run the test, you will likely need a vendor key, for example: `MISTRAL_API_KEY=... pytest trace/integrations/mistral/mistral_test.py::test_mistral_quickstart`
+4. At this point, you should be able to run the unit test and see a failure at the `assert len(res.calls) == 1` line. If you see any different errors, fix them before moving forward. Note, to run the test, you will likely need a vendor key, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart`. Note: the `--record-mode=rewrite` tells the system to ignore any recorded network calls.
 5. Now - time to implement the integration!
+6. Inside of `<vendor>.py`, implement the integration. The most basic form will look like this. Of course, you might need to do a lot here if there is sufficient complexity required. The key idea is to have a symbol called `<vendor>_patcher` exported at the end which is a subclass of `weave.trace.patcher.Patcher`. _Note: this assumes non-generator return libraries. More work is required for those to work well._
+
+   ```
+   import importlib
+
+   import weave
+   from weave.trace.patcher import SymbolPatcher, MultiPatcher
+
+
+   <vendor>_patcher = MultiPatcher(                            # <vendor>_patcher.attempt_patch() will attempt to patch all patchers
+       [
+           SymbolPatcher(                                      # `SymbolPatcher` is a helper class for simple patching of a symbole
+               lambda: importlib.import_module(<import_path>), # Provide function that returns the base symbol - often an import
+               <path_to_symbol>,                               # provide the path to the target symbol from the base
+               weave.op(),                                     # provide a callback to perform the wrapping. `weave.op` should work in many cases
+           )
+       ]
+   )
+   ```
+
+7. Register the autopatcher. Navigate to `weave/autopatch.py` and add a line to `def autopatch()` like:
+
+   ```
+   from .trace.integrations.<vendor>.<vendor> import <vendor>_patcher
+
+   <vendor>_patcher.attempt_patch()
+   ```
+
+   This will ensure that the patch is applied when initializing weave.
+
+8. Next, add the patcher to the test. Note: this step should go away in the future. Inside of `patch_<vendor>` fixture, fill out:
+   ```
+   @pytest.fixture()
+   def patch_<vendor>() -> Generator[None, None, None]:
+       <vendor>_patcher.attempt_patch()
+       yield
+       <vendor>_patcher.undo_patch()
+   ```
+9. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
+   - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --weave-server=prod --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--weave-server=prod `). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
+10. Finally, when you are ready, save the network recordings:
+    - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
+    - Run `MISTRAL_API_KEY=... pytest trace/integrations/mistral/mistral_test.py::test_mistral_quickstart` to validate it works!
+11. Add your integration to the docs (TBD best practices)!
+
+## Developing an Autopatch Framework Integration
+
+TODO
+
+## Developing an Manual Vendor Integration
+
+TODO
+
+## Developing an Manual Framework Integration
+
+TODO
