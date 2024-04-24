@@ -1,7 +1,7 @@
 import importlib
 
 import weave
-from weave.trace.patcher import SymbolPatcher
+from weave.trace.patcher import SymbolPatcher, MultiPatcher
 
 mistral_patches = {
     "MistralClient.chat": SymbolPatcher(
@@ -11,12 +11,4 @@ mistral_patches = {
     )
 }
 
-
-def autopatch_mistral() -> None:
-    for patch in mistral_patches.values():
-        patch.attempt_patch()
-
-
-def undo_patch_mistral() -> None:
-    for patch in mistral_patches.values():
-        patch.undo_patch()
+mistral_patcher = MultiPatcher(mistral_patches.values())

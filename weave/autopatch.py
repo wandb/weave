@@ -24,6 +24,6 @@ def autopatch_openai() -> None:
 def autopatch() -> None:
     autopatch_openai()
 
-    from .trace.integrations.mistral.mistral import autopatch_mistral
+    from .trace.integrations.mistral.mistral import mistral_patcher
 
-    autopatch_mistral()
+    mistral_patcher.attempt_patch()

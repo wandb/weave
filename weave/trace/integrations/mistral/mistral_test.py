@@ -4,7 +4,7 @@ import weave
 from weave.trace_server import trace_server_interface as tsi
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
-from .mistral import autopatch_mistral, undo_patch_mistral
+from .mistral import mistral_patcher
 
 from typing import Generator
 
@@ -14,9 +14,9 @@ from typing import Generator
 
 @pytest.fixture(scope="module")
 def patch_mistral() -> Generator[None, None, None]:
-    autopatch_mistral()
+    mistral_patcher.attempt_patch()
     yield
-    undo_patch_mistral()
+    mistral_patcher.undo_patch()
 
 
 @pytest.mark.vcr(

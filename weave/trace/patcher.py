@@ -1,5 +1,24 @@
 from typing import Any, Callable, Optional
 
+class Patcher():
+    def attempt_patch(self):
+        pass
+
+    def undo_patch(self):
+        pass
+
+class MultiPatcher(Patcher):
+    def __init__(self, patchers: list[Patcher]) -> None:
+        self.patchers = patchers
+
+    def attempt_patch(self) -> None:
+        for patcher in self.patchers:
+            patcher.attempt_patch()
+
+    def undo_patch(self) -> None:
+        for patcher in self.patchers:
+            patcher.undo_patch()
+
 
 class _SymbolTarget:
     def __init__(self, base_symbol: Any, attr: str) -> None:
