@@ -225,7 +225,7 @@ def configure_logger() -> None:
         return
     # Disable ddtrace logs, not sure why they're turned on.
     ddtrace_logs = logging.getLogger("ddtrace")
-    ddtrace_logs.setLevel(logging.INFO)
+    ddtrace_logs.setLevel(logging.ERROR)
 
     logger = logging.getLogger("root")
     logger.setLevel(env_log_level())
@@ -253,6 +253,7 @@ def configure_logger() -> None:
                     environment.weave_log_format(LogFormat.PRETTY), logging.INFO
                 ),
             )
+            logger.info("Logging enabled to console and pid file. 1")
         else:
             # This is the default case. Log to a file for this process, but
             # do not write to standard out/error. This is important because
@@ -264,6 +265,8 @@ def configure_logger() -> None:
                     environment.weave_log_format(LogFormat.PRETTY), logging.INFO
                 ),
             )
+            logger.info("Logging enabled to pid file. 2")
+
     else:
         if dd_env == "ci":
             # CI expects logs in the pid logfile
@@ -276,6 +279,8 @@ def configure_logger() -> None:
                     environment.weave_log_format(LogFormat.PRETTY), logging.INFO
                 ),
             )
+            logger.info("Logging enabled CI. 3")
+
         elif environment.wandb_production():
             # Only log in the datadog format to the wsgi stream
             enable_stream_logging(
@@ -284,6 +289,8 @@ def configure_logger() -> None:
                     environment.weave_log_format(LogFormat.DATADOG), level=None
                 ),
             )
+            logger.info("Logging enabled prod. 4")
+
         else:
             # Otherwise this is dev mode with datadog logging turned on.
             # Log to standard out and a known filename that the datadog
@@ -297,3 +304,5 @@ def configure_logger() -> None:
                     environment.weave_log_format(LogFormat.DATADOG), level=None
                 ),
             )
+            logger.info("Logging enabled dev mode. 5")
+
