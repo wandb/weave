@@ -22,7 +22,7 @@ Almost everything in this directory is the output of `tree-sitter generate`:
 tree-sitter generate
 ```
 
-This yields a bunch of intermediate files.  Then we need to use `web-tree-sitter` to createa `wasm` binding:
+This yields a bunch of intermediate files. Then we need to use `web-tree-sitter` to create a `wasm` binding:
 
 ```
 npx tree-sitter build-wasm .

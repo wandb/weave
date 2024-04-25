@@ -717,7 +717,7 @@ class Converter {
     }
 
     if (validCalls.length > 1) {
-      // Hack: x - y doesn't work b ecause it is ambiguous with unary - (negation)
+      // Hack: x - y doesn't work because it is ambiguous with unary - (negation)
       if (displayName === '-') {
         return validCalls.find(call => call.fromOp.name === 'number-sub')!;
       }

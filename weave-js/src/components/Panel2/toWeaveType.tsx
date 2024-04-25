@@ -174,5 +174,5 @@ export function toWeaveType(o: any): any {
   } else if (_.isBoolean(o)) {
     return 'boolean';
   }
-  throw new Error('Type conversion not implemeneted for value: ' + o);
+  throw new Error('Type conversion not implemented for value: ' + o);
 }

@@ -361,7 +361,6 @@ const MainPeekingLayout: FC = () => {
             id="dragger"
             onMouseDown={handleMousedown}
             style={{
-              borderTop: '1px solid #ddd',
               position: 'absolute',
               inset: '0 auto 0 0',
               zIndex: 2,

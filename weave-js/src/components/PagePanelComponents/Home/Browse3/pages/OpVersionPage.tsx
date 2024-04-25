@@ -1,5 +1,6 @@
 import React, {useMemo} from 'react';
 
+import {LoadingDots} from '../../../../LoadingDots';
 import {OpCodeViewer} from '../OpCodeViewer';
 import {
   CallsLink,
@@ -70,7 +71,9 @@ const OpVersionPageInner: React.FC<{
             Name: (
               <>
                 {opId}{' '}
-                {(!opVersions.loading || opVersionCount > 0) && (
+                {opVersions.loading ? (
+                  <LoadingDots />
+                ) : (
                   <>
                     [
                     <OpVersionsLink
