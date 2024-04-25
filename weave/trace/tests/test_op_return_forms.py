@@ -19,7 +19,6 @@ def test_op_return_sync_empty(client):
         )
     )
 
-        
     obj_ref = get_ref(fn)
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
@@ -41,7 +40,6 @@ async def test_op_return_async_empty(client):
         )
     )
 
-        
     obj_ref = get_ref(fn)
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
@@ -62,7 +60,6 @@ def test_op_return_sync_obj(client):
         )
     )
 
-        
     obj_ref = get_ref(fn)
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
@@ -89,4 +86,3 @@ async def test_op_return_async_obj(client):
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == 1
-
