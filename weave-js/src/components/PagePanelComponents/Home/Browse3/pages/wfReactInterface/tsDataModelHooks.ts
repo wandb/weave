@@ -176,7 +176,10 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         result: cachedCall,
       };
     }
-    const result = callRes ? traceCallToUICallSchema(callRes.call) : null;
+    const result =
+      callRes && 'call' in callRes
+        ? traceCallToUICallSchema(callRes.call)
+        : null;
     if (callRes == null || loadingRef.current) {
       return {
         loading: true,
