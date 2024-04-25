@@ -1,6 +1,8 @@
 import * as path from 'path';
 import pkg from 'lodash';
-import {visit} from 'ast-types';
+import {visit, Type} from 'ast-types';
+
+Type.def('StaticBlock').finalize();
 
 const {sortBy} = pkg;
 
