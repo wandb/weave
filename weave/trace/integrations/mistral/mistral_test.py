@@ -52,7 +52,9 @@ def test_mistral_quickstart(
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     # We really should be auto-resolving this for the user...
-    output = weave.ref(res.calls[0].output).get()
+    output_ref_str = res.calls[0].output
+    assert isinstance(output_ref_str, str)
+    output = weave.ref(output_ref_str).get()
     assert output.choices[0].message.content == exp
     # Probably should do some other more robust testing here
 
@@ -96,6 +98,8 @@ def test_mistral_quickstart_with_stream(
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
     # We really should be auto-resolving this for the user...
-    output = weave.ref(res.calls[0].output).get()
+    output_ref_str = res.calls[0].output
+    assert isinstance(output_ref_str, str)
+    output = weave.ref(output_ref_str).get()
     assert output.choices[0].message.content == exp
     # Probably should do some other more robust testing here
