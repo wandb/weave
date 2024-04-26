@@ -72,14 +72,16 @@ def test_mistral_quickstart(
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    output = _get_call_output(res.calls[0])
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
     assert output.model == chat_response.model
     assert output.object == chat_response.object
     assert output.created == chat_response.created
-    summary = res.calls[0].summary
+    summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
@@ -120,14 +122,16 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    output = _get_call_output(res.calls[0])
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chat_response.id
     assert output.model == chat_response.model
     assert output.object == chat_response.object
     assert output.created == chat_response.created
-    summary = res.calls[0].summary
+    summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
@@ -174,14 +178,16 @@ def test_mistral_quickstart_with_stream(
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    output = _get_call_output(res.calls[0])
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chunk.id
     assert output.model == chunk.model
     assert output.object == chunk.object
     assert output.created == chunk.created
-    summary = res.calls[0].summary
+    summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
@@ -227,14 +233,16 @@ async def test_mistral_quickstart_with_stream_async(
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    output = _get_call_output(res.calls[0])
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
     assert output.id == chunk.id
     assert output.model == chunk.model
     assert output.object == chunk.object
     assert output.created == chunk.created
-    summary = res.calls[0].summary
+    summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output.model]
     assert model_usage["requests"] == 1
