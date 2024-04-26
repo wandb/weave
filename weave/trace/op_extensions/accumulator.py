@@ -19,12 +19,30 @@ V = TypeVar("V")
 
 
 def add_accumulator(op: Op, accumulator: Callable[[S, V], S]) -> Op:
-    """
+    """This is to be used internally only - specifically designed for integrations with streaming libraries.
+
     Add an accumulator to an op. The accumulator will be called with the output of the op
     after the op is resolved. The accumulator should return the output of the op. This is intended
     for internal use only and may change in the future. The accumulator should take two arguments:
     the current state of the accumulator and the value to accumulate. It should return the new state
     of the accumulator. The first time the accumulator is called, the current state will be an empty list.
+
+    The intended usage is:
+
+    ```
+    def simple_list_accumulator(acc, value):
+        acc.append(value)
+        return acc
+
+    @weave.op()
+    def fn():
+        size = 10
+        while size > 0:
+            size -= 1
+            yield size
+
+    add_accumulator(fn, simple_list_accumulator) # returns the op with `list(range(9, -1, -1))` as output
+    ```
     """
 
     def on_output(value: Iterator[V], on_finish: FinishCallbackType) -> Iterator:
