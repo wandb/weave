@@ -94,6 +94,13 @@ def simple_list_accumulator(acc, value):
     return acc
 
 
+""" There are 16 tests that follow, permutations of the following:
+    - (2x) sync/async
+    - (2x) generator/iterator
+    - (4x) never iterated/partially iterated/fully iterated/exception thrown
+"""
+
+
 def test_op_return_sync_generator(client):
     @weave.op()
     def fn():

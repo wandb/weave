@@ -522,6 +522,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
+        """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:

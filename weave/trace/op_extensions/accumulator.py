@@ -1,5 +1,4 @@
 import atexit
-from types import GeneratorType
 from typing import (
     Any,
     AsyncIterator,
@@ -15,28 +14,34 @@ import weakref
 
 from weave.trace.op import Op, FinishCallbackType
 
+S = TypeVar("S")
+V = TypeVar("V")
 
-def add_accumulator(op: Op, accumulator: Callable) -> Op:
+
+def add_accumulator(op: Op, accumulator: Callable[[S, V], S]) -> Op:
     """
     Add an accumulator to an op. The accumulator will be called with the output of the op
-    after the op is resolved. The accumulator should return the output of the op.
+    after the op is resolved. The accumulator should return the output of the op. This is intended
+    for internal use only and may change in the future. The accumulator should take two arguments:
+    the current state of the accumulator and the value to accumulate. It should return the new state
+    of the accumulator. The first time the accumulator is called, the current state will be an empty list.
     """
 
-    def on_output(value: Any, on_finish: FinishCallbackType) -> Iterator:
-        return build_iterator_from_accumulator_for_op(value, accumulator, on_finish)
+    def on_output(value: Iterator[V], on_finish: FinishCallbackType) -> Iterator:
+        return _build_iterator_from_accumulator_for_op(value, accumulator, on_finish)
 
-    op._set_on_output(on_output)
+    op._set_on_output_handler(on_output)
     return op
 
 
-def build_iterator_from_accumulator_for_op(
-    value: Iterator,
+def _build_iterator_from_accumulator_for_op(
+    value: Iterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
-) -> "IteratorWrapper":
-    acc: Accumulator = Accumulator(accumulator, [])
+) -> "_IteratorWrapper":
+    acc: _Accumulator = _Accumulator(accumulator, [])
 
-    def on_yield(value: Any) -> None:
+    def on_yield(value: V) -> None:
         acc.next(value)
 
     def on_error(e: Exception) -> None:
@@ -45,14 +50,10 @@ def build_iterator_from_accumulator_for_op(
     def on_close() -> None:
         on_finish(acc.get_state(), None)
 
-    return IteratorWrapper(value, on_yield, on_error, on_close)
+    return _IteratorWrapper(value, on_yield, on_error, on_close)
 
 
-S = TypeVar("S")
-V = TypeVar("V")
-
-
-class Accumulator(Generic[S, V]):
+class _Accumulator(Generic[S, V]):
     state: Optional[S]
 
     def __init__(
@@ -70,20 +71,21 @@ class Accumulator(Generic[S, V]):
         return self._state
 
 
-OnYieldType = Callable[[Any], None]
-OnErrorType = Callable[[Exception], None]
-OnCloseType = Callable[[], None]
+_OnYieldType = Callable[[V], None]
+_OnErrorType = Callable[[Exception], None]
+_OnCloseType = Callable[[], None]
 
 
-class IteratorWrapper:
-    """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator."""
+class _IteratorWrapper(Generic[V]):
+    """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
+    that this class will be helpful in other contexts and might be moved to a more general location in the future."""
 
     def __init__(
         self,
         iterator: Union[Iterator, AsyncIterator],
-        on_yield: OnYieldType,
-        on_error: OnErrorType,
-        on_close: OnCloseType,
+        on_yield: _OnYieldType,
+        on_error: _OnErrorType,
+        on_close: _OnCloseType,
     ) -> None:
         self._iterator = iterator
         self._on_yield = on_yield
@@ -103,10 +105,10 @@ class IteratorWrapper:
             self._on_error(e)
             self._on_finished_called = True
 
-    def __iter__(self) -> "IteratorWrapper":
+    def __iter__(self) -> "_IteratorWrapper":
         return self
 
-    def __next__(self) -> Generator[None, None, Any]:
+    def __next__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator, "__next__"):
             raise TypeError(
                 f"Cannot call next on an iterator of type {type(self._iterator)}"
@@ -122,10 +124,10 @@ class IteratorWrapper:
             self._call_on_error_once(e)
             raise
 
-    def __aiter__(self) -> "IteratorWrapper":
+    def __aiter__(self) -> "_IteratorWrapper":
         return self
 
-    async def __anext__(self) -> Generator[None, None, Any]:
+    async def __anext__(self) -> Generator[None, None, V]:
         if not hasattr(self._iterator, "__anext__"):
             raise TypeError(
                 f"Cannot call anext on an iterator of type {type(self._iterator)}"
@@ -143,13 +145,6 @@ class IteratorWrapper:
 
     def __del__(self) -> None:
         self._call_on_close_once()
-
-    # def __enter__(self):
-    #     return self
-
-    # def __exit__(self, exc_type, exc_value, traceback):
-    #     self._call_on_close_once()
-    #     return False
 
     def close(self) -> None:
         self._call_on_close_once()

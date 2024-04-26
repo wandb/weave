@@ -26,13 +26,20 @@ def print_call_link(call: "Call") -> None:
 
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
-OnOutputCallbackType = Callable[[Any, FinishCallbackType], Any]
+OnOutputHandlerType = Callable[[Any, FinishCallbackType], Any]
 
 
 class Op:
     resolve_fn: Callable
-    #
-    _on_output: Optional[OnOutputCallbackType] = None
+    # `_on_output_handler` is an experimental API and may change in the future intended for use by internal Weave code.
+    # Specifically, it is used to set a callback that will be called when the output of the op is available. This handler
+    # is passed two values: the output of the op and a finish callback that should be called with the output of the op.
+    # The finish callback should be called exactly once and can optionally take an exception as a second argument to
+    # indicate an error. If the finish callback is not called, the op will not finish and the run will not complete. This
+    # is useful for cases where the output of the op is not immediately available or the op needs to do some processing before
+    # it can be returned. If we decide to make this a public API, we will likely add this to the constructor of the op.
+    # For now it can be set using the `_set_on_output_handler` method.
+    _on_output_handler: Optional[OnOutputHandlerType] = None
     # double-underscore to avoid conflict with old Weave refs
     __ref: Optional[ObjectRef] = None
 
@@ -40,7 +47,7 @@ class Op:
         self.resolve_fn = resolve_fn
         self.name = resolve_fn.__name__
         self.signature = inspect.signature(resolve_fn)
-        self._on_output = None
+        self._on_output_handler = None
 
     def __get__(
         self, obj: Optional[object], objtype: Optional[type[object]] = None
@@ -65,16 +72,21 @@ class Op:
             self, parent_run, inputs_with_defaults, attributes=attributes
         )
 
+        has_finished = False
+
         def finish(
             output: Any = None, exception: Optional[BaseException] = None
         ) -> None:
+            nonlocal has_finished
+            if has_finished:
+                raise ValueError("Should not call finish more than once")
             client.finish_call(run, output, exception)
             if not parent_run:
                 print_call_link(run)
 
         def on_output(output: Any) -> Any:
-            if self._on_output:
-                return self._on_output(output, finish)
+            if self._on_output_handler:
+                return self._on_output_handler(output, finish)
             finish(output)
             return output
 
@@ -123,19 +135,9 @@ class Op:
         client = graph_client_context.require_graph_client()
         return client.op_calls(self)
 
-    def _set_on_output(self, on_output: OnOutputCallbackType) -> None:
-        """This is an experimental API and may change in the future intended for use by internal Weave code.
-
-        This method allows setting a callback that will be called when the output of the op is available. The callback
-        should take two arguments: the output of the op and a finish callback that should be called with the output of the
-        op when the callback is done. The finish callback should be called exactly once and can optionally take an
-        exception as a second argument to indicate an error. If the finish callback is not called, the op will not finish
-        and the run will not complete. This is useful for cases where the output of the op is not immediately available
-        and the op needs to do some processing before it can be returned.
-
-        If we decide to make this a public API, we will likely add this to the constructor of the op.
-        """
-        self._on_output = on_output
+    def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
+        """This is an experimental API and may change in the future intended for use by internal Weave code."""
+        self._on_output_handler = on_output
 
 
 OpType.instance_classes = Op
