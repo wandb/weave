@@ -25,15 +25,11 @@ def add_accumulator(op: Op, accumulator: Callable[[S, V], S]) -> Op:
     after the op is resolved. The accumulator should return the output of the op. This is intended
     for internal use only and may change in the future. The accumulator should take two arguments:
     the current state of the accumulator and the value to accumulate. It should return the new state
-    of the accumulator. The first time the accumulator is called, the current state will be an empty list.
+    of the accumulator. The first time the accumulator is called, the current state will be None.
 
     The intended usage is:
 
     ```
-    def simple_list_accumulator(acc, value):
-        acc.append(value)
-        return acc
-
     @weave.op()
     def fn():
         size = 10
@@ -41,6 +37,11 @@ def add_accumulator(op: Op, accumulator: Callable[[S, V], S]) -> Op:
             size -= 1
             yield size
 
+    def simple_list_accumulator(acc, value):
+        if acc is None:
+            acc = []
+        acc.append(value)
+        return acc
     add_accumulator(fn, simple_list_accumulator) # returns the op with `list(range(9, -1, -1))` as output
     ```
     """
@@ -57,7 +58,7 @@ def _build_iterator_from_accumulator_for_op(
     accumulator: Callable,
     on_finish: FinishCallbackType,
 ) -> "_IteratorWrapper":
-    acc: _Accumulator = _Accumulator(accumulator, [])
+    acc: _Accumulator = _Accumulator(accumulator)
 
     def on_yield(value: V) -> None:
         acc.next(value)

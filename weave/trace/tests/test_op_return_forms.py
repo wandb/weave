@@ -90,6 +90,8 @@ async def test_op_return_async_obj(client):
 
 
 def simple_list_accumulator(acc, value):
+    if acc is None:
+        acc = []
     acc.append(value)
     return acc
 
@@ -247,7 +249,7 @@ def test_op_return_sync_generator_never_iter(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == []
+    assert res.calls[0].output == None
 
 
 @pytest.mark.asyncio
@@ -273,7 +275,7 @@ async def test_op_return_async_generator_never_iter(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == []
+    assert res.calls[0].output == None
 
 
 def test_op_return_sync_iterator_never_iter(client):
@@ -307,7 +309,7 @@ def test_op_return_sync_iterator_never_iter(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == []
+    assert res.calls[0].output == None
 
 
 @pytest.mark.asyncio
@@ -342,7 +344,7 @@ async def test_op_return_async_iterator_never_iter(client):
     assert obj_ref is not None
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
-    assert res.calls[0].output == []
+    assert res.calls[0].output == None
 
 
 def test_op_return_sync_generator_partial(client):
