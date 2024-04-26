@@ -6,7 +6,18 @@ from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 from .mistral import mistral_patcher
 
-from typing import Generator
+from typing import Any, Generator
+
+
+def _get_call_output(call: tsi.CallSchema) -> Any:
+    """This is a hack and should not be needed. We should be able to auto-resolve this for the user.
+
+    Keeping this here for now, but it should be removed in the future once we have a better solution.
+    """
+    call_output = call.output
+    if isinstance(call_output, str) and call_output.startswith("weave://"):
+        return weave.ref(call_output).get()
+    return call_output
 
 
 @pytest.fixture()
@@ -51,12 +62,16 @@ def test_mistral_quickstart(
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    # We really should be auto-resolving this for the user...
-    output_ref_str = res.calls[0].output
-    assert isinstance(output_ref_str, str)
-    output = weave.ref(output_ref_str).get()
+    output = _get_call_output(res.calls[0])
     assert output.choices[0].message.content == exp
-    # Probably should do some other more robust testing here
+    assert output.choices[0].finish_reason == "stop"
+    assert output.id == chat_response.id
+    assert output.model == chat_response.model
+    assert output.object == chat_response.object
+    assert output.created == chat_response.created
+    assert output.usage.completion_tokens == 299
+    assert output.usage.prompt_tokens == 10
+    assert output.usage.total_tokens == 309
 
 
 @pytest.mark.vcr(
@@ -97,9 +112,13 @@ def test_mistral_quickstart_with_stream(
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
-    # We really should be auto-resolving this for the user...
-    output_ref_str = res.calls[0].output
-    assert isinstance(output_ref_str, str)
-    output = weave.ref(output_ref_str).get()
+    output = _get_call_output(res.calls[0])
     assert output.choices[0].message.content == exp
-    # Probably should do some other more robust testing here
+    assert output.choices[0].finish_reason == "stop"
+    assert output.id == chunk.id
+    assert output.model == chunk.model
+    assert output.object == chunk.object
+    assert output.created == chunk.created
+    assert output.usage.completion_tokens == 274
+    assert output.usage.prompt_tokens == 10
+    assert output.usage.total_tokens == 284
