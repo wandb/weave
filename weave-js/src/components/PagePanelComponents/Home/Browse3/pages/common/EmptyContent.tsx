@@ -26,16 +26,16 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
 export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   icon: 'type-boolean' as const,
   heading: 'No evaluations yet',
-  description: 'Use evaluations to track model performance across datasets.',
+  description: 'Use evaluations to track the performance of your application.',
   moreInformation: (
     <>
       Learn{' '}
       <TargetBlank href="https://wandb.me/weave_evals">
         evaluation basics
       </TargetBlank>{' '}
-      or see how you can{' '}
+      or follow our tutorial to{' '}
       <TargetBlank href="http://wandb.me/weave_eval_tut">
-        use models an evaluation pipeline
+        set up an evaluation pipeline
       </TargetBlank>
       .
     </>
