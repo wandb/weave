@@ -22,7 +22,16 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
 
 
 @pytest.fixture()
-def patch_mistral() -> Generator[None, None, None]:
+def patch_mistral(request) -> Generator[None, None, None]:
+    # This little hack is to allow us to run the tests in prod mode
+    # For some reason pytest's import procedure causes the patching
+    # to fail in prod mode. Specifically, the patches get run twice
+    # despite the fact that the patcher is a singleton.
+    weave_server_flag = request.config.getoption("--weave-server")
+    if weave_server_flag == ("prod"):
+        yield
+        return
+
     mistral_patcher.attempt_patch()
     yield
     mistral_patcher.undo_patch()
