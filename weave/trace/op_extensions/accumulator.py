@@ -131,7 +131,7 @@ class IteratorWrapper:
                 f"Cannot call anext on an iterator of type {type(self._iterator)}"
             )
         try:
-            value = await anext(self._iterator)  # type: ignore
+            value = await self._iterator.__anext__()  # type: ignore
             self._on_yield(value)
             return value
         except StopIteration:
