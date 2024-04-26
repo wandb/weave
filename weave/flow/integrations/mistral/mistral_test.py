@@ -20,7 +20,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     return call_output
 
 
-@pytest.fixture()
+@pytest.fixture(scope="package")
 def patch_mistral(request: Any) -> Generator[None, None, None]:
     # This little hack is to allow us to run the tests in prod mode
     # For some reason pytest's import procedure causes the patching

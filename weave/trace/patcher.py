@@ -37,7 +37,6 @@ class SymbolPatcher(Patcher):
     _attribute_name: str
     _make_new_value: Callable
     _original_value: Any = None
-    _patched_applied: bool = False
 
     def __init__(
         self, get_base_symbol: Callable, attribute_name: str, make_new_value: Callable
@@ -60,27 +59,31 @@ class SymbolPatcher(Patcher):
         return _SymbolTarget(base_symbol, attr)
 
     def attempt_patch(self) -> bool:
-        if self._patched_applied:
+        if self._original_value:
             return True
         target = self._get_symbol_target()
         if target is None:
             return False
-        self._original_value = getattr(target.base_symbol, target.attr)
+        original_value = getattr(target.base_symbol, target.attr)
+        try:
+            new_val = self._make_new_value(original_value)
+        except Exception:
+            print(f"Failed to patch {self._attribute_name}")
+            return False
         setattr(
             target.base_symbol,
             target.attr,
-            self._make_new_value(self._original_value),
+            new_val,
         )
-        self._patched_applied = True
+        self._original_value = original_value
         return True
 
     def undo_patch(self) -> bool:
-        if not self._patched_applied:
+        if not self._original_value:
             return False
         target = self._get_symbol_target()
         if target is None:
             return False
 
         setattr(target.base_symbol, target.attr, self._original_value)
-        self._patched_applied = False
         return True
