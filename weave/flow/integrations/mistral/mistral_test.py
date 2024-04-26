@@ -167,3 +167,52 @@ def test_mistral_quickstart_with_stream(
     assert output.usage.completion_tokens == 274
     assert output.usage.prompt_tokens == 10
     assert output.usage.total_tokens == 284
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+@pytest.mark.asyncio
+async def test_mistral_quickstart_with_stream_async(
+    client: weave.weave_client.WeaveClient, patch_mistral: None
+) -> None:
+    # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
+    api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
+    model = "mistral-large-latest"
+
+    mistral_client = MistralAsyncClient(api_key=api_key)
+
+    chat_response = mistral_client.chat_stream(
+        model=model,
+        messages=[ChatMessage(role="user", content="What is the best French cheese?")],
+    )
+
+    all_content = ""
+    async for chunk in chat_response:
+        all_content += chunk.choices[0].delta.content
+
+    exp = """The "best" French cheese can depend on personal preferences, but here are a few popular ones:
+
+1. Brie: Often referred to as "The Queen of Cheeses," Brie is a soft cheese named after the French region Brie. It has a mild, slightly sweet flavor with a creamy texture.
+
+2. Camembert: This is another soft cheese from Normandy, France. It has a stronger flavor than Brie, with a hint of mushroom taste.
+
+3. Roquefort: This is a blue cheese made from sheep's milk. It's aged in the natural Combalou caves of Roquefort-sur-Soulzon, which gives it a unique, tangy flavor.
+
+4. Comté: This is a hard cheese made from unpasteurized cow's milk in the Franche-Comté region of eastern France. It has a complex, nutty flavor.
+
+5. Chèvre: This is a general term for goat cheese in French. It can come in many forms and flavors, from fresh and mild to aged and tangy."""
+
+    assert all_content == exp
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    output = _get_call_output(res.calls[0])
+    assert output.choices[0].message.content == exp
+    assert output.choices[0].finish_reason == "stop"
+    assert output.id == chunk.id
+    assert output.model == chunk.model
+    assert output.object == chunk.object
+    assert output.created == chunk.created
+    assert output.usage.completion_tokens == 242
+    assert output.usage.prompt_tokens == 10
+    assert output.usage.total_tokens == 252
