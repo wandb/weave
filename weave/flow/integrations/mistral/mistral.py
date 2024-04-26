@@ -99,7 +99,7 @@ mistral_patcher = MultiPatcher(
             "MistralAsyncClient.chat",
             weave.op(),
         ),
-        # # Patch the async, streaming chat method
+        # Patch the async, streaming chat method
         SymbolPatcher(
             lambda: importlib.import_module("mistralai.async_client"),
             "MistralAsyncClient.chat_stream",
