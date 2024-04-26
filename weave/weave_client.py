@@ -478,7 +478,9 @@ class WeaveClient:
         return call
 
     @trace_sentry.global_trace_sentry.watch()
-    def finish_call(self, call: Call, output: Any) -> None:
+    def finish_call(
+        self, call: Call, output: Any = None, exception: Optional[BaseException] = None
+    ) -> None:
         self.save_nested_objects(output)
         output = map_to_refs(output)
         call.output = output
@@ -491,6 +493,12 @@ class WeaveClient:
             summary["usage"] = {}
             summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
 
+        # Exception Handling
+        exception_str: Optional[str] = None
+        if exception:
+            exception_str = exception_to_json_str(exception)
+            call.exception = exception_str
+
         self.server.call_end(
             CallEndReq(
                 end=EndedCallSchemaForInsert(
@@ -499,6 +507,7 @@ class WeaveClient:
                     ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
                     output=to_json(output, self._project_id(), self.server),
                     summary=summary,
+                    exception=exception_str,
                 )
             )
         )
@@ -513,34 +522,8 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
-        exception_str = exception_to_json_str(exception)
-        call.exception = exception_str
-
-        # Summary handling
-        summary = {}
-        if call._children:
-            summary = sum_dict_leaves([child.summary or {} for child in call._children])
-
-        self.server.call_end(
-            CallEndReq(
-                end=EndedCallSchemaForInsert(
-                    project_id=self._project_id(),
-                    id=call.id,  # type: ignore
-                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                    exception=exception_str,
-                    summary=summary,
-                )
-            )
-        )
-
-        # Descendent error tracking disabled til we fix UI
-        # Add this call's summary after logging the call, so that only
-        # descendents are included in what we log
-        # summary.setdefault("descendants", {}).setdefault(
-        #     call.op_name, {"successes": 0, "errors": 0}
-        # )["errors"] += 1
-
-        call.summary = summary
+        """Fail a call with an exception. This is a convenience method for finish_call."""
+        return self.finish_call(call, exception=exception)
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
