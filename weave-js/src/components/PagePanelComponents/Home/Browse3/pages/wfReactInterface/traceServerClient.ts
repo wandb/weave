@@ -47,9 +47,13 @@ type TraceCallReadReq = {
   id: string;
 };
 
-export type TraceCallReadRes = {
+export type TraceCallReadSuccess = {
   call: TraceCallSchema;
 };
+export type TraceCallReadError = {
+  detail: string;
+};
+export type TraceCallReadRes = TraceCallReadSuccess | TraceCallReadError;
 
 interface TraceCallsFilter {
   op_names?: string[];

@@ -71,6 +71,14 @@ const isSimpleData = (data: Data): boolean => {
   return isSimple;
 };
 
+// Use a deep comparison to avoid re-rendering when the data object hasn't really changed.
+const ObjectViewerSectionNonEmptyMemoed = React.memo(
+  (props: ObjectViewerSectionProps) => (
+    <ObjectViewerSectionNonEmpty {...props} />
+  ),
+  (prevProps, nextProps) => _.isEqual(prevProps, nextProps)
+);
+
 const ObjectViewerSectionNonEmpty = ({
   title,
   data,
@@ -199,7 +207,7 @@ export const ObjectViewerSection = ({
       isRef(value)
     ) {
       return (
-        <ObjectViewerSectionNonEmpty
+        <ObjectViewerSectionNonEmptyMemoed
           title={title}
           data={{Value: value}}
           noHide={noHide}
