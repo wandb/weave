@@ -95,6 +95,8 @@ This directory contains various integrations for Weave. As of this writing, ther
    )
    ```
 
+   Please see the mistral example for how to write an accumulator to work with streaming results.
+
 7. Register the autopatcher. Navigate to `weave/autopatch.py` and add a line to `def autopatch()` like:
 
    ```
@@ -119,15 +121,3 @@ This directory contains various integrations for Weave. As of this writing, ther
     - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
     - Run `MISTRAL_API_KEY=... pytest flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` to validate it works!
 11. Add your integration to the docs (TBD best practices)!
-
-## Developing an Autopatch Framework Integration
-
-TODO
-
-## Developing an Manual Vendor Integration
-
-TODO
-
-## Developing an Manual Framework Integration
-
-TODO
