@@ -46,7 +46,10 @@ class SymbolPatcher(Patcher):
         self._make_new_value = make_new_value
 
     def _get_symbol_target(self) -> Optional[_SymbolTarget]:
-        base_symbol = self._get_base_symbol()
+        try:
+            base_symbol = self._get_base_symbol()
+        except Exception:
+            return None
         if base_symbol is None:
             return None
         parts = self._attribute_name.split(".")
