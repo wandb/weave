@@ -89,14 +89,19 @@ class IteratorWrapper:
         self._on_yield = on_yield
         self._on_error = on_error
         self._on_close = on_close
-        self._on_close_called = False
+        self._on_finished_called = False
 
         atexit.register(weakref.WeakMethod(self._call_on_close_once))
 
     def _call_on_close_once(self) -> None:
-        if not self._on_close_called:
-            self._on_close_called = True
+        if not self._on_finished_called:
             self._on_close()
+            self._on_finished_called = True
+
+    def _call_on_error_once(self, e: Exception) -> None:
+        if not self._on_finished_called:
+            self._on_error(e)
+            self._on_finished_called = True
 
     def __iter__(self) -> "IteratorWrapper":
         return self
@@ -114,7 +119,7 @@ class IteratorWrapper:
             self._call_on_close_once()
             raise
         except Exception as e:
-            self._on_error(e)
+            self._call_on_error_once(e)
             raise
 
     def __aiter__(self) -> "IteratorWrapper":
@@ -133,7 +138,7 @@ class IteratorWrapper:
             self._call_on_close_once()
             raise
         except Exception as e:
-            self._on_error(e)
+            self._call_on_error_once(e)
             raise
 
     def __del__(self) -> None:
@@ -156,7 +161,8 @@ class IteratorWrapper:
             "_on_yield",
             "_on_error",
             "_on_close",
-            "_on_close_called",
+            "_on_finished_called",
+            "_call_on_error_once",
         ]:
             return object.__getattribute__(self, name)
         return getattr(self._iterator, name)
