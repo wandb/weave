@@ -22,7 +22,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
 
 
 @pytest.fixture()
-def patch_mistral(request) -> Generator[None, None, None]:
+def patch_mistral(request: Any) -> Generator[None, None, None]:
     # This little hack is to allow us to run the tests in prod mode
     # For some reason pytest's import procedure causes the patching
     # to fail in prod mode. Specifically, the patches get run twice
