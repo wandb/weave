@@ -70,9 +70,13 @@ def test_mistral_quickstart(
     assert output.model == chat_response.model
     assert output.object == chat_response.object
     assert output.created == chat_response.created
-    assert output.usage.completion_tokens == 299
-    assert output.usage.prompt_tokens == 10
-    assert output.usage.total_tokens == 309
+    summary = res.calls[0].summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 299
+    assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
+    assert output.usage.total_tokens == model_usage["total_tokens"] == 309
 
 
 @pytest.mark.vcr(
@@ -114,9 +118,13 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
     assert output.model == chat_response.model
     assert output.object == chat_response.object
     assert output.created == chat_response.created
-    assert output.usage.completion_tokens == 297
-    assert output.usage.prompt_tokens == 10
-    assert output.usage.total_tokens == 307
+    summary = res.calls[0].summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 297
+    assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
+    assert output.usage.total_tokens == model_usage["total_tokens"] == 307
 
 
 @pytest.mark.vcr(
@@ -164,9 +172,13 @@ def test_mistral_quickstart_with_stream(
     assert output.model == chunk.model
     assert output.object == chunk.object
     assert output.created == chunk.created
-    assert output.usage.completion_tokens == 274
-    assert output.usage.prompt_tokens == 10
-    assert output.usage.total_tokens == 284
+    summary = res.calls[0].summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 274
+    assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
+    assert output.usage.total_tokens == model_usage["total_tokens"] == 284
 
 
 @pytest.mark.vcr(
@@ -213,6 +225,10 @@ async def test_mistral_quickstart_with_stream_async(
     assert output.model == chunk.model
     assert output.object == chunk.object
     assert output.created == chunk.created
-    assert output.usage.completion_tokens == 242
-    assert output.usage.prompt_tokens == 10
-    assert output.usage.total_tokens == 252
+    summary = res.calls[0].summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.completion_tokens == model_usage["completion_tokens"] == 242
+    assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
+    assert output.usage.total_tokens == model_usage["total_tokens"] == 252
