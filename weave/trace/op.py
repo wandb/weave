@@ -132,6 +132,8 @@ class Op:
         exception as a second argument to indicate an error. If the finish callback is not called, the op will not finish
         and the run will not complete. This is useful for cases where the output of the op is not immediately available
         and the op needs to do some processing before it can be returned.
+
+        If we decide to make this a public API, we will likely add this to the constructor of the op.
         """
         self._on_output = on_output
 

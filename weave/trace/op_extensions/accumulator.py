@@ -1,0 +1,162 @@
+import atexit
+from types import GeneratorType
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Generator,
+    Generic,
+    Iterator,
+    Optional,
+    TypeVar,
+    Union,
+)
+import weakref
+
+from weave.trace.op import Op, FinishCallbackType
+
+
+def add_accumulator(op: Op, accumulator: Callable) -> Op:
+    """
+    Add an accumulator to an op. The accumulator will be called with the output of the op
+    after the op is resolved. The accumulator should return the output of the op.
+    """
+
+    def on_output(value: Any, on_finish: FinishCallbackType) -> Iterator:
+        return build_iterator_from_accumulator_for_op(value, accumulator, on_finish)
+
+    op._set_on_output(on_output)
+    return op
+
+
+def build_iterator_from_accumulator_for_op(
+    value: Iterator,
+    accumulator: Callable,
+    on_finish: FinishCallbackType,
+) -> "IteratorWrapper":
+    acc: Accumulator = Accumulator(accumulator, [])
+
+    def on_yield(value: Any) -> None:
+        acc.next(value)
+
+    def on_error(e: Exception) -> None:
+        on_finish(acc.get_state(), e)
+
+    def on_close() -> None:
+        on_finish(acc.get_state(), None)
+
+    return IteratorWrapper(value, on_yield, on_error, on_close)
+
+
+S = TypeVar("S")
+V = TypeVar("V")
+
+
+class Accumulator(Generic[S, V]):
+    state: Optional[S]
+
+    def __init__(
+        self,
+        accumulator: Callable[[Optional[S], V], S],
+        initial_state: Optional[S] = None,
+    ):
+        self._accumulator = accumulator
+        self._state = initial_state
+
+    def next(self, value: V) -> None:
+        self._state = self._accumulator(self._state, value)
+
+    def get_state(self) -> Optional[S]:
+        return self._state
+
+
+OnYieldType = Callable[[Any], None]
+OnErrorType = Callable[[Exception], None]
+OnCloseType = Callable[[], None]
+
+
+class IteratorWrapper:
+    """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator."""
+
+    def __init__(
+        self,
+        iterator: Union[Iterator, AsyncIterator],
+        on_yield: OnYieldType,
+        on_error: OnErrorType,
+        on_close: OnCloseType,
+    ) -> None:
+        self._iterator = iterator
+        self._on_yield = on_yield
+        self._on_error = on_error
+        self._on_close = on_close
+        self._on_close_called = False
+
+        atexit.register(weakref.WeakMethod(self._call_on_close_once))
+
+    def _call_on_close_once(self) -> None:
+        if not self._on_close_called:
+            self._on_close_called = True
+            self._on_close()
+
+    def __iter__(self) -> "IteratorWrapper":
+        return self
+
+    def __next__(self) -> Generator[None, None, Any]:
+        if not hasattr(self._iterator, "__next__"):
+            raise TypeError(
+                f"Cannot call next on an iterator of type {type(self._iterator)}"
+            )
+        try:
+            value = next(self._iterator)  # type: ignore
+            self._on_yield(value)
+            return value
+        except (StopIteration, StopAsyncIteration) as e:
+            self._call_on_close_once()
+            raise
+        except Exception as e:
+            self._on_error(e)
+            raise
+
+    def __aiter__(self) -> "IteratorWrapper":
+        return self
+
+    async def __anext__(self) -> Generator[None, None, Any]:
+        if not hasattr(self._iterator, "__anext__"):
+            raise TypeError(
+                f"Cannot call anext on an iterator of type {type(self._iterator)}"
+            )
+        try:
+            value = await anext(self._iterator)  # type: ignore
+            self._on_yield(value)
+            return value
+        except StopIteration:
+            self._call_on_close_once()
+            raise
+        except Exception as e:
+            self._on_error(e)
+            raise
+
+    def __del__(self) -> None:
+        self._call_on_close_once()
+
+    # def __enter__(self):
+    #     return self
+
+    # def __exit__(self, exc_type, exc_value, traceback):
+    #     self._call_on_close_once()
+    #     return False
+
+    def close(self) -> None:
+        self._call_on_close_once()
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate all other attributes to the wrapped iterator."""
+        if name in [
+            "_iterator",
+            "_on_yield",
+            "_on_error",
+            "_on_close",
+            "_on_close_called",
+        ]:
+            return object.__getattribute__(self, name)
+        return getattr(self._iterator, name)
