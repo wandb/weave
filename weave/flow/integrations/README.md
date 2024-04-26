@@ -98,7 +98,7 @@ This directory contains various integrations for Weave. As of this writing, ther
 7. Register the autopatcher. Navigate to `weave/autopatch.py` and add a line to `def autopatch()` like:
 
    ```
-   from .trace.integrations.<vendor>.<vendor> import <vendor>_patcher
+   from .flow.integrations.<vendor>.<vendor> import <vendor>_patcher
 
    <vendor>_patcher.attempt_patch()
    ```
@@ -113,11 +113,11 @@ This directory contains various integrations for Weave. As of this writing, ther
        yield
        <vendor>_patcher.undo_patch()
    ```
-9. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
-   - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --weave-server=prod --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--weave-server=prod `). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
+9. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
+   - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --weave-server=prod --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--weave-server=prod `). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
 10. Finally, when you are ready, save the network recordings:
-    - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
-    - Run `MISTRAL_API_KEY=... pytest trace/integrations/mistral/mistral_test.py::test_mistral_quickstart` to validate it works!
+    - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
+    - Run `MISTRAL_API_KEY=... pytest flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` to validate it works!
 11. Add your integration to the docs (TBD best practices)!
 
 ## Developing an Autopatch Framework Integration
