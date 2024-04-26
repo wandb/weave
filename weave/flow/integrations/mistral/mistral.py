@@ -81,15 +81,29 @@ def mistral_stream_wrapper(fn: typing.Callable) -> typing.Callable:
 
 mistral_patcher = MultiPatcher(
     [
+        # Patch the sync, non-streaming chat method
         SymbolPatcher(
             lambda: importlib.import_module("mistralai.client"),
             "MistralClient.chat",
             weave.op(),
         ),
+        # Patch the sync, streaming chat method
         SymbolPatcher(
             lambda: importlib.import_module("mistralai.client"),
             "MistralClient.chat_stream",
             mistral_stream_wrapper,
         ),
+        # Patch the async, non-streaming chat method
+        SymbolPatcher(
+            lambda: importlib.import_module("mistralai.async_client"),
+            "MistralAsyncClient.chat",
+            weave.op(),
+        ),
+        # # Patch the async, non-streaming chat method
+        # SymbolPatcher(
+        #     lambda: importlib.import_module("mistralai.async_client"),
+        #     "MistralAsyncClient.chat",
+        #     weave.op(),
+        # ),
     ]
 )

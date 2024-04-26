@@ -3,6 +3,7 @@ import pytest
 import weave
 from weave.trace_server import trace_server_interface as tsi
 from mistralai.client import MistralClient
+from mistralai.async_client import MistralAsyncClient
 from mistralai.models.chat_completion import ChatMessage
 from .mistral import mistral_patcher
 
@@ -72,6 +73,50 @@ def test_mistral_quickstart(
     assert output.usage.completion_tokens == 299
     assert output.usage.prompt_tokens == 10
     assert output.usage.total_tokens == 309
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+@pytest.mark.asyncio
+async def test_mistral_quickstart_async(
+    client: weave.weave_client.WeaveClient, patch_mistral: None
+) -> None:
+    # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
+    api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
+    model = "mistral-large-latest"
+
+    mistral_client = MistralAsyncClient(api_key=api_key)
+
+    chat_response = await mistral_client.chat(
+        model=model,
+        messages=[ChatMessage(role="user", content="What is the best French cheese?")],
+    )
+
+    all_content = chat_response.choices[0].message.content
+    exp = """There are many excellent French cheeses, and the "best" one often depends on personal preference. However, some of the most popular and highly regarded French cheeses include:
+
+* Comté: A hard cheese made from unpasteurized cow's milk in the Franche-Comté region of eastern France. It has a rich, nutty flavor and a firm, slightly granular texture.
+* Camembert: A soft, surface-ripened cheese made from cow's milk in Normandy. It has a bloomy white rind and a creamy, earthy flavor.
+* Roquefort: A blue cheese made from sheep's milk in the south of France. It has a tangy, slightly salty flavor and a crumbly texture.
+* Brie: A soft cheese made from cow's milk in the Île-de-France region around Paris. It has a white, edible rind and a creamy, buttery flavor.
+* Reblochon: A soft, washed-rind cheese made from cow's milk in the Savoie region of the French Alps. It has a nutty, fruity flavor and a soft, supple texture.
+
+Ultimately, the best French cheese is a matter of personal taste. I would recommend trying a variety of cheeses and seeing which ones you enjoy the most."""
+
+    assert all_content == exp
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    output = _get_call_output(res.calls[0])
+    assert output.choices[0].message.content == exp
+    assert output.choices[0].finish_reason == "stop"
+    assert output.id == chat_response.id
+    assert output.model == chat_response.model
+    assert output.object == chat_response.object
+    assert output.created == chat_response.created
+    assert output.usage.completion_tokens == 297
+    assert output.usage.prompt_tokens == 10
+    assert output.usage.total_tokens == 307
 
 
 @pytest.mark.vcr(
