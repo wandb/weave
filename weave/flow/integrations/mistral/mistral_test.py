@@ -4,7 +4,6 @@ import weave
 from weave.trace_server import trace_server_interface as tsi
 from mistralai.client import MistralClient
 from mistralai.async_client import MistralAsyncClient
-from mistralai.models.chat_completion import ChatMessage
 from .mistral import mistral_patcher
 
 from typing import Any, Generator
@@ -51,7 +50,7 @@ def test_mistral_quickstart(
 
     chat_response = mistral_client.chat(
         model=model,
-        messages=[ChatMessage(role="user", content="What is the best French cheese?")],
+        messages=[dict(role="user", content="What is the best French cheese?")],
     )
 
     all_content = chat_response.choices[0].message.content
@@ -105,7 +104,7 @@ async def test_mistral_quickstart_async(
 
     chat_response = await mistral_client.chat(
         model=model,
-        messages=[ChatMessage(role="user", content="What is the best French cheese?")],
+        messages=[dict(role="user", content="What is the best French cheese?")],
     )
 
     all_content = chat_response.choices[0].message.content
@@ -154,7 +153,7 @@ def test_mistral_quickstart_with_stream(
 
     chat_response = mistral_client.chat_stream(
         model=model,
-        messages=[ChatMessage(role="user", content="What is the best French cheese?")],
+        messages=[dict(role="user", content="What is the best French cheese?")],
     )
 
     all_content = ""
@@ -211,7 +210,7 @@ async def test_mistral_quickstart_with_stream_async(
 
     chat_response = mistral_client.chat_stream(
         model=model,
-        messages=[ChatMessage(role="user", content="What is the best French cheese?")],
+        messages=[dict(role="user", content="What is the best French cheese?")],
     )
 
     all_content = ""
