@@ -32,7 +32,7 @@ OnOutputCallbackType = Callable[[Any, FinishCallbackType], Any]
 class Op:
     resolve_fn: Callable
     #
-    _on_output: Optional[OnOutputCallbackType]
+    _on_output: Optional[OnOutputCallbackType] = None
     # double-underscore to avoid conflict with old Weave refs
     __ref: Optional[ObjectRef] = None
 
