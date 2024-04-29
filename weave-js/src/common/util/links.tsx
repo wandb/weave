@@ -94,19 +94,16 @@ export const TargetBlank: FCWithRef<
   React.AnchorHTMLAttributes<HTMLAnchorElement>,
   HTMLAnchorElement
 > = React.memo(
-  React.forwardRef(({children, ...passthroughProps}, ref) => {
+  React.forwardRef(({children, href, ...passthroughProps}, ref) => {
     // Enforce an absolute prefixed url for blank targets
-    if (
-      passthroughProps.href != null &&
-      !(passthroughProps.href.indexOf('://') > 0) // regex for http, file, s3, gs, etc
-    ) {
-      passthroughProps.href = getConfig().urlPrefixed(passthroughProps.href);
-    }
+    const parsedUrl = getAbsolutePrefixedUrl(href);
+
     return (
       // eslint-disable-next-line wandb/no-a-tags
       <A
         target="_blank"
         rel="noopener noreferrer"
+        href={parsedUrl}
         {...passthroughProps}
         ref={ref}>
         {children}
@@ -114,6 +111,23 @@ export const TargetBlank: FCWithRef<
     );
   })
 );
+
+// Taken from - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a#href
+const BLACK_LISTED_HREF_PREFIX = ['mailto:', 'tel:', 'sms:'];
+export const getAbsolutePrefixedUrl = (href?: string) => {
+  if (href == null) {
+    return undefined;
+  }
+
+  if (
+    BLACK_LISTED_HREF_PREFIX.some(prefix => href.indexOf(prefix) === 0) ||
+    href.indexOf('://') > 0
+  ) {
+    return href;
+  }
+
+  return getConfig().urlPrefixed(href);
+};
 
 export type LinkProps = RRLinkProps & {
   RRLinkComp?: React.FC<any>;
