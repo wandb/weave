@@ -112,17 +112,12 @@ export const TargetBlank: FCWithRef<
   })
 );
 
-// Taken from - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a#href
-const BLACK_LISTED_HREF_PREFIX = ['mailto:', 'tel:', 'sms:'];
 export const getAbsolutePrefixedUrl = (href?: string) => {
   if (href == null) {
     return undefined;
   }
 
-  if (
-    BLACK_LISTED_HREF_PREFIX.some(prefix => href.indexOf(prefix) === 0) ||
-    href.indexOf('://') > 0
-  ) {
+  if (href.indexOf('mailto:') === 0 || href.indexOf('://') > 0) {
     return href;
   }
 

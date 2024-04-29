@@ -6,7 +6,7 @@ describe('getAbsolutePrefixedUrl', () => {
       'mailto:support@wandb.com'
     );
   });
-  it('returns correct linke with ://', () => {
+  it('returns correct link with ://', () => {
     expect(
       getAbsolutePrefixedUrl('https://docs.wandb.ai/guides/runs/alert')
     ).toEqual('https://docs.wandb.ai/guides/runs/alert');
