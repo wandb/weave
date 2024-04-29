@@ -724,7 +724,7 @@ describe('ll', () => {
     };
     const findOp = node.fromOp;
     // Ensure the equality check in the predicate below works. It does as long
-    // as nothing upstream of findOp has alreayd been replaced.
+    // as nothing upstream of findOp has already been replaced.
     expect(
       mapNodes(node, n =>
         n.nodeType === 'output' && n.fromOp === findOp

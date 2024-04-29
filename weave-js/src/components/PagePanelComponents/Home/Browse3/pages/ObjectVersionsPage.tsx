@@ -172,6 +172,7 @@ const ObjectVersionsTable: React.FC<{
             objectName={obj.objectId}
             version={obj.versionHash}
             versionIndex={obj.versionIndex}
+            fullWidth={true}
           />
         );
       },

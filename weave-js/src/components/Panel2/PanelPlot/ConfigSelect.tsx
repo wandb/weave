@@ -1,6 +1,6 @@
 /**
  * A select component for use in panel plot config based
- * on our commmon select component.
+ * on our common select component.
  */
 import {Select} from '@wandb/weave/components/Form/Select';
 import React from 'react';

@@ -91,7 +91,7 @@ export interface TableState {
 
   // A table's rows node depends on the filters,
   // which depend on the column filter and select functions.
-  // Store them seperately from the table column panel config,
+  // Store them separately from the table column panel config,
   // so we don't recompute the row node if the panel config
   // changes
   columnNames: {[id: string]: string};

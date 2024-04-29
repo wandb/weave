@@ -66,7 +66,7 @@ export const PanelWeaveLink: React.FC<PanelLabeledItemProps> = props => {
   const weave = useWeaveContext();
   const {frame: contextFrame} = usePanelContext();
 
-  // We subtitute existing variables first. Only variables declared specifically
+  // We substitute existing variables first. Only variables declared specifically
   // for this panel are templated.
   const toExpr = useMemo(
     () => weave.callFunction(config.to, contextFrame),

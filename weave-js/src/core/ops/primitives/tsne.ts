@@ -167,7 +167,7 @@ const d2p = function (D: any, perplexity: any, tol: any) {
           beta = (beta + betamax) / 2;
         }
       } else {
-        // converse case. make distrubtion less peaky
+        // converse case. make distribution less peaky
         betamax = beta;
         if (betamin === -Infinity) {
           beta = beta / 2;

@@ -8,8 +8,10 @@ import styled from 'styled-components';
 import * as Colors from '../common/css/color.styles';
 
 const DotsContainer = styled.div`
-  display: flex;
+  display: inline-flex;
+  vertical-align: middle;
   align-items: center;
+  padding: 0 4px;
 
   @keyframes fade {
     from {

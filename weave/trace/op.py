@@ -41,9 +41,6 @@ class Op:
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self._watched_call(*args, **kwargs)
-
-    def _watched_call(self, *args: Any, **kwargs: Any) -> Any:
         maybe_client = graph_client_context.get_graph_client()
         if maybe_client is None:
             return self.resolve_fn(*args, **kwargs)
@@ -60,15 +57,24 @@ class Op:
         run = client.create_call(
             self, parent_run, inputs_with_defaults, attributes=attributes
         )
+
+        def finish_with_output(output: Any) -> None:
+            client.finish_call(run, output)
+            if not parent_run:
+                print_call_link(run)
+
+        def fail_with_error(error: BaseException) -> None:
+            client.fail_call(run, error)
+            if not parent_run:
+                print_call_link(run)
+
         try:
             with run_context.current_run(run):
-                res = self.resolve_fn(**inputs)
+                res = self.resolve_fn(*args, **kwargs)
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
-            client.fail_call(run, e)
-            if not parent_run:
-                print_call_link(run)
+            fail_with_error(e)
             raise
         # We cannot let BoxedNone or BoxedBool escape into the user's code
         # since they cannot pass instance checks for None or bool.
@@ -83,21 +89,15 @@ class Op:
                     awaited_res = res
                     with run_context.current_run(run):
                         output = await awaited_res
-                    client.finish_call(run, output)
-                    if not parent_run:
-                        print_call_link(run)
+                    finish_with_output(output)
                     return output
                 except BaseException as e:
-                    client.fail_call(run, e)
-                    if not parent_run:
-                        print_call_link(run)
+                    fail_with_error(e)
                     raise
 
             return _run_async()
         else:
-            client.finish_call(run, res)
-            if not parent_run:
-                print_call_link(run)
+            finish_with_output(res)
 
         return res
 
@@ -176,6 +176,10 @@ def _apply_fn_defaults_to_inputs(
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
         if param_name not in inputs:
-            if param.default != inspect.Parameter.empty:
+            if param.default != inspect.Parameter.empty and param.default is not None:
                 inputs[param_name] = param.default
+            if param.kind == inspect.Parameter.VAR_POSITIONAL:
+                inputs[param_name] = tuple()
+            elif param.kind == inspect.Parameter.VAR_KEYWORD:
+                inputs[param_name] = dict()
     return inputs

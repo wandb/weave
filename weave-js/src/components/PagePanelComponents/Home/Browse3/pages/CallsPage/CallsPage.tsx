@@ -340,7 +340,7 @@ export const CallsTable: FC<{
           <ListItem sx={{minWidth: '190px'}}>
             <FormControl fullWidth>
               <Autocomplete
-                PaperComponent={StyledPaper}
+                PaperComponent={paperProps => <StyledPaper {...paperProps} />}
                 size="small"
                 // Temp disable multiple for simplicity - may want to re-enable
                 // multiple
