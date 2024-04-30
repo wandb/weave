@@ -105,6 +105,8 @@ const ObjectViewerSectionNonEmpty = ({
         <CodeEditor
           value={JSON.stringify(data, null, 2)}
           language="json"
+          handleMouseWheel
+          alwaysConsumeMouseWheel={false}
           readOnly
         />
       );
