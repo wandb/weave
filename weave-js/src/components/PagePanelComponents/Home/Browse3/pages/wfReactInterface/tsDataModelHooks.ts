@@ -532,6 +532,7 @@ const useRootObjectVersions = makeTraceServerEndpointHook(
         latest_only: filter.latestOnly,
         is_op: false,
       },
+      limit,
     },
     skip: opts?.skip,
   }),

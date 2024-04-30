@@ -227,6 +227,7 @@ class _ObjectVersionFilter(BaseModel):
 class ObjQueryReq(BaseModel):
     project_id: str
     filter: typing.Optional[_ObjectVersionFilter] = None
+    limit: typing.Optional[int] = None
 
 
 class ObjQueryRes(BaseModel):

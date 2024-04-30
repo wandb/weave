@@ -401,6 +401,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.project_id,
             conditions=conds,
             parameters=parameters,
+            limit=req.limit,
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
