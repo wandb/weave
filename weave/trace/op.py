@@ -166,6 +166,9 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
         functools.update_wrapper(op, f)
         return op  # type: ignore
 
+    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
+        return wrap(args[0])
+
     return wrap
 
 
