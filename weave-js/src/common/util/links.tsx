@@ -117,7 +117,7 @@ export const getAbsolutePrefixedUrl = (href?: string) => {
     return undefined;
   }
 
-  if (href.indexOf('mailto:') === 0 || href.indexOf('://') > 0) {
+  if (href.startsWith('mailto:') || href.indexOf('://') > 0) {
     return href;
   }
 
