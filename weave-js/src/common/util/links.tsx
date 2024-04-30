@@ -90,23 +90,108 @@ export const A = styled.a`
 `;
 A.displayName = 'S.A';
 
-export const TargetBlank: FCWithRef<
+export const getIsExternalLink = (url: string) => {
+  return (
+    url.startsWith('http') || url.startsWith('//') || url.indexOf('://') > 0
+  );
+};
+
+export const getIsMailToLink = (url?: string) => {
+  return url != null && url.startsWith('mailto:');
+};
+
+export const getAbsolutePrefixedUrl = (href?: string) => {
+  if (href == null) {
+    return undefined;
+  }
+
+  if (getIsExternalLink(href)) {
+    return getConfig().urlPrefixed(href);
+  }
+
+  return href;
+};
+
+export const MailTo: FCWithRef<
   React.AnchorHTMLAttributes<HTMLAnchorElement>,
   HTMLAnchorElement
 > = React.memo(
-  React.forwardRef(({children, ...passthroughProps}, ref) => {
-    // Enforce an absolute prefixed url for blank targets
-    if (
-      passthroughProps.href != null &&
-      !(passthroughProps.href.indexOf('://') > 0) // regex for http, file, s3, gs, etc
-    ) {
-      passthroughProps.href = getConfig().urlPrefixed(passthroughProps.href);
+  React.forwardRef(({children, href, ...passthroughProps}, ref) => {
+    if (!getIsMailToLink(href)) {
+      throw new Error('use TargetBlank or Link component instead');
     }
+
     return (
       // eslint-disable-next-line wandb/no-a-tags
       <A
         target="_blank"
         rel="noopener noreferrer"
+        href={href}
+        {...passthroughProps}
+        ref={ref}>
+        {children}
+      </A>
+    );
+  })
+);
+
+/**
+ * This will only allow safe external links that start with http.
+ * This enforces absolute prefixed url for blank targets.
+ */
+export const SanitizedTargetBlank: FCWithRef<
+  React.AnchorHTMLAttributes<HTMLAnchorElement>,
+  HTMLAnchorElement
+> = React.memo(
+  React.forwardRef(({children, href, ...passthroughProps}, ref) => {
+    if (getIsMailToLink(href)) {
+      throw new Error('use MailTo component instead');
+    }
+    if (href != null && !getIsExternalLink(href)) {
+      throw new Error('use a Link component from react-router-dom instead');
+    }
+
+    return (
+      // eslint-disable-next-line wandb/no-a-tags
+      <A
+        target="_blank"
+        rel="noopener noreferrer"
+        href={getAbsolutePrefixedUrl(href)}
+        {...passthroughProps}
+        ref={ref}>
+        {children}
+      </A>
+    );
+  })
+);
+
+/**
+ * Warning: do not pass in untrusted hrefs!
+ */
+export const TargetBlank: FCWithRef<
+  React.AnchorHTMLAttributes<HTMLAnchorElement>,
+  HTMLAnchorElement
+> = React.memo(
+  React.forwardRef(({children, href, ...passthroughProps}, ref) => {
+    if (getIsMailToLink(href)) {
+      throw new Error('use MailTo component instead');
+    }
+
+    if (href != null && getIsExternalLink(href)) {
+    }
+
+    // Enforce an absolute prefixed url for blank targets
+    const parsedHref =
+      href != null && getIsExternalLink(href)
+        ? getAbsolutePrefixedUrl(href)
+        : href;
+
+    return (
+      // eslint-disable-next-line wandb/no-a-tags
+      <A
+        target="_blank"
+        rel="noopener noreferrer"
+        href={parsedHref}
         {...passthroughProps}
         ref={ref}>
         {children}
@@ -116,32 +201,41 @@ export const TargetBlank: FCWithRef<
 );
 
 export type LinkProps = RRLinkProps & {
-  RRLinkComp?: React.FC<any>;
+  ReactRouterLinkComp?: React.FC<any>;
   newTab?: boolean;
 };
 
 export const Link: FCWithRef<LinkProps, HTMLAnchorElement> = React.memo(
   React.forwardRef(
-    ({RRLinkComp = RRLink, newTab = true, children, ...passProps}, ref) => {
+    (
+      {ReactRouterLinkComp = RRLink, newTab = true, children, ...passProps},
+      ref
+    ) => {
       const {to} = passProps;
-      const isExternalLink =
-        typeof to === 'string' &&
-        (to.startsWith('http') || to.startsWith('//'));
-      return isExternalLink ? (
-        newTab ? (
-          <TargetBlank {...passProps} href={to} ref={ref}>
-            {children}
-          </TargetBlank>
-        ) : (
+      const isExternalLink = typeof to === 'string' && getIsExternalLink(to);
+
+      if (isExternalLink) {
+        const safeUrl = getSafeUrlWithoutXss(to);
+        if (newTab) {
+          return (
+            <SanitizedTargetBlank {...passProps} href={safeUrl} ref={ref}>
+              {children}
+            </SanitizedTargetBlank>
+          );
+        }
+
+        return (
           // eslint-disable-next-line wandb/no-a-tags
-          <a {...passProps} href={to} ref={ref}>
+          <a {...passProps} href={safeUrl} ref={ref}>
             {children}
           </a>
-        )
-      ) : (
-        <RRLinkComp {...passProps} ref={ref}>
+        );
+      }
+
+      return (
+        <ReactRouterLinkComp {...passProps} ref={ref}>
           {children}
-        </RRLinkComp>
+        </ReactRouterLinkComp>
       );
     }
   )
@@ -153,7 +247,7 @@ type NavLinkProps = Omit<RRNavLinkProps, 'className' | 'style'> & {
 };
 
 export const NavLink: React.FC<NavLinkProps> = React.memo(props => {
-  return <Link RRLinkComp={RRNavLink} {...props} />;
+  return <Link ReactRouterLinkComp={RRNavLink} {...props} />;
 });
 
 type LinkNoCrawlProps = LinkProps & {LinkComp?: React.FC<any>};
@@ -192,3 +286,26 @@ export function getHREFFromAbsoluteURL(url: string): string {
   }
   return `https://${url}`;
 }
+
+/**
+ * SECURITY CHECK: validate that this URL is actually a link to a webpage - if not, omit it.
+ * Rendering non- http/https links is a risk for XSS, even when they use target="_blank"
+ * because users can still choose to right click and open in the same tab */
+export const getSafeUrlWithoutXss = (url: string): string => {
+  try {
+    const urlForChecking = new URL(url);
+    if (
+      urlForChecking.protocol !== 'http:' &&
+      urlForChecking.protocol !== 'https:'
+    ) {
+      console.error('Unsafe URL was attempted to be rendered: ' + url);
+      // for now, just blanking out the URL to prevent the unsafe link from getting rendered,
+      // not trying to make this a good experience, since users are very unlikely to see this
+      return '';
+    }
+    return url;
+  } catch (e) {
+    // URL constructor throws on invalid URLs - in that case, we don't want to allow that as a link
+    return '';
+  }
+};
