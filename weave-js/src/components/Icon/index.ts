@@ -165,6 +165,7 @@ export {
   IconRowHeightXlarge,
   IconRun,
   IconRunningRepeat,
+  IconSave,
   IconScikitLogo,
   IconSearch,
   IconSelectMoveTool,
