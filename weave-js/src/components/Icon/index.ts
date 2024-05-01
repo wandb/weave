@@ -220,6 +220,7 @@ export {
   IconWandb,
   IconWarning,
   IconWarningAlt,
+  IconWeave,
   IconWeaveGroupBoard,
   IconWebhook,
   IconXAxiAlt,
