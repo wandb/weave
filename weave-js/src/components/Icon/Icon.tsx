@@ -165,6 +165,7 @@ import {ReactComponent as ImportRowHeightSmall} from '../../assets/icons/icon-ro
 import {ReactComponent as ImportRowHeightXlarge} from '../../assets/icons/icon-row-height-xlarge.svg';
 import {ReactComponent as ImportRun} from '../../assets/icons/icon-run.svg';
 import {ReactComponent as ImportRunningRepeat} from '../../assets/icons/icon-running-repeat.svg';
+import {ReactComponent as ImportSave} from '../../assets/icons/icon-save.svg';
 import {ReactComponent as ImportScikitLogo} from '../../assets/icons/icon-scikit-logo.svg';
 import {ReactComponent as ImportSearch} from '../../assets/icons/icon-search.svg';
 import {ReactComponent as ImportSelectMoveTool} from '../../assets/icons/icon-select-move-tool.svg';
@@ -735,6 +736,9 @@ export const IconRun = (props: SVGIconProps) => (
 export const IconRunningRepeat = (props: SVGIconProps) => (
   <ImportRunningRepeat {...updateIconProps(props)} />
 );
+export const IconSave = (props: SVGIconProps) => (
+  <ImportSave {...updateIconProps(props)} />
+);
 export const IconScikitLogo = (props: SVGIconProps) => (
   <ImportScikitLogo {...updateIconProps(props)} />
 );
@@ -1085,6 +1089,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'row-height-xlarge': IconRowHeightXlarge,
   run: IconRun,
   'running-repeat': IconRunningRepeat,
+  save: IconSave,
   'scikit-logo': IconScikitLogo,
   search: IconSearch,
   'select-move-tool': IconSelectMoveTool,
