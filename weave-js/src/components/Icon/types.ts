@@ -164,6 +164,7 @@ export const IconNames = {
   RowHeightXlarge: 'row-height-xlarge',
   Run: 'run',
   RunningRepeat: 'running-repeat',
+  Save: 'save',
   ScikitLogo: 'scikit-logo',
   Search: 'search',
   SelectMoveTool: 'select-move-tool',
