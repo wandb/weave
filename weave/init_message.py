@@ -86,7 +86,7 @@ def print_init_message(
 
     message = ""
     if username is not None:
-        message += f"Logged in as W&B user {username}.\n"
+        message += f"Logged in as Weights & Biases user: {username}.\n"
     message += (
         f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
     )
