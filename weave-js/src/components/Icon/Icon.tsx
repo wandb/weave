@@ -220,6 +220,7 @@ import {ReactComponent as ImportViewGlasses} from '../../assets/icons/icon-view-
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
+import {ReactComponent as ImportWeave} from '../../assets/icons/icon-weave.svg';
 import {ReactComponent as ImportWeaveGroupBoard} from '../../assets/icons/icon-weave-group-board.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
 import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
@@ -900,6 +901,9 @@ export const IconWarning = (props: SVGIconProps) => (
 export const IconWarningAlt = (props: SVGIconProps) => (
   <ImportWarningAlt {...updateIconProps(props)} />
 );
+export const IconWeave = (props: SVGIconProps) => (
+  <ImportWeave {...updateIconProps(props)} />
+);
 export const IconWeaveGroupBoard = (props: SVGIconProps) => (
   <ImportWeaveGroupBoard {...updateIconProps(props)} />
 );
@@ -1140,6 +1144,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   wandb: IconWandb,
   warning: IconWarning,
   'warning-alt': IconWarningAlt,
+  weave: IconWeave,
   'weave-group-board': IconWeaveGroupBoard,
   webhook: IconWebhook,
   'x-axi-alt': IconXAxiAlt,
