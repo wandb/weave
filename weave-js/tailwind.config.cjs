@@ -54,6 +54,7 @@ module.exports = {
       // Breakpoints
       768: '48rem',
       1024: '64rem',
+      1280: '80rem',
     },
     /**
      * Keep these colors in sync with what is in color.styles.ts

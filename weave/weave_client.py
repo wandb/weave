@@ -510,6 +510,12 @@ class WeaveClient:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
+        # Exception Handling
+        exception_str: Optional[str] = None
+        if exception:
+            exception_str = exception_to_json_str(exception)
+            call.exception = exception_str
+
         self.server.call_end(
             CallEndReq(
                 end=EndedCallSchemaForInsert(
