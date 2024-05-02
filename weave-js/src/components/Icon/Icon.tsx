@@ -165,6 +165,7 @@ import {ReactComponent as ImportRowHeightSmall} from '../../assets/icons/icon-ro
 import {ReactComponent as ImportRowHeightXlarge} from '../../assets/icons/icon-row-height-xlarge.svg';
 import {ReactComponent as ImportRun} from '../../assets/icons/icon-run.svg';
 import {ReactComponent as ImportRunningRepeat} from '../../assets/icons/icon-running-repeat.svg';
+import {ReactComponent as ImportSave} from '../../assets/icons/icon-save.svg';
 import {ReactComponent as ImportScikitLogo} from '../../assets/icons/icon-scikit-logo.svg';
 import {ReactComponent as ImportSearch} from '../../assets/icons/icon-search.svg';
 import {ReactComponent as ImportSelectMoveTool} from '../../assets/icons/icon-select-move-tool.svg';
@@ -220,6 +221,7 @@ import {ReactComponent as ImportViewGlasses} from '../../assets/icons/icon-view-
 import {ReactComponent as ImportWandb} from '../../assets/icons/icon-wandb.svg';
 import {ReactComponent as ImportWarning} from '../../assets/icons/icon-warning.svg';
 import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warning-alt.svg';
+import {ReactComponent as ImportWeave} from '../../assets/icons/icon-weave.svg';
 import {ReactComponent as ImportWeaveGroupBoard} from '../../assets/icons/icon-weave-group-board.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
 import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
@@ -735,6 +737,9 @@ export const IconRun = (props: SVGIconProps) => (
 export const IconRunningRepeat = (props: SVGIconProps) => (
   <ImportRunningRepeat {...updateIconProps(props)} />
 );
+export const IconSave = (props: SVGIconProps) => (
+  <ImportSave {...updateIconProps(props)} />
+);
 export const IconScikitLogo = (props: SVGIconProps) => (
   <ImportScikitLogo {...updateIconProps(props)} />
 );
@@ -899,6 +904,9 @@ export const IconWarning = (props: SVGIconProps) => (
 );
 export const IconWarningAlt = (props: SVGIconProps) => (
   <ImportWarningAlt {...updateIconProps(props)} />
+);
+export const IconWeave = (props: SVGIconProps) => (
+  <ImportWeave {...updateIconProps(props)} />
 );
 export const IconWeaveGroupBoard = (props: SVGIconProps) => (
   <ImportWeaveGroupBoard {...updateIconProps(props)} />
@@ -1085,6 +1093,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'row-height-xlarge': IconRowHeightXlarge,
   run: IconRun,
   'running-repeat': IconRunningRepeat,
+  save: IconSave,
   'scikit-logo': IconScikitLogo,
   search: IconSearch,
   'select-move-tool': IconSelectMoveTool,
@@ -1140,6 +1149,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   wandb: IconWandb,
   warning: IconWarning,
   'warning-alt': IconWarningAlt,
+  weave: IconWeave,
   'weave-group-board': IconWeaveGroupBoard,
   webhook: IconWebhook,
   'x-axi-alt': IconXAxiAlt,
