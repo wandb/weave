@@ -25,8 +25,21 @@ def print_call_link(call: "Call") -> None:
     print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
+FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
+OnOutputHandlerType = Callable[[Any, FinishCallbackType], Any]
+
+
 class Op:
     resolve_fn: Callable
+    # `_on_output_handler` is an experimental API and may change in the future intended for use by internal Weave code.
+    # Specifically, it is used to set a callback that will be called when the output of the op is available. This handler
+    # is passed two values: the output of the op and a finish callback that should be called with the output of the op.
+    # The finish callback should be called exactly once and can optionally take an exception as a second argument to
+    # indicate an error. If the finish callback is not called, the op will not finish and the run will not complete. This
+    # is useful for cases where the output of the op is not immediately available or the op needs to do some processing before
+    # it can be returned. If we decide to make this a public API, we will likely add this to the constructor of the op.
+    # For now it can be set using the `_set_on_output_handler` method.
+    _on_output_handler: Optional[OnOutputHandlerType] = None
     # double-underscore to avoid conflict with old Weave refs
     __ref: Optional[ObjectRef] = None
 
@@ -34,6 +47,7 @@ class Op:
         self.resolve_fn = resolve_fn
         self.name = resolve_fn.__name__
         self.signature = inspect.signature(resolve_fn)
+        self._on_output_handler = None
 
     def __get__(
         self, obj: Optional[object], objtype: Optional[type[object]] = None
@@ -58,15 +72,23 @@ class Op:
             self, parent_run, inputs_with_defaults, attributes=attributes
         )
 
-        def finish_with_output(output: Any) -> None:
-            client.finish_call(run, output)
+        has_finished = False
+
+        def finish(
+            output: Any = None, exception: Optional[BaseException] = None
+        ) -> None:
+            nonlocal has_finished
+            if has_finished:
+                raise ValueError("Should not call finish more than once")
+            client.finish_call(run, output, exception)
             if not parent_run:
                 print_call_link(run)
 
-        def fail_with_error(error: BaseException) -> None:
-            client.fail_call(run, error)
-            if not parent_run:
-                print_call_link(run)
+        def on_output(output: Any) -> Any:
+            if self._on_output_handler:
+                return self._on_output_handler(output, finish)
+            finish(output)
+            return output
 
         try:
             with run_context.current_run(run):
@@ -74,7 +96,7 @@ class Op:
                 # TODO: can we get rid of this?
                 res = box.box(res)
         except BaseException as e:
-            fail_with_error(e)
+            finish(exception=e)
             raise
         # We cannot let BoxedNone or BoxedBool escape into the user's code
         # since they cannot pass instance checks for None or bool.
@@ -89,17 +111,14 @@ class Op:
                     awaited_res = res
                     with run_context.current_run(run):
                         output = await awaited_res
-                    finish_with_output(output)
-                    return output
+                    return on_output(output)
                 except BaseException as e:
-                    fail_with_error(e)
+                    finish(exception=e)
                     raise
 
             return _run_async()
         else:
-            finish_with_output(res)
-
-        return res
+            return on_output(res)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name})"
@@ -115,6 +134,10 @@ class Op:
     def calls(self) -> "CallsIter":
         client = graph_client_context.require_graph_client()
         return client.op_calls(self)
+
+    def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
+        """This is an experimental API and may change in the future intended for use by internal Weave code."""
+        self._on_output_handler = on_output
 
 
 OpType.instance_classes = Op
@@ -165,6 +188,9 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
         op = Op(f)
         functools.update_wrapper(op, f)
         return op  # type: ignore
+
+    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
+        return wrap(args[0])
 
     return wrap
 

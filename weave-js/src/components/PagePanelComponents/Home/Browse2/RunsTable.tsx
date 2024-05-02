@@ -626,7 +626,11 @@ export const RunsTable: FC<{
           renderCell: cellParams => {
             if (field in cellParams.row) {
               const value = (cellParams.row as any)[field];
-              return <CellValue value={value} isExpanded={isExpanded} />;
+              return (
+                <ErrorBoundary>
+                  <CellValue value={value} isExpanded={isExpanded} />
+                </ErrorBoundary>
+              );
             }
             return <NotApplicable />;
           },
@@ -727,10 +731,12 @@ export const RunsTable: FC<{
         },
         renderCell: cellParams => {
           return (
-            <CellValue
-              value={(cellParams.row as any).output}
-              isExpanded={isExpanded}
-            />
+            <ErrorBoundary>
+              <CellValue
+                value={(cellParams.row as any).output}
+                isExpanded={isExpanded}
+              />
+            </ErrorBoundary>
           );
         },
       });

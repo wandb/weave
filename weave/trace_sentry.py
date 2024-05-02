@@ -14,8 +14,10 @@ import atexit
 import functools
 import pathlib
 import sys
+import os
 from types import TracebackType
 from typing import Any, Callable, Dict, Optional, Tuple, Type, Union
+import site
 
 
 if sys.version_info >= (3, 8):
@@ -67,11 +69,17 @@ class Sentry:
     @property
     def environment(self) -> str:
         """Return the environment we're running in."""
-        # check if we're in a git repo
-        is_git = pathlib.Path(__file__).parent.parent.parent.joinpath(".git").exists()
+        set_env = os.environ.get("WEAVE_SENTRY_ENV", None)
+        if set_env:
+            return set_env
 
-        # these match the environments for gorilla
-        return "development" if is_git else "production"
+        import weave
+
+        is_dev = _is_local_dev_install(weave)
+        if is_dev:
+            return "development"
+
+        return "production"
 
     @_safe_noop
     def setup(self) -> None:
@@ -211,6 +219,19 @@ class Sentry:
             return wrapper
 
         return watch_dec
+
+
+def _is_local_dev_install(module: Any) -> bool:
+    # Check if the __file__ attribute exists
+    if hasattr(module, "__file__"):
+        module_path = module.__file__
+        # Check if the path is within any of the site-packages directories
+        for directory in site.getsitepackages():
+            if directory in module_path:
+                return False
+        return True
+    else:
+        return False
 
 
 global_trace_sentry = Sentry()

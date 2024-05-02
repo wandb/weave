@@ -10,7 +10,7 @@ from ...trace_server import trace_server_interface as tsi
 # There are 24 (2 * 2 * 3 * 2) distinct arg shapes, each with a number of variants
 #
 #                        Astrisk in the table means that the argument is named
-#                        we use `*` to idicate the start of keyword-only arguments
+#                        we use `*` to indicate the start of keyword-only arguments
 #                        rather than using default values ---\
 #                                                            |
 #                                                            |
@@ -430,8 +430,25 @@ def test_general_arg_variations(client, fn, arg_variations):
 
 
 # Below are specific tests for each of the 24 stubs
-# While the above test is more general and cover all possible variations, the below tests are more specific and
+# While the above test is more general and covers all possible variations, the below tests are more specific and
 # a bit easier to read and understand (technically, the above test is more comprehensive and should be enough)
+
+
+def test_no_args(client):
+    @weave.op
+    def my_op() -> int:
+        return 1
+
+    my_op()
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert res.calls[0].op_name == my_op.ref.uri()
+    assert res.calls[0].inputs == {}
 
 
 def test_args_empty(client):
