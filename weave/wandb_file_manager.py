@@ -27,7 +27,7 @@ from urllib import parse
 tracer = engine_trace.tracer()  # type: ignore
 
 
-def _file_path(uri: artifact_wandb.WeaveWBArtifactURI, md5_hex: str) -> str:
+def _file_path(uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI], md5_hex: str) -> str:
     if uri.path is None:
         raise errors.WeaveInternalError("Artifact URI has no path in call to file_path")
     path_parts = uri.path.split(".", 1)
@@ -35,6 +35,8 @@ def _file_path(uri: artifact_wandb.WeaveWBArtifactURI, md5_hex: str) -> str:
         extension = "." + path_parts[1]
     else:
         extension = ""
+    if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
+        return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/{md5_hex}{extension}"
     return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/{md5_hex}{extension}"
 
 
@@ -258,8 +260,10 @@ class WandbFileManager:
             str, typing.Optional[artifact_wandb.WandbArtifactManifest]
         ] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
-    def manifest_path(self, uri: artifact_wandb.WeaveWBArtifactURI) -> str:
+    def manifest_path(self, uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]) -> str:
         assert uri.version is not None
+        if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
+            return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     def _manifest(

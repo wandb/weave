@@ -42,6 +42,7 @@ def is_subdir(path: str, root: str) -> bool:
 
 def safe_path(path: str) -> str:
     root = get_filesystem_dir()
+    print(f"logging wandb file manager root dir ===> {root}", flush=True)
     result = os.path.join(root, path)
     if not is_subdir(result, root):
         raise errors.WeaveAccessDeniedError(f"Path {path} is not allowed")

@@ -1154,6 +1154,7 @@ class WeaveWBArtifactByIDURI(uris.WeaveURI):
             self.name,
             self.version,
             self.artifact_id,
+            self.entity_name,
             self.netloc,
             path,
             self.extra,
@@ -1172,7 +1173,8 @@ class WeaveWBArtifactByIDURI(uris.WeaveURI):
             resolved_artifact_uri = WeaveWBArtifactByIDURI(
                 self.name.split(":", 1)[0],
                 self.commit_hash,
-                self.artifact_id
+                self.artifact_id,
+                self.entity_name,
             )
             self._resolved_artifact_uri = resolved_artifact_uri
         return self._resolved_artifact_uri
