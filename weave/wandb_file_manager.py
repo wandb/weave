@@ -27,7 +27,12 @@ from urllib import parse
 tracer = engine_trace.tracer()  # type: ignore
 
 
-def _file_path(uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI], md5_hex: str) -> str:
+def _file_path(
+    uri: typing.Union[
+        artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+    ],
+    md5_hex: str,
+) -> str:
     if uri.path is None:
         raise errors.WeaveInternalError("Artifact URI has no path in call to file_path")
     path_parts = uri.path.split(".", 1)
@@ -41,7 +46,9 @@ def _file_path(uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wan
 
 
 def _local_path_and_download_url(
-    art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+    art_uri: typing.Union[
+        artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+    ],
     manifest: artifact_wandb.WandbArtifactManifest,
 ) -> typing.Optional[typing.Tuple[str, str]]:
     path = art_uri.path
@@ -87,14 +94,23 @@ class WandbFileManagerAsync:
             str, typing.Optional[artifact_wandb.WandbArtifactManifest]
         ] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
-    def manifest_path(self, uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],) -> str:
+    def manifest_path(
+        self,
+        uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
+    ) -> str:
         assert uri.version is not None
         if isinstance(uri, artifact_wandb.WeaveWBArtifactURI):
             return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
         return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
 
     async def _manifest(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI], manifest_path: str
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
+        manifest_path: str,
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         if art_uri.version is None:
             raise errors.WeaveInternalError(
@@ -108,10 +124,12 @@ class WandbFileManagerAsync:
             pass
         # Download
         print(f"download manifest via id ===> {art_uri.__class__}", flush=True)
-        print(art_uri, flush=None)
         manifest_url = None
         if isinstance(art_uri, artifact_wandb.WeaveWBArtifactByIDURI):
-            print(f"downloading manifest via artifact id ===> {art_uri.artifact_id}", flush=True)
+            print(
+                f"downloading manifest via artifact id ===> {art_uri.artifact_id}",
+                flush=True,
+            )
             artifact_id = art_uri.artifact_id
             manifest_url = await self.wandb_api.artifact_manifest_url_from_id(
                 art_id=artifact_id,
@@ -133,7 +151,10 @@ class WandbFileManagerAsync:
             return artifact_wandb.WandbArtifactManifest(json.loads(await f.read()))
 
     async def manifest(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         with tracer.trace("wandb_file_manager.manifest") as span:
             assert art_uri.version is not None
@@ -146,7 +167,10 @@ class WandbFileManagerAsync:
             return manifest
 
     async def local_path_and_download_url(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
@@ -159,7 +183,10 @@ class WandbFileManagerAsync:
         return _local_path_and_download_url(art_uri, manifest)
 
     async def ensure_file(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         path = art_uri.path
         if path is None:
@@ -231,7 +258,10 @@ class WandbFileManagerAsync:
             return file_path
 
     async def direct_url(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         path = art_uri.path
         if path is None:
@@ -260,14 +290,23 @@ class WandbFileManager:
             str, typing.Optional[artifact_wandb.WandbArtifactManifest]
         ] = cache.LruTimeWindowCache(datetime.timedelta(minutes=5))
 
-    def manifest_path(self, uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]) -> str:
+    def manifest_path(
+        self,
+        uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
+    ) -> str:
         assert uri.version is not None
         if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
             return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     def _manifest(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI], manifest_path: str,
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
+        manifest_path: str,
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         if art_uri.version is None:
             raise errors.WeaveInternalError(
@@ -281,7 +320,6 @@ class WandbFileManager:
             pass
         # Download
         print(f"download manifest via id ===> {art_uri.__class__}", flush=True)
-        print(art_uri, flush=None)
         manifest_url = None
         if isinstance(art_uri, artifact_wandb.WeaveWBArtifactByIDURI):
             artifact_id = art_uri.artifact_id
@@ -305,7 +343,10 @@ class WandbFileManager:
             return artifact_wandb.WandbArtifactManifest(json.loads(f.read()))
 
     def manifest(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("inside sync manifest", flush=True)
         with tracer.trace("wandb_file_manager.manifest") as span:
@@ -319,7 +360,10 @@ class WandbFileManager:
             return manifest
 
     def local_path_and_download_url(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
@@ -366,7 +410,10 @@ class WandbFileManager:
             return file_path
 
     def ensure_file(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         path = art_uri.path
         if path is None:
@@ -396,7 +443,10 @@ class WandbFileManager:
             return file_path
 
     def direct_url(
-        self, art_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI]
+        self,
+        art_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         path = art_uri.path
         if path is None:

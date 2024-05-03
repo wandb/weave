@@ -811,9 +811,7 @@ async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
                 and file.artifact._read_artifact_uri
             ):
                 uri = file.artifact._read_artifact_uri.with_path(file.path)
-                task = loop.create_task(
-                    conn.ensure_file(uri)
-                )
+                task = loop.create_task(conn.ensure_file(uri))
                 tasks.add(task)
         await asyncio.wait(tasks)
 

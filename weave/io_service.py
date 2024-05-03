@@ -401,14 +401,15 @@ class Server:
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("inside io_service, ensure manifest()")
         try:
-            uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
+            uri: typing.Union[
+                "artifact_wandb.WeaveWBArtifactURI",
+                "artifact_wandb.WeaveWBArtifactByIDURI",
+            ] = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         except errors.WeaveInternalError:
             uri = artifact_wandb.WeaveWBArtifactByIDURI.parse(artifact_uri)
         return await self.wandb_file_manager.manifest(uri)
 
-    async def handle_ensure_file(
-        self, artifact_uri: str
-    ) -> typing.Optional[str]:
+    async def handle_ensure_file(self, artifact_uri: str) -> typing.Optional[str]:
         try:
             uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         except errors.WeaveInternalError:
@@ -420,9 +421,7 @@ class Server:
     ) -> typing.Optional[str]:
         return await self.wandb_file_manager.ensure_file_downloaded(download_url)
 
-    async def handle_direct_url(
-        self, artifact_uri: str
-    ) -> typing.Optional[str]:
+    async def handle_direct_url(self, artifact_uri: str) -> typing.Optional[str]:
         try:
             uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         except errors.WeaveInternalError:
@@ -533,7 +532,9 @@ class AsyncConnection:
 
     async def manifest(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("inside async manifest in io_service.py", flush=True)
         manifest: typing.Optional[
@@ -543,7 +544,9 @@ class AsyncConnection:
 
     async def ensure_file(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         res = await self.request("ensure_file", str(artifact_uri))
         return res
@@ -554,7 +557,9 @@ class AsyncConnection:
 
     async def direct_url(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         res = await self.request("direct_url", str(artifact_uri))
         return res
@@ -626,7 +631,9 @@ class SyncClient:
 
     def manifest(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("inside manifest in io_service.py", flush=True)
         manifest: typing.Optional[artifact_wandb.WandbArtifactManifest] = self.request(
@@ -636,7 +643,9 @@ class SyncClient:
 
     def ensure_file(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         return self.request("ensure_file", str(artifact_uri))
 
@@ -645,7 +654,9 @@ class SyncClient:
 
     def direct_url(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         return self.request("direct_url", str(artifact_uri))
 
@@ -664,14 +675,18 @@ class ServerlessClient:
 
     def manifest(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("serverless client inside manifest in io_service.py", flush=True)
         return self.wandb_file_manager.manifest(artifact_uri)
 
     def ensure_file(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         return self.wandb_file_manager.ensure_file(artifact_uri)
 
@@ -680,7 +695,9 @@ class ServerlessClient:
 
     def direct_url(
         self,
-        artifact_uri: typing.Union[artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI],
+        artifact_uri: typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
+        ],
     ) -> typing.Optional[str]:
         return self.wandb_file_manager.direct_url(artifact_uri)
 
