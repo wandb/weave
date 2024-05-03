@@ -812,7 +812,7 @@ async def ensure_files(files: dict[str, artifact_fs.FilesystemArtifactFile]):
             ):
                 uri = file.artifact._read_artifact_uri.with_path(file.path)
                 task = loop.create_task(
-                    conn.ensure_file(file.artifact.artifact_id, uri)
+                    conn.ensure_file(uri)
                 )
                 tasks.add(task)
         await asyncio.wait(tasks)
@@ -859,10 +859,6 @@ def file_table(file: artifact_fs.FilesystemArtifactFile) -> typing.Optional[Tabl
     # a file from run summary since it is constructed from a hard-coded artifact
     # URL. This path is only used when fetching tables.
     try:
-        print(
-            "\n\nlogging inside file_table\n\n",
-            flush=True,
-        )
         return Table(_get_table_like_awl_from_file(file).awl)
     except FileNotFoundError as e:
         print(f"file_table exception: {e}", flush=True)

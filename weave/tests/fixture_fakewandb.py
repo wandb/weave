@@ -274,10 +274,11 @@ class FakeIoServiceClient:
         ma = MockedArtifact(artifact)
         self.mocked_artifacts[str(artifact_uri)] = ma
 
-    def manifest(self, artifact_uri, artifact_id):
+    def manifest(self, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
         if uri_str in self.mocked_artifacts:
             return FakeArtifactManifest(self.mocked_artifacts[uri_str].artifact)
+            # return FakeFilesystemManifest(self.mocked_artifacts[uri_str].local_path.name)
         requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
         target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
         return FakeFilesystemManifest(target)
@@ -295,10 +296,10 @@ class FakeIoServiceClient:
 
         return FakeFs()
 
-    def direct_url(self, artifact_uri, artifact_id):
+    def direct_url(self, artifact_uri):
         return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
-    def ensure_file(self, artifact_uri, artifact_id):
+    def ensure_file(self, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
         print(self.mocked_artifacts)
         if uri_str in self.mocked_artifacts:

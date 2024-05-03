@@ -37,7 +37,7 @@ class WbHistogram:
 
 def _filesystem_artifact_file_from_artifact_path(artifact_path: str):
     uri = WeaveWBLoggedArtifactURI.parse(artifact_path)
-    artifact = WandbArtifact(artifact_id="", uri=uri, name=uri.name)
+    artifact = WandbArtifact(uri=uri, name=uri.name)
     file_path = uri.path
     if file_path is None:
         raise ValueError("Artifact path must contain a file path")

@@ -36,7 +36,7 @@ async def gql_test() -> None:
             "v4",
             entity_name="shawn",
             project_name="dsviz_demo",
-        ),
+        )
     )
     if man is None:
         raise Exception("Manifest is None")

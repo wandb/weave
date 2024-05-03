@@ -28,26 +28,13 @@ static_art_file_gql = """
                 id
                 name
                 project {
-                        id
-                        name
-                        entity {
-                            id
-                            name
-                        }
-                    }
-                defaultArtifactType {
                     id
                     name
+                    entity {
+                        id
+                        name
+                    }
                 }
-            }
-        """
-
-static_art_file_gql_no_entity = """
-            id
-            commitHash
-            artifactSequence {
-                id
-                name
                 defaultArtifactType {
                     id
                     name
@@ -560,27 +547,26 @@ def history_metrics(
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     print(f"\n\nlogging version query result: ===> \n{artifactVersion}\n\n", flush=True)
     artifact_id = artifactVersion["id"]
-    entity_name = "_"
-    project_name = "_"
-    if artifactVersion["artifactSequence"]["project"] is not None:
-        entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
-        project_name = artifactVersion["artifactSequence"]["project"]["name"]
-    print(
-        f"\n\nlogging version project_name: ===> \n{project_name}\nentity_name ===> {entity_name}\n\n",
-        flush=True,
-    )
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
     commit_hash = artifactVersion["commitHash"]
+    uri = artifact_wandb.WeaveWBArtifactByIDURI(home_sequence_name, commit_hash, artifact_id)
+    print(f"\n\nlogging artifact_by_id uri: ===> \n{uri}\n\n", flush=True)
+    # if artifactVersion["artifactSequence"]["project"] is not None:
+    #     entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
+    #     project_name = artifactVersion["artifactSequence"]["project"]["name"]
+    #     uri = artifact_wandb.WeaveWBArtifactURI(
+    #         home_sequence_name, commit_hash, entity_name, project_name
+    #     )
+    # print(
+    #     f"\n\nlogging version project_name: ===> \n{project_name}\nentity_name ===> {entity_name}\n\n",
+    #     flush=True,
+    # )
+
     return artifact_wandb.WandbArtifact(
         name=home_sequence_name,
         type=type_name,
-        uri=artifact_wandb.WeaveWBArtifactURI(
-            home_sequence_name, commit_hash, entity_name, project_name
-        )
-        if entity_name != "_"
-        else None,
-        artifact_id=artifact_id,
+        uri=uri,
     )
 
 
