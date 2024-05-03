@@ -411,7 +411,10 @@ class Server:
 
     async def handle_ensure_file(self, artifact_uri: str) -> typing.Optional[str]:
         try:
-            uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
+            uri: typing.Union[
+                "artifact_wandb.WeaveWBArtifactURI",
+                "artifact_wandb.WeaveWBArtifactByIDURI",
+            ] = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         except errors.WeaveInternalError:
             uri = artifact_wandb.WeaveWBArtifactByIDURI.parse(artifact_uri)
         return await self.wandb_file_manager.ensure_file(uri)
@@ -423,7 +426,10 @@ class Server:
 
     async def handle_direct_url(self, artifact_uri: str) -> typing.Optional[str]:
         try:
-            uri = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
+            uri: typing.Union[
+                "artifact_wandb.WeaveWBArtifactURI",
+                "artifact_wandb.WeaveWBArtifactByIDURI",
+            ] = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         except errors.WeaveInternalError:
             uri = artifact_wandb.WeaveWBArtifactByIDURI.parse(artifact_uri)
         return await self.wandb_file_manager.direct_url(uri)
