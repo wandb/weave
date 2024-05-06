@@ -9,6 +9,7 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import * as Colors from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
@@ -895,7 +896,25 @@ export const RunsTable: FC<{
           </VisibilityAlertAction>
         </VisibilityAlert>
       )}
-      <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexDirection: 'row-reverse',
+        }}>
+        <Button
+          className="m-8 h-32"
+          size="small"
+          variant="secondary"
+          onClick={() => apiRef.current.exportDataAsCsv()}>
+          Export to CSV
+        </Button>
+        <BoringColumnInfo
+          tableStats={tableStats}
+          columns={columns.cols as any}
+        />
+      </div>
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
