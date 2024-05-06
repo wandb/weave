@@ -21,7 +21,7 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: dict, model_output: dict) -> dict:
+def match_score1(expected: str, model_output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
     return {'match': expected == model_output['generated_text']}
 
@@ -71,7 +71,7 @@ examples = [
 
 # Define any custom scoring function
 @weave.op()
-def match_score1(expected: dict, model_output: dict) -> dict:
+def match_score1(expected: str, model_output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
     return {'match': expected == model_output['generated_text']}
 ```
@@ -132,7 +132,7 @@ examples = [
 ]
 
 @weave.op()
-def match_score1(expected: dict, model_output: dict) -> dict:
+def match_score1(expected: str, model_output: dict) -> dict:
     return {'match': expected == model_output['generated_text']}
 
 @weave.op()
