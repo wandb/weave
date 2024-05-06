@@ -8,7 +8,12 @@ import typing
 from weave import wandb_api
 from weave import util
 from .tag_test_util import op_add_tag
-from ..artifact_wandb import WandbArtifact, WeaveWBArtifactURI, WandbArtifactManifest
+from ..artifact_wandb import (
+    WandbArtifact,
+    WeaveWBArtifactURI,
+    WandbArtifactManifest,
+    WeaveWBArtifactByIDURI,
+)
 from .. import wandb_client_api
 from unittest import mock
 import shutil
@@ -279,7 +284,10 @@ class FakeIoServiceClient:
         if uri_str in self.mocked_artifacts:
             return FakeArtifactManifest(self.mocked_artifacts[uri_str].artifact)
             # return FakeFilesystemManifest(self.mocked_artifacts[uri_str].local_path.name)
-        requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
+        if isinstance(artifact_uri, WeaveWBArtifactURI):
+            requested_path = f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}"
+        elif isinstance(artifact_uri, WeaveWBArtifactByIDURI):
+            requested_path = f"{artifact_uri.path_root}/{artifact_uri.artifact_id}/{artifact_uri.name}_{artifact_uri.version}"
         target = os.path.abspath(os.path.join(shared_artifact_dir, requested_path))
         return FakeFilesystemManifest(target)
 
@@ -297,7 +305,10 @@ class FakeIoServiceClient:
         return FakeFs()
 
     def direct_url(self, artifact_uri):
-        return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+        if isinstance(artifact_uri, WeaveWBArtifactURI):
+            return f"https://api.wandb.ai/{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+        elif isinstance(artifact_uri, WeaveWBArtifactByIDURI):
+            return f"https://api.wandb.ai/{artifact_uri.path_root}/{artifact_uri.artifact_id}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
     def ensure_file(self, artifact_uri):
         uri_str = str(artifact_uri.with_path(""))
@@ -309,7 +320,10 @@ class FakeIoServiceClient:
             if entry is None:
                 return None
             return entry.local_path
-        return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+        if isinstance(artifact_uri, WeaveWBArtifactURI):
+            return f"{artifact_uri.entity_name}/{artifact_uri.project_name}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
+        elif isinstance(artifact_uri, WeaveWBArtifactByIDURI):
+            return f"{artifact_uri.path_root}/{artifact_uri.artifact_id}/{artifact_uri.name}_{artifact_uri.version}/{artifact_uri.path}"
 
     def ensure_file_downloaded(self, download_url):
         # assumes the file is already in the testdata directory
