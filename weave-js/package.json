@@ -143,6 +143,7 @@
     "vite-plugin-svgr": "^2.4.0",
     "wavesurfer.js": "^2.0.0",
     "web-tree-sitter": "^0.20.5",
+    "yet-another-react-lightbox": "^3.17.5",
     "zen-observable": "^0.10.0"
   },
   "devDependencies": {
