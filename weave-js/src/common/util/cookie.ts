@@ -157,3 +157,14 @@ function getFirebaseCookiesObject(): Struct<string> {
     return {};
   }
 }
+
+export const generateCookieString = () => {
+  // Generate 32 random bytes
+  const randomBytes = new Uint8Array(32);
+  window.crypto.getRandomValues(randomBytes);
+
+  // Convert bytes to hexadecimal strings
+  return Array.from(randomBytes)
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+};
