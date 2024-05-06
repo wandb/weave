@@ -113,10 +113,12 @@ def clear_cache() -> None:
 
 def get_user_cache_key() -> typing.Optional[str]:
     ctx = wandb_api.get_wandb_api_context()
+
     if ctx is None:
         if environment.is_public():
             raise errors.WeaveAccessDeniedError("No user set in public environment")
         return None
+    print(ctx, flush=True)
     if ctx.user_id is None:
         unauthed_user_cookie = ctx.cookies.get("anon_wandb")
         if unauthed_user_cookie:
