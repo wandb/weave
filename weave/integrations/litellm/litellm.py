@@ -87,6 +87,7 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
 def make_wrapper(name: str) -> typing.Callable:
     def litellm_wrapper(fn: typing.Callable) -> typing.Callable:
         op = weave.op()(fn)
+        op.name = name  # type: ignore
         return add_accumulator(
             op,  # type: ignore
             litellm_accumulator,
