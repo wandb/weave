@@ -2,7 +2,7 @@ from typing import Callable, Any, Mapping, Optional
 import inspect
 import functools
 import typing
-from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine
+from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine, Dict
 from typing_extensions import ParamSpec
 
 from weave.trace.errors import OpCallError
@@ -26,7 +26,7 @@ def print_call_link(call: "Call") -> None:
 
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
-OnOutputHandlerType = Callable[[Any, FinishCallbackType], Any]
+OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
 
 
 class Op:
@@ -91,7 +91,7 @@ class Op:
 
         def on_output(output: Any) -> Any:
             if self._on_output_handler:
-                return self._on_output_handler(output, finish)
+                return self._on_output_handler(output, finish, inputs)
             finish(output)
             return output
 
