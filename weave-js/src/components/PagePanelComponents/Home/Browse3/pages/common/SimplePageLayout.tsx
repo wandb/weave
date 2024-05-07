@@ -41,6 +41,7 @@ export const SimplePageLayout: FC<{
   }>;
   leftSidebar?: ReactNode;
   hideTabsIfSingle?: boolean;
+  headerExtra?: ReactNode;
 }> = props => {
   const {tabs} = props;
   const simplePageLayoutContextValue = useContext(SimplePageLayoutContext);
@@ -117,6 +118,7 @@ export const SimplePageLayout: FC<{
           </Box>
           {simplePageLayoutContextValue.headerSuffix}
         </Box>
+        {props.headerExtra}
         {(!props.hideTabsIfSingle || tabs.length > 1) && (
           <Tabs.Root
             value={tabs[tabValue].label}
