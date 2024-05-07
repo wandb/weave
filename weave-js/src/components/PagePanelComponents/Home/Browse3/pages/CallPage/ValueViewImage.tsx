@@ -77,6 +77,9 @@ export const ValueViewImage = ({value}: ValueViewImageProps) => {
         plugins={[Fullscreen, Zoom]}
         open={lightboxOpen}
         close={() => setLightboxOpen(false)}
+        controller={{
+          closeOnBackdropClick: true,
+        }}
         slides={[{src: value}]}
         render={{
           // Hide previous and next buttons because we only have one image.
