@@ -304,10 +304,9 @@ export const RunsTable: FC<{
 
   useEffect(() => {
     removeExtra('exportRunsTableButton');
-    addExtra(
-      'exportRunsTableButton',
-      <ExportRunsTableButton tableRef={apiRef} />
-    );
+    addExtra('exportRunsTableButton', {
+      node: <ExportRunsTableButton tableRef={apiRef} />,
+    });
 
     return () => removeExtra('exportRunsTableButton');
   }, [apiRef, addExtra, removeExtra]);

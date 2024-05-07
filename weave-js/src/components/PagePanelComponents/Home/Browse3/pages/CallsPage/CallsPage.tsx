@@ -88,7 +88,7 @@ export const CallsPage: FC<{
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
 
-  const {extras} = React.useContext(WeaveHeaderExtrasContext);
+  const {renderExtras} = React.useContext(WeaveHeaderExtrasContext);
 
   return (
     <SimplePageLayout
@@ -107,7 +107,7 @@ export const CallsPage: FC<{
           ),
         },
       ]}
-      headerExtra={<>{...Object.values(extras)}</>}
+      headerExtra={renderExtras()}
     />
   );
 };

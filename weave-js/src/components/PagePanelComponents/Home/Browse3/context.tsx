@@ -11,6 +11,7 @@ import React, {
   useCallback,
   useContext,
   useMemo,
+  useState,
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
@@ -664,25 +665,27 @@ export const usePeekLocation = () => {
 };
 
 export const WeaveHeaderExtrasContext = createContext<{
-  extras: {[key: string]: ReactNode};
-  addExtra: (key: string, value: ReactNode) => void;
+  extras: {[key: string]: HeaderExtra};
+  addExtra: (key: string, value: HeaderExtra) => void;
   removeExtra: (key: string) => void;
+  renderExtras: () => ReactNode;
 }>({
   extras: {},
   addExtra: () => {},
   removeExtra: () => {},
+  renderExtras: () => null,
 });
+
+type HeaderExtra = {node: ReactNode; order?: number};
 
 export const WeaveHeaderExtrasProvider = ({
   children,
 }: {
   children: ReactNode;
 }) => {
-  const [extras, setExtras] = React.useState<{[key: string]: React.ReactNode}>(
-    {}
-  );
+  const [extras, setExtras] = useState<{[key: string]: HeaderExtra}>({});
   const addExtra = useCallback(
-    (key: string, extra: React.ReactNode) => {
+    (key: string, extra: HeaderExtra) => {
       setExtras(prev => {
         return {...prev, [key]: extra};
       });
@@ -700,8 +703,22 @@ export const WeaveHeaderExtrasProvider = ({
     },
     [setExtras]
   );
+
+  const renderExtras = useCallback(() => {
+    return (
+      <>
+        {Object.entries(extras)
+          .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
+          .map(([key, extra]) => {
+            return <React.Fragment key={key}>{extra.node}</React.Fragment>;
+          })}
+      </>
+    );
+  }, [extras]);
+
   return (
-    <WeaveHeaderExtrasContext.Provider value={{extras, addExtra, removeExtra}}>
+    <WeaveHeaderExtrasContext.Provider
+      value={{extras, addExtra, removeExtra, renderExtras}}>
       {children}
     </WeaveHeaderExtrasContext.Provider>
   );
