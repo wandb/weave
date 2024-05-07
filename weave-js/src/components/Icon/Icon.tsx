@@ -58,6 +58,7 @@ import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.
 import {ReactComponent as ImportEmailEnvelope} from '../../assets/icons/icon-email-envelope.svg';
 import {ReactComponent as ImportExpandRight} from '../../assets/icons/icon-expand-right.svg';
 import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-expand-uncollapse.svg';
+import {ReactComponent as ImportExportShareUpload} from '../../assets/icons/icon-export-share-upload.svg';
 import {ReactComponent as ImportFacebookSocial} from '../../assets/icons/icon-facebook-social.svg';
 import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg';
 import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
@@ -415,6 +416,9 @@ export const IconExpandRight = (props: SVGIconProps) => (
 );
 export const IconExpandUncollapse = (props: SVGIconProps) => (
   <ImportExpandUncollapse {...updateIconProps(props)} />
+);
+export const IconExportShareUpload = (props: SVGIconProps) => (
+  <ImportExportShareUpload {...updateIconProps(props)} />
 );
 export const IconFacebookSocial = (props: SVGIconProps) => (
   <ImportFacebookSocial {...updateIconProps(props)} />
@@ -986,6 +990,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'email-envelope': IconEmailEnvelope,
   'expand-right': IconExpandRight,
   'expand-uncollapse': IconExpandUncollapse,
+  'export-share-upload': IconExportShareUpload,
   'facebook-social': IconFacebookSocial,
   failed: IconFailed,
   'filter-alt': IconFilterAlt,

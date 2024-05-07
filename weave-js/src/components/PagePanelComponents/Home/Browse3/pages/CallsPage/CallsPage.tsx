@@ -11,7 +11,11 @@ import React, {FC, useCallback, useMemo} from 'react';
 
 import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
-import {useWeaveflowRouteContext} from '../../context';
+import {
+  useWeaveflowRouteContext,
+  WeaveHeaderExtrasContext,
+  WeaveHeaderExtrasProvider,
+} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
 import {Empty} from '../common/Empty';
@@ -55,6 +59,11 @@ export type WFHighLevelCallFilter = {
   frozen?: boolean;
 };
 
+const HeaderExtras = () => {
+  const {renderExtras} = React.useContext(WeaveHeaderExtrasContext);
+  return <>{renderExtras()}</>;
+};
+
 export const CallsPage: FC<{
   entity: string;
   project: string;
@@ -86,23 +95,26 @@ export const CallsPage: FC<{
   }, [filter.opVersionRefs, isEvaluationTable]);
 
   return (
-    <SimplePageLayout
-      title={title}
-      hideTabsIfSingle
-      tabs={[
-        {
-          label: 'All',
-          content: (
-            <CallsTable
-              {...props}
-              hideControls={filter.frozen}
-              initialFilter={filter}
-              onFilterUpdate={setFilter}
-            />
-          ),
-        },
-      ]}
-    />
+    <WeaveHeaderExtrasProvider>
+      <SimplePageLayout
+        title={title}
+        hideTabsIfSingle
+        tabs={[
+          {
+            label: 'All',
+            content: (
+              <CallsTable
+                {...props}
+                hideControls={filter.frozen}
+                initialFilter={filter}
+                onFilterUpdate={setFilter}
+              />
+            ),
+          },
+        ]}
+        headerExtra={<HeaderExtras />}
+      />
+    </WeaveHeaderExtrasProvider>
   );
 };
 
