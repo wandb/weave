@@ -23,8 +23,8 @@ def add_accumulator(
     op: Op,
     accumulator: Callable[[S, V], S],
     *,
-    should_accumulate: Optional[Callable[[Dict], bool]],
-    on_finish_post_processor: Optional[Callable[[Any], Any]],
+    should_accumulate: Optional[Callable[[Dict], bool]] = None,
+    on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
 ) -> Op:
     """This is to be used internally only - specifically designed for integrations with streaming libraries.
 
