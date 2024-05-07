@@ -166,12 +166,7 @@ def check_wandb_run_matches_weave_project_entity(
     if wandb_run_id:
         # ex: "entity/project/run_id"
         wandb_entity, wandb_project, _ = wandb_run_id.split("/")
-        if wandb_project != weave_project:
+        if wandb_entity != weave_entity or wandb_project != weave_project:
             raise ValueError(
-                f"Wandb.init received project: '{wandb_project}' but does not match weave.init project: '{weave_project}' (projects must match to use weave)"
-            )
-
-        if wandb_entity != weave_entity:
-            raise ValueError(
-                f"Wandb.init received entity: '{wandb_entity}' but does not match weave.init entity: '{weave_entity}' (entities must match to use weave)"
+                f"Wandb.init called with <entity>/<project>: '{wandb_entity}/{wandb_project}' but does not match weave.init: '{weave_entity}/{weave_project}' (project and entity must match to use weave)"
             )
