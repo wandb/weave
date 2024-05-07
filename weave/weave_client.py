@@ -601,3 +601,9 @@ def safe_current_wb_run_id() -> Optional[str]:
         return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
     except ImportError:
         return None
+
+
+def make_anonymous_op(name: str) -> Op:
+    op = Op(lambda *args, **kwargs: None)
+    op.name = name
+    return op
