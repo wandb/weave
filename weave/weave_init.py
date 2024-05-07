@@ -163,7 +163,7 @@ def init_local() -> InitializedClient:
 
 
 def wandb_run_project_matches_weave_project(weave_project: str) -> bool:
-    wandb_uri = weave_client.safe_current_wb_run_ure()
+    wandb_uri = weave_client.safe_current_wb_run_uri()
     if not wandb_uri:
         return True
 
