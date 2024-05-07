@@ -160,10 +160,10 @@ def init_local() -> InitializedClient:
 
 
 def check_wandb_run_project_matches_weave_project(weave_project: str) -> None:
-    wandb_id = weave_client.safe_current_wb_run_id()
-    if wandb_id:
+    wandb_run_id = weave_client.safe_current_wb_run_id()
+    if wandb_run_id:
         # ex: "entity/project/run_id"
-        wandb_project = wandb_id.split("/")[1]
+        wandb_project = wandb_run_id.split("/")[1]
         if wandb_project != weave_project:
             raise ValueError(
                 f"Wandb.init received project: '{wandb_project}' but does not match weave.init project: '{weave_project}' (projects must match to use weave)"
