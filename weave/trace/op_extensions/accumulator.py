@@ -155,7 +155,7 @@ class _IteratorWrapper(Generic[V]):
             value = await self._iterator.__anext__()  # type: ignore
             self._on_yield(value)
             return value
-        except StopIteration:
+        except StopAsyncIteration:
             self._call_on_close_once()
             raise
         except Exception as e:
