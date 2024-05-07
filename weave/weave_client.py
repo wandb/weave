@@ -462,7 +462,7 @@ class WeaveClient:
         if parent is not None:
             parent._children.append(call)
 
-        current_wb_run_uri = safe_current_wb_run_uri()
+        current_wb_run_id = safe_current_wb_run_id()
         start = StartedCallSchemaForInsert(
             project_id=self._project_id(),
             id=call_id,
@@ -472,7 +472,7 @@ class WeaveClient:
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes=attributes,
-            wb_run_id=current_wb_run_uri,
+            wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
         return call
@@ -591,7 +591,7 @@ class WeaveClient:
         return ""
 
 
-def safe_current_wb_run_uri() -> Optional[str]:
+def safe_current_wb_run_id() -> Optional[str]:
     try:
         import wandb
 
