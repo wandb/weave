@@ -2,19 +2,19 @@ import {Box, Typography} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
+  GridApiPro,
   GridColDef,
   GridColumnGroup,
   GridColumnVisibilityModel,
   GridRowSelectionModel,
-  useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import * as Colors from '@wandb/weave/common/css/color.styles';
+import {Button} from '@wandb/weave/components/Button';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
   ComponentProps,
   FC,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -38,7 +38,6 @@ import {parseRef} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {LoadingDots} from '../../../LoadingDots';
 import {Timestamp} from '../../../Timestamp';
-import {WeaveMainTableContext} from '../Browse3/context';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
 import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
@@ -236,12 +235,35 @@ const getPeekId = (peekPath: string | null): string | null => {
   return pathname.split('/').pop() ?? null;
 };
 
+export const ExportRunsTableButton = ({
+  tableRef,
+}: {
+  tableRef: React.MutableRefObject<GridApiPro>;
+}) => (
+  <Box
+    sx={{
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }}>
+    <Button
+      className="mx-16"
+      size="medium"
+      variant="secondary"
+      onClick={() => tableRef.current?.exportDataAsCsv()}
+      icon="export-share-upload">
+      Export to CSV
+    </Button>
+  </Box>
+);
+
 export const RunsTable: FC<{
   loading: boolean;
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+  ref?: React.MutableRefObject<GridApiPro>;
+}> = ({loading, spans, clearFilters, ioColumnsOnly, ref: apiRef}) => {
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
@@ -274,16 +296,6 @@ export const RunsTable: FC<{
   const isSingleOp = useMemo(() => {
     return uniqueSpanNames.length === 1;
   }, [uniqueSpanNames]);
-
-  const {setMainTableRef} = useContext(WeaveMainTableContext);
-  const apiRef = useGridApiRef();
-
-  useEffect(() => {
-    setMainTableRef(apiRef);
-    return () => {
-      setMainTableRef(undefined);
-    };
-  }, [apiRef, setMainTableRef]);
 
   // Have to add _result when null, even though we try to do this in the python
   // side

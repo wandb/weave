@@ -1,4 +1,3 @@
-import {GridApiPro, useGridApiRef} from '@mui/x-data-grid-pro';
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
@@ -624,52 +623,6 @@ export const WeaveflowPeekContext = createContext<{
 }>({
   isPeeking: false,
 });
-
-export const WeaveMainTableContext = createContext<{
-  mainTableRef: React.MutableRefObject<GridApiPro> | undefined;
-  shouldShowExportButton: boolean;
-  setShouldShowExportButton: (isSet: boolean) => void;
-  setMainTableRef: (
-    ref: React.MutableRefObject<GridApiPro> | undefined
-  ) => void;
-}>({
-  shouldShowExportButton: false,
-  setShouldShowExportButton: () => {},
-  mainTableRef: undefined,
-  setMainTableRef: () => {},
-});
-
-export const WeaveMainTableContextProvider = ({
-  children,
-}: {
-  children: ReactNode;
-}) => {
-  const [shouldShowExportButton, setShouldShowExportButton] =
-    React.useState(false);
-  const mainTableRef = useGridApiRef();
-  const setMainTableRef = (
-    ref: React.MutableRefObject<GridApiPro> | undefined
-  ) => {
-    if (ref === undefined) {
-      setShouldShowExportButton(false);
-      return;
-    }
-    mainTableRef.current = ref.current;
-    setShouldShowExportButton(true);
-  };
-
-  return (
-    <WeaveMainTableContext.Provider
-      value={{
-        mainTableRef,
-        shouldShowExportButton,
-        setShouldShowExportButton,
-        setMainTableRef,
-      }}>
-      {children}
-    </WeaveMainTableContext.Provider>
-  );
-};
 
 export const useClosePeek = () => {
   const history = useHistory();

@@ -1,19 +1,18 @@
 // import {PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
-  Box,
   Chip,
   FormControl,
   // IconButton,
   ListItem,
 } from '@mui/material';
-import {Button} from '@wandb/weave/components/Button';
+import {GridApiPro, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
+import React, {FC, MutableRefObject, useCallback, useMemo} from 'react';
 
 import {Loading} from '../../../../../Loading';
-import {RunsTable} from '../../../Browse2/RunsTable';
-import {useWeaveflowRouteContext, WeaveMainTableContext} from '../../context';
+import {ExportRunsTableButton, RunsTable} from '../../../Browse2/RunsTable';
+import {useWeaveflowRouteContext} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
 import {Empty} from '../common/Empty';
@@ -87,9 +86,9 @@ export const CallsPage: FC<{
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
 
-  const {mainTableRef, shouldShowExportButton} = useContext(
-    WeaveMainTableContext
-  );
+  const [shouldShowExportButton, setShouldShowExportButton] =
+    React.useState(false);
+  const runsTableRef = useGridApiRef();
 
   return (
     <SimplePageLayout
@@ -101,6 +100,8 @@ export const CallsPage: FC<{
           content: (
             <CallsTable
               {...props}
+              setShouldShowExportButton={setShouldShowExportButton}
+              runsTableRef={runsTableRef}
               hideControls={filter.frozen}
               initialFilter={filter}
               onFilterUpdate={setFilter}
@@ -110,21 +111,7 @@ export const CallsPage: FC<{
       ]}
       headerExtra={
         shouldShowExportButton ? (
-          <Box
-            sx={{
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-            }}>
-            <Button
-              className="mx-16"
-              size="medium"
-              variant="secondary"
-              onClick={() => mainTableRef?.current?.exportDataAsCsv()}
-              icon="export-share-upload">
-              Export to CSV
-            </Button>
-          </Box>
+          <ExportRunsTableButton tableRef={runsTableRef} />
         ) : null
       }
     />
@@ -152,6 +139,8 @@ export const CallsTable: FC<{
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
+  runsTableRef?: MutableRefObject<GridApiPro>;
+  setShouldShowExportButton: (shouldShow: boolean) => void;
 }> = props => {
   const {useCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
@@ -159,7 +148,6 @@ export const CallsTable: FC<{
     props.initialFilter,
     props.onFilterUpdate
   );
-  const {setShouldShowExportButton} = useContext(WeaveMainTableContext);
 
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
@@ -323,15 +311,6 @@ export const CallsTable: FC<{
     props.project
   );
 
-  useEffect(() => {
-    if (!calls?.loading && calls?.result != null && calls.result.length > 0) {
-      setShouldShowExportButton(true);
-    }
-    return () => {
-      setShouldShowExportButton(false);
-    };
-  }, [calls?.loading, calls?.result, setShouldShowExportButton]);
-
   if (calls.loading) {
     return <Loading centered />;
   }
@@ -339,11 +318,14 @@ export const CallsTable: FC<{
   const spans = calls.result ?? [];
   const isEmpty = spans.length === 0;
   if (isEmpty) {
+    props.setShouldShowExportButton(false);
     if (isEvaluateTable) {
       return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
     } else {
       return <Empty {...EMPTY_PROPS_TRACES} />;
     }
+  } else {
+    props.setShouldShowExportButton(true);
   }
 
   return (
@@ -477,6 +459,7 @@ export const CallsTable: FC<{
         />
       ) : (
         <RunsTable
+          ref={props.runsTableRef}
           key={callsKey}
           loading={calls.loading}
           spans={spans}

@@ -48,7 +48,6 @@ import {
   useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
-  WeaveMainTableContextProvider,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
 import {BoardPage} from './Browse3/pages/BoardPage';
@@ -335,9 +334,7 @@ const MainPeekingLayout: FC = () => {
               ? 0
               : `${(drawerWidthPct * windowSize.width) / 100}px`,
           }}>
-          <WeaveMainTableContextProvider>
-            <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
-          </WeaveMainTableContextProvider>
+          <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
         </Box>
 
         <Drawer
