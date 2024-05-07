@@ -7,6 +7,7 @@ import {ValueViewNumber} from '../Browse3/pages/CallPage/ValueViewNumber';
 import {ValueViewPrimitive} from '../Browse3/pages/CallPage/ValueViewPrimitive';
 import {isRef} from '../Browse3/pages/common/util';
 import {CellValueBoolean} from './CellValueBoolean';
+import {CellValueImage} from './CellValueImage';
 import {CellValueString} from './CellValueString';
 import {SmallRef} from './SmallRef';
 
@@ -47,6 +48,9 @@ export const CellValue = ({value, isExpanded = false}: CellValueProps) => {
     );
   }
   if (typeof value === 'string') {
+    if (value.startsWith('data:image/')) {
+      return <CellValueImage value={value} />;
+    }
     return <CellValueString value={value} />;
   }
   if (typeof value === 'number') {

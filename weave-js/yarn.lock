@@ -16996,6 +16996,11 @@ yargs@~17.6.0:
     y18n "^5.0.5"
     yargs-parser "^21.1.1"
 
+yet-another-react-lightbox@^3.17.5:
+  version "3.17.5"
+  resolved "https://registry.yarnpkg.com/yet-another-react-lightbox/-/yet-another-react-lightbox-3.17.5.tgz#cb8c973e7d8c6f3b805ccde27dd0be3075d5817f"
+  integrity sha512-bfJe4PO6VgRCclyHYZr3XPXC8Ku44im5aQCI6SWUoCCO4ELo6kpAQxpb24VYz3RLtkMRVVCyXRVnkfPDXSfXhw==
+
 yields-store@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/yields-store/-/yields-store-1.0.2.tgz#af16de4576ae323461ae27eafb01d0d5718e3649"

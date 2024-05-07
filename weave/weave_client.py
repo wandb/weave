@@ -482,7 +482,8 @@ class WeaveClient:
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
         self.save_nested_objects(output)
-        output = map_to_refs(output)
+        original_output = output
+        output = map_to_refs(original_output)
         call.output = output
 
         # Summary handling
@@ -492,6 +493,16 @@ class WeaveClient:
         elif isinstance(output, dict) and "usage" in output and "model" in output:
             summary["usage"] = {}
             summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
+        elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
+            # Handle the cases where we are emitting an object instead of a pre-serialized dict
+            # In fact, this is going to become the more common case
+            model = original_output.model
+            usage = original_output.usage
+            if isinstance(usage, pydantic.BaseModel):
+                usage = usage.model_dump(exclude_unset=True)
+            if isinstance(usage, dict) and isinstance(model, str):
+                summary["usage"] = {}
+                summary["usage"][model] = {"requests": 1, **usage}
 
         # Exception Handling
         exception_str: Optional[str] = None
