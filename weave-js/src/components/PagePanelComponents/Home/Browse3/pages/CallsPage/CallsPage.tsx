@@ -87,7 +87,7 @@ export const CallsPage: FC<{
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
 
-  const {mainTableRef, isRefSet} = useContext(WeaveMainTableContext);
+  const {mainTableRef, shouldShowExportButton} = useContext(WeaveMainTableContext);
 
   return (
     <SimplePageLayout
@@ -107,7 +107,7 @@ export const CallsPage: FC<{
         },
       ]}
       headerExtra={
-        isRefSet ? (
+        shouldShowExportButton ? (
           <Box
             sx={{
               height: '100%',
@@ -157,7 +157,7 @@ export const CallsTable: FC<{
     props.initialFilter,
     props.onFilterUpdate
   );
-  const {setIsRefSet} = useContext(WeaveMainTableContext);
+  const {setShouldShowExportButton} = useContext(WeaveMainTableContext);
 
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
@@ -323,12 +323,12 @@ export const CallsTable: FC<{
 
   useEffect(() => {
     if (!calls?.loading && calls?.result != null && calls.result.length > 0) {
-      setIsRefSet(true);
+      setShouldShowExportButton(true);
     }
     return () => {
-      setIsRefSet(false);
+      setShouldShowExportButton(false);
     };
-  }, [calls?.loading, calls?.result, setIsRefSet]);
+  }, [calls?.loading, calls?.result, setShouldShowExportButton]);
 
   if (calls.loading) {
     return <Loading centered />;

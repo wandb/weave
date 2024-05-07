@@ -627,14 +627,14 @@ export const WeaveflowPeekContext = createContext<{
 
 export const WeaveMainTableContext = createContext<{
   mainTableRef: React.MutableRefObject<GridApiPro> | undefined;
-  isRefSet: boolean;
-  setIsRefSet: (isSet: boolean) => void;
+  shouldShowExportButton: boolean;
+  setShouldShowExportButton: (isSet: boolean) => void;
   setMainTableRef: (
     ref: React.MutableRefObject<GridApiPro> | undefined
   ) => void;
 }>({
-  isRefSet: false,
-  setIsRefSet: () => {},
+  shouldShowExportButton: false,
+  setShouldShowExportButton: () => {},
   mainTableRef: undefined,
   setMainTableRef: () => {},
 });
@@ -644,22 +644,22 @@ export const WeaveMainTableContextProvider = ({
 }: {
   children: ReactNode;
 }) => {
-  const [isRefSet, setIsRefSet] = React.useState(false);
+  const [shouldShowExportButton, setShouldShowExportButton] = React.useState(false);
   const mainTableRef = useGridApiRef();
   const setMainTableRef = (
     ref: React.MutableRefObject<GridApiPro> | undefined
   ) => {
     if (ref === undefined) {
-      setIsRefSet(false);
+      setShouldShowExportButton(false);
       return;
     }
     mainTableRef.current = ref.current;
-    setIsRefSet(true);
+    setShouldShowExportButton(true);
   };
 
   return (
     <WeaveMainTableContext.Provider
-      value={{mainTableRef, isRefSet, setIsRefSet, setMainTableRef}}>
+      value={{mainTableRef, shouldShowExportButton, setShouldShowExportButton, setMainTableRef}}>
       {children}
     </WeaveMainTableContext.Provider>
   );
