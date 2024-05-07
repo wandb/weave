@@ -163,10 +163,11 @@ def init_local() -> InitializedClient:
 
 
 def wandb_run_project_matches_weave_project(weave_project: str) -> bool:
-    wandb_uri = weave_client.safe_current_wb_run_id()
+    wandb_uri = weave_client.safe_current_wb_run_ure()
     if not wandb_uri:
         return True
 
-    wandb_project = wandb_uri.split("/")[1].split("/")[0]
+    # ex: "entity/project/run_id"
+    wandb_project = wandb_uri.split("/")[1]
 
     return wandb_project == weave_project
