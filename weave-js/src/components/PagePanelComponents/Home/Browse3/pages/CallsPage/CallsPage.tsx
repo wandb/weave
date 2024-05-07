@@ -87,7 +87,9 @@ export const CallsPage: FC<{
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
 
-  const {mainTableRef, shouldShowExportButton} = useContext(WeaveMainTableContext);
+  const {mainTableRef, shouldShowExportButton} = useContext(
+    WeaveMainTableContext
+  );
 
   return (
     <SimplePageLayout

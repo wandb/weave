@@ -644,7 +644,8 @@ export const WeaveMainTableContextProvider = ({
 }: {
   children: ReactNode;
 }) => {
-  const [shouldShowExportButton, setShouldShowExportButton] = React.useState(false);
+  const [shouldShowExportButton, setShouldShowExportButton] =
+    React.useState(false);
   const mainTableRef = useGridApiRef();
   const setMainTableRef = (
     ref: React.MutableRefObject<GridApiPro> | undefined
@@ -659,7 +660,12 @@ export const WeaveMainTableContextProvider = ({
 
   return (
     <WeaveMainTableContext.Provider
-      value={{mainTableRef, shouldShowExportButton, setShouldShowExportButton, setMainTableRef}}>
+      value={{
+        mainTableRef,
+        shouldShowExportButton,
+        setShouldShowExportButton,
+        setMainTableRef,
+      }}>
       {children}
     </WeaveMainTableContext.Provider>
   );
