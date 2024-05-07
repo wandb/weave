@@ -14,6 +14,7 @@ import {RunsTable} from '../../../Browse2/RunsTable';
 import {
   useWeaveflowRouteContext,
   WeaveHeaderExtrasContext,
+  WeaveHeaderExtrasProvider,
 } from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
@@ -58,6 +59,11 @@ export type WFHighLevelCallFilter = {
   frozen?: boolean;
 };
 
+const HeaderExtras = () => {
+  const {renderExtras} = React.useContext(WeaveHeaderExtrasContext);
+  return <>{renderExtras()}</>;
+};
+
 export const CallsPage: FC<{
   entity: string;
   project: string;
@@ -88,27 +94,27 @@ export const CallsPage: FC<{
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
 
-  const {renderExtras} = React.useContext(WeaveHeaderExtrasContext);
-
   return (
-    <SimplePageLayout
-      title={title}
-      hideTabsIfSingle
-      tabs={[
-        {
-          label: 'All',
-          content: (
-            <CallsTable
-              {...props}
-              hideControls={filter.frozen}
-              initialFilter={filter}
-              onFilterUpdate={setFilter}
-            />
-          ),
-        },
-      ]}
-      headerExtra={renderExtras()}
-    />
+    <WeaveHeaderExtrasProvider>
+      <SimplePageLayout
+        title={title}
+        hideTabsIfSingle
+        tabs={[
+          {
+            label: 'All',
+            content: (
+              <CallsTable
+                {...props}
+                hideControls={filter.frozen}
+                initialFilter={filter}
+                onFilterUpdate={setFilter}
+              />
+            ),
+          },
+        ]}
+        headerExtra={<HeaderExtras />}
+      />
+    </WeaveHeaderExtrasProvider>
   );
 };
 

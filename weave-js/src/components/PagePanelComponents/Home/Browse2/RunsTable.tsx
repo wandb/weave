@@ -303,7 +303,6 @@ export const RunsTable: FC<{
   const apiRef = useGridApiRef();
 
   useEffect(() => {
-    removeExtra('exportRunsTableButton');
     addExtra('exportRunsTableButton', {
       node: <ExportRunsTableButton tableRef={apiRef} />,
     });
