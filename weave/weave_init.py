@@ -87,13 +87,15 @@ def init_weave(
         wandb_api.init()
         wandb_context = wandb_api.get_wandb_api_context()
 
+    entity_name, project_name = get_entity_project_from_project_name(project_name)
+
+    check_wandb_run_matches_weave_project_entity(entity_name, project_name)
+
     api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:
         api_key = wandb_context.api_key
     remote_server = init_weave_get_server(api_key)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
-    entity_name, project_name = get_entity_project_from_project_name(project_name)
 
     # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(
@@ -155,3 +157,16 @@ def init_local() -> InitializedClient:
     server.setup_tables()
     client = weave_client.WeaveClient("none", "none", server)
     return InitializedClient(client)
+
+
+def check_wandb_run_matches_weave_project_entity(
+    weave_entity: str, weave_project: str
+) -> None:
+    wandb_run_id = weave_client.safe_current_wb_run_id()
+    if wandb_run_id:
+        # ex: "entity/project/run_id"
+        wandb_entity, wandb_project, _ = wandb_run_id.split("/")
+        if wandb_entity != weave_entity or wandb_project != weave_project:
+            raise ValueError(
+                f"Wandb.init called with <entity>/<project>: '{wandb_entity}/{wandb_project}' but does not match weave.init: '{weave_entity}/{weave_project}' (project and entity must match)"
+            )
