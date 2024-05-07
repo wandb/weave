@@ -97,6 +97,8 @@ class SelectableCHCallSchema(BaseModel):
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
 
+    deleted_at: typing.Optional[datetime.datetime] = None
+
 
 all_call_insert_columns = list(
     CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
@@ -860,7 +862,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
-            conditions = ["1 = 1"]
+            conditions = []
+
+        conditions += ["deleted_at IS NULL"]
 
         conditions_part = _combine_conditions(conditions, "AND")
 
@@ -941,7 +945,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHObjSchema]:
         if not conditions:
-            conditions = ["1 = 1"]
+            conditions = []
+
+        conditions += ["deleted_at IS NULL"]
 
         conditions_part = _combine_conditions(conditions, "AND")
 
