@@ -9,12 +9,12 @@ import {
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import * as Colors from '@wandb/weave/common/css/color.styles';
-import {Button} from '@wandb/weave/components/Button';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
   ComponentProps,
   FC,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -38,6 +38,7 @@ import {parseRef} from '../../../../react';
 import {ErrorBoundary} from '../../../ErrorBoundary';
 import {LoadingDots} from '../../../LoadingDots';
 import {Timestamp} from '../../../Timestamp';
+import {WeaveMainTableContext} from '../Browse3/context';
 import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
 import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
 import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
@@ -274,7 +275,16 @@ export const RunsTable: FC<{
     return uniqueSpanNames.length === 1;
   }, [uniqueSpanNames]);
 
+  const {setMainTableRef} = useContext(WeaveMainTableContext);
   const apiRef = useGridApiRef();
+
+  useEffect(() => {
+    setMainTableRef(apiRef);
+    return () => {
+      setMainTableRef(undefined);
+    };
+  }, [apiRef, setMainTableRef]);
+
   // Have to add _result when null, even though we try to do this in the python
   // side
   spans = useMemo(
@@ -853,7 +863,7 @@ export const RunsTable: FC<{
       return;
     }
     autosized.current = true;
-    apiRef.current.autosizeColumns({
+    apiRef?.current.autosizeColumns({
       includeHeaders: true,
       expand: true,
     });
@@ -880,7 +890,7 @@ export const RunsTable: FC<{
   // see https://github.com/mui/mui-x/issues/6206
   useEffect(() => {
     if (columns != null && initialState != null) {
-      apiRef.current.restoreState(initialState);
+      apiRef?.current.restoreState(initialState);
     }
   }, [columns, initialState, apiRef]);
 
@@ -896,25 +906,7 @@ export const RunsTable: FC<{
           </VisibilityAlertAction>
         </VisibilityAlert>
       )}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexDirection: 'row-reverse',
-        }}>
-        <Button
-          className="m-8 h-32"
-          size="small"
-          variant="secondary"
-          onClick={() => apiRef.current.exportDataAsCsv()}>
-          Export to CSV
-        </Button>
-        <BoringColumnInfo
-          tableStats={tableStats}
-          columns={columns.cols as any}
-        />
-      </div>
+      <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility

@@ -57,6 +57,7 @@ export const IconNames = {
   EmailEnvelope: 'email-envelope',
   ExpandRight: 'expand-right',
   ExpandUncollapse: 'expand-uncollapse',
+  ExportShareUpload: 'export-share-upload',
   FacebookSocial: 'facebook-social',
   Failed: 'failed',
   FilterAlt: 'filter-alt',

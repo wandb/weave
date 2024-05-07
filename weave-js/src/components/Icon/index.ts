@@ -58,6 +58,7 @@ export {
   IconEmailEnvelope,
   IconExpandRight,
   IconExpandUncollapse,
+  IconExportShareUpload,
   IconFacebookSocial,
   IconFailed,
   IconFilterAlt,

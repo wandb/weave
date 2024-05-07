@@ -1,17 +1,19 @@
 // import {PivotTableChart} from '@mui/icons-material';
 import {
   Autocomplete,
+  Box,
   Chip,
   FormControl,
   // IconButton,
   ListItem,
 } from '@mui/material';
+import {Button} from '@wandb/weave/components/Button';
 import _ from 'lodash';
-import React, {FC, useCallback, useMemo} from 'react';
+import React, {FC, useCallback, useContext, useEffect, useMemo} from 'react';
 
 import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
-import {useWeaveflowRouteContext} from '../../context';
+import {useWeaveflowRouteContext, WeaveMainTableContext} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
 import {Empty} from '../common/Empty';
@@ -85,6 +87,8 @@ export const CallsPage: FC<{
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
 
+  const {mainTableRef, isRefSet} = useContext(WeaveMainTableContext);
+
   return (
     <SimplePageLayout
       title={title}
@@ -102,6 +106,25 @@ export const CallsPage: FC<{
           ),
         },
       ]}
+      headerExtra={
+        isRefSet ? (
+          <Box
+            sx={{
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+            }}>
+            <Button
+              className="mx-16"
+              size="medium"
+              variant="secondary"
+              onClick={() => mainTableRef?.current?.exportDataAsCsv()}
+              icon="export-share-upload">
+              Export to CSV
+            </Button>
+          </Box>
+        ) : null
+      }
     />
   );
 };
@@ -134,6 +157,7 @@ export const CallsTable: FC<{
     props.initialFilter,
     props.onFilterUpdate
   );
+  const {setIsRefSet} = useContext(WeaveMainTableContext);
 
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
@@ -296,6 +320,15 @@ export const CallsTable: FC<{
     props.entity,
     props.project
   );
+
+  useEffect(() => {
+    if (!calls?.loading && calls?.result != null && calls.result.length > 0) {
+      setIsRefSet(true);
+    }
+    return () => {
+      setIsRefSet(false);
+    };
+  }, [calls?.loading, calls?.result, setIsRefSet]);
 
   if (calls.loading) {
     return <Loading centered />;

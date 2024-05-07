@@ -1,3 +1,4 @@
+import {GridApiPro, useGridApiRef} from '@mui/x-data-grid-pro';
 import {
   isWandbArtifactRef,
   isWeaveObjectRef,
@@ -623,6 +624,46 @@ export const WeaveflowPeekContext = createContext<{
 }>({
   isPeeking: false,
 });
+
+export const WeaveMainTableContext = createContext<{
+  mainTableRef: React.MutableRefObject<GridApiPro> | undefined;
+  isRefSet: boolean;
+  setIsRefSet: (isSet: boolean) => void;
+  setMainTableRef: (
+    ref: React.MutableRefObject<GridApiPro> | undefined
+  ) => void;
+}>({
+  isRefSet: false,
+  setIsRefSet: () => {},
+  mainTableRef: undefined,
+  setMainTableRef: () => {},
+});
+
+export const WeaveMainTableContextProvider = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
+  const [isRefSet, setIsRefSet] = React.useState(false);
+  const mainTableRef = useGridApiRef();
+  const setMainTableRef = (
+    ref: React.MutableRefObject<GridApiPro> | undefined
+  ) => {
+    if (ref === undefined) {
+      setIsRefSet(false);
+      return;
+    }
+    mainTableRef.current = ref.current;
+    setIsRefSet(true);
+  };
+
+  return (
+    <WeaveMainTableContext.Provider
+      value={{mainTableRef, isRefSet, setIsRefSet, setMainTableRef}}>
+      {children}
+    </WeaveMainTableContext.Provider>
+  );
+};
 
 export const useClosePeek = () => {
   const history = useHistory();
