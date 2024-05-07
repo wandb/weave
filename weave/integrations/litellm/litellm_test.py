@@ -3,8 +3,8 @@ import pytest
 import weave
 from weave.trace_server import trace_server_interface as tsi
 from typing import Any, Generator
-from litellm import completion
-from litellm import acompletion
+import litellm
+from .litellm import litellm_patcher
 
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
@@ -29,11 +29,9 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
         yield
         return
 
-    print("TODO: Implement")
+    litellm_patcher.attempt_patch()
     yield
-    # litellm_patcher.attempt_patch()
-    # yield
-    # litellm_patcher.undo_patch()
+    litellm_patcher.undo_patch()
 
 
 @pytest.mark.vcr(
@@ -43,10 +41,10 @@ def test_litellm_quickstart(
     client: weave.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
-    chat_response = completion(
+    chat_response = litellm.completion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
         model="gpt-3.5-turbo",
-        messages=[{ "content": "Hello, how are you?","role": "user"}]
+        messages=[{"content": "Hello, how are you?", "role": "user"}],
     )
 
     all_content = chat_response.choices[0].message.content
@@ -73,6 +71,7 @@ def test_litellm_quickstart(
     # assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
     # assert output.usage.total_tokens == model_usage["total_tokens"] == 309
 
+
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -81,10 +80,10 @@ async def test_litellm_quickstart_async(
     client: weave.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
-    chat_response = await acompletion(
+    chat_response = await litellm.acompletion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
         model="gpt-3.5-turbo",
-        messages=[{ "content": "Hello, how are you?","role": "user"}]
+        messages=[{"content": "Hello, how are you?", "role": "user"}],
     )
 
     all_content = chat_response.choices[0].message.content
@@ -119,18 +118,18 @@ def test_litellm_quickstart_stream(
     client: weave.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
-    chat_response = completion(
+    chat_response = litellm.completion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
         model="gpt-3.5-turbo",
-        messages=[{ "content": "Hello, how are you?","role": "user"}],
-        stream=True
+        messages=[{"content": "Hello, how are you?", "role": "user"}],
+        stream=True,
     )
 
     all_content = ""
     for chunk in chat_response:
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
-    
+
     exp = """Hello! I'm just a virtual assistant so I don't have feelings, but I'm here and ready to help you with anything you need. How can I assist you today?"""
 
     assert all_content == exp
@@ -163,11 +162,11 @@ async def test_litellm_quickstart_stream_async(
     client: weave.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
-    chat_response = await acompletion(
+    chat_response = await litellm.acompletion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
         model="gpt-3.5-turbo",
-        messages=[{ "content": "Hello, how are you?","role": "user"}],
-        stream=True
+        messages=[{"content": "Hello, how are you?", "role": "user"}],
+        stream=True,
     )
 
     all_content = ""
@@ -196,4 +195,3 @@ async def test_litellm_quickstart_stream_async(
     # assert output.usage.completion_tokens == model_usage["completion_tokens"] == 299
     # assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
     # assert output.usage.total_tokens == model_usage["total_tokens"] == 309
-
