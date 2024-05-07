@@ -604,6 +604,9 @@ def safe_current_wb_run_id() -> Optional[str]:
 
 
 def build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
+    if config is None:
+        config = {}
+
     def resolve_fn(*args, **kwargs):  # type: ignore
         # Code-capture unavailable for this op
         op_config = config
