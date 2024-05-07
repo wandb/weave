@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Any, Sequence, Union, Optional, TypedDict
+from typing import Any, Sequence, Union, Optional, TypedDict, Dict
 import dataclasses
 import typing
 import uuid
@@ -603,7 +603,12 @@ def safe_current_wb_run_id() -> Optional[str]:
         return None
 
 
-def make_anonymous_op(name: str) -> Op:
-    op = Op(lambda *args, **kwargs: None)
+def build_anonymous_op(name: str, op_details: Optional[Dict] = None) -> Op:
+    def resolve_fn(*args, **kwargs):  # type: ignore
+        # Code-capture unavailable for this op
+        print(op_details)
+
+    resolve_fn.__name__ = name
+    op = Op(resolve_fn)
     op.name = name
     return op
