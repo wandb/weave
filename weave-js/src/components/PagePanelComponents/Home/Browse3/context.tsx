@@ -662,3 +662,47 @@ export const usePeekLocation = () => {
     };
   }, [peekPath]);
 };
+
+export const WeaveHeaderExtrasContext = createContext<{
+  extras: {[key: string]: ReactNode};
+  addExtra: (key: string, value: ReactNode) => void;
+  removeExtra: (key: string) => void;
+}>({
+  extras: {},
+  addExtra: () => {},
+  removeExtra: () => {},
+});
+
+export const WeaveHeaderExtrasProvider = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
+  const [extras, setExtras] = React.useState<{[key: string]: React.ReactNode}>(
+    {}
+  );
+  const addExtra = useCallback(
+    (key: string, extra: React.ReactNode) => {
+      setExtras(prev => {
+        return {...prev, [key]: extra};
+      });
+    },
+    [setExtras]
+  );
+
+  const removeExtra = useCallback(
+    (key: string) => {
+      setExtras(prev => {
+        const newExtras = {...prev};
+        delete newExtras[key];
+        return newExtras;
+      });
+    },
+    [setExtras]
+  );
+  return (
+    <WeaveHeaderExtrasContext.Provider value={{extras, addExtra, removeExtra}}>
+      {children}
+    </WeaveHeaderExtrasContext.Provider>
+  );
+};

@@ -6,13 +6,15 @@ import {
   // IconButton,
   ListItem,
 } from '@mui/material';
-import {GridApiPro, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {FC, MutableRefObject, useCallback, useMemo} from 'react';
+import React, {FC, useCallback, useMemo} from 'react';
 
 import {Loading} from '../../../../../Loading';
-import {ExportRunsTableButton, RunsTable} from '../../../Browse2/RunsTable';
-import {useWeaveflowRouteContext} from '../../context';
+import {RunsTable} from '../../../Browse2/RunsTable';
+import {
+  useWeaveflowRouteContext,
+  WeaveHeaderExtrasContext,
+} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
 import {Empty} from '../common/Empty';
@@ -86,9 +88,7 @@ export const CallsPage: FC<{
     return 'Traces';
   }, [filter.opVersionRefs, isEvaluationTable]);
 
-  const [shouldShowExportButton, setShouldShowExportButton] =
-    React.useState(false);
-  const runsTableRef = useGridApiRef();
+  const {extras} = React.useContext(WeaveHeaderExtrasContext);
 
   return (
     <SimplePageLayout
@@ -100,8 +100,6 @@ export const CallsPage: FC<{
           content: (
             <CallsTable
               {...props}
-              setShouldShowExportButton={setShouldShowExportButton}
-              runsTableRef={runsTableRef}
               hideControls={filter.frozen}
               initialFilter={filter}
               onFilterUpdate={setFilter}
@@ -109,11 +107,7 @@ export const CallsPage: FC<{
           ),
         },
       ]}
-      headerExtra={
-        shouldShowExportButton ? (
-          <ExportRunsTableButton tableRef={runsTableRef} />
-        ) : null
-      }
+      headerExtra={<>{...Object.values(extras)}</>}
     />
   );
 };
@@ -139,8 +133,6 @@ export const CallsTable: FC<{
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
-  runsTableRef?: MutableRefObject<GridApiPro>;
-  setShouldShowExportButton: (shouldShow: boolean) => void;
 }> = props => {
   const {useCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
@@ -318,14 +310,11 @@ export const CallsTable: FC<{
   const spans = calls.result ?? [];
   const isEmpty = spans.length === 0;
   if (isEmpty) {
-    props.setShouldShowExportButton(false);
     if (isEvaluateTable) {
       return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
     } else {
       return <Empty {...EMPTY_PROPS_TRACES} />;
     }
-  } else {
-    props.setShouldShowExportButton(true);
   }
 
   return (
@@ -459,7 +448,6 @@ export const CallsTable: FC<{
         />
       ) : (
         <RunsTable
-          ref={props.runsTableRef}
           key={callsKey}
           loading={calls.loading}
           spans={spans}
