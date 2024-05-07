@@ -84,14 +84,17 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def litellm_wrapper(fn: typing.Callable) -> typing.Callable:
-    op = weave.op()(fn)
-    return add_accumulator(
-        op,  # type: ignore
-        litellm_accumulator,
-        should_accumulate=should_use_accumulator,
-        on_finish_post_processor=litellm_on_finish_post_processor,
-    )
+def make_wrapper(name: str) -> typing.Callable:
+    def litellm_wrapper(fn: typing.Callable) -> typing.Callable:
+        op = weave.op()(fn)
+        return add_accumulator(
+            op,  # type: ignore
+            litellm_accumulator,
+            should_accumulate=should_use_accumulator,
+            on_finish_post_processor=litellm_on_finish_post_processor,
+        )
+
+    return litellm_wrapper
 
 
 litellm_patcher = MultiPatcher(
@@ -99,12 +102,12 @@ litellm_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("litellm"),
             "completion",
-            litellm_wrapper,
+            make_wrapper("litellm.completion"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("litellm"),
             "acompletion",
-            litellm_wrapper,
+            make_wrapper("litellm.acompletion"),
         ),
     ]
 )
