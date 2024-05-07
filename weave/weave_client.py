@@ -603,6 +603,7 @@ def safe_current_wb_run_id() -> Optional[str]:
     except ImportError:
         return None
 
+
 def check_wandb_run_matches(
     wandb_run_id: Optional[str], weave_entity: str, weave_project: str
 ) -> None:
