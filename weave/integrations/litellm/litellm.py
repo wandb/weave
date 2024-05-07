@@ -1,17 +1,19 @@
 import importlib
 
-# import typing
+import typing
 
 import weave
 
 # from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import SymbolPatcher, MultiPatcher
 
-# if typing.TYPE_CHECKING:
-#     from litellmai.models.chat_completion import (
-#         ChatCompletionStreamResponse,
-#         ChatCompletionResponse,
-#     )
+if typing.TYPE_CHECKING:
+    from weave.trace.op import FinishCallbackType
+
+    # from litellmai.models.chat_completion import (
+    #     ChatCompletionStreamResponse,
+    #     ChatCompletionResponse,
+    # )
 
 
 # def litellm_accumulator(
@@ -74,10 +76,23 @@ from weave.trace.patcher import SymbolPatcher, MultiPatcher
 #     return acc
 
 
-# def litellm_stream_wrapper(fn: typing.Callable) -> typing.Callable:
-#     op = weave.op()(fn)
-#     acc_op = add_accumulator(op, litellm_accumulator)  # type: ignore
-#     return acc_op
+def litellm_output_handler(
+    output_val: typing.Any, on_finish: "FinishCallbackType"
+) -> typing.Any:
+    import pydantic
+
+    val_to_finish = output_val
+    if isinstance(output_val, pydantic.BaseModel):
+        val_to_finish = output_val.model_dump()
+
+    on_finish(val_to_finish, None)
+    return output_val
+
+
+def litellm_wrapper(fn: typing.Callable) -> typing.Callable:
+    op = weave.op()(fn)
+    op._set_on_output_handler(litellm_output_handler)  # type: ignore
+    return op
 
 
 litellm_patcher = MultiPatcher(
@@ -86,12 +101,12 @@ litellm_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("litellm"),
             "completion",
-            weave.op(),
+            litellm_wrapper,
         ),
         SymbolPatcher(
             lambda: importlib.import_module("litellm"),
             "acompletion",
-            weave.op(),
+            litellm_wrapper,
         ),
     ]
 )

@@ -56,20 +56,20 @@ def test_litellm_quickstart(
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output.choices[0].message.content == exp
-    assert output.choices[0].finish_reason == "stop"
-    assert output.id == chat_response.id
-    assert output.model == chat_response.model
-    assert output.object == chat_response.object
-    assert output.created == chat_response.created
+    assert output["choices"][0]["message"]["content"] == exp
+    assert output["choices"][0]["finish_reason"] == "stop"
+    assert output["id"] == chat_response.id
+    assert output["model"] == chat_response.model
+    assert output["object"] == chat_response.object
+    assert output["created"] == chat_response.created
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][output.model]
+    model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
     # TODO:
-    # assert output.usage.completion_tokens == model_usage["completion_tokens"] == 299
-    # assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    # assert output.usage.total_tokens == model_usage["total_tokens"] == 309
+    # assert output['usage'].completion_tokens == model_usage["completion_tokens"] == 299
+    # assert output['usage'].prompt_tokens == model_usage["prompt_tokens"] == 10
+    # assert output['usage'].total_tokens == model_usage["total_tokens"] == 309
 
 
 @pytest.mark.vcr(
@@ -95,20 +95,20 @@ async def test_litellm_quickstart_async(
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output.choices[0].message.content == exp
-    assert output.choices[0].finish_reason == "stop"
-    assert output.id == chat_response.id
-    assert output.model == chat_response.model
-    assert output.object == chat_response.object
-    assert output.created == chat_response.created
+    assert output["choices"][0]["message"]["content"] == exp
+    assert output["choices"][0]["finish_reason"] == "stop"
+    assert output["id"] == chat_response.id
+    assert output["model"] == chat_response.model
+    assert output["object"] == chat_response.object
+    assert output["created"] == chat_response.created
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][output.model]
+    model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
     # TODO:
-    # assert output.usage.completion_tokens == model_usage["completion_tokens"] == 299
-    # assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    # assert output.usage.total_tokens == model_usage["total_tokens"] == 309
+    # assert output['usage'].completion_tokens == model_usage["completion_tokens"] == 299
+    # assert output['usage'].prompt_tokens == model_usage["prompt_tokens"] == 10
+    # assert output['usage'].total_tokens == model_usage["total_tokens"] == 309
 
 
 @pytest.mark.vcr(
@@ -138,20 +138,20 @@ def test_litellm_quickstart_stream(
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output.choices[0].message.content == exp
-    assert output.choices[0].finish_reason == "stop"
-    assert output.id == chat_response.id
-    assert output.model == chat_response.model
-    assert output.object == chat_response.object
-    assert output.created == chat_response.created
+    assert output["choices"][0]["message"]["content"] == exp
+    assert output["choices"][0]["finish_reason"] == "stop"
+    assert output["id"] == chat_response.id
+    assert output["model"] == chat_response.model
+    assert output["object"] == chat_response.object
+    assert output["created"] == chat_response.created
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][output.model]
+    model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
     # TODO:
-    # assert output.usage.completion_tokens == model_usage["completion_tokens"] == 299
-    # assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    # assert output.usage.total_tokens == model_usage["total_tokens"] == 309
+    # assert output['usage'].completion_tokens == model_usage["completion_tokens"] == 299
+    # assert output['usage'].prompt_tokens == model_usage["prompt_tokens"] == 10
+    # assert output['usage'].total_tokens == model_usage["total_tokens"] == 309
 
 
 @pytest.mark.vcr(
@@ -181,17 +181,17 @@ async def test_litellm_quickstart_stream_async(
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
-    assert output.choices[0].message.content == exp
-    assert output.choices[0].finish_reason == "stop"
-    assert output.id == chat_response.id
-    assert output.model == chat_response.model
-    assert output.object == chat_response.object
-    assert output.created == chat_response.created
+    assert output["choices"][0]["message"]["content"] == exp
+    assert output["choices"][0]["finish_reason"] == "stop"
+    assert output["id"] == chat_response.id
+    assert output["model"] == chat_response.model
+    assert output["object"] == chat_response.object
+    assert output["created"] == chat_response.created
     summary = call.summary
     assert summary is not None
-    model_usage = summary["usage"][output.model]
+    model_usage = summary["usage"][output["model"]]
     assert model_usage["requests"] == 1
     # TODO:
-    # assert output.usage.completion_tokens == model_usage["completion_tokens"] == 299
-    # assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
-    # assert output.usage.total_tokens == model_usage["total_tokens"] == 309
+    # assert output['usage'].completion_tokens == model_usage["completion_tokens"] == 299
+    # assert output['usage'].prompt_tokens == model_usage["prompt_tokens"] == 10
+    # assert output['usage'].total_tokens == model_usage["total_tokens"] == 309
