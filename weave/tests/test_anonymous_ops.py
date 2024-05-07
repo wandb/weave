@@ -38,7 +38,7 @@ def test_anonymous_op(client: weave_client.WeaveClient) -> str:
     call = calls[0]
     assert (
         call.op_name
-        == "weave:///shawn/test-project/op/anonymous_op:uENcFxZswmx2pFJVx32Die6vSTL9kJPFiXc7FwURAyc"
+        == "weave:///shawn/test-project/op/anonymous_op:N1aAYGQILnPRAs7Yy7r1dkUkEVrOQf6tbzyrHZhuwCw"
     )
     assert call.inputs == {"a": 1}
     assert call.output == {"c": 3}

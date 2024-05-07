@@ -603,10 +603,10 @@ def safe_current_wb_run_id() -> Optional[str]:
         return None
 
 
-def build_anonymous_op(name: str, op_details: Optional[Dict] = None) -> Op:
+def build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     def resolve_fn(*args, **kwargs):  # type: ignore
         # Code-capture unavailable for this op
-        print(op_details)
+        op_config = config
 
     resolve_fn.__name__ = name
     op = Op(resolve_fn)
