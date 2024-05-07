@@ -89,10 +89,7 @@ def init_weave(
 
     entity_name, project_name = get_entity_project_from_project_name(project_name)
 
-    if not wandb_run_project_matches_weave_project(project_name):
-        raise ValueError(
-            f"Wandb.init received project: {project_name} but does not match weave.init project: {project_name}. Projects must match to use weave."
-        )
+    check_wandb_run_project_matches_weave_project(project_name)
 
     api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:
@@ -162,12 +159,15 @@ def init_local() -> InitializedClient:
     return InitializedClient(client)
 
 
-def wandb_run_project_matches_weave_project(weave_project: str) -> bool:
+def check_wandb_run_project_matches_weave_project(weave_project: str):
     wandb_uri = weave_client.safe_current_wb_run_uri()
     if not wandb_uri:
-        return True
+        return
 
     # ex: "entity/project/run_id"
     wandb_project = wandb_uri.split("/")[1]
 
-    return wandb_project == weave_project
+    if wandb_project != weave_project:
+        raise ValueError(
+            f"Wandb.init received project: '{wandb_project}' but does not match weave.init project: '{weave_project}' (projects must match to use weave)"
+        )
