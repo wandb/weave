@@ -44,5 +44,8 @@ def test_llamaindex_quickstart(
     response = query_engine.query("What did the author do growing up?")
     print(response)
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 13
+    assert len(res.calls) == 8
     # TODO: Finish Assertions
+
+
+# TODO: Do async stuff

@@ -32,18 +32,15 @@ def push_call(run: "Call") -> None:
     _run_stack.set(new_stack)
 
 
-def pop_call(run_id: typing.Optional[str]) -> None:
+def pop_call(call_id: typing.Optional[str]) -> None:
     new_stack = copy.copy(_run_stack.get())
-    if run_id:
-        id_found = False
-        for i, call in enumerate(new_stack):
-            if call.id == run_id:
-                id_found = True
-                break
-        if id_found:
-            new_stack = new_stack[: i + 1]
+    if call_id:
+        if len(new_stack) == 0:
+            raise ValueError("Call stack is empty")
+        elif new_stack[-1].id == call_id:
+            new_stack.pop()
         else:
-            raise ValueError(f"Run with id {run_id} not found in stack")
+            raise ValueError(f"Call with id {call_id} not at top of stack")
     else:
         new_stack.pop()
     _run_stack.set(new_stack)
