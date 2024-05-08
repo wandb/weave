@@ -433,7 +433,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         lazyLoad
         selectOnNavigation={false}
         searchQuery={searchQuery}
-        search={opts => opts}
+        search={search !== false ? opts => opts : false}
         renderLabel={renderLabel}
         onSearchChange={(e, data) => {
           props.onSearchChange?.(e, data);
