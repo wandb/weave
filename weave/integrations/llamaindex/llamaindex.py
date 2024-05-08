@@ -1,10 +1,8 @@
 from weave.trace.patcher import Patcher
-from weave import run_context
-from weave.weave_client import build_anonymous_op, Call
+from weave.weave_client import Call
 from weave import graph_client_context
 
 TRANSFORM_EMBEDDINGS = False
-TREAT_TRACE_AS_CALL = False
 ALLOWED_ROOT_EVENT_TYPES = ("query",)
 
 import_failed = False
@@ -46,32 +44,28 @@ if not import_failed:
             **kwargs: Any,
         ) -> str:
             """Run when an event starts and return id of event."""
-            if parent_id == "root" and event_type not in ALLOWED_ROOT_EVENT_TYPES:
-                return event_id
             gc = graph_client_context.require_graph_client()
 
             if event_type == CBEventType.EXCEPTION:
-                call = self._call_map[event_id]
-                if payload:
-                    exception = payload.get("EXCEPTION")
-                else:
-                    exception = "Unknown exception occurred."
-                gc.finish_call(call, None, exception=exception)
-                run_context.pop_call(call.id)
+                if event_id in self._call_map:
+                    call = self._call_map.pop(event_id)
+                    if payload:
+                        exception = payload.get("EXCEPTION")
+                    else:
+                        exception = "Unknown exception occurred."
+                    gc.finish_call(call, None, exception=exception)
             else:
-                if (TREAT_TRACE_AS_CALL or parent_id != "root") and (
-                    parent_id not in self._call_map
-                ):
-                    return event_id
-                else:
-                    op_name = "llama_index." + event_type.name.lower()
-                    parent_call = self._call_map.get(parent_id)
+                is_valid_root = (
+                    parent_id == "root" and event_type in ALLOWED_ROOT_EVENT_TYPES
+                )
+                is_valid_child = parent_id != "root" and parent_id in self._call_map
+                if is_valid_root or is_valid_child:
                     call = gc.create_call(
-                        build_anonymous_op(op_name),
-                        parent_call,
+                        "llama_index." + event_type.name.lower(),
+                        self._call_map.get(parent_id),
                         process_payload(payload),
                     )
-                    run_context.push_call(call)
+
                     self._call_map[event_id] = call
             return event_id
 
@@ -85,21 +79,11 @@ if not import_failed:
             """Run when an event ends."""
             if event_id in self._call_map:
                 gc = graph_client_context.require_graph_client()
-                call = self._call_map.pop(event_id)
-                gc.finish_call(call, process_payload(payload))
-                run_context.pop_call(call.id)
+                gc.finish_call(self._call_map.pop(event_id), process_payload(payload))
 
         def start_trace(self, trace_id: Optional[str] = None) -> None:
             """Run when an overall trace is launched."""
-            if TREAT_TRACE_AS_CALL:
-                gc = graph_client_context.require_graph_client()
-                trace_id = trace_id or "root"
-                op_name = "llama_index." + trace_id + "_root"
-                call = gc.create_call(build_anonymous_op(op_name), None, {})
-                run_context.push_call(call)
-                if "root" in self._call_map:
-                    raise Exception("Root call already exists")
-                self._call_map["root"] = call
+            pass
 
         def end_trace(
             self,
@@ -107,14 +91,7 @@ if not import_failed:
             trace_map: Optional[Dict[str, List[str]]] = None,
         ) -> None:
             """Run when an overall trace is exited."""
-            if TREAT_TRACE_AS_CALL:
-                trace_id = trace_id or "root"
-                gc = graph_client_context.require_graph_client()
-                trace_id = trace_id or ""
-                call = self._call_map.pop("root")
-                output = None
-                gc.finish_call(call, output)
-                run_context.pop_call(call.id)
+            pass
 
 else:
 
