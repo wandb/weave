@@ -7,7 +7,7 @@ import_failed = False
 
 try:
     from llama_index.core.callbacks.base_handler import BaseCallbackHandler
-    from llama_index.core.callbacks.schema import CBEventType
+    from llama_index.core.callbacks.schema import CBEventType, EventPayload
 except ImportError:
     import_failed = True
 
@@ -36,7 +36,7 @@ if not import_failed:
         def on_event_start(
             self,
             event_type: CBEventType,
-            payload: Optional[Dict[str, Any]] = None,
+            payload: Optional[Dict[EventPayload, Any]] = None,
             event_id: str = "",
             parent_id: str = "",
             **kwargs: Any,
@@ -45,11 +45,12 @@ if not import_failed:
             gc = graph_client_context.require_graph_client()
 
             if event_type == CBEventType.EXCEPTION:
-                print(
-                    event_type, payload, event_id, parent_id, self._call_map.keys()
-                )
+                print(event_type, payload, event_id, parent_id, self._call_map.keys())
                 call = self._call_map[event_id]
-                exception = payload.get("EXCEPTION")
+                if payload:
+                    exception = payload.get("EXCEPTION")
+                else:
+                    exception = "Unknown exception occurred."
                 gc.finish_call(call, None, exception=exception)
                 run_context.pop_call(call.id)
             else:
@@ -58,12 +59,12 @@ if not import_failed:
                 call = gc.create_call(build_anonymous_op(op_name), None, inputs)
                 run_context.push_call(call)
                 self._call_map[event_id] = call
-                return event_id
+            return event_id
 
         def on_event_end(
             self,
             event_type: CBEventType,
-            payload: Optional[Dict[str, Any]] = None,
+            payload: Optional[Dict[EventPayload, Any]] = None,
             event_id: str = "",
             **kwargs: Any,
         ) -> None:
@@ -80,7 +81,8 @@ if not import_failed:
             op_name = "llama_index.start"
             call = gc.create_call(build_anonymous_op(op_name), None, {})
             run_context.push_call(call)
-            self._call_map['root_' + trace_id] = call
+            trace_id = trace_id or ""
+            self._call_map["root_" + trace_id] = call
 
         def end_trace(
             self,
@@ -89,14 +91,15 @@ if not import_failed:
         ) -> None:
             """Run when an overall trace is exited."""
             gc = graph_client_context.require_graph_client()
-            call = self._call_map['root_' + trace_id]
+            trace_id = trace_id or ""
+            call = self._call_map["root_" + trace_id]
             output = None
             gc.finish_call(call, output)
             run_context.pop_call(call.id)
 
 else:
 
-    class WeaveCallbackHandler:
+    class WeaveCallbackHandler:  # type: ignore
         pass
 
 

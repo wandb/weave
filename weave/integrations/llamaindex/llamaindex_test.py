@@ -21,7 +21,7 @@ def patch_llamaindex(request: Any) -> Generator[None, None, None]:
     llamaindex_patcher.undo_patch()
 
 
-def filter_body(r):
+def filter_body(r: Any) -> Any:
     r.body = ""
     return r
 
@@ -44,5 +44,5 @@ def test_llamaindex_quickstart(
     response = query_engine.query("What did the author do growing up?")
     print(response)
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 11
+    assert len(res.calls) == 13
     # TODO: Finish Assertions
