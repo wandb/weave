@@ -20,6 +20,8 @@ from . import io_service
 from . import logs
 from . import environment
 import logging
+from . import autopatch
+
 
 from flask.testing import FlaskClient
 
@@ -335,6 +337,7 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     if inited_client is None:
         client = weave_client.WeaveClient("shawn", "test-project", tsi)
         inited_client = weave_init.InitializedClient(client)
+        autopatch.autopatch()
     try:
         yield inited_client.client
     finally:
