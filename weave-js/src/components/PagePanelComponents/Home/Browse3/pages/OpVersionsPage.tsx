@@ -10,6 +10,7 @@ import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
+import {Reactions} from '../feedback/Reactions';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
@@ -117,6 +118,14 @@ export const FilterableOpVersionsTable: React.FC<{
             fullWidth={true}
           />
         );
+      },
+    }),
+
+    basicField('feedback', 'Feedback', {
+      width: 150,
+      renderCell: cellParams => {
+        const weaveRef = cellParams.row.id;
+        return <Reactions weaveRef={weaveRef} />;
       },
     }),
 

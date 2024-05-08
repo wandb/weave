@@ -14,12 +14,14 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {makeRefCall} from '../../../../../../util/refs';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
+import {Reactions} from '../../feedback/Reactions';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {isRef} from '../common/util';
@@ -190,6 +192,16 @@ function buildCallsTableColumns(
             preservePath={preservePath}
           />
         );
+      },
+    },
+    {
+      field: 'feedback',
+      headerName: 'Feedback',
+      width: 150,
+      renderCell: rowParams => {
+        const callId = rowParams.row.id;
+        const weaveRef = makeRefCall(entity, project, callId);
+        return <Reactions weaveRef={weaveRef} />;
       },
     },
     ...(isSingleOp && !isSingleOpVersion

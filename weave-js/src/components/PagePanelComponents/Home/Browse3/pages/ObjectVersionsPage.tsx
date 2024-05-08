@@ -12,6 +12,7 @@ import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
 import {useWeaveflowRouteContext} from '../context';
+import {Reactions} from '../feedback/Reactions';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {basicField} from './common/DataTable';
 import {Empty} from './common/Empty';
@@ -181,6 +182,14 @@ const ObjectVersionsTable: React.FC<{
         );
       },
     }),
+    basicField('feedback', 'Feedback', {
+      width: 150,
+      renderCell: cellParams => {
+        const weaveRef = cellParams.row.id;
+        return <Reactions weaveRef={weaveRef} />;
+      },
+    }),
+
     basicField('baseObjectClass', 'Category', {
       width: 100,
       renderCell: cellParams => {

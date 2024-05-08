@@ -474,7 +474,7 @@ export interface WandbArtifactRef {
   artifactRefExtra?: string;
 }
 
-type WeaveKind = 'object' | 'op' | 'table';
+type WeaveKind = 'object' | 'op' | 'table' | 'call';
 export interface WeaveObjectRef {
   scheme: 'weave';
   entityName: string;
@@ -528,6 +528,19 @@ const RE_WEAVE_TABLE_REF_PATHNAME = new RegExp(
     PATTERN_PROJECT,
     '/table/',
     '([a-f0-9]+)', // Digest
+    '/?', // Ref extra portion is optional
+    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    '$', // End of the string
+  ].join('')
+);
+const RE_WEAVE_CALL_REF_PATHNAME = new RegExp(
+  [
+    '^', // Start of the string
+    PATTERN_ENTITY,
+    '/',
+    PATTERN_PROJECT,
+    '/call/',
+    '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', // Call UUID
     '/?', // Ref extra portion is optional
     '([a-zA-Z0-9_/]*)', // Optional ref extra
     '$', // End of the string
@@ -593,6 +606,19 @@ export const parseRef = (ref: string): ObjectRef => {
         weaveKind: 'table' as WeaveKind,
         artifactName: '',
         artifactVersion: digest,
+        artifactRefExtra: '',
+      };
+    }
+    const callMatch = trimmed.match(RE_WEAVE_CALL_REF_PATHNAME);
+    if (callMatch !== null) {
+      const [entity, project, callId] = callMatch.slice(1);
+      return {
+        scheme: 'weave',
+        entityName: entity,
+        projectName: project,
+        weaveKind: 'call' as WeaveKind,
+        artifactName: callId,
+        artifactVersion: '',
         artifactRefExtra: '',
       };
     }

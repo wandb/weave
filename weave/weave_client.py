@@ -10,6 +10,7 @@ import datetime
 from requests import HTTPError
 
 from weave.exception import exception_to_json_str
+from weave.feedback import Feedback
 from weave.table import Table
 from weave import trace_sentry, urls
 from weave import run_context
@@ -144,6 +145,19 @@ class Call:
     summary: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
+
+    _feedback: Optional[Feedback] = None
+
+    @property
+    def feedback(self) -> Feedback:
+        if self._feedback is None:
+            project_parts = self.project_id.split("/")
+            if len(project_parts) != 2:
+                raise ValueError(f"Invalid project_id: {self.project_id}")
+            entity, project = project_parts
+            weave_ref = CallRef(entity, project, self.id)
+            self._feedback = Feedback(weave_ref.uri())
+        return self._feedback
 
     @property
     def ui_url(self) -> str:
@@ -598,12 +612,6 @@ class WeaveClient:
         raise NotImplementedError()
 
     def ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
-        raise NotImplementedError()
-
-    def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
-        raise NotImplementedError()
-
-    def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError()
 
     def op_runs(self, op_def: Op) -> Sequence[Call]:

@@ -57,6 +57,60 @@ export type TraceCallReadError = {
 };
 export type TraceCallReadRes = TraceCallReadSuccess | TraceCallReadError;
 
+// TODO: field vs. key, other kinds of values, enum of ops
+export type Filter = {
+  field: string;
+  op: string;
+  value: string;
+};
+
+export type FeedbackCreateReq = {
+  project_id: string;
+  weave_ref: string;
+  feedback_type: string;
+  payload: Record<string, any>;
+};
+
+export type FeedbackCreateSuccess = {};
+export type FeedbackCreateError = {
+  detail: string;
+};
+export type FeedbackCreateRes = FeedbackCreateSuccess | FeedbackCreateError;
+
+export type FeedbackQueryReq = {
+  project_id: string;
+  query?: Query;
+  sort_by?: SortBy[];
+};
+
+export type Feedback = {
+  id: string;
+  weave_ref: string;
+  wb_user_id: string; // authenticated creator username
+  creator: string; // display name
+  created_at: string;
+  feedback_type: string;
+  payload: Record<string, any>;
+};
+
+export type FeedbackQuerySuccess = {
+  result: Feedback[];
+};
+export type FeedbackQueryError = {
+  detail: string;
+};
+export type FeedbackQueryRes = FeedbackQuerySuccess | FeedbackQueryError;
+
+export type FeedbackPurgeReq = {
+  project_id: string;
+  id: string;
+};
+export type FeedbackPurgeSuccess = {};
+export type FeedbackPurgeError = {
+  detail: string;
+};
+export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
+
 interface TraceCallsFilter {
   op_names?: string[];
   input_refs?: string[];
@@ -338,6 +392,28 @@ export class TraceServerClient {
         req
       );
     };
+
+  feedbackCreate: (req: FeedbackCreateReq) => Promise<FeedbackCreateRes> =
+    req => {
+      return this.makeRequest<FeedbackCreateReq, FeedbackCreateRes>(
+        '/feedback/create',
+        req
+      );
+    };
+
+  feedbackQuery: (req: FeedbackQueryReq) => Promise<FeedbackQueryRes> = req => {
+    return this.makeRequest<FeedbackQueryReq, FeedbackQueryRes>(
+      '/feedback/query',
+      req
+    );
+  };
+
+  feedbackPurge: (req: FeedbackPurgeReq) => Promise<FeedbackPurgeRes> = req => {
+    return this.makeRequest<FeedbackPurgeReq, FeedbackPurgeRes>(
+      '/feedback/purge',
+      req
+    );
+  };
 
   fileContent: (
     req: TraceFileContentReadReq

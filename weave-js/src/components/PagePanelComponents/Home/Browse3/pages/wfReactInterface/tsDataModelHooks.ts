@@ -27,6 +27,7 @@ import {
   CallFilter,
   CallKey,
   CallSchema,
+  FeedbackKey,
   Loadable,
   LoadableWithError,
   ObjectVersionFilter,
@@ -416,6 +417,79 @@ const useCallsDeleteFunc = () => {
   );
 
   return callsDelete;
+};
+
+const useFeedback = (
+  key: FeedbackKey | null
+): LoadableWithError<traceServerClient.Feedback[] | null> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const [feedbackRes, setFeedbackRes] =
+    useState<traceServerClient.FeedbackQueryRes | null>(null);
+  const deepKey = useDeepMemo(key);
+
+  useEffect(() => {
+    if (deepKey) {
+      setFeedbackRes(null);
+      loadingRef.current = true;
+      getTsClient()
+        .feedbackQuery({
+          project_id: projectIdFromParts({
+            entity: deepKey.entity,
+            project: deepKey.project,
+          }),
+          query: {
+            $expr: {
+              $eq: [{$getField: 'weave_ref'}, {$literal: deepKey.weaveRef}],
+            },
+          },
+          sort_by: [{field: 'created_at', direction: 'desc'}],
+        })
+        .then(res => {
+          loadingRef.current = false;
+          if ('result' in res) {
+            const usersNeedingLookup = _.uniq(
+              res.result.filter(f => f.creator === null).map(f => f.wb_user_id)
+            );
+            console.log({res, usersNeedingLookup});
+          }
+          setFeedbackRes(res);
+        })
+        .catch(err => {
+          loadingRef.current = false;
+          setFeedbackRes({
+            detail: err,
+          });
+        });
+    }
+  }, [deepKey, getTsClient]);
+
+  return useMemo(() => {
+    if (deepKey == null) {
+      return {
+        loading: false,
+        result: null,
+        error: null,
+      };
+    }
+    if (feedbackRes == null || loadingRef.current) {
+      return {
+        loading: true,
+        result: null,
+        error: null,
+      };
+    }
+    console.dir({feedbackRes});
+    const result =
+      feedbackRes && 'result' in feedbackRes ? feedbackRes.result : [];
+    const error =
+      feedbackRes && 'detail' in feedbackRes ? feedbackRes.detail : null;
+    return {
+      loading: false,
+      result,
+      error,
+    };
+  }, [feedbackRes, deepKey]);
 };
 
 const useOpVersion = (
@@ -1231,6 +1305,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useRefsData,
   useApplyMutationsToRef,
   useFileContent,
+  useFeedback,
   derived: {
     useChildCallsForCompare,
     useGetRefsType,

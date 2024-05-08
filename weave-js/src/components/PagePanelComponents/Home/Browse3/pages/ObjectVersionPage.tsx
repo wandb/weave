@@ -2,7 +2,10 @@ import Box from '@mui/material/Box';
 import React, {useMemo} from 'react';
 
 import {maybePluralizeWord} from '../../../../../core/util/string';
+import {makeRefObject} from '../../../../../util/refs';
 import {LoadingDots} from '../../../../LoadingDots';
+import {FeedbackGrid} from '../feedback/FeedbackGrid';
+import {Reactions} from '../feedback/Reactions';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
 import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
@@ -72,6 +75,15 @@ const ObjectVersionPageInner: React.FC<{
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
   const refExtra = objectVersion.refExtra;
+  const weaveRef = makeRefObject(
+    entityName,
+    projectName,
+    'object',
+    objectName,
+    objectVersion.versionHash,
+    refExtra
+  );
+  console.log({weaveRef});
   const objectVersions = useRootObjectVersions(entityName, projectName, {
     objectIds: [objectName],
   });
@@ -171,6 +183,7 @@ const ObjectVersionPageInner: React.FC<{
             //     version={typeVersionHash}
             //   />
             // ),
+            Feedback: <Reactions weaveRef={weaveRef} />,
           }}
         />
       }
@@ -223,6 +236,18 @@ const ObjectVersionPageInner: React.FC<{
                   </WeaveCHTableSourceRefContext.Provider>
                 )}
               </Box>
+            </ScrollableTabContent>
+          ),
+        },
+        {
+          label: 'Feedback',
+          content: (
+            <ScrollableTabContent sx={{pb: 0}}>
+              <FeedbackGrid
+                entity={entityName}
+                project={projectName}
+                weaveRef={weaveRef}
+              />
             </ScrollableTabContent>
           ),
         },

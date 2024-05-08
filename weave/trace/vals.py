@@ -17,6 +17,7 @@ from weave.trace.refs import (
     TABLE_ROW_ID_EDGE_NAME,
 )
 from weave import box
+from weave.feedback import Feedback
 from weave.table import Table
 from weave.trace.serialize import from_json
 from weave.trace.errors import InternalError

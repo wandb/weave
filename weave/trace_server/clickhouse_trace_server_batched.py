@@ -30,6 +30,7 @@ import json
 import typing
 import hashlib
 import dataclasses
+import uuid
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult, StreamContext
@@ -41,6 +42,7 @@ from pydantic import BaseModel
 from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
 from .errors import RequestTooLarge
+from .orm import Table, Column, ParamBuilder
 
 from .trace_server_interface_util import (
     extract_refs_from_values,
@@ -60,6 +62,18 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
+
+
+TABLE_FEEDBACK = Table('feedback', [
+    Column("id", "string"),
+    Column("project_id", "string"),
+    Column("weave_ref", "string"),
+    Column("wb_user_id", "string"),
+    Column("creator", "string", nullable=True),
+    Column("created_at", "datetime"),
+    Column("feedback_type", "string"),
+    Column("payload", "json", db_name="payload_dump"),
+])
 
 
 class NotFoundError(Exception):
@@ -881,6 +895,52 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise ValueError("Missing chunks")
         return tsi.FileContentReadRes(content=b"".join(chunks))
 
+    def feedback_create(self, req: tsi.FeedbackCreateReqForInsert) -> tsi.FeedbackCreateRes:
+        feedback_id = generate_id()
+        created_at = datetime.datetime.now(datetime.UTC)
+        # TODO: Any validation on weave_ref?
+        # TODO: What should max payload size be?
+        payload = _dict_value_to_dump(req.payload)
+        if len(payload) > 1024:
+            raise ValueError("Feedback payload too large")
+        row = {
+            "id": feedback_id,
+            "project_id": req.project_id,
+            "weave_ref": req.weave_ref,
+            "wb_user_id": req.wb_user_id,
+            "creator": req.creator,
+            "feedback_type": req.feedback_type,
+            "payload": payload,
+            "created_at": created_at,
+        }
+        TABLE_FEEDBACK.insert(row).execute(self.ch_client)
+        return {
+            "id": feedback_id,
+            "created_at": created_at,
+            "wb_user_id": req.wb_user_id,
+        }
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        query = TABLE_FEEDBACK.select()
+        query = query.project_id(req.project_id)
+        query = query.fields(req.fields)
+        query = query.where(req.query)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        result = query.execute(self.ch_client)
+        return dict(result=result)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        # TODO: Instead of passing conditions to DELETE FROM,
+        #       should we select matching ids, and then DELETE FROM WHERE id IN (...)?
+        #       This would allow us to return the number of rows deleted, and complain
+        #       if too many things would be deleted.
+        query = TABLE_FEEDBACK.purge()
+        query = query.project_id(req.project_id)
+        query = query.where(req.query)
+        result = query.execute(self.ch_client)
+        return dict(result=result)
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
@@ -1064,6 +1124,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             query_str,
             parameters,
         )
+
+        # Get distinct call_ids, get feedback
 
         for row in raw_res:
             yield dict(zip(columns, row))
@@ -1302,6 +1364,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
 
 def _dict_value_to_dump(
+
     value: dict,
 ) -> str:
     if not isinstance(value, dict):
@@ -1530,7 +1593,9 @@ def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
 def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
-    combined = f" {operator} ".join([f"({c})" for c in conditions])
+    if len(conditions) == 1:
+        return conditions[0]
+    combined = f" {operator} ".join(f"({c})" for c in conditions)
     return f"({combined})"
 
 
@@ -1563,41 +1628,6 @@ def find_call_descendants(
     return list(descendants)
 
 
-param_builder_count = 0
-
-
-class ParamBuilder:
-    """ParamBuilder helps with the construction of parameterized clickhouse queries.
-    It is used in a number of functions/routines that build queries to ensure that
-    the queries are parameterized and safe from injection attacks. Specifically, a caller
-    would use it as follows:
-
-    ```
-    pb = ParamBuilder()
-    param_name = pb.add_param("some_value")
-    query = f"SELECT * FROM some_table WHERE some_column = {{{param_name}:String}}"
-    parameters = pb.get_params()
-    # Execute the query with the parameters
-    ```
-
-    With queries that have many construction phases, it is recommended to use the
-    same ParamBuilder instance to ensure that the parameter names are unique across
-    the query.
-    """
-
-    def __init__(self, prefix: typing.Optional[str] = None):
-        global param_builder_count
-        param_builder_count += 1
-        self._params: typing.Dict[str, typing.Any] = {}
-        self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
-
-    def add_param(self, param_value: typing.Any) -> str:
-        param_name = self._prefix + str(len(self._params))
-        self._params[param_name] = param_value
-        return param_name
-
-    def get_params(self) -> typing.Dict[str, typing.Any]:
-        return {**self._params}
 
 
 def _python_value_to_ch_type(value: typing.Any) -> str:

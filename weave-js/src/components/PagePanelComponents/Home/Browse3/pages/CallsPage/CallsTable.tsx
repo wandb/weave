@@ -30,9 +30,11 @@ import React, {
 
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {parseRef} from '../../../../../../react';
+import {makeRefCall} from '../../../../../../util/refs';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {WeaveHeaderExtrasContext} from '../../context';
+import {Reactions} from '../../feedback/Reactions';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -290,7 +292,7 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
-    useState<GridPinnedColumns>({left: ['op_name']});
+    useState<GridPinnedColumns>({left: ['op_name', 'feedback']});
 
   // END OF CPR FACTORED CODE
 

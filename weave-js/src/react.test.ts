@@ -74,6 +74,20 @@ describe('parseRef', () => {
       weaveKind: 'table',
     });
   });
+  it('parses a weave call ref', () => {
+    const parsed = parseRef(
+      'weave:///entity/project/call/178a32ca-1c00-486d-bd55-6207a7a25ff7'
+    );
+    expect(parsed).toEqual({
+      scheme: 'weave',
+      artifactName: '178a32ca-1c00-486d-bd55-6207a7a25ff7',
+      artifactRefExtra: '',
+      artifactVersion: '',
+      entityName: 'entity',
+      projectName: 'project',
+      weaveKind: 'call',
+    });
+  });
   it('parses an op ref with * as version', () => {
     const parsed = parseRef('weave:///entity/project/op/op-name:*');
     expect(parsed).toEqual({

@@ -5,6 +5,7 @@ import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../../Button';
+import {Tailwind} from '../../../../../Tailwind';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
 import {
   TRACETREE_PARAM,
@@ -14,10 +15,12 @@ import {
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {TabUseCall} from '../TabUseCall';
 import {useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallDetails} from './CallDetails';
+import {CallFeedback} from './CallFeedback';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
 import {CallTraceView, useCallFlattenedTraceTree} from './CallTraceView';
@@ -69,8 +72,20 @@ const useCallTabs = (call: CallSchema) => {
         ]
       : []),
     {
+      label: 'Feedback',
+      content: (
+        <Tailwind style={{height: '100%', overflow: 'auto'}}>
+          <CallFeedback call={call} />
+        </Tailwind>
+      ),
+    },
+    {
       label: 'Summary',
       content: <CallSummary call={call} />,
+    },
+    {
+      label: 'Use',
+      content: <TabUseCall call={call} />,
     },
   ];
 };

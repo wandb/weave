@@ -1,6 +1,8 @@
 import React from 'react';
 import styled from 'styled-components';
 
+import {makeRefCall} from '../../../../../../util/refs';
+import {Reactions} from '../../feedback/Reactions';
 import {CallId} from '../common/CallId';
 import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
@@ -38,6 +40,7 @@ export const CallOverview: React.FC<{
   const opName = opNiceName(call.spanName);
 
   const statusCode = call.rawSpan.status_code;
+  const refCall = makeRefCall(call.entity, call.project, call.callId);
 
   return (
     <>
@@ -45,6 +48,7 @@ export const CallOverview: React.FC<{
         <CallName>{opName}</CallName>
         <CallId callId={call.callId} />
         <StatusChip value={statusCode} iconOnly />
+        <Reactions weaveRef={refCall} />
         <OverflowBin>
           <OverflowMenu selectedCalls={[call]} />
         </OverflowBin>

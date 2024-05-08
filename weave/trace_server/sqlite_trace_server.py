@@ -452,12 +452,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 WITH RECURSIVE Descendants AS (
                     SELECT id
                     FROM calls
-                    WHERE project_id = ? AND 
-                        deleted_at IS NULL AND 
+                    WHERE project_id = ? AND
+                        deleted_at IS NULL AND
                         parent_id IN (SELECT id FROM calls WHERE id IN ({}))
-                    
+
                     UNION ALL
-                    
+
                     SELECT c.id
                     FROM calls c
                     JOIN Descendants d ON c.parent_id = d.id
@@ -476,7 +476,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             delete_query = """
                 UPDATE calls
                 SET deleted_at = CURRENT_TIMESTAMP
-                WHERE deleted_at is NULL AND 
+                WHERE deleted_at is NULL AND
                     id IN ({})
             """.format(
                 ", ".join("?" * len(all_ids))
