@@ -24,6 +24,7 @@ except ImportError:
 from typing import Any, Dict, List, Optional
 
 if not import_failed:
+
     class WeaveCallbackHandler(BaseCallbackHandler):
         """Base callback handler that can be used to track event starts and ends."""
 
@@ -147,11 +148,10 @@ if not import_failed:
             token = self._event_tokens.pop(event_id)
             run_context._run_stack.reset(token)
 
-
         def start_trace(self, trace_id: Optional[str] = None) -> None:
             """Run when an overall trace is launched."""
+            # TODO: We should probably start a call here
             pass
-
 
         def end_trace(
             self,
@@ -162,8 +162,10 @@ if not import_failed:
             pass
 
 else:
-    class WeaveCallbackHandler():
+
+    class WeaveCallbackHandler:
         pass
+
 
 class LLamaIndexPatcher(Patcher):
     def __init__(self) -> None:
@@ -192,7 +194,6 @@ class LLamaIndexPatcher(Patcher):
             return True
         except Exception:
             return False
-    
 
 
 llamaindex_patcher = LLamaIndexPatcher()

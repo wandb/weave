@@ -20,12 +20,16 @@ def patch_llamaindex(request: Any) -> Generator[None, None, None]:
     yield
     llamaindex_patcher.undo_patch()
 
+
 def filter_body(r):
-    r.body = ''
+    r.body = ""
     return r
 
+
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"], before_record_request=filter_body
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
 )
 def test_llamaindex_quickstart(
     client: weave.weave_client.WeaveClient, patch_llamaindex: None
@@ -41,4 +45,4 @@ def test_llamaindex_quickstart(
     print(response)
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 11
-    #TODO: Finish Assertions
+    # TODO: Finish Assertions
