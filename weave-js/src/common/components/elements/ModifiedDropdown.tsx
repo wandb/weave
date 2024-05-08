@@ -131,13 +131,15 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       if (firstRenderRef.current) {
         return;
       }
-      doSearch(searchQuery);
-      if (prevDoSearch !== doSearch) {
-        prevDoSearch?.cancel();
-        doSearch.flush();
+      if (search !== false) {
+        doSearch(searchQuery);
+        if (prevDoSearch !== doSearch) {
+          prevDoSearch?.cancel();
+          doSearch.flush();
+        }
       }
       // eslint-disable-next-line
-    }, [searchQuery, doSearch]);
+    }, [searchQuery, doSearch, search]);
     useEffect(() => {
       firstRenderRef.current = false;
     }, []);
