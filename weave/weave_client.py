@@ -463,6 +463,7 @@ class WeaveClient:
             parent._children.append(call)
 
         current_wb_run_id = safe_current_wb_run_id()
+        check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
         start = StartedCallSchemaForInsert(
             project_id=self._project_id(),
             id=call_id,
@@ -601,3 +602,15 @@ def safe_current_wb_run_id() -> Optional[str]:
         return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
     except ImportError:
         return None
+
+
+def check_wandb_run_matches(
+    wandb_run_id: Optional[str], weave_entity: str, weave_project: str
+) -> None:
+    if wandb_run_id:
+        # ex: "entity/project/run_id"
+        wandb_entity, wandb_project, _ = wandb_run_id.split("/")
+        if wandb_entity != weave_entity or wandb_project != weave_project:
+            raise ValueError(
+                f'Project Mismatch: weave and wandb must be initialized using the same project. Found wandb.init targeting project "{wandb_entity}/{wandb_project}" and weave.init targeting project "{weave_entity}/{weave_project}". To fix, please use the same project for both library initializations.'
+            )
