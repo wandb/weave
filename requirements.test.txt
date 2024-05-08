@@ -27,3 +27,4 @@ fastapi>=0.110.0
 pytest-recording==0.13.1
 vcrpy==6.0.1
 mistralai>=0.1.8
+llama-index>=0.10.35
