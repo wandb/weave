@@ -23,7 +23,9 @@ from weave.trace.object_record import (
 from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
+    CallsDeleteReq,
     ObjSchema,
+    OpsDeleteReq,
     RefsReadBatchReq,
     TraceServerInterface,
     ObjCreateReq,
@@ -536,6 +538,26 @@ class WeaveClient:
     def fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
+    
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_call(self, call: Call) -> None:
+       self.server.calls_delete(
+            CallsDeleteReq(
+                project_id=self._project_id(),
+                ids=[call.id],
+            )
+        )
+       
+    
+    # @trace_sentry.global_trace_sentry.watch()
+    # def delete_op(self, op: Op) -> None:
+    #     self.server.ops_delete(
+    #         OpsDeleteReq(
+    #             project_id=self._project_id(),
+    #             op_ids=[op],
+    #         )
+    #     )
+
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:

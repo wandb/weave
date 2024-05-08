@@ -264,7 +264,9 @@ const Browse3Mounted: FC<{
                 flexDirection: 'column',
               }}>
               <ErrorBoundary>
-                <MainPeekingLayout />
+                <WFDataModelAutoProvider entityName='griffin_wb' projectName='sparkles'>
+                  <MainPeekingLayout />
+                </WFDataModelAutoProvider>
               </ErrorBoundary>
             </Box>
           </Box>
@@ -304,6 +306,11 @@ const MainPeekingLayout: FC = () => {
 
   const {handleMousedown, drawerWidthPct} = useDrawerResize();
   const closePeek = useClosePeek();
+
+  const {useDeleteCalls} = useWFHooks();
+
+  const [toDelete, deleteCalls] = useState<string[]>([]);
+  useDeleteCalls("griffin_wb/sparkles", toDelete)
 
   useMousetrap('esc', closePeek);
 
@@ -379,6 +386,15 @@ const MainPeekingLayout: FC = () => {
                         height: '41px',
                         flex: '0 0 auto',
                       }}>
+                      <Button
+                        tooltip='Delete'
+                        icon='delete'
+                        color='secondary'
+                        onClick={() => {
+                          console.log('Delete', peekLocation);
+                          deleteCalls([peekLocation.pathname.split('/').pop()!]);
+                        }}
+                      ></Button>
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}

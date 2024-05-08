@@ -1,4 +1,4 @@
-import {Box, Typography} from '@mui/material';
+import {Box, Checkbox, Typography} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -465,6 +465,10 @@ export const RunsTable: FC<{
     }
   }, [rowIds, peekId]);
 
+  const [toDelete, setToDelete] = useState<string[]>([]);
+
+  console.log("toDelete", toDelete);
+
   // Custom logic to control path preservation preference
   const preservePath = useMemo(() => {
     return (
@@ -475,6 +479,27 @@ export const RunsTable: FC<{
 
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
+      {
+        field: "delete_checkbox",
+        headerName: "",
+        minWidth: 40,
+        filterable: false,
+        hideable: true,
+        width: 50,
+        renderCell: rowParams => {
+          return (
+            <div style={{margin: 'auto'}}>
+              <Checkbox checked={toDelete.includes(rowParams.row.call.callId)} onChange={() => {
+                console.log("onchange", rowParams.row.call.callId, toDelete);
+                if (!toDelete.includes(rowParams.row.call.callId)) {
+                  console.log("add", toDelete, rowParams.row.call.callId)
+                  setToDelete(toDelete.concat([rowParams.row.call.callId]))
+                }
+              }}/>
+            </div>
+          );
+        }
+      },
       {
         field: 'span_id',
         headerName: 'Trace',
