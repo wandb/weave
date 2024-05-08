@@ -200,6 +200,8 @@ export {
   IconTensorflowLogo,
   IconTextLanguage,
   IconTextLanguageAlt,
+  IconThumbsDown,
+  IconThumbsUp,
   IconTriangleDown,
   IconTriangleLeft,
   IconTriangleRight,
