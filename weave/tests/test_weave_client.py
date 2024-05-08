@@ -235,6 +235,16 @@ def test_calls_query(client):
         id=call1.id,
     )
 
+def test_calls_delete(client):
+    call0 = client.create_call("x", None, {"a": 5, "b": 10})
+    call1 = client.create_call("x", None, {"a": 6, "b": 11})
+
+    client.delete_call(call0)
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
+
+    assert len(result) == 1
+
 
 def test_dataset_calls(client):
     ref = client.save(
@@ -247,7 +257,6 @@ def test_dataset_calls(client):
     calls = list(client.calls({"op_name": "x"}))
     assert calls[0].inputs["a"] == "xx"
     assert calls[1].inputs["a"] == "yy"
-
 
 @pytest.mark.skip()
 def test_mutations(client):
@@ -467,6 +476,7 @@ def test_evaluate(client):
     # TODO: walk the whole graph and make sure all the refs and relationships
     # are there.
     child0 = eval_call_children[0]
+    
     assert child0.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
 
     eval_obj = child0.inputs["self"]
@@ -586,7 +596,6 @@ def test_op_query(client):
     client.save_object(myop, "my-op")
     res = client.objects()
     assert len(res) == 1
-
 
 def test_refs_read_batch_noextra(client):
     ref = client.save_object([1, 2, 3], "my-list")
