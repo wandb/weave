@@ -59,12 +59,29 @@ def assert_calls_correct_for_quickstart(calls: list[tsi.CallSchema]) -> None:
     assert got == exp
 
 
+@pytest.fixture
+def fake_api_key() -> Generator[None, None, None]:
+    import os
+
+    orig_key = os.environ.get("OPENAI_API_KEY")
+    os.environ["OPENAI_API_KEY"] = "sk-DUMMY_KEY"
+    try:
+        yield
+    finally:
+        if orig_key is None:
+            del os.environ["OPENAI_API_KEY"]
+        else:
+            os.environ["OPENAI_API_KEY"] = orig_key
+
+
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_llamaindex_quickstart(client: weave.weave_client.WeaveClient) -> None:
+def test_llamaindex_quickstart(
+    client: weave.weave_client.WeaveClient, fake_api_key: None
+) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
     from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 
@@ -85,7 +102,7 @@ def test_llamaindex_quickstart(client: weave.weave_client.WeaveClient) -> None:
 )
 @pytest.mark.asyncio
 async def test_llamaindex_quickstart_async(
-    client: weave.weave_client.WeaveClient,
+    client: weave.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
     # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
     from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
