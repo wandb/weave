@@ -612,5 +612,5 @@ def check_wandb_run_matches(
         wandb_entity, wandb_project, _ = wandb_run_id.split("/")
         if wandb_entity != weave_entity or wandb_project != weave_project:
             raise ValueError(
-                f"Wandb.init called with <entity>/<project>: '{wandb_entity}/{wandb_project}' but does not match weave.init: '{weave_entity}/{weave_project}' (project and entity must match)"
+                f'Project Mismatch: weave and wandb must be initialized using the same project. Found wandb.init targeting project "{wandb_entity}/{wandb_project}" and weave.init targeting project "{weave_entity}/{weave_project}". To fix, please use the same project for both library initializations.'
             )
