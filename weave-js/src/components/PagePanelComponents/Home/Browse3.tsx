@@ -29,7 +29,7 @@ import {
   useHistory,
   useParams,
 } from 'react-router-dom';
-import { Modal } from 'semantic-ui-react';
+import {Modal} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
@@ -73,7 +73,7 @@ import {
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
-import { useGetTraceServerClientContext } from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {useGetTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -266,7 +266,9 @@ const Browse3Mounted: FC<{
                 flexDirection: 'column',
               }}>
               <ErrorBoundary>
-                <WFDataModelAutoProvider entityName='griffin_wb' projectName='sparkles'>
+                <WFDataModelAutoProvider
+                  entityName="griffin_wb"
+                  projectName="sparkles">
                   <MainPeekingLayout />
                 </WFDataModelAutoProvider>
               </ErrorBoundary>
@@ -383,7 +385,7 @@ const MainPeekingLayout: FC = () => {
                         height: '41px',
                         flex: '0 0 auto',
                       }}>
-                      <DeleteCallButton 
+                      <DeleteCallButton
                         entity={params.entity!}
                         project={params.project!}
                         id={peekLocation?.pathname.split('/').pop() ?? ''}
@@ -416,11 +418,11 @@ const MainPeekingLayout: FC = () => {
   );
 };
 
-const DeleteCallButton: FC<({
+export const DeleteCallButton: FC<{
   entity: string;
   project: string;
-  id: string;
-})> = ({entity, project, id}) => {
+  ids: string[];
+}> = ({entity, project, ids}) => {
   const closePeek = useClosePeek();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const getTsClient = useGetTraceServerClientContext();
@@ -428,63 +430,65 @@ const DeleteCallButton: FC<({
 
   return (
     <>
-    {confirmDelete && (
-      <Modal
-        open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
-        size='tiny'
-      >
-        <Modal.Header>Delete Call</Modal.Header>
-        <Modal.Content>
-          <p>Are you sure you want to delete this call?</p>
-        </Modal.Content>
-        <Modal.Actions>
-          <Button
-            onClick={() => {
-              setConfirmDelete(false);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            style={{marginLeft: '4px'}}
-            variant='destructive'
-            onClick={() => {
-              client.callsDelete({
-                project_id:`${entity}/${project}`, 
-                ids: [id]
-              })
-              .catch(e => {
-                console.error(e);
-                return false
-              })
-              .then((res) => {
-                if (res) {
-                  setConfirmDelete(false);
-                  closePeek();
-                } else {
-                  console.error('Failed to delete call');
-                }
-              });
-            }}
-          >
-            Confirm
-          </Button>
-        </Modal.Actions>
-      </Modal>
-    )}
+      {confirmDelete && (
+        <Modal
+          open={confirmDelete}
+          onClose={() => setConfirmDelete(false)}
+          size="tiny">
+          <Modal.Header>Delete Call</Modal.Header>
+          <Modal.Content>
+            <p>
+              Are you sure you want to delete{' '}
+              {ids.length > 1 ? 'these calls' : 'this call'}?
+            </p>
+          </Modal.Content>
+          <Modal.Actions>
+            <Button
+              onClick={() => {
+                setConfirmDelete(false);
+              }}>
+              Cancel
+            </Button>
+            <Button
+              style={{marginLeft: '4px'}}
+              variant="destructive"
+              onClick={() => {
+                client
+                  .callsDelete({
+                    project_id: `${entity}/${project}`,
+                    ids,
+                  })
+                  .catch(e => {
+                    console.error(e);
+                    return false;
+                  })
+                  .then(res => {
+                    if (res) {
+                      setConfirmDelete(false);
+                      closePeek();
+                    } else {
+                      console.error('Failed to delete call');
+                    }
+                  });
+              }}>
+              Confirm
+            </Button>
+          </Modal.Actions>
+        </Modal>
+      )}
       <Button
-        tooltip='Delete'
-        icon='delete'
-        variant='destructive'
+        tooltip="Delete"
+        icon="delete"
+        variant="destructive"
         style={{
           marginLeft: '4px',
         }}
-        onClick={() => setConfirmDelete(true)}
-      />
+        onClick={() => setConfirmDelete(true)}>
+        Delete
+      </Button>
     </>
-  )
-}
+  );
+};
 
 const ProjectRedirect: FC = () => {
   const history = useHistory();
