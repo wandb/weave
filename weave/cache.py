@@ -119,10 +119,10 @@ def get_user_cache_key() -> typing.Optional[str]:
             raise errors.WeaveAccessDeniedError("No user set in public environment")
         return None
     if ctx.user_id is None:
-        unauthed_user_cookie = ctx.cookies.get("anon_wandb")
-        if unauthed_user_cookie:
-            return unauthed_user_cookie
-        raise errors.WeaveAccessDeniedError("No anon cookie for unauthed user")
+        if ctx.cookies is None or "anon_wandb" not in ctx.cookies:
+            raise errors.WeaveAccessDeniedError("No anon cookie for unauthed user")
+        unauthed_user_cookie = ctx.cookies["anon_wandb"]
+        return unauthed_user_cookie
     return ctx.user_id
 
 
