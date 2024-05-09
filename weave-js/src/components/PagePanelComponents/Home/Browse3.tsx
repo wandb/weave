@@ -388,7 +388,7 @@ const MainPeekingLayout: FC = () => {
                       <DeleteCallButton
                         entity={params.entity!}
                         project={params.project!}
-                        id={peekLocation?.pathname.split('/').pop() ?? ''}
+                        ids={[peekLocation?.pathname.split('/').pop()!] ?? []}
                       />
                       <FullPageButton
                         query={query}
