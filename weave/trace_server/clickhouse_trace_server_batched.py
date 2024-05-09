@@ -300,8 +300,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         # TODO(gst): use FE time or server time?
-        deleted_at = datetime.datetime.now()
+        deleted_at = datetime.datetime.now()        
         data = [(req.project_id, id, deleted_at) for id in req.ids]
+        for parent_id in req.ids:
+            # query for children of this call
+            children = self._select_calls_query(
+                req.project_id,
+                conditions=["parent_id = {parent_id: String}"],
+                parameters={"parent_id": parent_id},
+            )
+
+            # add children to the list of calls to delete
+            data += [(req.project_id, child.id, deleted_at) for child in children]
+
         summary = self._insert("call_parts", data=data, column_names=["project_id", "id", "deleted_at"])
         return tsi.CallsDeleteRes(num_deleted=summary.written_rows)
 
