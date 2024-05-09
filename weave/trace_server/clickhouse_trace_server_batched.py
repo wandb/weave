@@ -299,13 +299,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryRes(calls=calls)
     
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        conds: typing.List[str] = []
-
-        num_deleted = self._delete_calls(req.project_id, req.ids, conds)
-
-        print("\n\n>>>>>>>", num_deleted, '\n')
-
-        return tsi.CallsDeleteRes()
+        # TODO(gst): use FE time or server time?
+        deleted_at = datetime.datetime.now()
+        data = [(req.project_id, id, deleted_at) for id in req.ids]
+        summary = self._insert("call_parts", data=data, column_names=["project_id", "id", "deleted_at"])
+        return tsi.CallsDeleteRes(num_deleted=summary.written_rows)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -344,12 +342,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
     
     def ops_delete(self, req: tsi.OpsDeleteReq) -> tsi.OpsDeleteRes:
-        conds: typing.List[str] = ["is_op = 1"]
-
-        num_deleted = self._delete_objs(req.project_id, req.op_ids, conds)
-
-        return tsi.OpsDeleteRes(num_deleted=num_deleted)
-        
+        deleted_at = datetime.datetime.now()
+        column_names = ["project_id", "object_id", "deleted_at"]
+        data = [(req.project_id, id, deleted_at) for id in req.op_ids]
+        summary = self._insert("object_versions", data=data, column_names=column_names)
+        return tsi.OpsDeleteRes(num_deleted=summary.written_rows)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         json_val = json.dumps(req.obj.val)
@@ -846,40 +843,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for row in dicts:
             calls.append(_raw_call_dict_to_ch_call(row))
         return calls
-    
-    def _delete_calls(self, project_id, ids, conds) -> int:
-        conditions = conds + ["id IN {object_ids: Array(String)}"]
-        conditions_part = _combine_conditions(conditions, "AND")
-
-        parameters = {"object_ids": ids}
-        query_result = self._query(
-            f"""
-            ALTER TABLE calls_merged
-            UPDATE deleted_at = now()
-            WHERE project_id = {{project_id: String}}
-            AND {conditions_part}
-        """,
-            {"project_id": project_id, **parameters},
-        )
-        print("\n\n>>>>>>>", query_result.result_rows, query_result.row_count, '\n')
-        return query_result
-    
-    def _delete_objs(self, project_id, ids, conds) -> int:
-        conditions = conds + ["object_id IN {object_ids: Array(String)}"]
-        conditions_part = _combine_conditions(conditions, "AND")
-
-        parameters = {"object_ids": ids}
-        query_result = self._query(
-            f"""
-            ALTER TABLE object_versions
-            UPDATE deleted_at = now()
-            WHERE project_id = {{project_id: String}}
-            AND {conditions_part}
-        """,
-            {"project_id": project_id, **parameters},
-        )
-        print("\n\n>>>>>>>", query_result.summary, query_result.first_row, query_result.result_rows, query_result.row_count, '\n')
-        return query_result
 
     def _select_calls_query_raw(
         self,
@@ -1037,17 +1000,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         print("Running migrations")
         migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
         migrator.apply_migrations(self._database)
-
-    def _command(
-        self,
-        cmd: str,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> int: 
-        print("Running command: " + cmd + " with parameters: " + str(parameters))
-        parameters = _process_parameters(parameters)
-        res = self.ch_client.command(cmd, parameters=parameters)
-        print("Summary: " + json.dumps(res.summary, indent=2))
-        return res
 
     def _query(
         self,

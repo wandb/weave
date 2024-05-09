@@ -140,7 +140,7 @@ class CallsDeleteReq(BaseModel):
     ids: typing.List[str]
 
 class CallsDeleteRes(BaseModel):
-    pass
+    num_deleted: int
 
 
 class _CallsFilter(BaseModel):
