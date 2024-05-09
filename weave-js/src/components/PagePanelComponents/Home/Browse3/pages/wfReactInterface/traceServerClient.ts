@@ -186,12 +186,13 @@ export class TraceServerClient {
     this.scheduleReadBatch();
   }
 
-  callsDelete: (req: TraceCallsDeleteReq) => Promise<TraceCallsDeleteRes> = req => {
-    return this.makeRequest<TraceCallsDeleteReq, TraceCallsDeleteRes>(
-      '/calls/delete',
-      req
-    );
-  };
+  callsDelete: (req: TraceCallsDeleteReq) => Promise<TraceCallsDeleteRes> =
+    req => {
+      return this.makeRequest<TraceCallsDeleteReq, TraceCallsDeleteRes>(
+        '/calls/delete',
+        req
+      );
+    };
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(

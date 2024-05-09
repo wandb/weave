@@ -467,7 +467,7 @@ export const RunsTable: FC<{
 
   const [toDelete, setToDelete] = useState<string[]>([]);
 
-  console.log("toDelete", toDelete);
+  console.log('toDelete', toDelete);
 
   // Custom logic to control path preservation preference
   const preservePath = useMemo(() => {
@@ -480,8 +480,8 @@ export const RunsTable: FC<{
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
-        field: "delete_checkbox",
-        headerName: "",
+        field: 'delete_checkbox',
+        headerName: '',
         minWidth: 40,
         filterable: false,
         hideable: true,
@@ -489,16 +489,19 @@ export const RunsTable: FC<{
         renderCell: rowParams => {
           return (
             <div style={{margin: 'auto'}}>
-              <Checkbox checked={toDelete.includes(rowParams.row.call.callId)} onChange={() => {
-                console.log("onchange", rowParams.row.call.callId, toDelete);
-                if (!toDelete.includes(rowParams.row.call.callId)) {
-                  console.log("add", toDelete, rowParams.row.call.callId)
-                  setToDelete(toDelete.concat([rowParams.row.call.callId]))
-                }
-              }}/>
+              <Checkbox
+                checked={toDelete.includes(rowParams.row.call.callId)}
+                onChange={() => {
+                  console.log('onchange', rowParams.row.call.callId, toDelete);
+                  if (!toDelete.includes(rowParams.row.call.callId)) {
+                    console.log('add', toDelete, rowParams.row.call.callId);
+                    setToDelete(toDelete.concat([rowParams.row.call.callId]));
+                  }
+                }}
+              />
             </div>
           );
-        }
+        },
       },
       {
         field: 'span_id',

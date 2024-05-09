@@ -29,6 +29,7 @@ import {
   useHistory,
   useParams,
 } from 'react-router-dom';
+import { Modal } from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
@@ -72,6 +73,7 @@ import {
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
+import { useGetTraceServerClientContext } from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -307,11 +309,6 @@ const MainPeekingLayout: FC = () => {
   const {handleMousedown, drawerWidthPct} = useDrawerResize();
   const closePeek = useClosePeek();
 
-  const {useDeleteCalls} = useWFHooks();
-
-  const [toDelete, deleteCalls] = useState<string[]>([]);
-  useDeleteCalls("griffin_wb/sparkles", toDelete)
-
   useMousetrap('esc', closePeek);
 
   return (
@@ -386,15 +383,11 @@ const MainPeekingLayout: FC = () => {
                         height: '41px',
                         flex: '0 0 auto',
                       }}>
-                      <Button
-                        tooltip='Delete'
-                        icon='delete'
-                        color='secondary'
-                        onClick={() => {
-                          console.log('Delete', peekLocation);
-                          deleteCalls([peekLocation.pathname.split('/').pop()!]);
-                        }}
-                      ></Button>
+                      <DeleteCallButton 
+                        entity={params.entity!}
+                        project={params.project!}
+                        id={peekLocation?.pathname.split('/').pop() ?? ''}
+                      />
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}
@@ -422,6 +415,76 @@ const MainPeekingLayout: FC = () => {
     </WFDataModelAutoProvider>
   );
 };
+
+const DeleteCallButton: FC<({
+  entity: string;
+  project: string;
+  id: string;
+})> = ({entity, project, id}) => {
+  const closePeek = useClosePeek();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const getTsClient = useGetTraceServerClientContext();
+  const client = getTsClient();
+
+  return (
+    <>
+    {confirmDelete && (
+      <Modal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        size='tiny'
+      >
+        <Modal.Header>Delete Call</Modal.Header>
+        <Modal.Content>
+          <p>Are you sure you want to delete this call?</p>
+        </Modal.Content>
+        <Modal.Actions>
+          <Button
+            onClick={() => {
+              setConfirmDelete(false);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            style={{marginLeft: '4px'}}
+            variant='destructive'
+            onClick={() => {
+              client.callsDelete({
+                project_id:`${entity}/${project}`, 
+                ids: [id]
+              })
+              .catch(e => {
+                console.error(e);
+                return false
+              })
+              .then((res) => {
+                if (res) {
+                  setConfirmDelete(false);
+                  closePeek();
+                } else {
+                  console.error('Failed to delete call');
+                }
+              });
+            }}
+          >
+            Confirm
+          </Button>
+        </Modal.Actions>
+      </Modal>
+    )}
+      <Button
+        tooltip='Delete'
+        icon='delete'
+        variant='destructive'
+        style={{
+          marginLeft: '4px',
+        }}
+        onClick={() => setConfirmDelete(true)}
+      />
+    </>
+  )
+}
 
 const ProjectRedirect: FC = () => {
   const history = useHistory();
