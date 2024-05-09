@@ -120,8 +120,8 @@ def get_user_cache_key() -> typing.Optional[str]:
         return None
     if ctx.user_id:
         return ctx.user_id
-    if ctx.cookies and ctx.cookies["anon_wandb"] :
-        return ctx.cookies["anon_wandb"]    
+    if ctx.cookies and ctx.cookies["anon_wandb"]:
+        return ctx.cookies["anon_wandb"]
     return None
 
 
