@@ -7,10 +7,11 @@ import {
   ListItem,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {FC, useCallback, useMemo} from 'react';
+import React, {FC, useCallback, useMemo, useState} from 'react';
 
 import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
+import {DeleteCallButton} from '../../../Browse3';
 import {
   useWeaveflowRouteContext,
   WeaveHeaderExtrasContext,
@@ -140,6 +141,8 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
+  const [toDelete, setToDelete] = useState<Record<string, boolean>>({});
+
   const {useCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
   const {filter, setFilter} = useInitializingFilter(
@@ -436,6 +439,13 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          {Object.values(toDelete).some(a => !!a) && (
+            <DeleteCallButton
+              entity={props.entity}
+              project={props.project}
+              ids={Object.keys(toDelete).filter(k => toDelete[k])}
+            />
+          )}
         </>
       }>
       {isPivoting ? (
@@ -459,6 +469,8 @@ export const CallsTable: FC<{
           spans={spans}
           clearFilters={clearFilters}
           ioColumnsOnly={props.ioColumnsOnly}
+          toDelete={toDelete}
+          setToDelete={setToDelete}
         />
       )}
     </FilterLayoutTemplate>

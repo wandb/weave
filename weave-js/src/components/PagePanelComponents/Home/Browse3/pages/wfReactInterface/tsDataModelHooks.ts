@@ -140,30 +140,30 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useDeleteCalls = (
-  project_id: string,
-  callIDs: string[]
-): Loadable<any> => {
-  if (callIDs.length === 0) {
-    return {
-      loading: false,
-      result: null,
-    };
-  }
+// const useDeleteCalls = (
+//   projectID: string,
+//   callIDs: string[]
+// ): Loadable<any> => {
+//   const getTsClient = useGetTraceServerClientContext();
+//   if (callIDs.length === 0) {
+//     return {
+//       loading: false,
+//       result: null,
+//     };
+//   }
 
-  const getTsClient = useGetTraceServerClientContext();
-  getTsClient()
-    .callsDelete({project_id, ids: callIDs})
-    .catch(e => {
-      console.error(e);
-      return false;
-    });
+//   getTsClient()
+//     .callsDelete({project_id: projectID, ids: callIDs})
+//     .catch(e => {
+//       console.error(e);
+//       return false;
+//     });
 
-  return {
-    loading: false,
-    result: null,
-  };
-};
+//   return {
+//     loading: false,
+//     result: null,
+//   };
+// };
 
 const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1077,7 +1077,7 @@ const convertISOToDate = (iso: string) => {
 // Export //
 
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
-  useDeleteCalls,
+  // useDeleteCalls,
   useCall,
   useCalls,
   useOpVersion,

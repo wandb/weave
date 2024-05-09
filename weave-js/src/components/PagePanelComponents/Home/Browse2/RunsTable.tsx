@@ -1,4 +1,4 @@
-import {Box, Checkbox, Typography} from '@mui/material';
+import {Box, Typography} from '@mui/material';
 import {
   DataGridPro as DataGrid,
   DataGridPro,
@@ -11,6 +11,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
+import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
@@ -72,6 +73,7 @@ import {
   getInputColumns,
   useColumnVisibility,
 } from './tableStats';
+// import { Checkbox } from 'semantic-ui-react';
 
 export type DataGridColumnGroupingModel = Exclude<
   ComponentProps<typeof DataGrid>['columnGroupingModel'],
@@ -265,7 +267,9 @@ export const RunsTable: FC<{
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+  toDelete: Record<string, boolean>;
+  setToDelete: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}> = ({loading, spans, clearFilters, ioColumnsOnly, toDelete, setToDelete}) => {
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
@@ -465,10 +469,6 @@ export const RunsTable: FC<{
     }
   }, [rowIds, peekId]);
 
-  const [toDelete, setToDelete] = useState<string[]>([]);
-
-  console.log('toDelete', toDelete);
-
   // Custom logic to control path preservation preference
   const preservePath = useMemo(() => {
     return (
@@ -479,30 +479,6 @@ export const RunsTable: FC<{
 
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
-      {
-        field: 'delete_checkbox',
-        headerName: '',
-        minWidth: 40,
-        filterable: false,
-        hideable: true,
-        width: 50,
-        renderCell: rowParams => {
-          return (
-            <div style={{margin: 'auto'}}>
-              <Checkbox
-                checked={toDelete.includes(rowParams.row.call.callId)}
-                onChange={() => {
-                  console.log('onchange', rowParams.row.call.callId, toDelete);
-                  if (!toDelete.includes(rowParams.row.call.callId)) {
-                    console.log('add', toDelete, rowParams.row.call.callId);
-                    setToDelete(toDelete.concat([rowParams.row.call.callId]));
-                  }
-                }}
-              />
-            </div>
-          );
-        },
-      },
       {
         field: 'span_id',
         headerName: 'Trace',
@@ -518,14 +494,30 @@ export const RunsTable: FC<{
             return rowParams.row.call.spanName;
           }
           return (
-            <CallLink
-              entityName={params.entity}
-              projectName={params.project}
-              opName={opVersionRefOpName(opVersion)}
-              callId={rowParams.row.id}
-              fullWidth={true}
-              preservePath={preservePath}
-            />
+            <>
+              <Checkbox
+                size="small"
+                style={{marginRight: '4px', marginTop: '2px'}}
+                checked={toDelete[rowParams.row.call.callId] ?? false}
+                onClick={() => {
+                  setToDelete({
+                    ...toDelete,
+                    [rowParams.row.call.callId]:
+                      !toDelete[rowParams.row.call.callId] ?? false,
+                  });
+                  toDelete[rowParams.row.call.callId] =
+                    !toDelete[rowParams.row.call.callId] ?? true;
+                }}
+              />
+              <CallLink
+                entityName={params.entity}
+                projectName={params.project}
+                opName={opVersionRefOpName(opVersion)}
+                callId={rowParams.row.id}
+                fullWidth={true}
+                preservePath={preservePath}
+              />
+            </>
           );
         },
       },
@@ -904,6 +896,8 @@ export const RunsTable: FC<{
     preservePath,
     spans,
     tableStats,
+    setToDelete,
+    toDelete,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();
