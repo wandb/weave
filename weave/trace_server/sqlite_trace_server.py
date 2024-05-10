@@ -77,7 +77,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 op_name TEXT,
                 started_at TEXT,
                 ended_at TEXT,
-                deleted_at TEXT,
                 exception TEXT,
                 attributes TEXT,
                 inputs TEXT,
@@ -86,7 +85,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 output_refs TEXT,
                 summary TEXT,
                 wb_user_id TEXT,
-                wb_run_id TEXT
+                wb_run_id TEXT,
+                deleted_at TEXT
             )
         """
         )
@@ -96,14 +96,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 project_id TEXT,
                 object_id TEXT,
                 created_at TEXT,
-                deleted_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
                 refs TEXT,
                 val_dump TEXT,
                 digest TEXT UNIQUE,
                 version_index INTEGER,
-                is_latest INTEGER
+                is_latest INTEGER,
+                deleted_at TEXT
             )
         """
         )
