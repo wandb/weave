@@ -388,5 +388,5 @@ def check_base_url() -> None:
 def check_api_key(api_key: str) -> None:
     if "local" in api_key:
         raise errors.WeaveConfigurationError(
-            f'The current logged in users api key {api_key} points to a server that does not currently support Weave. Please relogin with "wandb login --host https://api.wandb.ai" and try again.'
+            f'The current logged in users api key {api_key} points to a server that does not currently support Weave. Try logging in with "wandb login --host https://api.wandb.ai".'
         )
