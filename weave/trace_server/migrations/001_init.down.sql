@@ -1,14 +1,15 @@
 DROP TABLE call_parts;
 DROP TABLE calls_merged;
+DROP VIEW calls_merged_view;
 
 DROP TABLE object_versions;
-DROP TABLE object_versions_deduped;
+DROP VIEW object_versions_deduped;
 
 DROP TABLE tables;
-DROP TABLE tables_deduped;
+DROP VIEW tables_deduped;
 
 DROP TABLE table_rows;
-DROP TABLE table_rows_deduped;
+DROP VIEW table_rows_deduped;
 
 DROP TABLE files;
-DROP TABLE files_deduped;
+DROP VIEW files_deduped;
