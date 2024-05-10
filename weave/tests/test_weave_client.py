@@ -488,7 +488,6 @@ def test_evaluate(client):
     # TODO: walk the whole graph and make sure all the refs and relationships
     # are there.
     child0 = eval_call_children[0]
-
     assert child0.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
 
     eval_obj = child0.inputs["self"]
