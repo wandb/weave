@@ -387,7 +387,11 @@ const MainPeekingLayout: FC = () => {
                         height: '41px',
                         flex: '0 0 auto',
                       }}>
-                      <OverflowMenu />
+                      <OverflowMenu
+                        entity={params.entity!}
+                        project={params.project!}
+                        deleteIDs={[]}
+                      />
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}
@@ -416,19 +420,21 @@ const MainPeekingLayout: FC = () => {
   );
 };
 
-const OverflowMenu: FC = () => {
-  const params = useParams<Browse3TabItemParams>();
+const OverflowMenu: FC<{
+  entity: string;
+  project: string;
+  deleteIDs: string[];
+}> = ({entity, project, deleteIDs}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
-  const peekLocation = usePeekLocation();
   const closePeek = useClosePeek();
 
   const onDelete = () => {
     client
       .callsDelete({
-        project_id: `${params.entity!}/${params.project!}`,
-        ids: [peekLocation?.pathname.split('/').pop()!],
+        project_id: `${entity}/${project}`,
+        ids: deleteIDs,
       })
       .catch(e => {
         console.error(e);
@@ -451,6 +457,7 @@ const OverflowMenu: FC = () => {
         text: 'Delete',
         icon: <IconDelete style={{marginRight: '4px'}} />,
         onClick: () => setConfirmDelete(true),
+        disabled: deleteIDs.length === 0,
       },
     ],
   ];
@@ -463,12 +470,12 @@ const OverflowMenu: FC = () => {
           onClose={() => setConfirmDelete(false)}
           size="tiny">
           <Modal.Header>
-            Delete {params.itemName.length > 1 ? 'calls' : 'call'}
+            Delete {deleteIDs.length > 1 ? 'calls' : 'call'}
           </Modal.Header>
           <Modal.Content>
             <p>
               Are you sure you want to delete{' '}
-              {params.itemName.length > 1 ? 'these calls' : 'this call'}?
+              {deleteIDs.length > 1 ? 'these calls' : 'this call'}?
             </p>
           </Modal.Content>
           <Modal.Actions>
@@ -489,13 +496,13 @@ const OverflowMenu: FC = () => {
       )}
       <PopupDropdown
         sections={menuOptions}
-        style={{marginLeft: '4px'}}
         trigger={
           <Button
             className="row-actions-button"
             icon="overflow-horizontal"
             size="medium"
             variant="ghost"
+            style={{marginLeft: '4px'}}
           />
         }
         offset="-50px, 0px"
