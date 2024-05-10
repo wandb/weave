@@ -22,7 +22,9 @@ def test_named_op(client: weave_client.WeaveClient) -> str:
 
 
 def test_anonymous_op(client: weave_client.WeaveClient) -> str:
-    call = client.create_call("anonymous_op", None, {"a": 1})
+    call = client.create_call(
+        weave_client.build_anonymous_op("anonymous_op"), None, {"a": 1}
+    )
     client.finish_call(call, {"c": 3}, None)
 
     call_res = client.server.calls_query(
@@ -45,7 +47,7 @@ def test_anonymous_op(client: weave_client.WeaveClient) -> str:
 
 def test_anonymous_op_with_config(client: weave_client.WeaveClient) -> str:
     call = client.create_call(
-        weave_client._build_anonymous_op("anonymous_op", {"library_version": "0.42.0"}),
+        weave_client.build_anonymous_op("anonymous_op", {"library_version": "0.42.0"}),
         None,
         {"a": 1},
     )
