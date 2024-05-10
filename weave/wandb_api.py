@@ -374,10 +374,9 @@ DEFAULT_WANDB_BASE_URL = "https://api.wandb.ai/"
 # Currently weave only supports WANDB_BASE_URL="https://api.wandb.ai/"
 # Remove once we expand to support other base urls
 def check_base_url() -> None:
-    if (
-        os.environ.get("WANDB_BASE_URL", DEFAULT_WANDB_BASE_URL)
-        not in DEFAULT_WANDB_BASE_URL
-    ):
+    base_url = os.environ.get("WANDB_BASE_URL", DEFAULT_WANDB_BASE_URL)
+    # Check that base url is either localhost for testing, or the default WANDB_BASE_URL
+    if base_url not in DEFAULT_WANDB_BASE_URL and base_url != "http://localhost:8080":
         raise errors.WeaveConfigurationError(
             'Weave is currently not available on dedicated deployments. Please set WANDB_BASE_URL to "https://api.wandb.ai/" and try again.'
         )
