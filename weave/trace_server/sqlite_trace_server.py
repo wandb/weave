@@ -77,6 +77,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 op_name TEXT,
                 started_at TEXT,
                 ended_at TEXT,
+                deleted_at TEXT,
                 exception TEXT,
                 attributes TEXT,
                 inputs TEXT,
@@ -95,6 +96,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 project_id TEXT,
                 object_id TEXT,
                 created_at TEXT,
+                deleted_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
                 refs TEXT,
@@ -349,6 +351,33 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        # update row with a deleted_at field set to NOW()
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute(
+                f"""
+                SELECT id
+                FROM calls
+                WHERE project_id = ? AND parent_id IN (SELECT id FROM calls WHERE project_id = ? AND id IN ?)
+                """,
+                (req.project_id, req.project_id, req.ids),
+            )
+            children_ids = [row[0] for row in cursor.fetchall()]
+            all_ids = req.ids + children_ids
+
+            # delete all children and all passed in ids
+            cursor.execute(
+                f"""
+                UPDATE calls
+                SET deleted_at = NOW()
+                WHERE project_id = ? AND id IN (?)
+                """,
+                (req.project_id, all_ids),
+            )
+
+            conn.commit()
+
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
 
@@ -356,9 +385,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError()
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise NotImplementedError()
-    
-    def ops_delete(self, req: tsi.OpsDeleteReq) -> tsi.OpsDeleteRes:
         raise NotImplementedError()
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
