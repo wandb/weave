@@ -72,7 +72,6 @@ import {
   getInputColumns,
   useColumnVisibility,
 } from './tableStats';
-// import { Checkbox } from 'semantic-ui-react';
 
 export type DataGridColumnGroupingModel = Exclude<
   ComponentProps<typeof DataGrid>['columnGroupingModel'],
