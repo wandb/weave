@@ -356,7 +356,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute(
-                f"""
+                """
                 SELECT id
                 FROM calls
                 WHERE project_id = ? AND parent_id IN (SELECT id FROM calls WHERE project_id = ? AND id IN ?)
@@ -368,7 +368,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             # delete all children and all passed in ids
             cursor.execute(
-                f"""
+                """
                 UPDATE calls
                 SET deleted_at = NOW()
                 WHERE project_id = ? AND id IN (?)
