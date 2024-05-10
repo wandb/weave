@@ -2,6 +2,7 @@
 # Weave interactions with the Weave API should go through this
 # module.
 
+import os
 import typing
 import graphql
 import gql
@@ -366,3 +367,26 @@ async def get_wandb_api() -> WandbApiAsync:
 
 def get_wandb_api_sync() -> WandbApi:
     return WandbApi()
+
+
+DEFAULT_WANDB_BASE_URL = "https://api.wandb.ai/"
+
+# Currently weave only supports WANDB_BASE_URL="https://api.wandb.ai/"
+# Remove once we expand to support other base urls
+def check_base_url() -> None:
+    if (
+        os.environ.get("WANDB_BASE_URL", DEFAULT_WANDB_BASE_URL)
+        not in DEFAULT_WANDB_BASE_URL
+    ):
+        raise errors.WeaveConfigurationError(
+            'Weave is currently not available on dedicated deployments. Please set WANDB_BASE_URL to "https://api.wandb.ai/" and try again.'
+        )
+
+
+# Currently weave only supports normal apikeys not local apikeys
+# Remove once we expand to support other base urls
+def check_api_key(api_key: str) -> None:
+    if "local" in api_key:
+        raise errors.WeaveConfigurationError(
+            'Weave is currently not available on dedicated deployments. Please relogin with "wandb login --host https://api.wandb.ai" and try again.'
+        )
