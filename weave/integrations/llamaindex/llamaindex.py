@@ -1,6 +1,7 @@
 from weave.trace.patcher import Patcher
-from weave.weave_client import Call
+from weave.weave_client import Call, build_anonymous_op
 from weave import graph_client_context
+from weave import run_context
 
 TRANSFORM_EMBEDDINGS = False
 ALLOWED_ROOT_EVENT_TYPES = ("query",)
@@ -70,6 +71,7 @@ if not import_failed:
 
                     # Finish the call with the exception.
                     gc.finish_call(call, None, exception=exception)
+                    run_context.pop_call(call.id)
             else:
                 # Check if the event is a valid root event or child event.
                 # Here, we only allow a subset of event types as the root since not
@@ -86,10 +88,11 @@ if not import_failed:
 
                     # Create a call object.
                     call = gc.create_call(
-                        "llama_index." + event_type.name.lower(),
+                        build_anonymous_op("llama_index." + event_type.name.lower()),
                         self._call_map.get(parent_id),
                         process_payload(payload),
                     )
+                    run_context.push_call(call)
 
                     # Add the call to the call map.
                     self._call_map[event_id] = call
@@ -112,7 +115,9 @@ if not import_failed:
             if event_id in self._call_map:
 
                 # Finish the call.
-                gc.finish_call(self._call_map.pop(event_id), process_payload(payload))
+                call = self._call_map.pop(event_id)
+                gc.finish_call(call, process_payload(payload))
+                run_context.pop_call(call.id)
 
         def start_trace(self, trace_id: Optional[str] = None) -> None:
             """Run when an overall trace is launched."""

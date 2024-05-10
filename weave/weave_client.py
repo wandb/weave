@@ -264,7 +264,6 @@ class WeaveClient:
         self.entity = entity
         self.project = project
         self.server = server
-        self._anonymous_ops_created: set[str] = set()
 
         if ensure_project_exists:
             self.server.ensure_project_exists(entity, project)
@@ -434,14 +433,11 @@ class WeaveClient:
         inputs: dict,
         attributes: dict = {},
     ) -> Call:
-        if isinstance(op, str):
-            self._anonymous_ops_created.add(op)
-            op = _build_anonymous_op(op)
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
-            raise ValueError("Invalid op type")
+            op_str = op
         self.save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
@@ -480,7 +476,6 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
-        run_context.push_call(call)
         return call
 
     @trace_sentry.global_trace_sentry.watch()
@@ -536,7 +531,6 @@ class WeaveClient:
         #     call.op_name, {"successes": 0, "errors": 0}
         # )["successes"] += 1
         call.summary = summary
-        run_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
@@ -622,7 +616,7 @@ def check_wandb_run_matches(
             )
 
 
-def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
+def build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
     if config is None:
         config = {}
 
