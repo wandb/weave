@@ -1,7 +1,7 @@
 DROP TABLE call_parts;
 DROP TABLE calls_merged;
 
-DROP TABLE objects;
+DROP TABLE object_versions;
 DROP TABLE objects_deduped;
 
 DROP TABLE tables;
