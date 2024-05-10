@@ -379,7 +379,7 @@ def check_base_url() -> None:
     # Check that base url is either localhost for testing, or the default WANDB_BASE_URL
     if base_url not in DEFAULT_WANDB_BASE_URL and not is_testing:
         raise errors.WeaveConfigurationError(
-            'Weave is currently not available on dedicated deployments. Please set WANDB_BASE_URL to "https://api.wandb.ai/" and try again.'
+            f"The target WANDB_BASE_URL {base_url} points to a server that does not currently support Weave. Try setting WANDB_BASE_URL to https://api.wandb.ai/."
         )
 
 
@@ -388,5 +388,5 @@ def check_base_url() -> None:
 def check_api_key(api_key: str) -> None:
     if "local" in api_key:
         raise errors.WeaveConfigurationError(
-            'Weave is currently not available on dedicated deployments. Please relogin with "wandb login --host https://api.wandb.ai" and try again.'
+            f'The current logged in users api key {api_key} points to a server that does not currently support Weave. Please relogin with "wandb login --host https://api.wandb.ai" and try again.'
         )
