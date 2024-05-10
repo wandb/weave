@@ -30,7 +30,7 @@ import {
   useHistory,
   useParams,
 } from 'react-router-dom';
-import {Icon, Modal} from 'semantic-ui-react';
+import {Modal} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
@@ -310,6 +310,8 @@ const MainPeekingLayout: FC = () => {
   const isDrawerOpen = peekLocation != null;
   const windowSize = useWindowSize();
 
+  const currentCallID = peekLocation?.pathname.split('/').pop();
+
   const {handleMousedown, drawerWidthPct} = useDrawerResize();
   const closePeek = useClosePeek();
 
@@ -390,7 +392,7 @@ const MainPeekingLayout: FC = () => {
                       <OverflowMenu
                         entity={params.entity!}
                         project={params.project!}
-                        deleteIDs={[]}
+                        deleteIDs={currentCallID ? [currentCallID] : []}
                       />
                       <FullPageButton
                         query={query}
@@ -507,78 +509,6 @@ const OverflowMenu: FC<{
         }
         offset="-50px, 0px"
       />
-    </>
-  );
-};
-
-export const DeleteCallButton: FC<{
-  entity: string;
-  project: string;
-  ids: string[];
-}> = ({entity, project, ids}) => {
-  const closePeek = useClosePeek();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const getTsClient = useGetTraceServerClientContext();
-  const client = getTsClient();
-
-  return (
-    <>
-      {confirmDelete && (
-        <Modal
-          open={confirmDelete}
-          onClose={() => setConfirmDelete(false)}
-          size="tiny">
-          <Modal.Header>Delete Call</Modal.Header>
-          <Modal.Content>
-            <p>
-              Are you sure you want to delete{' '}
-              {ids.length > 1 ? 'these calls' : 'this call'}?
-            </p>
-          </Modal.Content>
-          <Modal.Actions>
-            <Button
-              onClick={() => {
-                setConfirmDelete(false);
-              }}>
-              Cancel
-            </Button>
-            <Button
-              style={{marginLeft: '4px'}}
-              variant="destructive"
-              onClick={() => {
-                client
-                  .callsDelete({
-                    project_id: `${entity}/${project}`,
-                    ids,
-                  })
-                  .catch(e => {
-                    console.error(e);
-                    return false;
-                  })
-                  .then(res => {
-                    if (res) {
-                      setConfirmDelete(false);
-                      closePeek();
-                    } else {
-                      console.error('Failed to delete call');
-                    }
-                  });
-              }}>
-              Confirm
-            </Button>
-          </Modal.Actions>
-        </Modal>
-      )}
-      <Button
-        tooltip="Delete"
-        icon="delete"
-        variant="destructive"
-        style={{
-          marginLeft: '4px',
-        }}
-        onClick={() => setConfirmDelete(true)}>
-        Delete
-      </Button>
     </>
   );
 };
