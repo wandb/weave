@@ -969,7 +969,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for row in query_result:
             result.append(
                 SelectableCHObjSchema.model_validate(
-                    dict(zip(["query_result.column_names"], row))
+                    dict(
+                        zip(
+                            [
+                                "project_id",
+                                "object_id",
+                                "created_at",
+                                "kind",
+                                "base_object_class",
+                                "refs",
+                                "val_dump",
+                                "digest",
+                                "is_op",
+                                "_version_index_plus_1",
+                                "version_index",
+                                "version_count",
+                                "is_latest",
+                            ],
+                            row,
+                        )
+                    )
                 )
             )
 
@@ -988,11 +1007,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> typing.Iterator[QueryResult]:
         print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
-        stream = self.ch_client.query_rows_stream(
+        with self.ch_client.query_rows_stream(
             query, parameters=parameters, column_formats=column_formats, use_none=True
-        )
-        for block in stream:
-            for row in block:
+        ) as stream:
+            for row in stream:
                 yield row
 
     def _insert(
