@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import LinearProgress from '@mui/material/LinearProgress';
 import {LicenseInfo} from '@mui/x-license-pro';
+import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import _ from 'lodash';
 import React, {
@@ -35,6 +36,7 @@ import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
+import {IconDelete} from '../../Icon';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 // import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
@@ -76,7 +78,6 @@ import {
 import {useGetTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
-import { PopupDropdown } from '@wandb/weave/common/components/PopupDropdown';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -312,13 +313,6 @@ const MainPeekingLayout: FC = () => {
   const {handleMousedown, drawerWidthPct} = useDrawerResize();
   const closePeek = useClosePeek();
 
-  const sections = [{
-    key: 'delete',
-    text: 'Delete',
-    icon: <Icon name="trash" style={{marginRight: '4px'}} />,
-    onClick: () => {},
-  }]
-
   useMousetrap('esc', closePeek);
 
   return (
@@ -393,17 +387,7 @@ const MainPeekingLayout: FC = () => {
                         height: '41px',
                         flex: '0 0 auto',
                       }}>
-                      <PopupDropdown
-                        sections={sections}
-                        trigger={
-                          <Button
-                            icon="overflow-horizontal"
-                            size='small'
-                            variant="ghost"
-                          />
-                        }
-                        offset={`12px, -8px`}
-                      />
+                      <OverflowMenu />
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}
@@ -429,6 +413,94 @@ const MainPeekingLayout: FC = () => {
         </Drawer>
       </Box>
     </WFDataModelAutoProvider>
+  );
+};
+
+const OverflowMenu: FC = () => {
+  const params = useParams<Browse3TabItemParams>();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const getTsClient = useGetTraceServerClientContext();
+  const client = getTsClient();
+  const peekLocation = usePeekLocation();
+  const closePeek = useClosePeek();
+
+  const onDelete = () => {
+    client
+      .callsDelete({
+        project_id: `${params.entity!}/${params.project!}`,
+        ids: [peekLocation?.pathname.split('/').pop()!],
+      })
+      .catch(e => {
+        console.error(e);
+        return false;
+      })
+      .then(res => {
+        if (res) {
+          setConfirmDelete(false);
+          closePeek();
+        } else {
+          console.error('Failed to delete call');
+        }
+      });
+  };
+
+  const menuOptions = [
+    [
+      {
+        key: 'delete',
+        text: 'Delete',
+        icon: <IconDelete style={{marginRight: '4px'}} />,
+        onClick: () => setConfirmDelete(true),
+      },
+    ],
+  ];
+
+  return (
+    <>
+      {confirmDelete && (
+        <Modal
+          open={confirmDelete}
+          onClose={() => setConfirmDelete(false)}
+          size="tiny">
+          <Modal.Header>
+            Delete {params.itemName.length > 1 ? 'calls' : 'call'}
+          </Modal.Header>
+          <Modal.Content>
+            <p>
+              Are you sure you want to delete{' '}
+              {params.itemName.length > 1 ? 'these calls' : 'this call'}?
+            </p>
+          </Modal.Content>
+          <Modal.Actions>
+            <Button
+              onClick={() => {
+                setConfirmDelete(false);
+              }}>
+              Cancel
+            </Button>
+            <Button
+              style={{marginLeft: '4px'}}
+              variant="destructive"
+              onClick={onDelete}>
+              Confirm
+            </Button>
+          </Modal.Actions>
+        </Modal>
+      )}
+      <PopupDropdown
+        sections={menuOptions}
+        style={{marginLeft: '4px'}}
+        trigger={
+          <Button
+            className="row-actions-button"
+            icon="overflow-horizontal"
+            size="medium"
+            variant="ghost"
+          />
+        }
+        offset="-50px, 0px"
+      />
+    </>
   );
 };
 
