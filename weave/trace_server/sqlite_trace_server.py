@@ -224,7 +224,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         print("REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
-        conds = []
+        conds = ["deleted_at IS NULL"]
         filter = req.filter
         if filter:
             if filter.op_names:
@@ -435,6 +435,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         conds = [
             f"object_id = '{req.object_id}'",
+            "deleted_at IS NULL",
         ]
         if req.digest == "latest":
             conds.append("is_latest = 1")

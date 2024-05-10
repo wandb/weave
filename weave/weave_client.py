@@ -25,7 +25,6 @@ from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
     CallsDeleteReq,
     ObjSchema,
-    OpsDeleteReq,
     RefsReadBatchReq,
     TraceServerInterface,
     ObjCreateReq,
