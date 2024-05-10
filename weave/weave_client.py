@@ -439,10 +439,6 @@ class WeaveClient:
         else:
             op_str = op
 
-        # This should probably be configurable, but for now we redact the api_key
-        if "api_key" in inputs:
-            inputs["api_key"] = "REDACTED"
-
         self.save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
