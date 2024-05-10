@@ -297,10 +297,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
         ]
         return tsi.CallsQueryRes(calls=calls)
-    
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         # TODO(gst): use FE time or server time?
-        deleted_at = datetime.datetime.now()        
+        deleted_at = datetime.datetime.now()
         data = [(req.project_id, id, deleted_at) for id in req.ids]
         for parent_id in req.ids:
             # query for children of this call
@@ -313,7 +313,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # add children to the list of calls to delete
             data += [(req.project_id, child.id, deleted_at) for child in children]
 
-        summary = self._insert("call_parts", data=data, column_names=["project_id", "id", "deleted_at"])
+        summary = self._insert(
+            "call_parts", data=data, column_names=["project_id", "id", "deleted_at"]
+        )
         return tsi.CallsDeleteRes(num_deleted=summary.written_rows)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -351,13 +353,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
-    
-    def ops_delete(self, req: tsi.OpsDeleteReq) -> tsi.OpsDeleteRes:
-        deleted_at = datetime.datetime.now()
-        column_names = ["project_id", "object_id", "deleted_at"]
-        data = [(req.project_id, id, deleted_at) for id in req.op_ids]
-        summary = self._insert("object_versions", data=data, column_names=column_names)
-        return tsi.OpsDeleteRes(num_deleted=summary.written_rows)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         json_val = json.dumps(req.obj.val)
@@ -431,11 +426,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
-    
-    def objs_delete(self, req: tsi.ObjsDeleteReq) -> tsi.ObjsDeleteRes:
-        raise Exception("i dont know what im doing")
-        num_deleted = self._delete_objs(req.project_id, req.object_ids) 
-        return tsi.ObjsDeleteRes(num_deleted=num_deleted)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
 

@@ -139,6 +139,7 @@ class CallsDeleteReq(BaseModel):
     project_id: str
     ids: typing.List[str]
 
+
 class CallsDeleteRes(BaseModel):
     num_deleted: int
 
@@ -207,15 +208,6 @@ class OpQueryRes(BaseModel):
     op_objs: typing.List[ObjSchema]
 
 
-class OpsDeleteReq(BaseModel):
-    project_id: str
-    op_ids: typing.List[str]
-
-
-class OpsDeleteRes(BaseModel):
-    num_deleted: int
-
-
 class ObjCreateReq(BaseModel):
     obj: ObjSchemaForInsert
 
@@ -248,15 +240,6 @@ class ObjQueryReq(BaseModel):
 
 class ObjQueryRes(BaseModel):
     objs: typing.List[ObjSchema]
-
-
-class ObjsDeleteReq(BaseModel):
-    project_id: str
-    object_ids: typing.List[str]
-
-
-class ObjsDeleteRes(BaseModel):
-    num_deleted: int
 
 
 class TableCreateReq(BaseModel):
@@ -335,7 +318,7 @@ class TraceServerInterface:
     @abc.abstractmethod
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         ...
-    
+
     @abc.abstractmethod
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
         ...
@@ -351,10 +334,6 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        ...
-
-    @abc.abstractmethod
-    def ops_delete(self, req: OpsDeleteReq) -> OpsDeleteRes:
         ...
 
     # Obj API
