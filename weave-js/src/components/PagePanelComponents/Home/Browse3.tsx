@@ -29,7 +29,7 @@ import {
   useHistory,
   useParams,
 } from 'react-router-dom';
-import {Modal} from 'semantic-ui-react';
+import {Icon, Modal} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
@@ -76,6 +76,7 @@ import {
 import {useGetTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
+import { PopupDropdown } from '@wandb/weave/common/components/PopupDropdown';
 
 LicenseInfo.setLicenseKey(
   '7684ecd9a2d817a3af28ae2a8682895aTz03NjEwMSxFPTE3MjgxNjc2MzEwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLEtWPTI='
@@ -311,6 +312,13 @@ const MainPeekingLayout: FC = () => {
   const {handleMousedown, drawerWidthPct} = useDrawerResize();
   const closePeek = useClosePeek();
 
+  const sections = [{
+    key: 'delete',
+    text: 'Delete',
+    icon: <Icon name="trash" style={{marginRight: '4px'}} />,
+    onClick: () => {},
+  }]
+
   useMousetrap('esc', closePeek);
 
   return (
@@ -385,10 +393,16 @@ const MainPeekingLayout: FC = () => {
                         height: '41px',
                         flex: '0 0 auto',
                       }}>
-                      <DeleteCallButton
-                        entity={params.entity!}
-                        project={params.project!}
-                        ids={[peekLocation?.pathname.split('/').pop()!] ?? []}
+                      <PopupDropdown
+                        sections={sections}
+                        trigger={
+                          <Button
+                            icon="overflow-horizontal"
+                            size='small'
+                            variant="ghost"
+                          />
+                        }
+                        offset={`12px, -8px`}
                       />
                       <FullPageButton
                         query={query}
