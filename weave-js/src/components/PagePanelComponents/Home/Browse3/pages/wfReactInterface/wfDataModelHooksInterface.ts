@@ -146,7 +146,6 @@ type AppendRefMutation = {
 export type RefMutation = SetRefMutation | AppendRefMutation;
 
 export type WFDataModelHooksInterface = {
-  // useDeleteCalls: (projectID: string, callIDs: string[]) => Loadable<any>;
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,

@@ -49,7 +49,6 @@ const WFDataModelFromTraceServerProvider: FC = ({children}) => {
 const WFDataModelFromTraceServerCallsOnlyProvider: FC = ({children}) => {
   const mixedContext: WFDataModelHooksInterface = useMemo(() => {
     return {
-      useDeleteCalls: tsWFDataModelHooks.useDeleteCalls,
       useCall: tsWFDataModelHooks.useCall,
       useCalls: tsWFDataModelHooks.useCalls,
       useOpVersion: cgWFDataModelHooks.useOpVersion,
