@@ -15,7 +15,10 @@ def test_named_op(client: weave_client.WeaveClient) -> str:
 
     assert len(calls) == 1
     call = calls[0]
-    assert call.op_name == "anonymous_op"
+    assert (
+        call.op_name
+        == "weave:///shawn/test-project/op/anonymous_op:SP4LIwNDvmCFjxXhKSA1JysAqEB0x39RH03gXjBLOkc"
+    )
     assert call.inputs == {"a": 1}
     assert call.output == {"c": 3}
     assert call.exception is None
@@ -36,7 +39,7 @@ def test_anonymous_op(client: weave_client.WeaveClient) -> str:
     call = calls[0]
     assert (
         call.op_name
-        == "weave:///shawn/test-project/op/anonymous_op:LVPWVYAVQ4IruV0S8hgFgfC5GsPQHmwtnwonYgyrTNs"
+        == "weave:///shawn/test-project/op/anonymous_op:SP4LIwNDvmCFjxXhKSA1JysAqEB0x39RH03gXjBLOkc"
     )
     assert call.inputs == {"a": 1}
     assert call.output == {"c": 3}
@@ -62,7 +65,7 @@ def test_anonymous_op_with_config(client: weave_client.WeaveClient) -> str:
     call = calls[0]
     assert (
         call.op_name
-        == "weave:///shawn/test-project/op/anonymous_op:vAuPHxFezHYPJCkXnxv599LXe2WirOfjvXDDocBjtSI"
+        == "weave:///shawn/test-project/op/anonymous_op:KGg1k36GykT4eYSaanEY7KEptRZxz0DYcLtvyjX890A"
     )
     assert call.inputs == {"a": 1}
     assert call.output == {"c": 3}
