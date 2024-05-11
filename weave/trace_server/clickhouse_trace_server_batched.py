@@ -218,7 +218,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
-        return tsi.CallsQueryRes(calls=[call for call in stream])
+        return tsi.CallsQueryRes(calls=list(stream))
 
     def calls_query_stream(
         self, req: tsi.CallsQueryReq
@@ -957,7 +957,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters = {}
         query_result = self._query(
             f"""
-            SELECT *
+            SELECT 
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                refs,
+                val_dump,
+                digest,
+                is_op,
+                _version_index_plus_1,
+                version_index,
+                version_count,
+                is_latest
             FROM object_versions_deduped
             WHERE project_id = {{project_id: String}}
             AND {conditions_part}
