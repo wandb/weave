@@ -100,12 +100,14 @@ const PanelHistogram: React.FC<PanelHistogramProps> = props => {
       return [];
     }
     if (!isColorable) {
-      return nodeValueQuery.result.map(num => ({value: num}));
+      return nodeValueQuery.result?.map(num => ({value: num})) || [];
     } else {
-      return nodeValueQuery.result.map((num, ndx) => ({
-        value: num,
-        color: colorNodeValue.result[ndx] ?? '#94aecb',
-      }));
+      return (
+        nodeValueQuery.result?.map((num, ndx) => ({
+          value: num,
+          color: colorNodeValue.result[ndx] ?? '#94aecb',
+        })) || []
+      );
     }
   }, [nodeValueQuery, isColorable, colorNodeValue]);
 
