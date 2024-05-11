@@ -96,10 +96,9 @@ class Op:
             return output
 
         try:
-            with run_context.current_run(run):
-                res = self.resolve_fn(*args, **kwargs)
-                # TODO: can we get rid of this?
-                res = box.box(res)
+            res = self.resolve_fn(*args, **kwargs)
+            # TODO: can we get rid of this?
+            res = box.box(res)
         except BaseException as e:
             finish(exception=e)
             raise
@@ -114,8 +113,7 @@ class Op:
             async def _run_async() -> Coroutine[Any, Any, Any]:
                 try:
                     awaited_res = res
-                    with run_context.current_run(run):
-                        output = await awaited_res
+                    output = await awaited_res
                     return on_output(output)
                 except BaseException as e:
                     finish(exception=e)
