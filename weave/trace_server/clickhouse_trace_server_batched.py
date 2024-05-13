@@ -298,6 +298,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ]
         return tsi.CallsQueryRes(calls=calls)
 
+    def _select_calls_and_children(
+        self,
+        project_id: str,
+        call_id: str,
+        conditions: typing.Optional[typing.List[str]] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> typing.List[SelectableCHCallSchema]:
+        pass
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         # TODO(gst): use FE time or server time?
         # TODO(gst): write custom select statement for recursive delete

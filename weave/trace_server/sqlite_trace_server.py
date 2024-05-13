@@ -316,7 +316,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 order_parts.append(f"{field} {direction}")
 
             order_by_part = ", ".join(order_parts)
-            query += f"ORDER BY {order_by_part}"
+            query += f" ORDER BY {order_by_part}"
 
         limit = req.limit or -1
         if limit:
@@ -376,7 +376,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 ", ".join("?" * len(req.ids))
             )
 
-            params = [req.project_id, req.project_id] + req.ids + [req.project_id]
+            params = [req.project_id] + req.ids
             cursor.execute(recursive_query, params)
             all_ids = [x[0] for x in cursor.fetchall()] + req.ids
 
@@ -384,12 +384,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             delete_query = """
                 UPDATE calls
                 SET deleted_at = CURRENT_TIMESTAMP
-                WHERE id IN ({})
+                WHERE deleted_at is NULL AND 
+                    id IN ({})
             """.format(
                 ", ".join("?" * len(all_ids))
             )
             print("MUTATION", delete_query)
-            cursor.execute(delete_query, (req.project_id, *all_ids))
+            cursor.execute(delete_query, all_ids)
 
             num_deleted += cursor.rowcount
             conn.commit()
