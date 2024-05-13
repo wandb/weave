@@ -9,7 +9,7 @@ import hashlib
 import dataclasses
 
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.query import QueryResult
+from clickhouse_connect.driver.query import QueryResult, StreamContext
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect
@@ -217,6 +217,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        stream = self.calls_query_stream(req)
+        return tsi.CallsQueryRes(calls=list(stream))
+
+    def calls_query_stream(
+        self, req: tsi.CallsQueryReq
+    ) -> typing.Iterator[tsi.CallSchema]:
         conditions = []
         parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
@@ -291,10 +297,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not req.sort_by
             else [(s.field, s.direction) for s in req.sort_by],
         )
-        calls = [
-            _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
-        ]
-        return tsi.CallsQueryRes(calls=calls)
+        for ch_dict in ch_call_dicts:
+            yield tsi.CallSchema.model_validate(
+                _ch_call_dict_to_call_schema_dict(ch_dict)
+            )
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -832,7 +838,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[typing.Dict]:
+    ) -> typing.Iterable[typing.Dict]:
         if not parameters:
             parameters = {}
         parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
@@ -928,10 +934,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters,
         )
 
-        dicts = []
-        for row in raw_res.result_rows:
-            dicts.append(dict(zip(columns, row)))
-        return dicts
+        for row in raw_res:
+            yield dict(zip(columns, row))
 
     def _select_objs_query(
         self,
@@ -953,7 +957,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters = {}
         query_result = self._query(
             f"""
-            SELECT *
+            SELECT 
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                refs,
+                val_dump,
+                digest,
+                is_op,
+                _version_index_plus_1,
+                version_index,
+                version_count,
+                is_latest
             FROM object_versions_deduped
             WHERE project_id = {{project_id: String}}
             AND {conditions_part}
@@ -962,10 +979,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {"project_id": project_id, **parameters},
         )
         result: typing.List[SelectableCHObjSchema] = []
-        for row in query_result.result_rows:
+        for row in query_result:
             result.append(
                 SelectableCHObjSchema.model_validate(
-                    dict(zip(query_result.column_names, row))
+                    dict(
+                        zip(
+                            [
+                                "project_id",
+                                "object_id",
+                                "created_at",
+                                "kind",
+                                "base_object_class",
+                                "refs",
+                                "val_dump",
+                                "digest",
+                                "is_op",
+                                "_version_index_plus_1",
+                                "version_index",
+                                "version_count",
+                                "is_latest",
+                            ],
+                            row,
+                        )
+                    )
                 )
             )
 
@@ -981,14 +1017,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: typing.Dict[str, typing.Any],
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> QueryResult:
+    ) -> typing.Iterator[QueryResult]:
         print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(
+        with self.ch_client.query_rows_stream(
             query, parameters=parameters, column_formats=column_formats, use_none=True
-        )
-        print("Summary: " + json.dumps(res.summary, indent=2))
-        return res
+        ) as stream:
+            for row in stream:
+                yield row
 
     def _insert(
         self,
