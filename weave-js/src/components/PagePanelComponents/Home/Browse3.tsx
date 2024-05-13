@@ -264,11 +264,7 @@ const Browse3Mounted: FC<{
                 flexDirection: 'column',
               }}>
               <ErrorBoundary>
-                <WFDataModelAutoProvider
-                  entityName="griffin_wb"
-                  projectName="sparkles">
-                  <MainPeekingLayout />
-                </WFDataModelAutoProvider>
+                <MainPeekingLayout />
               </ErrorBoundary>
             </Box>
           </Box>
