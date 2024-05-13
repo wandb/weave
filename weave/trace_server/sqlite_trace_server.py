@@ -364,15 +364,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     FROM calls
                     WHERE project_id = ? AND 
                         deleted_at IS NULL AND 
-                        parent_id IN (SELECT id FROM calls WHERE project_id = ? AND id IN ({}))
+                        parent_id IN (SELECT id FROM calls WHERE id IN ({}))
                     
                     UNION ALL
                     
                     SELECT c.id
                     FROM calls c
                     JOIN Descendants d ON c.parent_id = d.id
-                    WHERE c.project_id = ? AND 
-                        c.deleted_at IS NULL
+                    WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
             """.format(
@@ -387,10 +386,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             delete_query = """
                 UPDATE calls
                 SET deleted_at = CURRENT_TIMESTAMP
-                WHERE project_id = ? AND 
-                    deleted_at is NULL AND 
-                    id IN ({})
-                """.format(
+                WHERE id IN ({})
+            """.format(
                 ", ".join("?" * len(all_ids))
             )
             print("MUTATION", delete_query)
