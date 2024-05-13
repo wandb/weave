@@ -199,6 +199,8 @@ export const IconNames = {
   TensorflowLogo: 'tensorflow-logo',
   TextLanguage: 'text-language',
   TextLanguageAlt: 'text-language-alt',
+  ThumbsDown: 'thumbs-down',
+  ThumbsUp: 'thumbs-up',
   TriangleDown: 'triangle-down',
   TriangleLeft: 'triangle-left',
   TriangleRight: 'triangle-right',

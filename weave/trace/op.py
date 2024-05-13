@@ -2,7 +2,7 @@ from typing import Callable, Any, Mapping, Optional
 import inspect
 import functools
 import typing
-from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine
+from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine, Dict
 from typing_extensions import ParamSpec
 
 from weave.trace.errors import OpCallError
@@ -26,7 +26,7 @@ def print_call_link(call: "Call") -> None:
 
 
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
-OnOutputHandlerType = Callable[[Any, FinishCallbackType], Any]
+OnOutputHandlerType = Callable[[Any, FinishCallbackType, Dict], Any]
 
 
 class Op:
@@ -70,6 +70,13 @@ class Op:
         except TypeError as e:
             raise OpCallError(f"Error calling {self.name}: {e}")
         inputs_with_defaults = _apply_fn_defaults_to_inputs(self.resolve_fn, inputs)
+
+        # This should probably be configurable, but for now we redact the api_key
+        if "api_key" in inputs_with_defaults:
+            inputs_with_defaults["api_key"] = "REDACTED"
+
+        # If/When we do memoization, this would be a good spot
+
         parent_run = run_context.get_current_run()
         client.save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
@@ -91,7 +98,7 @@ class Op:
 
         def on_output(output: Any) -> Any:
             if self._on_output_handler:
-                return self._on_output_handler(output, finish)
+                return self._on_output_handler(output, finish, inputs)
             finish(output)
             return output
 
