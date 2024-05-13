@@ -354,6 +354,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         # update row with a deleted_at field set to NOW()
         conn, cursor = get_conn_cursor(self.db_path)
+        num_deleted = 0
         with self.lock:
             cursor.execute(
                 """
@@ -366,7 +367,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             children_ids = [row[0] for row in cursor.fetchall()]
             all_ids = req.ids + children_ids
 
-            # delete all children and all passed in ids
+            # delete all children and all passed in ids (parents)
             cursor.execute(
                 """
                 UPDATE calls
@@ -375,8 +376,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 """,
                 (req.project_id, all_ids),
             )
-
+            num_deleted += cursor.rowcount
             conn.commit()
+
+        return tsi.CallsDeleteRes(num_deleted=num_deleted)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
