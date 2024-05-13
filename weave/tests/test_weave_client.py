@@ -256,8 +256,10 @@ def test_calls_delete(client):
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 1
 
-    num_deleted = client.delete_call(call1)
+    num_deleted = call1.delete()
     assert num_deleted == 1
+
+    assert call1.delete() == 0
 
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 0
