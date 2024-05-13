@@ -439,6 +439,7 @@ class WeaveClient:
             op_str = op_def_ref.uri()
         else:
             op_str = op
+
         self.save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
