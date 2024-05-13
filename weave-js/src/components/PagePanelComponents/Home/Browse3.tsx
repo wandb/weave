@@ -11,7 +11,6 @@ import {
 } from '@mui/material';
 import LinearProgress from '@mui/material/LinearProgress';
 import {LicenseInfo} from '@mui/x-license-pro';
-import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import _ from 'lodash';
 import React, {
@@ -30,13 +29,11 @@ import {
   useHistory,
   useParams,
 } from 'react-router-dom';
-import {Modal} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
-import {IconDelete} from '../../Icon';
 import {Browse2EntityPage} from './Browse2/Browse2EntityPage';
 import {Browse2HomePage} from './Browse2/Browse2HomePage';
 // import {RouteAwareBrowse3ProjectSideNav} from './Browse3/Browse3SideNav';
@@ -75,7 +72,6 @@ import {
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
-import {useGetTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -310,8 +306,6 @@ const MainPeekingLayout: FC = () => {
   const isDrawerOpen = peekLocation != null;
   const windowSize = useWindowSize();
 
-  const currentCallID = peekLocation?.pathname.split('/').pop();
-
   const {handleMousedown, drawerWidthPct} = useDrawerResize();
   const closePeek = useClosePeek();
 
@@ -389,11 +383,6 @@ const MainPeekingLayout: FC = () => {
                         height: '41px',
                         flex: '0 0 auto',
                       }}>
-                      <OverflowMenu
-                        entity={params.entity!}
-                        project={params.project!}
-                        deleteIDs={currentCallID ? [currentCallID] : []}
-                      />
                       <FullPageButton
                         query={query}
                         generalBase={generalBase}
@@ -419,97 +408,6 @@ const MainPeekingLayout: FC = () => {
         </Drawer>
       </Box>
     </WFDataModelAutoProvider>
-  );
-};
-
-const OverflowMenu: FC<{
-  entity: string;
-  project: string;
-  deleteIDs: string[];
-}> = ({entity, project, deleteIDs}) => {
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const getTsClient = useGetTraceServerClientContext();
-  const client = getTsClient();
-  const closePeek = useClosePeek();
-
-  const onDelete = () => {
-    client
-      .callsDelete({
-        project_id: `${entity}/${project}`,
-        ids: deleteIDs,
-      })
-      .catch(e => {
-        console.error(e);
-        return false;
-      })
-      .then(res => {
-        if (res) {
-          setConfirmDelete(false);
-          closePeek();
-        } else {
-          console.error('Failed to delete call');
-        }
-      });
-  };
-
-  const menuOptions = [
-    [
-      {
-        key: 'delete',
-        text: 'Delete',
-        icon: <IconDelete style={{marginRight: '4px'}} />,
-        onClick: () => setConfirmDelete(true),
-        disabled: deleteIDs.length === 0,
-      },
-    ],
-  ];
-
-  return (
-    <>
-      {confirmDelete && (
-        <Modal
-          open={confirmDelete}
-          onClose={() => setConfirmDelete(false)}
-          size="tiny">
-          <Modal.Header>
-            Delete {deleteIDs.length > 1 ? 'calls' : 'call'}
-          </Modal.Header>
-          <Modal.Content>
-            <p>
-              Are you sure you want to delete{' '}
-              {deleteIDs.length > 1 ? 'these calls' : 'this call'}?
-            </p>
-          </Modal.Content>
-          <Modal.Actions>
-            <Button
-              onClick={() => {
-                setConfirmDelete(false);
-              }}>
-              Cancel
-            </Button>
-            <Button
-              style={{marginLeft: '4px'}}
-              variant="destructive"
-              onClick={onDelete}>
-              Confirm
-            </Button>
-          </Modal.Actions>
-        </Modal>
-      )}
-      <PopupDropdown
-        sections={menuOptions}
-        trigger={
-          <Button
-            className="row-actions-button"
-            icon="overflow-horizontal"
-            size="medium"
-            variant="ghost"
-            style={{marginLeft: '4px'}}
-          />
-        }
-        offset="-50px, 0px"
-      />
-    </>
   );
 };
 
