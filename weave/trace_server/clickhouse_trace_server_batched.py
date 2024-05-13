@@ -300,6 +300,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         # TODO(gst): use FE time or server time?
+        # TODO(gst): write custom select statement for recursive delete
         deleted_at = datetime.datetime.now()
         data = [(req.project_id, id, deleted_at) for id in req.ids]
         for parent_id in req.ids:
@@ -309,6 +310,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conditions=["parent_id = {parent_id: String}"],
                 parameters={"parent_id": parent_id},
             )
+
+            # also grab grandchildren
+            for child in children:
+                grandchildren = self._select_calls_query(
+                    req.project_id,
+                    conditions=["parent_id = {parent_id: String}"],
+                    parameters={"parent_id": child.id},
+                )
+                data += [
+                    (req.project_id, grandchild.id, deleted_at)
+                    for grandchild in grandchildren
+                ]
 
             # add children to the list of calls to delete
             data += [(req.project_id, child.id, deleted_at) for child in children]
