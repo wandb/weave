@@ -120,12 +120,14 @@ class Op:
             async def _run_async() -> Coroutine[Any, Any, Any]:
                 try:
                     awaited_res = res
+                    run_context.push_call(run)
                     output = await awaited_res
                     return on_output(output)
                 except BaseException as e:
                     finish(exception=e)
                     raise
 
+            run_context.pop_call(run.id)
             return _run_async()
         else:
             return on_output(res)
