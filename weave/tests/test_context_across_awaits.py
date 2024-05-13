@@ -43,7 +43,7 @@ def setup():
     # outside -> reset the context to what it was at time of calling.
 
     def async_fn_inside_sync():
-        push_stack("async_fn_inside_sync") # -> stack is pushed
+        push_stack("async_fn_inside_sync")  # -> stack is pushed
 
         async def inner_async_fn():
             push_stack("inner_async_fn")
@@ -52,7 +52,7 @@ def setup():
             # Purposely putting the second pop inside
             pop_stack()
 
-        return inner_async_fn() # -> returns a coroutine object
+        return inner_async_fn()  # -> returns a coroutine object
 
     async def sync_fn_inside_async():
         push_stack("sync_fn_inside_async")
