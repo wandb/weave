@@ -26,15 +26,17 @@ export const OverflowMenu: FC<{
   const client = getTsClient();
   const closePeek = useClosePeek();
 
-  if (new Set(calls.map(c => c.entity)).size !== 1) {
+  console.log(calls);
+
+  if (new Set(calls.map(c => c.entity)).size > 1) {
     throw new Error('Cannot delete calls from multiple entities');
   }
-  const entity = calls[0].entity;
+  const entity = calls.length > 0 ? calls[0].entity : '';
 
-  if (new Set(calls.map(c => c.project)).size !== 1) {
+  if (new Set(calls.map(c => c.project)).size > 1) {
     throw new Error('Cannot delete calls from multiple projects');
   }
-  const project = calls[0].project;
+  const project = calls.length > 0 ? calls[0].project : '';
 
   const onDelete = () => {
     client

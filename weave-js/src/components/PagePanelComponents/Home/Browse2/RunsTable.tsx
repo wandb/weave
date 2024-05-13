@@ -11,6 +11,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
+import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
@@ -265,7 +266,9 @@ export const RunsTable: FC<{
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+  toDelete: Record<string, CallSchema | null>;
+  setToDelete: React.Dispatch<React.SetStateAction<Record<string, CallSchema | null>>>;
+}> = ({loading, spans, clearFilters, ioColumnsOnly, toDelete, setToDelete}) => {
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
@@ -490,14 +493,30 @@ export const RunsTable: FC<{
             return rowParams.row.call.spanName;
           }
           return (
-            <CallLink
-              entityName={params.entity}
-              projectName={params.project}
-              opName={opVersionRefOpName(opVersion)}
-              callId={rowParams.row.id}
-              fullWidth={true}
-              preservePath={preservePath}
-            />
+            <>
+              <Checkbox
+                size="small"
+                style={{marginRight: '4px', marginTop: '2px'}}
+                checked={toDelete[rowParams.row.call.callId] != null}
+                onClick={() => {
+                  setToDelete({
+                    ...toDelete,
+                    [rowParams.row.call.callId]:
+                      !toDelete[rowParams.row.call.callId] ? rowParams.row.call: null,
+                  });
+                  // toDelete[rowParams.row.call.callId] =
+                  //   !toDelete[rowParams.row.call.callId] ?? true;
+                }}
+              />
+              <CallLink
+                entityName={params.entity}
+                projectName={params.project}
+                opName={opVersionRefOpName(opVersion)}
+                callId={rowParams.row.id}
+                fullWidth={true}
+                preservePath={preservePath}
+              />
+            </>
           );
         },
       },
@@ -876,6 +895,8 @@ export const RunsTable: FC<{
     preservePath,
     spans,
     tableStats,
+    setToDelete,
+    toDelete,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();

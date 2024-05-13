@@ -7,7 +7,7 @@ import {
   ListItem,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {FC, useCallback, useMemo} from 'react';
+import React, {FC, useCallback, useMemo, useState} from 'react';
 
 import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
@@ -18,6 +18,7 @@ import {
 } from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
+import {OverflowMenu} from '../CallPage/OverviewMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -41,6 +42,7 @@ import {
 } from '../wfReactInterface/utilities';
 import {
   CallFilter,
+  CallSchema,
   OpVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
@@ -145,6 +147,10 @@ export const CallsTable: FC<{
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
     props.onFilterUpdate
+  );
+
+  const [toDelete, setToDelete] = useState<Record<string, CallSchema | null>>(
+    {}
   );
 
   const effectiveFilter = useMemo(() => {
@@ -436,6 +442,14 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          {/* {Object.values(toDelete).some(a => !!a) && (
+            <DeleteCallButton
+              entity={props.entity}
+              project={props.project}
+              ids={Object.keys(toDelete).filter(k => toDelete[k])}
+            />
+          )} */}
+          <OverflowMenu calls={Object.values(toDelete).filter(c => !!c)} />
         </>
       }>
       {isPivoting ? (
@@ -459,6 +473,8 @@ export const CallsTable: FC<{
           spans={spans}
           clearFilters={clearFilters}
           ioColumnsOnly={props.ioColumnsOnly}
+          toDelete={toDelete}
+          setToDelete={setToDelete}
         />
       )}
     </FilterLayoutTemplate>
