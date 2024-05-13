@@ -43,8 +43,7 @@ def example_to_model_input(example):
     return {"input": example["input"]}
 
 
-@pytest.mark.asyncio
-async def test_evaluate_callable_as_model(client):
+def test_evaluate_callable_as_model(client):
     @weave.op()
     async def model_predict(input) -> str:
         return eval(input)
@@ -53,12 +52,11 @@ async def test_evaluate_callable_as_model(client):
         dataset=dataset_rows,
         scorers=[score],
     )
-    result = await evaluation.evaluate(model_predict)
+    result = asyncio.run(evaluation.evaluate(model_predict))
     assert result == expected_eval_result
 
 
-@pytest.mark.asyncio
-async def test_predict_can_receive_other_params(client):
+def test_predict_can_receive_other_params(client):
     @weave.op()
     async def model_predict(input, target) -> str:
         return eval(input) + target
@@ -67,7 +65,7 @@ async def test_predict_can_receive_other_params(client):
         dataset=dataset_rows,
         scorers=[score],
     )
-    result = await evaluation.evaluate(model_predict)
+    result = asyncio.run(evaluation.evaluate(model_predict))
     assert result == {
         "model_output": {"mean": 18.5},
         "score": {"true_count": 0, "true_fraction": 0.0},
@@ -77,8 +75,7 @@ async def test_predict_can_receive_other_params(client):
     }
 
 
-@pytest.mark.asyncio
-async def test_can_preprocess_model_input(client):
+def test_can_preprocess_model_input(client):
     @weave.op()
     async def model_predict(x) -> str:
         return eval(x)
@@ -92,23 +89,21 @@ async def test_can_preprocess_model_input(client):
         scorers=[score],
         preprocess_model_input=preprocess,
     )
-    result = await evaluation.evaluate(model_predict)
+    result = asyncio.run(evaluation.evaluate(model_predict))
     assert result == expected_eval_result
 
 
-@pytest.mark.asyncio
-async def test_evaluate_rows_only(client):
+def test_evaluate_rows_only(client):
     evaluation = Evaluation(
         dataset=dataset_rows,
         scorers=[score],
     )
     model = EvalModel()
-    result = await evaluation.evaluate(model)
+    result = asyncio.run(evaluation.evaluate(model))
     assert result == expected_eval_result
 
 
-@pytest.mark.asyncio
-async def test_evaluate_other_model_method_names(eager_mode):
+def test_evaluate_other_model_method_names(eager_mode):
     class EvalModel(Model):
         @weave.op()
         async def infer(self, input) -> str:
@@ -119,12 +114,11 @@ async def test_evaluate_other_model_method_names(eager_mode):
         scorers=[score],
     )
     model = EvalModel()
-    result = await evaluation.evaluate(model)
+    result = asyncio.run(evaluation.evaluate(model))
     assert result == expected_eval_result
 
 
-@pytest.mark.asyncio
-async def test_score_as_class(client):
+def test_score_as_class(client):
     class MyScorer(weave.Scorer):
         @weave.op()
         def score(self, target, model_output):
@@ -135,7 +129,7 @@ async def test_score_as_class(client):
         scorers=[MyScorer()],
     )
     model = EvalModel()
-    result = await evaluation.evaluate(model)
+    result = asyncio.run(evaluation.evaluate(model))
     assert result == {
         "model_output": {"mean": 9.5},
         "MyScorer": {"true_count": 1, "true_fraction": 0.5},
@@ -145,8 +139,7 @@ async def test_score_as_class(client):
     }
 
 
-@pytest.mark.asyncio
-async def test_score_with_custom_summarize(client):
+def test_score_with_custom_summarize(client):
     class MyScorer(weave.Scorer):
         @weave.op()
         def summarize(self, score_rows):
@@ -162,7 +155,7 @@ async def test_score_with_custom_summarize(client):
         scorers=[MyScorer()],
     )
     model = EvalModel()
-    result = await evaluation.evaluate(model)
+    result = asyncio.run(evaluation.evaluate(model))
     assert result == {
         "model_output": {"mean": 9.5},
         "MyScorer": {"awesome": 3},
@@ -172,8 +165,7 @@ async def test_score_with_custom_summarize(client):
     }
 
 
-@pytest.mark.asyncio
-async def test_multiclass_f1_score(client):
+def test_multiclass_f1_score(client):
     evaluation = Evaluation(
         dataset=[{"target": {"a": False, "b": True}, "pred": {"a": True, "b": False}}],
         scorers=[MultiTaskBinaryClassificationF1(class_names=["a", "b"])],
@@ -183,7 +175,7 @@ async def test_multiclass_f1_score(client):
     def return_pred(pred):
         return pred
 
-    result = await evaluation.evaluate(return_pred)
+    result = asyncio.run(evaluation.evaluate(return_pred))
     assert result == {
         "model_output": {
             "a": {"true_count": 1, "true_fraction": 1.0},

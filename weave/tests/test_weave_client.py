@@ -194,9 +194,6 @@ def test_pydantic(client):
 
 
 def test_call_create(client):
-    from weave import run_context
-
-    print(run_context._run_stack.get())
     call = client.create_call("x", None, {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.call(call.id)
@@ -216,9 +213,6 @@ def test_call_create(client):
 
 
 def test_calls_query(client):
-    from weave import run_context
-
-    print(run_context._run_stack.get())
     call0 = client.create_call("x", None, {"a": 5, "b": 10})
     call1 = client.create_call("x", None, {"a": 6, "b": 11})
     call2 = client.create_call("y", None, {"a": 5, "b": 10})
