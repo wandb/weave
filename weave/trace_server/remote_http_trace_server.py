@@ -173,6 +173,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: t.Union[tsi.OpQueryReq, t.Dict[str, t.Any]]
     ) -> tsi.OpQueryRes:
         return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
+    
+    def ops_delete(
+        self, req: t.Union[tsi.OpsDeleteReq, t.Dict[str, t.Any]]
+    ) -> tsi.OpsDeleteRes:
+        return self._generic_request(
+            "/ops/delete", req, tsi.OpsDeleteReq, tsi.OpsDeleteRes
+        )
 
     # Obj API
 
