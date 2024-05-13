@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Any, Sequence, Union, Optional, TypedDict
+from typing import Any, Sequence, Union, Optional, TypedDict, Dict
 import dataclasses
 import typing
 import uuid
@@ -264,6 +264,7 @@ class WeaveClient:
         self.entity = entity
         self.project = project
         self.server = server
+        self._anonymous_ops: dict[str, Op] = {}
 
         if ensure_project_exists:
             self.server.ensure_project_exists(entity, project)
@@ -433,6 +434,10 @@ class WeaveClient:
         inputs: dict,
         attributes: dict = {},
     ) -> Call:
+        if isinstance(op, str):
+            if op not in self._anonymous_ops:
+                self._anonymous_ops[op] = _build_anonymous_op(op)
+            op = self._anonymous_ops[op]
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
@@ -477,6 +482,7 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
+        run_context.push_call(call)
         return call
 
     @trace_sentry.global_trace_sentry.watch()
@@ -532,6 +538,7 @@ class WeaveClient:
         #     call.op_name, {"successes": 0, "errors": 0}
         # )["successes"] += 1
         call.summary = summary
+        run_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
@@ -615,3 +622,22 @@ def check_wandb_run_matches(
             raise ValueError(
                 f'Project Mismatch: weave and wandb must be initialized using the same project. Found wandb.init targeting project "{wandb_entity}/{wandb_project}" and weave.init targeting project "{weave_entity}/{weave_project}". To fix, please use the same project for both library initializations.'
             )
+
+
+def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
+    if config is None:
+
+        def op_fn(*args, **kwargs):  # type: ignore
+            # Code-capture unavailable for this op
+            pass
+
+    else:
+
+        def op_fn(*args, **kwargs):  # type: ignore
+            # Code-capture unavailable for this op
+            op_config = config
+
+    op_fn.__name__ = name
+    op = Op(op_fn)
+    op.name = name
+    return op
