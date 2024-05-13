@@ -30,6 +30,11 @@ class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
 
 
+REMOTE_REQUEST_BYTES_LIMIT = (
+    (32 - 1) * 1024 * 1024
+)  # 32 MiB (real limit) - 1 MiB (buffer)
+
+
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
 
@@ -54,13 +59,34 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: t.Tuple[str, str]) -> None:
         self._auth = auth
 
-    def _flush_calls(self, batch: t.List) -> None:
+    def _flush_calls(
+        self, batch: t.List, _should_update_batch_size: bool = False
+    ) -> None:
         if len(batch) == 0:
             return
+
         data = Batch(batch=batch).model_dump_json()
+        encoded_data = data.encode("utf-8")
+        encoded_bytes = len(encoded_data)
+
+        # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
+        estimated_bytes_per_item = encoded_bytes / len(batch)
+        if _should_update_batch_size and estimated_bytes_per_item > 0:
+            target_batch_size = int(
+                REMOTE_REQUEST_BYTES_LIMIT // estimated_bytes_per_item
+            )
+            self.call_processor.max_batch_size = max(1, target_batch_size)
+
+        # If the batch is too big, recursively split it in half
+        if encoded_bytes > REMOTE_REQUEST_BYTES_LIMIT and len(batch) > 1:
+            split_idx = int(len(batch) // 2)
+            self._flush_calls(batch[:split_idx], False)
+            self._flush_calls(batch[split_idx:], False)
+            return
+
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
-            data=data.encode("utf-8"),
+            data=encoded_data,
             auth=self._auth,
         )
         r.raise_for_status()
