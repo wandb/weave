@@ -539,13 +539,14 @@ class WeaveClient:
         return self.finish_call(call, exception=exception)
 
     @trace_sentry.global_trace_sentry.watch()
-    def delete_call(self, call: Call) -> None:
-        self.server.calls_delete(
+    def delete_call(self, call: Call) -> int:
+        out = self.server.calls_delete(
             CallsDeleteReq(
                 project_id=self._project_id(),
                 ids=[call.id],
             )
         )
+        return out.num_deleted
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:

@@ -77,7 +77,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 op_name TEXT,
                 started_at TEXT,
                 ended_at TEXT,
-                deleted_at TEXT,
                 exception TEXT,
                 attributes TEXT,
                 inputs TEXT,
@@ -86,7 +85,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 output_refs TEXT,
                 summary TEXT,
                 wb_user_id TEXT,
-                wb_run_id TEXT
+                wb_run_id TEXT,
+                deleted_at TEXT
             )
         """
         )
@@ -96,14 +96,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 project_id TEXT,
                 object_id TEXT,
                 created_at TEXT,
-                deleted_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
                 refs TEXT,
                 val_dump TEXT,
                 digest TEXT UNIQUE,
                 version_index INTEGER,
-                is_latest INTEGER
+                is_latest INTEGER,
+                deleted_at TEXT
             )
         """
         )
@@ -352,30 +352,48 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        # update row with a deleted_at field set to NOW()
+        # update row with a deleted_at field set to now
         conn, cursor = get_conn_cursor(self.db_path)
         num_deleted = 0
         with self.lock:
-            cursor.execute(
-                """
-                SELECT id
-                FROM calls
-                WHERE project_id = ? AND parent_id IN (SELECT id FROM calls WHERE project_id = ? AND id IN ?)
-                """,
-                (req.project_id, req.project_id, req.ids),
+            recursive_query = """
+                WITH RECURSIVE Descendants AS (
+                    SELECT id
+                    FROM calls
+                    WHERE project_id = ? AND 
+                        deleted_at IS NULL AND 
+                        parent_id IN (SELECT id FROM calls WHERE project_id = ? AND id IN ({}))
+                    
+                    UNION ALL
+                    
+                    SELECT c.id
+                    FROM calls c
+                    JOIN Descendants d ON c.parent_id = d.id
+                    WHERE c.project_id = ? AND 
+                        c.deleted_at IS NULL
+                )
+                SELECT id FROM Descendants;
+            """.format(
+                ", ".join("?" * len(req.ids))
             )
-            children_ids = [row[0] for row in cursor.fetchall()]
-            all_ids = req.ids + children_ids
 
-            # delete all children and all passed in ids (parents)
-            cursor.execute(
-                """
+            params = [req.project_id, req.project_id] + req.ids + [req.project_id]
+            cursor.execute(recursive_query, params)
+            all_ids = [x[0] for x in cursor.fetchall()] + req.ids
+
+            # set deleted_at for all children and parents
+            delete_query = """
                 UPDATE calls
-                SET deleted_at = NOW()
-                WHERE project_id = ? AND id IN (?)
-                """,
-                (req.project_id, all_ids),
+                SET deleted_at = CURRENT_TIMESTAMP
+                WHERE project_id = ? AND 
+                    deleted_at is NULL AND 
+                    id IN ({})
+                """.format(
+                ", ".join("?" * len(all_ids))
             )
+            print("MUTATION", delete_query)
+            cursor.execute(delete_query, (req.project_id, *all_ids))
+
             num_deleted += cursor.rowcount
             conn.commit()
 
