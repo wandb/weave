@@ -442,7 +442,9 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          <OverflowMenu calls={Object.values(toDelete).filter(c => !!c)} />
+          <OverflowMenu
+            calls={Object.values(toDelete).filter(c => !!c) as CallSchema[]}
+          />
         </>
       }>
       {isPivoting ? (
