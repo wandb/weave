@@ -4,6 +4,7 @@ import dataclasses
 import operator
 import typing
 from pydantic import BaseModel
+from pydantic import v1 as pydantic_v1
 
 from weave.trace.op import Op
 from weave.trace.refs import (
@@ -460,7 +461,10 @@ def make_trace_obj(
             )
         val = val.__get__(parent, type(parent))
     box_val = box.box(val)
-    setattr(box_val, "ref", new_ref)
+    if isinstance(box_val, pydantic_v1.BaseModel):
+        box_val.__dict__["ref"] = new_ref
+    else:
+        setattr(box_val, "ref", new_ref)
     return box_val
 
 
