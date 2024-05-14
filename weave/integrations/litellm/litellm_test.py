@@ -43,7 +43,7 @@ def test_litellm_quickstart(
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
-        model="gpt-3.5-turbo",
+        model="gpt-3.5-turbo-0125",
         messages=[{"content": "Hello, how are you?", "role": "user"}],
     )
 
@@ -52,7 +52,7 @@ def test_litellm_quickstart(
 
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    assert len(res.calls) == 2
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
@@ -83,7 +83,7 @@ async def test_litellm_quickstart_async(
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
-        model="gpt-3.5-turbo",
+        model="gpt-3.5-turbo-0125",
         messages=[{"content": "Hello, how are you?", "role": "user"}],
     )
 
@@ -92,7 +92,7 @@ async def test_litellm_quickstart_async(
 
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    assert len(res.calls) == 2
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
@@ -122,7 +122,7 @@ def test_litellm_quickstart_stream(
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
-        model="gpt-3.5-turbo",
+        model="gpt-3.5-turbo-0125",
         messages=[{"content": "Hello, how are you?", "role": "user"}],
         stream=True,
     )
@@ -136,7 +136,7 @@ def test_litellm_quickstart_stream(
 
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    assert len(res.calls) == 2
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)
@@ -167,7 +167,7 @@ async def test_litellm_quickstart_stream_async(
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
-        model="gpt-3.5-turbo",
+        model="gpt-3.5-turbo-0125",
         messages=[{"content": "Hello, how are you?", "role": "user"}],
         stream=True,
     )
@@ -180,7 +180,7 @@ async def test_litellm_quickstart_stream_async(
 
     assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert len(res.calls) == 1
+    assert len(res.calls) == 2
     call = res.calls[0]
     assert call.exception is None and call.ended_at is not None
     output = _get_call_output(call)

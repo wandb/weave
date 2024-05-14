@@ -167,7 +167,12 @@ class TraceObject(Tracable):
         val_attr_val = object.__getattribute__(self._val, __name)
         result = attribute_access_result(self, val_attr_val, __name)
         # Store the result on _val so we don't deref next time.
-        object.__setattr__(self._val, __name, result)
+        try:
+            object.__setattr__(self._val, __name, result)
+        except AttributeError:
+            # Happens if self._val.<name> is a property. Return the raw value instead
+            # of a Traceable value.
+            return val_attr_val
         return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
