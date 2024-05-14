@@ -287,9 +287,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
             limit=req.limit,
             offset=req.offset,
-            order_by=None
-            if not req.sort_by
-            else [(s.field, s.direction) for s in req.sort_by],
+            order_by=(
+                None
+                if not req.sort_by
+                else [(s.field, s.direction) for s in req.sort_by]
+            ),
         )
         calls = [
             _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
@@ -762,6 +764,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             port=self._port,
             user=self._user,
             password=self._password,
+            secure=self._port == 8443,  # TODO(np): FIXME
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
