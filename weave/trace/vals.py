@@ -20,7 +20,7 @@ from weave.table import Table
 from weave.trace.serialize import from_json
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.graph_client_context import require_graph_client
+from weave.graph_client_context import get_graph_client
 from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     _TableRowFilter,
@@ -133,7 +133,14 @@ def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> 
 
     new_ref = ref.with_attr(attr_name)
 
-    gc = require_graph_client()
+    gc = get_graph_client()
+
+    if gc is None:
+        # In the case that the graph client has been closed but the user still
+        # maintains a reference to this object, we should gracefully fallback
+        # to the raw value.
+        return val_attr_val
+
     return make_trace_obj(
         val_attr_val,
         new_ref,
