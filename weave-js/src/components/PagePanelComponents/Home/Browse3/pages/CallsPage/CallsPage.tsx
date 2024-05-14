@@ -18,7 +18,7 @@ import {
 } from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
-import {OverflowMenu} from '../CallPage/OverviewMenu';
+import {OverflowMenu} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -442,13 +442,6 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          {/* {Object.values(toDelete).some(a => !!a) && (
-            <DeleteCallButton
-              entity={props.entity}
-              project={props.project}
-              ids={Object.keys(toDelete).filter(k => toDelete[k])}
-            />
-          )} */}
           <OverflowMenu calls={Object.values(toDelete).filter(c => !!c)} />
         </>
       }>

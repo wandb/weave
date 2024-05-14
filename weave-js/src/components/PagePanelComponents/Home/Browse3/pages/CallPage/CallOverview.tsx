@@ -6,7 +6,7 @@ import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ExceptionAlert} from './Exceptions';
-import {OverflowMenu} from './OverviewMenu';
+import {OverflowMenu} from './OverflowMenu';
 
 export const Overview = styled.div`
   display: flex;

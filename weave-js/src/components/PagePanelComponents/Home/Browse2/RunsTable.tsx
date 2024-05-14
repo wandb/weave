@@ -17,6 +17,7 @@ import * as _ from 'lodash';
 import React, {
   ComponentProps,
   FC,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -478,6 +479,17 @@ export const RunsTable: FC<{
     );
   }, [uniqueSpanNames]);
 
+  const bulkChecked =
+    Object.values(toDelete).length === tableData.length &&
+    Object.values(toDelete).every(c => c != null);
+  const bulkDelete = useCallback(() => {
+    const newToDelete: Record<string, CallSchema | null> = {};
+    tableData.forEach(call => {
+      newToDelete[call.id] = call.call;
+    });
+    setToDelete(newToDelete);
+  }, [tableData, setToDelete]);
+
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
@@ -489,6 +501,21 @@ export const RunsTable: FC<{
         filterable: false,
         width: 250,
         hideable: false,
+        renderHeader: headerParams => {
+          return (
+            <>
+              <Checkbox
+                size="small"
+                style={{marginRight: '4px', marginTop: '2px'}}
+                checked={bulkChecked}
+                onClick={() => {
+                  bulkChecked ? setToDelete({}) : bulkDelete();
+                }}
+              />
+              <span style={{fontWeight: 600}}>Trace</span>
+            </>
+          );
+        },
         renderCell: rowParams => {
           const opVersion = rowParams.row.call.opVersionRef;
           if (opVersion == null) {
@@ -509,8 +536,6 @@ export const RunsTable: FC<{
                       ? rowParams.row.call
                       : null,
                   });
-                  // toDelete[rowParams.row.call.callId] =
-                  //   !toDelete[rowParams.row.call.callId] ?? true;
                 }}
               />
               <CallLink
@@ -902,6 +927,8 @@ export const RunsTable: FC<{
     tableStats,
     setToDelete,
     toDelete,
+    bulkChecked,
+    bulkDelete,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();
