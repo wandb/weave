@@ -267,7 +267,9 @@ export const RunsTable: FC<{
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
   toDelete: Record<string, CallSchema | null>;
-  setToDelete: React.Dispatch<React.SetStateAction<Record<string, CallSchema | null>>>;
+  setToDelete: React.Dispatch<
+    React.SetStateAction<Record<string, CallSchema | null>>
+  >;
 }> = ({loading, spans, clearFilters, ioColumnsOnly, toDelete, setToDelete}) => {
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
@@ -501,8 +503,11 @@ export const RunsTable: FC<{
                 onClick={() => {
                   setToDelete({
                     ...toDelete,
-                    [rowParams.row.call.callId]:
-                      !toDelete[rowParams.row.call.callId] ? rowParams.row.call: null,
+                    [rowParams.row.call.callId]: !toDelete[
+                      rowParams.row.call.callId
+                    ]
+                      ? rowParams.row.call
+                      : null,
                   });
                   // toDelete[rowParams.row.call.callId] =
                   //   !toDelete[rowParams.row.call.callId] ?? true;

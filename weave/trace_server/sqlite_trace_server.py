@@ -405,7 +405,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         raise NotImplementedError()
-    
+
     def ops_delete(self, req: tsi.OpsDeleteReq) -> tsi.OpsDeleteRes:
         raise NotImplementedError()
 

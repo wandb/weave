@@ -311,7 +311,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions: typing.Optional[typing.List[str]] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHCallSchema]:
-        pass
+        raise NotImplementedError()
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         # TODO(gst): use FE time or server time?
@@ -462,27 +462,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
-    
+
     def _delete_objs(
         self,
         project_id: str,
         object_ids: typing.List[str],
         conditions: typing.Optional[typing.List[str]] = None,
     ) -> int:
-        object_ids = self._select_objs_query(
+        if conditions is None:
+            conditions = []
+        conditions += ["object_id IN {object_ids: Array(String)}"]
+        objects = self._select_objs_query(
             project_id,
             conditions=conditions,
+            parameters={"object_ids": object_ids},
         )
-        if len(object_ids) == 0:
+        if len(objects) == 0:
             return 0
-        
+
         self._insert(
             "object_versions",
-            data=[(project_id, object_id, datetime.datetime.now()) for object_id in object_ids],
+            data=[
+                (project_id, object.object_id, datetime.datetime.now())
+                for object in objects
+            ],
             column_names=["project_id", "object_id", "deleted_at"],
         )
-        return len(object_ids)
-        
+        return len(objects)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
 

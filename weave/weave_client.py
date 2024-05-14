@@ -430,7 +430,7 @@ class WeaveClient:
         op_def_ref = self._save_object(op, op.name)
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
-    
+
     @trace_sentry.global_trace_sentry.watch()
     def op_delete(self, op: Op) -> int:
         if op.ref is None:
