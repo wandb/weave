@@ -60,7 +60,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth = auth
 
     def _flush_calls(
-        self, batch: t.List, _should_update_batch_size: bool = False
+        self, batch: t.List, *, _should_update_batch_size: bool = True
     ) -> None:
         if len(batch) == 0:
             return
@@ -80,8 +80,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         # If the batch is too big, recursively split it in half
         if encoded_bytes > REMOTE_REQUEST_BYTES_LIMIT and len(batch) > 1:
             split_idx = int(len(batch) // 2)
-            self._flush_calls(batch[:split_idx], False)
-            self._flush_calls(batch[split_idx:], False)
+            self._flush_calls(batch[:split_idx], _should_update_batch_size=False)
+            self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
         r = requests.post(
