@@ -129,6 +129,28 @@ if not import_failed:
             # Not implemented - required by interface.
             pass
 
+    def process_payload(
+        payload: Optional[Dict[EventPayload, Any]] = None
+    ) -> Optional[Dict[EventPayload, Any]]:
+        if payload is None:
+            return None
+        res = {}
+        for k, v in payload.items():
+            if TRANSFORM_EMBEDDINGS and k == EventPayload.EMBEDDINGS:
+                shape = get_embedding_shape(v)
+                res[k] = f"Embedding with shape {shape}"
+            else:
+                res[k] = v
+        return res
+
+    def get_embedding_shape(embedding: List) -> Tuple:
+        """Get the shape of an embedding."""
+        res = []
+        while isinstance(embedding, list):
+            res.append(len(embedding))
+            embedding = embedding[0]
+        return tuple(res)
+
 else:
 
     class WeaveCallbackHandler:  # type: ignore
@@ -162,30 +184,6 @@ class LLamaIndexPatcher(Patcher):
             return True
         except Exception:
             return False
-
-
-def process_payload(
-    payload: Optional[Dict[EventPayload, Any]] = None
-) -> Optional[Dict[EventPayload, Any]]:
-    if payload is None:
-        return None
-    res = {}
-    for k, v in payload.items():
-        if TRANSFORM_EMBEDDINGS and k == EventPayload.EMBEDDINGS:
-            shape = get_embedding_shape(v)
-            res[k] = f"Embedding with shape {shape}"
-        else:
-            res[k] = v
-    return res
-
-
-def get_embedding_shape(embedding: List) -> Tuple:
-    """Get the shape of an embedding."""
-    res = []
-    while isinstance(embedding, list):
-        res.append(len(embedding))
-        embedding = embedding[0]
-    return tuple(res)
 
 
 llamaindex_patcher = LLamaIndexPatcher()
