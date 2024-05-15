@@ -17,3 +17,5 @@ objgraph>=3.6.0
 tabulate
 # Weaveflow Additions
 faiss-cpu
+# Pinning for package resolution speed in CI
+scipy>=1.13.0  # required by umap-learn
