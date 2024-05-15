@@ -91,6 +91,7 @@ import {
   CallKey,
   CallSchema,
   Loadable,
+  LoadableWithRefetch,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -158,7 +159,7 @@ const useCalls = (
   filter: CallFilter,
   limit?: number,
   opts?: {skip?: boolean}
-): Loadable<CallSchema[]> => {
+): LoadableWithRefetch<CallSchema[]> => {
   let runsNode = fnRunsNode(
     {
       entityName: entity,

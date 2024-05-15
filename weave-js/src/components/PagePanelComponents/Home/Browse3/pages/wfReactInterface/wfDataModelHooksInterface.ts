@@ -28,7 +28,7 @@ export type LoadableWithError<T> = {
 };
 
 export type LoadableWithRefetch<T> = Loadable<T> & {
-  refetch: () => void;
+  refetch?: () => void;
 };
 
 export type CallKey = {
