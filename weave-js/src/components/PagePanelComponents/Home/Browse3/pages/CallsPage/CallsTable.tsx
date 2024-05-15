@@ -10,11 +10,11 @@
 import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
-  DataGridPro as DataGrid,
   DataGridPro,
   GridApiPro,
   GridColDef,
   GridColumnGroup,
+  GridColumnGroupingModel,
   GridColumnVisibilityModel,
   GridRowSelectionModel,
   useGridApiRef,
@@ -32,13 +32,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {useParams} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {hexToRGB} from '../../../../../../common/css/utils';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {monthRoundedTime} from '../../../../../../common/util/time';
-import {useWeaveContext} from '../../../../../../context';
 import {
   isObjectTypeLike,
   isTypedDictLike,
@@ -48,13 +46,11 @@ import {
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef} from '../../../../../../react';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
-import {Loading} from '../../../../../Loading';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Timestamp} from '../../../../../Timestamp';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
 import {CollapseGroupHeader} from '../../../Browse2/CollapseGroupHeader';
-import {Browse2RootObjectVersionItemParams} from '../../../Browse2/CommonLib';
 import {CustomGroupedColumnHeader} from '../../../Browse2/CustomGroupedColumnHeader';
 import {ExpandHeader} from '../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
@@ -107,7 +103,36 @@ import {useOpVersionOptions} from './callsTableOpVersionOptions';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableOpVersionOptions';
 import {useCallsForQuery} from './callsTableQuery';
 
+const VisibilityAlert = styled.div`
+  background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
+  color: ${Colors.MOON_800};
+  padding: 6px 12px;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+VisibilityAlert.displayName = 'S.VisibilityAlert';
+
+const VisibilityAlertText = styled.div`
+  white-space: nowrap;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+VisibilityAlertText.displayName = 'S.VisibilityAlertText';
+
+const VisibilityAlertAction = styled.div`
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+`;
+VisibilityAlertAction.displayName = 'S.VisibilityAlertAction';
+
 const OP_FILTER_GROUP_HEADER = 'Op';
+
 export const CallsTable: FC<{
   entity: string;
   project: string;
@@ -510,7 +535,7 @@ export const CallsTable: FC<{
     // CPR (Tim): I still don't understand how inputs/outputs/attributes/summary aren't
     // all handled in the same generic way. Lets do that! Also, we don't have any concept
     // of "_keys" anymore, so we can remove all that junk. The flattening will be done before-hand.
-    const colGroupingModel: DataGridColumnGroupingModel = [];
+    const colGroupingModel: GridColumnGroupingModel = [];
     const row0 = newSpans[0];
     if (row0 == null) {
       return {cols: [], colGroupingModel: []};
@@ -1180,39 +1205,6 @@ const useParentIdOptions = (
 };
 
 /// Start of RunsTable.tsx move over
-
-type DataGridColumnGroupingModel = Exclude<
-  ComponentProps<typeof DataGrid>['columnGroupingModel'],
-  undefined
->;
-
-const VisibilityAlert = styled.div`
-  background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
-  color: ${Colors.MOON_800};
-  padding: 6px 12px;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-VisibilityAlert.displayName = 'S.VisibilityAlert';
-
-const VisibilityAlertText = styled.div`
-  white-space: nowrap;
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-VisibilityAlertText.displayName = 'S.VisibilityAlertText';
-
-const VisibilityAlertAction = styled.div`
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-`;
-VisibilityAlertAction.displayName = 'S.VisibilityAlertAction';
 
 function addToTree(
   node: GridColumnGroup,
