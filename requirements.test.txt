@@ -35,7 +35,12 @@ tqdm>=4.66.3  # CVE 2024-34062
 cryptography>=42.0.7  # CVE 2023-23931
 sortedcontainers>=2.4.0
 rfc3986>=2.0.0  # requied by twine
-nh3>=0.2.17  # requied by twine
+nh3>=0.2.17  # required by twine
+docutils>=0.21.2  # required by twine
+readme_renderer>=43.0  # required by twine
+requests>=2.31.0
+rfc3986-validator>=0.1.1
+
 
 # Integration Tests
 pytest-recording==0.13.1
