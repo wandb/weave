@@ -151,27 +151,6 @@ export const CallsTable: FC<{
     effectiveFilter
   );
 
-  // CPR (Tim): Another thing that could be more clearly extracted to a separate function
-  const opVersionOptionsWithRoots: {
-    [ref: string]: {
-      title: string;
-      ref: string;
-      group: string;
-      objectVersion?: OpVersionSchema;
-    };
-  } = useMemo(() => {
-    return {
-      [ALL_TRACES_OR_CALLS_REF_KEY]: {
-        title: effectiveFilter.traceRootsOnly
-          ? ALL_TRACES_TITLE
-          : ALL_CALLS_TITLE,
-        ref: '',
-        group: ANY_OP_GROUP_HEADER,
-      },
-      ...opVersionOptions,
-    };
-  }, [effectiveFilter.traceRootsOnly, opVersionOptions]);
-
   const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
   const opVersionRefOrAllTitle = useMemo(() => {
     return opVersionRef ?? ALL_TRACES_OR_CALLS_REF_KEY;
@@ -893,6 +872,9 @@ export const CallsTable: FC<{
   // const {peekingRouter} = useWeaveflowRouteContext();
   // const history = useHistory();
   useEffect(() => {
+    if (Object.keys(apiRef.current).length == 0) {
+      return;
+    }
     if (autosized.current) {
       return;
     }
@@ -930,7 +912,11 @@ export const CallsTable: FC<{
   // initialState won't take effect if columns are not set.
   // see https://github.com/mui/mui-x/issues/6206
   useEffect(() => {
-    if (columns != null && initialState != null) {
+    if (
+      Object.keys(apiRef.current).length > 0 &&
+      columns != null &&
+      initialState != null
+    ) {
       apiRef.current.restoreState(initialState);
     }
   }, [columns, initialState, apiRef]);
@@ -994,15 +980,13 @@ export const CallsTable: FC<{
                   />
                 )}
                 getOptionLabel={option => {
-                  return (
-                    opVersionOptionsWithRoots[option]?.title ?? 'loading...'
-                  );
+                  return opVersionOptions[option]?.title ?? 'loading...';
                 }}
                 disableClearable={
                   opVersionRefOrAllTitle === ALL_TRACES_OR_CALLS_REF_KEY
                 }
-                groupBy={option => opVersionOptionsWithRoots[option]?.group}
-                options={Object.keys(opVersionOptionsWithRoots)}
+                groupBy={option => opVersionOptions[option]?.group}
+                options={Object.keys(opVersionOptions)}
               />
             </FormControl>
           </ListItem>
@@ -1140,7 +1124,14 @@ const useOpVersionOptions = (
   entity: string,
   project: string,
   effectiveFilter: WFHighLevelCallFilter
-) => {
+): {
+  [ref: string]: {
+    title: string;
+    ref: string;
+    group: string;
+    objectVersion?: OpVersionSchema;
+  };
+} => {
   const {useOpVersions} = useWFHooks();
   // Get all the "latest" versions
   const latestVersions = useOpVersions(entity, project, {
@@ -1162,7 +1153,7 @@ const useOpVersionOptions = (
     }
   );
 
-  return useMemo(() => {
+  const opVersionOptionsWithoutAllSection = useMemo(() => {
     const result: Array<{
       title: string;
       ref: string;
@@ -1201,6 +1192,19 @@ const useOpVersionOptions = (
 
     return _.fromPairs(result.map(r => [r.ref, r]));
   }, [currentOpId, currentVersions.result, latestVersions.result]);
+
+  return useMemo(() => {
+    return {
+      [ALL_TRACES_OR_CALLS_REF_KEY]: {
+        title: effectiveFilter.traceRootsOnly
+          ? ALL_TRACES_TITLE
+          : ALL_CALLS_TITLE,
+        ref: '',
+        group: ANY_OP_GROUP_HEADER,
+      },
+      ...opVersionOptionsWithoutAllSection,
+    };
+  }, [effectiveFilter.traceRootsOnly, opVersionOptionsWithoutAllSection]);
 };
 
 const useConsumesObjectVersionOptions = (
