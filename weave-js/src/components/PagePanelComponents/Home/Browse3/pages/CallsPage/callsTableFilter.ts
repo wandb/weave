@@ -200,3 +200,21 @@ export const useOpVersionOptions = (
     };
   }, [effectiveFilter, opVersionOptionsWithoutAllSection]);
 };
+export const useOutputObjectVersionOptions = (
+  effectiveFilter: WFHighLevelCallFilter
+) => {
+  const {useObjectVersion} = useWFHooks();
+  // We don't populate this one because it is expensive
+  const currentRef = effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
+  const objectVersion = useObjectVersion(
+    currentRef ? refUriToObjectVersionKey(currentRef) : null
+  );
+  return useMemo(() => {
+    if (!currentRef || objectVersion.loading || !objectVersion.result) {
+      return {};
+    }
+    return {
+      [currentRef]: objectVersion.result,
+    };
+  }, [currentRef, objectVersion.loading, objectVersion.result]);
+};

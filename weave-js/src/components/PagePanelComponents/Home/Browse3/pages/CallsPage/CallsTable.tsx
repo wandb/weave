@@ -90,7 +90,6 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {
   objectVersionNiceString,
   opVersionRefOpName,
-  refUriToObjectVersionKey,
 } from '../wfReactInterface/utilities';
 import {
   CallSchema,
@@ -102,6 +101,7 @@ import {getEffectiveFilter} from './callsTableFilter';
 import {useOpVersionOptions} from './callsTableFilter';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
+import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 
 const VisibilityAlert = styled.div`
@@ -1138,25 +1138,6 @@ export const CallsTable: FC<{
       </React.Fragment>
     </FilterLayoutTemplate>
   );
-};
-
-const useOutputObjectVersionOptions = (
-  effectiveFilter: WFHighLevelCallFilter
-) => {
-  const {useObjectVersion} = useWFHooks();
-  // We don't populate this one because it is expensive
-  const currentRef = effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
-  const objectVersion = useObjectVersion(
-    currentRef ? refUriToObjectVersionKey(currentRef) : null
-  );
-  return useMemo(() => {
-    if (!currentRef || objectVersion.loading || !objectVersion.result) {
-      return {};
-    }
-    return {
-      [currentRef]: objectVersion.result,
-    };
-  }, [currentRef, objectVersion.loading, objectVersion.result]);
 };
 
 const useParentIdOptions = (
