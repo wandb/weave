@@ -3,7 +3,6 @@ import _ from 'lodash';
 import React, {FC, useMemo} from 'react';
 
 import {Loading} from '../../../../../Loading';
-import {RunsTable} from '../../../Browse2/RunsTable';
 import {useWeaveflowRouteContext} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
@@ -30,6 +29,7 @@ import {
   useCurrentFilterIsEvaluationsFilter,
   WFHighLevelCallFilter,
 } from './CallsPage';
+import {RunsTable} from './RunsTable';
 
 const ALL_TRACES_REF_KEY = '__all_traces__';
 const ALL_CALLS_REF_KEY = '__all_calls__';

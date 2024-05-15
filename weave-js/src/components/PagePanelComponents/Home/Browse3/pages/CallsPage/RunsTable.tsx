@@ -25,55 +25,55 @@ import React, {
 import {useParams} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {hexToRGB} from '../../../../common/css/utils';
-import {A, TargetBlank} from '../../../../common/util/links';
-import {monthRoundedTime} from '../../../../common/util/time';
-import {useWeaveContext} from '../../../../context';
+import {hexToRGB} from '../../../../../../common/css/utils';
+import {A, TargetBlank} from '../../../../../../common/util/links';
+import {monthRoundedTime} from '../../../../../../common/util/time';
+import {useWeaveContext} from '../../../../../../context';
 import {
   isObjectTypeLike,
   isTypedDictLike,
   Type,
   typedDictPropertyTypes,
-} from '../../../../core';
-import {useDeepMemo} from '../../../../hookUtils';
-import {parseRef} from '../../../../react';
-import {ErrorBoundary} from '../../../ErrorBoundary';
-import {LoadingDots} from '../../../LoadingDots';
-import {Timestamp} from '../../../Timestamp';
-import {WeaveHeaderExtrasContext} from '../Browse3/context';
-import {BoringColumnInfo} from '../Browse3/pages/CallPage/BoringColumnInfo';
-import {isPredictAndScoreOp} from '../Browse3/pages/common/heuristics';
-import {CallLink, opNiceName} from '../Browse3/pages/common/Links';
-import {StatusChip} from '../Browse3/pages/common/StatusChip';
-import {renderCell, useURLSearchParamsDict} from '../Browse3/pages/util';
-import {
-  DICT_KEY_EDGE_NAME,
-  OBJECT_ATTR_EDGE_NAME,
-} from '../Browse3/pages/wfReactInterface/constants';
-import {useWFHooks} from '../Browse3/pages/wfReactInterface/context';
-import {opVersionRefOpName} from '../Browse3/pages/wfReactInterface/utilities';
-import {
-  CallSchema,
-  OpVersionKey,
-} from '../Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import {StyledDataGrid} from '../Browse3/StyledDataGrid';
-import {flattenObject} from './browse2Util';
-import {CellValue} from './CellValue';
-import {CollapseGroupHeader} from './CollapseGroupHeader';
-import {Browse2RootObjectVersionItemParams} from './CommonLib';
-import {CustomGroupedColumnHeader} from './CustomGroupedColumnHeader';
-import {ExpandHeader} from './ExpandHeader';
-import {NotApplicable} from './NotApplicable';
-import {RefValue} from './RefValue';
+} from '../../../../../../core';
+import {useDeepMemo} from '../../../../../../hookUtils';
+import {parseRef} from '../../../../../../react';
+import {ErrorBoundary} from '../../../../../ErrorBoundary';
+import {LoadingDots} from '../../../../../LoadingDots';
+import {Timestamp} from '../../../../../Timestamp';
+import {flattenObject} from '../../../Browse2/browse2Util';
+import {CellValue} from '../../../Browse2/CellValue';
+import {CollapseGroupHeader} from '../../../Browse2/CollapseGroupHeader';
+import {Browse2RootObjectVersionItemParams} from '../../../Browse2/CommonLib';
+import {CustomGroupedColumnHeader} from '../../../Browse2/CustomGroupedColumnHeader';
+import {ExpandHeader} from '../../../Browse2/ExpandHeader';
+import {NotApplicable} from '../../../Browse2/NotApplicable';
+import {RefValue} from '../../../Browse2/RefValue';
 import {
   columnHasRefs,
   columnRefs,
   computeTableStats,
   getInputColumns,
   useColumnVisibility,
-} from './tableStats';
+} from '../../../Browse2/tableStats';
+import {WeaveHeaderExtrasContext} from '../../context';
+import {StyledDataGrid} from '../../StyledDataGrid';
+import {BoringColumnInfo} from '../CallPage/BoringColumnInfo';
+import {isPredictAndScoreOp} from '../common/heuristics';
+import {CallLink, opNiceName} from '../common/Links';
+import {StatusChip} from '../common/StatusChip';
+import {renderCell, useURLSearchParamsDict} from '../util';
+import {
+  DICT_KEY_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
+} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
+import {opVersionRefOpName} from '../wfReactInterface/utilities';
+import {
+  CallSchema,
+  OpVersionKey,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 
-export type DataGridColumnGroupingModel = Exclude<
+type DataGridColumnGroupingModel = Exclude<
   ComponentProps<typeof DataGrid>['columnGroupingModel'],
   undefined
 >;
@@ -142,10 +142,7 @@ function addToTree(
   addToTree(newNode, fields.slice(1), fullPath, depth + 1);
 }
 
-export function buildTree(
-  strings: string[],
-  rootGroupName: string
-): GridColumnGroup {
+function buildTree(strings: string[], rootGroupName: string): GridColumnGroup {
   const root: GridColumnGroup = {groupId: rootGroupName, children: []};
 
   for (const str of strings) {
@@ -238,7 +235,7 @@ const getPeekId = (peekPath: string | null): string | null => {
   return pathname.split('/').pop() ?? null;
 };
 
-export const ExportRunsTableButton = ({
+const ExportRunsTableButton = ({
   tableRef,
 }: {
   tableRef: React.MutableRefObject<GridApiPro>;
