@@ -972,15 +972,7 @@ export const CallsTable: FC<{
   // CPR (Tim): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
-      showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
-      showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
-      filterPopoutTargetUrl={baseRouter.callsUIUrl(
-        props.entity,
-        props.project,
-        effectiveFilter
-      )}
       filterListSx={{
-        // Hide until we show filters
         pb: 1,
         display: props.hideControls ? 'none' : 'flex',
       }}
