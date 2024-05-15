@@ -205,22 +205,14 @@ export const CallsTable: FC<{
     [effectiveFilter.parentId, parentIdOptions]
   );
 
-  // CPR (Tim): Co-locate this closer to the effective filter stuff
-  const clearFilters = useMemo(() => {
-    if (Object.keys(filter ?? {}).length > 0) {
-      return () => setFilter({});
-    }
-    return null;
-  }, [filter, setFilter]);
-
   // CPR (Tim): Investigate this: I added it before to reset the table when
   // new data flowed in, but it seems like it might be unnecessary
-  const callsKey = useMemo(() => {
-    if (calls.loading || calls.result == null) {
-      return null;
-    }
-    return Math.random();
-  }, [calls.loading, calls.result]);
+  // const callsKey = useMemo(() => {
+  //   if (calls.loading || calls.result == null) {
+  //     return null;
+  //   }
+  //   return Math.random();
+  // }, [calls.loading, calls.result]);
 
   // CPR (Tim): Remove this, and add a slot for empty content that can be calculated
   // in the parent component
@@ -944,6 +936,14 @@ export const CallsTable: FC<{
 
   // END ORIGINAL RUNS TABLE
 
+  // CPR (Tim): Co-locate this closer to the effective filter stuff
+  const clearFilters = useMemo(() => {
+    if (Object.keys(filter ?? {}).length > 0) {
+      return () => setFilter({});
+    }
+    return null;
+  }, [filter, setFilter]);
+
   // CPR (Tim): This probably should just be moved to the data grid
   if (loading) {
     return <Loading centered />;
@@ -1050,7 +1050,8 @@ export const CallsTable: FC<{
           )}
         </>
       }>
-      <React.Fragment key={callsKey}>
+      {/* <React.Fragment key={callsKey}> */}
+      <React.Fragment>
         {showVisibilityAlert && (
           <VisibilityAlert>
             <VisibilityAlertText>
