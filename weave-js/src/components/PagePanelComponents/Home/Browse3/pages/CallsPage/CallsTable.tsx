@@ -132,6 +132,9 @@ export const CallsTable: FC<{
   ioColumnsOnly?: boolean;
 }> = props => {
   const {entity, project, initialFilter, onFilterUpdate, frozenFilter} = props;
+  const {
+    derived: {useGetRefsType},
+  } = useWFHooks();
 
   // Make sure we respect the controlling nature of the filter
   const [filter, setFilter] = useControllableState(
@@ -207,16 +210,7 @@ export const CallsTable: FC<{
     [effectiveFilter.parentId, parentIdOptions]
   );
 
-  // RUNS TABLE HELPER
-
   // START ORIGINAL RUNS TABLE
-
-  // CPR (Tim): Move this to the top of the component
-  const weave = useWeaveContext();
-  const {
-    derived: {useGetRefsType},
-  } = useWFHooks();
-  const {client} = weave;
 
   // CPR (Tim): Column Expansion needs to be moved to a "table state" object in the future
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
@@ -272,9 +266,6 @@ export const CallsTable: FC<{
       })),
     [callsResult]
   );
-
-  // CPR (Tim): This is completely incorrect - we should never be getting URL params from this component
-  const params = useParams<Browse2RootObjectVersionItemParams>();
 
   // CPR (Tim): This is not a generally correct - why are we doing this?!?
   let onlyOneOutputResult = true;
@@ -386,7 +377,7 @@ export const CallsTable: FC<{
 
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedRefCols, client, tableStats]);
+  }, [expandedRefCols, tableStats]);
 
   // CPR (Tim): I really want to just always show everything - this hiding
   // feels more confusing than it is worth and also is costly. Remove.
@@ -468,8 +459,8 @@ export const CallsTable: FC<{
           }
           return (
             <CallLink
-              entityName={params.entity}
-              projectName={params.project}
+              entityName={entity}
+              projectName={project}
               opName={opVersionRefOpName(opVersion)}
               callId={rowParams.row.id}
               fullWidth={true}
@@ -855,8 +846,8 @@ export const CallsTable: FC<{
     isSingleOp,
     isSingleOpVersion,
     onlyOneOutputResult,
-    params.entity,
-    params.project,
+    entity,
+    project,
     preservePath,
     newSpans,
     tableStats,
