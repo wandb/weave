@@ -118,7 +118,6 @@ const OP_FILTER_GROUP_HEADER = 'Op';
 const ANY_OP_GROUP_HEADER = '';
 const ALL_TRACES_TITLE = 'All Ops';
 const ALL_CALLS_TITLE = 'All Calls';
-const ALLOW_ALL_CALLS_UNFILTERED = false;
 const OP_GROUP_HEADER = 'Ops';
 const OP_VERSION_GROUP_HEADER = (currentOpId: string) =>
   `Specific Versions of ${opNiceName(currentOpId)}`;
@@ -126,9 +125,7 @@ const OP_VERSION_GROUP_HEADER = (currentOpId: string) =>
 export const CallsTable: FC<{
   entity: string;
   project: string;
-  // CPR (Tim): frozenFilter should be renamed to "hiddenPreFilter" or something similar
   frozenFilter?: WFHighLevelCallFilter;
-  // CPR (Tim): `initialFilter` should be renamed something like `userFilter`
   initialFilter?: WFHighLevelCallFilter;
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
@@ -148,10 +145,7 @@ export const CallsTable: FC<{
   // CPR (Tim): Determining the effective filter (and assertions) should be extracted to a separate function
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
-    if (
-      !ALLOW_ALL_CALLS_UNFILTERED &&
-      !currentFilterShouldUseNonTraceRoots(workingFilter)
-    ) {
+    if (!currentFilterShouldUseNonTraceRoots(workingFilter)) {
       // If we are not allowing all calls unfiltered (meaning the totally
       // unfiltered list of all calls is disabled) and the current filter
       // settings do not call for non-trace roots only, then we should force
@@ -200,15 +194,16 @@ export const CallsTable: FC<{
         ref: '',
         group: ANY_OP_GROUP_HEADER,
       },
-      ...(ALLOW_ALL_CALLS_UNFILTERED
-        ? {
-            [ALL_CALLS_REF_KEY]: {
-              title: ALL_CALLS_TITLE,
-              ref: '',
-              group: ANY_OP_GROUP_HEADER,
-            },
-          }
-        : {}),
+      // CPR (Tim): Review this condition
+      // ...(ALLOW_ALL_CALLS_UNFILTERED
+      //   ? {
+      //       [ALL_CALLS_REF_KEY]: {
+      //         title: ALL_CALLS_TITLE,
+      //         ref: '',
+      //         group: ANY_OP_GROUP_HEADER,
+      //       },
+      //     }
+      //   : {}),
       ...opVersionOptions,
     };
   }, [opVersionOptions]);
