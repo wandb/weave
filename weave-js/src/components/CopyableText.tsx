@@ -24,6 +24,7 @@ const Wrapper = styled.div`
   align-items: center;
   cursor: pointer;
   padding: 8px;
+  border-radius: 8px;
   &:hover {
     background-color: ${MOON_200};
   }

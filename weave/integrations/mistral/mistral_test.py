@@ -20,28 +20,10 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     return call_output
 
 
-@pytest.fixture(scope="package")
-def patch_mistral(request: Any) -> Generator[None, None, None]:
-    # This little hack is to allow us to run the tests in prod mode
-    # For some reason pytest's import procedure causes the patching
-    # to fail in prod mode. Specifically, the patches get run twice
-    # despite the fact that the patcher is a singleton.
-    weave_server_flag = request.config.getoption("--weave-server")
-    if weave_server_flag == ("prod"):
-        yield
-        return
-
-    mistral_patcher.attempt_patch()
-    yield
-    mistral_patcher.undo_patch()
-
-
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_mistral_quickstart(
-    client: weave.weave_client.WeaveClient, patch_mistral: None
-) -> None:
+def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -93,9 +75,7 @@ def test_mistral_quickstart(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_mistral_quickstart_async(
-    client: weave.weave_client.WeaveClient, patch_mistral: None
-) -> None:
+async def test_mistral_quickstart_async(client: weave.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -142,9 +122,7 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_mistral_quickstart_with_stream(
-    client: weave.weave_client.WeaveClient, patch_mistral: None
-) -> None:
+def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
@@ -200,7 +178,7 @@ def test_mistral_quickstart_with_stream(
 )
 @pytest.mark.asyncio
 async def test_mistral_quickstart_with_stream_async(
-    client: weave.weave_client.WeaveClient, patch_mistral: None
+    client: weave.weave_client.WeaveClient,
 ) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
     api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
