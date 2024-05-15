@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import computeScrollIntoView from 'compute-scroll-into-view';
-import React, {useMemo, useState, useEffect} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {ThemeProvider} from 'styled-components';
 import * as S from './WBMenu.styles';
 
