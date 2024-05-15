@@ -144,7 +144,7 @@ class CallsDeleteReq(BaseModel):
 
 
 class CallsDeleteRes(BaseModel):
-    num_deleted: int
+    success: bool
 
 
 class _CallsFilter(BaseModel):
@@ -217,7 +217,7 @@ class OpsDeleteReq(BaseModel):
 
 
 class OpsDeleteRes(BaseModel):
-    num_deleted: int
+    success: bool
 
 
 class ObjCreateReq(BaseModel):

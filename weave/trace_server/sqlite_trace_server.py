@@ -395,7 +395,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             num_deleted += cursor.rowcount
             conn.commit()
 
-        return tsi.CallsDeleteRes(num_deleted=num_deleted)
+        return tsi.CallsDeleteRes(success=True)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()

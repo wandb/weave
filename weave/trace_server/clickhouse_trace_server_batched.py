@@ -317,8 +317,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=proj_params | {"ids": req.ids},
         )
 
-        print("\n>>>> PARENTS", [p.id for p in parents])
-
         # get all calls with trace_ids matching parents
         all_calls = self._select_calls_query(
             req.project_id,
@@ -326,21 +324,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
         )
 
-        print("\n>>>> ALL CALLS", [c.id for c in all_calls])
-
         all_descendants = find_call_descendants_in_memory_dfs(
             root_ids=req.ids,
             all_calls=all_calls,
         )
-
-        print("\n>>>> ALL DESCENDANTS", all_descendants)
 
         # create insert payload for all descendants (and parents)
         data = [(req.project_id, d, deleted_at) for d in all_descendants]
         summary = self._insert(
             "call_parts", data=data, column_names=["project_id", "id", "deleted_at"]
         )
-        return tsi.CallsDeleteRes(num_deleted=summary.written_rows)
+        return tsi.CallsDeleteRes(success=summary.written_rows == len(all_descendants))
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
