@@ -111,6 +111,7 @@ import {
   useCurrentFilterIsEvaluationsFilter,
   WFHighLevelCallFilter,
 } from './CallsPage';
+import {getEffectiveFilter} from './callsTableFilter';
 
 const ALL_TRACES_REF_KEY = '__all_traces__';
 const ALL_CALLS_REF_KEY = '__all_calls__';
@@ -143,29 +144,10 @@ export const CallsTable: FC<{
   );
 
   // CPR (Tim): Determining the effective filter (and assertions) should be extracted to a separate function
-  const effectiveFilter = useMemo(() => {
-    const workingFilter = {...filter, ...props.frozenFilter};
-    if (!currentFilterShouldUseNonTraceRoots(workingFilter)) {
-      // If we are not allowing all calls unfiltered (meaning the totally
-      // unfiltered list of all calls is disabled) and the current filter
-      // settings do not call for non-trace roots only, then we should force
-      // trace roots only.
-      workingFilter.traceRootsOnly = true;
-    }
-    return workingFilter;
-  }, [filter, props.frozenFilter]);
-
-  if ((effectiveFilter.opVersionRefs?.length ?? 0) > 1) {
-    throw new Error('Multiple op versions not yet supported');
-  }
-
-  if ((effectiveFilter.inputObjectVersionRefs?.length ?? 0) > 1) {
-    throw new Error('Multiple input object versions not yet supported');
-  }
-
-  if ((effectiveFilter.outputObjectVersionRefs?.length ?? 0) > 1) {
-    throw new Error('Multiple output object versions not yet supported');
-  }
+  const effectiveFilter = useMemo(
+    () => getEffectiveFilter(filter, props.frozenFilter),
+    [filter, props.frozenFilter]
+  );
 
   const lowLevelFilter: CallFilter = useMemo(() => {
     return convertHighLevelFilterToLowLevelFilter(effectiveFilter);
@@ -1195,21 +1177,11 @@ export const CallsTable: FC<{
   );
 };
 
-const currentFilterShouldUseNonTraceRoots = (filter: WFHighLevelCallFilter) => {
-  return (
-    (filter.inputObjectVersionRefs?.length ?? 0) > 0 ||
-    (filter.opVersionRefs?.length ?? 0) > 0 ||
-    filter.parentId != null
-  );
-};
-
 const convertHighLevelFilterToLowLevelFilter = (
   effectiveFilter: WFHighLevelCallFilter
 ): CallFilter => {
-  const forcingNonTraceRootsOnly =
-    currentFilterShouldUseNonTraceRoots(effectiveFilter);
   return {
-    traceRootsOnly: !forcingNonTraceRootsOnly && effectiveFilter.traceRootsOnly,
+    traceRootsOnly: effectiveFilter.traceRootsOnly,
     opVersionRefs: effectiveFilter.opVersionRefs,
     inputObjectVersionRefs: effectiveFilter.inputObjectVersionRefs,
     outputObjectVersionRefs: effectiveFilter.outputObjectVersionRefs,
