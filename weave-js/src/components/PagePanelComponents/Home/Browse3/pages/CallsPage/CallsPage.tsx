@@ -149,9 +149,7 @@ export const CallsTable: FC<{
     props.onFilterUpdate
   );
 
-  const [selectedCalls, setSelectedCalls] = useState<
-    Record<string, CallSchema | null>
-  >({});
+  const [selectedCalls, setSelectedCalls] = useState<CallSchema[]>([]);
 
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
@@ -443,10 +441,9 @@ export const CallsTable: FC<{
             />
           )}
           <OverflowMenu
-            selectedCalls={
-              Object.values(selectedCalls).filter(c => !!c) as CallSchema[]
-            }
+            selectedCalls={selectedCalls}
             refetch={calls.refetch}
+            setSelectedCalls={setSelectedCalls}
           />
         </>
       }>

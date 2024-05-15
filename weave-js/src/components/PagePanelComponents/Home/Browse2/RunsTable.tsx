@@ -266,10 +266,8 @@ export const RunsTable: FC<{
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-  selectedCalls: Record<string, CallSchema | null>;
-  setSelectedCalls: React.Dispatch<
-    React.SetStateAction<Record<string, CallSchema | null>>
-  >;
+  selectedCalls: CallSchema[];
+  setSelectedCalls: React.Dispatch<React.SetStateAction<CallSchema[]>>;
 }> = ({
   loading,
   spans,
@@ -506,15 +504,13 @@ export const RunsTable: FC<{
               <Checkbox
                 size="small"
                 style={{marginRight: '8px', marginTop: '0px'}}
-                checked={selectedCalls[rowParams.row.call.callId] != null}
+                checked={selectedCalls.includes(rowParams.row.call)}
                 onClick={() => {
-                  setSelectedCalls({
-                    ...selectedCalls,
-                    [rowParams.row.call.callId]: !selectedCalls[
-                      rowParams.row.call.callId
-                    ]
-                      ? rowParams.row.call
-                      : null,
+                  setSelectedCalls(prev => {
+                    if (prev.includes(rowParams.row.call)) {
+                      return prev.filter(call => call !== rowParams.row.call);
+                    }
+                    return [...prev, rowParams.row.call];
                   });
                 }}
               />

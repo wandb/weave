@@ -1,7 +1,7 @@
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
 import {IconDelete} from '@wandb/weave/components/Icon';
-import React, {FC, useState} from 'react';
+import React, {Dispatch, FC, SetStateAction, useState} from 'react';
 import {Modal} from 'semantic-ui-react';
 import styled from 'styled-components';
 
@@ -20,8 +20,9 @@ CallName.displayName = 'S.CallName';
 
 export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
+  setSelectedCalls?: Dispatch<SetStateAction<CallSchema[]>>;
   refetch?: () => void;
-}> = ({selectedCalls, refetch}) => {
+}> = ({selectedCalls, setSelectedCalls, refetch}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
@@ -43,6 +44,7 @@ export const OverflowMenu: FC<{
           calls={selectedCalls}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
+          setSelectedCalls={setSelectedCalls}
           refetch={refetch}
         />
       )}
@@ -69,8 +71,9 @@ const ConfirmDeleteModal: FC<{
   calls: CallSchema[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
+  setSelectedCalls?: Dispatch<SetStateAction<CallSchema[]>>;
   refetch?: () => void;
-}> = ({calls, confirmDelete, setConfirmDelete, refetch}) => {
+}> = ({calls, confirmDelete, setConfirmDelete, setSelectedCalls, refetch}) => {
   const getTsClient = useGetTraceServerClientContext();
   const closePeek = useClosePeek();
 
@@ -96,6 +99,9 @@ const ConfirmDeleteModal: FC<{
       .then(res => {
         setConfirmDelete(false);
         refetch?.();
+        setSelectedCalls?.(curCalls =>
+          curCalls?.filter(c => !calls.includes(c))
+        );
         closePeek();
       });
   };
