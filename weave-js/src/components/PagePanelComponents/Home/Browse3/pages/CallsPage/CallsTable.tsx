@@ -205,23 +205,6 @@ export const CallsTable: FC<{
     [effectiveFilter.parentId, parentIdOptions]
   );
 
-  // CPR (Tim): Investigate this: I added it before to reset the table when
-  // new data flowed in, but it seems like it might be unnecessary
-  // const callsKey = useMemo(() => {
-  //   if (calls.loading || calls.result == null) {
-  //     return null;
-  //   }
-  //   return Math.random();
-  // }, [calls.loading, calls.result]);
-
-  // CPR (Tim): Remove this, and add a slot for empty content that can be calculated
-  // in the parent component
-  const isEvaluateTable = useCurrentFilterIsEvaluationsFilter(
-    effectiveFilter,
-    props.entity,
-    props.project
-  );
-
   // RUNS TABLE HELPER
 
   // CPR (Tim): Replace these consts below
@@ -944,20 +927,22 @@ export const CallsTable: FC<{
     return null;
   }, [filter, setFilter]);
 
-  // CPR (Tim): This probably should just be moved to the data grid
-  if (loading) {
-    return <Loading centered />;
-  }
+  // CPR (Tim): Investigate this: I added it before to reset the table when
+  // new data flowed in, but it seems like it might be unnecessary
+  // const callsKey = useMemo(() => {
+  //   if (calls.loading || calls.result == null) {
+  //     return null;
+  //   }
+  //   return Math.random();
+  // }, [calls.loading, calls.result]);
 
-  // CPR (Tim): This is incorrect as it should have a different thing if there are filters applied (the one in the slots below)
-  const isEmpty = spans.length === 0;
-  if (isEmpty) {
-    if (isEvaluateTable) {
-      return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-    } else {
-      return <Empty {...EMPTY_PROPS_TRACES} />;
-    }
-  }
+  // CPR (Tim): Remove this, and add a slot for empty content that can be calculated
+  // in the parent component
+  const isEvaluateTable = useCurrentFilterIsEvaluationsFilter(
+    effectiveFilter,
+    props.entity,
+    props.project
+  );
 
   // CPR (Tim): Pull out different inline-properties and create them above
   return (
@@ -1105,6 +1090,15 @@ export const CallsTable: FC<{
           }}
           slots={{
             noRowsOverlay: () => {
+              const isEmpty = spans.length === 0;
+              if (!loading && isEmpty) {
+                // CPR (Tim): Move "isEvaluateTable" out and instead make this empty state a prop
+                if (isEvaluateTable) {
+                  return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
+                } else if (effectiveFilter.traceRootsOnly) {
+                  return <Empty {...EMPTY_PROPS_TRACES} />;
+                }
+              }
               return (
                 <Box
                   sx={{
