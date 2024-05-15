@@ -83,7 +83,7 @@ import {StatusChip} from '../common/StatusChip';
 import {
   renderCell,
   truncateID,
-  useInitializingFilter,
+  useControllableState,
   useURLSearchParamsDict,
 } from '../util';
 import {
@@ -129,9 +129,8 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
-  // CPR (Tim): This `useInitializingFilter` could use a slight refactor and rename
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
+  const [filter, setFilter] = useControllableState(
+    props.initialFilter ?? {},
     props.onFilterUpdate
   );
 

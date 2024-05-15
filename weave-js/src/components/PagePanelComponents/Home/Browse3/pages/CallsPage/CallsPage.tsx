@@ -8,7 +8,7 @@ import {
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {SimplePageLayout} from '../common/SimplePageLayout';
-import {useInitializingFilter} from '../util';
+import {useControllableState} from '../util';
 import {
   opVersionKeyToRefUri,
   opVersionRefOpName,
@@ -29,8 +29,8 @@ export const CallsPage: FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
 }> = props => {
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
+  const [filter, setFilter] = useControllableState(
+    props.initialFilter ?? {},
     props.onFilterUpdate
   );
 
