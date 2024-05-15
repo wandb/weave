@@ -11,7 +11,6 @@ import React, {FC, useCallback, useMemo, useState} from 'react';
 
 import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
-import {DeleteCallButton} from '../../../Browse3';
 import {
   useWeaveflowRouteContext,
   WeaveHeaderExtrasContext,
@@ -19,6 +18,7 @@ import {
 } from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
+import {OverflowMenu} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -42,6 +42,7 @@ import {
 } from '../wfReactInterface/utilities';
 import {
   CallFilter,
+  CallSchema,
   OpVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
@@ -141,14 +142,14 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
-  const [toDelete, setToDelete] = useState<Record<string, boolean>>({});
-
   const {useCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
     props.onFilterUpdate
   );
+
+  const [selectedCalls, setSelectedCalls] = useState<CallSchema[]>([]);
 
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
@@ -439,13 +440,11 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          {Object.values(toDelete).some(a => !!a) && (
-            <DeleteCallButton
-              entity={props.entity}
-              project={props.project}
-              ids={Object.keys(toDelete).filter(k => toDelete[k])}
-            />
-          )}
+          <OverflowMenu
+            selectedCalls={selectedCalls}
+            refetch={calls.refetch}
+            setSelectedCalls={setSelectedCalls}
+          />
         </>
       }>
       {isPivoting ? (
@@ -469,8 +468,8 @@ export const CallsTable: FC<{
           spans={spans}
           clearFilters={clearFilters}
           ioColumnsOnly={props.ioColumnsOnly}
-          toDelete={toDelete}
-          setToDelete={setToDelete}
+          selectedCalls={selectedCalls}
+          setSelectedCalls={setSelectedCalls}
         />
       )}
     </FilterLayoutTemplate>

@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+from collections import defaultdict
 import threading
 from contextlib import contextmanager
 import datetime
@@ -9,7 +10,7 @@ import hashlib
 import dataclasses
 
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.query import QueryResult
+from clickhouse_connect.driver.query import QueryResult, StreamContext
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect
@@ -219,6 +220,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        stream = self.calls_query_stream(req)
+        return tsi.CallsQueryRes(calls=list(stream))
+
+    def calls_query_stream(
+        self, req: tsi.CallsQueryReq
+    ) -> typing.Iterator[tsi.CallSchema]:
         conditions = []
         parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
@@ -293,30 +300,41 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not req.sort_by
             else [(s.field, s.direction) for s in req.sort_by],
         )
-        calls = [
-            _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
-        ]
-        return tsi.CallsQueryRes(calls=calls)
-
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        # TODO(gst): use FE time or server time?
-        deleted_at = datetime.datetime.now()
-        data = [(req.project_id, id, deleted_at) for id in req.ids]
-        for parent_id in req.ids:
-            # query for children of this call
-            children = self._select_calls_query(
-                req.project_id,
-                conditions=["parent_id = {parent_id: String}"],
-                parameters={"parent_id": parent_id},
+        for ch_dict in ch_call_dicts:
+            yield tsi.CallSchema.model_validate(
+                _ch_call_dict_to_call_schema_dict(ch_dict)
             )
 
-            # add children to the list of calls to delete
-            data += [(req.project_id, child.id, deleted_at) for child in children]
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        deleted_at = datetime.datetime.now()
+        proj_cond = "project_id = {project_id: String}"
+        proj_params = {"project_id": req.project_id}
 
+        # get all parents
+        parents = self._select_calls_query(
+            req.project_id,
+            conditions=[proj_cond, "id IN {ids: Array(String)}"],
+            parameters=proj_params | {"ids": req.ids},
+        )
+
+        # get all calls with trace_ids matching parents
+        all_calls = self._select_calls_query(
+            req.project_id,
+            conditions=[proj_cond, "trace_id IN {trace_ids: Array(String)}"],
+            parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
+        )
+
+        all_descendants = find_call_descendants_in_memory_dfs(
+            root_ids=req.ids,
+            all_calls=all_calls,
+        )
+
+        # create insert payload for all descendants (and parents)
+        data = [(req.project_id, d, deleted_at) for d in all_descendants]
         summary = self._insert(
             "call_parts", data=data, column_names=["project_id", "id", "deleted_at"]
         )
-        return tsi.CallsDeleteRes(num_deleted=summary.written_rows)
+        return tsi.CallsDeleteRes(success=summary.written_rows == len(all_descendants))
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -353,6 +371,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
+
+    def ops_delete(self, req: tsi.OpsDeleteReq) -> tsi.OpsDeleteRes:
+        num_deleted = self._delete_objs(
+            req.project_id,
+            req.ids,
+            conditions=["is_op = 1"],
+        )
+        return tsi.OpsDeleteRes(success=req.ids == num_deleted)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         json_val = json.dumps(req.obj.val)
@@ -426,6 +452,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def _delete_objs(
+        self,
+        project_id: str,
+        object_ids: typing.List[str],
+        conditions: typing.Optional[typing.List[str]] = None,
+    ) -> int:
+        if conditions is None:
+            conditions = []
+        conditions += ["object_id IN {object_ids: Array(String)}"]
+        objects = self._select_objs_query(
+            project_id,
+            conditions=conditions,
+            parameters={"object_ids": object_ids},
+        )
+        if len(objects) == 0:
+            return 0
+
+        summary = self._insert(
+            "object_versions",
+            data=[
+                (project_id, object.object_id, datetime.datetime.now())
+                for object in objects
+            ],
+            column_names=["project_id", "object_id", "deleted_at"],
+        )
+        return summary.written_rows
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
 
@@ -854,7 +907,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[typing.Dict]:
+    ) -> typing.Iterable[typing.Dict]:
         if not parameters:
             parameters = {}
         parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
@@ -882,9 +935,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
-            conditions = []
-
-        conditions += ["deleted_at IS NULL"]
+            conditions = ["1 = 1"]
 
         conditions_part = _combine_conditions(conditions, "AND")
 
@@ -944,7 +995,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             FROM calls_merged
             WHERE project_id = {{project_id: String}}
             GROUP BY project_id, id
-            HAVING {conditions_part}
+            HAVING deleted_at IS NULL AND
+                {conditions_part}
             {order_by_part}
             {limit_part}
             {offset_part}
@@ -952,10 +1004,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters,
         )
 
-        dicts = []
-        for row in raw_res.result_rows:
-            dicts.append(dict(zip(columns, row)))
-        return dicts
+        for row in raw_res:
+            yield dict(zip(columns, row))
 
     def _select_objs_query(
         self,
@@ -965,9 +1015,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHObjSchema]:
         if not conditions:
-            conditions = []
-
-        conditions += ["deleted_at IS NULL"]
+            conditions = ["1 = 1"]
 
         conditions_part = _combine_conditions(conditions, "AND")
 
@@ -979,19 +1027,52 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters = {}
         query_result = self._query(
             f"""
-            SELECT *
+            SELECT 
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                refs,
+                val_dump,
+                digest,
+                is_op,
+                _version_index_plus_1,
+                version_index,
+                version_count,
+                is_latest
             FROM object_versions_deduped
-            WHERE project_id = {{project_id: String}}
-            AND {conditions_part}
+            WHERE project_id = {{project_id: String}} AND
+                deleted_at IS NULL AND
+                {conditions_part}
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
         )
         result: typing.List[SelectableCHObjSchema] = []
-        for row in query_result.result_rows:
+        for row in query_result:
             result.append(
                 SelectableCHObjSchema.model_validate(
-                    dict(zip(query_result.column_names, row))
+                    dict(
+                        zip(
+                            [
+                                "project_id",
+                                "object_id",
+                                "created_at",
+                                "kind",
+                                "base_object_class",
+                                "refs",
+                                "val_dump",
+                                "digest",
+                                "is_op",
+                                "_version_index_plus_1",
+                                "version_index",
+                                "version_count",
+                                "is_latest",
+                            ],
+                            row,
+                        )
+                    )
                 )
             )
 
@@ -1007,14 +1088,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: typing.Dict[str, typing.Any],
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> QueryResult:
+    ) -> typing.Iterator[QueryResult]:
         print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(
+        with self.ch_client.query_rows_stream(
             query, parameters=parameters, column_formats=column_formats, use_none=True
-        )
-        print("Summary: " + json.dumps(res.summary, indent=2))
-        return res
+        ) as stream:
+            for row in stream:
+                yield row
 
     def _insert(
         self,
@@ -1283,3 +1364,32 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
         raise ValueError(f"Invalid operator: {operator}")
     combined = f" {operator} ".join([f"({c})" for c in conditions])
     return f"({combined})"
+
+
+def find_call_descendants_in_memory_dfs(
+    root_ids: typing.List[str],
+    all_calls: typing.List[SelectableCHCallSchema],
+) -> typing.List[str]:
+    # make a map of call_id to children list
+    children_map = defaultdict(list)
+    for call in all_calls:
+        if call.parent_id is not None:
+            children_map[call.parent_id].append(call.id)
+
+    # do DFS to get all descendants
+    def find_all_descendants(root_ids: typing.List[str]) -> typing.Set[str]:
+        descendants = set()
+        stack = root_ids
+
+        while stack:
+            current_id = stack.pop()
+            if current_id not in descendants:
+                descendants.add(current_id)
+                stack += children_map.get(current_id, [])
+
+        return descendants
+
+    # Find descendants for each initial id
+    descendants = find_all_descendants(root_ids)
+
+    return list(descendants)

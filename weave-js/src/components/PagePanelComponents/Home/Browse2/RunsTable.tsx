@@ -73,7 +73,6 @@ import {
   getInputColumns,
   useColumnVisibility,
 } from './tableStats';
-// import { Checkbox } from 'semantic-ui-react';
 
 export type DataGridColumnGroupingModel = Exclude<
   ComponentProps<typeof DataGrid>['columnGroupingModel'],
@@ -267,9 +266,16 @@ export const RunsTable: FC<{
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-  toDelete: Record<string, boolean>;
-  setToDelete: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-}> = ({loading, spans, clearFilters, ioColumnsOnly, toDelete, setToDelete}) => {
+  selectedCalls: CallSchema[];
+  setSelectedCalls: React.Dispatch<React.SetStateAction<CallSchema[]>>;
+}> = ({
+  loading,
+  spans,
+  clearFilters,
+  ioColumnsOnly,
+  selectedCalls,
+  setSelectedCalls,
+}) => {
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
@@ -497,16 +503,15 @@ export const RunsTable: FC<{
             <>
               <Checkbox
                 size="small"
-                style={{marginRight: '4px', marginTop: '2px'}}
-                checked={toDelete[rowParams.row.call.callId] ?? false}
+                style={{marginRight: '8px', marginTop: '0px'}}
+                checked={selectedCalls.includes(rowParams.row.call)}
                 onClick={() => {
-                  setToDelete({
-                    ...toDelete,
-                    [rowParams.row.call.callId]:
-                      !toDelete[rowParams.row.call.callId] ?? false,
+                  setSelectedCalls(prev => {
+                    if (prev.includes(rowParams.row.call)) {
+                      return prev.filter(call => call !== rowParams.row.call);
+                    }
+                    return [...prev, rowParams.row.call];
                   });
-                  toDelete[rowParams.row.call.callId] =
-                    !toDelete[rowParams.row.call.callId] ?? true;
                 }}
               />
               <CallLink
@@ -896,8 +901,8 @@ export const RunsTable: FC<{
     preservePath,
     spans,
     tableStats,
-    setToDelete,
-    toDelete,
+    selectedCalls,
+    setSelectedCalls,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();

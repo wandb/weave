@@ -27,6 +27,10 @@ export type LoadableWithError<T> = {
   error: Error | null;
 };
 
+export type LoadableWithRefetch<T> = Loadable<T> & {
+  refetch?: () => void;
+};
+
 export type CallKey = {
   entity: string;
   project: string;
@@ -146,7 +150,6 @@ type AppendRefMutation = {
 export type RefMutation = SetRefMutation | AppendRefMutation;
 
 export type WFDataModelHooksInterface = {
-  // useDeleteCalls: (projectID: string, callIDs: string[]) => Loadable<any>;
   useCall: (key: CallKey | null) => Loadable<CallSchema | null>;
   useCalls: (
     entity: string,
@@ -154,7 +157,11 @@ export type WFDataModelHooksInterface = {
     filter: CallFilter,
     limit?: number,
     opts?: {skip?: boolean}
-  ) => Loadable<CallSchema[]>;
+  ) => LoadableWithRefetch<CallSchema[]>;
+  useCallsDelete: () => (
+    projectID: string,
+    ids: string[]
+  ) => Promise<{success: boolean}>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,

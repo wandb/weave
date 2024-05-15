@@ -240,20 +240,62 @@ def test_calls_delete(client):
     call0 = client.create_call("x", None, {"a": 5, "b": 10})
     call1 = client.create_call("x", None, {"a": 6, "b": 11})
 
-    client.delete_call(call0)
+    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
+    assert len(result) == 2
+
+    num_deleted = client.delete_call(call0)
+    assert num_deleted == 1
 
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 1
 
     # no-op if already deleted
-    client.delete_call(call0)
+    num_deleted = client.delete_call(call0)
+    assert num_deleted == 0
 
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 1
 
-    client.delete_call(call1)
+    num_deleted = call1.delete()
+    assert num_deleted == 1
+
+    assert call1.delete() == 0
 
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
+    assert len(result) == 0
+
+
+def test_calls_delete_cascade(client):
+    # run an evaluation, then delete the evaluation and its children
+    @weave.op()
+    async def model_predict(input) -> str:
+        return eval(input)
+
+    dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+
+    @weave.op()
+    async def score(target, model_output):
+        return target == model_output
+
+    evaluation = Evaluation(
+        name="my-eval",
+        dataset=dataset_rows,
+        scorers=[score],
+    )
+    asyncio.run(evaluation.evaluate(model_predict))
+
+    evaluate_calls = list(weave.as_op(evaluation.evaluate).calls())
+    assert len(evaluate_calls) == 1
+    eval_call = evaluate_calls[0]
+    eval_call_children = list(eval_call.children())
+    assert len(eval_call_children) == 3
+
+    # delete the evaluation, should cascade to all the calls and sub-calls
+    num_deleted = client.delete_call(eval_call)
+    assert num_deleted == 8
+
+    # check that all the calls are gone
+    result = list(client.calls())
     assert len(result) == 0
 
 
@@ -488,7 +530,6 @@ def test_evaluate(client):
     # TODO: walk the whole graph and make sure all the refs and relationships
     # are there.
     child0 = eval_call_children[0]
-
     assert child0.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
 
     eval_obj = child0.inputs["self"]
