@@ -1,3 +1,13 @@
+/**
+ * TODO:
+ *    * Finish annotating
+ *    * Execute on a number of the cleanups
+ *    * Re-organize file & symbols
+ *    * Implement Sort / Filter Controls (alongside columns) + server-side mode
+ *    * Implement Pagination Controls
+ *    * Implement the custom hook that populates the data - refactor thereafter
+ */
+
 import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
@@ -117,7 +127,9 @@ const OP_VERSION_GROUP_HEADER = (currentOpId: string) =>
 export const CallsTable: FC<{
   entity: string;
   project: string;
+  // CPR (Tim): frozenFilter should be renamed to "hiddenPreFilter" or something similar
   frozenFilter?: WFHighLevelCallFilter;
+  // CPR (Tim): `initialFilter` should be renamed something like `userFilter`
   initialFilter?: WFHighLevelCallFilter;
   // Setting this will make the component a controlled component. The parent
   // is responsible for updating the filter.
@@ -127,11 +139,14 @@ export const CallsTable: FC<{
 }> = props => {
   const {useCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
+
+  // CPR (Tim): This `useInitializingFilter` could use a slight refactor and rename
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
     props.onFilterUpdate
   );
 
+  // CPR (Tim): Determining the effective filter (and assertions) should be extracted to a separate function
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
     if (
@@ -170,6 +185,8 @@ export const CallsTable: FC<{
     props.project,
     effectiveFilter
   );
+
+  // CPR (Tim): Another thing that could be more clearly extracted to a separate function
   const opVersionOptionsWithRoots: {
     [ref: string]: {
       title: string;
@@ -196,14 +213,20 @@ export const CallsTable: FC<{
       ...opVersionOptions,
     };
   }, [opVersionOptions]);
+
   const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
   const opVersionRefOrAllTitle = useMemo(() => {
     return (
       opVersionRef ??
+      // CPR (Tim): This is not correct. After further investigation, I think we should remove
+      // the `ALLOW_ALL_CALLS_UNFILTERED` flag and instead just calculate trace_roots_only
+      // based on the filter. This will allow us to remove a bunch of the hacky conditional logic
+      // and other calls to `currentFilterShouldUseNonTraceRoots`.
       (effectiveFilter.traceRootsOnly ? ALL_TRACES_REF_KEY : ALL_CALLS_REF_KEY)
     );
   }, [opVersionRef, effectiveFilter.traceRootsOnly]);
 
+  // CPR (Tim): This chunk (including the one above and 3 below follow a similar pattern and could be extracted to a function)
   const consumesObjectVersionOptions =
     useConsumesObjectVersionOptions(effectiveFilter);
   const inputObjectVersionRef =
@@ -229,6 +252,7 @@ export const CallsTable: FC<{
     ? parentIdOptions[effectiveFilter.parentId]
     : null;
 
+  // CPR (Tim): Co-locate this closer to the effective filter stuff
   const clearFilters = useMemo(() => {
     if (Object.keys(filter ?? {}).length > 0) {
       return () => setFilter({});
@@ -236,6 +260,8 @@ export const CallsTable: FC<{
     return null;
   }, [filter, setFilter]);
 
+  // CPR (Tim): Investigate this: I added it before to reset the table when
+  // new data flowed in, but it seems like it might be unnecessary
   const callsKey = useMemo(() => {
     if (calls.loading || calls.result == null) {
       return null;
@@ -243,6 +269,8 @@ export const CallsTable: FC<{
     return Math.random();
   }, [calls.loading, calls.result]);
 
+  // CPR (Tim): Remove this, and add a slot for empty content that can be calculated
+  // in the parent component
   const isEvaluateTable = useCurrentFilterIsEvaluationsFilter(
     effectiveFilter,
     props.entity,
@@ -251,19 +279,23 @@ export const CallsTable: FC<{
 
   // RUNS TABLE HELPER
 
+  // CPR (Tim): Replace these consts below
   const loading = calls.loading;
   const ioColumnsOnly = props.ioColumnsOnly;
+
+  // CPR (Tim): Why? Rename and put close to calls results
   const spans = useMemo(() => calls.result ?? [], [calls.result]);
 
   // START ORIGINAL RUNS TABLE
 
-  // Support for expanding and collapsing ref values in columns
-  // This is a set of fields that have been expanded.
+  // CPR (Tim): Move this to the top of the component
   const weave = useWeaveContext();
   const {
     derived: {useGetRefsType},
   } = useWFHooks();
   const {client} = weave;
+
+  // CPR (Tim): Column Expansion needs to be moved to a "table state" object in the future
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
     new Set<string>().add('input.example')
   );
@@ -278,8 +310,10 @@ export const CallsTable: FC<{
     });
   };
 
+  // CPR (Tim): This is going to go away completely once we move to remove expansion
   const [expandedColInfo, setExpandedColInfo] = useState<ExtraColumns>({});
 
+  // CPR (Tim): We should change `isSingleOpVersion` and `isSingleOp` to be derived from the filter, not requiring a full pass
   const isSingleOpVersion = useMemo(() => {
     return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
   }, [spans]);
@@ -290,6 +324,7 @@ export const CallsTable: FC<{
     return uniqueSpanNames.length === 1;
   }, [uniqueSpanNames]);
 
+  // CPR (Tim): Potential Refactor here with registering the export button (where to put it?)
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
   const apiRef = useGridApiRef();
 
@@ -301,8 +336,9 @@ export const CallsTable: FC<{
     return () => removeExtra('exportRunsTableButton');
   }, [apiRef, addExtra, removeExtra]);
 
-  // Have to add _result when null, even though we try to do this in the python
-  // side
+  // CPR (Tim): This needs to be removed completely - we should not need to put `_result` in anywhere.
+  // In fact, it should be removed from the read client as well. When we flatten the data, we can handle
+  // primitive collisions with containers there.
   const newSpans = useMemo(
     () =>
       spans.map(s => ({
@@ -311,8 +347,11 @@ export const CallsTable: FC<{
       })),
     [spans]
   );
+
+  // CPR (Tim): This is completely incorrect - we should never be getting URL params from this component
   const params = useParams<Browse2RootObjectVersionItemParams>();
 
+  // CPR (Tim): This is not a generally correct - why are we doing this?!?
   let onlyOneOutputResult = true;
   for (const s of newSpans) {
     // get display keys
@@ -329,6 +368,10 @@ export const CallsTable: FC<{
     }
   }
 
+  // CPR (Tim): The vast majority of this is going to roll into the calls hook that we create
+  // Specifically: the flattening of the data. We should make this a highly structured and
+  // typed output. Moreover, since sorting is moving to the backend, we don't need anything
+  // fancy here: just the id and the flattened call.
   const tableData = useMemo(() => {
     return newSpans.map((call: CallSchema) => {
       const argOrder = call.rawSpan.inputs._input_order;
@@ -390,9 +433,14 @@ export const CallsTable: FC<{
       };
     });
   }, [loading, onlyOneOutputResult, newSpans]);
+
+  // CPR (Tim): Move table stats (and derivative calcs) into the new hook
   const tableStats = useMemo(() => {
     return computeTableStats(tableData);
   }, [tableData]);
+
+  // CPR (Tim): This entire block goes away when we move to our new hook model. We don't
+  // need to calculate new columns as they are already going to be part of the data itself
   const getRefsType = useGetRefsType();
   useEffect(() => {
     const fetchData = async () => {
@@ -415,12 +463,17 @@ export const CallsTable: FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedRefCols, client, tableStats]);
 
+  // CPR (Tim): I really want to just always show everything - this hiding
+  // feels more confusing than it is worth and also is costly. Remove.
   const [forceShowAll, setForceShowAll] = useState(false);
   const {allShown, columnVisibilityModel: defaultVisibilityModel} =
     useColumnVisibility(tableStats, isSingleOpVersion);
+
+  // CPR (Tim): Move all GridModel controls to a common place
   const [columnVisibilityModel, setColumnVisibilityModel] =
     useState<GridColumnVisibilityModel>(defaultVisibilityModel);
 
+  // CPR (Tim): This gets removed as well
   useEffect(() => {
     if (forceShowAll) {
       // If not specified, columns default to visible.
@@ -428,8 +481,12 @@ export const CallsTable: FC<{
     }
   }, [forceShowAll]);
 
+  // CPR (Tim): This gets removed as well
   const showVisibilityAlert = !allShown && !forceShowAll;
 
+  // CPR (Tim): Preferably this is passed in from the top, not
+  // something where we inspect URLs deep in a component. At the
+  // very least this should be moved to it's own function
   // Highlight table row if it matches peek drawer.
   const query = useURLSearchParamsDict();
   const {peekPath} = query;
@@ -456,6 +513,7 @@ export const CallsTable: FC<{
     }
   }, [rowIds, peekId]);
 
+  // CPR (Tim): Pull out into it's own function
   // Custom logic to control path preservation preference
   const preservePath = useMemo(() => {
     return (
@@ -464,6 +522,9 @@ export const CallsTable: FC<{
     );
   }, [uniqueSpanNames]);
 
+  // CPR (Tim): Yeah, there is going to be a lot here. A few general notes:
+  // * For readability: would be clean to extract each field def into a function
+  // * Perhaps consider reducing the min-width for a lot of these
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
@@ -541,6 +602,10 @@ export const CallsTable: FC<{
         },
       },
     ];
+
+    // CPR (Tim): I still don't understand how inputs/outputs/attributes/summary aren't
+    // all handled in the same generic way. Lets do that! Also, we don't have any concept
+    // of "_keys" anymore, so we can remove all that junk. The flattening will be done before-hand.
     const colGroupingModel: DataGridColumnGroupingModel = [];
     const row0 = newSpans[0];
     if (row0 == null) {
@@ -575,6 +640,7 @@ export const CallsTable: FC<{
       }
     }
 
+    // CPR (Tim): Yeah, this is going to change likely.
     // Gets the children of a expanded group field(a ref that has been expanded)
     // returns an array of column definitions, for the children
     const getGroupChildren = (groupField: string) => {
@@ -584,7 +650,7 @@ export const CallsTable: FC<{
       const expandCols = expandedColInfo[groupField] ?? [];
       // for each expanded column, add a column definition
       for (const col of expandCols) {
-        // Dont show name or description column for expanded refs
+        // Don't show name or description column for expanded refs
         if (col.path === 'name' || col.path === 'description') {
           continue;
         }
@@ -688,6 +754,7 @@ export const CallsTable: FC<{
       colGroupingModel.push(colGroup);
     };
 
+    // CPR (Tim): Refactor this away
     // Add input columns
     const inputOrder = !isSingleOpVersion
       ? getInputColumns(tableStats)
@@ -714,6 +781,7 @@ export const CallsTable: FC<{
 
       const outputOrder = Object.keys(outputKeys);
       addColumnGroup('output', outputOrder);
+      // CPR (Tim): Pretty sure this else branch goes away (or rather the one above.)
     } else {
       // If there is only one output _result, we don't need to do all the work on outputs
       // we add one special group from the _result and allow it to be expanded one level
@@ -868,6 +936,8 @@ export const CallsTable: FC<{
     newSpans,
     tableStats,
   ]);
+
+  // CPR (tim): Again, move to a hook
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();
   // const history = useHistory();
@@ -884,6 +954,8 @@ export const CallsTable: FC<{
       expand: true,
     });
   }, [apiRef, loading]);
+
+  // CPR (Tim): These will get extracted into their own controls (at least sorting will)
   const initialStateRaw: ComponentProps<typeof DataGridPro>['initialState'] =
     useMemo(() => {
       if (loading) {
@@ -901,6 +973,8 @@ export const CallsTable: FC<{
   // a trickle of state updates. However, if the ultimate state is the same,
   // we don't want to re-render the table.
   const initialState = useDeepMemo(initialStateRaw);
+
+  // Tim (CPR): This whole section can be simplified I believe
   // This is a workaround.
   // initialState won't take effect if columns are not set.
   // see https://github.com/mui/mui-x/issues/6206
@@ -912,10 +986,12 @@ export const CallsTable: FC<{
 
   // END ORIGINAL RUNS TABLE
 
+  // CPR (Tim): This probably should just be moved to the data grid
   if (loading) {
     return <Loading centered />;
   }
 
+  // CPR (Tim): This is incorrect as it should have a different thing if there are filters applied (the one in the slots below)
   const isEmpty = spans.length === 0;
   if (isEmpty) {
     if (isEvaluateTable) {
@@ -925,6 +1001,7 @@ export const CallsTable: FC<{
     }
   }
 
+  // CPR (Tim): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
       showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
