@@ -1377,7 +1377,7 @@ def find_call_descendants_in_memory_dfs(
             children_map[call.parent_id].append(call.id)
 
     # do DFS to get all descendants
-    def find_all_descendants(root_ids: typing.List[str]):
+    def find_all_descendants(root_ids: typing.List[str]) -> typing.Set[str]:
         descendants = set()
         stack = root_ids
 
