@@ -5,7 +5,7 @@ import {maybePluralizeWord} from '../../../../../core/util/string';
 import {LoadingDots} from '../../../../LoadingDots';
 import {WeaveCHTableSourceRefContext} from './CallPage/DataTableView';
 import {ObjectViewerSection} from './CallPage/ObjectViewerSection';
-import {WFHighLevelCallFilter} from './CallsPage/CallsPage';
+import {WFHighLevelCallFilter} from './CallsPage/callsTableFilter';
 import {
   CallLink,
   CallsLink,

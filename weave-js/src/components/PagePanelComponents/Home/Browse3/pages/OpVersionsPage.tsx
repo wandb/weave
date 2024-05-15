@@ -20,7 +20,7 @@ import {
   OpVersionsLink,
 } from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useInitializingFilter, useURLSearchParamsDict} from './util';
+import {useControllableState, useURLSearchParamsDict} from './util';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
@@ -37,8 +37,8 @@ export const OpVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
+  const [filter, setFilter] = useControllableState(
+    props.initialFilter ?? {},
     props.onFilterUpdate
   );
 

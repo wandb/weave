@@ -23,7 +23,7 @@ import {ObjectVersionLink, ObjectVersionsLink} from './common/Links';
 import {FilterLayoutTemplate} from './common/SimpleFilterableDataTable';
 import {SimplePageLayout} from './common/SimplePageLayout';
 import {TypeVersionCategoryChip} from './common/TypeVersionCategoryChip';
-import {useInitializingFilter, useURLSearchParamsDict} from './util';
+import {useControllableState, useURLSearchParamsDict} from './util';
 import {useWFHooks} from './wfReactInterface/context';
 import {objectVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {
@@ -39,8 +39,8 @@ export const ObjectVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelObjectVersionFilter) => void;
 }> = props => {
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
+  const [filter, setFilter] = useControllableState(
+    props.initialFilter ?? {},
     props.onFilterUpdate
   );
 
