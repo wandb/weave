@@ -14,18 +14,7 @@ import {
   opVersionRefOpName,
 } from '../wfReactInterface/utilities';
 import {CallsTable} from './CallsTable';
-
-export type WFHighLevelCallFilter = {
-  traceRootsOnly?: boolean;
-  opVersionRefs?: string[];
-  inputObjectVersionRefs?: string[];
-  outputObjectVersionRefs?: string[];
-  parentId?: string | null;
-  // This really doesn't belong here. We are using it to indicate that the
-  // filter is frozen and should not be updated by the user. However, this
-  // control should really be managed outside of the filter itself.
-  frozen?: boolean;
-};
+import {WFHighLevelCallFilter} from './callsTableFilter';
 
 const HeaderExtras = () => {
   const {renderExtras} = React.useContext(WeaveHeaderExtrasContext);

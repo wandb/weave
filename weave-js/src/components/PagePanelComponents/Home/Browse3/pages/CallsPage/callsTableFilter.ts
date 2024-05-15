@@ -1,4 +1,14 @@
-import {WFHighLevelCallFilter} from './CallsPage';
+export type WFHighLevelCallFilter = {
+  traceRootsOnly?: boolean;
+  opVersionRefs?: string[];
+  inputObjectVersionRefs?: string[];
+  outputObjectVersionRefs?: string[];
+  parentId?: string | null;
+  // This really doesn't belong here. We are using it to indicate that the
+  // filter is frozen and should not be updated by the user. However, this
+  // control should really be managed outside of the filter itself.
+  frozen?: boolean;
+};
 
 /**
  * Given a frozen filter and an active filter, return the effective filter. The

@@ -102,16 +102,14 @@ import {
   refUriToOpVersionKey,
 } from '../wfReactInterface/utilities';
 import {
-  CallFilter,
   CallSchema,
   OpVersionKey,
   OpVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
-import {
-  useCurrentFilterIsEvaluationsFilter,
-  WFHighLevelCallFilter,
-} from './CallsPage';
+import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
+import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
+import {useCallsForQuery} from './callsTableQuery';
 
 const ALL_TRACES_REF_KEY = '__all_traces__';
 const ALL_CALLS_REF_KEY = '__all_calls__';
@@ -134,7 +132,6 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
-  const {useCalls} = useWFHooks();
   const {baseRouter} = useWeaveflowRouteContext();
 
   // CPR (Tim): This `useInitializingFilter` could use a slight refactor and rename
@@ -148,11 +145,7 @@ export const CallsTable: FC<{
     [filter, props.frozenFilter]
   );
 
-  const lowLevelFilter: CallFilter = useMemo(() => {
-    return convertHighLevelFilterToLowLevelFilter(effectiveFilter);
-  }, [effectiveFilter]);
-
-  const calls = useCalls(props.entity, props.project, lowLevelFilter);
+  const calls = useCallsForQuery(props.entity, props.project, effectiveFilter);
 
   const opVersionOptions = useOpVersionOptions(
     props.entity,
@@ -1174,20 +1167,6 @@ export const CallsTable: FC<{
       </React.Fragment>
     </FilterLayoutTemplate>
   );
-};
-
-const convertHighLevelFilterToLowLevelFilter = (
-  effectiveFilter: WFHighLevelCallFilter
-): CallFilter => {
-  return {
-    traceRootsOnly: effectiveFilter.traceRootsOnly,
-    opVersionRefs: effectiveFilter.opVersionRefs,
-    inputObjectVersionRefs: effectiveFilter.inputObjectVersionRefs,
-    outputObjectVersionRefs: effectiveFilter.outputObjectVersionRefs,
-    parentIds: effectiveFilter.parentId
-      ? [effectiveFilter.parentId]
-      : undefined,
-  };
 };
 
 const useOpVersionOptions = (
