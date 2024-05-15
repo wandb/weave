@@ -7,7 +7,7 @@ import {
   ListItem,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {FC, useCallback, useMemo} from 'react';
+import React, {FC, useMemo} from 'react';
 
 import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
@@ -23,10 +23,7 @@ import {
   EMPTY_PROPS_EVALUATIONS,
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
-import {
-  EVALUATE_OP_NAME_POST_PYDANTIC,
-  isEvaluateOp,
-} from '../common/heuristics';
+import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {SimplePageLayout} from '../common/SimplePageLayout';
@@ -43,7 +40,6 @@ import {
   CallFilter,
   OpVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
-import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
 
 export type WFHighLevelCallFilter = {
   traceRootsOnly?: boolean;
@@ -51,8 +47,6 @@ export type WFHighLevelCallFilter = {
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
   parentId?: string | null;
-  isPivot?: boolean;
-  pivotSpec?: Partial<WFHighLevelPivotSpec>;
   // This really doesn't belong here. We are using it to indicate that the
   // filter is frozen and should not be updated by the user. However, this
   // control should really be managed outside of the filter itself.
@@ -244,51 +238,6 @@ export const CallsTable: FC<{
     ? parentIdOptions[effectiveFilter.parentId]
     : null;
 
-  const userEnabledPivot = effectiveFilter.isPivot ?? false;
-  // TODO: Decide if we want to expose pivot or remove.
-  // const setUserEnabledPivot = useCallback(
-  //   (enabled: boolean) => {
-  //     setFilter({
-  //       ...filter,
-  //       isPivot: enabled,
-  //       // Reset the pivot dims when disabling pivot
-  //       pivotSpec:
-  //         filter.pivotSpec?.colDim == null || filter.pivotSpec?.rowDim == null
-  //           ? undefined
-  //           : filter.pivotSpec,
-  //     });
-  //   },
-  //   [filter, setFilter]
-  // );
-  const setPivotDims = useCallback(
-    (spec: Partial<WFHighLevelPivotSpec>) => {
-      if (
-        filter.pivotSpec?.colDim !== spec.colDim ||
-        filter.pivotSpec?.rowDim !== spec.rowDim
-      ) {
-        setFilter({
-          ...filter,
-          pivotSpec: {
-            ...filter.pivotSpec,
-            ...spec,
-          },
-        });
-      }
-    },
-    [filter, setFilter]
-  );
-
-  const qualifiesForPivoting = useMemo(() => {
-    const shownSpanNames = _.uniq(
-      (calls.result ?? []).map(span => span.spanName)
-    );
-    // Super restrictive for now - just showing pivot when
-    // there is only one span name and it is the evaluation.
-    return shownSpanNames.length === 1 && isEvaluateOp(shownSpanNames[0]);
-  }, [calls.result]);
-
-  const isPivoting = userEnabledPivot && qualifiesForPivoting;
-  const hidePivotControls = true;
   const clearFilters = useMemo(() => {
     if (Object.keys(filter ?? {}).length > 0) {
       return () => setFilter({});
@@ -334,21 +283,11 @@ export const CallsTable: FC<{
       )}
       filterListSx={{
         // Hide until we show filters
-        pb: isPivoting && !hidePivotControls ? 0 : 1,
+        pb: 1,
         display: props.hideControls ? 'none' : 'flex',
       }}
       filterListItems={
         <>
-          {/* <IconButton
-            style={{width: '37px', height: '37px'}}
-            size="small"
-            color={userEnabledPivot ? 'primary' : 'default'}
-            disabled={!qualifiesForPivoting}
-            onClick={() => {
-              setUserEnabledPivot(!userEnabledPivot);
-            }}>
-            <PivotTableChart />
-          </IconButton> */}
           <ListItem sx={{minWidth: '190px'}}>
             <FormControl fullWidth>
               <Autocomplete
@@ -357,10 +296,9 @@ export const CallsTable: FC<{
                 // Temp disable multiple for simplicity - may want to re-enable
                 // multiple
                 limitTags={1}
-                disabled={
-                  isPivoting ||
-                  Object.keys(props.frozenFilter ?? {}).includes('opVersions')
-                }
+                disabled={Object.keys(props.frozenFilter ?? {}).includes(
+                  'opVersions'
+                )}
                 value={opVersionRefOrAllTitle}
                 onChange={(event, newValue) => {
                   if (newValue === ALL_TRACES_REF_KEY) {
@@ -438,29 +376,13 @@ export const CallsTable: FC<{
           )}
         </>
       }>
-      {isPivoting ? (
-        <PivotRunsView
-          loading={calls.loading}
-          runs={calls.result ?? []}
-          pivotSpec={effectiveFilter.pivotSpec ?? {}}
-          onPivotSpecChange={setPivotDims}
-          entity={props.entity}
-          project={props.project}
-          showCompareButton
-          // Since we have a very constrained pivot, we can hide
-          // the controls for now as there is no need to change them.
-          // Punting on design
-          hideControls={hidePivotControls}
-        />
-      ) : (
-        <RunsTable
-          key={callsKey}
-          loading={calls.loading}
-          spans={spans}
-          clearFilters={clearFilters}
-          ioColumnsOnly={props.ioColumnsOnly}
-        />
-      )}
+      <RunsTable
+        key={callsKey}
+        loading={calls.loading}
+        spans={spans}
+        clearFilters={clearFilters}
+        ioColumnsOnly={props.ioColumnsOnly}
+      />
     </FilterLayoutTemplate>
   );
 };
