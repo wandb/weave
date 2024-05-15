@@ -17,7 +17,6 @@ import * as _ from 'lodash';
 import React, {
   ComponentProps,
   FC,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -267,11 +266,18 @@ export const RunsTable: FC<{
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-  toDelete: Record<string, CallSchema | null>;
-  setToDelete: React.Dispatch<
+  selectedCalls: Record<string, CallSchema | null>;
+  setSelectedCalls: React.Dispatch<
     React.SetStateAction<Record<string, CallSchema | null>>
   >;
-}> = ({loading, spans, clearFilters, ioColumnsOnly, toDelete, setToDelete}) => {
+}> = ({
+  loading,
+  spans,
+  clearFilters,
+  ioColumnsOnly,
+  selectedCalls,
+  setSelectedCalls,
+}) => {
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
@@ -479,17 +485,6 @@ export const RunsTable: FC<{
     );
   }, [uniqueSpanNames]);
 
-  const bulkChecked =
-    Object.values(toDelete).length === tableData.length &&
-    Object.values(toDelete).every(c => c != null);
-  const bulkDelete = useCallback(() => {
-    const newToDelete: Record<string, CallSchema | null> = {};
-    tableData.forEach(call => {
-      newToDelete[call.id] = call.call;
-    });
-    setToDelete(newToDelete);
-  }, [tableData, setToDelete]);
-
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
@@ -501,21 +496,6 @@ export const RunsTable: FC<{
         filterable: false,
         width: 250,
         hideable: false,
-        renderHeader: headerParams => {
-          return (
-            <>
-              <Checkbox
-                size="small"
-                style={{marginRight: '4px', marginTop: '2px'}}
-                checked={bulkChecked}
-                onClick={() => {
-                  bulkChecked ? setToDelete({}) : bulkDelete();
-                }}
-              />
-              <span style={{fontWeight: 600}}>Trace</span>
-            </>
-          );
-        },
         renderCell: rowParams => {
           const opVersion = rowParams.row.call.opVersionRef;
           if (opVersion == null) {
@@ -525,12 +505,12 @@ export const RunsTable: FC<{
             <>
               <Checkbox
                 size="small"
-                style={{marginRight: '4px', marginTop: '2px'}}
-                checked={toDelete[rowParams.row.call.callId] != null}
+                style={{marginRight: '8px', marginTop: '0px'}}
+                checked={selectedCalls[rowParams.row.call.callId] != null}
                 onClick={() => {
-                  setToDelete({
-                    ...toDelete,
-                    [rowParams.row.call.callId]: !toDelete[
+                  setSelectedCalls({
+                    ...selectedCalls,
+                    [rowParams.row.call.callId]: !selectedCalls[
                       rowParams.row.call.callId
                     ]
                       ? rowParams.row.call
@@ -925,10 +905,8 @@ export const RunsTable: FC<{
     preservePath,
     spans,
     tableStats,
-    setToDelete,
-    toDelete,
-    bulkChecked,
-    bulkDelete,
+    selectedCalls,
+    setSelectedCalls,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();

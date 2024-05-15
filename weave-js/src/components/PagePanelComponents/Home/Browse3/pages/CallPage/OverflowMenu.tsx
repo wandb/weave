@@ -19,8 +19,9 @@ const CallName = styled.p`
 CallName.displayName = 'S.CallName';
 
 export const OverflowMenu: FC<{
-  calls: CallSchema[];
-}> = ({calls}) => {
+  selectedCalls: CallSchema[];
+  refetch?: () => void;
+}> = ({selectedCalls, refetch}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
@@ -30,7 +31,7 @@ export const OverflowMenu: FC<{
         text: 'Delete',
         icon: <IconDelete style={{marginRight: '4px'}} />,
         onClick: () => setConfirmDelete(true),
-        disabled: calls.length === 0,
+        disabled: selectedCalls.length === 0,
       },
     ],
   ];
@@ -39,9 +40,10 @@ export const OverflowMenu: FC<{
     <>
       {confirmDelete && (
         <ConfirmDeleteModal
-          calls={calls}
+          calls={selectedCalls}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
+          refetch={refetch}
         />
       )}
       <PopupDropdown
@@ -67,9 +69,9 @@ const ConfirmDeleteModal: FC<{
   calls: CallSchema[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
-}> = ({calls, confirmDelete, setConfirmDelete}) => {
+  refetch?: () => void;
+}> = ({calls, confirmDelete, setConfirmDelete, refetch}) => {
   const getTsClient = useGetTraceServerClientContext();
-  const client = getTsClient();
   const closePeek = useClosePeek();
 
   if (new Set(calls.map(c => c.entity)).size > 1) {
@@ -83,22 +85,18 @@ const ConfirmDeleteModal: FC<{
   const project = calls.length > 0 ? calls[0].project : '';
 
   const onDelete = () => {
-    client
+    getTsClient()
       .callsDelete({
         project_id: `${entity}/${project}`,
         ids: calls.map(c => c.callId),
       })
       .catch(e => {
-        console.error(e);
-        return false;
+        throw new Error('Failed to delete calls');
       })
       .then(res => {
-        if (res) {
-          setConfirmDelete(false);
-          closePeek();
-        } else {
-          console.error('Failed to delete call');
-        }
+        setConfirmDelete(false);
+        refetch?.();
+        closePeek();
       });
   };
 

@@ -27,6 +27,10 @@ export type LoadableWithError<T> = {
   error: Error | null;
 };
 
+export type LoadableWithRefetch<T> = Loadable<T> & {
+  refetch: () => void;
+};
+
 export type CallKey = {
   entity: string;
   project: string;
@@ -153,7 +157,7 @@ export type WFDataModelHooksInterface = {
     filter: CallFilter,
     limit?: number,
     opts?: {skip?: boolean}
-  ) => Loadable<CallSchema[]>;
+  ) => LoadableWithRefetch<CallSchema[]>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,

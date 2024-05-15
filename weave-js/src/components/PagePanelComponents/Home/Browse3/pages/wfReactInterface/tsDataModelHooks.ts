@@ -28,6 +28,7 @@ import {
   CallSchema,
   Loadable,
   LoadableWithError,
+  LoadableWithRefetch,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -202,12 +203,18 @@ const useCalls = (
   filter: CallFilter,
   limit?: number,
   opts?: {skip?: boolean}
-): Loadable<CallSchema[]> => {
+): LoadableWithRefetch<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
+
+  const [doRefetch, setDoRefetch] = useState(false);
+  const refetch = useCallback(() => {
+    setDoRefetch(r => !r);
+  }, []);
+
   useEffect(() => {
     if (opts?.skip) {
       return;
@@ -239,13 +246,14 @@ const useCalls = (
       setCallRes({calls: []});
     };
     getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
+  }, [entity, project, deepFilter, limit, opts?.skip, doRefetch, getTsClient]);
 
   return useMemo(() => {
     if (opts?.skip) {
       return {
         loading: false,
         result: [],
+        refetch,
       };
     }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
@@ -255,6 +263,7 @@ const useCalls = (
       return {
         loading: true,
         result: [],
+        refetch,
       };
     } else {
       allResults.forEach(call => {
@@ -270,9 +279,10 @@ const useCalls = (
       return {
         loading: false,
         result,
+        refetch,
       };
     }
-  }, [callRes, entity, project, opts?.skip]);
+  }, [callRes, entity, project, opts?.skip, refetch]);
 };
 
 const useOpVersion = (
