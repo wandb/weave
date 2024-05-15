@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+from collections import defaultdict
 import threading
 from contextlib import contextmanager
 import datetime
@@ -304,43 +305,38 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _ch_call_dict_to_call_schema_dict(ch_dict)
             )
 
-    def _select_calls_and_children(
-        self,
-        project_id: str,
-        call_id: str,
-        conditions: typing.Optional[typing.List[str]] = None,
-        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[SelectableCHCallSchema]:
-        raise NotImplementedError()
-
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        # TODO(gst): use FE time or server time?
-        # TODO(gst): write custom select statement for recursive delete
         deleted_at = datetime.datetime.now()
-        data = [(req.project_id, id, deleted_at) for id in req.ids]
-        for parent_id in req.ids:
-            # query for children of this call
-            children = self._select_calls_query(
-                req.project_id,
-                conditions=["parent_id = {parent_id: String}"],
-                parameters={"parent_id": parent_id},
-            )
+        proj_cond = "project_id = {project_id: String}"
+        proj_params = {"project_id": req.project_id}
 
-            # also grab grandchildren
-            for child in children:
-                grandchildren = self._select_calls_query(
-                    req.project_id,
-                    conditions=["parent_id = {parent_id: String}"],
-                    parameters={"parent_id": child.id},
-                )
-                data += [
-                    (req.project_id, grandchild.id, deleted_at)
-                    for grandchild in grandchildren
-                ]
+        # get all parents
+        parents = self._select_calls_query(
+            req.project_id,
+            conditions=[proj_cond, "id IN {ids: Array(String)}"],
+            parameters=proj_params | {"ids": req.ids},
+        )
 
-            # add children to the list of calls to delete
-            data += [(req.project_id, child.id, deleted_at) for child in children]
+        print("\n>>>> PARENTS", [p.id for p in parents])
 
+        # get all calls with trace_ids matching parents
+        all_calls = self._select_calls_query(
+            req.project_id,
+            conditions=[proj_cond, "trace_id IN {trace_ids: Array(String)}"],
+            parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
+        )
+
+        print("\n>>>> ALL CALLS", [c.id for c in all_calls])
+
+        all_descendants = find_call_descendants_in_memory_dfs(
+            root_ids=req.ids,
+            all_calls=all_calls,
+        )
+
+        print("\n>>>> ALL DESCENDANTS", all_descendants)
+
+        # create insert payload for all descendants (and parents)
+        data = [(req.project_id, d, deleted_at) for d in all_descendants]
         summary = self._insert(
             "call_parts", data=data, column_names=["project_id", "id", "deleted_at"]
         )
@@ -1376,3 +1372,32 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
         raise ValueError(f"Invalid operator: {operator}")
     combined = f" {operator} ".join([f"({c})" for c in conditions])
     return f"({combined})"
+
+
+def find_call_descendants_in_memory_dfs(
+    root_ids: typing.List[str],
+    all_calls: typing.List[SelectableCHCallSchema],
+) -> typing.List[str]:
+    # make a map of call_id to children list
+    children_map = defaultdict(list)
+    for call in all_calls:
+        if call.parent_id is not None:
+            children_map[call.parent_id].append(call.id)
+
+    # do DFS to get all descendants
+    def find_all_descendants(root_ids: typing.List[str]):
+        descendants = set()
+        stack = root_ids
+
+        while stack:
+            current_id = stack.pop()
+            if current_id not in descendants:
+                descendants.add(current_id)
+                stack += children_map.get(current_id, [])
+
+        return descendants
+
+    # Find descendants for each initial id
+    descendants = find_all_descendants(root_ids)
+
+    return list(descendants)
