@@ -148,42 +148,62 @@ export const CallsTable: FC<{
   // Fetch the calls
   const calls = useCallsForQuery(entity, project, effectiveFilter);
 
+  // Now, there are 4 primary controls:
+  // 1. Op Version
+  // 2. Input Object Version
+  // 3. Output Object Version
+  // 4. Parent ID
+  //
+  // The following chunks of code are responsible for determining the
+  // values for the options as well as the selected values for each of
+  // these controls. They each follow the pattern of:
+  //
+  // const control = useControlOptions(...)
+  // const selectedControl = useMemo(() => {...}, [...])
+  //
+
+  // 1. Op Version
   const opVersionOptions = useOpVersionOptions(
     entity,
     project,
     effectiveFilter
   );
-
-  const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
-  const opVersionRefOrAllTitle = useMemo(() => {
+  const selectedOpVersionOption = useMemo(() => {
+    const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
     return opVersionRef ?? ALL_TRACES_OR_CALLS_REF_KEY;
-  }, [opVersionRef]);
+  }, [effectiveFilter.opVersionRefs]);
 
-  // CPR (Tim): This chunk (including the one above and 3 below follow a similar pattern and could be extracted to a function)
-  const consumesObjectVersionOptions =
-    useConsumesObjectVersionOptions(effectiveFilter);
-  const inputObjectVersionRef =
-    effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
-  const inputObjectVersion = inputObjectVersionRef
-    ? consumesObjectVersionOptions[inputObjectVersionRef]
-    : null;
+  // 2. Input Object Version
+  const inputObjectVersionOptions =
+    useInputObjectVersionOptions(effectiveFilter);
+  const selectedInputObjectVersion = useMemo(() => {
+    const inputObjectVersionRef =
+      effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
+    return inputObjectVersionRef
+      ? inputObjectVersionOptions[inputObjectVersionRef]
+      : null;
+  }, [inputObjectVersionOptions, effectiveFilter.inputObjectVersionRefs]);
 
-  const producesObjectVersionOptions =
-    useProducesObjectVersionOptions(effectiveFilter);
-  const outputObjectVersionRef =
-    effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
-  const outputObjectVersion = outputObjectVersionRef
-    ? producesObjectVersionOptions[outputObjectVersionRef]
-    : null;
+  // 3. Output Object Version
+  const outputObjectVersionOptions =
+    useOutputObjectVersionOptions(effectiveFilter);
+  const selectedOutputObjectVersion = useMemo(() => {
+    const outputObjectVersionRef =
+      effectiveFilter.outputObjectVersionRefs?.[0] ?? null;
+    return outputObjectVersionRef
+      ? outputObjectVersionOptions[outputObjectVersionRef]
+      : null;
+  }, [effectiveFilter.outputObjectVersionRefs, outputObjectVersionOptions]);
 
-  const parentIdOptions = useParentIdOptions(
-    props.entity,
-    props.project,
-    effectiveFilter
+  // 4. Parent ID
+  const parentIdOptions = useParentIdOptions(entity, project, effectiveFilter);
+  const selectedParentId = useMemo(
+    () =>
+      effectiveFilter.parentId
+        ? parentIdOptions[effectiveFilter.parentId]
+        : null,
+    [effectiveFilter.parentId, parentIdOptions]
   );
-  const parentOpDisplay = effectiveFilter.parentId
-    ? parentIdOptions[effectiveFilter.parentId]
-    : null;
 
   // CPR (Tim): Co-locate this closer to the effective filter stuff
   const clearFilters = useMemo(() => {
@@ -959,7 +979,7 @@ export const CallsTable: FC<{
                 disabled={Object.keys(props.frozenFilter ?? {}).includes(
                   'opVersions'
                 )}
-                value={opVersionRefOrAllTitle}
+                value={selectedOpVersionOption}
                 onChange={(event, newValue) => {
                   if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
                     setFilter({
@@ -984,16 +1004,18 @@ export const CallsTable: FC<{
                   return opVersionOptions[option]?.title ?? 'loading...';
                 }}
                 disableClearable={
-                  opVersionRefOrAllTitle === ALL_TRACES_OR_CALLS_REF_KEY
+                  selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
                 }
                 groupBy={option => opVersionOptions[option]?.group}
                 options={Object.keys(opVersionOptions)}
               />
             </FormControl>
           </ListItem>
-          {inputObjectVersion && (
+          {selectedInputObjectVersion && (
             <Chip
-              label={`Input: ${objectVersionNiceString(inputObjectVersion)}`}
+              label={`Input: ${objectVersionNiceString(
+                selectedInputObjectVersion
+              )}`}
               onDelete={() => {
                 setFilter({
                   ...filter,
@@ -1002,9 +1024,11 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          {outputObjectVersion && (
+          {selectedOutputObjectVersion && (
             <Chip
-              label={`Output: ${objectVersionNiceString(outputObjectVersion)}`}
+              label={`Output: ${objectVersionNiceString(
+                selectedOutputObjectVersion
+              )}`}
               onDelete={() => {
                 setFilter({
                   ...filter,
@@ -1013,9 +1037,9 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          {parentOpDisplay && (
+          {selectedParentId && (
             <Chip
-              label={`Parent: ${parentOpDisplay}`}
+              label={`Parent: ${selectedParentId}`}
               onDelete={() => {
                 setFilter({
                   ...filter,
@@ -1211,7 +1235,7 @@ const useOpVersionOptions = (
   }, [effectiveFilter, opVersionOptionsWithoutAllSection]);
 };
 
-const useConsumesObjectVersionOptions = (
+const useInputObjectVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
   const {useObjectVersion} = useWFHooks();
@@ -1230,7 +1254,7 @@ const useConsumesObjectVersionOptions = (
   }, [currentRef, objectVersion.loading, objectVersion.result]);
 };
 
-const useProducesObjectVersionOptions = (
+const useOutputObjectVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
   const {useObjectVersion} = useWFHooks();
