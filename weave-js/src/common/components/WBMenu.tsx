@@ -85,7 +85,8 @@ export interface WBMenuProps {
   onSelect?: WBMenuOnSelectHandler;
   onEsc?(): void;
 }
-
+type HighlightIdx = number | undefined;
+type HighlightVal = string | number | undefined;
 export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
   (
     {
@@ -107,27 +108,41 @@ export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
     ref
   ) => {
     const [defaultHighlighted, defaultHighlightedIndex] = useMemo(() => {
-      if (!highlightFirst) return [undefined, undefined];
-      const foundIndex = options.findIndex(el => !el.disabled);
+      const result: [HighlightVal, HighlightIdx] = [undefined, undefined];
+      if (selected) {
+        const foundSelectedIndex = options.findIndex(
+          el => selected === el.value
+        );
+        if (foundSelectedIndex) {
+          [result[0], result[1]] = [
+            options[foundSelectedIndex]?.value,
+            foundSelectedIndex,
+          ];
+        }
+      } else if (highlightFirst) {
+        const foundIndex = options.findIndex(el => !el.disabled);
+        if (foundIndex) {
+          [result[0], result[1]] = [options[foundIndex]?.value, foundIndex];
+        }
+      }
 
-      if (!foundIndex) return [undefined, undefined];
-
-      return [options[foundIndex]?.value, foundIndex];
+      return result;
     }, [highlightFirst, options]);
 
-    const [highlighted, setHighlighted] = useState<string | number | undefined>(
-      defaultHighlighted
+    const [highlighted, setHighlighted] =
+      useState<HighlightVal>(defaultHighlighted);
+    const [highlightedIndex, setHighlightedIndex] = useState<HighlightIdx>(
+      defaultHighlightedIndex
     );
-    const [highlightedIndex, setHighlightedIndex] = useState<
-      number | undefined
-    >(defaultHighlightedIndex);
 
     const contentRef = React.useRef<HTMLDivElement>(null);
     useEffect(() => {
       function onKeyDown(e: KeyboardEvent) {
         if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
           e.preventDefault();
-          if (!options || !options.length) return;
+          if (!options || !options.length) {
+            return;
+          }
 
           const block = e.key === 'ArrowUp' ? 'start' : 'end';
           const moveAmount = e.key === 'ArrowUp' ? -1 : 1;
