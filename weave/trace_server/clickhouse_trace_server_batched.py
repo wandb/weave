@@ -372,14 +372,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
-    def ops_delete(self, req: tsi.OpsDeleteReq) -> tsi.OpsDeleteRes:
-        num_deleted = self._delete_objs(
-            req.project_id,
-            req.ids,
-            conditions=["is_op = 1"],
-        )
-        return tsi.OpsDeleteRes(success=req.ids == num_deleted)
-
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         json_val = json.dumps(req.obj.val)
         digest = str_digest(json_val)
@@ -452,33 +444,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
-
-    def _delete_objs(
-        self,
-        project_id: str,
-        object_ids: typing.List[str],
-        conditions: typing.Optional[typing.List[str]] = None,
-    ) -> int:
-        if conditions is None:
-            conditions = []
-        conditions += ["object_id IN {object_ids: Array(String)}"]
-        objects = self._select_objs_query(
-            project_id,
-            conditions=conditions,
-            parameters={"object_ids": object_ids},
-        )
-        if len(objects) == 0:
-            return 0
-
-        summary = self._insert(
-            "object_versions",
-            data=[
-                (project_id, object.object_id, datetime.datetime.now())
-                for object in objects
-            ],
-            column_names=["project_id", "object_id", "deleted_at"],
-        )
-        return summary.written_rows
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
 

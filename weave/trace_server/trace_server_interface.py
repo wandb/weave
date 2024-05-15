@@ -211,15 +211,6 @@ class OpQueryRes(BaseModel):
     op_objs: typing.List[ObjSchema]
 
 
-class OpsDeleteReq(BaseModel):
-    project_id: str
-    ids: typing.List[str]
-
-
-class OpsDeleteRes(BaseModel):
-    success: bool
-
-
 class ObjCreateReq(BaseModel):
     obj: ObjSchemaForInsert
 
@@ -346,10 +337,6 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        ...
-
-    @abc.abstractmethod
-    def ops_delete(self, req: OpsDeleteReq) -> OpsDeleteRes:
         ...
 
     # Obj API
