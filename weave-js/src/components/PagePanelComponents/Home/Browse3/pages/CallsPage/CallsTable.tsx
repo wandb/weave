@@ -108,8 +108,7 @@ import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 
-const ALL_TRACES_REF_KEY = '__all_traces__';
-const ALL_CALLS_REF_KEY = '__all_calls__';
+const ALL_TRACES_OR_CALLS_REF_KEY = '__NO_REF__';
 const OP_FILTER_GROUP_HEADER = 'Op';
 const ANY_OP_GROUP_HEADER = '';
 const ALL_TRACES_TITLE = 'All Ops';
@@ -129,21 +128,26 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
+  const {entity, project, initialFilter, onFilterUpdate, frozenFilter} = props;
+
+  // Make sure we respect the controlling nature of the filter
   const [filter, setFilter] = useControllableState(
-    props.initialFilter ?? {},
-    props.onFilterUpdate
+    initialFilter ?? {},
+    onFilterUpdate
   );
 
+  // Calculate the effective filter
   const effectiveFilter = useMemo(
-    () => getEffectiveFilter(filter, props.frozenFilter),
-    [filter, props.frozenFilter]
+    () => getEffectiveFilter(filter, frozenFilter),
+    [filter, frozenFilter]
   );
 
-  const calls = useCallsForQuery(props.entity, props.project, effectiveFilter);
+  // Fetch the calls
+  const calls = useCallsForQuery(entity, project, effectiveFilter);
 
   const opVersionOptions = useOpVersionOptions(
-    props.entity,
-    props.project,
+    entity,
+    project,
     effectiveFilter
   );
 
@@ -157,36 +161,21 @@ export const CallsTable: FC<{
     };
   } = useMemo(() => {
     return {
-      [ALL_TRACES_REF_KEY]: {
-        title: ALL_TRACES_TITLE,
+      [ALL_TRACES_OR_CALLS_REF_KEY]: {
+        title: effectiveFilter.traceRootsOnly
+          ? ALL_TRACES_TITLE
+          : ALL_CALLS_TITLE,
         ref: '',
         group: ANY_OP_GROUP_HEADER,
       },
-      // CPR (Tim): Review this condition
-      // ...(ALLOW_ALL_CALLS_UNFILTERED
-      //   ? {
-      //       [ALL_CALLS_REF_KEY]: {
-      //         title: ALL_CALLS_TITLE,
-      //         ref: '',
-      //         group: ANY_OP_GROUP_HEADER,
-      //       },
-      //     }
-      //   : {}),
       ...opVersionOptions,
     };
-  }, [opVersionOptions]);
+  }, [effectiveFilter.traceRootsOnly, opVersionOptions]);
 
   const opVersionRef = effectiveFilter.opVersionRefs?.[0] ?? null;
   const opVersionRefOrAllTitle = useMemo(() => {
-    return (
-      opVersionRef ??
-      // CPR (Tim): This is not correct. After further investigation, I think we should remove
-      // the `ALLOW_ALL_CALLS_UNFILTERED` flag and instead just calculate trace_roots_only
-      // based on the filter. This will allow us to remove a bunch of the hacky conditional logic
-      // and other calls to `currentFilterShouldUseNonTraceRoots`.
-      (effectiveFilter.traceRootsOnly ? ALL_TRACES_REF_KEY : ALL_CALLS_REF_KEY)
-    );
-  }, [opVersionRef, effectiveFilter.traceRootsOnly]);
+    return opVersionRef ?? ALL_TRACES_OR_CALLS_REF_KEY;
+  }, [opVersionRef]);
 
   // CPR (Tim): This chunk (including the one above and 3 below follow a similar pattern and could be extracted to a function)
   const consumesObjectVersionOptions =
@@ -985,16 +974,9 @@ export const CallsTable: FC<{
                 )}
                 value={opVersionRefOrAllTitle}
                 onChange={(event, newValue) => {
-                  if (newValue === ALL_TRACES_REF_KEY) {
+                  if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
                     setFilter({
                       ...filter,
-                      traceRootsOnly: true,
-                      opVersionRefs: [],
-                    });
-                  } else if (newValue === ALL_CALLS_REF_KEY) {
-                    setFilter({
-                      ...filter,
-                      traceRootsOnly: false,
                       opVersionRefs: [],
                     });
                   } else {
@@ -1017,8 +999,7 @@ export const CallsTable: FC<{
                   );
                 }}
                 disableClearable={
-                  opVersionRefOrAllTitle === ALL_TRACES_REF_KEY ||
-                  opVersionRefOrAllTitle === ALL_CALLS_REF_KEY
+                  opVersionRefOrAllTitle === ALL_TRACES_OR_CALLS_REF_KEY
                 }
                 groupBy={option => opVersionOptionsWithRoots[option]?.group}
                 options={Object.keys(opVersionOptionsWithRoots)}
