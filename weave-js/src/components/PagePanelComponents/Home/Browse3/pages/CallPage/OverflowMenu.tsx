@@ -6,7 +6,7 @@ import {Modal} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 import {useClosePeek} from '../../context';
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 const CallName = styled.p`
@@ -74,7 +74,8 @@ const ConfirmDeleteModal: FC<{
   setSelectedCalls?: Dispatch<SetStateAction<CallSchema[]>>;
   refetch?: () => void;
 }> = ({calls, confirmDelete, setConfirmDelete, setSelectedCalls, refetch}) => {
-  const getTsClient = useGetTraceServerClientContext();
+  const {useCallsDelete} = useWFHooks();
+  const callsDelete = useCallsDelete();
   const closePeek = useClosePeek();
 
   if (new Set(calls.map(c => c.entity)).size > 1) {
@@ -88,22 +89,14 @@ const ConfirmDeleteModal: FC<{
   const project = calls.length > 0 ? calls[0].project : '';
 
   const onDelete = () => {
-    getTsClient()
-      .callsDelete({
-        project_id: `${entity}/${project}`,
-        ids: calls.map(c => c.callId),
-      })
-      .catch(e => {
-        throw new Error('Failed to delete calls');
-      })
-      .then(res => {
-        setConfirmDelete(false);
-        refetch?.();
-        setSelectedCalls?.(curCalls =>
-          curCalls?.filter(c => !calls.includes(c))
-        );
-        closePeek();
-      });
+    callsDelete(
+      `${entity}/${project}`,
+      calls.map(c => c.callId)
+    );
+    setConfirmDelete(false);
+    refetch?.();
+    setSelectedCalls?.(curCalls => curCalls?.filter(c => !calls.includes(c)));
+    closePeek();
   };
 
   return (
