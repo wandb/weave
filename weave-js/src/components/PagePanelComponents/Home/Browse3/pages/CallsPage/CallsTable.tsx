@@ -1,11 +1,10 @@
 /**
  * TODO:
- *    * Finish annotating
- *    * Execute on a number of the cleanups
+ *    * Fix all comments
  *    * Re-organize file & symbols
  *    * Implement Sort / Filter Controls (alongside columns) + server-side mode
  *    * Implement Pagination Controls
- *    * Implement the custom hook that populates the data - refactor thereafter
+ *    * Implement the custom hook that populates the data (in-memory to start) - refactor thereafter
  */
 
 import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
