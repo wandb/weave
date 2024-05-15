@@ -32,7 +32,6 @@ numpy>=1.21
 wandb>=0.16.4
 graphql-core>3
 gql[requests]>=3.4.1
-sortedcontainers>=2.4.0  # speed up dep resolution 
 
 # Segment logging
 analytics-python>=1.2.9

@@ -10,12 +10,10 @@ ipynbname>=2021.3.2
 pillow>=10.0.1  # addresses CVE-2023-4863
 scikit-learn>=1.2.1  # used for embedding projection
 umap-learn>=0.5.3  # used for embedding projection
-tqdm>=4.66.3  # CVE 2024-34062
 typeguard>=4.1.3
 # Used for debugging
 objgraph>=3.6.0
 tabulate
 # Weaveflow Additions
 faiss-cpu
-# Pinning for package resolution speed in CI
-scipy>=1.13.0  # required by umap-learn
+
