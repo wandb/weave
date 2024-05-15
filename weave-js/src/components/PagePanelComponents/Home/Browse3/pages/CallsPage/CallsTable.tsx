@@ -207,10 +207,6 @@ export const CallsTable: FC<{
 
   // RUNS TABLE HELPER
 
-  // CPR (Tim): Replace these consts below
-  const loading = calls.loading;
-  const ioColumnsOnly = props.ioColumnsOnly;
-
   // CPR (Tim): Why? Rename and put close to calls results
   const spans = useMemo(() => calls.result ?? [], [calls.result]);
 
@@ -325,7 +321,7 @@ export const CallsTable: FC<{
       return {
         id: call.callId,
         call,
-        loading,
+        loading: calls.loading,
         opVersion: call.opVersionRef,
         isRoot: call.parentId == null,
         trace_id: call.traceId,
@@ -362,7 +358,7 @@ export const CallsTable: FC<{
         ),
       };
     });
-  }, [loading, onlyOneOutputResult, newSpans]);
+  }, [calls.loading, onlyOneOutputResult, newSpans]);
 
   // CPR (Tim): Move table stats (and derivative calcs) into the new hook
   const tableStats = useMemo(() => {
@@ -814,7 +810,7 @@ export const CallsTable: FC<{
       renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
     });
 
-    if (!ioColumnsOnly) {
+    if (!props.ioColumnsOnly) {
       cols.push({
         field: 'timestampMs',
         headerName: 'Called',
@@ -856,7 +852,7 @@ export const CallsTable: FC<{
   }, [
     expandedColInfo,
     expandedRefCols,
-    ioColumnsOnly,
+    props.ioColumnsOnly,
     isSingleOp,
     isSingleOpVersion,
     onlyOneOutputResult,
@@ -878,7 +874,7 @@ export const CallsTable: FC<{
     if (autosized.current) {
       return;
     }
-    if (loading) {
+    if (calls.loading) {
       return;
     }
     autosized.current = true;
@@ -886,12 +882,12 @@ export const CallsTable: FC<{
       includeHeaders: true,
       expand: true,
     });
-  }, [apiRef, loading, apiRefIsReady]);
+  }, [apiRef, calls.loading, apiRefIsReady]);
 
   // CPR (Tim): These will get extracted into their own controls (at least sorting will)
   const initialStateRaw: ComponentProps<typeof DataGridPro>['initialState'] =
     useMemo(() => {
-      if (loading) {
+      if (calls.loading) {
         return undefined;
       }
       return {
@@ -900,7 +896,7 @@ export const CallsTable: FC<{
           sortModel: [{field: 'timestampMs', sort: 'desc'}],
         },
       };
-    }, [loading]);
+    }, [calls.loading]);
 
   // Various interactions (correctly) cause new data to be loaded, which causes
   // a trickle of state updates. However, if the ultimate state is the same,
@@ -1071,7 +1067,7 @@ export const CallsTable: FC<{
           // End Column Menu
           columnHeaderHeight={40}
           apiRef={apiRef}
-          loading={loading}
+          loading={calls.loading}
           rows={tableData}
           initialState={initialState}
           onColumnVisibilityModelChange={newModel =>
@@ -1091,7 +1087,7 @@ export const CallsTable: FC<{
           slots={{
             noRowsOverlay: () => {
               const isEmpty = spans.length === 0;
-              if (!loading && isEmpty) {
+              if (!calls.loading && isEmpty) {
                 // CPR (Tim): Move "isEvaluateTable" out and instead make this empty state a prop
                 if (isEvaluateTable) {
                   return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
