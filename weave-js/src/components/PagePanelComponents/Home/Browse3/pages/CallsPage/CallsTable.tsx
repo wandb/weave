@@ -99,8 +99,9 @@ import {
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
-import {useOpVersionOptions} from './callsTableOpVersionOptions';
-import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableOpVersionOptions';
+import {useOpVersionOptions} from './callsTableFilter';
+import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
+import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 
 const VisibilityAlert = styled.div`
@@ -1137,25 +1138,6 @@ export const CallsTable: FC<{
       </React.Fragment>
     </FilterLayoutTemplate>
   );
-};
-
-const useInputObjectVersionOptions = (
-  effectiveFilter: WFHighLevelCallFilter
-) => {
-  const {useObjectVersion} = useWFHooks();
-  // We don't populate this one because it is expensive
-  const currentRef = effectiveFilter.inputObjectVersionRefs?.[0] ?? null;
-  const objectVersion = useObjectVersion(
-    currentRef ? refUriToObjectVersionKey(currentRef) : null
-  );
-  return useMemo(() => {
-    if (!currentRef || objectVersion.loading || !objectVersion.result) {
-      return {};
-    }
-    return {
-      [currentRef]: objectVersion.result,
-    };
-  }, [currentRef, objectVersion.loading, objectVersion.result]);
 };
 
 const useOutputObjectVersionOptions = (
