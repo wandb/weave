@@ -147,6 +147,8 @@ export const CallsTable: FC<{
 
   // Fetch the calls
   const calls = useCallsForQuery(entity, project, effectiveFilter);
+  const callsLoading = calls.loading;
+  const callsResult = useMemo(() => calls.result ?? [], [calls.result]);
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -207,9 +209,6 @@ export const CallsTable: FC<{
 
   // RUNS TABLE HELPER
 
-  // CPR (Tim): Why? Rename and put close to calls results
-  const spans = useMemo(() => calls.result ?? [], [calls.result]);
-
   // START ORIGINAL RUNS TABLE
 
   // CPR (Tim): Move this to the top of the component
@@ -239,11 +238,11 @@ export const CallsTable: FC<{
 
   // CPR (Tim): We should change `isSingleOpVersion` and `isSingleOp` to be derived from the filter, not requiring a full pass
   const isSingleOpVersion = useMemo(() => {
-    return _.uniq(spans.map(span => span.rawSpan.name)).length === 1;
-  }, [spans]);
+    return _.uniq(callsResult.map(span => span.rawSpan.name)).length === 1;
+  }, [callsResult]);
   const uniqueSpanNames = useMemo(() => {
-    return _.uniq(spans.map(span => span.spanName));
-  }, [spans]);
+    return _.uniq(callsResult.map(span => span.spanName));
+  }, [callsResult]);
   const isSingleOp = useMemo(() => {
     return uniqueSpanNames.length === 1;
   }, [uniqueSpanNames]);
@@ -267,11 +266,11 @@ export const CallsTable: FC<{
   // primitive collisions with containers there.
   const newSpans = useMemo(
     () =>
-      spans.map(s => ({
+      callsResult.map(s => ({
         ...s,
         output: s.rawSpan.output == null ? {_result: null} : s.rawSpan.output,
       })),
-    [spans]
+    [callsResult]
   );
 
   // CPR (Tim): This is completely incorrect - we should never be getting URL params from this component
@@ -321,7 +320,7 @@ export const CallsTable: FC<{
       return {
         id: call.callId,
         call,
-        loading: calls.loading,
+        loading: callsLoading,
         opVersion: call.opVersionRef,
         isRoot: call.parentId == null,
         trace_id: call.traceId,
@@ -358,7 +357,7 @@ export const CallsTable: FC<{
         ),
       };
     });
-  }, [calls.loading, onlyOneOutputResult, newSpans]);
+  }, [callsLoading, onlyOneOutputResult, newSpans]);
 
   // CPR (Tim): Move table stats (and derivative calcs) into the new hook
   const tableStats = useMemo(() => {
@@ -874,7 +873,7 @@ export const CallsTable: FC<{
     if (autosized.current) {
       return;
     }
-    if (calls.loading) {
+    if (callsLoading) {
       return;
     }
     autosized.current = true;
@@ -882,12 +881,12 @@ export const CallsTable: FC<{
       includeHeaders: true,
       expand: true,
     });
-  }, [apiRef, calls.loading, apiRefIsReady]);
+  }, [apiRef, callsLoading, apiRefIsReady]);
 
   // CPR (Tim): These will get extracted into their own controls (at least sorting will)
   const initialStateRaw: ComponentProps<typeof DataGridPro>['initialState'] =
     useMemo(() => {
-      if (calls.loading) {
+      if (callsLoading) {
         return undefined;
       }
       return {
@@ -896,7 +895,7 @@ export const CallsTable: FC<{
           sortModel: [{field: 'timestampMs', sort: 'desc'}],
         },
       };
-    }, [calls.loading]);
+    }, [callsLoading]);
 
   // Various interactions (correctly) cause new data to be loaded, which causes
   // a trickle of state updates. However, if the ultimate state is the same,
@@ -926,11 +925,11 @@ export const CallsTable: FC<{
   // CPR (Tim): Investigate this: I added it before to reset the table when
   // new data flowed in, but it seems like it might be unnecessary
   // const callsKey = useMemo(() => {
-  //   if (calls.loading || calls.result == null) {
+  //   if (callsLoading || calls.result == null) {
   //     return null;
   //   }
   //   return Math.random();
-  // }, [calls.loading, calls.result]);
+  // }, [callsLoading, calls.result]);
 
   // CPR (Tim): Remove this, and add a slot for empty content that can be calculated
   // in the parent component
@@ -1067,7 +1066,7 @@ export const CallsTable: FC<{
           // End Column Menu
           columnHeaderHeight={40}
           apiRef={apiRef}
-          loading={calls.loading}
+          loading={callsLoading}
           rows={tableData}
           initialState={initialState}
           onColumnVisibilityModelChange={newModel =>
@@ -1086,8 +1085,8 @@ export const CallsTable: FC<{
           }}
           slots={{
             noRowsOverlay: () => {
-              const isEmpty = spans.length === 0;
-              if (!calls.loading && isEmpty) {
+              const isEmpty = callsResult.length === 0;
+              if (!callsLoading && isEmpty) {
                 // CPR (Tim): Move "isEvaluateTable" out and instead make this empty state a prop
                 if (isEvaluateTable) {
                   return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
