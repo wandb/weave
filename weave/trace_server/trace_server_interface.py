@@ -40,6 +40,8 @@ class CallSchema(BaseModel):
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
 
+    deleted_at: typing.Optional[datetime.datetime] = None
+
 
 # Essentially a partial of StartedCallSchema. Mods:
 # - id is not required (will be generated)
@@ -90,6 +92,7 @@ class ObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
+    deleted_at: typing.Optional[datetime.datetime] = None
     digest: str
     version_index: int
     is_latest: int
@@ -133,6 +136,15 @@ class CallReadReq(BaseModel):
 
 class CallReadRes(BaseModel):
     call: CallSchema
+
+
+class CallsDeleteReq(BaseModel):
+    project_id: str
+    ids: typing.List[str]
+
+
+class CallsDeleteRes(BaseModel):
+    success: bool
 
 
 class _CallsFilter(BaseModel):
@@ -197,6 +209,15 @@ class OpQueryReq(BaseModel):
 
 class OpQueryRes(BaseModel):
     op_objs: typing.List[ObjSchema]
+
+
+class OpsDeleteReq(BaseModel):
+    project_id: str
+    ids: typing.List[str]
+
+
+class OpsDeleteRes(BaseModel):
+    success: bool
 
 
 class ObjCreateReq(BaseModel):
@@ -310,6 +331,10 @@ class TraceServerInterface:
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         ...
 
+    @abc.abstractmethod
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
+        ...
+
     # Op API
     @abc.abstractmethod
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
@@ -321,6 +346,10 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
+        ...
+
+    @abc.abstractmethod
+    def ops_delete(self, req: OpsDeleteReq) -> OpsDeleteRes:
         ...
 
     # Obj API

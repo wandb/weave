@@ -23,7 +23,9 @@ from weave.trace.object_record import (
 from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
+    CallsDeleteReq,
     ObjSchema,
+    OpsDeleteReq,
     RefsReadBatchReq,
     TraceServerInterface,
     ObjCreateReq,
@@ -164,6 +166,10 @@ class Call:
             self.project_id,
             _CallsFilter(parent_ids=[self.id]),
         )
+
+    def delete(self) -> int:
+        client = graph_client_context.require_graph_client()
+        return client.delete_call(call=self)
 
 
 class CallsIter:
@@ -427,6 +433,15 @@ class WeaveClient:
         return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()
+    def op_delete(self, op: Op) -> int:
+        if op.ref is None:
+            raise ValueError("Can't delete an op that hasn't been saved")
+        out = self.server.ops_delete(
+            OpsDeleteReq(project_id=self._project_id(), ids=[op.ref.digest])
+        )
+        return out.num_deleted
+
+    @trace_sentry.global_trace_sentry.watch()
     def create_call(
         self,
         op: Union[str, Op],
@@ -544,6 +559,16 @@ class WeaveClient:
     def fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_call(self, call: Call) -> int:
+        out = self.server.calls_delete(
+            CallsDeleteReq(
+                project_id=self._project_id(),
+                ids=[call.id],
+            )
+        )
+        return out.num_deleted
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:

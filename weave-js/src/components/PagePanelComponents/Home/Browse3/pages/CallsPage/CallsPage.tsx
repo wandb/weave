@@ -7,7 +7,7 @@ import {
   ListItem,
 } from '@mui/material';
 import _ from 'lodash';
-import React, {FC, useCallback, useMemo} from 'react';
+import React, {FC, useCallback, useMemo, useState} from 'react';
 
 import {Loading} from '../../../../../Loading';
 import {RunsTable} from '../../../Browse2/RunsTable';
@@ -18,6 +18,7 @@ import {
 } from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledTextField} from '../../StyledTextField';
+import {OverflowMenu} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -41,6 +42,7 @@ import {
 } from '../wfReactInterface/utilities';
 import {
   CallFilter,
+  CallSchema,
   OpVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {PivotRunsView, WFHighLevelPivotSpec} from './PivotRunsTable';
@@ -146,6 +148,8 @@ export const CallsTable: FC<{
     props.initialFilter,
     props.onFilterUpdate
   );
+
+  const [selectedCalls, setSelectedCalls] = useState<CallSchema[]>([]);
 
   const effectiveFilter = useMemo(() => {
     const workingFilter = {...filter, ...props.frozenFilter};
@@ -436,6 +440,11 @@ export const CallsTable: FC<{
               }}
             />
           )}
+          <OverflowMenu
+            selectedCalls={selectedCalls}
+            refetch={calls.refetch}
+            setSelectedCalls={setSelectedCalls}
+          />
         </>
       }>
       {isPivoting ? (
@@ -459,6 +468,8 @@ export const CallsTable: FC<{
           spans={spans}
           clearFilters={clearFilters}
           ioColumnsOnly={props.ioColumnsOnly}
+          selectedCalls={selectedCalls}
+          setSelectedCalls={setSelectedCalls}
         />
       )}
     </FilterLayoutTemplate>

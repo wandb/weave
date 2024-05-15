@@ -11,6 +11,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
+import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import * as _ from 'lodash';
 import React, {
@@ -265,7 +266,16 @@ export const RunsTable: FC<{
   spans: CallSchema[];
   clearFilters?: null | (() => void);
   ioColumnsOnly?: boolean;
-}> = ({loading, spans, clearFilters, ioColumnsOnly}) => {
+  selectedCalls: CallSchema[];
+  setSelectedCalls: React.Dispatch<React.SetStateAction<CallSchema[]>>;
+}> = ({
+  loading,
+  spans,
+  clearFilters,
+  ioColumnsOnly,
+  selectedCalls,
+  setSelectedCalls,
+}) => {
   // Support for expanding and collapsing ref values in columns
   // This is a set of fields that have been expanded.
   const weave = useWeaveContext();
@@ -490,14 +500,29 @@ export const RunsTable: FC<{
             return rowParams.row.call.spanName;
           }
           return (
-            <CallLink
-              entityName={params.entity}
-              projectName={params.project}
-              opName={opVersionRefOpName(opVersion)}
-              callId={rowParams.row.id}
-              fullWidth={true}
-              preservePath={preservePath}
-            />
+            <>
+              <Checkbox
+                size="small"
+                style={{marginRight: '8px', marginTop: '0px'}}
+                checked={selectedCalls.includes(rowParams.row.call)}
+                onClick={() => {
+                  setSelectedCalls(prev => {
+                    if (prev.includes(rowParams.row.call)) {
+                      return prev.filter(call => call !== rowParams.row.call);
+                    }
+                    return [...prev, rowParams.row.call];
+                  });
+                }}
+              />
+              <CallLink
+                entityName={params.entity}
+                projectName={params.project}
+                opName={opVersionRefOpName(opVersion)}
+                callId={rowParams.row.id}
+                fullWidth={true}
+                preservePath={preservePath}
+              />
+            </>
           );
         },
       },
@@ -876,6 +901,8 @@ export const RunsTable: FC<{
     preservePath,
     spans,
     tableStats,
+    selectedCalls,
+    setSelectedCalls,
   ]);
   const autosized = useRef(false);
   // const {peekingRouter} = useWeaveflowRouteContext();

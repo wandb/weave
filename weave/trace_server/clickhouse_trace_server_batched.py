@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+from collections import defaultdict
 import threading
 from contextlib import contextmanager
 import datetime
@@ -96,6 +97,8 @@ class SelectableCHCallSchema(BaseModel):
 
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
+
+    deleted_at: typing.Optional[datetime.datetime] = None
 
 
 all_call_insert_columns = list(
@@ -302,6 +305,37 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _ch_call_dict_to_call_schema_dict(ch_dict)
             )
 
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        deleted_at = datetime.datetime.now()
+        proj_cond = "project_id = {project_id: String}"
+        proj_params = {"project_id": req.project_id}
+
+        # get all parents
+        parents = self._select_calls_query(
+            req.project_id,
+            conditions=[proj_cond, "id IN {ids: Array(String)}"],
+            parameters=proj_params | {"ids": req.ids},
+        )
+
+        # get all calls with trace_ids matching parents
+        all_calls = self._select_calls_query(
+            req.project_id,
+            conditions=[proj_cond, "trace_id IN {trace_ids: Array(String)}"],
+            parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
+        )
+
+        all_descendants = find_call_descendants_in_memory_dfs(
+            root_ids=req.ids,
+            all_calls=all_calls,
+        )
+
+        # create insert payload for all descendants (and parents)
+        data = [(req.project_id, d, deleted_at) for d in all_descendants]
+        summary = self._insert(
+            "call_parts", data=data, column_names=["project_id", "id", "deleted_at"]
+        )
+        return tsi.CallsDeleteRes(success=summary.written_rows == len(all_descendants))
+
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
 
@@ -337,6 +371,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
+
+    def ops_delete(self, req: tsi.OpsDeleteReq) -> tsi.OpsDeleteRes:
+        num_deleted = self._delete_objs(
+            req.project_id,
+            req.ids,
+            conditions=["is_op = 1"],
+        )
+        return tsi.OpsDeleteRes(success=req.ids == num_deleted)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         json_val = json.dumps(req.obj.val)
@@ -410,6 +452,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+
+    def _delete_objs(
+        self,
+        project_id: str,
+        object_ids: typing.List[str],
+        conditions: typing.Optional[typing.List[str]] = None,
+    ) -> int:
+        if conditions is None:
+            conditions = []
+        conditions += ["object_id IN {object_ids: Array(String)}"]
+        objects = self._select_objs_query(
+            project_id,
+            conditions=conditions,
+            parameters={"object_ids": object_ids},
+        )
+        if len(objects) == 0:
+            return 0
+
+        summary = self._insert(
+            "object_versions",
+            data=[
+                (project_id, object.object_id, datetime.datetime.now())
+                for object in objects
+            ],
+            column_names=["project_id", "object_id", "deleted_at"],
+        )
+        return summary.written_rows
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
 
@@ -926,7 +995,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             FROM calls_merged
             WHERE project_id = {{project_id: String}}
             GROUP BY project_id, id
-            HAVING {conditions_part}
+            HAVING deleted_at IS NULL AND
+                {conditions_part}
             {order_by_part}
             {limit_part}
             {offset_part}
@@ -972,8 +1042,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 version_count,
                 is_latest
             FROM object_versions_deduped
-            WHERE project_id = {{project_id: String}}
-            AND {conditions_part}
+            WHERE project_id = {{project_id: String}} AND
+                deleted_at IS NULL AND
+                {conditions_part}
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
@@ -1293,3 +1364,32 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
         raise ValueError(f"Invalid operator: {operator}")
     combined = f" {operator} ".join([f"({c})" for c in conditions])
     return f"({combined})"
+
+
+def find_call_descendants_in_memory_dfs(
+    root_ids: typing.List[str],
+    all_calls: typing.List[SelectableCHCallSchema],
+) -> typing.List[str]:
+    # make a map of call_id to children list
+    children_map = defaultdict(list)
+    for call in all_calls:
+        if call.parent_id is not None:
+            children_map[call.parent_id].append(call.id)
+
+    # do DFS to get all descendants
+    def find_all_descendants(root_ids: typing.List[str]) -> typing.Set[str]:
+        descendants = set()
+        stack = root_ids
+
+        while stack:
+            current_id = stack.pop()
+            if current_id not in descendants:
+                descendants.add(current_id)
+                stack += children_map.get(current_id, [])
+
+        return descendants
+
+    # Find descendants for each initial id
+    descendants = find_all_descendants(root_ids)
+
+    return list(descendants)
