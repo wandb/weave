@@ -197,7 +197,7 @@ export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
           width={width}
           backgroundColor={backgroundColor}
           dataTest={dataTest}>
-          {options.map(option => {
+          {options.map((option, index) => {
             const isSelected = selected === option.value;
             const isHovered = highlighted === option.value;
             return (
@@ -207,6 +207,7 @@ export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
                 ref={isSelected ? selectedRef : undefined}
                 onMouseEnter={() => {
                   setHighlighted(option.value);
+                  setHighlightedIndex(index);
                 }}
                 style={option.disabled ? {pointerEvents: 'none'} : undefined}
                 onMouseDown={e => {
