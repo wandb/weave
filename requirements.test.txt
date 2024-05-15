@@ -29,6 +29,7 @@ smmap>=5.0.1  # required by notebook, llama-index
 charset-normalizer>=3.3.2  # required by wandb, llama-index
 certifi>=2024.2.2  # required by wandb, llama-index
 scipy>=1.13.0  # required by umap-learn
+regex>=2024.5.15  # required by llama-index
 tqdm>=4.66.3  # CVE 2024-34062
 cryptography>=42.0.7  # CVE 2023-23931
 sortedcontainers>=2.4.0
