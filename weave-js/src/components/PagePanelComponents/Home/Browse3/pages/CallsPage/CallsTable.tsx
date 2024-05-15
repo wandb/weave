@@ -143,7 +143,6 @@ export const CallsTable: FC<{
     props.onFilterUpdate
   );
 
-  // CPR (Tim): Determining the effective filter (and assertions) should be extracted to a separate function
   const effectiveFilter = useMemo(
     () => getEffectiveFilter(filter, props.frozenFilter),
     [filter, props.frozenFilter]
