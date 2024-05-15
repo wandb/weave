@@ -1,11 +1,8 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import computeScrollIntoView from 'compute-scroll-into-view';
-import * as _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState, useEffect} from 'react';
 import {ThemeProvider} from 'styled-components';
-
-import useControllableState from '../util/controllable';
 import * as S from './WBMenu.styles';
 
 export type WBMenuOption = {
@@ -80,9 +77,6 @@ export interface WBMenuProps {
 
   highlightFirst?: boolean;
 
-  highlighted?: string | number | null;
-  onChangeHighlighted?: (newHighlight: string | number | null) => void;
-
   theme?: WBMenuTheme;
   backgroundColor?: string;
   fontSize?: number;
@@ -106,130 +100,69 @@ export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
       fontSize,
       lineHeight,
       highlightFirst,
-      highlighted: highlightedProp,
-      onChangeHighlighted,
       onSelect,
       onEsc,
       dataTest,
     },
     ref
   ) => {
-    const getDefaultHoverIndex = React.useCallback(() => {
-      let found = -1;
-      if (highlightFirst && options.length > 0) {
-        found = options.findIndex(opt => !opt.disabled);
-      } else {
-        found = options.findIndex(opt => selected === opt.value);
-      }
+    const [defaultHighlighted, defaultHighlightedIndex] = useMemo(() => {
+      if (!highlightFirst) return [undefined, undefined];
+      const foundIndex = options.findIndex(el => !el.disabled);
 
-      return found >= 0 ? found : 0;
-    }, [highlightFirst, options, selected]);
-    // dedupe options
-    const prevLength = options.length;
-    options = _.uniqBy(options, opt => opt.value);
-    if (options.length !== prevLength) {
-      // eslint-disable-next-line no-console
-      console.warn('Passed duplicate options into WBMenu');
-    }
+      if (!foundIndex) return [undefined, undefined];
 
-    const [highlighted, setHighlighted] = useControllableState(
-      options[getDefaultHoverIndex()]?.value || null,
-      highlightedProp,
-      onChangeHighlighted
+      return [options[foundIndex]?.value, foundIndex];
+    }, [highlightFirst, options]);
+
+    const [highlighted, setHighlighted] = useState<string | number | undefined>(
+      defaultHighlighted
     );
-    const highlightedIndex = useMemo(() => {
-      if (highlighted === null) {
-        return null;
-      }
-      const found = options.findIndex(opt => highlighted === opt.value);
-
-      return found >= 0 ? found : null;
-    }, [options, highlighted]);
-
-    const lastHighlightedValue = React.useRef<string | number | null>(
-      highlighted
-    );
-    const setHighlightedWrapped = React.useCallback(
-      (newHighlighted: number | string | null) => {
-        const last = highlighted;
-        setHighlighted(newHighlighted);
-        lastHighlightedValue.current = last;
-      },
-      [highlighted, setHighlighted]
-    );
+    const [highlightedIndex, setHighlightedIndex] = useState<
+      number | undefined
+    >(defaultHighlightedIndex);
 
     const contentRef = React.useRef<HTMLDivElement>(null);
-    React.useEffect(() => {
+    useEffect(() => {
       function onKeyDown(e: KeyboardEvent) {
-        if (e.keyCode === 38 /* up */) {
+        if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
           e.preventDefault();
-          let moved = false;
-          for (
-            let i = (highlightedIndex || getDefaultHoverIndex()) - 1;
-            i >= -1;
-            i--
-          ) {
-            const modIndex =
-              ((i % options.length) + options.length) % options.length;
-            if (!options[modIndex].disabled) {
-              setHighlightedWrapped(options[modIndex].value);
-              const child = contentRef.current?.children[modIndex];
-              if (child) {
-                scrollIntoView(child, {
-                  scrollMode: 'if-needed',
-                  block: 'start',
-                });
-              }
-              moved = true;
-              break;
+          if (!options || !options.length) return;
+
+          const block = e.key === 'ArrowUp' ? 'start' : 'end';
+          const moveAmount = e.key === 'ArrowUp' ? -1 : 1;
+
+          let newHighlightedIndex;
+          if (typeof highlightedIndex === 'undefined') {
+            newHighlightedIndex = options.findIndex(el => !el.disabled);
+          } else {
+            newHighlightedIndex = highlightedIndex + moveAmount;
+            if (newHighlightedIndex >= options.length) {
+              newHighlightedIndex = options.findIndex(el => !el.disabled);
+            } else if (newHighlightedIndex < 0) {
+              newHighlightedIndex = options.findLastIndex(el => !el.disabled);
             }
           }
-          if (!moved && contentRef.current != null) {
-            scrollIntoView(contentRef.current, {
-              scrollMode: 'if-needed',
-              block: 'start',
-            });
-          }
-        }
-        if (e.keyCode === 40 /* down */) {
-          e.preventDefault();
-          let moved = false;
-          for (
-            let i = (highlightedIndex || getDefaultHoverIndex()) + 1;
-            i <= options.length;
-            i++
-          ) {
-            const modIndex =
-              ((i % options.length) + options.length) % options.length;
-            if (!options[modIndex].disabled) {
-              setHighlightedWrapped(options[modIndex].value);
-              const child = contentRef.current?.children[modIndex];
-              if (child) {
-                scrollIntoView(child, {
-                  scrollMode: 'if-needed',
-                  block: 'end',
-                });
-              }
-              moved = true;
-              break;
+          if (typeof newHighlightedIndex === 'number') {
+            setHighlighted(options[newHighlightedIndex].value);
+            setHighlightedIndex(newHighlightedIndex);
+
+            const child = contentRef.current?.children[newHighlightedIndex];
+            if (child) {
+              scrollIntoView(child, {
+                scrollMode: 'if-needed',
+                block,
+              });
             }
           }
-          if (!moved && contentRef.current != null) {
-            scrollIntoView(contentRef.current, {
-              scrollMode: 'if-needed',
-              block: 'end',
-            });
-          }
-        }
-        if (e.keyCode === 13 && !e.shiftKey /* enter */) {
+        } else if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           if (highlightedIndex != null) {
             onSelect?.(options[highlightedIndex].value, {
               option: options[highlightedIndex],
             });
           }
-        }
-        if (e.keyCode === 27 /* esc */) {
+        } else if (e.key === 'Escape') {
           e.preventDefault();
           onEsc?.();
         }
@@ -238,14 +171,7 @@ export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
       return () => {
         document.removeEventListener('keydown', onKeyDown);
       };
-    }, [
-      getDefaultHoverIndex,
-      highlightedIndex,
-      onEsc,
-      onSelect,
-      options,
-      setHighlightedWrapped,
-    ]);
+    }, [highlightedIndex, onEsc, onSelect, options]);
 
     const contentCallbackRef = React.useCallback(
       (node: HTMLDivElement | null) => {
@@ -271,7 +197,7 @@ export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
           width={width}
           backgroundColor={backgroundColor}
           dataTest={dataTest}>
-          {options.map((option, i) => {
+          {options.map(option => {
             const isSelected = selected === option.value;
             const isHovered = highlighted === option.value;
             return (

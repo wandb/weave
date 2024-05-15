@@ -16,7 +16,8 @@
       "scripthost",
       "esnext.asynciterable",
       "es2017.object",
-      "ES2019"
+      "ES2019",
+      "es2023"
     ],
     "module": "commonjs",
     "moduleResolution": "node",
@@ -26,7 +27,7 @@
     "noImplicitReturns": true,
     "paths": {
       "@wandb/weave/*": ["src/*"],
-      "plotly\\.js": ["plotly.js-dist-min"],
+      "plotly\\.js": ["plotly.js-dist-min"]
     },
     "preserveSymlinks": true,
     "resolveJsonModule": true,
