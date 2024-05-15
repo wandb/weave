@@ -224,7 +224,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         print("REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
-        conds = ["deleted_at IS NULL"]
+        conds = []
         filter = req.filter
         if filter:
             if filter.op_names:
@@ -274,7 +274,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
 
-        query = f"SELECT * FROM calls WHERE project_id = '{req.project_id}'"
+        query = f"SELECT * FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
 
@@ -455,10 +455,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = [
-            f"object_id = '{req.object_id}'",
-            "deleted_at IS NULL",
-        ]
+        conds = [f"object_id = '{req.object_id}'"]
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
@@ -688,7 +685,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
         cursor.execute(
-            """SELECT * FROM objects WHERE project_id = ? AND """ + pred,
+            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
+            + pred,
             (project_id,),
         )
         query_result = cursor.fetchall()
