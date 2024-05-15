@@ -5,6 +5,7 @@ flask>=2.1
 black>=22.3.0  # used for code generation
 flask_cors>=4.0.1  # CVE 2024-1681
 notebook>=6.4.8  # current Colab version
+jinja2>=  # required by notebook, CVE 2024-34064
 ipynbname>=2021.3.2
 pillow>=10.0.1  # addresses CVE-2023-4863
 scikit-learn>=1.2.1  # used for embedding projection
