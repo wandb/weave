@@ -104,7 +104,10 @@ import {
   OpVersionSchema,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
-import {WFHighLevelCallFilter} from './callsTableFilter';
+import {
+  filterShouldUseTraceRootsOnly,
+  WFHighLevelCallFilter,
+} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
 
@@ -257,6 +260,8 @@ export const CallsTable: FC<{
   // CPR (Tim): Potential Refactor here with registering the export button (where to put it?)
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
   const apiRef = useGridApiRef();
+  const apiRefIsReady =
+    apiRef.current && Object.keys(apiRef.current).length > 0;
 
   useEffect(() => {
     addExtra('exportRunsTableButton', {
@@ -872,7 +877,7 @@ export const CallsTable: FC<{
   // const {peekingRouter} = useWeaveflowRouteContext();
   // const history = useHistory();
   useEffect(() => {
-    if (Object.keys(apiRef.current).length == 0) {
+    if (!apiRefIsReady) {
       return;
     }
     if (autosized.current) {
@@ -886,7 +891,7 @@ export const CallsTable: FC<{
       includeHeaders: true,
       expand: true,
     });
-  }, [apiRef, loading]);
+  }, [apiRef, loading, apiRefIsReady]);
 
   // CPR (Tim): These will get extracted into their own controls (at least sorting will)
   const initialStateRaw: ComponentProps<typeof DataGridPro>['initialState'] =
@@ -912,14 +917,10 @@ export const CallsTable: FC<{
   // initialState won't take effect if columns are not set.
   // see https://github.com/mui/mui-x/issues/6206
   useEffect(() => {
-    if (
-      Object.keys(apiRef.current).length > 0 &&
-      columns != null &&
-      initialState != null
-    ) {
+    if (apiRefIsReady && columns != null && initialState != null) {
       apiRef.current.restoreState(initialState);
     }
-  }, [columns, initialState, apiRef]);
+  }, [columns, initialState, apiRef, apiRefIsReady]);
 
   // END ORIGINAL RUNS TABLE
 
@@ -1196,7 +1197,10 @@ const useOpVersionOptions = (
   return useMemo(() => {
     return {
       [ALL_TRACES_OR_CALLS_REF_KEY]: {
-        title: effectiveFilter.traceRootsOnly
+        title: filterShouldUseTraceRootsOnly({
+          ...effectiveFilter,
+          opVersionRefs: [],
+        })
           ? ALL_TRACES_TITLE
           : ALL_CALLS_TITLE,
         ref: '',
@@ -1204,7 +1208,7 @@ const useOpVersionOptions = (
       },
       ...opVersionOptionsWithoutAllSection,
     };
-  }, [effectiveFilter.traceRootsOnly, opVersionOptionsWithoutAllSection]);
+  }, [effectiveFilter, opVersionOptionsWithoutAllSection]);
 };
 
 const useConsumesObjectVersionOptions = (

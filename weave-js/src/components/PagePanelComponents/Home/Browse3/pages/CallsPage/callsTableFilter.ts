@@ -56,7 +56,9 @@ const validateFilterUICompatibility = (filter: WFHighLevelCallFilter) => {
  * filter should use trace roots only if the filter does not specify any
  * other fields.
  */
-const filterShouldUseTraceRootsOnly = (filter: WFHighLevelCallFilter) => {
+export const filterShouldUseTraceRootsOnly = (
+  filter: WFHighLevelCallFilter
+) => {
   const opVersionRefsSet = (filter.opVersionRefs?.length ?? 0) > 0;
   const inputObjectVersionRefsSet =
     (filter.inputObjectVersionRefs?.length ?? 0) > 0;
@@ -64,9 +66,9 @@ const filterShouldUseTraceRootsOnly = (filter: WFHighLevelCallFilter) => {
     (filter.outputObjectVersionRefs?.length ?? 0) > 0;
   const parentIdSet = filter.parentId != null;
   return (
-    opVersionRefsSet ||
-    inputObjectVersionRefsSet ||
-    outputObjectVersionRefsSet ||
-    parentIdSet
+    !opVersionRefsSet &&
+    !inputObjectVersionRefsSet &&
+    !outputObjectVersionRefsSet &&
+    !parentIdSet
   );
 };
