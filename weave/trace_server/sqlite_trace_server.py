@@ -354,7 +354,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         # update row with a deleted_at field set to now
         conn, cursor = get_conn_cursor(self.db_path)
-        num_deleted = 0
         with self.lock:
             recursive_query = """
                 WITH RECURSIVE Descendants AS (
@@ -391,8 +390,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
-
-            num_deleted += cursor.rowcount
             conn.commit()
 
         return tsi.CallsDeleteRes(success=True)
