@@ -66,10 +66,7 @@ import {
   getInputColumns,
   useColumnVisibility,
 } from '../../../Browse2/tableStats';
-import {
-  useWeaveflowRouteContext,
-  WeaveHeaderExtrasContext,
-} from '../../context';
+import {WeaveHeaderExtrasContext} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -132,8 +129,6 @@ export const CallsTable: FC<{
   hideControls?: boolean;
   ioColumnsOnly?: boolean;
 }> = props => {
-  const {baseRouter} = useWeaveflowRouteContext();
-
   // CPR (Tim): This `useInitializingFilter` could use a slight refactor and rename
   const {filter, setFilter} = useInitializingFilter(
     props.initialFilter,
