@@ -378,7 +378,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.ids,
             conditions=["is_op = 1"],
         )
-        return tsi.OpsDeleteRes(num_deleted=num_deleted)
+        return tsi.OpsDeleteRes(success=req.ids == num_deleted)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         json_val = json.dumps(req.obj.val)
@@ -470,7 +470,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if len(objects) == 0:
             return 0
 
-        self._insert(
+        summary = self._insert(
             "object_versions",
             data=[
                 (project_id, object.object_id, datetime.datetime.now())
@@ -478,7 +478,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ],
             column_names=["project_id", "object_id", "deleted_at"],
         )
-        return len(objects)
+        return summary.written_rows
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
 
@@ -935,9 +935,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         select_columns_part = ", ".join(merged_cols)
 
         if not conditions:
-            conditions = []
-
-        conditions += ["deleted_at IS NULL"]
+            conditions = ["1 = 1"]
 
         conditions_part = _combine_conditions(conditions, "AND")
 
@@ -997,7 +995,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             FROM calls_merged
             WHERE project_id = {{project_id: String}}
             GROUP BY project_id, id
-            HAVING {conditions_part}
+            HAVING deleted_at IS NULL AND
+                {conditions_part}
             {order_by_part}
             {limit_part}
             {offset_part}
@@ -1016,9 +1015,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.List[SelectableCHObjSchema]:
         if not conditions:
-            conditions = []
-
-        conditions += ["deleted_at IS NULL"]
+            conditions = ["1 = 1"]
 
         conditions_part = _combine_conditions(conditions, "AND")
 
@@ -1045,8 +1042,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 version_count,
                 is_latest
             FROM object_versions_deduped
-            WHERE project_id = {{project_id: String}}
-            AND {conditions_part}
+            WHERE project_id = {{project_id: String}} AND
+                deleted_at IS NULL AND
+                {conditions_part}
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
