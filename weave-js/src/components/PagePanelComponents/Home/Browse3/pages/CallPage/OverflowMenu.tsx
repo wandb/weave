@@ -91,11 +91,12 @@ const ConfirmDeleteModal: FC<{
     callsDelete(
       `${calls[0].entity}/${calls[0].project}`,
       calls.map(c => c.callId)
-    );
-    setConfirmDelete(false);
-    refetch?.();
-    setSelectedCalls?.(curCalls => curCalls?.filter(c => !calls.includes(c)));
-    closePeek();
+    ).then(() => {
+      setConfirmDelete(false);
+      refetch?.();
+      setSelectedCalls?.(curCalls => curCalls?.filter(c => !calls.includes(c)));
+      closePeek();
+    });
   };
 
   return (

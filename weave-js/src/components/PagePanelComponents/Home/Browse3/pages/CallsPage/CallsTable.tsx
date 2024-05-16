@@ -72,6 +72,7 @@ import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {BoringColumnInfo} from '../CallPage/BoringColumnInfo';
+import { OverflowMenu } from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -108,7 +109,6 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
-import { OverflowMenu } from '../CallPage/OverflowMenu';
 
 const VisibilityAlert = styled.div`
   background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
