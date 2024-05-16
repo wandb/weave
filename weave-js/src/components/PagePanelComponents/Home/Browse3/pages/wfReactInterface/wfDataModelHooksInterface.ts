@@ -160,8 +160,8 @@ export type WFDataModelHooksInterface = {
   ) => LoadableWithRefetch<CallSchema[]>;
   useCallsDelete: () => (
     projectID: string,
-    ids: string[]
-  ) => Promise<{success: boolean}>;
+    callIDs: string[]
+  ) => Promise<void>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,

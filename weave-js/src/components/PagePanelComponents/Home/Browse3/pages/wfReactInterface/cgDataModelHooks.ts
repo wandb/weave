@@ -1068,7 +1068,7 @@ const useFileContent = (
 
 const useCallsDelete =
   () =>
-  (projectID: string, ids: string[]): Promise<{success: boolean}> => {
+  (projectID: string, callIDs: string[]): Promise<void> => {
     throw new Error('Not implemented');
   };
 

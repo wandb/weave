@@ -81,11 +81,9 @@ const ConfirmDeleteModal: FC<{
   let error = null;
   if (calls.length === 0) {
     error = 'No calls selected';
-  }
-  if (new Set(calls.map(c => c.entity)).size > 1) {
+  } else if (new Set(calls.map(c => c.entity)).size > 1) {
     error = 'Cannot delete calls from multiple entities';
-  }
-  if (new Set(calls.map(c => c.project)).size > 1) {
+  } else if (new Set(calls.map(c => c.project)).size > 1) {
     error = 'Cannot delete calls from multiple projects';
   }
 

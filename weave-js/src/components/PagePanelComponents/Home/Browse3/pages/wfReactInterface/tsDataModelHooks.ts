@@ -306,10 +306,6 @@ const useCallsDelete = () => {
     (projectID, callIDs): Promise<void> => {
       return getTsClient()
         .callsDelete({project_id: projectID, call_ids: callIDs})
-        .catch(e => {
-          console.error(e);
-          return {success: false};
-        });
     },
     [getTsClient]
   );
