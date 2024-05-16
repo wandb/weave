@@ -3,6 +3,7 @@
 import computeScrollIntoView from 'compute-scroll-into-view';
 import React, {useEffect, useMemo, useState} from 'react';
 import {ThemeProvider} from 'styled-components';
+
 import * as S from './WBMenu.styles';
 
 export type WBMenuOption = {
@@ -127,7 +128,7 @@ export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
       }
 
       return result;
-    }, [highlightFirst, options]);
+    }, [highlightFirst, options, selected]);
 
     const [highlighted, setHighlighted] =
       useState<HighlightVal>(defaultHighlighted);
