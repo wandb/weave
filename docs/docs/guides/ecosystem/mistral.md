@@ -26,6 +26,7 @@ Weave automatically tracks and logs LLM calls made via the [MistralAI Python lib
 3. Use the MistralAI library as usual:
 
     ```python
+    import os
     from mistralai.client import MistralClient
     from mistralai.models.chat_completion import ChatMessage
 
