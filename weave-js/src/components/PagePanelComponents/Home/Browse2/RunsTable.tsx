@@ -931,6 +931,7 @@ export const RunsTable: FC<{
           </VisibilityAlertAction>
         </VisibilityAlert>
       )}
+      <button onClick={() => {throw new Error("throwing for sentry")}}>Click for error</button>
       <BoringColumnInfo tableStats={tableStats} columns={columns.cols as any} />
       <StyledDataGrid
         // Start Column Menu
