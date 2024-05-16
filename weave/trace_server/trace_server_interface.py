@@ -147,50 +147,86 @@ class _CallsFilter(BaseModel):
     wb_run_ids: typing.Optional[typing.List[str]] = None
 
 
+# Can be any standard json-able value
+class _RawValue(BaseModel):
+    value_: typing.Union[
+        str, int, float, bool, dict[str, "_RawValue"], list["_RawValue"]
+    ]
+
+
 # Field should be a key of `CallSchema`. For dictionary fields (`attributes`,
 # `inputs`, `outputs`, `summary`), the field can be dot-separated.
-FieldStr = str
+class _FieldSelect(BaseModel):
+    field_: str
 
 
-class _SortBy(BaseModel):
-    field: FieldStr
-    # Direction should be either 'asc' or 'desc'
-    direction: typing.Union[typing.Literal["asc"], typing.Literal["desc"]]
+_Operand: typing.TypeAlias = typing.Union[_RawValue, _FieldSelect, "_Operation"]
+
+# Operations: all operations have the form of a single property
+# with the name of the operation suffixed with an underscore.
+# Subset of Mongo Operators: https://www.mongodb.com/docs/manual/reference/operator/query/
+# Starting with these operators for now since they are the most common and with negation
+# can cover most of the other operators.
+class _AndOperation(BaseModel):
+    and_: typing.Tuple["_Operand", "_Operand"]
 
 
-class _ValueOperand(BaseModel):
-    type: typing.Literal["value"]
-    value: typing.Any
+class _OrOperation(BaseModel):
+    or_: typing.Tuple["_Operand", "_Operand"]
 
 
-class _FieldOperand(BaseModel):
-    type: typing.Literal["field"]
-    field: FieldStr
+class _NotOperation(BaseModel):
+    not_: "_Operand"
 
 
-_Operand = typing.Union[_ValueOperand, _FieldOperand]
+class _EqOperation(BaseModel):
+    eq_: typing.Tuple["_Operand", "_Operand"]
 
-_Operator = typing.Union[
-    typing.Literal["equals"],
-    typing.Literal["greater_than"],
-    typing.Literal["greater_than_or_equals"],
-    typing.Literal["matches"],
+
+class _GtOperation(BaseModel):
+    gt_: typing.Tuple["_Operand", "_Operand"]
+
+
+class _GteOperation(BaseModel):
+    gte_: typing.Tuple["_Operand", "_Operand"]
+
+
+class _RegexOperation(BaseModel):
+    regex_: typing.Tuple["_Operand", "_Operand"]
+
+
+_Operation: typing.TypeAlias = typing.Union[
+    _AndOperation,
+    _OrOperation,
+    _NotOperation,
+    _EqOperation,
+    _GtOperation,
+    _GteOperation,
+    _RegexOperation,
 ]
 
-
-class _FilterOperation(BaseModel):
-    left: _Operand
-    operator: _Operator
-    right: _Operand
-    negated: bool = False
-
-
-class _FilterByOrGroup(BaseModel):
-    any: typing.List[_FilterOperation]
+# Update the models to include the recursive types
+_RawValue.model_rebuild()
+_FieldSelect.model_rebuild()
+_AndOperation.model_rebuild()
+_OrOperation.model_rebuild()
+_NotOperation.model_rebuild()
+_EqOperation.model_rebuild()
+_GtOperation.model_rebuild()
+_GteOperation.model_rebuild()
+_RegexOperation.model_rebuild()
 
 
 class _FilterBy(BaseModel):
-    all: typing.List[_FilterByOrGroup]
+    filter: _Operation
+
+
+# Field should be a key of `CallSchema`. For dictionary fields (`attributes`,
+# `inputs`, `outputs`, `summary`), the field can be dot-separated.
+class _SortBy(BaseModel):
+    field: str  # Consider changing this to _FieldSelect
+    # Direction should be either 'asc' or 'desc'
+    direction: typing.Literal["asc", "desc"]
 
 
 class CallsQueryReq(BaseModel):

@@ -712,45 +712,15 @@ def test_trace_call_filter(client):
         basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
 
     for (count, filter_by) in [
-        # Base Case - no filter
+        # Base Case - simple True
         (
             5,
-            tsi._FilterBy.model_validate(
-                {
-                    "all": [
-                        {
-                            "any": [
-                                {
-                                    "left": {"type": "value", "value": 1},
-                                    "operator": "equals",
-                                    "right": {"type": "value", "value": 1},
-                                    "negated": False,
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ),
+            {"eq_": [{"value_": 1}, {"value_": 1}]},
         ),
-        # Base Case - no filter negated
+        # Base Case - simple false
         (
             0,
-            tsi._FilterBy.model_validate(
-                {
-                    "all": [
-                        {
-                            "any": [
-                                {
-                                    "left": {"type": "value", "value": 1},
-                                    "operator": "equals",
-                                    "right": {"type": "value", "value": 1},
-                                    "negated": True,
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ),
+            {"eq_": [{"value_": 1}, {"value_": 2}]},
         ),
         # TODO: Write a lot more tests!
         # TODO: Make Clickhouse run in master!
@@ -764,7 +734,7 @@ def test_trace_call_filter(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter_by=filter_by,
+                filter_by=tsi._FilterBy.model_validate({"filter": filter_by}),
             )
         )
 
