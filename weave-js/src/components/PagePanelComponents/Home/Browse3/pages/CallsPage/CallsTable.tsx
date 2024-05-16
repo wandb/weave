@@ -20,7 +20,10 @@ import {
   GridColumnGroup,
   GridColumnGroupingModel,
   GridColumnVisibilityModel,
+  GridFilterModel,
+  GridPaginationModel,
   GridRowSelectionModel,
+  GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
 import * as Colors from '@wandb/weave/common/css/color.styles';
@@ -177,22 +180,58 @@ export const CallsTable: FC<{
     return () => removeExtra('exportRunsTableButton');
   }, [apiRef, addExtra, removeExtra]);
 
+  // Table State consists of:
+  // 1. Filter (Structured Filter)
+  // 2. Filter (Unstructured Filter)
+  // 3. Sort
+  // 4. Pagination
+  //
+  // The following sections set up the state for these aspects
+
+  // 1. Filter (Structured Filter)
   // Make sure we respect the controlling nature of the filter
   const [filter, setFilter] = useControllableState(
     initialFilter ?? {},
     onFilterUpdate
   );
-
   // Calculate the effective filter
   const effectiveFilter = useMemo(
     () => getEffectiveFilter(filter, frozenFilter),
     [filter, frozenFilter]
   );
 
+  // 2. Filter (Unstructured Filter)
+  const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
+
+  // 3. Sort
+  const [sortModelInner, setSortModel] = useState<GridSortModel>([
+    {field: 'timestampMs', sort: 'desc'},
+  ]);
+  // Ensure that we always have a default sort
+  const sortModel: GridSortModel = useMemo(() => {
+    return sortModelInner.length === 0
+      ? [{field: 'timestampMs', sort: 'desc'}]
+      : sortModelInner;
+  }, [sortModelInner]);
+
+  // 4. Pagination
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    pageSize: 3,
+    page: 0,
+  });
+
   // Fetch the calls
-  const calls = useCallsForQuery(entity, project, effectiveFilter);
+  const calls = useCallsForQuery(
+    entity,
+    project,
+    effectiveFilter,
+    filterModel,
+    sortModel,
+    paginationModel
+  );
   const callsLoading = calls.loading;
-  const callsResult = useMemo(() => calls.result ?? [], [calls.result]);
+  const callsResult = calls.result;
+  const callsTotal = calls.total;
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -909,9 +948,6 @@ export const CallsTable: FC<{
       }
       return {
         pinnedColumns: {left: ['span_id']},
-        sorting: {
-          sortModel: [{field: 'timestampMs', sort: 'desc'}],
-        },
       };
     }, [callsLoading]);
 
@@ -1080,6 +1116,27 @@ export const CallsTable: FC<{
             setColumnVisibilityModel(newModel)
           }
           columnVisibilityModel={columnVisibilityModel}
+          // SORT SECTION START
+          sortingMode="server"
+          sortModel={sortModel}
+          onSortModelChange={newModel => setSortModel(newModel)}
+          // SORT SECTION END
+          // FILTER SECTION START
+          filterMode="server"
+          filterModel={filterModel}
+          onFilterModelChange={newModel => setFilterModel(newModel)}
+          // FILTER SECTION END
+          // PAGINATION SECTION START
+          pagination
+          // Auto page size is pretty nice except when resizing on not-first page
+          autoPageSize
+          rowCount={callsTotal}
+          paginationMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={newModel => setPaginationModel(newModel)}
+          // Empty list required to disable showing selector
+          pageSizeOptions={[]}
+          // PAGINATION SECTION END
           rowHeight={38}
           columns={columns.cols as any}
           experimentalFeatures={{columnGrouping: true}}
