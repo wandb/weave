@@ -15,7 +15,7 @@ import React, {
 } from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
-import {WFHighLevelCallFilter} from './pages/CallsPage/CallsPage';
+import {WFHighLevelCallFilter} from './pages/CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from './pages/ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from './pages/OpVersionsPage';
 import {useURLSearchParamsDict} from './pages/util';

@@ -64,6 +64,7 @@ import {
   getChainRootVar,
   isConstructor,
 } from './core/mutate';
+import {trimStartChar} from './core/util/string';
 import {UseNodeValueServerExecutionError} from './errors';
 import {useDeepMemo} from './hookUtils';
 import {consoleLog} from './util';
@@ -473,11 +474,12 @@ export interface WandbArtifactRef {
   artifactRefExtra?: string;
 }
 
+type WeaveKind = 'object' | 'op' | 'table';
 export interface WeaveObjectRef {
   scheme: 'weave';
   entityName: string;
   projectName: string;
-  weaveKind: 'object' | 'op' | 'table';
+  weaveKind: WeaveKind;
   artifactName: string;
   artifactVersion: string;
   artifactRefExtra?: string;
@@ -498,6 +500,39 @@ export const isWandbArtifactRef = (ref: ObjectRef): ref is WandbArtifactRef => {
 export const isWeaveObjectRef = (ref: ObjectRef): ref is WeaveObjectRef => {
   return ref.scheme === 'weave';
 };
+
+const PATTERN_ENTITY = '([a-z0-9-_]+)'; // Entity name: lowercase, digits, dash, underscore
+const PATTERN_PROJECT = '([^\\#?%:]{1,128})'; // Project name
+const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
+  [
+    '^', // Start of the string
+    PATTERN_ENTITY,
+    '/',
+    PATTERN_PROJECT,
+    '/',
+    '(object|op)', // Weave kind
+    '/',
+    '([a-zA-Z0-9-_/. ]{1,128})', // Artifact name
+    ':',
+    '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
+    '/?', // Ref extra portion is optional
+    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    '$', // End of the string
+  ].join('')
+);
+const RE_WEAVE_TABLE_REF_PATHNAME = new RegExp(
+  [
+    '^', // Start of the string
+    PATTERN_ENTITY,
+    '/',
+    PATTERN_PROJECT,
+    '/table/',
+    '([a-f0-9]+)', // Digest
+    '/?', // Ref extra portion is optional
+    '([a-zA-Z0-9_/]*)', // Optional ref extra
+    '$', // End of the string
+  ].join('')
+);
 
 export const parseRef = (ref: string): ObjectRef => {
   const url = new URL(ref);
@@ -534,7 +569,9 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactPath: artifactPathPart,
       artifactRefExtra: url.hash ? url.hash.slice(1) : undefined,
     };
-  } else if (isLocalArtifact) {
+  }
+
+  if (isLocalArtifact) {
     const [artifactName, artifactPath] = splitUri;
     return {
       scheme: 'local-artifact',
@@ -542,39 +579,43 @@ export const parseRef = (ref: string): ObjectRef => {
       artifactVersion: 'latest',
       artifactPath,
     };
-  } else if (isWeaveRef) {
+  }
+
+  if (isWeaveRef) {
+    const trimmed = trimStartChar(url.pathname, '/');
+    const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
+    if (tableMatch !== null) {
+      const [entity, project, artifactVer] = tableMatch.slice(1);
+      return {
+        scheme: 'weave',
+        entityName: entity,
+        projectName: project,
+        weaveKind: 'table' as WeaveKind,
+        artifactName: '',
+        artifactVersion: artifactVer,
+        artifactRefExtra: '',
+      };
+    }
+    const match = trimmed.match(RE_WEAVE_OBJECT_REF_PATHNAME);
+    if (match === null) {
+      throw new Error('Invalid weave ref uri: ' + ref);
+    }
     const [
       entityName,
       projectName,
       weaveKind,
-      artifactNameAndVersion,
-      ...refExtraParts
-    ] = url.pathname.replace(/^\/+/, '').split('/');
-
-    if (!['object', 'op', 'table'].includes(weaveKind)) {
-      throw new Error('Invalid uri: ' + ref + '. got: ' + weaveKind);
-    }
-
-    // const [artifactId, artifactRefExtra] = artifactIdAndExtra.split('/', 2);
-    let [artifactNamePart, artifactVersion] = artifactNameAndVersion.split(
-      ':',
-      2
-    );
-    if (weaveKind === 'table') {
-      if (artifactVersion != null && artifactVersion !== '') {
-        throw new Error('Invalid uri: ' + ref + '. got: ' + artifactVersion);
-      }
-      artifactVersion = artifactNamePart;
-      artifactNamePart = '';
-    }
+      artifactName,
+      artifactVersion,
+      artifactRefExtra,
+    ] = match.slice(1);
     return {
       scheme: 'weave',
       entityName,
       projectName,
-      weaveKind: weaveKind as 'object' | 'op' | 'table',
-      artifactName: artifactNamePart,
+      weaveKind: weaveKind as WeaveKind,
+      artifactName,
       artifactVersion,
-      artifactRefExtra: refExtraParts.join('/'),
+      artifactRefExtra: artifactRefExtra ?? '',
     };
   }
   throw new Error(`Unknown protocol: ${url.protocol}`);

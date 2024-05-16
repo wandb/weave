@@ -809,6 +809,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             port=self._port,
             user=self._user,
             password=self._password,
+            secure=self._port == 8443,
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
