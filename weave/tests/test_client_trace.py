@@ -722,12 +722,16 @@ def test_trace_call_filter(client):
             "dict": "Different Type",
             "str": False,
         },
+        0.1,
     )
+
+    basic_op("simple_primitive", 0.1)
+    basic_op(42, 0.1)
 
     for (count, filter_by) in [
         # Base Case - simple True
         (
-            11,
+            13,
             {"eq_": [{"value_": 1}, {"value_": 1}]},
         ),
         # Base Case - simple false
@@ -739,6 +743,16 @@ def test_trace_call_filter(client):
         (
             1,
             {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+        ),
+        # eq - string
+        (
+            1,
+            {"eq_": [{"value_": "simple_primitive"}, {"field_": "inputs.in_val"}]},
+        ),
+        # eq - string out
+        (
+            1,
+            {"eq_": [{"value_": "simple_primitive"}, {"field_": "output"}]},
         ),
         # gt
         (
@@ -783,7 +797,7 @@ def test_trace_call_filter(client):
                     {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
                 ]
             },
-        )
+        ),
         # or
         (
             4,
@@ -797,10 +811,10 @@ def test_trace_call_filter(client):
                     {"gte_": [{"value_": 9}, {"field_": "inputs.in_val.prim"}]},
                 ]
             },
-        )
+        ),
         # Invalid type - safely return none
         (0, {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.str"}]}),
-        (0, {"eq_": [{"value_": "5"}, {"field_": "inputs.in_val.prim"}]})
+        (0, {"eq_": [{"value_": "5"}, {"field_": "inputs.in_val.prim"}]}),
         # Different key access
         (4, {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.list.0"}]}),
         (4, {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.dict.inner"}]}),
