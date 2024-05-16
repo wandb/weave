@@ -61,12 +61,14 @@ const DEFAULT_OPTION_RENDERER: OptionRenderer = ({
  * findLastIndex immediately returns that element index. Otherwise, findLastIndex returns -1.
  */
 export function findLastIndex<T>(
-  array: Array<T>,
+  array: T[],
   predicate: (value: T, index: number, obj: T[]) => boolean
 ): number {
   let l = array.length;
   while (l--) {
-    if (predicate(array[l], l, array)) return l;
+    if (predicate(array[l], l, array)) {
+      return l;
+    }
   }
   return -1;
 }
