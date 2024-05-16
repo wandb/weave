@@ -288,16 +288,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters["wb_run_ids"] = req.filter.wb_run_ids
 
         if req.filter_by:
-            filter_by_params = {}
+            filter_by_params: typing.Dict[str, typing.Any] = {}
             filter_by_param_prefix = "filter_by_"
 
-            def add_param(param_value: typing.Any) -> str:
+            def add_param(param_value: typing.Any) -> typing.Tuple[str, str]:
                 param_name = filter_by_param_prefix + str(len(filter_by_params))
                 filter_by_params[param_name] = param_value
                 return param_name, python_value_to_ch_type(param_value)
 
             # This is the mongo-style filter_by
-            def process_operation(operation):
+            def process_operation(operation: tsi._Operation) -> str:
                 cond = None
 
                 if isinstance(operation, tsi._AndOperation):
@@ -332,7 +332,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 return cond
 
-            def python_value_to_ch_type(value):
+            def python_value_to_ch_type(value: typing.Any) -> str:
                 if isinstance(value, str):
                     return "String"
                 elif isinstance(value, int):
@@ -346,7 +346,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 else:
                     raise ValueError(f"Unknown value type: {value}")
 
-            def process_operand(operand):
+            def process_operand(operand: tsi._Operand) -> str:
                 if isinstance(operand, tsi._RawValue):
                     param_name, param_type = add_param(operand.value_)
                     return "{" + param_name + ":" + param_type + "}"
@@ -402,7 +402,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                     else:
                         return field
-                elif isinstance(operand, tsi._Operation):
+                elif isinstance(operand, tsi._OperationTypes):
                     return process_operation(operand)
                 else:
                     raise ValueError(f"Unknown operand type: {operand}")

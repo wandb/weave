@@ -891,7 +891,9 @@ def test_trace_call_filter(client):
             )
 
     if failed_cases:
-        raise AssertionError("\n".join(failed_cases))
+        raise AssertionError(
+            f"Failed {len(failed_cases)} cases:" + "\n".join(failed_cases)
+        )
 
 
 def test_ops_with_default_params(client):
