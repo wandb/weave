@@ -26,7 +26,7 @@
     "noImplicitReturns": true,
     "paths": {
       "@wandb/weave/*": ["src/*"],
-      "plotly\\.js": ["plotly.js-dist-min"]
+      "plotly\\.js": ["plotly.js-dist-min"],
     },
     "preserveSymlinks": true,
     "resolveJsonModule": true,
