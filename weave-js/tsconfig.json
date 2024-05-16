@@ -16,8 +16,7 @@
       "scripthost",
       "esnext.asynciterable",
       "es2017.object",
-      "ES2019",
-      "es2023"
+      "ES2019"
     ],
     "module": "commonjs",
     "moduleResolution": "node",
