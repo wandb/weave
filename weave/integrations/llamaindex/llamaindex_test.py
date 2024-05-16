@@ -79,6 +79,9 @@ def fake_api_key() -> Generator[None, None, None]:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
+@pytest.mark.block_network(
+    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+)
 def test_llamaindex_quickstart(
     client: weave.weave_client.WeaveClient, fake_api_key: None
 ) -> None:
@@ -99,6 +102,9 @@ def test_llamaindex_quickstart(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
+)
+@pytest.mark.block_network(
+    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
 )
 @pytest.mark.asyncio
 async def test_llamaindex_quickstart_async(
