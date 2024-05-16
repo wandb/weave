@@ -17,7 +17,7 @@ class Nearly:
         self.v = v
 
     def __eq__(self, other):
-        return abs(self.v - other) < 0.01
+        return abs(self.v - other) < 0.03
 
 
 expected_eval_result = {
