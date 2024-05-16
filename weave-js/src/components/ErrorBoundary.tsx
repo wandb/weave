@@ -1,6 +1,5 @@
 import {datadogRum} from '@datadog/browser-rum';
 import * as Sentry from '@sentry/react';
-
 import React, {Component, ErrorInfo, ReactNode} from 'react';
 
 import {weaveErrorToDDPayload} from '../errors';

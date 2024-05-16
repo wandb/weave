@@ -1053,7 +1053,12 @@ export const CallsTable: FC<{
           tableStats={tableStats}
           columns={columns.cols as any}
         />
-        <button onClick={() => {throw new Error('test')}}>Throw Error</button>  
+        <button
+          onClick={() => {
+            throw new Error('test');
+          }}>
+          Throw Error
+        </button>
         <StyledDataGrid
           // Start Column Menu
           // ColumnMenu is needed to support pinning and column visibility
