@@ -207,15 +207,6 @@ _Operation: typing.TypeAlias = typing.Union[
     _LikeOperation,
 ]
 
-_OperationTypes = (
-    _AndOperation,
-    _OrOperation,
-    _NotOperation,
-    _EqOperation,
-    _GtOperation,
-    _GteOperation,
-    _LikeOperation,
-)
 
 # Update the models to include the recursive types
 _RawValue.model_rebuild()

@@ -402,7 +402,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                     else:
                         return field
-                elif isinstance(operand, tsi._OperationTypes):
+                elif isinstance(
+                    operand,
+                    (
+                        tsi._AndOperation,
+                        tsi._OrOperation,
+                        tsi._NotOperation,
+                        tsi._EqOperation,
+                        tsi._GtOperation,
+                        tsi._GteOperation,
+                        tsi._LikeOperation,
+                    ),
+                ):
                     return process_operation(operand)
                 else:
                     raise ValueError(f"Unknown operand type: {operand}")
