@@ -27,6 +27,15 @@ export const useCallsForQuery = (
     return convertHighLevelFilterToLowLevelFilter(filter);
   }, [filter]);
 
+  const offset = gridPage.page * gridPage.pageSize;
+  const limit = gridPage.pageSize;
+
+  // TODO: Pass offset and limit to useCall
+  // TODO: Convert Filter to Our Filter and Pass to Calls
+  // TODO: Convert Sort to Our Sort and Pass to Calls
+  // TODO: Implement a count endpoint (or (short term) - figure out some way to get
+  // the system to know there are more pages)
+
   const calls = useCalls(entity, project, lowLevelFilter);
   const callResults = useMemo(() => {
     return calls.result ?? [];
@@ -34,20 +43,19 @@ export const useCallsForQuery = (
 
   // 100% in-memory handling of sorting, filtering, and paging. MUST be moved to backend.
 
-  // Filter
-  console.log('Applying filter', gridFilter);
+  // Filter - Not implemented
+  // console.log('Applying filter', gridFilter);
   // TODO: Implement validation of filter fields
   // TODO: Implement filtering
 
-  // Sort
-  console.log('Applying sort', gridSort);
+  // Sort - Not implemented
+  // console.log('Applying sort', gridSort);
   // TODO: Implement validation of sort fields
   // TODO: Implement sorting
 
-  // Page
+  // Page - This is just implemented for fun.
   console.log('Applying page', gridPage);
-  const offset = gridPage.page * gridPage.pageSize;
-  const limit = gridPage.pageSize;
+
   const pagedCalls = useMemo(
     () => callResults.slice(offset, offset + limit),
     [callResults, offset, limit]
