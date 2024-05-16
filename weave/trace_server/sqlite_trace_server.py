@@ -372,7 +372,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 )
                 SELECT id FROM Descendants;
             """.format(
-                ", ".join("?" * len(req.ids))
+                ", ".join("?" * len(req.call_ids))
             )
 
             params = [req.project_id] + req.call_ids

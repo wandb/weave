@@ -241,28 +241,33 @@ def test_calls_query(client):
 
 def test_calls_delete(client):
     call0 = client.create_call("x", None, {"a": 5, "b": 10})
-    call1 = client.create_call("x", None, {"a": 6, "b": 11})
+    call0_child1 = client.create_call("x", call0, {"a": 5, "b": 11})
+    _call0_child2 = client.create_call("x", call0_child1, {"a": 5, "b": 12})
+    call1 = client.create_call("y", None, {"a": 6, "b": 11})
 
-    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
-    assert len(result) == 2
+    print([f"{x.id} {x.parent_id} \n" for x in list(client.calls())])
+    assert len(list(client.calls())) == 4
 
-    client.delete_call(call0)
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
+    assert len(result) == 3
 
-    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
+    # should deleted call0_child1, _call0_child2, call1, but not call0
+    client.delete_call(call0_child1)
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 1
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
+    assert len(result) == 0
 
     # no-op if already deleted
-    client.delete_call(call0)
+    client.delete_call(call0_child1)
+    call1.delete()
+    call1.delete()
 
-    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
+    result = list(client.calls())
+    # only call0 should be left
     assert len(result) == 1
-
-    call1.delete()
-    call1.delete()
-    client.delete_call(call1)
-
-    result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
-    assert len(result) == 0
 
 
 def test_calls_delete_cascade(client):
