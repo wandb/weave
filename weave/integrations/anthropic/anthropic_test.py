@@ -9,9 +9,9 @@ from typing import Generator
 
 @pytest.fixture()
 def patch_anthropic() -> Generator[None, None, None]:
-       anthropic_patcher.attempt_patch()
-       yield
-       anthropic_patcher.undo_patch()
+    anthropic_patcher.attempt_patch()
+    yield
+    anthropic_patcher.undo_patch()
 
 
 @pytest.mark.vcr(
@@ -21,7 +21,7 @@ def patch_anthropic() -> Generator[None, None, None]:
 def test_anthropic_quickstart(
     client: weave.weave_client.WeaveClient,
     patch_anthropic: None,
-    ) -> None:
+) -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     model = "claude-3-opus-20240229"
     anthropic_client = Anthropic(
@@ -30,11 +30,9 @@ def test_anthropic_quickstart(
     message = anthropic_client.messages.create(
         model=model,
         max_tokens=1024,
-        messages=[
-            {"role": "user", "content": "Hello, Claude"}
-        ]
+        messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-    
+
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
 
     assert len(res.calls) == 1
