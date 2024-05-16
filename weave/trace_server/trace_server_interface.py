@@ -147,11 +147,50 @@ class _CallsFilter(BaseModel):
     wb_run_ids: typing.Optional[typing.List[str]] = None
 
 
+# Field should be a key of `CallSchema`. For dictionary fields (`attributes`,
+# `inputs`, `outputs`, `summary`), the field can be dot-separated.
+FieldStr = str
+
+
 class _SortBy(BaseModel):
-    # Field should be a key of `CallSchema`. For dictionary fields (`attributes`, `inputs`, `outputs`, `summary`), the field can be dot-separated.
-    field: str
+    field: FieldStr
     # Direction should be either 'asc' or 'desc'
-    direction: str
+    direction: typing.Union[typing.Literal["asc"], typing.Literal["desc"]]
+
+
+class _ValueOperand(BaseModel):
+    type: typing.Literal["value"]
+    value: typing.Any
+
+
+class _FieldOperand(BaseModel):
+    type: typing.Literal["field"]
+    field: FieldStr
+
+
+_Operand = typing.Union[_ValueOperand, _FieldOperand]
+
+_Operator = typing.Union[
+    typing.Literal["equals"],
+    typing.Literal["greater_than"],
+    typing.Literal["greater_than_or_equals"],
+    typing.Literal["matches"],
+]
+
+
+class _FilterOperation(BaseModel):
+    left: _Operand
+    operator: _Operator
+    right: _Operand
+    negated: bool = False
+
+
+class _FilterByOrGroup(BaseModel):
+    any: typing.List[_FilterOperation]
+
+
+class _FilterBy(BaseModel):
+    all: typing.List[_FilterByOrGroup]
 
 
 class CallsQueryReq(BaseModel):
@@ -161,6 +200,7 @@ class CallsQueryReq(BaseModel):
     offset: typing.Optional[int] = None
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
+    filter_by: typing.Optional[_FilterBy] = None
 
 
 class CallsQueryRes(BaseModel):

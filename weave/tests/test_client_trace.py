@@ -700,6 +700,77 @@ def test_trace_call_sort(client):
         assert inner_res.calls[2].inputs["in_val"]["prim"] == last
 
 
+def test_trace_call_filter(client):
+    @weave.op()
+    def basic_op(in_val: dict, delay) -> dict:
+        import time
+
+        time.sleep(delay)
+        return in_val
+
+    for i in range(5):
+        basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
+
+    for (count, filter_by) in [
+        # Base Case - no filter
+        (
+            5,
+            tsi._FilterBy.model_validate(
+                {
+                    "all": [
+                        {
+                            "any": [
+                                {
+                                    "left": {"type": "value", "value": 1},
+                                    "operator": "equals",
+                                    "right": {"type": "value", "value": 1},
+                                    "negated": False,
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ),
+        ),
+        # Base Case - no filter negated
+        (
+            0,
+            tsi._FilterBy.model_validate(
+                {
+                    "all": [
+                        {
+                            "any": [
+                                {
+                                    "left": {"type": "value", "value": 1},
+                                    "operator": "equals",
+                                    "right": {"type": "value", "value": 1},
+                                    "negated": True,
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ),
+        ),
+        # TODO: Write a lot more tests!
+        # TODO: Make Clickhouse run in master!
+        # (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
+        # (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),
+        # (2, 0, [tsi._SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
+        # (2, 0, [tsi._SortBy(field="output.prim", direction="desc")]),
+        # (2, 0, [tsi._SortBy(field="output.list.0", direction="desc")]),
+        # (2, 0, [tsi._SortBy(field="output.dict.inner", direction="desc")]),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                filter_by=filter_by,
+            )
+        )
+
+        assert len(inner_res.calls) == count
+
+
 def test_ops_with_default_params(client):
     @weave.op()
     def op_with_default(a: int, b: int = 10) -> int:
