@@ -104,6 +104,11 @@ def pytest_collection_modifyitems(config, items):
 
     items[:] = selected_items
 
+    # Add the weave_client marker to all tests that have a client fixture
+    for item in items:
+        if "client" in item.fixturenames:
+            item.add_marker(pytest.mark.weave_client)
+
 
 @pytest.fixture(autouse=True)
 def pre_post_each_test(test_artifact_dir, caplog):
@@ -342,8 +347,3 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         yield inited_client.client
     finally:
         inited_client.reset()
-
-def pytest_collection_modifyitems(config, items):
-    for item in items:
-        if 'client' in item.fixturenames:
-            item.add_marker(pytest.mark.weave_client)

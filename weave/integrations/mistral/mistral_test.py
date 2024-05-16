@@ -21,7 +21,8 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "weave_clickhouse:8123"],
 )
 def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
@@ -72,7 +73,8 @@ def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "weave_clickhouse:8123"],
 )
 @pytest.mark.asyncio
 async def test_mistral_quickstart_async(client: weave.weave_client.WeaveClient) -> None:
@@ -120,7 +122,8 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "weave_clickhouse:8123"],
 )
 def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
@@ -174,7 +177,8 @@ def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) 
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "weave_clickhouse:8123"],
 )
 @pytest.mark.asyncio
 async def test_mistral_quickstart_with_stream_async(
