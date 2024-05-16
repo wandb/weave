@@ -72,7 +72,7 @@ import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {BoringColumnInfo} from '../CallPage/BoringColumnInfo';
-import { OverflowMenu } from '../CallPage/OverflowMenu';
+import {OverflowMenu} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
