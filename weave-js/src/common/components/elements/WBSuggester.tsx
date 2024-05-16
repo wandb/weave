@@ -63,9 +63,6 @@ export interface WBSuggesterProps {
    */
   contextContent?: React.ReactChild | null;
 
-  highlighted?: number | string | null;
-  onChangeHighlighted?: (newHighlight: number | string | null) => void;
-
   /**
    * The number of pixels above the bottom you can scroll before loading the next page.
    */
@@ -112,8 +109,6 @@ const WBSuggester: React.FC<WBSuggesterProps> = ({
   sortScoreFn,
   onResolvedOptions,
   contextContent,
-  highlighted,
-  onChangeHighlighted,
 }) => {
   const defaultSortScoreFn: SortScoreFn = option => {
     const s = option.name ?? option.value.toString();
@@ -157,8 +152,6 @@ const WBSuggester: React.FC<WBSuggesterProps> = ({
               }
               dataTest={dataTest}
               options={filteredOptions}
-              highlighted={highlighted}
-              onChangeHighlighted={onChangeHighlighted}
               highlightFirst
               selected={selected}
               pageSize={pageSize}
