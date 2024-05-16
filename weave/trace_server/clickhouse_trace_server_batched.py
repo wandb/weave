@@ -384,20 +384,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         json_path_param_name, json_path_param_type = add_param(
                             "$." + json_path
                         )
-                        method = "JSONExtractString"
+                        method = "toString"
                         if operand.cast_ == "int":
-                            method = "JSONExtractInt"
+                            method = "toInt64OrNull" 
                         elif operand.cast_ == "float":
-                            method = "JSONExtractFloat"
+                            method = "toFloat64OrNull"
                         elif operand.cast_ == "bool":
-                            method = "JSONExtractBool"
+                            method = "toUInt8OrNull"
                         return (
                             method
-                            + "("
+                            + "(JSON_VALUE("
                             + field
                             + ", {"
                             + json_path_param_name
-                            + ":String})"
+                            + ":String}))"
                         )
 
                     else:
