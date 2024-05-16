@@ -27,10 +27,17 @@ export class ErrorBoundary extends Component<Props, State> {
       'weave_panel_error_boundary',
       weaveErrorToDDPayload(error)
     );
-    Sentry.withScope(scope => {
-      scope.setTag("weave_error", "true");
-      Sentry.captureException(error);
-    });
+    try {
+      if (!!Sentry?.getCurrentHub()?.getClient()?.getOptions()?.dsn) {
+        console.log('ErrorBoundary: ', error.message);
+        Sentry.withScope(scope => {
+          scope.setTag('weave_error', 'true');
+          Sentry.captureException(error);
+        });
+      }
+    } catch (e) {
+      console.log('ErrorBoundary: sentry is not inited');
+    }
   }
 
   public render() {
