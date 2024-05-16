@@ -80,11 +80,7 @@ export type TraceCallsQueryRes = {
 
 export type TraceCallsDeleteReq = {
   project_id: string;
-  ids: string[];
-};
-
-export type TraceCallsDeleteRes = {
-  success: boolean;
+  call_ids: string[];
 };
 
 interface TraceObjectsFilter {
@@ -186,13 +182,9 @@ export class TraceServerClient {
     this.scheduleReadBatch();
   }
 
-  callsDelete: (req: TraceCallsDeleteReq) => Promise<TraceCallsDeleteRes> =
-    req => {
-      return this.makeRequest<TraceCallsDeleteReq, TraceCallsDeleteRes>(
-        '/calls/delete',
-        req
-      );
-    };
+  callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
+    return this.makeRequest<TraceCallsDeleteReq, void>('/calls/delete', req);
+  };
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(

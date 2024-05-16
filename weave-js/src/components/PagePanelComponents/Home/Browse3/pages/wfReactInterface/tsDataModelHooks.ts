@@ -210,13 +210,18 @@ const useCalls = (
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
 
-  const [doRefetch, setDoRefetch] = useState(false);
+  const currTimestamp = new Date().getTime();
+  const [lastFetch, setLastFetch] = useState(currTimestamp);
   const refetch = useCallback(() => {
-    setDoRefetch(r => !r);
-  }, []);
+    setLastFetch(currTimestamp);
+  }, [currTimestamp]);
 
   useEffect(() => {
     if (opts?.skip) {
+      return;
+    }
+    if (lastFetch !== currTimestamp) {
+      // Skip if we're not refetching
       return;
     }
     setCallRes(null);
@@ -246,7 +251,16 @@ const useCalls = (
       setCallRes({calls: []});
     };
     getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, limit, opts?.skip, doRefetch, getTsClient]);
+  }, [
+    entity,
+    project,
+    deepFilter,
+    limit,
+    opts?.skip,
+    lastFetch,
+    currTimestamp,
+    getTsClient,
+  ]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -289,9 +303,9 @@ const useCallsDelete = () => {
   const getTsClient = useGetTraceServerClientContext();
 
   const callsDelete = useCallback(
-    (projectID, ids): Promise<traceServerClient.TraceCallsDeleteRes> => {
+    (projectID, callIDs): Promise<void> => {
       return getTsClient()
-        .callsDelete({project_id: projectID, ids})
+        .callsDelete({project_id: projectID, call_ids: callIDs})
         .catch(e => {
           console.error(e);
           return {success: false};
