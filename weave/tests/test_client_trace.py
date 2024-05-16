@@ -708,13 +708,26 @@ def test_trace_call_filter(client):
         time.sleep(delay)
         return in_val
 
-    for i in range(5):
-        basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
+    for i in range(10):
+        basic_op(
+            {"prim": i, "list": [i], "dict": {"inner": i}, "str": "str_" + str(i)},
+            i / 10,
+        )
+
+    # Adding a row of a different type here to make sure we safely exclude it without it messing up other things
+    basic_op(
+        {
+            "prim": "Different Type",
+            "list": "Different Type",
+            "dict": "Different Type",
+            "str": False,
+        },
+    )
 
     for (count, filter_by) in [
         # Base Case - simple True
         (
-            5,
+            11,
             {"eq_": [{"value_": 1}, {"value_": 1}]},
         ),
         # Base Case - simple false
@@ -722,14 +735,78 @@ def test_trace_call_filter(client):
             0,
             {"eq_": [{"value_": 1}, {"value_": 2}]},
         ),
-        # TODO: Write a lot more tests!
-        # TODO: Make Clickhouse run in master!
-        # (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
-        # (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),
-        # (2, 0, [tsi._SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
-        # (2, 0, [tsi._SortBy(field="output.prim", direction="desc")]),
-        # (2, 0, [tsi._SortBy(field="output.list.0", direction="desc")]),
-        # (2, 0, [tsi._SortBy(field="output.dict.inner", direction="desc")]),
+        # eq
+        (
+            1,
+            {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+        ),
+        # gt
+        (
+            4,
+            {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+        ),
+        # gte
+        (
+            5,
+            {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+        ),
+        # not gt = lte
+        (
+            5,
+            {"not_": {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]}},
+        ),
+        # not gte = lt
+        (
+            4,
+            {"not_": {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]}},
+        ),
+        # regex all
+        (
+            10,
+            {"regex_": [{"field_": "inputs.in_val.str"}, {"value_": ".*"}]},
+        ),
+        # regex select
+        (
+            1,
+            {"regex_": [{"field_": "inputs.in_val.str"}, {"value_": "5"}]},
+        ),
+        # and
+        (
+            3,
+            {
+                "and_": [
+                    {
+                        "not_": {
+                            "gt_": [{"value_": 7}, {"field_": "inputs.in_val.prim"}]
+                        }
+                    },
+                    {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+                ]
+            },
+        )
+        # or
+        (
+            4,
+            {
+                "or_": [
+                    {
+                        "not_": {
+                            "gt_": [{"value_": 3}, {"field_": "inputs.in_val.prim"}]
+                        }
+                    },
+                    {"gte_": [{"value_": 9}, {"field_": "inputs.in_val.prim"}]},
+                ]
+            },
+        )
+        # Invalid type - safely return none
+        (0, {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.str"}]}),
+        (0, {"eq_": [{"value_": "5"}, {"field_": "inputs.in_val.prim"}]})
+        # Different key access
+        (4, {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.list.0"}]}),
+        (4, {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.dict.inner"}]}),
+        (4, {"gt_": [{"value_": 5}, {"field_": "output.prim"}]}),
+        (4, {"gt_": [{"value_": 5}, {"field_": "output.list.0"}]}),
+        (4, {"gt_": [{"value_": 5}, {"field_": "output.dict.inner"}]}),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
