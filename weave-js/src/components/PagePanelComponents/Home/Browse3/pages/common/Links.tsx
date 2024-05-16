@@ -14,7 +14,7 @@ import {
   usePeekLocation,
   useWeaveflowRouteContext,
 } from '../../context';
-import {WFHighLevelCallFilter} from '../CallsPage/CallsPage';
+import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {CallId} from './CallId';

@@ -5,6 +5,7 @@
  * the context.
  */
 
+import {parseRef} from '../../../../../../react';
 import {WANDB_ARTIFACT_SCHEME} from '../../../common';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
@@ -167,42 +168,23 @@ const wandbArtifactRefStringToRefDict = (uri: string): WFNaiveRefDict => {
 };
 
 const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
-  const scheme = WEAVE_REF_SCHEME;
-  if (!uri.startsWith(WEAVE_REF_PREFIX)) {
+  const parsed = parseRef(uri);
+  if (parsed.scheme !== WEAVE_REF_SCHEME) {
     throw new Error('Invalid uri: ' + uri);
   }
-  const uriWithoutScheme = uri.slice(WEAVE_REF_PREFIX.length);
-  let uriParts = uriWithoutScheme;
-  // let refExtraPath = '';
-  // const refExtraTuples = [];
-  // if (uriWithoutScheme.includes('#')) {
-  //   [uriParts, refExtraPath] = uriWithoutScheme.split('#');
-  //   const refExtraParts = refExtraPath.split('/');
-  //   if (refExtraParts.length % 2 !== 0) {
-  //     throw new Error('Invalid uri: ' + uri);
-  //   }
-  //   for (let i = 0; i < refExtraParts.length; i += 2) {
-  //     refExtraTuples.push({
-  //       edgeType: refExtraParts[i],
-  //       edgeName: refExtraParts[i + 1],
-  //     });
-  //   }
-  // }
-  if (uriParts.endsWith('/')) {
-    uriParts = uriParts.slice(0, -1);
-  }
-  const [entity, project, weaveKind, artifactNameAndVersion, ...refExtraParts] =
-    uriParts.split('/');
+  const {
+    scheme,
+    entityName: entity,
+    projectName: project,
+    artifactName,
+    weaveKind,
+    artifactVersion: versionCommitHash,
+    artifactRefExtra,
+  } = parsed;
 
-  if (!['object', 'op', 'table'].includes(weaveKind)) {
-    throw new Error('Invalid uri: ' + uri + '. got: ' + weaveKind);
-  }
-
-  const [artifactName, versionCommitHash] = artifactNameAndVersion.split(':');
-  const refExtraTuples = [];
-
-  if (refExtraParts) {
-    // {const refExtraParts = refExtraPath.split('/');
+  const refExtraTuples: WFNaiveRefDict['refExtraTuples'] = [];
+  if (artifactRefExtra) {
+    const refExtraParts = artifactRefExtra.split('/');
     if (refExtraParts.length % 2 !== 0) {
       throw new Error('Invalid uri: ' + uri + '. got: ' + refExtraParts);
     }
@@ -218,7 +200,7 @@ const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
     scheme,
     entity,
     project,
-    weaveKind: weaveKind as 'object' | 'table' | 'op',
+    weaveKind,
     artifactName,
     versionCommitHash,
     filePathParts: [],
