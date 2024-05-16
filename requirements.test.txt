@@ -21,29 +21,8 @@ supervisor>=4.2.5
 clickhouse_connect==0.7.0
 uvicorn>=0.27.0
 fastapi>=0.110.0
-SecretStorage>=3.3.3
-six>=1.16.0  # required by hypothesis
-pyzmq>=26.0.3  # required by notebook
-rpds-py>=0.18.1  # required by notebook
-soupsieve>=2.5  # required by notebook
-referencing>=0.35.1  # required by notebook
-sniffio>=1.3.1  # required by notebook, llama-index
-smmap>=5.0.1  # required by notebook, llama-index
-charset-normalizer>=3.3.2  # required by wandb, llama-index
-certifi>=2024.2.2  # required by wandb, llama-index
-regex>=2024.5.15  # required by llama-index
-pytz>=2024.1  # required by llama-index
-scipy>=1.13.0  # required by umap-learn
-rfc3986>=2.0.0  # requied by twine
-nh3>=0.2.17  # required by twine
-docutils>=0.21.2  # required by twine
-readme_renderer>=43.0  # required by twine
 tqdm>=4.66.3  # CVE 2024-34062
 cryptography>=42.0.7  # CVE 2023-23931
-sortedcontainers>=2.4.0
-requests>=2.31.0
-rfc3986-validator>=0.1.1
-
 
 # Integration Tests
 pytest-recording==0.13.1

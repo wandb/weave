@@ -1,13 +1,14 @@
 # Should match version in integration_test/package.json
 FROM cypress/included:10.11.0 as builder
 
-RUN apt update
+RUN apt update && apt upgrade -y
 RUN apt -y install python3-venv python3-dev gcc g++ xz-utils
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 COPY requirements.* /root/
 WORKDIR /root
 RUN python3 -m venv venv
 RUN --mount=type=cache,target=/root/.cache /bin/bash -c "source venv/bin/activate && \
+    pip install --upgrade pip && \
     pip install -r requirements.test.txt -r requirements.dev.txt && \
     pip install \"spacy>=3.0.0,<4.0.0\" && python3 -m spacy download en_core_web_sm"
 
