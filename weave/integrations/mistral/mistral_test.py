@@ -21,10 +21,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-)
-@pytest.mark.block_network(
-    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
@@ -75,10 +72,7 @@ def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-)
-@pytest.mark.block_network(
-    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
 async def test_mistral_quickstart_async(client: weave.weave_client.WeaveClient) -> None:
@@ -126,10 +120,7 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-)
-@pytest.mark.block_network(
-    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
@@ -183,17 +174,14 @@ def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) 
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-)
-@pytest.mark.block_network(
-    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
 async def test_mistral_quickstart_with_stream_async(
     client: weave.weave_client.WeaveClient,
 ) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
-    api_key = os.environ.get("MISTRAL_API_KEY", "Ax1zTPxR1U0Y3jcDsj4Wl09IS3TBJxk4")
+    api_key = os.environ.get("MISTRAL_API_KEY", "DUMMY_API_KEY")
     model = "mistral-large-latest"
 
     mistral_client = MistralAsyncClient(api_key=api_key)

@@ -55,8 +55,8 @@ This directory contains various integrations for Weave. As of this writing, ther
    ```
    @pytest.mark.vcr(
        filter_headers=["authorization"],
+       allowed_hosts=["api.wandb.ai", "localhost"],
    )
-   @pytest.mark.block_network(allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"])
    def test_<vendor>_quickstart(
        client: weave.weave_client.WeaveClient,
        patch_<vendor>: None,

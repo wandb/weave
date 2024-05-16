@@ -35,10 +35,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-)
-@pytest.mark.block_network(
-    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_litellm_quickstart(
     client: weave.weave_client.WeaveClient, patch_litellm: None
@@ -77,10 +74,7 @@ def test_litellm_quickstart(
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-)
-@pytest.mark.block_network(
-    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
 async def test_litellm_quickstart_async(
@@ -120,10 +114,7 @@ async def test_litellm_quickstart_async(
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-)
-@pytest.mark.block_network(
-    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_litellm_quickstart_stream(
     client: weave.weave_client.WeaveClient, patch_litellm: None
@@ -167,10 +158,7 @@ def test_litellm_quickstart_stream(
 
 
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-)
-@pytest.mark.block_network(
-    allowed_hosts=["::1", "api.wandb.ai", "localhost", "weave_clickhouse"]
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
 async def test_litellm_quickstart_stream_async(

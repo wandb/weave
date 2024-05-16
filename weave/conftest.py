@@ -7,6 +7,7 @@ import typing
 import pytest
 import shutil
 import tempfile
+import vcr
 
 import weave
 
@@ -107,7 +108,10 @@ def pytest_collection_modifyitems(config, items):
     # Add the weave_client marker to all tests that have a client fixture
     for item in items:
         if "client" in item.fixturenames:
-            item.add_marker(pytest.mark.weave_client)
+            # Ideally this inner condition would not be needed,
+            # but it seems that vcr and clickhouse client don't play well together
+            if item.get_closest_marker("vcr") is None:
+                item.add_marker(pytest.mark.weave_client)
 
 
 @pytest.fixture(autouse=True)
@@ -347,3 +351,30 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         yield inited_client.client
     finally:
         inited_client.reset()
+
+
+# def my_vcr():
+#     return vcr.VCR(
+#         # cassette_library_dir='cassettes',
+#         # path_transformer=vcr.VCR.ensure_suffix('.yaml'),
+#         record_mode='once',
+#         # before_record_request=before_record_request,
+#         filter_headers=['authorization'],
+#         ignore_hosts=["api.wandb.ai", "localhost", "weave_clickhouse"],
+#     )
+
+# # def before_record_request(request):
+# #     # Allow requests to specific hosts or paths
+# #     allowed_hosts = ["api.wandb.ai", "localhost", "weave_clickhouse"]
+# #     if request.host in allowed_hosts:
+# #         return None  # Returning None allows the request to pass through
+
+# #     # Otherwise, record the request
+# #     return request
+
+# @pytest.fixture(scope='module')
+# def vcr_cassette():
+#     return my_vcr()
+
+# def pytest_configure(config):
+#     config.pluginmanager.register(vcr.VCRPlugin(), 'vcr')
