@@ -287,6 +287,131 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 conditions.append("wb_run_id IN {wb_run_ids: Array(String)}")
                 parameters["wb_run_ids"] = req.filter.wb_run_ids
 
+        if req.filter_by:
+            filter_by_params = {}
+            filter_by_param_prefix = "filter_by_"
+
+            def add_param(param_value: typing.Any) -> str:
+                param_name = filter_by_param_prefix + str(len(filter_by_params))
+                filter_by_params[param_name] = param_value
+                return param_name, python_value_to_ch_type(param_value)
+
+            # This is the mongo-style filter_by
+            def process_operation(operation):
+                cond = None
+
+                if isinstance(operation, tsi._AndOperation):
+                    lhs_part = process_operand(operation.and_[0])
+                    rhs_part = process_operand(operation.and_[1])
+                    cond = f"({lhs_part} AND {rhs_part})"
+                elif isinstance(operation, tsi._OrOperation):
+                    lhs_part = process_operand(operation.or_[0])
+                    rhs_part = process_operand(operation.or_[1])
+                    cond = f"({lhs_part} OR {rhs_part})"
+                elif isinstance(operation, tsi._NotOperation):
+                    operand_part = process_operand(operation.not_)
+                    cond = f"(NOT ({operand_part}))"
+                elif isinstance(operation, tsi._EqOperation):
+                    lhs_part = process_operand(operation.eq_[0])
+                    rhs_part = process_operand(operation.eq_[1])
+                    cond = f"({lhs_part} = {rhs_part})"
+                elif isinstance(operation, tsi._GtOperation):
+                    lhs_part = process_operand(operation.gt_[0])
+                    rhs_part = process_operand(operation.gt_[1])
+                    cond = f"({lhs_part} > {rhs_part})"
+                elif isinstance(operation, tsi._GteOperation):
+                    lhs_part = process_operand(operation.gte_[0])
+                    rhs_part = process_operand(operation.gte_[1])
+                    cond = f"({lhs_part} >= {rhs_part})"
+                elif isinstance(operation, tsi._LikeOperation):
+                    lhs_part = process_operand(operation.like_[0])
+                    rhs_part = process_operand(operation.like_[1])
+                    cond = f"({lhs_part} LIKE {rhs_part})"
+                else:
+                    raise ValueError(f"Unknown operation type: {operation}")
+
+                return cond
+
+            def python_value_to_ch_type(value):
+                if isinstance(value, str):
+                    return "String"
+                elif isinstance(value, int):
+                    return "UInt64"
+                elif isinstance(value, float):
+                    return "Float64"
+                elif isinstance(value, bool):
+                    return "UInt8"
+                elif value is None:
+                    return "Nullable(String)"
+                else:
+                    raise ValueError(f"Unknown value type: {value}")
+
+            def process_operand(operand):
+                if isinstance(operand, tsi._RawValue):
+                    param_name, param_type = add_param(operand.value_)
+                    return "{" + param_name + ":" + param_type + "}"
+                elif isinstance(operand, tsi._FieldSelect):
+                    # TODO: Extract this to work with the sort implementation - basically the same logic
+                    json_path = None
+                    if operand.field_.startswith("inputs"):
+                        field = "inputs_dump" + operand.field_[len("inputs") :]
+                        if field.startswith("inputs_dump."):
+                            json_path = field[len("inputs_dump.") :]
+                            field = "inputs_dump"
+                    elif operand.field_.startswith("output"):
+                        field = "output_dump" + operand.field_[len("output") :]
+                        if field.startswith("output_dump."):
+                            json_path = field[len("output_dump.") :]
+                            field = "output_dump"
+                    elif operand.field_.startswith("attributes"):
+                        field = "attributes_dump" + operand.field_[len("attributes") :]
+                        if field.startswith("attributes_dump."):
+                            json_path = field[len("attributes_dump.") :]
+                            field = "attributes_dump"
+                    elif operand.field_.startswith("summary"):
+                        field = "summary_dump" + operand.field_[len("summary") :]
+                        if field.startswith("summary_dump."):
+                            json_path = field[len("summary_dump.") :]
+                            field = "summary_dump"
+                    else:
+                        field = operand.field_
+
+                    # validate field
+                    if field not in all_call_select_columns:
+                        raise ValueError(f"Unknown field: {field}")
+
+                    if json_path is not None:
+                        json_path_param_name, json_path_param_type = add_param(
+                            "$." + json_path
+                        )
+                        method = "JSONExtractString"
+                        if operand.cast_ == "int":
+                            method = "JSONExtractInt"
+                        elif operand.cast_ == "float":
+                            method = "JSONExtractFloat"
+                        elif operand.cast_ == "bool":
+                            method = "JSONExtractBool"
+                        return (
+                            method
+                            + "("
+                            + field
+                            + ", {"
+                            + json_path_param_name
+                            + ":String})"
+                        )
+
+                    else:
+                        return field
+                elif isinstance(operand, tsi._Operation):
+                    return process_operation(operand)
+                else:
+                    raise ValueError(f"Unknown operand type: {operand}")
+
+            filter_cond = process_operation(req.filter_by.filter)
+
+            conditions.append(filter_cond)
+            parameters.update(filter_by_params)
+
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
             conditions=conditions,
@@ -904,6 +1029,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 ], f"Invalid order_by direction: {direction}"
                 if json_path:
                     key = f"order_field_{field}"
+                    # TODO! Fix this injection!
                     field = f"JSON_VALUE({field}, '$.{{{key}: String}}')"
                     parameters[key] = json_path
                 order_parts.append(f"{field} {direction}")

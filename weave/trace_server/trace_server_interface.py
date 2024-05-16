@@ -158,6 +158,8 @@ class _RawValue(BaseModel):
 # `inputs`, `outputs`, `summary`), the field can be dot-separated.
 class _FieldSelect(BaseModel):
     field_: str
+    # Should this be an operation??
+    cast_: typing.Optional[typing.Literal["str", "int", "float", "bool"]] = None
 
 
 _Operand: typing.TypeAlias = typing.Union[_RawValue, _FieldSelect, "_Operation"]
@@ -191,8 +193,8 @@ class _GteOperation(BaseModel):
     gte_: typing.Tuple["_Operand", "_Operand"]
 
 
-class _RegexOperation(BaseModel):
-    regex_: typing.Tuple["_Operand", "_Operand"]
+class _LikeOperation(BaseModel):
+    like_: typing.Tuple["_Operand", "_Operand"]
 
 
 _Operation: typing.TypeAlias = typing.Union[
@@ -202,7 +204,7 @@ _Operation: typing.TypeAlias = typing.Union[
     _EqOperation,
     _GtOperation,
     _GteOperation,
-    _RegexOperation,
+    _LikeOperation,
 ]
 
 # Update the models to include the recursive types
@@ -214,7 +216,7 @@ _NotOperation.model_rebuild()
 _EqOperation.model_rebuild()
 _GtOperation.model_rebuild()
 _GteOperation.model_rebuild()
-_RegexOperation.model_rebuild()
+_LikeOperation.model_rebuild()
 
 
 class _FilterBy(BaseModel):
@@ -236,7 +238,9 @@ class CallsQueryReq(BaseModel):
     offset: typing.Optional[int] = None
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
-    filter_by: typing.Optional[_FilterBy] = None
+    filter_by: typing.Optional[
+        _FilterBy
+    ] = None  # should this be moved inside of "filter?"
 
 
 class CallsQueryRes(BaseModel):

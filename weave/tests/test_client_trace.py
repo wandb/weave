@@ -728,6 +728,7 @@ def test_trace_call_filter(client):
     basic_op("simple_primitive", 0.1)
     basic_op(42, 0.1)
 
+    failed_cases = []
     for (count, filter_by) in [
         # Base Case - simple True
         (
@@ -742,7 +743,7 @@ def test_trace_call_filter(client):
         # eq
         (
             1,
-            {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+            {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.prim", "cast_": "int"}]},
         ),
         # eq - string
         (
@@ -757,32 +758,46 @@ def test_trace_call_filter(client):
         # gt
         (
             4,
-            {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+            {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.prim", "cast_": "int"}]},
         ),
         # gte
         (
             5,
-            {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+            {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim", "cast_": "int"}]},
         ),
         # not gt = lte
         (
             5,
-            {"not_": {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]}},
+            {
+                "not_": {
+                    "gt_": [
+                        {"value_": 5},
+                        {"field_": "inputs.in_val.prim", "cast_": "int"},
+                    ]
+                }
+            },
         ),
         # not gte = lt
         (
             4,
-            {"not_": {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]}},
+            {
+                "not_": {
+                    "gte_": [
+                        {"value_": 5},
+                        {"field_": "inputs.in_val.prim", "cast_": "int"},
+                    ]
+                }
+            },
         ),
-        # regex all
+        # like all
+        (
+            13,
+            {"like_": [{"field_": "inputs.in_val.str"}, {"value_": "%"}]},
+        ),
+        # like select
         (
             10,
-            {"regex_": [{"field_": "inputs.in_val.str"}, {"value_": ".*"}]},
-        ),
-        # regex select
-        (
-            1,
-            {"regex_": [{"field_": "inputs.in_val.str"}, {"value_": "5"}]},
+            {"like_": [{"field_": "inputs.in_val.str"}, {"value_": "str%"}]},
         ),
         # and
         (
@@ -791,10 +806,18 @@ def test_trace_call_filter(client):
                 "and_": [
                     {
                         "not_": {
-                            "gt_": [{"value_": 7}, {"field_": "inputs.in_val.prim"}]
+                            "gt_": [
+                                {"value_": 7},
+                                {"field_": "inputs.in_val.prim", "cast_": "int"},
+                            ]
                         }
                     },
-                    {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim"}]},
+                    {
+                        "gte_": [
+                            {"value_": 5},
+                            {"field_": "inputs.in_val.prim", "cast_": "int"},
+                        ]
+                    },
                 ]
             },
         ),
@@ -805,23 +828,56 @@ def test_trace_call_filter(client):
                 "or_": [
                     {
                         "not_": {
-                            "gt_": [{"value_": 3}, {"field_": "inputs.in_val.prim"}]
+                            "gt_": [
+                                {"value_": 3},
+                                {"field_": "inputs.in_val.prim", "cast_": "int"},
+                            ]
                         }
                     },
-                    {"gte_": [{"value_": 9}, {"field_": "inputs.in_val.prim"}]},
+                    {
+                        "gte_": [
+                            {"value_": 9},
+                            {"field_": "inputs.in_val.prim", "cast_": "int"},
+                        ]
+                    },
                 ]
             },
         ),
         # Invalid type - safely return none
-        (0, {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.str"}]}),
-        (0, {"eq_": [{"value_": "5"}, {"field_": "inputs.in_val.prim"}]}),
+        (0, {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.str", "cast_": "int"}]}),
+        (
+            0,
+            {
+                "eq_": [
+                    {"value_": "5"},
+                    {"field_": "inputs.in_val.prim", "cast_": "str"},
+                ]
+            },
+        ),
         # Different key access
-        (4, {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.list.0"}]}),
-        (4, {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.dict.inner"}]}),
-        (4, {"gt_": [{"value_": 5}, {"field_": "output.prim"}]}),
-        (4, {"gt_": [{"value_": 5}, {"field_": "output.list.0"}]}),
-        (4, {"gt_": [{"value_": 5}, {"field_": "output.dict.inner"}]}),
+        (
+            4,
+            {
+                "gt_": [
+                    {"value_": 5},
+                    {"field_": "inputs.in_val.list.0", "cast_": "int"},
+                ]
+            },
+        ),
+        (
+            4,
+            {
+                "gt_": [
+                    {"value_": 5},
+                    {"field_": "inputs.in_val.dict.inner", "cast_": "int"},
+                ]
+            },
+        ),
+        (4, {"gt_": [{"value_": 5}, {"field_": "output.prim", "cast_": "int"}]}),
+        (4, {"gt_": [{"value_": 5}, {"field_": "output.list.0", "cast_": "int"}]}),
+        (4, {"gt_": [{"value_": 5}, {"field_": "output.dict.inner", "cast_": "int"}]}),
     ]:
+        print(f"TEST CASE [{count}]", filter_by)
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
@@ -829,7 +885,13 @@ def test_trace_call_filter(client):
             )
         )
 
-        assert len(inner_res.calls) == count
+        if len(inner_res.calls) != count:
+            failed_cases.append(
+                f"Query {filter_by} expected {count}, but found {len(inner_res.calls)}"
+            )
+
+    if failed_cases:
+        raise AssertionError("\n".join(failed_cases))
 
 
 def test_ops_with_default_params(client):
