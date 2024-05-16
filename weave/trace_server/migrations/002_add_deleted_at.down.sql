@@ -1,9 +1,16 @@
+/*
+This migration undoes the addition of the deleted_at column to: 
+    - the object_versions, call_parts, and calls_merged tables
+    - the object_versions_deduped and calls_merged_view views
+*/
+
 ALTER TABLE object_versions DROP COLUMN deleted_at;
 
 CREATE OR REPLACE VIEW object_versions_deduped as
     SELECT project_id,
         object_id,
         created_at,
+        -- **** remove deleted_at from view ****
         kind,
         base_object_class,
         refs,
@@ -58,6 +65,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs
+        -- **** remove deleted_at from view ****
     FROM call_parts
     GROUP BY project_id,
         id;

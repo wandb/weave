@@ -78,19 +78,20 @@ const ConfirmDeleteModal: FC<{
   const callsDelete = useCallsDelete();
   const closePeek = useClosePeek();
 
+  let error = null;
+  if (calls.length === 0) {
+    error = 'No calls selected';
+  }
   if (new Set(calls.map(c => c.entity)).size > 1) {
-    throw new Error('Cannot delete calls from multiple entities');
+    error = 'Cannot delete calls from multiple entities';
   }
-  const entity = calls.length > 0 ? calls[0].entity : '';
-
   if (new Set(calls.map(c => c.project)).size > 1) {
-    throw new Error('Cannot delete calls from multiple projects');
+    error = 'Cannot delete calls from multiple projects';
   }
-  const project = calls.length > 0 ? calls[0].project : '';
 
   const onDelete = () => {
     callsDelete(
-      `${entity}/${project}`,
+      `${calls[0].entity}/${calls[0].project}`,
       calls.map(c => c.callId)
     );
     setConfirmDelete(false);
@@ -106,10 +107,14 @@ const ConfirmDeleteModal: FC<{
       size="tiny">
       <Modal.Header>Delete {calls.length > 1 ? 'calls' : 'call'}</Modal.Header>
       <Modal.Content>
-        <p>
-          Are you sure you want to delete
-          {calls.length > 1 ? ' these calls' : ' this call'}?
-        </p>
+        {error != null ? (
+          <p style={{color: 'red'}}>{error}</p>
+        ) : (
+          <p>
+            Are you sure you want to delete
+            {calls.length > 1 ? ' these calls' : ' this call'}?
+          </p>
+        )}
         {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
           <CallName key={call.callId}>{call.spanName}</CallName>
         ))}
@@ -130,6 +135,7 @@ const ConfirmDeleteModal: FC<{
         <Button
           style={{marginLeft: '4px'}}
           variant="destructive"
+          disabled={error != null}
           onClick={onDelete}>
           {calls.length > 1 ? 'Delete calls' : 'Delete call'}
         </Button>

@@ -5,7 +5,7 @@ CREATE OR REPLACE VIEW object_versions_deduped as
     SELECT project_id,
         object_id,
         created_at,
-        deleted_at,
+        deleted_at,  -- **** Add deleted_at to the view ****
         kind,
         base_object_class,
         refs,
@@ -66,7 +66,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs,
-        anySimpleState(deleted_at) as deleted_at
+        anySimpleState(deleted_at) as deleted_at  -- **** Add deleted_at to the view ****
     FROM call_parts
     GROUP BY project_id,
         id;

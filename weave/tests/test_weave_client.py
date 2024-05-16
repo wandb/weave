@@ -246,19 +246,20 @@ def test_calls_delete(client):
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 2
 
-    assert client.delete_call(call0)
+    client.delete_call(call0)
 
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 1
 
     # no-op if already deleted
-    assert not client.delete_call(call0)
+    client.delete_call(call0)
 
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 1
 
-    assert call1.delete()
-    assert not call1.delete()
+    call1.delete()
+    call1.delete()
+    client.delete_call(call1)
 
     result = list(client.calls(weave_client._CallsFilter(op_names=["x"])))
     assert len(result) == 0
@@ -290,8 +291,7 @@ def test_calls_delete_cascade(client):
     assert len(eval_call_children) == 3
 
     # delete the evaluation, should cascade to all the calls and sub-calls
-    assert client.delete_call(eval_call)
-    assert not client.delete_call(eval_call)
+    client.delete_call(eval_call)
 
     # check that all the calls are gone
     result = list(client.calls())

@@ -375,9 +375,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 ", ".join("?" * len(req.ids))
             )
 
-            params = [req.project_id] + req.ids
+            params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
-            all_ids = [x[0] for x in cursor.fetchall()] + req.ids
+            all_ids = [x[0] for x in cursor.fetchall()] + req.call_ids
 
             # set deleted_at for all children and parents
             delete_query = """
@@ -392,7 +392,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             cursor.execute(delete_query, all_ids)
             conn.commit()
 
-        return tsi.CallsDeleteRes(success=True)
+        return tsi.CallsDeleteRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()

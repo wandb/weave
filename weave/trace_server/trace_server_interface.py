@@ -140,11 +140,11 @@ class CallReadRes(BaseModel):
 
 class CallsDeleteReq(BaseModel):
     project_id: str
-    ids: typing.List[str]
+    call_ids: typing.List[str]
 
 
 class CallsDeleteRes(BaseModel):
-    success: bool
+    pass
 
 
 class _CallsFilter(BaseModel):

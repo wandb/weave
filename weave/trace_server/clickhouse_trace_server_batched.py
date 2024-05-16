@@ -36,6 +36,8 @@ MAX_FLUSH_AGE = 15
 
 FILE_CHUNK_SIZE = 100000
 
+MAX_DELETE_CALLS_COUNT = 100
+
 
 class NotFoundError(Exception):
     pass
@@ -306,6 +308,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
+            raise RequestTooLarge(
+                f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
+            )
+
         deleted_at = datetime.datetime.now()
         proj_cond = "project_id = {project_id: String}"
         proj_params = {"project_id": req.project_id}
@@ -314,7 +321,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parents = self._select_calls_query(
             req.project_id,
             conditions=[proj_cond, "id IN {ids: Array(String)}"],
-            parameters=proj_params | {"ids": req.ids},
+            parameters=proj_params | {"ids": req.call_ids},
         )
 
         # get all calls with trace_ids matching parents
@@ -324,17 +331,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
         )
 
-        all_descendants = find_call_descendants_in_memory_dfs(
-            root_ids=req.ids,
+        all_descendants = find_call_descendants(
+            root_ids=req.call_ids,
             all_calls=all_calls,
         )
 
         # create insert payload for all descendants (and parents)
         data = [(req.project_id, d, deleted_at) for d in all_descendants]
-        summary = self._insert(
+        self._insert(
             "call_parts", data=data, column_names=["project_id", "id", "deleted_at"]
         )
-        return tsi.CallsDeleteRes(success=summary.written_rows == len(all_descendants))
+        return tsi.CallsDeleteRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -1008,7 +1015,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 is_latest
             FROM object_versions_deduped
             WHERE project_id = {{project_id: String}} AND
-                deleted_at IS NULL AND
                 {conditions_part}
             {limit_part}
         """,
@@ -1331,7 +1337,7 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
     return f"({combined})"
 
 
-def find_call_descendants_in_memory_dfs(
+def find_call_descendants(
     root_ids: typing.List[str],
     all_calls: typing.List[SelectableCHCallSchema],
 ) -> typing.List[str]:
