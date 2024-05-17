@@ -426,11 +426,9 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         return '';
       }
       return (
-        // <div className="ui dropdown">
         <div className="text">
           <OptionWithTooltip text={selectedOption ? selectedOption.text : ''} />
         </div>
-        // </div>
       );
     };
     return wrapWithDragDrop(
@@ -458,17 +456,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
           }
         }}
         trigger={renderTrigger()}
-
-        // trigger={
-        //   selectedOption ? (
-        //     <OptionWithTooltip
-        //       key={selectedOption.text}
-        //       text={selectedOption.text}
-        //     />
-        //   ) : (
-        //     <span>Select an option</span>
-        //   )
-        // }
       />
     );
   },
