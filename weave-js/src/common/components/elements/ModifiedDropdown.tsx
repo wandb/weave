@@ -1,3 +1,6 @@
+import './ModifiedDropdown.less';
+
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import _ from 'lodash';
 import memoize from 'memoize-one';
 import React, {
@@ -17,7 +20,7 @@ import {
   StrictDropdownProps,
 } from 'semantic-ui-react';
 import {LabelProps} from 'semantic-ui-react';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+
 import {
   DragDropProvider,
   DragDropState,
@@ -31,7 +34,6 @@ import {Omit} from '../../types/base';
 import {makePropsAreEqual} from '../../util/shouldUpdate';
 import {Struct} from '../../util/types';
 import {Option} from '../../util/uihelpers';
-import './ModifiedDropdown.less';
 
 type LabelCoord = {
   top: number;
