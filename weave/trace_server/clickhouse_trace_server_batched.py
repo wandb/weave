@@ -353,26 +353,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 elif isinstance(operand, tsi._FieldSelect):
                     # TODO: Extract this to work with the sort implementation - basically the same logic
                     json_path = None
-                    if operand.field_.startswith("inputs"):
-                        field = "inputs_dump" + operand.field_[len("inputs") :]
-                        if field.startswith("inputs_dump."):
-                            json_path = field[len("inputs_dump.") :]
-                            field = "inputs_dump"
-                    elif operand.field_.startswith("output"):
-                        field = "output_dump" + operand.field_[len("output") :]
-                        if field.startswith("output_dump."):
-                            json_path = field[len("output_dump.") :]
-                            field = "output_dump"
-                    elif operand.field_.startswith("attributes"):
-                        field = "attributes_dump" + operand.field_[len("attributes") :]
-                        if field.startswith("attributes_dump."):
-                            json_path = field[len("attributes_dump.") :]
-                            field = "attributes_dump"
-                    elif operand.field_.startswith("summary"):
-                        field = "summary_dump" + operand.field_[len("summary") :]
-                        if field.startswith("summary_dump."):
-                            json_path = field[len("summary_dump.") :]
-                            field = "summary_dump"
+                    if operand.field_ == 'inputs' or operand.field_.startswith("inputs."):
+                        if operand.field_ == "inputs":
+                            json_path = "$"
+                        else:
+                            json_path = "$." + operand.field_[len("inputs.") :]
+                        field = "inputs_dump"
+                    elif operand.field_ == 'output' or operand.field_.startswith("output."):
+                        if operand.field_ == "output":
+                            json_path = "$"
+                        else:
+                            json_path = "$." + operand.field_[len("output.") :]
+                        field = "output_dump"
+                    elif operand.field_ == 'attributes' or operand.field_.startswith("attributes."):
+                        if operand.field_ == "attributes":
+                            json_path = "$"
+                        else:
+                            json_path = "$." + operand.field_[len("attributes.") :]
+                        field = "attributes_dump"
+                    elif operand.field_ == 'summary' or operand.field_.startswith("summary."):
+                        if operand.field_ == "summary":
+                            json_path = "$"
+                        else:
+                            json_path = "$." + operand.field_[len("summary.") :]
+                        field = "summary_dump"
                     else:
                         field = operand.field_
 
@@ -382,7 +386,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                     if json_path is not None:
                         json_path_param_name, json_path_param_type = add_param(
-                            "$." + json_path
+                            json_path
                         )
                         method = "toString"
                         if operand.cast_ == "int":
