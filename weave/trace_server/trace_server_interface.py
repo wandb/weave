@@ -230,6 +230,7 @@ class _SortBy(BaseModel):
     field: str  # Consider changing this to _FieldSelect
     # Direction should be either 'asc' or 'desc'
     direction: typing.Literal["asc", "desc"]
+    
 
 
 class CallsQueryReq(BaseModel):

@@ -224,7 +224,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
         conditions = []
-        parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
+        param_builder = ParamBuilder()
+
         if req.filter:
             if req.filter.op_names:
                 # We will build up (0 or 1) + N conditions for the op_version_refs
@@ -243,59 +244,57 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 if non_wildcarded_names:
                     or_conditions.append(
-                        "op_name IN {non_wildcarded_names: Array(String)}"
+                        f"op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
                     )
-                    parameters["non_wildcarded_names"] = non_wildcarded_names
 
-                for name_ndx, name in enumerate(wildcarded_names):
-                    param_name = "wildcarded_name_" + str(name_ndx)
-                    or_conditions.append("op_name LIKE {" + param_name + ": String}")
+                for name in wildcarded_names:
                     like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-                    parameters[param_name] = like_name
+                    or_conditions.append(
+                        f"op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
+                    )
 
                 if or_conditions:
                     conditions.append(_combine_conditions(or_conditions, "OR"))
 
             if req.filter.input_refs:
-                parameters["input_refs"] = req.filter.input_refs
-                conditions.append("hasAny(input_refs, {input_refs: Array(String)})")
+                conditions.append(
+                    f"hasAny(input_refs, {param_builder.add_param(req.filter.input_refs)})"
+                )
 
             if req.filter.output_refs:
-                parameters["output_refs"] = req.filter.output_refs
-                conditions.append("hasAny(output_refs, {output_refs: Array(String)})")
+                conditions.append(
+                    f"hasAny(output_refs, {param_builder.add_param(req.filter.output_refs)})"
+                )
 
             if req.filter.parent_ids:
-                conditions.append("parent_id IN {parent_ids: Array(String)}")
-                parameters["parent_ids"] = req.filter.parent_ids
+                conditions.append(
+                    f"parent_id IN {param_builder.add_param(req.filter.parent_ids)})"
+                )
 
             if req.filter.trace_ids:
-                conditions.append("trace_id IN {trace_ids: Array(String)}")
-                parameters["trace_ids"] = req.filter.trace_ids
+                conditions.append(
+                    f"trace_id IN {param_builder.add_param(req.filter.trace_ids)})"
+                )
 
             if req.filter.call_ids:
-                conditions.append("id IN {call_ids: Array(String)}")
-                parameters["call_ids"] = req.filter.call_ids
+                conditions.append(
+                    f"id IN {param_builder.add_param(req.filter.call_ids)})"
+                )
 
             if req.filter.trace_roots_only:
                 conditions.append("parent_id IS NULL")
 
             if req.filter.wb_user_ids:
-                conditions.append("wb_user_id IN {wb_user_ids: Array(String)}")
-                parameters["wb_user_ids"] = req.filter.wb_user_ids
+                conditions.append(
+                    f"wb_user_id IN {param_builder.add_param(req.filter.wb_user_ids)})"
+                )
 
             if req.filter.wb_run_ids:
-                conditions.append("wb_run_id IN {wb_run_ids: Array(String)}")
-                parameters["wb_run_ids"] = req.filter.wb_run_ids
+                conditions.append(
+                    f"wb_run_id IN {param_builder.add_param(req.filter.wb_run_ids)})"
+                )
 
         if req.filter_by:
-            filter_by_params: typing.Dict[str, typing.Any] = {}
-            filter_by_param_prefix = "filter_by_"
-
-            def add_param(param_value: typing.Any) -> typing.Tuple[str, str]:
-                param_name = filter_by_param_prefix + str(len(filter_by_params))
-                filter_by_params[param_name] = param_value
-                return param_name, python_value_to_ch_type(param_value)
-
             # This is the mongo-style filter_by
             def process_operation(operation: tsi._Operation) -> str:
                 cond = None
@@ -332,88 +331,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 return cond
 
-            def python_value_to_ch_type(value: typing.Any) -> str:
-                if isinstance(value, str):
-                    return "String"
-                elif isinstance(value, int):
-                    return "UInt64"
-                elif isinstance(value, float):
-                    return "Float64"
-                elif isinstance(value, bool):
-                    return "UInt8"
-                elif value is None:
-                    return "Nullable(String)"
-                else:
-                    raise ValueError(f"Unknown value type: {value}")
-
             def process_operand(operand: tsi._Operand) -> str:
                 if isinstance(operand, tsi._RawValue):
-                    param_name, param_type = add_param(operand.value_)
-                    return "{" + param_name + ":" + param_type + "}"
+                    return _param_slot(
+                        param_builder.add_param(operand.value_),
+                        _python_value_to_ch_type(operand.value_),
+                    )
                 elif isinstance(operand, tsi._FieldSelect):
-                    # TODO: Extract this to work with the sort implementation - basically the same logic
-                    json_path = None
-                    if operand.field_ == "inputs" or operand.field_.startswith(
-                        "inputs."
-                    ):
-                        if operand.field_ == "inputs":
-                            json_path = "$"
-                        else:
-                            json_path = "$." + operand.field_[len("inputs.") :]
-                        field = "inputs_dump"
-                    elif operand.field_ == "output" or operand.field_.startswith(
-                        "output."
-                    ):
-                        if operand.field_ == "output":
-                            json_path = "$"
-                        else:
-                            json_path = "$." + operand.field_[len("output.") :]
-                        field = "output_dump"
-                    elif operand.field_ == "attributes" or operand.field_.startswith(
-                        "attributes."
-                    ):
-                        if operand.field_ == "attributes":
-                            json_path = "$"
-                        else:
-                            json_path = "$." + operand.field_[len("attributes.") :]
-                        field = "attributes_dump"
-                    elif operand.field_ == "summary" or operand.field_.startswith(
-                        "summary."
-                    ):
-                        if operand.field_ == "summary":
-                            json_path = "$"
-                        else:
-                            json_path = "$." + operand.field_[len("summary.") :]
-                        field = "summary_dump"
-                    else:
-                        field = operand.field_
-
-                    # validate field
-                    if field not in all_call_select_columns:
-                        raise ValueError(f"Unknown field: {field}")
-
-                    if json_path is not None:
-                        json_path_param_name, json_path_param_type = add_param(
-                            json_path
-                        )
-                        method = "toString"
-                        if operand.cast_ == "int":
-                            method = "toInt64OrNull"
-                        elif operand.cast_ == "float":
-                            method = "toFloat64OrNull"
-                        elif operand.cast_ == "bool":
-                            method = "toUInt8OrNull"
-                        return (
-                            method
-                            + "(JSON_VALUE("
-                            + field
-                            + ", {"
-                            + json_path_param_name
-                            + ":String}))"
-                        )
-
-                    else:
-                        return field
+                    field, _ = _transform_external_calls_field_to_internal_calls_field(
+                        operand.field_, operand.cast_, param_builder
+                    )
+                    return field
                 elif isinstance(
                     operand,
                     (
@@ -433,12 +361,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             filter_cond = process_operation(req.filter_by.filter)
 
             conditions.append(filter_cond)
-            parameters.update(filter_by_params)
 
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
             conditions=conditions,
-            parameters=parameters,
+            parameters=param_builder.get_params(),
             limit=req.limit,
             offset=req.offset,
             order_by=None
@@ -1023,38 +950,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
-                json_path: typing.Optional[str] = None
-                if field.startswith("inputs"):
-                    field = "inputs_dump" + field[len("inputs") :]
-                    if field.startswith("inputs_dump."):
-                        field = "inputs_dump"
-                        json_path = field[len("inputs_dump.") :]
-                elif field.startswith("output"):
-                    field = "output_dump" + field[len("output") :]
-                    if field.startswith("output_dump."):
-                        field = "output_dump"
-                        json_path = field[len("output_dump.") :]
-                elif field.startswith("attributes"):
-                    field = "attributes_dump" + field[len("attributes") :]
-                elif field.startswith("summary"):
-                    field = "summary_dump" + field[len("summary") :]
-                elif field == ("latency"):
+                (
+                    field,
+                    param_builder,
+                ) = _transform_external_calls_field_to_internal_calls_field(field)
+                parameters.update(param_builder.get_params())
+                if field == ("latency"):
                     field = "ended_at - started_at"
 
-                assert (
-                    field in all_call_select_columns
-                ), f"Invalid order_by field: {field}"
                 assert direction in [
                     "ASC",
                     "DESC",
                     "asc",
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
-                if json_path:
-                    key = f"order_field_{field}"
-                    # TODO! Fix this injection!
-                    field = f"JSON_VALUE({field}, '$.{{{key}: String}}')"
-                    parameters[key] = json_path
                 order_parts.append(f"{field} {direction}")
 
             order_by_part = ", ".join(order_parts)
@@ -1070,8 +979,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit_part = "LIMIT {limit: Int64}"
             parameters["limit"] = limit
 
-        raw_res = self._query(
-            f"""
+        query_str = f"""
             SELECT {select_columns_part}
             FROM calls_merged
             WHERE project_id = {{project_id: String}}
@@ -1080,7 +988,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {order_by_part}
             {limit_part}
             {offset_part}
-        """,
+        """
+        print("query_str", query_str)
+        raw_res = self._query(
+            query_str,
             parameters,
         )
 
@@ -1443,3 +1354,105 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
         raise ValueError(f"Invalid operator: {operator}")
     combined = f" {operator} ".join([f"({c})" for c in conditions])
     return f"({combined})"
+
+
+param_builder_count = 0
+
+
+class ParamBuilder:
+    def __init__(self, prefix: typing.Optional[str] = None):
+        global param_builder_count
+        param_builder_count += 1
+        self._params: typing.Dict[str, typing.Any] = {}
+        self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
+
+    def add_param(self, param_value: typing.Any) -> str:
+        param_name = self._prefix + str(len(self._params))
+        self._params[param_name] = param_value
+        return param_name
+
+    def get_params(self) -> typing.Dict[str, typing.Any]:
+        return {**self._params}
+
+
+def _python_value_to_ch_type(value: typing.Any) -> str:
+    if isinstance(value, str):
+        return "String"
+    elif isinstance(value, int):
+        return "UInt64"
+    elif isinstance(value, float):
+        return "Float64"
+    elif isinstance(value, bool):
+        return "UInt8"
+    elif value is None:
+        return "Nullable(String)"
+    else:
+        raise ValueError(f"Unknown value type: {value}")
+
+
+def _param_slot(param_name: str, param_type: str) -> str:
+    return f"{{{param_name}:{param_type}}}"
+
+
+def _transform_external_calls_field_to_internal_calls_field(
+    field: str,
+    cast: typing.Optional[str] = None,
+    param_builder: typing.Optional[ParamBuilder] = None,
+) -> tuple[str, ParamBuilder]:
+    param_builder = param_builder or ParamBuilder()
+    json_path = None
+    if field == "inputs" or field.startswith("inputs."):
+        if field == "inputs":
+            json_path = "$"
+        else:
+            json_path = "$." + field[len("inputs.") :]
+        field = "inputs_dump"
+    elif field == "output" or field.startswith("output."):
+        if field == "output":
+            json_path = "$"
+        else:
+            json_path = "$." + field[len("output.") :]
+        field = "output_dump"
+    elif field == "attributes" or field.startswith("attributes."):
+        if field == "attributes":
+            json_path = "$"
+        else:
+            json_path = "$." + field[len("attributes.") :]
+        field = "attributes_dump"
+    elif field == "summary" or field.startswith("summary."):
+        if field == "summary":
+            json_path = "$"
+        else:
+            json_path = "$." + field[len("summary.") :]
+        field = "summary_dump"
+    else:
+        assert field in all_call_select_columns, f"Invalid order_by field: {field}"
+
+    # validate field
+    if field not in all_call_select_columns:
+        raise ValueError(f"Unknown field: {field}")
+
+    if json_path is not None:
+        json_path_param_name = param_builder.add_param(json_path)
+        method = "toString"
+        if cast is not None:
+            if cast == "int":
+                method = "toInt64OrNull"
+            elif cast == "float":
+                method = "toFloat64OrNull"
+            elif cast == "bool":
+                method = "toUInt8OrNull"
+            elif cast == "str":
+                method = "toString"
+            else:
+                raise ValueError(f"Unknown cast: {cast}")
+        field = (
+            method
+            + "(JSON_VALUE("
+            + field
+            + ", {"
+            + json_path_param_name
+            + ":String}))"
+        )
+
+    return field, param_builder
