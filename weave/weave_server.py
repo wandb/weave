@@ -393,20 +393,21 @@ def execute_v2():
 
 @blueprint.route("/__weave/file/<path:path>")
 def send_local_file(path):
-    # path is given relative to the FS root. check to see that path is a subdirectory of the
-    # local artifacts path. if not, return 403. then if there is a cache scope function defined
-    # call it to make sure we have access to the path
-    abspath = "/" / pathlib.Path(
-        path
-    )  # add preceding slash as werkzeug strips this by default and it is reappended below in send_from_directory
     try:
-        local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).absolute()
-    except errors.WeaveAccessDeniedError:
+        # Retrieve and normalize the local artifacts path
+        local_artifacts_path = pathlib.Path(filesystem.get_filesystem_dir()).resolve(strict=True)
+        
+        # Construct the full absolute path of the requested file
+        requested_path = (local_artifacts_path / path).resolve(strict=True)
+        
+        # Ensure the requested path is within the local artifacts directory
+        if not str(requested_path).startswith(str(local_artifacts_path)):
+            abort(403)
+        
+        # Send the file from the directory
+        return send_from_directory(local_artifacts_path, str(requested_path.relative_to(local_artifacts_path)))
+    except (errors.WeaveAccessDeniedError, FileNotFoundError):
         abort(403)
-    if local_artifacts_path not in list(abspath.parents):
-        abort(403)
-    return send_from_directory("/", path)
-
 
 @blueprint.before_request
 def _disable_eager_mode():
