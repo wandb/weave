@@ -37,6 +37,7 @@ REMOTE_REQUEST_BYTES_LIMIT = (
 
 REMOTE_REQUEST_RETRY_LIMIT = 3
 REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
+REMOTE_REQUEST_RETRY_INTERVAL = 60 * 5  # 5 minutes
 
 
 def _is_retryable_exception(self, e: Exception) -> bool:
@@ -70,7 +71,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential(multiplier=1, min=1, max=60),
+        wait=tenacity.wait_exponential(
+            multiplier=1, min=1, max=REMOTE_REQUEST_RETRY_INTERVAL
+        ),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         reraise=True,
     )
@@ -111,7 +114,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential(multiplier=1, min=1, max=60),
+        wait=tenacity.wait_exponential(
+            multiplier=1, min=1, max=REMOTE_REQUEST_RETRY_INTERVAL
+        ),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         reraise=True,
     )
@@ -146,6 +151,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r.raise_for_status()
         return res_model.model_validate(r.json())
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential(
+            multiplier=1, min=1, max=REMOTE_REQUEST_RETRY_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        reraise=True,
+    )
     def server_info(self) -> ServerInfoRes:
         r = requests.get(self.trace_server_url + "/server_info")
         r.raise_for_status()
@@ -259,6 +272,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
         )
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential(
+            multiplier=1, min=1, max=REMOTE_REQUEST_RETRY_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        reraise=True,
+    )
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         r = requests.post(
             self.trace_server_url + "/files/create",
@@ -269,6 +290,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential(
+            multiplier=1, min=1, max=REMOTE_REQUEST_RETRY_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        reraise=True,
+    )
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         r = requests.post(
             self.trace_server_url + "/files/content",
