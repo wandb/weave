@@ -67,7 +67,7 @@ import {
   getInputColumns,
   useColumnVisibility,
 } from '../../../Browse2/tableStats';
-import {WeaveHeaderExtrasContext} from '../../context';
+import {baseContext, WeaveHeaderExtrasContext} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
@@ -193,6 +193,9 @@ export const CallsTable: FC<{
 
   // Fetch the calls
   const calls = useCallsForQuery(entity, project, effectiveFilter);
+  if (calls.refetch) {
+    baseContext.refetchCalls = calls.refetch;
+  }
   const callsLoading = calls.loading;
   const callsResult = useMemo(() => calls.result ?? [], [calls.result]);
 

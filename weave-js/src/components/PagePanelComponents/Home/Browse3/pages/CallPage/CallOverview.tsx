@@ -34,8 +34,8 @@ OverflowBin.displayName = 'S.OverflowBin';
 
 export const CallOverview: React.FC<{
   call: CallSchema;
-  refetch?: () => void;
-}> = ({call}) => {
+  refetchCalls?: () => void;
+}> = ({call, refetchCalls}) => {
   const opName = opNiceName(call.spanName);
 
   const statusCode = call.rawSpan.status_code;
@@ -47,7 +47,7 @@ export const CallOverview: React.FC<{
         <CallId callId={call.callId} />
         <StatusChip value={statusCode} iconOnly />
         <OverflowBin>
-          <OverflowMenu selectedCalls={[call]} />
+          <OverflowMenu selectedCalls={[call]} refetch={refetchCalls} />
         </OverflowBin>
       </Overview>
       {call.rawSpan.exception && (

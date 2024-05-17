@@ -5,7 +5,7 @@ import React, {Dispatch, FC, SetStateAction, useState} from 'react';
 import {Modal} from 'semantic-ui-react';
 import styled from 'styled-components';
 
-import {useClosePeek} from '../../context';
+import {useClosePeekOrNavigateUp} from '../../context';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
@@ -76,7 +76,7 @@ const ConfirmDeleteModal: FC<{
 }> = ({calls, confirmDelete, setConfirmDelete, setSelectedCalls, refetch}) => {
   const {useCallsDelete} = useWFHooks();
   const callsDelete = useCallsDelete();
-  const closePeek = useClosePeek();
+  const close = useClosePeekOrNavigateUp();
 
   let error = null;
   if (calls.length === 0) {
@@ -95,7 +95,7 @@ const ConfirmDeleteModal: FC<{
       setConfirmDelete(false);
       refetch?.();
       setSelectedCalls?.(curCalls => curCalls?.filter(c => !calls.includes(c)));
-      closePeek();
+      close();
     });
   };
 

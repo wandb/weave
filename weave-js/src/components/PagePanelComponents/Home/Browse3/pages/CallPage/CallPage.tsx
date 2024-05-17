@@ -5,7 +5,11 @@ import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
+import {
+  baseContext,
+  TRACETREE_PARAM,
+  useWeaveflowCurrentRouteContext,
+} from '../../context';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
@@ -129,7 +133,12 @@ const CallPageInnerVertical: FC<{
         </Box>
       }
       isSidebarOpen={showTraceTree}
-      headerContent={<CallOverview call={selectedCall} />}
+      headerContent={
+        <CallOverview
+          call={selectedCall}
+          refetchCalls={baseContext.refetchCalls}
+        />
+      }
       leftSidebar={
         loading ? (
           <Loading centered />

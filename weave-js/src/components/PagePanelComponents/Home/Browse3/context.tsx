@@ -417,6 +417,7 @@ export const browse3ContextGen = (
         primaryDim
       )}&secondaryDim=${encodeURIComponent(secondaryDim)}`;
     },
+    refetchCalls: () => {},
   };
   return browse3Context;
 };
@@ -662,6 +663,27 @@ export const usePeekLocation = () => {
       },
     };
   }, [peekPath]);
+};
+
+export const useClosePeekOrNavigateUp = () => {
+  /*
+  If we are peeking, just close the peek drawer
+  If we are not peeking, navigate up one level, unless we are at the root
+  */
+  const history = useHistory();
+  const peekLoc = usePeekLocation();
+  const closePeek = useClosePeek();
+
+  return () => {
+    if (peekLoc != null) {
+      closePeek();
+    } else {
+      // Not peeking (fullscreen) so navigate to the parent page
+      const path = history.location.pathname.split('/');
+      path.pop();
+      history.replace(path.join('/'));
+    }
+  };
 };
 
 export const WeaveHeaderExtrasContext = createContext<{
