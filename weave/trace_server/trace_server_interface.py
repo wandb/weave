@@ -162,7 +162,7 @@ class _FieldSelect(BaseModel):
     cast_: typing.Optional[typing.Literal["str", "int", "float", "bool"]] = None
 
 
-_Operand: typing.TypeAlias = typing.Union[_RawValue, _FieldSelect, "_Operation"]
+_Operand = typing.Union[_RawValue, _FieldSelect, "_Operation"]
 
 # Operations: all operations have the form of a single property
 # with the name of the operation suffixed with an underscore.
@@ -197,7 +197,7 @@ class _LikeOperation(BaseModel):
     like_: typing.Tuple["_Operand", "_Operand"]
 
 
-_Operation: typing.TypeAlias = typing.Union[
+_Operation = typing.Union[
     _AndOperation,
     _OrOperation,
     _NotOperation,
@@ -230,7 +230,6 @@ class _SortBy(BaseModel):
     field: str  # Consider changing this to _FieldSelect
     # Direction should be either 'asc' or 'desc'
     direction: typing.Literal["asc", "desc"]
-    
 
 
 class CallsQueryReq(BaseModel):

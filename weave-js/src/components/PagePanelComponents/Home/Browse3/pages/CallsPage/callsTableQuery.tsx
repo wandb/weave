@@ -6,12 +6,11 @@ import {
 } from '@mui/x-data-grid-pro';
 import {useMemo} from 'react';
 
-import {useTraceUpdate} from '../../../../../../common/util/hooks';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {useWFHooks} from '../wfReactInterface/context';
+import {FilterBy} from '../wfReactInterface/traceServerClient';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {FilterBy} from '../wfReactInterface/traceServerClient';
 
 /**
  * Given a calls query, resolve the calls and return them. This hook will
