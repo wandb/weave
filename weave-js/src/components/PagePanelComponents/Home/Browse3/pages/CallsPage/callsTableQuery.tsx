@@ -35,7 +35,7 @@ export const useCallsForQuery = (
   const limit = gridPage.pageSize;
 
   const overLimit = useMemo(() => {
-    const INCREMENT = 25;
+    const INCREMENT = 50; // this is pretty lame that we have to do this. The data grid thrashes between different sized
     const atLeast = limit + 1;
     return Math.ceil(atLeast / INCREMENT) * INCREMENT;
   }, [limit]);
