@@ -1,4 +1,5 @@
 import {
+  GridFilterItem,
   GridFilterModel,
   GridPaginationModel,
   GridSortModel,
@@ -10,6 +11,7 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
+import {FilterBy} from '../wfReactInterface/traceServerClient';
 
 /**
  * Given a calls query, resolve the calls and return them. This hook will
@@ -33,9 +35,9 @@ export const useCallsForQuery = (
   const limit = gridPage.pageSize;
 
   const overLimit = useMemo(() => {
+    const INCREMENT = 25;
     const atLeast = limit + 1;
-    const ceilToNearest50 = Math.ceil(atLeast / 50) * 50;
-    return ceilToNearest50;
+    return Math.ceil(atLeast / INCREMENT) * INCREMENT;
   }, [limit]);
 
   // TODO: Implement a count endpoint (or (short term) - figure out some way to get
@@ -52,10 +54,41 @@ export const useCallsForQuery = (
     }, [gridSort])
   );
 
-  const filterBy = useMemo(() => {
-    console.log(gridFilter);
-    return undefined;
+  const filterByRaw = useMemo(() => {
+    const setItems = gridFilter.items.filter(item => item.value !== undefined);
+
+    const operationConverter = (item: GridFilterItem) => {
+      // TODO: This needs to be muc much more sophisticated
+      if (item.operator === 'contains') {
+        return {
+          like_: [{field_: item.field}, {value_: '%' + item.value + '%'}], // TODO: escape % and _
+        };
+      } else {
+        throw new Error('Unsupported operator');
+      }
+    };
+
+    if (setItems.length === 0) {
+      return undefined;
+    }
+
+    if (setItems.length === 1) {
+      return operationConverter(setItems[0]);
+    }
+
+    const operation = gridFilter.logicOperator === 'or' ? 'or_' : 'and_'; // and is default
+
+    return {
+      [operation]: setItems.map(operationConverter),
+    };
   }, [gridFilter]);
+
+  const filterBy: FilterBy | undefined = useMemo(() => {
+    if (filterByRaw === undefined) {
+      return undefined;
+    }
+    return {filter: filterByRaw} as FilterBy;
+  }, [filterByRaw]);
 
   const calls = useCalls(
     entity,

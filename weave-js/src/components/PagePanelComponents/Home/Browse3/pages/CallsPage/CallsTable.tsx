@@ -239,7 +239,12 @@ export const CallsTable: FC<{
       setCallsResult(calls.result ?? []);
     }
   }, [callsLoading, calls.result, callsResult]);
-  const callsTotal = calls.total;
+  const [callsTotal, setCallsTotal] = useState<number>(0);
+  useEffect(() => {
+    if (!callsLoading) {
+      setCallsTotal(calls.total ?? 0);
+    }
+  }, [callsLoading, calls.total, callsTotal]);
 
   // Now, there are 4 primary controls:
   // 1. Op Version
