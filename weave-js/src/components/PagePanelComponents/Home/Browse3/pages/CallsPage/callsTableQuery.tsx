@@ -5,6 +5,8 @@ import {
 } from '@mui/x-data-grid-pro';
 import {useMemo} from 'react';
 
+import {useTraceUpdate} from '../../../../../../common/util/hooks';
+import {useDeepMemo} from '../../../../../../hookUtils';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -30,42 +32,53 @@ export const useCallsForQuery = (
   const offset = gridPage.page * gridPage.pageSize;
   const limit = gridPage.pageSize;
 
-  // TODO: Pass offset and limit to useCall
-  // TODO: Convert Filter to Our Filter and Pass to Calls
-  // TODO: Convert Sort to Our Sort and Pass to Calls
+  const overLimit = useMemo(() => {
+    const atLeast = limit + 1;
+    const ceilToNearest50 = Math.ceil(atLeast / 50) * 50;
+    return ceilToNearest50;
+  }, [limit]);
+
   // TODO: Implement a count endpoint (or (short term) - figure out some way to get
   // the system to know there are more pages)
 
-  const calls = useCalls(entity, project, lowLevelFilter);
+  const sortBy = useDeepMemo(
+    useMemo(() => {
+      return gridSort.map(sort => {
+        return {
+          field: sort.field,
+          direction: sort.sort ?? 'asc',
+        };
+      });
+    }, [gridSort])
+  );
+
+  const filterBy = useMemo(() => {
+    console.log(gridFilter);
+    return undefined;
+  }, [gridFilter]);
+
+  const calls = useCalls(
+    entity,
+    project,
+    lowLevelFilter,
+    overLimit,
+    offset,
+    sortBy,
+    filterBy
+  );
+
   const callResults = useMemo(() => {
     return calls.result ?? [];
   }, [calls]);
 
-  // 100% in-memory handling of sorting, filtering, and paging. MUST be moved to backend.
-
-  // Filter - Not implemented
-  // console.log('Applying filter', gridFilter);
-  // TODO: Implement validation of filter fields
-  // TODO: Implement filtering
-
-  // Sort - Not implemented
-  // console.log('Applying sort', gridSort);
-  // TODO: Implement validation of sort fields
-  // TODO: Implement sorting
-
-  // Page - This is just implemented for fun.
-  console.log('Applying page', gridPage);
-
-  const pagedCalls = useMemo(
-    () => callResults.slice(offset, offset + limit),
-    [callResults, offset, limit]
-  );
-  console.log(callResults, pagedCalls, offset, offset + limit);
+  const limitedResults = useMemo(() => {
+    return callResults.slice(0, limit);
+  }, [callResults, limit]);
 
   return {
     loading: calls.loading,
-    result: pagedCalls,
-    total: callResults.length,
+    result: limitedResults,
+    total: offset + callResults.length, // TODO: Implement a count endpoint
   };
 };
 

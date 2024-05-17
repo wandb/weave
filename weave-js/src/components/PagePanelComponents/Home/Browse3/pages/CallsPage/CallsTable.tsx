@@ -205,12 +205,12 @@ export const CallsTable: FC<{
 
   // 3. Sort
   const [sortModelInner, setSortModel] = useState<GridSortModel>([
-    {field: 'timestampMs', sort: 'desc'},
+    {field: 'started_at', sort: 'desc'},
   ]);
   // Ensure that we always have a default sort
   const sortModel: GridSortModel = useMemo(() => {
     return sortModelInner.length === 0
-      ? [{field: 'timestampMs', sort: 'desc'}]
+      ? [{field: 'started_at', sort: 'desc'}]
       : sortModelInner;
   }, [sortModelInner]);
 
@@ -229,8 +229,16 @@ export const CallsTable: FC<{
     sortModel,
     paginationModel
   );
+
+  // Scrappy: we want to only update result once loading is done
+
   const callsLoading = calls.loading;
-  const callsResult = calls.result;
+  const [callsResult, setCallsResult] = useState<CallSchema[]>([]);
+  useEffect(() => {
+    if (!callsLoading) {
+      setCallsResult(calls.result ?? []);
+    }
+  }, [callsLoading, calls.result, callsResult]);
   const callsTotal = calls.total;
 
   // Now, there are 4 primary controls:
@@ -382,7 +390,7 @@ export const CallsTable: FC<{
         isRoot: call.parentId == null,
         trace_id: call.traceId,
         status_code: call.rawSpan.status_code,
-        timestampMs: call.rawSpan.timestamp,
+        started_at: call.rawSpan.timestamp, // This illustrates a problem in the system - need to use the same field names!
         userId: call.userId,
         latency: call.rawSpan.summary.latency_s,
         ..._.mapKeys(
@@ -868,7 +876,7 @@ export const CallsTable: FC<{
 
     if (!ioColumnsOnly) {
       cols.push({
-        field: 'timestampMs',
+        field: 'started_at',
         headerName: 'Called',
         // Should have custom timestamp filter here.
         filterable: false,
@@ -878,7 +886,7 @@ export const CallsTable: FC<{
         renderCell: (cellParams: any) => {
           return (
             <Timestamp
-              value={cellParams.row.timestampMs / 1000}
+              value={cellParams.row.started_at / 1000}
               format="relative"
             />
           );
