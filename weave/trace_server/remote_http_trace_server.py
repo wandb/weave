@@ -1,5 +1,6 @@
 import io
 import json
+import sys
 import typing as t
 from pydantic import BaseModel
 import requests
@@ -35,7 +36,8 @@ REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
 
-REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
+# REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
+REMOTE_REQUEST_RETRY_DURATION = 60
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
 
 
@@ -47,7 +49,16 @@ def _is_retryable_exception(e: Exception) -> bool:
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
     print(
         f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: {retry_state.outcome.exception()}",
+        file=sys.stderr,
     )
+
+
+def _log_failure(retry_state: tenacity.RetryCallState):
+    print(
+        f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: {retry_state.outcome.exception()}",
+        file=sys.stderr,
+    )
+    return retry_state.outcome.result()
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
@@ -79,6 +90,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
         reraise=True,
     )
     def _flush_calls(
@@ -121,6 +133,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
         reraise=True,
     )
     def _generic_request(
@@ -159,6 +172,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
         reraise=True,
     )
     def server_info(self) -> ServerInfoRes:
@@ -279,6 +293,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
         reraise=True,
     )
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
@@ -296,6 +311,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
         reraise=True,
     )
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
