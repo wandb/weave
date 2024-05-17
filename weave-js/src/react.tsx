@@ -585,14 +585,14 @@ export const parseRef = (ref: string): ObjectRef => {
     const trimmed = trimStartChar(url.pathname, '/');
     const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
     if (tableMatch !== null) {
-      const [entity, project, artifactVer] = tableMatch.slice(1);
+      const [entity, project, digest] = tableMatch.slice(1);
       return {
         scheme: 'weave',
         entityName: entity,
         projectName: project,
         weaveKind: 'table' as WeaveKind,
         artifactName: '',
-        artifactVersion: artifactVer,
+        artifactVersion: digest,
         artifactRefExtra: '',
       };
     }
