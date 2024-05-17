@@ -78,6 +78,8 @@ const ConfirmDeleteModal: FC<{
   const callsDelete = useCallsDelete();
   const close = useClosePeekOrNavigateUp();
 
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   let error = null;
   if (calls.length === 0) {
     error = 'No calls selected';
@@ -88,10 +90,12 @@ const ConfirmDeleteModal: FC<{
   }
 
   const onDelete = () => {
+    setDeleteLoading(true);
     callsDelete(
       `${calls[0].entity}/${calls[0].project}`,
       calls.map(c => c.callId)
     ).then(() => {
+      setDeleteLoading(false);
       setConfirmDelete(false);
       refetch?.();
       setSelectedCalls?.(curCalls => curCalls?.filter(c => !calls.includes(c)));
@@ -126,6 +130,7 @@ const ConfirmDeleteModal: FC<{
       <Modal.Actions>
         <Button
           variant="ghost"
+          disabled={deleteLoading}
           onClick={() => {
             setConfirmDelete(false);
           }}>
@@ -134,7 +139,7 @@ const ConfirmDeleteModal: FC<{
         <Button
           style={{marginLeft: '4px'}}
           variant="destructive"
-          disabled={error != null}
+          disabled={error != null || deleteLoading}
           onClick={onDelete}>
           {calls.length > 1 ? 'Delete calls' : 'Delete call'}
         </Button>
