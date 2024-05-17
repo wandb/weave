@@ -67,11 +67,70 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
+type RawValue =
+  | string
+  | number
+  | boolean
+  | {[key: string]: RawValue}
+  | RawValue[];
+
+interface FieldSelect {
+  field_: string;
+  cast_?: 'str' | 'int' | 'float' | 'bool';
+}
+
+type Operand = RawValue | FieldSelect | Operation;
+
+interface AndOperation {
+  and_: [Operand, Operand];
+}
+
+interface OrOperation {
+  or_: [Operand, Operand];
+}
+
+interface NotOperation {
+  not_: Operand;
+}
+
+interface EqOperation {
+  eq_: [Operand, Operand];
+}
+
+interface GtOperation {
+  gt_: [Operand, Operand];
+}
+
+interface GteOperation {
+  gte_: [Operand, Operand];
+}
+
+interface LikeOperation {
+  like_: [Operand, Operand];
+}
+
+type Operation =
+  | AndOperation
+  | OrOperation
+  | NotOperation
+  | EqOperation
+  | GtOperation
+  | GteOperation
+  | LikeOperation;
+
+export interface FilterBy {
+  filter: Operation;
+}
+
+export type SortBy = {field: string; direction: 'asc' | 'desc'};
+
 export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
   offset?: number;
+  sort_by?: SortBy[];
+  filter_by?: FilterBy;
 };
 
 export type TraceCallsQueryRes = {

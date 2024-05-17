@@ -11,6 +11,7 @@
 
 import * as Types from '../../../../../../core/model/types';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
+import * as traceServerClient from './traceServerClient'; // TODO: This import is not ideal, should delete this whole interface
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -152,6 +153,9 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: CallFilter,
     limit?: number,
+    offset?: number,
+    sortBy?: traceServerClient.SortBy[],
+    filterBy?: traceServerClient.FilterBy,
     opts?: {skip?: boolean}
   ) => Loadable<CallSchema[]>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;

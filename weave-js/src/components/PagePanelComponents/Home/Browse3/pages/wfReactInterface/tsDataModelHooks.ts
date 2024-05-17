@@ -201,6 +201,9 @@ const useCalls = (
   project: string,
   filter: CallFilter,
   limit?: number,
+  offset?: number,
+  sortBy?: traceServerClient.SortBy[],
+  filterBy?: traceServerClient.FilterBy,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -228,6 +231,9 @@ const useCalls = (
         wb_user_ids: deepFilter.userIds,
       },
       limit,
+      offset,
+      sort_by: sortBy,
+      filter_by: filterBy,
     };
     const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -239,7 +245,17 @@ const useCalls = (
       setCallRes({calls: []});
     };
     getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
+  }, [
+    entity,
+    project,
+    deepFilter,
+    limit,
+    opts?.skip,
+    getTsClient,
+    offset,
+    sortBy,
+    filterBy,
+  ]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -618,6 +634,9 @@ const useChildCallsForCompare = (
         : [],
     },
     undefined,
+    undefined,
+    undefined,
+    undefined,
     {skip: skipParent}
   );
 
@@ -635,6 +654,9 @@ const useChildCallsForCompare = (
       parentIds: subParentCallIds,
       opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
     },
+    undefined,
+    undefined,
+    undefined,
     undefined,
     {skip: skipChild}
   );

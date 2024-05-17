@@ -157,6 +157,9 @@ const useCalls = (
   project: string,
   filter: CallFilter,
   limit?: number,
+  offset?: number,
+  sortBy?: any,
+  filterBy?: any,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   let runsNode = fnRunsNode(
