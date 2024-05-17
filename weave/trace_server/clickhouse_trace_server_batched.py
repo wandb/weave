@@ -353,25 +353,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 elif isinstance(operand, tsi._FieldSelect):
                     # TODO: Extract this to work with the sort implementation - basically the same logic
                     json_path = None
-                    if operand.field_ == 'inputs' or operand.field_.startswith("inputs."):
+                    if operand.field_ == "inputs" or operand.field_.startswith(
+                        "inputs."
+                    ):
                         if operand.field_ == "inputs":
                             json_path = "$"
                         else:
                             json_path = "$." + operand.field_[len("inputs.") :]
                         field = "inputs_dump"
-                    elif operand.field_ == 'output' or operand.field_.startswith("output."):
+                    elif operand.field_ == "output" or operand.field_.startswith(
+                        "output."
+                    ):
                         if operand.field_ == "output":
                             json_path = "$"
                         else:
                             json_path = "$." + operand.field_[len("output.") :]
                         field = "output_dump"
-                    elif operand.field_ == 'attributes' or operand.field_.startswith("attributes."):
+                    elif operand.field_ == "attributes" or operand.field_.startswith(
+                        "attributes."
+                    ):
                         if operand.field_ == "attributes":
                             json_path = "$"
                         else:
                             json_path = "$." + operand.field_[len("attributes.") :]
                         field = "attributes_dump"
-                    elif operand.field_ == 'summary' or operand.field_.startswith("summary."):
+                    elif operand.field_ == "summary" or operand.field_.startswith(
+                        "summary."
+                    ):
                         if operand.field_ == "summary":
                             json_path = "$"
                         else:
@@ -390,7 +398,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         )
                         method = "toString"
                         if operand.cast_ == "int":
-                            method = "toInt64OrNull" 
+                            method = "toInt64OrNull"
                         elif operand.cast_ == "float":
                             method = "toFloat64OrNull"
                         elif operand.cast_ == "bool":

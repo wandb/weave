@@ -683,10 +683,10 @@ def test_trace_call_sort(client):
     for (first, last, sort_by) in [
         (2, 0, [tsi._SortBy(field="started_at", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="inputs.in_val.list[0]", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
         (2, 0, [tsi._SortBy(field="output.prim", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="output.list.0", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="output.list[0]", direction="desc")]),
         (2, 0, [tsi._SortBy(field="output.dict.inner", direction="desc")]),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
@@ -758,33 +758,33 @@ def test_trace_call_filter(client):
         # gt
         (
             4,
-            {"gt_": [{"value_": 5}, {"field_": "inputs.in_val.prim", "cast_": "int"}]},
+            {"gt_": [{"field_": "inputs.in_val.prim", "cast_": "int"}, {"value_": 5}]},
         ),
         # gte
         (
             5,
-            {"gte_": [{"value_": 5}, {"field_": "inputs.in_val.prim", "cast_": "int"}]},
+            {"gte_": [{"field_": "inputs.in_val.prim", "cast_": "int"}, {"value_": 5}]},
         ),
         # not gt = lte
         (
-            5,
+            6,
             {
                 "not_": {
                     "gt_": [
-                        {"value_": 5},
                         {"field_": "inputs.in_val.prim", "cast_": "int"},
+                        {"value_": 5},
                     ]
                 }
             },
         ),
         # not gte = lt
         (
-            4,
+            5,
             {
                 "not_": {
                     "gte_": [
-                        {"value_": 5},
                         {"field_": "inputs.in_val.prim", "cast_": "int"},
+                        {"value_": 5},
                     ]
                 }
             },
@@ -807,15 +807,15 @@ def test_trace_call_filter(client):
                     {
                         "not_": {
                             "gt_": [
-                                {"value_": 7},
                                 {"field_": "inputs.in_val.prim", "cast_": "int"},
+                                {"value_": 7},
                             ]
                         }
                     },
                     {
                         "gte_": [
-                            {"value_": 5},
                             {"field_": "inputs.in_val.prim", "cast_": "int"},
+                            {"value_": 5},
                         ]
                     },
                 ]
@@ -823,21 +823,21 @@ def test_trace_call_filter(client):
         ),
         # or
         (
-            4,
+            5,
             {
                 "or_": [
                     {
                         "not_": {
                             "gt_": [
-                                {"value_": 3},
                                 {"field_": "inputs.in_val.prim", "cast_": "int"},
+                                {"value_": 3},
                             ]
                         }
                     },
                     {
                         "gte_": [
-                            {"value_": 9},
                             {"field_": "inputs.in_val.prim", "cast_": "int"},
+                            {"value_": 9},
                         ]
                     },
                 ]
@@ -845,8 +845,9 @@ def test_trace_call_filter(client):
         ),
         # Invalid type - safely return none
         (0, {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.str", "cast_": "int"}]}),
+        # Cast across type
         (
-            0,
+            1,
             {
                 "eq_": [
                     {"value_": "5"},
@@ -859,8 +860,8 @@ def test_trace_call_filter(client):
             4,
             {
                 "gt_": [
+                    {"field_": "inputs.in_val.list[0]", "cast_": "int"},
                     {"value_": 5},
-                    {"field_": "inputs.in_val.list.0", "cast_": "int"},
                 ]
             },
         ),
@@ -868,14 +869,30 @@ def test_trace_call_filter(client):
             4,
             {
                 "gt_": [
-                    {"value_": 5},
                     {"field_": "inputs.in_val.dict.inner", "cast_": "int"},
+                    {"value_": 5},
                 ]
             },
         ),
-        (4, {"gt_": [{"value_": 5}, {"field_": "output.prim", "cast_": "int"}]}),
-        (4, {"gt_": [{"value_": 5}, {"field_": "output.list.0", "cast_": "int"}]}),
-        (4, {"gt_": [{"value_": 5}, {"field_": "output.dict.inner", "cast_": "int"}]}),
+        (
+            4,
+            {
+                "gt_": [
+                    {"field_": "output.prim", "cast_": "int"},
+                    {"value_": 5},
+                ]
+            },
+        ),
+        (
+            4,
+            {
+                "gt_": [
+                    {"field_": "output.list[0]", "cast_": "int"},
+                    {"value_": 5},
+                ]
+            },
+        ),
+        (4, {"gt_": [{"field_": "output.dict.inner", "cast_": "int"}, {"value_": 5}]}),
     ]:
         print(f"TEST CASE [{count}]", filter_by)
         inner_res = get_client_trace_server(client).calls_query(
@@ -892,7 +909,7 @@ def test_trace_call_filter(client):
 
     if failed_cases:
         raise AssertionError(
-            f"Failed {len(failed_cases)} cases:" + "\n".join(failed_cases)
+            f"Failed {len(failed_cases)} cases:\n" + "\n".join(failed_cases)
         )
 
 
