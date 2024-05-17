@@ -39,17 +39,14 @@ REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
 REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
 
 
-def _is_retryable_exception(self, e: Exception) -> bool:
+def _is_retryable_exception(e: Exception) -> bool:
     # TODO: Identify unretriable exceptions
     return True
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
     print(
-        "Retrying %s: attempt %s ended with: %s",
-        retry_state.fn,
-        retry_state.attempt_number,
-        retry_state.outcome,
+        f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: {retry_state.outcome.exception()}",
     )
 
 
