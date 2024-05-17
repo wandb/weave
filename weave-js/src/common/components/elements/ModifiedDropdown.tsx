@@ -95,32 +95,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
     const [searchQuery, setSearchQuery] = useState('');
     const [options, setOptions] = useState(propsOptions);
 
-    const [showTooltip, setShowTooltip] = useState(false);
-    const tooltipRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      const dropdownTextElement = document.querySelector('.ui.dropdown .text');
-      const selectedOption = propsOptions.find(opt => opt.value === value);
-      if (dropdownTextElement && selectedOption) {
-        // dropdownTextElement.setAttribute('data-tooltip', selectedOption.text);
-        setShowTooltip(
-          dropdownTextElement.scrollWidth > dropdownTextElement.clientWidth
-        );
-      }
-    }, [value, propsOptions]);
-
-    const [showSelectedTooltip, setShowSelectedTooltip] = useState(false);
-    const selectedTextRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      const selectedOption = propsOptions.find(opt => opt.value === value);
-      if (selectedTextRef.current && selectedOption) {
-        setShowSelectedTooltip(
-          selectedTextRef.current.scrollWidth >
-            selectedTextRef.current.clientWidth
-        );
-      }
-    }, [value, propsOptions, selectedTextRef]);
     const doSearch = useMemo(
       () =>
         _.debounce((query: string) => {
@@ -509,11 +483,7 @@ export default ModifiedDropdown;
 const OptionWithTooltip = ({text}: any) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const optionRef = useRef<HTMLDivElement>(null);
-  console.log(
-    text,
-    optionRef?.current?.scrollWidth,
-    optionRef?.current?.clientWidth
-  );
+
   useEffect(() => {
     if (optionRef.current) {
       setShowTooltip(
@@ -526,26 +496,17 @@ const OptionWithTooltip = ({text}: any) => {
     <div
       ref={optionRef}
       style={{
-        // padding: '13px 18px',
-        // margin: '-13px -18px',
-        // maxWidth: '200px',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
       }}>
       {showTooltip ? (
         <Tooltip
-          // style={{
-          //   maxWidth: '300px',
-          //   wordWrap: 'break-word',
-          //   whiteSpace: 'normal',
-          // }}
           content={
             <span
               style={{
                 display: 'inline-block',
                 maxWidth: 300,
-                // textAlign: 'left',
                 overflowWrap: 'anywhere',
               }}>
               {text}
