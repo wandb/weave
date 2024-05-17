@@ -1,3 +1,9 @@
+/*
+This migration adds the deleted_at column to: 
+    - the object_versions, call_parts, and calls_merged tables
+    - the object_versions_deduped and calls_merged_view views
+*/
+
 ALTER TABLE object_versions
     ADD COLUMN deleted_at Nullable(DateTime64(3)) DEFAULT NULL;
 
