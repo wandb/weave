@@ -17,7 +17,7 @@ import {
   StrictDropdownProps,
 } from 'semantic-ui-react';
 import {LabelProps} from 'semantic-ui-react';
-
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {
   DragDropProvider,
   DragDropState,
@@ -31,6 +31,7 @@ import {Omit} from '../../types/base';
 import {makePropsAreEqual} from '../../util/shouldUpdate';
 import {Struct} from '../../util/types';
 import {Option} from '../../util/uihelpers';
+import './ModifiedDropdown.less';
 
 type LabelCoord = {
   top: number;
@@ -94,6 +95,32 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
     const [searchQuery, setSearchQuery] = useState('');
     const [options, setOptions] = useState(propsOptions);
 
+    const [showTooltip, setShowTooltip] = useState(false);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const dropdownTextElement = document.querySelector('.ui.dropdown .text');
+      const selectedOption = propsOptions.find(opt => opt.value === value);
+      if (dropdownTextElement && selectedOption) {
+        // dropdownTextElement.setAttribute('data-tooltip', selectedOption.text);
+        setShowTooltip(
+          dropdownTextElement.scrollWidth > dropdownTextElement.clientWidth
+        );
+      }
+    }, [value, propsOptions]);
+
+    const [showSelectedTooltip, setShowSelectedTooltip] = useState(false);
+    const selectedTextRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const selectedOption = propsOptions.find(opt => opt.value === value);
+      if (selectedTextRef.current && selectedOption) {
+        setShowSelectedTooltip(
+          selectedTextRef.current.scrollWidth >
+            selectedTextRef.current.clientWidth
+        );
+      }
+    }, [value, propsOptions, selectedTextRef]);
     const doSearch = useMemo(
       () =>
         _.debounce((query: string) => {
@@ -212,13 +239,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         ? computedOptions
         : computedOptions.map(opt => ({
             ...opt,
-            content: (
-              <div
-                style={{padding: '13px 18px', margin: '-13px -18px'}}
-                onClick={() => setSearchQuery('')}>
-                {opt.text}
-              </div>
-            ),
+            content: <OptionWithTooltip key={opt.value} text={opt.text} />,
           })),
       resultLimit,
       searchQuery,
@@ -425,7 +446,19 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       ) : (
         <>{children}</>
       );
-
+    const selectedOption = propsOptions.find(opt => opt.value === value);
+    const renderTrigger = () => {
+      if (searchQuery) {
+        return '';
+      }
+      return (
+        // <div className="ui dropdown">
+        <div className="text">
+          <OptionWithTooltip text={selectedOption ? selectedOption.text : ''} />
+        </div>
+        // </div>
+      );
+    };
     return wrapWithDragDrop(
       <Dropdown
         {...passProps}
@@ -450,6 +483,18 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
             }
           }
         }}
+        trigger={renderTrigger()}
+
+        // trigger={
+        //   selectedOption ? (
+        //     <OptionWithTooltip
+        //       key={selectedOption.text}
+        //       text={selectedOption.text}
+        //     />
+        //   ) : (
+        //     <span>Select an option</span>
+        //   )
+        // }
       />
     );
   },
@@ -460,3 +505,59 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
 );
 
 export default ModifiedDropdown;
+
+const OptionWithTooltip = ({text}: any) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const optionRef = useRef<HTMLDivElement>(null);
+  console.log(
+    text,
+    optionRef?.current?.scrollWidth,
+    optionRef?.current?.clientWidth
+  );
+  useEffect(() => {
+    if (optionRef.current) {
+      setShowTooltip(
+        optionRef.current.scrollWidth > optionRef.current.clientWidth
+      );
+    }
+  }, [text]);
+
+  return (
+    <div
+      ref={optionRef}
+      style={{
+        // padding: '13px 18px',
+        // margin: '-13px -18px',
+        // maxWidth: '200px',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}>
+      {showTooltip ? (
+        <Tooltip
+          // style={{
+          //   maxWidth: '300px',
+          //   wordWrap: 'break-word',
+          //   whiteSpace: 'normal',
+          // }}
+          content={
+            <span
+              style={{
+                display: 'inline-block',
+                maxWidth: 300,
+                // textAlign: 'left',
+                overflowWrap: 'anywhere',
+              }}>
+              {text}
+            </span>
+          }
+          size="small"
+          position="bottom center"
+          trigger={<span>{text}</span>}
+        />
+      ) : (
+        text
+      )}
+    </div>
+  );
+};
