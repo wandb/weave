@@ -3,6 +3,7 @@ import json
 import typing as t
 from pydantic import BaseModel
 import requests
+import tenacity
 
 from weave.trace_server import environment as wf_env
 
@@ -34,6 +35,14 @@ REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
 
+REMOTE_REQUEST_RETRY_LIMIT = 3
+REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
+
+
+def _is_retryable_exception(self, e: Exception) -> bool:
+    # TODO: Identify unretriable exceptions
+    return True
+
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
@@ -59,8 +68,17 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: t.Tuple[str, str]) -> None:
         self._auth = auth
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential(multiplier=1, min=1, max=60),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        reraise=True,
+    )
     def _flush_calls(
-        self, batch: t.List, *, _should_update_batch_size: bool = True
+        self,
+        batch: t.List,
+        *,
+        _should_update_batch_size: bool = True,
     ) -> None:
         if len(batch) == 0:
             return
@@ -91,6 +109,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
         r.raise_for_status()
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential(multiplier=1, min=1, max=60),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        reraise=True,
+    )
     def _generic_request(
         self,
         url: str,
