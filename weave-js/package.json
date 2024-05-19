@@ -10,7 +10,7 @@
     "build": "yarn generate && rm -rf build && NODE_OPTIONS=--max-old-space-size=16384 vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "testci": "CI=true vitest --reporter=default --reporter=junit --outputFile=./test-results/junit",
+    "testci": "CI=true vitest --reporter=default --reporter=junit --outputFile=./test-results/junit/results.xml",
     "eslint": "eslint --ext .js,.jsx,.ts,.tsx src",
     "eslint-fix": "eslint --fix --ext .js,.jsx,.ts,.tsx src",
     "tslint": "tslint --project .",
