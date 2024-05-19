@@ -234,6 +234,7 @@ const PanelImage: FC<PanelImageProps> = ({config, input}) => {
 
 export const Spec: Panel2.PanelSpec<PanelImageConfigType> = {
   id: 'image-file',
+  icon: 'photo',
   displayName: 'Image',
   ConfigComponent: PanelImageConfig,
   Component: PanelImage,

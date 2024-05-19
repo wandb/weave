@@ -2,53 +2,49 @@ import os
 import random
 import numpy as np
 
+import pathlib
 import typing
 import pytest
 import shutil
 import tempfile
 
-from weave.panels import table_state
+import weave
+
 from . import context_state
-from . import weave_server
 from .tests import fixture_fakewandb
 from . import serialize
-from . import client
+from . import client as client_legacy
 from .language_features.tagging.tag_store import isolated_tagging_context
 from . import logs
 from . import io_service
 from . import logs
+from . import environment
 import logging
+from . import autopatch
+
 
 from flask.testing import FlaskClient
 
 from .tests.wandb_system_tests_conftest import *
+from .tests.trace_server_clickhouse_conftest import *
 
-from _pytest.config import Config
-from _pytest.reports import TestReport
-from typing import Tuple, Optional
+from weave.trace_server import (
+    sqlite_trace_server,
+    trace_server_interface,
+    remote_http_trace_server,
+)
+from weave import weave_init
 
+logs.configure_logger()
 
-def pytest_report_teststatus(
-    report: TestReport, config: Config
-) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    if report.when == "call":
-        duration = "{:.2f}s".format(report.duration)
-        if report.failed:
-            return "failed", "F", f"FAILED({duration})"
-        elif report.passed:
-            return "passed", ".", f"PASSED({duration})"
-        elif hasattr(
-            report, "wasxfail"
-        ):  # 'xfail' means that the test was expected to fail
-            return report.outcome, "x", "XFAIL"
-        elif report.skipped:
-            return report.outcome, "s", "SKIPPED"
+# Lazy mode was the default for a long time. Eager is now the default for the user API.
+# A lot of tests are written to expect lazy mode, so just make lazy mode the default for
+# tests.
+context_state._eager_mode.set(False)
 
-    elif report.when in ("setup", "teardown"):
-        if report.failed:
-            return "error", "E", "ERROR"
-
-    return None, None, None
+# A lot of tests rely on weave.ops.* being in scope. Importing this here
+# makes that work...
+from weave import ops
 
 
 ### Disable datadog engine tracing
@@ -93,6 +89,27 @@ def test_artifact_dir():
     return "/tmp/weave/pytest/%s" % os.environ.get("PYTEST_CURRENT_TEST")
 
 
+def pytest_collection_modifyitems(config, items):
+    # Get the job number from environment variable (0 for even tests, 1 for odd tests)
+    job_num = config.getoption("--job-num", default=None)
+    if job_num is None:
+        return
+
+    job_num = int(job_num)
+
+    selected_items = []
+    for index, item in enumerate(items):
+        if index % 2 == job_num:
+            selected_items.append(item)
+
+    items[:] = selected_items
+
+    # Add the weave_client marker to all tests that have a client fixture
+    for item in items:
+        if "client" in item.fixturenames:
+            item.add_marker(pytest.mark.weave_client)
+
+
 @pytest.fixture(autouse=True)
 def pre_post_each_test(test_artifact_dir, caplog):
     # TODO: can't get this to work. I was trying to setup pytest log capture
@@ -100,6 +117,9 @@ def pre_post_each_test(test_artifact_dir, caplog):
     caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
+        pathlib.Path(__file__).parent.parent / "wb_schema.gql"
+    )
     try:
         shutil.rmtree(test_artifact_dir)
     except (FileNotFoundError, OSError):
@@ -108,6 +128,13 @@ def pre_post_each_test(test_artifact_dir, caplog):
     with isolated_tagging_context():
         yield
     del os.environ["WEAVE_LOCAL_ARTIFACT_DIR"]
+
+
+@pytest.fixture(autouse=True)
+def throw_on_error():
+    os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"] = "true"
+    yield
+    del os.environ["WEAVE_VALUE_OR_ERROR_DEBUG"]
 
 
 @pytest.fixture()
@@ -139,10 +166,26 @@ def cereal_csv():
 
 
 @pytest.fixture()
+def eager_mode():
+    with context_state.eager_execution():
+        yield
+
+
+@pytest.fixture()
 def fake_wandb():
     setup_response = fixture_fakewandb.setup()
     yield setup_response
     fixture_fakewandb.teardown(setup_response)
+
+
+@pytest.fixture()
+def use_server_gql_schema():
+    old_schema_path = environment.gql_schema_path()
+    if old_schema_path is not None:
+        del os.environ["WEAVE_GQL_SCHEMA_PATH"]
+    yield
+    if old_schema_path is not None:
+        os.environ["WEAVE_GQL_SCHEMA_PATH"] = old_schema_path
 
 
 @pytest.fixture()
@@ -156,6 +199,8 @@ def fixed_random_seed():
 
 @pytest.fixture()
 def app():
+    from . import weave_server
+
     app = weave_server.make_app()
     app.config.update(
         {
@@ -198,6 +243,8 @@ class HttpServerTestClient:
 
 @pytest.fixture()
 def http_server_test_client(app):
+    from . import weave_server
+
     app = weave_server.make_app()
     flask_client = app.test_client()
     return HttpServerTestClient(flask_client)
@@ -205,7 +252,7 @@ def http_server_test_client(app):
 
 @pytest.fixture()
 def weave_test_client(http_server_test_client):
-    return client.Client(http_server_test_client)
+    return client_legacy.Client(http_server_test_client)
 
 
 @pytest.fixture()
@@ -235,5 +282,68 @@ def io_server_factory():
 
 @pytest.fixture()
 def consistent_table_col_ids():
+    from weave.panels import table_state
+
     with table_state.use_consistent_col_ids():
         yield
+
+
+@pytest.fixture()
+def ref_tracking():
+    with context_state.ref_tracking(True):
+        yield
+
+
+@pytest.fixture()
+def strict_op_saving():
+    with context_state.strict_op_saving(True):
+        yield
+
+
+# we already were doing pytest_addoption in wandb_system_tests_conftest so
+# the weave flag is there as well
+# def pytest_addoption(parser):
+#     parser.addoption(
+#         "--weave-server",
+#         action="store",
+#         default="sqlite",
+#         help="Specify the client object to use: sqlite or clickhouse",
+#     )
+
+
+@pytest.fixture()
+def client(request) -> Generator[weave_client.WeaveClient, None, None]:
+    inited_client = None
+    weave_server_flag = request.config.getoption("--weave-server")
+    tsi: trace_server_interface.TraceServerInterface
+    if weave_server_flag == "sqlite":
+        sql_lite_server = sqlite_trace_server.SqliteTraceServer(
+            "file::memory:?cache=shared"
+        )
+        sql_lite_server.drop_tables()
+        sql_lite_server.setup_tables()
+        tsi = sql_lite_server
+    elif weave_server_flag == "clickhouse":
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
+            use_async_insert=False
+        )
+        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
+        ch_server._run_migrations()
+        tsi = ch_server
+    elif weave_server_flag.startswith("http"):
+        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
+            weave_server_flag
+        )
+        tsi = remote_server
+    elif weave_server_flag == ("prod"):
+        inited_client = weave_init.init_weave("dev_testing")
+
+    if inited_client is None:
+        client = weave_client.WeaveClient("shawn", "test-project", tsi)
+        inited_client = weave_init.InitializedClient(client)
+        autopatch.autopatch()
+    try:
+        yield inited_client.client
+    finally:
+        inited_client.reset()

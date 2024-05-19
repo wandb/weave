@@ -14,8 +14,10 @@
 // ***********************************************************
 
 // Import commands.js using ES2015 syntax:
-import '@deploysentinel/cypress-debugger/support'; // ❗ Must be imported top of file
 import './commands'
+import '@replayio/cypress/support';
+import "cypress-real-events/support";
+
 
 // Alternatively you can use CommonJS syntax:
 // require('./commands')

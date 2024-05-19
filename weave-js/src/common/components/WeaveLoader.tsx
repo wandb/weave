@@ -1,5 +1,6 @@
-import React from 'react';
 import './WeaveLoader.css';
+
+import React from 'react';
 
 export interface WeaveLoaderProps {
   className?: string;

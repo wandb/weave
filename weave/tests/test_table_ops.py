@@ -7,6 +7,7 @@ from .. import weave_types as types
 from .. import ops
 from .. import storage
 from .. import context
+from .. import context_state
 from .. import weave_internal
 from .. import graph
 from .. import box
@@ -15,6 +16,29 @@ from ..ops_domain import table as table_ops
 from . import weavejs_ops
 
 TABLE_TYPES = ["list", "pandas", "sql"]
+
+_loading_builtins_token = context_state.set_loading_built_ins()
+
+
+@weave.op(
+    name="test_table_ops-op_list_table",
+    input_type={"n": types.Int()},
+    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
+)
+def op_list_table(n):
+    return [{"a": i, "b": str(i)} for i in range(n)]
+
+
+@weave.op(
+    name="test_table_ops-op_list",
+    input_type={"n": types.Int()},
+    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
+)
+def op_list(n):
+    return [{"a": i, "b": str(i)} for i in range(n)]
+
+
+context_state.clear_loading_built_ins(_loading_builtins_token)
 
 
 def get_test_table(table_type):
@@ -93,7 +117,7 @@ def test_filter(table_type):
 @pytest.mark.parametrize("table_type", ["pandas"])
 def test_groupby(table_type):
     table = get_test_table(table_type)
-    groupby_fn = weave.define_fn(
+    groupby_fn = weave_internal.define_fn(
         {"row": weave.types.TypedDict({})}, lambda row: row["type"]
     )
     # TODO: add a pick here to check that it works.
@@ -157,7 +181,7 @@ def test_groupby_list(table_type):
 @pytest.mark.parametrize("table_type", ["list", "sql"])
 def test_groupby_list_weavejs_form(table_type):
     table = get_test_table(table_type)
-    groupby_fn = weave.define_fn(
+    groupby_fn = weave_internal.define_fn(
         {"row": table.type.object_type},
         lambda row: graph.OutputNode(
             types.String(),
@@ -175,20 +199,11 @@ def test_groupby_list_weavejs_form(table_type):
 @pytest.mark.parametrize("table_type", TABLE_TYPES)
 def test_map(table_type):
     table = get_test_table(table_type)
-    map_fn = weave.define_fn(
+    map_fn = weave_internal.define_fn(
         {"row": weave.types.TypedDict({})}, lambda row: row["potass"]
     )
     mapped = table.map(map_fn)
     assert weave.use(mapped[0]) == 280
-
-
-@weave.op(
-    name="test_table_ops-op_list_table",
-    input_type={"n": types.Int()},
-    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
-)
-def op_list_table(n):
-    return [{"a": i, "b": str(i)} for i in range(n)]
 
 
 def test_list_returning_op():
@@ -202,18 +217,11 @@ def test_list_returning_op():
 
 
 def test_list_map():
-    map_fn = weave.define_fn({"row": weave.types.TypedDict({})}, lambda row: row["a"])
+    map_fn = weave_internal.define_fn(
+        {"row": weave.types.TypedDict({})}, lambda row: row["a"]
+    )
     res = weave.use(op_list_table(2).map(map_fn))
     assert res == [0, 1]
-
-
-@weave.op(
-    name="test_table_ops-op_list",
-    input_type={"n": types.Int()},
-    output_type=types.List(types.TypedDict({"a": types.Int(), "b": types.String()})),
-)
-def op_list(n):
-    return [{"a": i, "b": str(i)} for i in range(n)]
 
 
 def test_list_get_and_op():

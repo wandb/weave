@@ -1,18 +1,22 @@
 import contextlib
 import logging
+import os
 import typing
+from urllib.parse import urlparse
 
 from weave.client_interface import ClientInterface
 
+from . import urls
 from . import util
 from . import client
-from . import server
 from . import context_state
 
 
 @contextlib.contextmanager
 def execution_client():
     """Returns a client for use by the execution engine and op resolvers."""
+    from . import server
+
     # Force in process execution
     with context_state.client(client.NonCachingClient(server.InProcessServer())):
         with context_state.analytics_disabled():
@@ -21,6 +25,8 @@ def execution_client():
 
 @contextlib.contextmanager
 def local_http_client():
+    from . import server
+
     s = server.HttpServer()
     s.start()
     with context_state.server(s):
@@ -31,6 +37,8 @@ def local_http_client():
 
 @contextlib.contextmanager
 def weavejs_client():
+    from . import server
+
     s = server.HttpServer()
     s.start()
     with context_state.server(s):
@@ -43,22 +51,44 @@ def use_fixed_server_port():
     # s = server.HttpServer(port=9994)
     # s.start()
     # _weave_client.set(server.HttpServerClient(s.url))
+    from . import server
+
     context_state.set_client(server.HttpServerClient("http://localhost:9994"))
 
 
 def use_frontend_devmode():
     """Talk to external server running on 9994"""
     use_fixed_server_port()
+    urls.use_local_urls()
 
     # point frontend to vite server
     context_state.set_frontend_url("http://localhost:3000")
 
 
+def use_lazy_execution():
+    context_state._eager_mode.set(False)
+
+
+lazy_execution = context_state.lazy_execution
+
+
 def _make_default_client():
+    from . import server
+
     if util.is_notebook():
         serv = context_state.get_server()
         if serv is None:
-            serv = server.HttpServer()
+            frontend_url = os.environ.get("WEAVE_FRONTEND_URL")
+            if frontend_url is not None:
+                parsed_url = urlparse(frontend_url)
+                server_args = {}
+                if parsed_url.hostname is not None:
+                    server_args["host"] = parsed_url.hostname
+                if parsed_url.port is not None:
+                    server_args["port"] = parsed_url.port
+                serv = server.HttpServer(**server_args)
+            else:
+                serv = server.HttpServer()
             serv.start()
             context_state.set_server(serv)
         # Falling through here means the notebook kernel uses
@@ -78,7 +108,9 @@ def get_client() -> typing.Optional[ClientInterface]:
 
 
 def get_frontend_url():
-    url = context_state.get_frontend_url()
+    from . import server
+
+    url = os.environ.get("WEAVE_FRONTEND_URL", context_state.get_frontend_url())
     if url is None:
         client = get_client()
         if isinstance(client, server.HttpServerClient):

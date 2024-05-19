@@ -1,61 +1,30 @@
-import * as Panel2 from '../panel';
-import React, {useMemo} from 'react';
-import {TraceTreeSpanViewer} from './PanelTraceTreeTrace';
-import {useNodeValue} from '@wandb/weave/react';
 import {
   constFunction,
   constNumber,
-  constString,
   listObjectType,
-  opDict,
   opLimit,
   opMap,
-  opPick,
 } from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
+import React, {useCallback, useMemo} from 'react';
 import {Loader} from 'semantic-ui-react';
-import {flatToTrees, unifyRoots} from './util';
+
+import * as Panel2 from '../panel';
+import {opSpanAsDictToLegacySpanShape} from './common';
+import {TraceTreeSpanViewer} from './PanelTraceTreeTrace';
+import {flatToTrees, SpanWeaveType, unifyRoots} from './util';
 
 const inputType = {
   type: 'list' as const,
-  objectType: {
-    type: 'typedDict' as const,
-    propertyTypes: {
-      trace_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      span_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      parent_id: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      name: {
-        type: 'union' as const,
-        members: ['string' as const, 'none' as const],
-      },
-      start_time_ms: {
-        type: 'union' as const,
-        members: ['number' as const, 'none' as const],
-      },
-      end_time_ms: {
-        type: 'union' as const,
-        members: ['number' as const, 'none' as const],
-      },
-      attributes: {
-        type: 'union' as const,
-        members: [
-          {type: 'typedDict' as const, propertyTypes: {}},
-          'none' as const,
-        ],
-      },
-    },
-  },
+  objectType: SpanWeaveType,
 };
 
-type PanelTraceTreeTraceProps = Panel2.PanelProps<typeof inputType>;
+type PanelTraceTreeTraceProps = Panel2.PanelProps<
+  typeof inputType,
+  {
+    selectedSpanIndex?: number;
+  }
+>;
 
 const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
   const query = useMemo(() => {
@@ -64,18 +33,7 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
       arr: limited as any,
       mapFn: constFunction(
         {row: listObjectType(props.input.type), index: 'number'},
-        ({row, index}) =>
-          opDict({
-            name: opPick({obj: row, key: constString('name')}),
-            start_time_ms: opPick({
-              obj: row,
-              key: constString('start_time_ms'),
-            }),
-            end_time_ms: opPick({obj: row, key: constString('end_time_ms')}),
-            trace_id: opPick({obj: row, key: constString('trace_id')}),
-            span_id: opPick({obj: row, key: constString('span_id')}),
-            parent_id: opPick({obj: row, key: constString('parent_id')}),
-          } as any)
+        ({row, index}) => opSpanAsDictToLegacySpanShape({spanDict: row})
       ),
     } as any);
   }, [props.input]);
@@ -85,14 +43,28 @@ const PanelTraceRender: React.FC<PanelTraceTreeTraceProps> = props => {
       nodeValue.loading ? null : unifyRoots(flatToTrees(nodeValue.result)),
     [nodeValue.loading, nodeValue.result]
   );
+  const setSelectedSpanIndex = useCallback(
+    (selectedSpanIndex: number) => {
+      props.updateConfig({selectedSpanIndex});
+    },
+    [props]
+  );
   if (tree == null) {
     return <Loader />;
   }
-  return <TraceTreeSpanViewer span={tree} />;
+
+  return (
+    <TraceTreeSpanViewer
+      span={tree}
+      selectedSpanIndex={props.config?.selectedSpanIndex}
+      onSelectSpanIndex={setSelectedSpanIndex}
+      hideDetails={true}
+    />
+  );
 };
 
 export const Spec: Panel2.PanelSpec = {
-  id: 'Trace',
+  id: 'tracePanel',
   canFullscreen: true,
   Component: PanelTraceRender,
   inputType,

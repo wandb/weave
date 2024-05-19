@@ -9,6 +9,7 @@ from .. import ops
 from .. import serialize
 from .. import registry_mem
 from .. import op_args
+from .. import weave_internal
 import weave
 from . import fixture_fakewandb as fwb
 
@@ -27,7 +28,7 @@ def test_serialize(fake_wandb):
     file = av.file("test_results.table.json")
     table = file.table()
     rows = table.rows()
-    filter_fn = api.define_fn(
+    filter_fn = weave_internal.define_fn(
         {"row": rows.type.object_type}, lambda row: row["score_Animalia"] + 100
     )
     filtered = rows.map(filter_fn)
@@ -41,10 +42,12 @@ def test_serialize(fake_wandb):
 def test_serialize_nested_function():
     rows = api.save([{"a": [1, 2]}])
     filtered = rows.filter(
-        api.define_fn(
+        weave_internal.define_fn(
             {"row": types.TypedDict({"a": types.List(types.Int())})},
             lambda row: ops.numbers_avg(
-                row["a"].map(api.define_fn({"row": types.Int()}, lambda row: row + 1))
+                row["a"].map(
+                    weave_internal.define_fn({"row": types.Int()}, lambda row: row + 1)
+                )
             ),
         )
     )

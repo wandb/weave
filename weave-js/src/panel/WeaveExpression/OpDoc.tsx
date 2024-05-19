@@ -2,10 +2,9 @@ import * as markdown from '@wandb/weave/common/util/markdown';
 import {opDisplayName} from '@wandb/weave/core';
 import React from 'react';
 
-import {useWeaveContext} from '../../context';
-
-import * as S from './OpDoc.styles';
 import {Button} from '../../components/Button';
+import {useWeaveContext} from '../../context';
+import * as S from './OpDoc.styles';
 
 export interface OpDocProps {
   opName: string;

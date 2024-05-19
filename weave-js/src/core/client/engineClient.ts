@@ -44,6 +44,9 @@ export class EngineClient implements Client {
   public isPolling(): boolean {
     return false;
   }
+  public clearCacheForNode(node: GraphTypes.Node<any>): Promise<void> {
+    throw new Error('not implemented');
+  }
   addOnPollingChangeListener(callback: (polling: boolean) => void): void {
     return;
   }
@@ -52,5 +55,8 @@ export class EngineClient implements Client {
   }
   public debugMeta(): {id: string} & {[prop: string]: any} {
     return {id: 'EngineClient', opStore: this.opStore.debugMeta()};
+  }
+  public isWeavePythonBackend(): boolean {
+    return false;
   }
 }

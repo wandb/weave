@@ -3,11 +3,12 @@ from . import panel
 from . import graph
 from . import weave_types
 from . import storage
-from . import ops
 
 
 def make_node(v: typing.Any) -> graph.Node:
     """Business logic for how values passed to panels are converted to json."""
+    from . import ops
+
     if isinstance(v, graph.Node):
         return v
 
@@ -17,7 +18,7 @@ def make_node(v: typing.Any) -> graph.Node:
 
     # Otherwise
     ref = storage.save(v)
-    return ops.get(str(ref))
+    return ops.get(str(ref))  # type: ignore
 
 
 def child_item(v):

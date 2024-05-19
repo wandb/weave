@@ -11,6 +11,7 @@ export const AdvancedPropertiesHeader = styled.div`
     color: ${globals.TEAL_LIGHT};
   }
 `;
+AdvancedPropertiesHeader.displayName = 'S.AdvancedPropertiesHeader';
 
 export const ConstrainedIconContainer = styled.div`
   height: 24px;
@@ -21,27 +22,29 @@ export const ConstrainedIconContainer = styled.div`
   background-color: ${globals.TEAL_TRANSPARENT};
   color: ${globals.TEAL};
   border-radius: 4px;
-  margin-left: 10px;
+  margin-left: 8px;
   cursor: pointer;
   &:hover {
     background-color: ${globals.TEAL_LIGHT_TRANSPARENT};
   }
 `;
+ConstrainedIconContainer.displayName = 'S.ConstrainedIconContainer';
 
 export const UnconstrainedIconContainer = styled.div`
   height: 24px;
   display: flex;
   padding: 3px;
-  color: ${globals.MOON_500}
+  color: ${globals.MOON_500};
   justify-content: center;
   align-items: center;
   border-radius: 4px;
-  margin-left: 10px;
+  margin-left: 8px;
   cursor: pointer;
   &:hover {
-      background-color: ${globals.MOON_100}
+    background-color: ${globals.MOON_100};
   }
 `;
+UnconstrainedIconContainer.displayName = 'S.UnconstrainedIconContainer';
 
 export const AddNewSeriesContainer = styled.div`
   display: flex;
@@ -55,6 +58,7 @@ export const AddNewSeriesContainer = styled.div`
     color: ${globals.MOON_600};
   }
 `;
+AddNewSeriesContainer.displayName = 'S.AddNewSeriesContainer';
 
 export const AddNewSeriesText = styled.div`
   margin-left: 12px;
@@ -62,7 +66,9 @@ export const AddNewSeriesText = styled.div`
   line-height: 24px;
   font-weight: 600;
 `;
+AddNewSeriesText.displayName = 'S.AddNewSeriesText';
 
 export const AddNewSeriesButton = styled.div`
   margin-right: 12px;
 `;
+AddNewSeriesButton.displayName = 'S.AddNewSeriesButton';

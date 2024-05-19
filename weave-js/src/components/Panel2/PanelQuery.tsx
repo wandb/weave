@@ -1,20 +1,5 @@
-import React, {useCallback, useMemo} from 'react';
-
-import * as Panel from './panel';
-import {PanelContextProvider} from './PanelContext';
-import * as Table from './PanelTable/tableState';
 import {useWeaveContext} from '@wandb/weave/context';
-import {TableState} from '../..';
-import * as ConfigPanel from './ConfigPanel';
-import {Button} from 'semantic-ui-react';
 import {
-  ChildPanel,
-  ChildPanelConfigComp,
-  ChildPanelFullConfig,
-} from './ChildPanel';
-import {
-  NodeOrVoidNode,
-  Type,
   constNodeUnsafe,
   constString,
   isAssignableTo,
@@ -22,17 +7,32 @@ import {
   listObjectType,
   mapNodes,
   maybe,
+  Node,
+  NodeOrVoidNode,
   opOr,
   opStringEqual,
-  Node,
+  Type,
   varNode,
   voidNode,
   Weave,
 } from '@wandb/weave/core';
-import {Spec as SelectEditorSpec} from './PanelSelectEditor';
+import React, {useCallback, useMemo} from 'react';
+import {Button} from 'semantic-ui-react';
+
+import {TableState} from '../..';
+import {
+  ChildPanel,
+  ChildPanelConfigComp,
+  ChildPanelFullConfig,
+} from './ChildPanel';
+import * as ConfigPanel from './ConfigPanel';
 import {ExpressionView} from './ExpressionView';
-import {updatePreFilter} from './PanelTable/tableState';
+import * as Panel from './panel';
 import {useUpdateConfig2} from './PanelComp';
+import {PanelContextProvider} from './PanelContext';
+import {Spec as SelectEditorSpec} from './PanelSelectEditor';
+import * as Table from './PanelTable/tableState';
+import {updatePreFilter} from './PanelTable/tableState';
 
 interface Condition {
   expression: NodeOrVoidNode;

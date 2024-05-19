@@ -1,3 +1,4 @@
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {
   constString,
   isConstNode,
@@ -9,9 +10,9 @@ import {
 import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
 import {Icon} from 'semantic-ui-react';
+import styled from 'styled-components';
 
 import {isServedLocally} from '../../PagePanelComponents/util';
-import {useIsAuthenticated} from '../../PagePanelComponents/util';
 import {LayoutTabs} from '../LayoutTabs';
 import * as Panel2 from '../panel';
 import {usePanelContext} from '../PanelContext';
@@ -20,7 +21,6 @@ import {FrameVariablesTable} from './FrameVariablesTable';
 import {LocalDashboardsTable} from './LocalDashboardsTable';
 import {LocalObjectsTable, useLocalObjectsExist} from './LocalObjectsTable';
 import {ViewerProjectsTable} from './ViewerProjectsTable';
-import styled from 'styled-components';
 
 const HIDE_VARIABLES_TAB = true;
 

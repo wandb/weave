@@ -14,7 +14,7 @@ def map_to_python(  # type: ignore[empty-body]
     path: list[str] = [],
     mapper_options: typing.Any = None,
 ) -> "mappers.Mapper":
-    pass
+    raise NotImplementedError
 
 
 def map_from_python(  # type: ignore[empty-body]
@@ -23,4 +23,4 @@ def map_from_python(  # type: ignore[empty-body]
     path: list[str] = [],
     mapper_options: typing.Any = None,
 ) -> "mappers.Mapper":
-    pass
+    raise NotImplementedError

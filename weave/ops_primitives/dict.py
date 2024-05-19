@@ -1,6 +1,8 @@
 import typing
-from ._dict_utils import typeddict_pick_output_type
-from ..api import op, weave_class, OpVarArgs
+from .._dict_utils import typeddict_pick_output_type
+from ..decorator_op import op
+from ..decorator_class import weave_class
+from ..op_args import OpVarArgs
 from .. import weave_types as types
 from ._dict_utils import tag_aware_dict_val_for_escaped_key
 from ..language_features.tagging import tagged_value_type
@@ -84,7 +86,7 @@ class TypedDict:
 
     @op(
         output_type=lambda input_type: types.List(
-            types.UnionType(
+            types.union(
                 *(
                     types.Const(types.String(), k)
                     for k in input_type["self"].property_types.keys()

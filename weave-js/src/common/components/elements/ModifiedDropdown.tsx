@@ -61,6 +61,7 @@ export interface ModifiedDropdownExtraProps {
   itemLimit?: number;
   options: Option[];
   resultLimit?: number;
+  resultLimitMessage?: string;
   style?: CSSProperties;
 
   optionTransform?(option: Option): Option;
@@ -72,18 +73,24 @@ type ModifiedDropdownProps = Omit<StrictDropdownProps, 'options'> &
 const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
   (props: ModifiedDropdownProps) => {
     const {
-      allowAdditions,
       debounceTime,
-      enableReordering,
-      itemLimit,
       multiple,
       onChange,
       options: propsOptions,
-      optionTransform,
       search,
       value,
     } = props;
-    const resultLimit = props.resultLimit ?? 100;
+
+    const {
+      itemLimit,
+      optionTransform,
+      enableReordering,
+      allowAdditions,
+      resultLimit = 100,
+      resultLimitMessage = `Limited to ${resultLimit} items. Refine search to see other options.`,
+      ...passProps
+    } = props;
+
     const [searchQuery, setSearchQuery] = useState('');
     const [options, setOptions] = useState(propsOptions);
 
@@ -124,13 +131,15 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       if (firstRenderRef.current) {
         return;
       }
-      doSearch(searchQuery);
-      if (prevDoSearch !== doSearch) {
-        prevDoSearch?.cancel();
-        doSearch.flush();
+      if (search !== false) {
+        doSearch(searchQuery);
+        if (prevDoSearch !== doSearch) {
+          prevDoSearch?.cancel();
+          doSearch.flush();
+        }
       }
       // eslint-disable-next-line
-    }, [searchQuery, doSearch]);
+    }, [searchQuery, doSearch, search]);
     useEffect(() => {
       firstRenderRef.current = false;
     }, []);
@@ -175,12 +184,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         if (options.length > resultLimit) {
           displayOpts.push({
             key: ITEM_LIMIT_VALUE,
-            text: (
-              <span className="hint-text">
-                Limited to {resultLimit} items. Refine search to see other
-                options.
-              </span>
-            ),
+            text: <span className="hint-text">{resultLimitMessage}</span>,
             value: ITEM_LIMIT_VALUE,
           });
         }
@@ -204,8 +208,20 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       return itemCount() >= itemLimit;
     }, [itemLimit, itemCount]);
 
+    const computedOptions = searchQuery ? options : propsOptions;
     const displayOptions = getDisplayOptions(
-      searchQuery ? options : propsOptions,
+      multiple
+        ? computedOptions
+        : computedOptions.map(opt => ({
+            ...opt,
+            content: (
+              <div
+                style={{padding: '13px 18px', margin: '-13px -18px'}}
+                onClick={() => setSearchQuery('')}>
+                {opt.text}
+              </div>
+            ),
+          })),
       resultLimit,
       searchQuery,
       value
@@ -412,11 +428,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         <>{children}</>
       );
 
-    const passProps = {...props};
-    delete passProps.itemLimit;
-    delete passProps.optionTransform;
-    delete passProps.allowAdditions;
-
     return wrapWithDragDrop(
       <Dropdown
         {...passProps}
@@ -424,7 +435,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         lazyLoad
         selectOnNavigation={false}
         searchQuery={searchQuery}
-        search={opts => opts}
+        search={search !== false ? opts => opts : false}
         renderLabel={renderLabel}
         onSearchChange={(e, data) => {
           props.onSearchChange?.(e, data);

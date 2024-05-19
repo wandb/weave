@@ -45,12 +45,12 @@ export enum SectionPanelSorting {
 
 export interface PanelBankSectionConfig {
   id: string;
-  name: string;
+  name?: string;
   panels: LayedOutPanel[];
-  isOpen: boolean;
-  flowConfig: PanelBankFlowSectionConfig;
-  type: 'grid' | 'flow';
-  sorted: SectionPanelSorting;
+  isOpen?: boolean;
+  flowConfig?: PanelBankFlowSectionConfig;
+  type?: 'grid' | 'flow';
+  sorted?: SectionPanelSorting;
 }
 
 // These are shared by PanelBankFlowSection and PanelBankGridSection

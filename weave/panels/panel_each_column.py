@@ -12,7 +12,7 @@ RenderType = typing.TypeVar("RenderType")
 
 @weave.type()
 class EachColumnConfig(typing.Generic[RenderType]):
-    layoutMode: str
+    layoutMode: str = dataclasses.field(default_factory=lambda: "flow")
     pbLayoutConfig: typing.Optional[PanelBankSectionConfig] = dataclasses.field(
         default_factory=lambda: None
     )

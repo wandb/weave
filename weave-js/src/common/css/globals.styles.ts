@@ -1,3 +1,4 @@
+export * from './breakpoints.styles';
 export * from './color.styles';
 export * from './utils';
 

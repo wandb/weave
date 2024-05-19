@@ -1,6 +1,8 @@
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import React, {useMemo} from 'react';
 
+import {urlPrefixed} from '../../../config';
+
 export const Scaler: React.FC<{
   scale: number;
   children: React.ReactNode;
@@ -64,9 +66,10 @@ export const PreviewNode: React.FC<{
   inputExpr: string;
 }> = props => {
   const url = useMemo(() => {
-    return `${
-      window.location.origin
-    }/?previewMode=true&exp=${encodeURIComponent(props.inputExpr)}`;
+    return urlPrefixed(
+      `/?previewMode=true&exp=${encodeURIComponent(props.inputExpr)}`,
+      true
+    );
   }, [props.inputExpr]);
 
   return (

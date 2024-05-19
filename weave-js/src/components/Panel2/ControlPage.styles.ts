@@ -7,7 +7,7 @@ export const ControlBar = styled.div`
   border-top: 1px solid #ddd;
   background-color: #f8f8f8;
   display: flex;
-  justify-content: space-betwee;
+  justify-content: space-between;
 `;
 
 export const ArrowIcon = styled(WBIcon)`

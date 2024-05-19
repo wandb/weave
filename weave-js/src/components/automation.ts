@@ -1,6 +1,6 @@
-import getConfig from '../config';
 import {useEffect} from 'react';
 
+import getConfig from '../config';
 import {useLoadWeaveObjects} from './Panel2/weaveBackend';
 
 let activeAutomationId: string | null;

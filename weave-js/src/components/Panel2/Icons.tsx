@@ -1,52 +1,40 @@
 import React, {SVGProps} from 'react';
 
-import {ReactComponent as DownSVGRaw} from '../../assets/icon-chevron-down.svg';
-import {ReactComponent as UpSVGRaw} from '../../assets/icon-chevron-up.svg';
-import {ReactComponent as NextSVGRaw} from '../../assets/icon-chevron-next.svg';
-import {ReactComponent as ToolSVGRaw} from '../../assets/icon-flash-bolt.svg';
-import {ReactComponent as PromptSVGRaw} from '../../assets/icon-forum-chat-bubble.svg';
-import {ReactComponent as ChainSVGRaw} from '../../assets/icon-link-alt.svg';
-import {ReactComponent as LLMSVGRaw} from '../../assets/icon-model.svg';
-import {ReactComponent as AgentSVGRaw} from '../../assets/icon-robot-service-member.svg';
+import {ReactComponent as AddNew} from '../../assets/icon-add-new.svg';
 import {ReactComponent as ImportIconBack} from '../../assets/icon-back.svg';
 import {ReactComponent as ImportIconCaret} from '../../assets/icon-caret.svg';
-import {ReactComponent as ImportIconChartVerticalBars} from '../../assets/icon-chart-vertical-bars.svg';
+import {ReactComponent as Checkmark} from '../../assets/icon-checkmark.svg';
+import {ReactComponent as DownSVGRaw} from '../../assets/icon-chevron-down.svg';
+import {ReactComponent as NextSVGRaw} from '../../assets/icon-chevron-next.svg';
+import {ReactComponent as UpSVGRaw} from '../../assets/icon-chevron-up.svg';
 import {ReactComponent as ImportIconClose} from '../../assets/icon-close.svg';
 import {ReactComponent as ImportIconColumnAlt} from '../../assets/icon-column-alt.svg';
 import {ReactComponent as ImportIconCopy} from '../../assets/icon-copy.svg';
+import {ReactComponent as DashboardBlackboard} from '../../assets/icon-dashboard-blackboard.svg';
+import {ReactComponent as Delete} from '../../assets/icon-delete.svg';
+import {ReactComponent as Docs} from '../../assets/icon-docs.svg';
+import {ReactComponent as ToolSVGRaw} from '../../assets/icon-flash-bolt.svg';
+import {ReactComponent as PromptSVGRaw} from '../../assets/icon-forum-chat-bubble.svg';
 import {ReactComponent as ImportIconFullScreenModeExpand} from '../../assets/icon-full-screen-mode-expand.svg';
+import {ReactComponent as Home} from '../../assets/icon-home.svg';
+import {ReactComponent as Info} from '../../assets/icon-info.svg';
+import {ReactComponent as LaptopLocalComputer} from '../../assets/icon-laptop-local-computer.svg';
+import {ReactComponent as ChainSVGRaw} from '../../assets/icon-link-alt.svg';
 import {ReactComponent as ImportIconMinimizeMode} from '../../assets/icon-minimize-mode.svg';
+import {ReactComponent as LLMSVGRaw} from '../../assets/icon-model.svg';
+import {ReactComponent as OpenNewTab} from '../../assets/icon-open-new-tab.svg';
 import {ReactComponent as ImportIconOverflowHorizontal} from '../../assets/icon-overflow-horizontal.svg';
+import {ReactComponent as PencilEdit} from '../../assets/icon-pencil-edit.svg';
 import {ReactComponent as ImportIconRedo} from '../../assets/icon-redo.svg';
-import {ReactComponent as ImportIconRetry} from '../../assets/icon-retry.svg';
-import {ReactComponent as ImportIconSettingsParameters} from '../../assets/icon-settings-parameters.svg';
+import {ReactComponent as AgentSVGRaw} from '../../assets/icon-robot-service-member.svg';
 import {ReactComponent as ImportIconSplit} from '../../assets/icon-split.svg';
-import {ReactComponent as ImportIconTextLanguageAlt} from '../../assets/icon-text-language-alt.svg';
+import {ReactComponent as Table} from '../../assets/icon-table.svg';
 import {ReactComponent as ImportIconUndo} from '../../assets/icon-undo.svg';
+import {ReactComponent as UserProfilePersonal} from '../../assets/icon-user-profile-personal.svg';
+import {ReactComponent as UsersTeam} from '../../assets/icon-users-team.svg';
 import {ReactComponent as ImportIconWeave} from '../../assets/icon-weave.svg';
 import {ReactComponent as WeaveLogo} from '../../assets/icon-weave-logo.svg';
 import {ReactComponent as WeaveLogoGray} from '../../assets/icon-weave-logo-gray.svg';
-import {ReactComponent as Docs} from '../../assets/icon-docs.svg';
-import {ReactComponent as Stack} from '../../assets/icon-stack.svg';
-import {ReactComponent as Delete} from '../../assets/icon-delete.svg';
-import {ReactComponent as PencilEdit} from '../../assets/icon-pencil-edit.svg';
-import {ReactComponent as System} from '../../assets/icon-system.svg';
-import {ReactComponent as Table} from '../../assets/icon-table.svg';
-import {ReactComponent as AddNew} from '../../assets/icon-add-new.svg';
-import {ReactComponent as OpenNewTab} from '../../assets/icon-open-new-tab.svg';
-import {ReactComponent as Home} from '../../assets/icon-home.svg';
-import {ReactComponent as Checkmark} from '../../assets/icon-checkmark.svg';
-import {ReactComponent as Loading} from '../../assets/icon-loading.svg';
-
-import {ReactComponent as ChevronBack} from '../../assets/icon-chevron-back.svg';
-import {ReactComponent as DashboardBlackboard} from '../../assets/icon-dashboard-blackboard.svg';
-import {ReactComponent as Info} from '../../assets/icon-info.svg';
-import {ReactComponent as LaptopLocalComputer} from '../../assets/icon-laptop-local-computer.svg';
-import {ReactComponent as SortAscending} from '../../assets/icon-sort-ascending.svg';
-import {ReactComponent as SortDescending} from '../../assets/icon-sort-descending.svg';
-import {ReactComponent as UsersTeam} from '../../assets/icon-users-team.svg';
-import {ReactComponent as Wandb} from '../../assets/icon-wandb.svg';
-import {ReactComponent as UserProfilePersonal} from '../../assets/icon-user-profile-personal.svg';
 
 type SVGIconProps = SVGProps<SVGElement>;
 const updateIconProps = (props: SVGIconProps) => {
@@ -62,9 +50,6 @@ export const IconBack = (props: SVGIconProps) => (
 );
 export const IconCaret = (props: SVGIconProps) => (
   <ImportIconCaret {...updateIconProps(props)} />
-);
-export const IconChartVerticalBars = (props: SVGIconProps) => (
-  <ImportIconChartVerticalBars {...updateIconProps(props)} />
 );
 export const IconClose = (props: SVGIconProps) => (
   <ImportIconClose {...updateIconProps(props)} />
@@ -87,17 +72,8 @@ export const IconOverflowHorizontal = (props: SVGIconProps) => (
 export const IconRedo = (props: SVGIconProps) => (
   <ImportIconRedo {...updateIconProps(props)} />
 );
-export const IconRetry = (props: SVGIconProps) => (
-  <ImportIconRetry {...updateIconProps(props)} />
-);
-export const IconSettingsParameters = (props: SVGIconProps) => (
-  <ImportIconSettingsParameters {...updateIconProps(props)} />
-);
 export const IconSplit = (props: SVGIconProps) => (
   <ImportIconSplit {...updateIconProps(props)} />
-);
-export const IconTextLanguageAlt = (props: SVGIconProps) => (
-  <ImportIconTextLanguageAlt {...updateIconProps(props)} />
 );
 export const IconUndo = (props: SVGIconProps) => (
   <ImportIconUndo {...updateIconProps(props)} />
@@ -124,17 +100,11 @@ export const IconDown = (props: SVGIconProps) => (
 export const IconDocs = (props: SVGIconProps) => (
   <Docs {...updateIconProps(props)} />
 );
-export const IconStack = (props: SVGIconProps) => (
-  <Stack {...updateIconProps(props)} />
-);
 export const IconDelete = (props: SVGIconProps) => (
   <Delete {...updateIconProps(props)} />
 );
 export const IconPencilEdit = (props: SVGIconProps) => (
   <PencilEdit {...updateIconProps(props)} />
-);
-export const IconSystem = (props: SVGIconProps) => (
-  <System {...updateIconProps(props)} />
 );
 export const IconTable = (props: SVGIconProps) => (
   <Table {...updateIconProps(props)} />
@@ -151,13 +121,6 @@ export const IconHome = (props: SVGIconProps) => (
 export const IconCheckmark = (props: SVGIconProps) => (
   <Checkmark {...updateIconProps(props)} />
 );
-export const IconLoading = (props: SVGIconProps) => (
-  <Loading {...updateIconProps(props)} />
-);
-
-export const IconChevronBack = (props: SVGIconProps) => (
-  <ChevronBack {...updateIconProps(props)} />
-);
 export const IconDashboardBlackboard = (props: SVGIconProps) => (
   <DashboardBlackboard {...updateIconProps(props)} />
 );
@@ -167,17 +130,8 @@ export const IconInfo = (props: SVGIconProps) => (
 export const IconLaptopLocalComputer = (props: SVGIconProps) => (
   <LaptopLocalComputer {...updateIconProps(props)} />
 );
-export const IconSortAscending = (props: SVGIconProps) => (
-  <SortAscending {...updateIconProps(props)} />
-);
-export const IconSortDescending = (props: SVGIconProps) => (
-  <SortDescending {...updateIconProps(props)} />
-);
 export const IconUsersTeam = (props: SVGIconProps) => (
   <UsersTeam {...updateIconProps(props)} />
-);
-export const IconWandb = (props: SVGIconProps) => (
-  <Wandb {...updateIconProps(props)} />
 );
 export const IconUserProfilePersonal = (props: SVGIconProps) => (
   <UserProfilePersonal {...updateIconProps(props)} />

@@ -27,8 +27,8 @@ describe('clientOps', () => {
   it('simple adder', async () => {
     const client = await testClient();
     const panelTransform: ExpansionFunction = (async (
-      inputs,
-      refineNode
+      inputs: any,
+      refineNode: any
     ): Promise<Node> => {
       const {input, config: configNode} = inputs;
       if (configNode.nodeType !== 'const') {

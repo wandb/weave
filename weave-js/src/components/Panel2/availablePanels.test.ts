@@ -1,6 +1,6 @@
+import {list, Type} from '../../core';
 import * as AvailablePanels from './availablePanels';
 import {Spec as ArraySpec} from './PanelRow';
-import {list, Type} from '../../core';
 
 describe('availablePanels', () => {
   it('type image[]', () => {

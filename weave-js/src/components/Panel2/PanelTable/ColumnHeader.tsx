@@ -6,29 +6,33 @@ import * as SemanticHacks from '@wandb/weave/common/util/semanticHacks';
 import {
   canGroupType,
   canSortType,
+  constFunction,
   EditingNode,
   isListLike,
   isVoidNode,
   listObjectType,
   Node,
   NodeOrVoidNode,
+  opCount,
   voidNode,
 } from '@wandb/weave/core';
+import {TableState} from '@wandb/weave/index';
 import React, {useCallback, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
 import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
+import {Button} from '../../Button';
+import {Tooltip} from '../../Tooltip';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
 import {PanelComp2} from '../PanelComp';
-import {PanelContextProvider} from '../PanelContext';
+import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
 import * as Table from './tableState';
 import {stripTag} from './util';
-import {IconClose} from '../Icons';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -122,6 +126,8 @@ export const ColumnHeader: React.FC<{
   panelContext: any;
   isPinned: boolean;
   simpleTable?: boolean;
+  countColumnId: string | null;
+  setCountColumnId: React.Dispatch<React.SetStateAction<string | null>>;
   updatePanelContext(newContext: any): void;
   updateTableState(newTableState: Table.TableState): void;
   setColumnPinState(pin: boolean): void;
@@ -141,8 +147,11 @@ export const ColumnHeader: React.FC<{
   isPinned,
   setColumnPinState,
   simpleTable,
+  countColumnId,
+  setCountColumnId,
 }) => {
   const weave = useWeaveContext();
+  const {stack} = usePanelContext();
 
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
 
@@ -155,6 +164,7 @@ export const ColumnHeader: React.FC<{
     useState<any>(propsPanelConfig);
   const enableGroup = Table.enableGroupByCol;
   const disableGroup = Table.disableGroupByCol;
+  const isGroupCountColumn = colId === 'groupCount';
 
   const applyWorkingState = useCallback(() => {
     let newState = tableState;
@@ -240,11 +250,38 @@ export const ColumnHeader: React.FC<{
       tableState.groupBy,
     ]
   );
-  const doUngroup = useCallback(() => {
-    const newTableState = disableGroup(tableState, colId);
+  const doUngroup = useCallback(async () => {
+    let newTableState: Table.TableState | null = null;
+    const countColumnExists = Object.keys(tableState.columnNames).includes(
+      'groupCount'
+    );
+    if (countColumnId && !countColumnExists) {
+      setCountColumnId(null);
+    }
+    if (countColumnId && countColumnExists && tableState.groupBy.length === 1) {
+      newTableState = Table.removeColumn(tableState, countColumnId);
+      setCountColumnId(null);
+    }
+    newTableState = await disableGroup(
+      newTableState ?? tableState,
+      colId,
+      inputArrayNode,
+      weave,
+      stack
+    );
     recordEvent('UNGROUP');
     updateTableState(newTableState);
-  }, [tableState, colId, disableGroup, updateTableState]);
+  }, [
+    countColumnId,
+    setCountColumnId,
+    disableGroup,
+    tableState,
+    colId,
+    inputArrayNode,
+    weave,
+    stack,
+    updateTableState,
+  ]);
 
   const selectedNode = useMemo(
     () =>
@@ -264,12 +301,13 @@ export const ColumnHeader: React.FC<{
   } = usePanelStacksForType(workingSelectFunction.type, workingPanelId, {
     excludeTable: true,
     excludePlot: true,
+    disallowedPanels: ['Group', 'Expression'],
   });
 
   let columnTypeForGroupByChecks = stripTag(workingSelectFunction.type);
   if (!isGroupCol) {
-    /* 
-      Once one column is grouped, the other non-grouped columns are all typed as 
+    /*
+      Once one column is grouped, the other non-grouped columns are all typed as
       lists. So we need to figure out the inner types of the non-grouped columns.
       */
     columnTypeForGroupByChecks = isListLike(columnTypeForGroupByChecks)
@@ -285,14 +323,44 @@ export const ColumnHeader: React.FC<{
       icon: 'configuration',
       onSelect: () => openColumnSettings(),
     });
-    if (!isGroupCol && canGroupType(columnTypeForGroupByChecks)) {
+    if (
+      !isGroupCol &&
+      !isGroupCountColumn &&
+      canGroupType(columnTypeForGroupByChecks)
+    ) {
       menuItems.push({
         value: 'group',
         name: 'Group by',
         icon: 'group-runs',
-        onSelect: () => {
-          const newTableState = enableGroup(tableState, colId);
+        onSelect: async () => {
           recordEvent('GROUP');
+          let newTableState: Table.TableState | null = null;
+          if (countColumnId == null) {
+            const {table, columnId} = Table.addColumnToTable(
+              tableState,
+              constFunction(
+                {
+                  row: {
+                    type: 'list',
+                    objectType: 'any',
+                  },
+                },
+                ({row}) => {
+                  return opCount({arr: row});
+                }
+              ).val,
+              'groupCount'
+            );
+            newTableState = table;
+            setCountColumnId(columnId);
+          }
+          newTableState = await enableGroup(
+            newTableState ?? tableState,
+            colId,
+            inputArrayNode,
+            weave,
+            stack
+          );
           updateTableState(newTableState);
         },
       });
@@ -389,19 +457,23 @@ export const ColumnHeader: React.FC<{
     }
     return menuItems;
   }, [
-    doUngroup,
-    columnTypeForGroupByChecks,
-    colId,
+    countColumnId,
+    setCountColumnId,
     isGroupCol,
-    enableGroup,
-    inputArrayNode,
-    tableState,
-    updateTableState,
+    columnTypeForGroupByChecks,
     workingSelectFunction.type,
     openColumnSettings,
+    enableGroup,
+    tableState,
+    colId,
+    inputArrayNode,
+    weave,
+    stack,
+    updateTableState,
+    doUngroup,
     isPinned,
     setColumnPinState,
-    weave,
+    isGroupCountColumn,
   ]);
 
   const colIsSorted =
@@ -467,12 +539,12 @@ export const ColumnHeader: React.FC<{
                 marginRight: `-${colControlsWidth}px`,
               }}
               onClick={() => setColumnSettingsOpen(!columnSettingsOpen)}>
-              {workingColumnName !== '' ? (
-                <S.ColumnNameText>{workingColumnName}</S.ColumnNameText>
+              {propsColumnName !== '' ? (
+                <S.ColumnNameText>{propsColumnName}</S.ColumnNameText>
               ) : (
                 <ExpressionView.ExpressionView
                   frame={cellFrame}
-                  node={workingSelectFunction}
+                  node={propsSelectFunction}
                 />
               )}
             </S.ColumnName>
@@ -480,9 +552,19 @@ export const ColumnHeader: React.FC<{
           content={
             columnSettingsOpen && (
               <div>
-                <S.CloseIconButton onClick={() => setColumnSettingsOpen(false)}>
-                  <IconClose width={20} />
-                </S.CloseIconButton>
+                <Tooltip
+                  // Button's built-in tooltip attribute won't position properly with custom wrapper style.
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      icon="close"
+                      size="small"
+                      twWrapperStyles={{position: 'absolute', right: 8}}
+                      onClick={() => setColumnSettingsOpen(false)}
+                    />
+                  }
+                  content="Discard changes"
+                />
                 <S.ColumnEditorSection>
                   <S.ColumnEditorSectionLabel>
                     Cell expression

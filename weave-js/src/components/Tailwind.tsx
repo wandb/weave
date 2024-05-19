@@ -1,7 +1,9 @@
+import classNames from 'classnames';
 import React from 'react';
 
 type TailwindProps = {
   style?: React.CSSProperties;
+  className?: string;
 };
 
 // Simple wrapper component that has the tw-style class,
@@ -18,9 +20,16 @@ type TailwindProps = {
 //
 // There's nothing bad about using this Tailwind wrapper around
 // existing elements, as long as you can test that they still look good.
-export const Tailwind: React.FC<TailwindProps> = ({style, children}) => {
+export const Tailwind: React.FC<TailwindProps> = ({
+  style,
+  className,
+  children,
+}) => {
   return (
-    <div className="tw-style" style={style}>
+    <div
+      className={classNames('tw-style', className)}
+      data-testid="tailwind-wrapper"
+      style={style}>
       {children}
     </div>
   );

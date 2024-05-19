@@ -3,27 +3,32 @@ import * as _ from 'lodash';
 import React, {useCallback, useState} from 'react';
 import styled, {css} from 'styled-components';
 
+import {Icon, IconHideHidden, IconLockClosed} from '../Icon';
 import {IconButton} from '../IconButton';
 import {getPanelStacksForType} from '../Panel2/availablePanels';
 import {ChildPanelConfig, ChildPanelFullConfig} from '../Panel2/ChildPanel';
 import {
   IconCaret as IconCaretUnstyled,
   IconOverflowHorizontal as IconOverflowHorizontalUnstyled,
-  IconWeave as IconWeaveUnstyled,
 } from '../Panel2/Icons';
-import {panelChildren} from '../Panel2/panelTree';
-import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
+import {PanelGroupConfig} from '../Panel2/PanelGroup';
 import {
   usePanelIsHoveredByPath,
   useSetPanelIsHoveredInOutline,
 } from '../Panel2/PanelInteractContext';
+import {getPanelIcon} from '../Panel2/PanelRegistry';
+import {panelChildren} from '../Panel2/panelTree';
+import {Tooltip} from '../Tooltip';
+import {OutlineItemPopupMenu} from './OutlineItemPopupMenu';
 
 const OutlineItem = styled.div``;
+OutlineItem.displayName = 'S.OutlineItem';
 
 const OutlineItemMenuButton = styled(IconButton).attrs({small: true})`
   flex-shrink: 0;
   margin: 0 8px 0 4px;
 `;
+OutlineItemMenuButton.displayName = 'S.OutlineItemMenuButton';
 
 const OutlineItemTitle = styled.div<{level: number; panelIsHovered: boolean}>`
   display: flex;
@@ -48,6 +53,7 @@ const OutlineItemTitle = styled.div<{level: number; panelIsHovered: boolean}>`
     visibility: hidden;
   }
 `;
+OutlineItemTitle.displayName = 'S.OutlineItemTitle';
 
 const OutlineItemToggle = styled.div<{expanded: boolean}>`
   flex-shrink: 0;
@@ -63,21 +69,23 @@ const OutlineItemToggle = styled.div<{expanded: boolean}>`
     background-color: ${globals.GRAY_50};
   }
 `;
+OutlineItemToggle.displayName = 'S.OutlineItemToggle';
 
 const OutlineItemIcon = styled.div`
   flex-shrink: 0;
   display: flex;
   margin-right: 8px;
 `;
+OutlineItemIcon.displayName = 'S.OutlineItemIcon';
 
 const OutlineItemName = styled.div`
   flex-shrink: 0;
-  max-width: 100px;
   overflow-wrap: break-word;
 `;
+OutlineItemName.displayName = 'S.OutlineItemName';
 
 const OutlineItemPanelID = styled.div`
-  color: ${globals.GRAY_500};
+  color: ${globals.MOON_450};
   font-size: 15px;
   font-family: 'Inconsolata', monospace;
   margin-left: 10px;
@@ -86,20 +94,22 @@ const OutlineItemPanelID = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
 `;
+OutlineItemPanelID.displayName = 'S.OutlineItemPanelID';
 
 const iconStyles = css`
   height: 18px;
   width: 18px;
 `;
+
 const IconCaret = styled(IconCaretUnstyled)`
   ${iconStyles}
 `;
+IconCaret.displayName = 'S.IconCaret';
+
 const IconOverflowHorizontal = styled(IconOverflowHorizontalUnstyled)`
   ${iconStyles}
 `;
-const IconWeave = styled(IconWeaveUnstyled)`
-  ${iconStyles}
-`;
+IconOverflowHorizontal.displayName = 'S.IconOverflowHorizontal';
 
 export type OutlinePanelProps = OutlineProps & {
   name: string;
@@ -118,6 +128,19 @@ export const shouldDisablePanelDelete = (
   // we can remove the 2 lines below in like 6 months
   path.length === 0 ||
   (path.length === 1 && ['main', 'sidebar'].includes(path[0]));
+
+const getPanelTypeIcon = (panelId: string | undefined) => {
+  if (!panelId) {
+    return 'panel';
+  }
+  if (panelId.startsWith('row.')) {
+    panelId = panelId.slice(4);
+  }
+  if (panelId.startsWith('maybe.')) {
+    panelId = panelId.slice(6);
+  }
+  return getPanelIcon(panelId);
+};
 
 const OutlinePanel: React.FC<OutlinePanelProps> = props => {
   const {
@@ -150,7 +173,9 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
     }
   }, [children]);
 
+  const iconName = getPanelTypeIcon(curPanelId);
   const shouldHideMenu = shouldDisablePanelDelete(localConfig, path);
+  const isPanelHidden = config.config.panelInfo?.[name]?.hidden;
 
   return (
     <OutlineItem>
@@ -176,12 +201,31 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
           {children != null && <IconCaret />}
         </OutlineItemToggle>
         <OutlineItemIcon>
-          <IconWeave />
+          <Tooltip
+            trigger={
+              <Icon
+                name={iconName}
+                width={18}
+                height={18}
+                color={globals.MOON_400}
+              />
+            }
+            content={curPanelId}
+          />
         </OutlineItemIcon>
 
         <OutlineItemName>{name}</OutlineItemName>
         <OutlineItemPanelID>{curPanelId}</OutlineItemPanelID>
-        {!shouldHideMenu && (
+        {shouldHideMenu ? (
+          <Tooltip
+            content={`The ${name} panel is a structural component of the board and cannot be edited.`}
+            trigger={
+              <OutlineItemMenuButton>
+                <IconLockClosed />
+              </OutlineItemMenuButton>
+            }
+          />
+        ) : (
           <OutlineItemPopupMenu
             config={config}
             localConfig={localConfig}
@@ -196,6 +240,19 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
             isOpen={isOutlineMenuOpen}
             onOpen={() => setIsOutlineMenuOpen(true)}
             onClose={() => setIsOutlineMenuOpen(false)}
+          />
+        )}
+        {isPanelHidden && (
+          <Tooltip
+            content="This panel is a part of the group but it is hidden from view."
+            trigger={
+              <IconHideHidden
+                style={{marginRight: '10px'}}
+                color={globals.MOON_500}
+                height={18}
+                width={18}
+              />
+            }
           />
         )}
       </OutlineItemTitle>
@@ -221,7 +278,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = props => {
 };
 
 export interface OutlineProps {
-  config: ChildPanelFullConfig;
+  config: ChildPanelFullConfig<PanelGroupConfig>;
   updateConfig: (newConfig: ChildPanelFullConfig) => void;
   updateConfig2: (
     change: (oldConfig: ChildPanelConfig) => ChildPanelFullConfig
@@ -251,3 +308,4 @@ export const Outline: React.FC<OutlineProps> = props => {
 const OutlineContainer = styled.div`
   padding: 8px 0;
 `;
+OutlineContainer.displayName = 'S.OutlineContainer';

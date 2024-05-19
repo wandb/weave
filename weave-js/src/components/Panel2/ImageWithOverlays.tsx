@@ -206,9 +206,8 @@ const SegmentationCanvas: FC<SegmentationCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const {width, height} = segmentation;
-  const [maskImageData, setMaskImageData] = useState<ImageData>();
 
-  // Create colored segmentation image data
+  // Create colored segmentation image data and draws it
   useEffect(() => {
     const allToggle = classOverlay.all ?? DEFAULT_ALL_MASK_CONTROL;
     const classColors = Object.fromEntries(
@@ -227,17 +226,12 @@ const SegmentationCanvas: FC<SegmentationCanvasProps> = ({
     );
     const newImageData = drawSegmentation(segmentation, classColors);
 
-    setMaskImageData(newImageData);
-  }, [segmentation, classState, classOverlay]);
-
-  // Draw colored segmentation image data
-  useEffect(() => {
-    if (canvasRef.current == null || maskImageData == null) {
+    if (canvasRef.current == null || newImageData == null) {
       return;
     }
     const canvas = canvasRef.current;
-    drawImageData(canvas, maskImageData);
-  }, [maskImageData]);
+    drawImageData(canvas, newImageData);
+  }, [segmentation, classState, classOverlay]);
 
   return <OverlayCanvas width={width} height={height} ref={canvasRef} />;
 };

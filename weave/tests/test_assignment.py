@@ -6,6 +6,8 @@ types = weave.types.get_type_classes()
 
 @pytest.mark.parametrize("type_name, type_cls", [(t.name, t) for t in types])
 def test_const_assignment(type_name, type_cls):
+    from ..ops_domain import wb_domain_types as wdt
+
     params = []
     # Quick list of types that don't work with this parametrization
     if type_name in ["const", "invalid", "union", "function", "unknown"]:
@@ -24,6 +26,11 @@ def test_const_assignment(type_name, type_cls):
         params = [
             weave.types.TypedDict({"col": weave.types.String()}),
             weave.types.String(),
+        ]
+    if type_name == "PartialObject":
+        params = [
+            type(wdt.RunType),
+            weave.types.TypedDict({"col": weave.types.String()}),
         ]
 
     cls_type = type_cls(*params)

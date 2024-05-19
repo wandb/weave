@@ -1,3 +1,5 @@
+/* tslint:disable */
+
 import {forwardOpInputs, newForwardGraph} from './engine/forwardGraph';
 import * as HL from './hl';
 import type {OutputNode} from './model';
@@ -681,7 +683,7 @@ describe('execute', () => {
 
     // Note: this is checking an implementation detail. We may change this
     // format, users shouldn't interact with it. But "assetArtifactResolver"
-    // depends on this format when it "looks up the graph" (for exmaple when
+    // depends on this format when it "looks up the graph" (for example when
     // you have an image in a table inside of an artifact), so test here
     // to ensure that doesnt break. A better test would be one that actually
     // checks an image in a table in an artifact from run summary.

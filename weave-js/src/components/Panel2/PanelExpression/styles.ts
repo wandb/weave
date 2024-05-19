@@ -8,12 +8,14 @@ export const Main = styled.div`
   height: 100%;
   width: 100%;
 `;
+Main.displayName = 'S.Main';
 
 export const EditorBar = styled.div`
   flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
 `;
+EditorBar.displayName = 'S.EditorBar';
 
 export const LockToggleButton = styled.div`
   padding-left: 4px;
@@ -22,6 +24,7 @@ export const LockToggleButton = styled.div`
     background-color: ${globals.gray200} !important;
   }
 `;
+LockToggleButton.displayName = 'S.LockToggleButton';
 
 export const BarButton = styled(Button)`
   margin-right: -5px !important;
@@ -38,6 +41,7 @@ export const BarButton = styled(Button)`
     margin: 0 !important;
   }
 `;
+BarButton.displayName = 'S.BarButton';
 
 export const ConfigButton = styled(Button)`
   margin-right: -5px !important;
@@ -51,6 +55,7 @@ export const ConfigButton = styled(Button)`
     background-color: ${globals.gray200} !important;
   }
 `;
+ConfigButton.displayName = 'S.ConfigButton';
 
 const rotate = keyframes`
   0% {
@@ -73,11 +78,13 @@ export const PanelHandler = styled.div<{lazySusan?: boolean}>`
       animation: ${rotate} 20s linear infinite;
     `}
 `;
+PanelHandler.displayName = 'S.PanelHandler';
 
 export const PanelHandlerContent = styled.div`
   flex: 1 1 auto;
   overflow: auto;
 `;
+PanelHandlerContent.displayName = 'S.PanelHandlerContent';
 
 export const PanelHandlerConfig = styled.div`
   flex: 0 0 350px;
@@ -86,23 +93,27 @@ export const PanelHandlerConfig = styled.div`
   margin-top: 10px;
   border-left: 1px solid #eee;
 `;
+PanelHandlerConfig.displayName = 'S.PanelHandlerConfig';
 
 export const ConfigurationContent = styled.div`
   display: flex;
   flex-direction: column;
   height: 100%;
 `;
+ConfigurationContent.displayName = 'S.ConfigurationContent';
 
 export const ConfigurationContentItems = styled.div`
   flex: 1 1 auto;
   overflow-x: hide;
   overflow-y: visible;
 `;
+ConfigurationContentItems.displayName = 'S.ConfigurationContentItems';
 
 export const ConfigurationContentItem = styled.div`
   height: 100%;
   width: 100%;
 `;
+ConfigurationContentItem.displayName = 'S.ConfigurationContentItem';
 
 export const ConfigurationContentControls = styled.div`
   flex: 0 0 auto;
@@ -111,6 +122,7 @@ export const ConfigurationContentControls = styled.div`
   display: flex;
   justify-content: flex-end;
 `;
+ConfigurationContentControls.displayName = 'S.ConfigurationContentControls';
 
 export const SidebarWrapper = styled.div`
   position: absolute;
@@ -120,3 +132,4 @@ export const SidebarWrapper = styled.div`
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
   z-index: 100;
 `;
+SidebarWrapper.displayName = 'S.SidebarWrapper';

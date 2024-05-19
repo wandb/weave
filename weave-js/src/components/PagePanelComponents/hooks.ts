@@ -1,12 +1,16 @@
 import {
   constNone,
-  callOpVeryUnsafe,
   constString,
-  maybe,
-  typedDict,
+  opFilesystemArtifactPreviousUri,
+  opFilesystemArtifactRootFromUri,
+  opGenerateCodeForObject,
+  opGet,
+  opRef,
+  opRefBranchPoint,
 } from '@wandb/weave/core';
 import {useClientContext, useNodeValue} from '@wandb/weave/react';
 import {useCallback, useMemo, useState} from 'react';
+
 import {BranchPointType, isLocalURI} from './util';
 
 export const useBranchPointFromURIString = (
@@ -16,19 +20,11 @@ export const useBranchPointFromURIString = (
     () =>
       uri == null || !isLocalURI(uri)
         ? constNone()
-        : (callOpVeryUnsafe(
-            'Ref-branch_point',
-            {
-              ref: callOpVeryUnsafe(
-                'ref',
-                {
-                  uri: constString(uri),
-                },
-                {type: 'FilesystemArtifactRef' as any}
-              ),
-            },
-            maybe(typedDict({}))
-          ) as any),
+        : opRefBranchPoint({
+            ref: opRef({
+              uri: constString(uri),
+            }),
+          }),
     [uri]
   );
   const hasRemoteVal = useNodeValue(hasRemoteNode);
@@ -42,19 +38,11 @@ export const usePreviousVersionFromURIString = (
     () =>
       uri == null || !isLocalURI(uri)
         ? constNone()
-        : (callOpVeryUnsafe(
-            'FilesystemArtifact-previousURI',
-            {
-              artifact: callOpVeryUnsafe(
-                'FilesystemArtifact-rootFromURI',
-                {
-                  uri: constString(uri),
-                },
-                {type: 'FilesystemArtifact' as any}
-              ) as any,
-            },
-            {type: 'string' as any}
-          ) as any),
+        : opFilesystemArtifactPreviousUri({
+            artifact: opFilesystemArtifactRootFromUri({
+              uri: constString(uri),
+            }),
+          }),
     [uri]
   );
   const hasRemoteVal = useNodeValue(previousURINode);
@@ -72,19 +60,11 @@ const useGetCodeFromURI = (uri: string | null) => {
     const codeStringNode =
       uri == null
         ? constNone()
-        : (callOpVeryUnsafe(
-            '__internal__-generateCodeForObject',
-            {
-              uri: callOpVeryUnsafe(
-                'get',
-                {
-                  uri: constString(uri),
-                },
-                'any' as const
-              ),
-            },
-            'string' as const
-          ) as any);
+        : opGenerateCodeForObject({
+            obj: opGet({
+              uri: constString(uri),
+            }),
+          });
     return client.query(codeStringNode);
   }, [client, uri]);
 };

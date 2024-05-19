@@ -1,4 +1,5 @@
 // main prismjs needs to be imported first before prism-markdown
+/* eslint-disable simple-import-sort/imports */
 import * as Prism from 'prismjs';
 
 import 'prismjs/components/prism-markdown';

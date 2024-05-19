@@ -22,6 +22,7 @@ import threading
 
 
 from . import artifact_wandb
+from . import cache
 from . import errors
 from . import engine_trace
 from . import filesystem
@@ -30,6 +31,7 @@ from . import wandb_api
 from . import wandb_file_manager
 from . import server_error_handling
 from . import async_queue
+from . import context_state
 from typing import Any, Callable, Dict, TypeVar, Iterator
 
 
@@ -49,6 +51,7 @@ class ArtifactMetadata(typing.TypedDict):
 class ServerRequestContext:
     trace_context: typing.Optional[engine_trace.TraceContext]
     wandb_api_context: typing.Optional[wandb_api.WandbApiContext]
+    cache_prefix_context: typing.Optional[str]
 
     @classmethod
     def from_json(cls, json: typing.Any) -> "ServerRequestContext":
@@ -61,7 +64,14 @@ class ServerRequestContext:
             wandb_api_context = wandb_api.WandbApiContext.from_json(
                 wandb_api_context_json
             )
-        return cls(trace_context=trace_context, wandb_api_context=wandb_api_context)
+        cache_prefix_context = json.get("cache_prefix_context", None)
+        if cache_prefix_context:
+            cache_prefix_context = str(cache_prefix_context)
+        return cls(
+            trace_context=trace_context,
+            wandb_api_context=wandb_api_context,
+            cache_prefix_context=cache_prefix_context,
+        )
 
     def to_json(self) -> typing.Any:
         trace_context = None
@@ -70,9 +80,12 @@ class ServerRequestContext:
         wandb_ctx = None
         if self.wandb_api_context:
             wandb_ctx = self.wandb_api_context.to_json()
+        if self.cache_prefix_context:
+            cache_prefix_context = self.cache_prefix_context
         return {
             "trace_context": trace_context,
             "wandb_api_context": wandb_ctx,
+            "cache_prefix_context": cache_prefix_context,
         }
 
 
@@ -148,7 +161,9 @@ class ShutDown:
         return isinstance(other, ShutDown)
 
 
-shutdown_request = ServerRequest("", "shutdown", (), ServerRequestContext(None, None))
+shutdown_request = ServerRequest(
+    "", "shutdown", (), ServerRequestContext(None, None, None)
+)
 shutdown_response = ServerResponse("", 0, ShutDown())
 
 HandlerFunction = Callable[..., Any]
@@ -331,7 +346,8 @@ class Server:
             while True:
                 try:
                     req = await self.request_queue.async_get()
-                except RuntimeError:
+                except RuntimeError as e:
+                    print("IO SERVICE RuntimeError", e)
                     # this happens when the loop is shutting down
                     break
                 if req.name == "shutdown":
@@ -340,10 +356,13 @@ class Server:
                     break
                 tracer.context_provider.activate(req.context.trace_context)
                 with wandb_api.wandb_api_context(req.context.wandb_api_context):
-                    # launch a task to handle the request
-                    task = loop.create_task(self._handle(req))
-                    active_tasks.add(task)
-                    task.add_done_callback(active_tasks.discard)
+                    with cache.time_interval_cache_prefix(
+                        req.context.cache_prefix_context
+                    ):
+                        # launch a task to handle the request
+                        task = loop.create_task(self._handle(req))
+                        active_tasks.add(task)
+                        task.add_done_callback(active_tasks.discard)
                 self.request_queue.task_done()
         self._request_handler_ready_to_shut_down_event.set()
 
@@ -457,12 +476,13 @@ class AsyncConnection:
 
         wb_ctx = wandb_api.get_wandb_api_context()
         cur_trace_context = tracer.current_trace_context()
+        cache_prefix = cache.get_cache_prefix_context()
 
         req = ServerRequest(
             self.client_id,
             name,
             args,
-            ServerRequestContext(cur_trace_context, wb_ctx),
+            ServerRequestContext(cur_trace_context, wb_ctx, cache_prefix),
             self.request_id,
         )
 
@@ -550,6 +570,7 @@ class SyncClient:
     def request(self, name: str, *args: typing.Any) -> typing.Any:
         wb_ctx = wandb_api.get_wandb_api_context()
         cur_trace_context = tracer.current_trace_context()
+        cache_prefix = cache.get_cache_prefix_context()
         self._current_request_id += 1
 
         with self.server.registered_client(self):
@@ -557,7 +578,7 @@ class SyncClient:
                 self.client_id,
                 name,
                 args,
-                ServerRequestContext(cur_trace_context, wb_ctx),
+                ServerRequestContext(cur_trace_context, wb_ctx, cache_prefix),
                 id=self._current_request_id,
             )
 
@@ -642,8 +663,16 @@ class ServerlessClient:
 
 
 def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:
-    # uncomment this for local debugging
-    # return ServerlessClient(filesystem.get_filesystem())
+    if context_state.serverless_io_service():
+        # The io service can't be used during atexit handlers, you get an error like
+        # "cannot schedule new futures after shutdown". So it can't really be cleaned up
+        # appropriately...
+        # This is problematic for users of wandb_stream_table, which tries to flush any
+        # outstanding logs during atexit. If any of those require the io service, you get
+        # a hang. So we just use the serverless client when setting up weaveflow for now.
+        # TODO: this is still an issue for users of streamtable outside of weaveflow, and
+        # could be an issue on the weave server if we want clean / flushing shutdowns.
+        return ServerlessClient(filesystem.get_filesystem())
     return SyncClient(get_server(), filesystem.get_filesystem())
 
 

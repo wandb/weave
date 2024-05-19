@@ -4,8 +4,8 @@ import React, {useEffect, useMemo, useRef} from 'react';
 
 import {useNodeValue} from '../../../react';
 import * as Panel2 from '../panel';
-import {toWeaveType} from '../toWeaveType';
 import {useUpdateConfig2} from '../PanelComp';
+import {toWeaveType} from '../toWeaveType';
 
 export const inputType = {type: 'Plotly'} as any;
 

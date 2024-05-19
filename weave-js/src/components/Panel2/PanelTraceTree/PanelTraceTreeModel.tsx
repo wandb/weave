@@ -86,7 +86,7 @@ const getSafeEntriesFromObject = (obj: any): Array<[string, any]> => {
     });
 };
 
-const GeneralObjectRenderer: React.FC<{data: any}> = props => {
+export const GeneralObjectRenderer: React.FC<{data: any}> = props => {
   if (props.data == null) {
     return <div>-</div>;
   } else if (typeof props.data === 'string') {

@@ -9,11 +9,11 @@ import {
   opFileContents,
   opFileDirectUrlAsOf,
   OutputNode,
-  WBTraceTreeType,
   TableType,
   Type,
   VoidNode,
   voidNode,
+  WBTraceTreeType,
 } from '@wandb/weave/core';
 import {useEffect, useMemo, useRef, useState} from 'react';
 

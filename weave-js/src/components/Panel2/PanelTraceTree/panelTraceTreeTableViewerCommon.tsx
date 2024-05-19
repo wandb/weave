@@ -1,7 +1,7 @@
 import {
-  Node,
   constNumber,
   constString,
+  Node,
   opCount,
   opIndex,
   opNumberToTimestamp,
@@ -14,14 +14,14 @@ import {useNodeValue} from '../../../react';
 import {dummyProps, useConfig} from '../panel';
 import {PanelComp2} from '../PanelComp';
 import {PanelTable} from '../PanelTable/PanelTable';
+import {
+  addNamedColumnToTable,
+  enableSortByCol,
+  TableState,
+} from '../PanelTable/tableState';
 import * as S from './lct.style';
 import {PanelTraceTreeModel} from './PanelTraceTreeModel';
 import {Spec as PanelTraceTreeTraceSpec} from './PanelTraceTreeTrace';
-import {
-  TableState,
-  addNamedColumnToTable,
-  enableSortByCol,
-} from '../PanelTable/tableState';
 
 const hardCodedConfig = {
   pinnedRows: {

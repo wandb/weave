@@ -22,17 +22,18 @@ export type SpanType = {
   results?: ResultType[];
   child_spans?: SpanType[];
   span_kind?: SpanKindType;
+  _span_index?: number; // special field to unmap the span
 };
 
 // Flat representation of a span, this is a TypedDict
 export interface FlatSpan {
   name: string;
   start_time_ms: number;
-  end_time_ms: number;
+  end_time_ms?: number;
   attributes: any;
   trace_id: string;
   span_id: string;
-  parent_id: string;
+  parent_id?: string;
 }
 
 export type WBTraceTree = {

@@ -1,5 +1,5 @@
 /**
- * KEEP THIS FILE IN SYNC WITH THE ONE IN WEAVE-JS
+ * KEEP THIS FILE IN SYNC WITH THE ONE IN CORE APP
  */
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -11,6 +11,11 @@ module.exports = {
      * Inherited by padding, margin, width, height, maxHeight, gap,
      * inset, space, translate, scrollMargin, and scrollPadding
      */
+    boxShadow: {
+      none: 'none',
+      md: '0px 12px 24px 0px #15181F29',
+      lg: '0px 24px 48px 0px #15181F29',
+    },
     spacing: {
       0: '0rem',
       px: '0.063rem',
@@ -49,6 +54,7 @@ module.exports = {
       // Breakpoints
       768: '48rem',
       1024: '64rem',
+      1280: '80rem',
     },
     /**
      * Keep these colors in sync with what is in color.styles.ts
@@ -181,7 +187,11 @@ module.exports = {
         700: '#193C80',
       },
     },
-    extend: {},
+    extend: {
+      opacity: {
+        35: '.35',
+      },
+    },
   },
   plugins: [require('tailwindcss-radix')],
   corePlugins: {
@@ -197,4 +207,7 @@ module.exports = {
   /* we use this so tailwind styles all require that they have an element with the tw-style somewhere
      in their parent hierarchy */
   important: '.tw-style',
+  experimental: {
+    optimizeUniversalDefaults: true
+  },
 };

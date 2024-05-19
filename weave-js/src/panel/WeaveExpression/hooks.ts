@@ -1,5 +1,5 @@
 import {computePosition, flip, offset, shift} from '@floating-ui/react';
-
+import {useIsMounted} from '@wandb/weave/common/util/hooks';
 import {
   AutosuggestResult,
   Parser,
@@ -199,8 +199,23 @@ export const useWeaveExpressionState = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [externalState, setExternalState] =
+  const [externalState, setExternalStateUnsafe] =
     React.useState<WeaveExpressionState>(internalState);
+
+  const isMounted = useIsMounted();
+
+  const setExternalState = React.useCallback<typeof setExternalStateUnsafe>(
+    args => {
+      // setExternalState is used by `WeaveExpressionState` to update the
+      // external state. `WeaveExpressionState` is not aware of the component
+      // mount state, nor does it need to be. This check is here to prevent
+      // a state update from being applied after the component has unmounted.
+      if (isMounted()) {
+        setExternalStateUnsafe(args);
+      }
+    },
+    [isMounted]
+  );
 
   const onChange = React.useCallback(
     (newValue: SlateNode[], newStack: Stack) => {
@@ -216,15 +231,6 @@ export const useWeaveExpressionState = (
   const applyPendingExpr = React.useCallback(() => {
     internalState.dispatch({type: 'flushPendingExpr'});
   }, [internalState]);
-
-  const [suppressSuggestions, setSuppressSuggestions] = React.useState(false);
-  const hideSuggestions = React.useCallback(
-    (nMillis: number) => {
-      setSuppressSuggestions(true);
-      setTimeout(() => setSuppressSuggestions(false), nMillis);
-    },
-    [setSuppressSuggestions]
-  );
 
   trace(`${internalState.id}: useWeaveExpressionState render`, externalState);
 
@@ -252,12 +258,6 @@ export const useWeaveExpressionState = (
 
     // Flush pending expression in non-live-update mode
     applyPendingExpr,
-
-    // To hide suggestions momentarily
-    suppressSuggestions,
-
-    // Callback to hide suggestions for n milliseconds
-    hideSuggestions,
 
     // EE focus state
     isFocused,
@@ -451,8 +451,9 @@ export const useSuggestionVisualState = ({
     trace(`SuggestionVisualState: showing`);
     element.style.opacity = '1';
 
-    const editorRootEl = ReactEditor.toDOMNode(editor, editor.children[0]);
-    computePosition(editorRootEl, element, {
+    const lastChild = editor.children[editor.children.length - 1];
+    const lastChildNode = ReactEditor.toDOMNode(editor, lastChild);
+    computePosition(lastChildNode, element, {
       placement: 'bottom-start',
       middleware: [
         offset(4),

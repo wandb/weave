@@ -4,7 +4,7 @@ import _ from 'lodash';
 
 import * as HL from './hl';
 import {defaultLanguageBinding} from './language';
-import type {Node, Type} from './model';
+import type {Frame, Node, Type} from './model';
 import {
   concreteTaggedValue,
   constBoolean,

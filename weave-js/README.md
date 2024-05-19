@@ -6,7 +6,7 @@ See PR https://github.com/wandb/core/pull/8926 for details.
 
 ### FAQ
 
-#### I am a frontend developer. How will the migration from app -> @wandb/weave affect my development workflow?2
+#### I am a frontend developer. How will the migration from app -> @wandb/weave affect my development workflow?
 
 The only effect this refactor should have on your development is that it changes where you import certain objects from. Instead of doing
 

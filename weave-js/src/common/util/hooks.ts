@@ -12,23 +12,8 @@ import {
   useState,
 } from 'react';
 
+import {difference} from './data';
 import {SetState} from './types';
-
-function difference(origObj: any, newObj: any) {
-  const changes = (objA: any, objB: any) => {
-    let arrayIndexCounter = 0;
-    return _.transform(objA, (result: any, value: any, key: any) => {
-      if (!_.isEqual(value, objB[key])) {
-        const resultKey = _.isArray(objB) ? arrayIndexCounter++ : key;
-        result[resultKey] =
-          _.isObject(value) && _.isObject(objB[key])
-            ? changes(value, objB[key])
-            : value;
-      }
-    });
-  };
-  return changes(newObj, origObj);
-}
 
 // This hook is used in development for debugging state changes
 // It shouldn't be used in production
@@ -267,3 +252,22 @@ export const useUpdatingState = <T extends any>(initialValue: T) => {
 
   return [state, setState] as const;
 };
+
+export function useIsMounted() {
+  // This hook exposes a method to check if a component is mounted. The returned
+  // function will be a stable reference across renders, so it is safe to use in
+  // dependencies. This is useful to use in callbacks for example to check if a
+  // component is still mounted before updating state. Stylistically, I think it
+  // is more readable to maintain mount state near the useEffect that uses it.
+  // However, with non-useEffect hooks, we sometimes want to check if a
+  // component is mounted before updating state. In those cases, we can use this
+  // hook.
+  const isMountedRef = useRef(false);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  return useCallback(() => isMountedRef.current, []);
+}

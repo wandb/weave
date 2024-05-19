@@ -42,6 +42,7 @@ export const PanelColor: React.FC<PanelColorProps> = props => {
 
 export const Spec: Panel2.PanelSpec = {
   id: 'Color',
+  icon: 'color',
   Component: PanelColor,
   inputType,
 };

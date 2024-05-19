@@ -1,3 +1,7 @@
+from .. import context_state as _context_state
+
+_loading_builtins_token = _context_state.set_loading_built_ins()
+
 from ..panel import Panel
 
 # special
@@ -32,6 +36,9 @@ from .panel_query import Query, QueryConfig, QueryCondition
 # editors
 from .panel_slider import Slider, SliderConfig
 from .panel_select import SelectEditor, SelectEditorConfig
+from .panel_dropdown import Dropdown, DropdownConfig
+from .panel_filter_editor import FilterEditor
+from .panel_grouping_editor import GroupingEditor
 from .panel_daterange import DateRange
 from .panel_string_editor import StringEditor
 from .panel_function_editor import FunctionEditor, FunctionEditorConfig
@@ -41,6 +48,7 @@ from .panel_object_picker import ObjectPicker, ObjectPickerConfig
 
 # basic
 from .panel_basic import *
+from .panel_string import PanelString
 
 # domain
 from .panel_domain import *
@@ -53,3 +61,5 @@ from .panel_legacy import *
 
 # top level board
 from .panel_board import Board, BoardPanel, BoardPanelLayout
+
+_context_state.clear_loading_built_ins(_loading_builtins_token)

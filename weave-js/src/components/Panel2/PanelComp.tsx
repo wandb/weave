@@ -1,4 +1,5 @@
 // import {ErrorBoundary} from 'react-error-boundary';
+import {datadogRum} from '@datadog/browser-rum';
 import {
   callOpVeryUnsafe,
   constNodeUnsafe,
@@ -14,11 +15,17 @@ import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useRef, useState} from 'react';
 import {Button, Modal, Popup} from 'semantic-ui-react';
 
-import {useWeaveDashUiEnable, useWeaveFeaturesContext} from '../../context';
+import {WeaveApp} from '../..';
+import {
+  useWeaveErrorBoundaryInPanelComp2Enabled,
+  useWeaveFeaturesContext,
+} from '../../context';
 // import {useExpressionHoverHandlers} from './PanelContext';
 import {useWeaveContext} from '../../context';
+import {weaveErrorToDDPayload} from '../../errors';
 import {useDeepMemo} from '../../hookUtils';
 import * as CGReact from '../../react';
+import {ErrorPanel} from '../ErrorPanel';
 import {panelSpecById} from './availablePanels';
 import {ComputeGraphViz} from './ComputeGraphViz';
 import * as Panel2 from './panel';
@@ -26,13 +33,13 @@ import * as S from './PanelComp.styles';
 import {usePanelContext} from './PanelContext';
 import {PanelExportUpdaterContext} from './PanelExportContext';
 import * as PanelLib from './panellib/libpanel';
-import * as TSTypeWithPath from './tsTypeWithPath';
-import {WeaveMessage} from './WeaveMessage';
 import {HOVER_DELAY_MS} from './Tooltip';
+import * as TSTypeWithPath from './tsTypeWithPath';
 
 class PanelCompErrorBoundary extends React.Component<
   {
     inPanelMaybe: boolean;
+    weave: WeaveApp;
     onInvalidGraph?: (node: NodeOrVoidNode) => void;
   },
   {hasError: boolean; customMessage?: string}
@@ -57,6 +64,11 @@ class PanelCompErrorBoundary extends React.Component<
       throw error;
     }
 
+    datadogRum.addAction(
+      'weave_panel_error_boundary',
+      weaveErrorToDDPayload(error, this.props.weave)
+    );
+
     if (error instanceof CGReact.InvalidGraph) {
       this.props.onInvalidGraph?.(error.node);
       return;
@@ -79,12 +91,7 @@ class PanelCompErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      return (
-        <WeaveMessage>
-          {this.state.customMessage ||
-            'Something went wrong. Check the javascript console.'}
-        </WeaveMessage>
-      );
+      return <ErrorPanel title={this.state.customMessage} />;
     }
 
     return this.props.children;
@@ -215,7 +222,7 @@ export function useUpdateConfig2<C>(props: {
 
 // PanelComp2 is the primary proxy for rendering all Weave Panels.
 export const PanelComp2Inner = (props: PanelComp2Props) => {
-  const dashUiEnabled = useWeaveDashUiEnable();
+  const enableErrorBoundary = useWeaveErrorBoundaryInPanelComp2Enabled();
   const {panelSpec, configMode} = props;
   const updateConfig2 = useUpdateConfig2(props);
   let unboundedContent = useMemo(() => {
@@ -276,17 +283,20 @@ export const PanelComp2Inner = (props: PanelComp2Props) => {
     }
   }, [panelSpec, props, configMode, updateConfig2]);
 
-  const {inPanelMaybe} = usePanelContext();
+  const {panelMaybeNode} = usePanelContext();
+  const weave = useWeaveContext();
 
   unboundedContent = useMemo(() => {
-    return dashUiEnabled ? (
-      <PanelCompErrorBoundary inPanelMaybe={inPanelMaybe}>
+    return enableErrorBoundary ? (
+      <PanelCompErrorBoundary
+        inPanelMaybe={panelMaybeNode != null}
+        weave={weave}>
         {unboundedContent}
       </PanelCompErrorBoundary>
     ) : (
       unboundedContent
     );
-  }, [dashUiEnabled, inPanelMaybe, unboundedContent]);
+  }, [enableErrorBoundary, panelMaybeNode, unboundedContent, weave]);
 
   if (props.input.nodeType === 'void') {
     return (

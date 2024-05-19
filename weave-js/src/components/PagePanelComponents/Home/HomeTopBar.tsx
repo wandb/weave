@@ -1,54 +1,15 @@
-import {voidNode} from '@wandb/weave/core';
-import moment from 'moment';
-import React, {useCallback, useState} from 'react';
-import getConfig from '../../../config';
-
+import React from 'react';
 import styled from 'styled-components';
-import {useWeaveContext} from '../../../context';
-import {IconWeaveLogo} from '../../Panel2/Icons';
-import {useNewPanelFromRootQueryCallback} from '../../Panel2/PanelRootBrowser/util';
-import {NavigateToExpressionType} from './common';
-import {Button} from '../../Button';
 
-export const HomeTopBar: React.FC<{
-  navigateToExpression: NavigateToExpressionType;
-  inJupyter: boolean;
-}> = props => {
-  const now = moment().format('YY_MM_DD_hh_mm_ss');
-  const inJupyter = props.inJupyter;
-  const defaultName = now;
-  const [newName] = useState('');
-  const weave = useWeaveContext();
-  const name = 'dashboard-' + (newName === '' ? defaultName : newName);
-  const makeNewDashboard = useNewPanelFromRootQueryCallback();
-  const {urlPrefixed} = getConfig();
-  const newDashboard = useCallback(() => {
-    makeNewDashboard(name, voidNode(), true, newDashExpr => {
-      if (inJupyter) {
-        const expStr = weave
-          .expToString(newDashExpr)
-          .replace(/\n+/g, '')
-          .replace(/\s+/g, '');
-        window.open(
-          urlPrefixed(`?exp=${encodeURIComponent(expStr)}`),
-          '_blank'
-        );
-      } else {
-        props.navigateToExpression(newDashExpr);
-      }
-    });
-  }, [inJupyter, makeNewDashboard, name, props, urlPrefixed, weave]);
+import {IconWeaveLogo} from '../../Panel2/Icons';
+
+export const HomeTopBar: React.FC = () => {
   return (
     <TopBar>
       <TopBarLeft>
         <WeaveLogo />
         Weave
       </TopBarLeft>
-      <TopBarRight>
-        <Button onClick={newDashboard} icon="add-new">
-          New board
-        </Button>
-      </TopBarRight>
     </TopBar>
   );
 };
@@ -60,6 +21,7 @@ const TopBar = styled.div`
   align-items: center;
   justify-content: space-between;
 `;
+TopBar.displayName = 'S.TopBar';
 
 const TopBarLeft = styled.div`
   display: flex;
@@ -67,14 +29,13 @@ const TopBarLeft = styled.div`
   font-size: 18px;
   font-weight: 600;
 `;
+TopBarLeft.displayName = 'S.TopBarLeft';
 
-const TopBarRight = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const WeaveLogo = styled(IconWeaveLogo)`
+const WeaveLogo = styled(IconWeaveLogo).attrs({
+  className: 'night-aware',
+})`
   width: 32px;
   height: 32px;
   margin-right: 12px;
 `;
+WeaveLogo.displayName = 'S.WeaveLogo';

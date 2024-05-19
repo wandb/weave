@@ -1,48 +1,59 @@
-import React, {useEffect, useMemo, useState} from 'react';
-
+import * as globals from '@wandb/weave/common/css/globals.styles';
+import {TargetBlank} from '@wandb/weave/common/util/links';
 import {
-  IconCopy,
+  IconAddNew,
   IconChevronDown,
-  IconInfo,
-  IconOpenNewTab,
+  IconCopy,
   IconDelete,
+  IconFullScreenModeExpand,
+  IconInfo,
+  IconLightbulbInfo,
+  IconOpenNewTab,
 } from '@wandb/weave/components/Icon';
-import * as query from './query';
-import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
-import moment from 'moment';
+import {useWeaveContext} from '@wandb/weave/context';
 import {
-  Node,
-  callOpVeryUnsafe,
   constString,
+  directlyConstructOpCall,
   list,
-  opArtifactMembershipArtifactVersion,
-  opArtifactMembershipForAlias,
-  opArtifactVersionFile,
+  Node,
+  opConcat,
+  opFilesystemArtifactFile,
   opFileTable,
   opGet,
   opIsNone,
-  opProjectArtifact,
+  opPick,
+  opProjectRuns,
   opRootProject,
+  opRunHistory3,
+  opStreamTableRows,
   opTableRows,
-  typedDict,
 } from '@wandb/weave/core';
-import {NavigateToExpressionType, SetPreviewNodeType} from './common';
 import {useNodeValue} from '@wandb/weave/react';
-import {useWeaveContext} from '@wandb/weave/context';
-import {
-  HomePreviewSidebarTemplate,
-  HomeBoardPreview,
-  HomeExpressionPreviewParts,
-} from './HomePreviewSidebar';
-import {useHistory, useParams} from 'react-router-dom';
-import {HomeParams} from './Home';
 import {setDocumentTitle} from '@wandb/weave/util/document';
+import moment from 'moment';
+import React, {useEffect, useMemo, useState} from 'react';
+import {useHistory, useParams} from 'react-router-dom';
+import styled from 'styled-components';
+
 import {
   urlEntity,
   urlProject,
   urlProjectAssetPreview,
   urlProjectAssets,
 } from '../../../urls';
+import {urlWandbFrontend} from '../../../util/urls';
+import {SpanWeaveWithTimestampType} from '../../Panel2/PanelTraceTree/util';
+import {useMakeLocalBoardFromNode} from '../../Panel2/pyBoardGen';
+import {NavigateToExpressionType, SetPreviewNodeType} from './common';
+import {HomeParams} from './Home';
+import {CenterBrowser, CenterBrowserActionType} from './HomeCenterBrowser';
+import {
+  HomePreviewSidebarTemplate,
+  SafeHomeExpressionPreviewParts,
+  SEED_BOARD_OP_NAME,
+} from './HomePreviewSidebar';
+import * as LayoutElements from './LayoutElements';
+import * as query from './query';
 
 type CenterEntityBrowserPropsType = {
   entityName: string;
@@ -89,6 +100,8 @@ export const CenterEntityBrowserInner: React.FC<
         (meta.num_stream_tables + meta.num_logged_tables ?? 0) > 0
           ? meta.num_stream_tables + meta.num_logged_tables
           : null,
+      'run logged traces':
+        meta.num_logged_traces > 0 ? meta.num_logged_traces : null,
       'updated at': moment.utc(meta.updatedAt).local().calendar(),
     }));
   }, [projectsMeta.result, entityName]);
@@ -112,8 +125,8 @@ export const CenterEntityBrowserInner: React.FC<
           label: 'View in Weights and Biases',
           onClick: row => {
             // Open a new tab with the W&B project URL
-            // TODO: make this work for local. Probably need to bring over `urlPrefixed`
-            const url = `https://wandb.ai/${props.entityName}/${row.project}/overview`;
+            const prefix = urlWandbFrontend();
+            const url = `${prefix}/${props.entityName}/${row.project}/overview`;
             // eslint-disable-next-line wandb/no-unprefixed-urls
             window.open(url, '_blank');
           },
@@ -128,7 +141,13 @@ export const CenterEntityBrowserInner: React.FC<
     <CenterBrowser
       allowSearch
       noDataCTA={`No projects with Weave assets found for entity: ${props.entityName}`}
-      columns={['project', 'boards', 'tables', 'updated at']}
+      columns={[
+        'project',
+        'boards',
+        'tables',
+        // 'run logged traces', // keeping this hidden for now to not draw attention
+        'updated at',
+      ]}
       loading={loading}
       title={browserTitle}
       data={browserData}
@@ -173,6 +192,8 @@ const CenterProjectBrowser: React.FC<CenterProjectBrowserPropsType> = props => {
     return <CenterProjectBoardsBrowser {...props} />;
   } else if (params.assetType === 'table') {
     return <CenterProjectTablesBrowser {...props} />;
+  } else if (params.assetType === 'run_logged_trace') {
+    return <CenterProjectLegacyTracesBrowser {...props} />;
   } else {
     return <>Not implemented</>;
   }
@@ -204,17 +225,26 @@ const CenterProjectBrowserInner: React.FC<
   const browserData = useMemo(() => {
     return [
       {
-        _id: 'boards',
+        _id: 'board',
         'asset type': 'Boards',
         count: assetCounts.result.boardCount ?? 0,
       },
       {
-        _id: 'tables',
+        _id: 'table',
         'asset type': 'Tables',
         count:
           (assetCounts.result.loggedTableCount ?? 0) +
           (assetCounts.result.runStreamCount ?? 0),
       },
+      ...(assetCounts.result.legacyTracesCount === 0
+        ? []
+        : [
+            {
+              _id: 'run_logged_trace',
+              'asset type': 'Run Logged Traces',
+              count: assetCounts.result.legacyTracesCount ?? 0,
+            },
+          ]),
       // TODO: Let's skip objects for the MVP
       // {
       //   _id: 'objects',
@@ -226,6 +256,7 @@ const CenterProjectBrowserInner: React.FC<
     ];
   }, [
     assetCounts.result.boardCount,
+    assetCounts.result.legacyTracesCount,
     assetCounts.result.loggedTableCount,
     assetCounts.result.runStreamCount,
   ]);
@@ -239,9 +270,8 @@ const CenterProjectBrowserInner: React.FC<
           icon: IconChevronDown,
           label: 'Browse asset type',
           onClick: row => {
-            const assetType = row._id === 'boards' ? 'board' : 'table';
             history.push(
-              urlProjectAssets(params.entity!, params.project!, assetType)
+              urlProjectAssets(params.entity!, params.project!, row._id)
             );
           },
         },
@@ -281,7 +311,7 @@ const rowToExpression = (
 
 const CenterProjectBoardsBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
-> = props => {
+> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
   const browserTitle = 'Boards';
@@ -294,7 +324,7 @@ const CenterProjectBoardsBrowser: React.FC<
     );
   }, [params.entity, params.project, params.preview, browserTitle]);
 
-  const boards = query.useProjectBoards(props.entityName, props.projectName);
+  const boards = query.useProjectBoards(entityName, projectName);
   const browserData = useMemo(() => {
     return boards.result.map(b => ({
       _id: b.name,
@@ -305,41 +335,20 @@ const CenterProjectBoardsBrowser: React.FC<
     }));
   }, [boards]);
 
-  const {setPreviewNode, navigateToExpression} = props;
-
-  useEffect(() => {
-    if (params.preview) {
-      const expr = rowToExpression(
-        params.entity!,
-        params.project!,
-        params.preview
-      );
-      const node = (
-        <HomeBoardPreview
-          expr={expr}
-          name={params.preview}
-          setPreviewNode={setPreviewNode}
-          navigateToExpression={navigateToExpression}
-        />
-      );
-      setPreviewNode(node);
-    } else {
-      setPreviewNode(undefined);
-    }
-  }, [
-    history,
-    params.entity,
-    params.project,
-    params.preview,
-    setPreviewNode,
-    navigateToExpression,
-  ]);
-
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
   > = useMemo(() => {
     return [
       [
+        {
+          icon: IconOpenNewTab,
+          label: 'Open board',
+          onClick: row => {
+            navigateToExpression(
+              rowToExpression(params.entity!, params.project!, row._id)
+            );
+          },
+        },
         {
           icon: IconInfo,
           label: 'Board details',
@@ -357,52 +366,109 @@ const CenterProjectBoardsBrowser: React.FC<
       ],
       [
         {
-          icon: IconOpenNewTab,
-          label: 'Open Board',
-          onClick: row => {
-            props.navigateToExpression(
-              rowToExpression(params.entity!, params.project!, row._id)
-            );
-          },
-        },
-      ],
-      [
-        {
           icon: IconDelete,
           label: 'Delete board',
           onClick: row => {
-            const uri = `wandb-artifact:///${props.entityName}/${props.projectName}/${row._id}:latest/obj`;
+            const uri = `wandb-artifact:///${entityName}/${projectName}/${row._id}:latest/obj`;
             setDeletingId(uri);
           },
         },
       ],
     ];
-  }, [props, history, params.entity, params.project, params.assetType]);
+  }, [
+    history,
+    params.entity,
+    params.project,
+    params.assetType,
+    entityName,
+    projectName,
+    navigateToExpression,
+  ]);
+
+  const sidebarActions = useMemo(
+    () =>
+      browserActions.map((actionSection, index) => {
+        if (index === 0) {
+          return actionSection.filter(
+            action => action.label !== 'Board details'
+          );
+        }
+        return actionSection;
+      }),
+    [browserActions]
+  );
+
+  useEffect(() => {
+    if (params.preview) {
+      const row = browserData.find(b => b._id === params.preview);
+      if (!row) {
+        setPreviewNode(undefined);
+        return;
+      }
+      const expr = rowToExpression(
+        params.entity!,
+        params.project!,
+        params.preview
+      );
+      const node = (
+        <HomePreviewSidebarTemplate
+          title={params.preview}
+          row={row}
+          actions={sidebarActions}
+          setPreviewNode={setPreviewNode}
+          primaryAction={{
+            icon: IconOpenNewTab,
+            label: `Open board`,
+            onClick: () => {
+              navigateToExpression(expr);
+            },
+          }}>
+          <SafeHomeExpressionPreviewParts
+            expr={expr}
+            navigateToExpression={navigateToExpression}
+          />
+        </HomePreviewSidebarTemplate>
+      );
+      setPreviewNode(node);
+    } else {
+      setPreviewNode(undefined);
+    }
+  }, [
+    history,
+    params.entity,
+    params.project,
+    params.preview,
+    setPreviewNode,
+    navigateToExpression,
+    sidebarActions,
+    browserData,
+  ]);
 
   return (
     <CenterBrowser
       allowSearch
       title={browserTitle}
       selectedRowId={params.preview}
-      setPreviewNode={props.setPreviewNode}
+      setPreviewNode={setPreviewNode}
       deletingId={deletingId}
       setDeletingId={setDeletingId}
-      noDataCTA={`No Weave boards found for project: ${props.entityName}/${props.projectName}`}
+      deleteTypeString="board"
+      noDataCTA={`No Weave boards found for project: ${entityName}/${projectName}`}
       breadcrumbs={[
         {
           key: 'entity',
-          text: props.entityName,
+          text: entityName,
           onClick: () => {
-            props.setPreviewNode(undefined);
-            history.push(urlEntity(props.entityName));
+            setPreviewNode(undefined);
+            history.push(urlEntity(entityName));
           },
         },
         {
           key: 'project',
-          text: props.projectName,
+          text: projectName,
           onClick: () => {
-            props.setPreviewNode(undefined);
-            history.push(urlProject(props.entityName, props.projectName));
+            setPreviewNode(undefined);
+            history.push(urlProject(entityName, projectName));
           },
         },
       ]}
@@ -414,113 +480,120 @@ const CenterProjectBoardsBrowser: React.FC<
   );
 };
 
-const tableRowToNode = (
-  kind: string,
+const legacyTraceRowToSimpleNode = (
   entityName: string,
   projectName: string,
-  artName: string
+  legacyTraceKey: string
 ) => {
-  let newExpr: Node;
-  if (kind === 'Stream Table') {
-    const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
-    const node = opGet({uri: constString(uri)});
-    node.type = {type: 'stream_table'} as any;
-    newExpr = callOpVeryUnsafe(
-      'stream_table-rows',
-      {
-        self: node,
-      },
-      list(typedDict({}))
-    ) as any;
-  } else {
-    // This is a  hacky here. Would be nice to have better mapping
-    const artNameParts = artName.split('-', 3);
-    const tableName = artNameParts[artNameParts.length - 1] + '.table.json';
-    newExpr = opTableRows({
-      table: opFileTable({
-        file: opArtifactVersionFile({
-          artifactVersion: opArtifactMembershipArtifactVersion({
-            artifactMembership: opArtifactMembershipForAlias({
-              artifact: opProjectArtifact({
-                project: opRootProject({
-                  entityName: constString(entityName),
-                  projectName: constString(projectName),
-                }),
-                artifactName: constString(artName),
-              }),
-              aliasName: constString('latest'),
-            }),
+  return opPick({
+    obj: opConcat({
+      arr: opRunHistory3({
+        run: opProjectRuns({
+          project: opRootProject({
+            entityName: constString(entityName),
+            projectName: constString(projectName),
           }),
-          path: constString(tableName),
         }),
       }),
-    });
-  }
-  return newExpr;
+    }),
+    key: constString(legacyTraceKey),
+  }) as Node<{type: 'wb_trace_tree'}>;
 };
 
-const CenterProjectTablesBrowser: React.FC<
+const opWBTraceTreeConvertToSpans = (inputs: {
+  tree: Node<{type: 'wb_trace_tree'}>;
+}) => {
+  return directlyConstructOpCall(
+    'wb_trace_tree-convertToSpans',
+    inputs,
+    list(list(SpanWeaveWithTimestampType))
+  );
+};
+
+const convertSimpleLegacyNodeToNewFormat = (
+  node: Node<{type: 'wb_trace_tree'}>
+) => {
+  return opConcat({
+    arr: opWBTraceTreeConvertToSpans({
+      tree: node,
+    }),
+  });
+};
+
+const CenterProjectLegacyTracesBrowser: React.FC<
   CenterProjectBrowserInnerPropsType
-> = props => {
+> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
   const history = useHistory();
   const params = useParams<HomeParams>();
+  const browserTitle = 'Run Logged Traces';
   const weave = useWeaveContext();
-  const browserTitle = 'Tables';
   useEffect(() => {
-    if (params.preview) {
-      setDocumentTitle(params.preview);
-    } else {
-      const title = `${params.entity}/${params.project} ${browserTitle}`;
-      setDocumentTitle(title);
-    }
+    setDocumentTitle(
+      params.preview
+        ? `${params.preview} Preview`
+        : `${params.entity}/${params.project} ${browserTitle}`
+    );
   }, [params.entity, params.project, params.preview, browserTitle]);
 
-  const runStreams = query.useProjectRunStreams(
-    props.entityName,
-    props.projectName
-  );
-  const loggedTables = query.useProjectRunLoggedTables(
-    props.entityName,
-    props.projectName
-  );
-  const isLoading = runStreams.loading || loggedTables.loading;
+  const legacyTraces = query.useProjectLegacyTraces(entityName, projectName);
   const browserData = useMemo(() => {
-    if (isLoading) {
-      return [];
-    }
-    const streams = runStreams.result.map(b => ({
+    return legacyTraces.result.map(b => ({
       _id: b.name,
-      _updatedAt: b.updatedAt,
       name: b.name,
-      kind: 'Stream Table',
-      'updated at': moment.utc(b.updatedAt).local().calendar(),
-      'created at': moment.utc(b.createdAt).local().calendar(),
-      'created by': b.createdByUserName,
+      // 'created at': moment.utc(b.createdAt).local().calendar(),
     }));
-    const logged = loggedTables.result.map(b => ({
-      _id: b.name,
-      _updatedAt: b.updatedAt,
-      name: b.name,
-      kind: 'Logged Table',
-      'updated at': moment.utc(b.updatedAt).local().calendar(),
-      'created at': moment.utc(b.createdAt).local().calendar(),
-      'created by': b.createdByUserName,
-    }));
-    const combined = [...streams, ...logged];
-    combined.sort((a, b) => b._updatedAt - a._updatedAt);
-    return combined;
-  }, [isLoading, loggedTables.result, runStreams.result]);
+  }, [legacyTraces]);
 
-  const {setPreviewNode, navigateToExpression} = props;
+  const browserActions: Array<
+    CenterBrowserActionType<(typeof browserData)[number]>
+  > = useMemo(
+    () => [
+      [
+        {
+          icon: IconInfo,
+          label: 'Table overview',
+          onClick: row => {
+            history.push(
+              urlProjectAssetPreview(
+                entityName,
+                projectName,
+                'run_logged_trace',
+                row._id
+              )
+            );
+          },
+        },
+        {
+          icon: IconCopy,
+          label: 'Copy Weave expression',
+          onClick: row => {
+            const node = legacyTraceRowToSimpleNode(
+              entityName,
+              projectName,
+              row._id
+            );
+            const copyText = weave.expToString(node);
+            navigator.clipboard.writeText(copyText).then(() => {
+              // give user feedback
+            });
+          },
+        },
+      ],
+    ],
+    [history, entityName, projectName, weave]
+  );
+
   useEffect(() => {
+    if (legacyTraces.loading) {
+      return;
+    }
     if (params.preview) {
       const row = browserData.find(b => b._id === params.preview);
       if (!row) {
         setPreviewNode(undefined);
         return;
       }
-      const expr = tableRowToNode(
-        row.kind,
+      const expr = legacyTraceRowToSimpleNode(
         params.entity!,
         params.project!,
         row._id
@@ -528,16 +601,22 @@ const CenterProjectTablesBrowser: React.FC<
       const node = (
         <HomePreviewSidebarTemplate
           title={row.name}
-          setPreviewNode={setPreviewNode}
-          primaryAction={{
-            icon: IconOpenNewTab,
-            label: 'Open Table',
-            onClick: () => {
-              navigateToExpression(expr);
-            },
-          }}>
-          <HomeExpressionPreviewParts
-            expr={expr}
+          row={row}
+          actions={[
+            [
+              {
+                icon: IconFullScreenModeExpand,
+                label: 'Preview Traces',
+                onClick: _ => {
+                  navigateToExpression(expr);
+                },
+              },
+            ],
+          ]}
+          setPreviewNode={setPreviewNode}>
+          <SafeHomeExpressionPreviewParts
+            expr={convertSimpleLegacyNodeToNewFormat(expr)}
+            generatorAllowList={['py_board-trace_monitor']}
             navigateToExpression={navigateToExpression}
           />
         </HomePreviewSidebarTemplate>
@@ -554,54 +633,174 @@ const CenterProjectTablesBrowser: React.FC<
     params.preview,
     setPreviewNode,
     navigateToExpression,
+    legacyTraces.loading,
   ]);
+
+  return (
+    <>
+      <CenterBrowser
+        allowSearch
+        title={browserTitle}
+        selectedRowId={params.preview}
+        noDataCTA={`No run logged traces found for project: ${entityName}/${projectName}`}
+        breadcrumbs={[
+          {
+            key: 'entity',
+            text: entityName,
+            onClick: () => {
+              setPreviewNode(undefined);
+              history.push(urlEntity(entityName));
+            },
+          },
+          {
+            key: 'project',
+            text: projectName,
+            onClick: () => {
+              setPreviewNode(undefined);
+              history.push(urlProject(entityName, projectName));
+            },
+          },
+        ]}
+        loading={legacyTraces.loading}
+        columns={['name']}
+        data={browserData}
+        actions={browserActions}
+      />
+    </>
+  );
+};
+
+const tableRowToNode = (
+  kind: string,
+  entityName: string,
+  projectName: string,
+  artName: string
+) => {
+  let newExpr: Node;
+  if (kind === 'Stream Table') {
+    const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest/obj`;
+    const node = opGet({uri: constString(uri)});
+    node.type = {type: 'stream_table'} as any;
+    newExpr = opStreamTableRows({
+      self: node as any,
+    });
+  } else {
+    // This is a hack. Would be nice to have better mapping
+    // Note that this will not work for tables with spaces in their name
+    // as we strip the space out to make the artifact name.
+    const artNameParts = artName.split('-', 3);
+    const tableName = artNameParts[artNameParts.length - 1] + '.table.json';
+
+    const uri = `wandb-artifact:///${entityName}/${projectName}/${artName}:latest`;
+    newExpr = opTableRows({
+      table: opFileTable({
+        file: opFilesystemArtifactFile({
+          artifactVersion: opGet({
+            uri: constString(uri),
+          }) as any,
+          path: constString(tableName),
+        }),
+      }),
+    });
+  }
+  return newExpr;
+};
+
+const CenterProjectTablesBrowser: React.FC<
+  CenterProjectBrowserInnerPropsType
+> = ({entityName, projectName, setPreviewNode, navigateToExpression}) => {
+  const history = useHistory();
+  const params = useParams<HomeParams>();
+  const weave = useWeaveContext();
+  const makeBoardFromNode = useMakeLocalBoardFromNode();
+  const [deletingId, setDeletingId] = useState<string | undefined>();
+
+  const browserTitle = 'Tables';
+  useEffect(() => {
+    if (params.preview) {
+      setDocumentTitle(params.preview);
+    } else {
+      const title = `${params.entity}/${params.project} ${browserTitle}`;
+      setDocumentTitle(title);
+    }
+  }, [params.entity, params.project, params.preview, browserTitle]);
+
+  const runStreams = query.useProjectRunStreams(entityName, projectName);
+  const loggedTables = query.useProjectRunLoggedTables(entityName, projectName);
+  const isLoading = runStreams.loading || loggedTables.loading;
+  const browserData = useMemo(() => {
+    if (isLoading) {
+      return [];
+    }
+    const streams = runStreams.result.map(b => ({
+      _id: b.name,
+      _updatedAt: b.updatedAt,
+      name: b.name,
+      kind: 'Stream Table',
+      // Here we make the assumption that the run creating this artifact
+      // is the underlying stream table pointed to by the artifact. This is
+      // not strictly true, but is always true for the current implementation.
+      // This approach saves us from having to execute multiple queries
+      // since we don't need to load the stream table files to determine
+      // the run id.
+      'updated at': moment.utc(b.createdByUpdatedAt).local().calendar(),
+      'created at': moment.utc(b.createdAt).local().calendar(),
+      'created by': b.createdByUserName,
+      'number of rows': b.numRows,
+    }));
+    const logged = loggedTables.result.map(b => ({
+      _id: b.name,
+      _updatedAt: b.updatedAt,
+      name: b.name,
+      kind: 'Logged Table',
+      'updated at': moment.utc(b.updatedAt).local().calendar(),
+      'created at': moment.utc(b.createdAt).local().calendar(),
+      'created by': b.createdByUserName,
+      // we use the # of steps in the run history to compute rows quickly. This works for stream tables
+      // because the table leverages run history. For logged tables, we must open the table in order
+      // to know the number of rows which is a much more expensive operation. Instead, we will just
+      // display a dummy placeholder
+      'number of rows': '-',
+    }));
+    const combined = [...streams, ...logged];
+    combined.sort((a, b) => b._updatedAt - a._updatedAt);
+    return combined;
+  }, [isLoading, loggedTables.result, runStreams.result]);
 
   const browserActions: Array<
     CenterBrowserActionType<(typeof browserData)[number]>
-  > = useMemo(() => {
-    return [
+  > = useMemo(
+    () => [
       [
         // Home Page TODO: Enable awesome previews
         {
           icon: IconInfo,
-          label: 'Table details',
+          label: 'Table overview',
           onClick: row => {
             history.push(
-              urlProjectAssetPreview(
-                props.entityName,
-                props.projectName,
-                'table',
-                row._id
-              )
+              urlProjectAssetPreview(entityName, projectName, 'table', row._id)
             );
           },
         },
-      ],
-      [
         {
-          icon: IconOpenNewTab,
-          label: 'Open Table',
+          icon: IconFullScreenModeExpand,
+          label: 'Preview table',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
-            props.navigateToExpression(
-              tableRowToNode(
-                row.kind,
-                props.entityName,
-                props.projectName,
-                row._id
-              )
+            navigateToExpression(
+              tableRowToNode(row.kind, entityName, projectName, row._id)
             );
           },
         },
-      ],
-      [
         {
           icon: IconCopy,
           label: 'Copy Weave expression',
+          disabled: row => row['number of rows'] === 0,
           onClick: row => {
             const node = tableRowToNode(
               row.kind,
-              props.entityName,
-              props.projectName,
+              entityName,
+              projectName,
               row._id
             );
             const copyText = weave.expToString(node);
@@ -611,8 +810,103 @@ const CenterProjectTablesBrowser: React.FC<
           },
         },
       ],
-    ];
-  }, [props, weave, history]);
+      [
+        {
+          icon: IconAddNew,
+          label: 'New board',
+          disabled: row => row['number of rows'] === 0,
+          onClick: row => {
+            const node = tableRowToNode(
+              row.kind,
+              entityName,
+              projectName,
+              row._id
+            );
+            makeBoardFromNode(SEED_BOARD_OP_NAME, node, newDashExpr => {
+              navigateToExpression(newDashExpr);
+            });
+          },
+        },
+      ],
+      [
+        {
+          icon: IconDelete,
+          label: 'Delete table',
+          onClick: row => {
+            const uri = `wandb-artifact:///${entityName}/${projectName}/${row._id}:latest/obj`;
+            setDeletingId(uri);
+          },
+        },
+      ],
+    ],
+    [
+      entityName,
+      projectName,
+      weave,
+      history,
+      makeBoardFromNode,
+      navigateToExpression,
+    ]
+  );
+
+  const sidebarActions = useMemo(
+    () =>
+      browserActions.map((actionSection, index) => {
+        if (index === 0) {
+          return actionSection.filter(
+            action => action.label !== 'Table overview'
+          );
+        }
+        return actionSection;
+      }),
+    [browserActions]
+  );
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+    if (params.preview) {
+      const row = browserData.find(b => b._id === params.preview);
+      if (!row) {
+        setPreviewNode(undefined);
+        return;
+      }
+      const expr = tableRowToNode(
+        row.kind,
+        params.entity!,
+        params.project!,
+        row._id
+      );
+      const node = (
+        <HomePreviewSidebarTemplate
+          title={row.name}
+          row={row}
+          setPreviewNode={setPreviewNode}
+          actions={sidebarActions}
+          emptyData={row['number of rows'] === 0}
+          emptyDataMessage={<EmptyTableMessage />}>
+          <SafeHomeExpressionPreviewParts
+            expr={expr}
+            navigateToExpression={navigateToExpression}
+          />
+        </HomePreviewSidebarTemplate>
+      );
+      setPreviewNode(node);
+    } else {
+      setPreviewNode(undefined);
+    }
+  }, [
+    sidebarActions,
+    browserData,
+    history,
+    params.entity,
+    params.project,
+    params.preview,
+    setPreviewNode,
+    navigateToExpression,
+    isLoading,
+  ]);
 
   return (
     <>
@@ -620,31 +914,90 @@ const CenterProjectTablesBrowser: React.FC<
         allowSearch
         title={browserTitle}
         selectedRowId={params.preview}
-        noDataCTA={`No Weave tables found for project: ${props.entityName}/${props.projectName}`}
+        deletingId={deletingId}
+        setDeletingId={setDeletingId}
+        deleteTypeString="table"
+        noDataCTA={`No Weave tables found for project: ${entityName}/${projectName}`}
         breadcrumbs={[
           {
             key: 'entity',
-            text: props.entityName,
+            text: entityName,
             onClick: () => {
-              props.setPreviewNode(undefined);
-              history.push(urlEntity(props.entityName));
+              setPreviewNode(undefined);
+              history.push(urlEntity(entityName));
             },
           },
           {
             key: 'project',
-            text: props.projectName,
+            text: projectName,
             onClick: () => {
-              props.setPreviewNode(undefined);
-              history.push(urlProject(props.entityName, props.projectName));
+              setPreviewNode(undefined);
+              history.push(urlProject(entityName, projectName));
             },
           },
         ]}
         loading={isLoading}
         filters={{kind: {placeholder: 'All table kinds'}}}
-        columns={['name', 'kind', 'updated at', 'created at', 'created by']}
+        columns={[
+          'name',
+          'kind',
+          'updated at',
+          'created at',
+          'created by',
+          'number of rows',
+        ]}
         data={browserData}
         actions={browserActions}
       />
     </>
+  );
+};
+
+const EmptyTableMessageBlockContainer = styled(LayoutElements.HBlock)`
+  background-color: ${globals.MOON_100};
+  border-radius: 8px;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+`;
+EmptyTableMessageBlockContainer.displayName =
+  'S.EmptyTableMessageBlockContainer';
+
+const EmptyTableMessageIcon = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 15px;
+`;
+EmptyTableMessageIcon.displayName = 'S.EmptyTableMessageIcon';
+
+const EmptyTableMessageText = styled.div`
+  padding: 15px 20px 15px 0px;
+  color: ${globals.MOON_600};
+`;
+EmptyTableMessageText.displayName = 'S.EmptyTableMessageText';
+
+const EmptyTableMessage = () => {
+  return (
+    <div>
+      <EmptyTableMessageBlockContainer>
+        <EmptyTableMessageIcon>
+          <IconLightbulbInfo style={{color: globals.MOON_600}} />
+        </EmptyTableMessageIcon>
+        <EmptyTableMessageText>
+          <div style={{fontWeight: 600, marginBottom: '2px'}}>
+            This table has no data
+          </div>
+          <div>
+            Table preview and board creation are not available until data has
+            been logged. Learn more about logging data to StreamTables{' '}
+            <TargetBlank href="https://docs.wandb.ai/guides/weave/streamtable">
+              here
+            </TargetBlank>
+            .
+          </div>
+        </EmptyTableMessageText>
+      </EmptyTableMessageBlockContainer>
+    </div>
   );
 };

@@ -1,8 +1,8 @@
 import Loader from '@wandb/weave/common/components/WandbLoader';
-import getConfig from '../../config';
 import {opFileDirectUrl} from '@wandb/weave/core';
 import React from 'react';
 
+import getConfig from '../../config';
 import * as CGReact from '../../react';
 import * as Panel2 from './panel';
 

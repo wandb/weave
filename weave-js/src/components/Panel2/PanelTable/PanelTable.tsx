@@ -1,11 +1,13 @@
 import 'react-base-table/lib/TableRow';
 
-import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {MOON_500} from '@wandb/weave/common/css/color.styles';
+import {saveTableAsCSV} from '@wandb/weave/common/util/csv';
 import {
+  callOpVeryUnsafe,
   constFunction,
   constNumber,
   constString,
+  dereferenceAllVars,
   escapeDots,
   isAssignableTo,
   isOutputNode,
@@ -26,6 +28,7 @@ import {
   opPick,
   opRunId,
   opRunName,
+  Stack,
   taggedValue,
   Type,
   typedDict,
@@ -39,8 +42,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import BaseTable, {BaseTableProps} from 'react-base-table';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import {
-  Button,
-  Icon,
+  Icon as SemanticIcon,
   Menu,
   MenuItemProps,
   Modal,
@@ -51,6 +53,10 @@ import {WeaveActionContextProvider} from '../../../actions';
 import {useWeaveContext} from '../../../context';
 import {WeaveApp} from '../../../index';
 import * as LLReact from '../../../react';
+import {Button} from '../../Button';
+import {Checkbox} from '../../Checkbox';
+import {IconName} from '../../Icon';
+import {Tooltip} from '../../Tooltip';
 import {ControlFilter} from '../ControlFilter';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
@@ -58,6 +64,7 @@ import {GrowToParent} from '../PanelComp.styles';
 import {PanelContextProvider, usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as S from '../PanelTable.styles';
+import {WeaveFormatContext} from '../WeaveFormatContext';
 import {TableActions} from './actions';
 import {Cell, Value} from './Cell';
 import {ColumnHeader} from './ColumnHeader';
@@ -70,12 +77,15 @@ import {
   TABLE_CONFIG_DEFAULTS,
   useUpdateConfigRespectingTableType,
 } from './config';
+import {Link} from './Link';
 import * as Table from './tableState';
 import * as TableType from './tableType';
 import {
   BaseTableDataType,
+  getColumnCellFormats,
   getTableMeasurements,
   nodeIsValidList,
+  tableIsPanelVariable,
   useAutomatedTableState,
   useBaseTableColumnDefinitions,
   useBaseTableData,
@@ -83,34 +93,34 @@ import {
   useRowsNode,
   useUpdateConfigKey,
 } from './util';
-import {Link} from './Link';
 
 const recordEvent = makeEventRecorder('Table');
 const inputType = TableType.GeneralTableLikeType;
 
 const baseColumnWidth = 95;
 const minColumnWidth = 30;
-const rowControlsWidth = 30;
+const rowControlsWidthWide = 64;
+const rowControlsWidthSmall = 30;
 const numberOfHeaders = 1;
 const headerHeight = 30;
-const footerHeight = 25;
+const footerHeight = 32;
 const rowHeightSettings = {
   [RowSize.Small]: 30,
   [RowSize.Medium]: 60,
   [RowSize.Large]: 120,
   [RowSize.XLarge]: 240,
 };
-const nextRowSize = {
-  [RowSize.Small]: RowSize.Medium,
-  [RowSize.Medium]: RowSize.Large,
-  [RowSize.Large]: RowSize.XLarge,
-  [RowSize.XLarge]: RowSize.Small,
+const rowSizeTooltipContent = {
+  [RowSize.Small]: 'Small row height',
+  [RowSize.Medium]: 'Medium row height',
+  [RowSize.Large]: 'Large row height',
+  [RowSize.XLarge]: 'Extra large row height',
 };
-const rowSizeIconName = {
-  [RowSize.Small]: 'rows',
-  [RowSize.Medium]: 'table',
-  [RowSize.Large]: 'table-collapsed',
-  [RowSize.XLarge]: 'fullscreen',
+const rowSizeIconName: {[key in RowSize]: IconName} = {
+  [RowSize.Small]: 'row-height-small',
+  [RowSize.Medium]: 'row-height-medium',
+  [RowSize.Large]: 'row-height-large',
+  [RowSize.XLarge]: 'row-height-xlarge',
 };
 const useOneBasedIndex = true;
 
@@ -254,6 +264,7 @@ const PanelTableInner: React.FC<
   const {
     input,
     updateConfig,
+    updateInput,
     updateContext,
     height,
     width,
@@ -269,6 +280,21 @@ const PanelTableInner: React.FC<
   }
 
   const rowActions = props.rowActions;
+
+  const {stack} = usePanelContext();
+  const tableIsPanelVariableVal = tableIsPanelVariable(stack);
+  const rowControlsWidth = useMemo(
+    () =>
+      tableIsPanelVariableVal ? rowControlsWidthWide : rowControlsWidthSmall,
+    [tableIsPanelVariableVal]
+  );
+
+  const countColumnExists = Object.keys(tableState.columnNames).includes(
+    'groupCount'
+  );
+  const [countColumnId, setCountColumnId] = useState<string | null>(
+    countColumnExists ? 'groupCount' : null
+  );
 
   const updateIndexOffset = useUpdateConfigKey('indexOffset', updateConfig);
   const updateTableState = useUpdateConfigKey('tableState', updateConfig);
@@ -349,46 +375,76 @@ const PanelTableInner: React.FC<
 
   const setRowAsPinned = useCallback(
     (row: number, pinned: boolean) => {
-      const pinnedRows = config.pinnedRows ?? {};
-      if (pinned) {
-        const update = {
-          pinnedRows: {
-            ...pinnedRows,
-            [compositeGroupKey]: pinnedRowsForCurrentGrouping.includes(row)
-              ? pinnedRowsForCurrentGrouping
-              : [...pinnedRowsForCurrentGrouping, row],
-          },
-        };
-        updateConfig(update);
+      if (window.location.toString().includes('browse2')) {
+        if (updateInput) {
+          updateInput(
+            opIndex({
+              arr: varNode('any', 'input'),
+              index: constNumber(row),
+            }) as any
+          );
+        }
       } else {
-        updateConfig({
-          pinnedRows: {
-            ...pinnedRows,
-            [compositeGroupKey]: pinnedRowsForCurrentGrouping.filter(
-              r => r !== row
-            ),
-          },
-        });
+        const pinnedRows = config.pinnedRows ?? {};
+        if (pinned) {
+          const update = {
+            pinnedRows: {
+              ...pinnedRows,
+              [compositeGroupKey]: pinnedRowsForCurrentGrouping.includes(row)
+                ? pinnedRowsForCurrentGrouping
+                : [...pinnedRowsForCurrentGrouping, row],
+            },
+          };
+          updateConfig(update);
+        } else {
+          updateConfig({
+            pinnedRows: {
+              ...pinnedRows,
+              [compositeGroupKey]: pinnedRowsForCurrentGrouping.filter(
+                r => r !== row
+              ),
+            },
+          });
+        }
       }
     },
     [
-      config.pinnedRows,
       compositeGroupKey,
+      config.pinnedRows,
       pinnedRowsForCurrentGrouping,
       updateConfig,
+      updateInput,
     ]
   );
 
   const setRowAsActive = useCallback(
     (row: number) => {
-      updateConfig({
-        activeRowForGrouping: {
-          ...config.activeRowForGrouping,
-          [compositeGroupKey]: row,
-        },
-      });
+      if (window.location.toString().includes('browse2')) {
+        // TODO: (Weaveflow): This is a hack - parameterize this
+        if (updateInput) {
+          updateInput(
+            callOpVeryUnsafe('index', {
+              arr: varNode('any', 'input'),
+              index: constNumber(row),
+            }) as any
+          );
+        }
+      } else {
+        const activeRowForGrouping =
+          {
+            ...config.activeRowForGrouping,
+            [compositeGroupKey]: row,
+          } ?? {};
+        // if row is less than 0, delete the active row
+        if (row < 0) {
+          delete activeRowForGrouping[compositeGroupKey];
+        }
+        updateConfig({
+          activeRowForGrouping,
+        });
+      }
     },
-    [compositeGroupKey, config.activeRowForGrouping, updateConfig]
+    [compositeGroupKey, config.activeRowForGrouping, updateConfig, updateInput]
   );
   const activeRowIndex = config.activeRowForGrouping?.[compositeGroupKey] ?? -1;
 
@@ -418,7 +474,11 @@ const PanelTableInner: React.FC<
     ? undefined
     : totalRowCountUse.result;
 
-  const orderedColumns = useOrderedColumns(tableState, config.pinnedColumns);
+  const orderedColumns = useOrderedColumns(
+    tableState,
+    config.pinnedColumns,
+    countColumnId
+  );
 
   // TODO: remove this constraint once plots work in smaller views
 
@@ -477,8 +537,8 @@ const PanelTableInner: React.FC<
     pinnableTotalRowCount
   );
   const downloadDataAsCSV = useCallback(() => {
-    downloadCSV(rowsNode, tableState, weave);
-  }, [rowsNode, tableState, weave]);
+    downloadCSV(rowsNode, tableState, weave, stack);
+  }, [rowsNode, stack, tableState, weave]);
 
   const headerRendererForColumn = useCallback(
     (colId: string, {headerIndex}: any) => {
@@ -501,6 +561,8 @@ const PanelTableInner: React.FC<
             setColumnPinState(colId, pinned);
           }}
           simpleTable={props.config.simpleTable}
+          countColumnId={countColumnId}
+          setCountColumnId={setCountColumnId}
         />
       );
     },
@@ -515,6 +577,8 @@ const PanelTableInner: React.FC<
       updateTableState,
       config.pinnedColumns,
       setColumnPinState,
+      countColumnId,
+      setCountColumnId,
     ]
   );
 
@@ -529,6 +593,7 @@ const PanelTableInner: React.FC<
     ) => {
       const rowNode = rowData.rowNode;
       const columnDef = columnDefinitions[colId];
+      const colType = columnDef.selectFn.type;
       // MaybeWrappers are needed because the table will eagerly ask for enough
       // rows to fill the screen, before we know if that many rows exist. This
       // means that the true value of every cell is possibly nullable, even if
@@ -536,42 +601,46 @@ const PanelTableInner: React.FC<
       // don't error when we get nulls back for small tables
       if (columnDef.isGrouped) {
         return (
-          <GrowToParent>
-            <Value
-              table={tableState}
-              colId={colId}
-              // Warning: not memoized
-              valueNode={opPick({
-                obj: opGroupGroupKey({
-                  obj: rowNode as any,
-                }),
-                key: constString(escapeDots(columnDef.name)),
-              })}
-              config={{}}
-              updateTableState={updateTableState}
-              panelContext={props.context}
-              updatePanelContext={updateContext}
-            />
-          </GrowToParent>
+          <WeaveFormatContext.Provider value={getColumnCellFormats(colType)}>
+            <GrowToParent>
+              <Value
+                table={tableState}
+                colId={colId}
+                // Warning: not memoized
+                valueNode={opPick({
+                  obj: opGroupGroupKey({
+                    obj: rowNode as any,
+                  }),
+                  key: constString(escapeDots(columnDef.name)),
+                })}
+                config={{}}
+                updateTableState={updateTableState}
+                panelContext={props.context}
+                updatePanelContext={updateContext}
+              />
+            </GrowToParent>
+          </WeaveFormatContext.Provider>
         );
       } else {
         return (
-          <GrowToParent>
-            <Cell
-              table={tableState}
-              colId={colId}
-              inputNode={input}
-              rowNode={rowNode}
-              selectFunction={columnDef.selectFn}
-              panelId={columnDef.panelId}
-              config={columnDef.panelConfig}
-              panelContext={props.context}
-              updateTableState={updateTableState}
-              updatePanelContext={updateContext}
-              updateInput={props.updateInput}
-              simpleTable={props.config.simpleTable}
-            />
-          </GrowToParent>
+          <WeaveFormatContext.Provider value={getColumnCellFormats(colType)}>
+            <GrowToParent>
+              <Cell
+                table={tableState}
+                colId={colId}
+                inputNode={input}
+                rowNode={rowNode}
+                selectFunction={columnDef.selectFn}
+                panelId={columnDef.panelId}
+                config={columnDef.panelConfig}
+                panelContext={props.context}
+                updateTableState={updateTableState}
+                updatePanelContext={updateContext}
+                updateInput={props.updateInput}
+                simpleTable={props.config.simpleTable}
+              />
+            </GrowToParent>
+          </WeaveFormatContext.Provider>
         );
       }
     },
@@ -587,7 +656,7 @@ const PanelTableInner: React.FC<
     ]
   );
 
-  const [shiftIsPressed, setShiftIsPressed] = useState(false);
+  const shiftIsPressedRef = useRef(false);
 
   const isFiltered = tableState.preFilterFunction.nodeType === 'output';
   const isGrouped = tableState.groupBy.length > 0;
@@ -658,7 +727,7 @@ const PanelTableInner: React.FC<
             rowNode={rowData.rowNode}
             setRowAsPinned={(index: number) => {
               if (!props.config.simpleTable) {
-                if (shiftIsPressed) {
+                if (shiftIsPressedRef.current && index > -1) {
                   setRowAsPinned(index, !rowData.isPinned);
                 } else {
                   setRowAsActive(index);
@@ -761,9 +830,9 @@ const PanelTableInner: React.FC<
     runNode,
     activeRowIndex,
     props.config.simpleTable,
-    shiftIsPressed,
     setRowAsPinned,
     setRowAsActive,
+    rowControlsWidth,
   ]);
 
   const indexInputRef = useRef<HTMLInputElement>(null);
@@ -772,7 +841,6 @@ const PanelTableInner: React.FC<
       1,
       numVisibleRows // - pinnedRowsForCurrentGrouping.length
     );
-    const nextSize = nextRowSize[config.rowSize];
 
     return (
       <div
@@ -780,33 +848,53 @@ const PanelTableInner: React.FC<
           height: '100%',
           width: '100%',
           display: 'flex',
-          padding: '2px 9px',
+          padding: '8px 12px 0',
           justifyContent: 'space-between',
         }}>
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name={rowSizeIconName[nextSize]}
-              onClick={() => {
-                setRowSize(nextSize);
-              }}
-            />
+            {(Object.keys(RowSize) as Array<keyof typeof RowSize>)
+              // Remove first 4 sizes, when iterating over the enum, since first 4 are numbers
+              .slice(4)
+              .map(rowSize => (
+                <Tooltip
+                  key={rowSize}
+                  position="top center"
+                  content={rowSizeTooltipContent[RowSize[rowSize]]}
+                  trigger={
+                    <Button
+                      startIcon={rowSizeIconName[RowSize[rowSize]]}
+                      onClick={() => setRowSize(RowSize[rowSize])}
+                      active={config.rowSize === RowSize[rowSize]}
+                      variant={
+                        config.rowSize === RowSize[rowSize] ? 'ghost' : 'quiet'
+                      }
+                      size="small"
+                    />
+                  }
+                />
+              ))}
           </div>
         )}
         <div
           style={{flex: '1 0 auto', display: 'flex', justifyContent: 'center'}}>
-          <div style={{flex: '0 0 auto'}}>
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name="left-arrow"
+          <div
+            style={{flex: '0 0 auto', display: 'flex', alignItems: 'center'}}>
+            <Button
+              variant="quiet"
+              size="small"
+              icon="back"
+              tooltip="First page"
               onClick={() => {
                 updateIndexOffset(0);
               }}
             />
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name="chevron-left"
+            <Button
+              variant="quiet"
+              size="small"
+              icon="chevron-back"
+              tooltip="Previous page"
+              className="mr-4"
               onClick={() => {
                 updateIndexOffset(adjustedIndexOffset - nonPinnedVisibleRows);
               }}
@@ -837,7 +925,7 @@ const PanelTableInner: React.FC<
                 }
               }}
             />
-            <span style={{lineHeight: '20px'}}>
+            <span style={{lineHeight: '24px'}}>
               &nbsp;-{' '}
               {adjustedIndexOffset +
                 nonPinnedVisibleRows -
@@ -848,16 +936,21 @@ const PanelTableInner: React.FC<
                 ? 'many'
                 : totalRowCountUse.result - (useOneBasedIndex ? 0 : 1)}
             </span>
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name="chevron-right"
+            <Button
+              variant="quiet"
+              size="small"
+              icon="chevron-next"
+              tooltip="Next page"
+              className="ml-4"
               onClick={() => {
                 updateIndexOffset(adjustedIndexOffset + nonPinnedVisibleRows);
               }}
             />
-            <S.TableIcon
-              style={{padding: '4px 5px 0px'}}
-              name="right-arrow"
+            <Button
+              variant="quiet"
+              size="small"
+              icon="forward-next"
+              tooltip="Last page"
               onClick={() => {
                 updateIndexOffset(
                   totalRowCountUse.result - nonPinnedVisibleRows
@@ -868,23 +961,27 @@ const PanelTableInner: React.FC<
         </div>
         {!props.config.simpleTable && (
           <div style={{flex: '0 0 auto'}}>
-            <S.TableActionText
+            <Button
+              variant="quiet"
+              size="small"
               onClick={() => {
                 downloadDataAsCSV();
               }}>
               Export as CSV
-            </S.TableActionText>
+            </Button>
             <Modal
               className="small"
               trigger={
-                <S.TableActionText
+                <Button
                   data-test="select-columns"
+                  variant="quiet"
+                  size="small"
                   onClick={() => {
                     recordEvent('SELECT_COLUMNS');
                     setShowColumnSelect(true);
                   }}>
                   Columns...
-                </S.TableActionText>
+                </Button>
               }
               open={showColumnSelect}
               onClose={() => setShowColumnSelect(false)}>
@@ -898,20 +995,23 @@ const PanelTableInner: React.FC<
               <Modal.Actions>
                 <Button
                   data-test="close-column-select"
-                  primary
+                  variant="primary"
+                  size="large"
                   onClick={() => setShowColumnSelect(false)}>
                   Close
                 </Button>
               </Modal.Actions>
             </Modal>
-            <S.TableActionText
+            <Button
               data-test="auto-columns"
+              variant="quiet"
+              size="small"
               onClick={() => {
                 recordEvent('RESET_TABLE');
                 resetTable();
               }}>
-              Reset Table
-            </S.TableActionText>
+              Reset table
+            </Button>
           </div>
         )}
       </div>
@@ -936,18 +1036,15 @@ const PanelTableInner: React.FC<
 
   const baseTableRef = useRef<BaseTable<BaseTableDataType>>(null);
 
-  const captureKeyDown = useCallback(
-    e => {
-      if (e.key === 'Shift') {
-        setShiftIsPressed(true);
-      }
-    },
-    [setShiftIsPressed]
-  );
+  const captureKeyDown = useCallback(e => {
+    if (e.key === 'Shift') {
+      shiftIsPressedRef.current = true;
+    }
+  }, []);
 
   const captureKeyUp = useCallback(e => {
     if (e.key === 'Shift') {
-      setShiftIsPressed(false);
+      shiftIsPressedRef.current = false;
     }
   }, []);
 
@@ -967,18 +1064,13 @@ const PanelTableInner: React.FC<
           return;
         }
         // TODO: make all these shiftIsPressed features discoverable!!!!
-        if (shiftIsPressed) {
+        if (shiftIsPressedRef.current) {
           setAllColumnWidths(resizeWidth);
         } else {
           setSingleColumnWidth(column.colId, resizeWidth);
         }
       },
-      [
-        props.config.simpleTable,
-        shiftIsPressed,
-        setAllColumnWidths,
-        setSingleColumnWidth,
-      ]
+      [props.config.simpleTable, setAllColumnWidths, setSingleColumnWidth]
     );
 
   const setFilterFunction: React.ComponentProps<
@@ -1090,8 +1182,9 @@ const IndexCell: React.FC<{
   activeRowIndex?: number;
   simpleTable?: boolean;
 }> = props => {
-  const {frame} = usePanelContext();
+  const {frame, stack} = usePanelContext();
   const weave = useWeaveContext();
+  const tableIsPanelVariableVal = tableIsPanelVariable(stack);
 
   if (
     props.runNode != null &&
@@ -1129,13 +1222,23 @@ const IndexCell: React.FC<{
   if (index.loading) {
     return <S.IndexColumnVal />;
   } else {
+    const isSelected =
+      index.result != null && index.result === props.activeRowIndex;
+    const runName = runNameNodeValue.result ?? '';
+    const basicIndexContent = (
+      <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+    );
+    const indexOnClick = () => {
+      if (!props.simpleTable) {
+        if (isSelected) {
+          props.setRowAsPinned(-1);
+        } else {
+          props.setRowAsPinned(index.result);
+        }
+      }
+    };
     return (
-      <S.IndexColumnVal
-        onClick={() => {
-          if (!props.simpleTable) {
-            props.setRowAsPinned(index.result);
-          }
-        }}>
+      <S.IndexColumnVal onClick={indexOnClick}>
         <S.IndexColumnText
           style={{
             color: colorNodeValue.loading ? 'inherit' : colorNodeValue.result,
@@ -1146,8 +1249,21 @@ const IndexCell: React.FC<{
                 }
               : {}),
           }}>
-          {props.simpleTable ? (
-            <span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>
+          {tableIsPanelVariableVal && (
+            <S.IndexCellCheckboxWrapper
+              className="index-cell-checkbox"
+              isSelected={isSelected}>
+              <Checkbox
+                onClick={indexOnClick}
+                checked={isSelected}
+                size="small"
+              />
+            </S.IndexCellCheckboxWrapper>
+          )}
+          {props.simpleTable || !runName ? (
+            basicIndexContent
+          ) : window.location.toString().includes('browse2') ? (
+            <div style={{cursor: 'pointer'}}>🔗</div>
           ) : (
             <Popup
               // Req'd to fix position issue. See https://github.com/Semantic-Org/Semantic-UI-React/issues/3725
@@ -1157,9 +1273,9 @@ const IndexCell: React.FC<{
                 },
               }}
               position="top center"
-              popperDependencies={[index.result, runNameNodeValue.result]}
-              content={runNameNodeValue.result ?? ''}
-              trigger={<span>{index.result + (useOneBasedIndex ? 1 : 0)}</span>}
+              popperDependencies={[index.result, runName]}
+              content={runName}
+              trigger={basicIndexContent}
             />
           )}
         </S.IndexColumnText>
@@ -1210,7 +1326,9 @@ const ActionCell: React.FC<{
           position="bottom left"
           trigger={
             <div>
-              {hover && <Icon name="ellipsis horizontal" size="small" />}
+              {hover && (
+                <SemanticIcon name="ellipsis horizontal" size="small" />
+              )}
             </div>
           }
           content={
@@ -1225,7 +1343,8 @@ const ActionCell: React.FC<{
 const downloadCSV = async (
   rowsNode: Node<Type>,
   tableState: Table.TableState,
-  weave: WeaveInterface
+  weave: WeaveInterface,
+  stack: Stack
 ) => {
   const safeTableState = makeCsvFriendlyTableState(tableState);
   const listDictNode = applyTableStateToRowsNode(
@@ -1233,7 +1352,10 @@ const downloadCSV = async (
     safeTableState,
     weave
   );
-  const listDictValue = await weave.client.query(listDictNode);
+
+  const listDictValue = await weave.client.query(
+    weave.dereferenceAllVars(listDictNode, stack)
+  );
   saveTableAsCSV({
     cols: listDictValue?.length > 0 ? Object.keys(listDictValue[0]) : [],
     data: listDictValue,
@@ -1361,6 +1483,8 @@ const applyTableStateToRowsNode = (
 
 export const TableSpec: Panel2.PanelSpec = {
   id: 'table',
+  icon: 'table',
+  category: 'Data',
   initialize: async (weave, inputNode, stack) => {
     if (inputNode.nodeType === 'void') {
       // Can't happen, id was selected based on Node type
@@ -1370,7 +1494,9 @@ export const TableSpec: Panel2.PanelSpec = {
       TableType.normalizeTableLike(inputNode),
       stack
     );
-    return getTableConfig(tableNormInput, undefined, weave);
+    const dereffedInput = dereferenceAllVars(tableNormInput, stack)
+      .node as Node;
+    return getTableConfig(dereffedInput, undefined, weave);
   },
   Component: PanelTable,
   inputType,

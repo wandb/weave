@@ -3,8 +3,8 @@ import wandb
 import weave
 from weave.language_features.tagging import make_tag_getter_op
 from weave.language_features.tagging.tagged_value_type import TaggedValueType
-from weave.ops_domain.wandb_domain_gql import _make_alias
 from weave.ops_domain import wbmedia
+from weave.ops_domain.wandb_domain_gql import _make_alias
 import numpy as np
 from weave.ops_arrow.list_ops import filter
 from weave.weave_internal import make_const_node
@@ -318,9 +318,13 @@ def test_join_group_combo(fake_wandb):
     join_obj = sorted[0].joinObj()[0]
     assert weave.use(join_obj) == [1.0]
 
+    from .. import context_state
+
+    _loading_builtins_token = context_state.set_loading_built_ins()
     tag_getter_op = make_tag_getter_op.make_tag_getter_op(
         "_ct_fake_run", weave.types.String()
     )
+    context_state.clear_loading_built_ins(_loading_builtins_token)
     run_names = sorted[0]["score"].mapEach(lambda row: tag_getter_op(row))
     use_run_names = weave.use(run_names)
     assert use_run_names.to_pylist_notags() == [

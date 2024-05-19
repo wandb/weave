@@ -1,3 +1,5 @@
+import _ from 'lodash';
+
 import callFunction, {callOpVeryUnsafe, dereferenceAllVars} from './callers';
 import {Client} from './client';
 import {
@@ -15,6 +17,7 @@ import {
   EditingOpInputs,
   Frame,
   isAssignableTo,
+  isConstNodeWithObjectType,
   Node,
   NodeOrVoidNode,
   OutputNode,
@@ -98,6 +101,28 @@ export class Weave implements WeaveInterface {
 
   expToString(node: EditingNode, indent: number | null = 0): string {
     return this.languageBinding.printGraph(node, indent);
+  }
+
+  /**
+   * Determines whether the expressions represented by two nodes are logically
+   * equivalent. This is used on panel updates to check if the input expression
+   * has actually changed.
+   */
+  isExpLogicallyEqual(node1: NodeOrVoidNode, node2: NodeOrVoidNode): boolean {
+    // If string representations don't match, the values are definitely different
+    if (this.expToString(node1) !== this.expToString(node2)) {
+      return false;
+    }
+
+    // Even if the string representations *do* match, the nodes may be objects that
+    // aren't actually equal. For const nodes with `_is_object: true`, `expToString`
+    // obfuscates the actual node value and returns a simple string based on the node
+    // type, e.g. "<Group>" or "<Object>". In this case, we need a deep equality check.
+    if (isConstNodeWithObjectType(node1) && isConstNodeWithObjectType(node2)) {
+      return _.isEqual(node1.val, node2.val);
+    }
+
+    return true;
   }
 
   nodeIsExecutable(node: EditingNode): node is NodeOrVoidNode {

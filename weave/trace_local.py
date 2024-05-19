@@ -34,9 +34,13 @@ def _value_id(val):
     return hash.hexdigest()
 
 
-def make_run_key(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]) -> RunKey:
+def make_run_key(
+    op_def: op_def.OpDef,
+    inputs_refs: Mapping[str, typing.Any],
+    impure_cache_key: typing.Optional[str] = None,
+) -> RunKey:
     hash_val: typing.Any
-    if not op_def.pure:
+    if not op_def.pure and impure_cache_key is None:
         hash_val = random.random()
     else:
         hashable_inputs = {}
@@ -47,6 +51,8 @@ def make_run_key(op_def: op_def.OpDef, inputs_refs: Mapping[str, typing.Any]) ->
             "op_version": op_def.version,
             "inputs": hashable_inputs,
         }
+        if impure_cache_key is not None:
+            hash_val["impure_cache_key"] = impure_cache_key
     hash = hashlib.md5()
     hash.update(json.dumps(hash_val).encode())
 

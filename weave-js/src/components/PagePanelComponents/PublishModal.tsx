@@ -1,22 +1,26 @@
+import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
+import {RED_550} from '@wandb/weave/common/css/color.styles';
+import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
+import * as w from '@wandb/weave/core';
+import {useNodeValue} from '@wandb/weave/react';
+import {trackPublishBoardClicked} from '@wandb/weave/util/events';
+import {useLocalStorage} from '@wandb/weave/util/useLocalStorage';
+import React, {useMemo} from 'react';
+import {useEffect, useState} from 'react';
 import {
   Dropdown,
   DropdownItemProps,
   Form,
   Input,
+  Loader,
   Modal,
 } from 'semantic-ui-react';
-import React from 'react';
 import styled from 'styled-components';
-import {RED_550} from '@wandb/weave/common/css/color.styles';
-import {WBButton} from '@wandb/weave/common/components/elements/WBButtonNew';
-import * as query from './Home/query';
-import {useIsAuthenticated} from './util';
-import {useEffect, useState} from 'react';
-import * as w from '@wandb/weave/core';
-import {useNodeValue} from '@wandb/weave/react';
+
 import {Icon} from '../Icon';
-import {TakeActionType} from './persistenceStateMachine';
+import * as query from './Home/query';
 import * as M from './Modal.styles';
+import {TakeActionType} from './persistenceStateMachine';
 
 const Error = styled.div`
   font-size: 14px;
@@ -39,6 +43,20 @@ const isValidBoardName = (name: string) => {
   );
 };
 
+const iconStyle = {
+  verticalAlign: 'middle',
+  display: 'inline-block',
+  marginRight: 8,
+};
+
+const useLastVisitedPath = () => {
+  const [lastVisitedPath] = useLocalStorage<string>('lastVisited', '');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [prefix, browse, scope, entityName, projectName] =
+    lastVisitedPath.split('/');
+  return {entityName, projectName};
+};
+
 export const PublishModal = ({
   defaultName,
   open,
@@ -51,34 +69,34 @@ export const PublishModal = ({
   const [projectName, setProjectName] = useState('');
   const isValidName = isValidBoardName(boardName);
   const showError = boardName.length > 0 && !isValidName;
+  const {entityName: lastVisitedEntity, projectName: lastVisitedProject} =
+    useLastVisitedPath();
 
+  // Make sure we only make requests once this is open
   const isAuthenticated = useIsAuthenticated();
-  const userEntities = query.useUserEntities(isAuthenticated);
-  const userName = query.useUserName(isAuthenticated);
+  const userEntities = query.useUserEntities(isAuthenticated && open);
+  const userName = query.useUserName(isAuthenticated && open);
 
-  const iconStyle = {
-    verticalAlign: 'middle',
-    display: 'inline-block',
-    marginRight: 8,
-  };
-
-  const entityOptions: DropdownItemProps[] =
-    userEntities.result.length === 0
-      ? []
-      : userEntities.result.sort().map(entName => ({
-          icon: (
-            <Icon
-              name={
-                entName === userName.result
-                  ? 'user-profile-personal'
-                  : 'users-team'
-              }
-              style={iconStyle}
-            />
-          ),
-          value: entName,
-          text: entName,
-        }));
+  const entityOptions: DropdownItemProps[] = useMemo(
+    () =>
+      userEntities.result.length === 0
+        ? []
+        : userEntities.result.sort().map(entName => ({
+            icon: (
+              <Icon
+                name={
+                  entName === userName.result
+                    ? 'user-profile-personal'
+                    : 'users-team'
+                }
+                style={iconStyle}
+              />
+            ),
+            value: entName,
+            text: entName,
+          })),
+    [userEntities.result, userName.result]
+  );
 
   const projectsNode = w.opEntityProjects({
     entity: w.opRootEntity({
@@ -86,13 +104,25 @@ export const PublishModal = ({
     }),
   });
 
-  // Initialize the entity selector to first option (user entity)
+  // Initialize entity selector to value from page location cache, username or first option
+  // in order of precedence.
   useEffect(() => {
     if (!userEntities.loading && entityOptions.length > 0) {
-      setEntityName(entityOptions[0].value as string);
+      let defaultEntity = entityOptions[0].value as string;
+      if (
+        lastVisitedEntity != null &&
+        entityOptions.some(o => o.value === lastVisitedEntity)
+      ) {
+        defaultEntity = lastVisitedEntity;
+      } else if (
+        userName.result != null &&
+        entityOptions.some(o => o.value === userName.result)
+      ) {
+        defaultEntity = userName.result;
+      }
+      setEntityName(defaultEntity);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userEntities.loading]);
+  }, [entityOptions, userEntities.loading, userName.result, lastVisitedEntity]);
 
   const projectDataNode = w.opProjectName({project: projectsNode});
   const projectNamesValue = useNodeValue(projectDataNode, {
@@ -111,13 +141,19 @@ export const PublishModal = ({
     text: name,
   }));
 
-  // Initalize the project selector to "weave" project if available,
-  // otherwise first project.
+  // Initialize project selector to value from page location cache, "weave" or first project
+  // in order of precedence.
   useEffect(() => {
     if (!projectNamesValue.loading && projectNames.length > 0) {
-      const defaultProjectName = projectNames.includes('weave')
-        ? 'weave'
-        : projectNames[0];
+      let defaultProjectName = projectNames[0];
+      if (
+        lastVisitedProject != null &&
+        projectNames.includes(lastVisitedProject)
+      ) {
+        defaultProjectName = lastVisitedProject;
+      } else if (projectNames.includes('weave')) {
+        defaultProjectName = 'weave';
+      }
       setProjectName(defaultProjectName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,63 +185,79 @@ export const PublishModal = ({
           Name your board and select a destination entity and project in Weights
           & Biases.
         </M.Description>
-        <Form>
-          <Form.Field>
-            <label>Name</label>
-            <Input
-              value={boardName}
-              placeholder="Name"
-              onChange={e => setBoardName(e.target.value)}
-              error={showError}
-            />
-            {showError && (
-              <Error>Spaces and special characters are not allowed.</Error>
-            )}
-          </Form.Field>
-          <Form.Field>
-            <label>Entity</label>
-            <Dropdown
-              placeholder="Select entity"
-              fluid
-              selection
-              options={entityOptions}
-              value={entityName}
-              onChange={(e, data) => {
-                setEntityName(data.value as string);
-                setProjectName('');
-              }}
-            />
-          </Form.Field>
-          <Form.Field>
-            <label>Project</label>
-            {projectOptions.length > 0 ? (
-              <Dropdown
-                placeholder="Select project"
-                fluid
-                selection
-                options={projectOptions}
-                value={projectName}
-                onChange={(e, data) => {
-                  setProjectName(data.value as string);
-                }}
-              />
-            ) : (
-              <span>Entity has no project</span>
-            )}
-          </Form.Field>
-        </Form>
-        <M.Buttons>
-          <WBButton
-            variant="confirm"
-            loading={acting}
-            disabled={!isValidName || !entityName || !projectName || acting}
-            onClick={onPublish}>
-            Publish board
-          </WBButton>
-          <WBButton variant="ghost" onClick={onClose}>
-            Cancel
-          </WBButton>
-        </M.Buttons>
+        {isAuthenticated === false ? (
+          <span>Please authenticate with W&B to publish boards</span>
+        ) : (
+          <>
+            <Form>
+              <Form.Field>
+                <label>Name</label>
+                <Input
+                  value={boardName}
+                  placeholder="Name"
+                  onChange={e => setBoardName(e.target.value)}
+                  error={showError}
+                />
+                {showError && (
+                  <Error>Spaces and special characters are not allowed.</Error>
+                )}
+              </Form.Field>
+              <Form.Field>
+                <label>Entity</label>
+                {userEntities.loading ? (
+                  <Loader active inline size="tiny" />
+                ) : (
+                  <Dropdown
+                    placeholder="Select entity"
+                    fluid
+                    selection
+                    options={entityOptions}
+                    value={entityName}
+                    onChange={(e, data) => {
+                      setEntityName(data.value as string);
+                      setProjectName('');
+                    }}
+                  />
+                )}
+              </Form.Field>
+              <Form.Field>
+                <label>Project</label>
+                {userEntities.loading || projectNamesValue.loading ? (
+                  <Loader active inline size="tiny" />
+                ) : projectOptions.length > 0 ? (
+                  <Dropdown
+                    placeholder="Select project"
+                    search
+                    fluid
+                    selection
+                    options={projectOptions}
+                    value={projectName}
+                    onChange={(e, data) => {
+                      setProjectName(data.value as string);
+                    }}
+                  />
+                ) : (
+                  <span>Entity has no project</span>
+                )}
+              </Form.Field>
+            </Form>
+            <M.Buttons>
+              <WBButton
+                variant="confirm"
+                loading={acting}
+                disabled={!isValidName || !entityName || !projectName || acting}
+                onClick={() => {
+                  onPublish();
+                  trackPublishBoardClicked('new_board', 'publish-new-modal');
+                }}>
+                Publish board
+              </WBButton>
+              <WBButton variant="ghost" onClick={onClose}>
+                Cancel
+              </WBButton>
+            </M.Buttons>
+          </>
+        )}
       </Modal.Content>
     </Modal>
   );

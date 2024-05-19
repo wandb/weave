@@ -18,14 +18,15 @@ import EmptyPanelBankSectionWatermark from './PanelBankEmptySectionWatermark';
 import {
   getBoxDimensions,
   getPagingParams,
+  getSnappedDimension,
+  getSnappedItemCount,
   isMobile,
   panelOnActivePage,
-  getSnappedItemCount,
-  getSnappedDimension,
 } from './panelbankFlow';
 import {isFirefox} from './panelbankUtil';
 
 type AllPanelBankFlowSectionProps = PanelBankSectionComponentSharedProps & {
+  panelBankSectionConfigRef: Required<PanelBankSectionConfig>;
   flowConfig: PanelBankFlowSectionConfig;
   currentPage: number;
   setCurrentPage: (newCurrentPage: number) => void;
@@ -255,7 +256,7 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
         }
           ${mobile ? 'mobile' : ''}`}
         style={{
-          height: noPanels ? DEFAULT_PANEL_SIZE : pageHeight + paginationHeight,
+          height: DEFAULT_PANEL_SIZE,
         }}>
         <div
           // TODO: do we even still need this div?
@@ -270,7 +271,9 @@ const PanelBankFlowSectionInnerComp: React.FC<AllPanelBankFlowSectionProps> = ({
               style={{
                 height: (maxPage + 1) * pageHeight,
                 position: 'relative',
-                transform: `translateY(-${currentPage * pageHeight}px)`,
+                transform: `translateY(-${
+                  currentPage * pageHeight - currentPage * gutterWidth
+                }px)`,
                 transition: 'transform 0.5s',
               }}>
               {renderPanelRefs.map(panelRef => {
@@ -378,7 +381,7 @@ export function actionSetFlowConfig(
 ): PanelBankSectionConfig {
   return produce(sectionConfig, draft => {
     draft.flowConfig = {
-      ...sectionConfig.flowConfig,
+      ...sectionConfig.flowConfig!,
       ...newFlowConfig,
     };
   });
@@ -405,7 +408,9 @@ const PanelBankFlowSectionComp = (
     ) => void;
   } & PanelBankSectionComponentSharedProps
 ) => {
-  const {panelBankSectionConfigRef, updateConfig} = props;
+  const {updateConfig} = props;
+  const panelBankSectionConfigRef =
+    props.panelBankSectionConfigRef as Required<PanelBankSectionConfig>;
   const {flowConfig} = panelBankSectionConfigRef;
 
   const updateFlowConfig = useAction(updateConfig, actionSetFlowConfig);
@@ -428,6 +433,7 @@ const PanelBankFlowSectionComp = (
   return (
     <PanelBankFlowSectionInnerComp
       {...props}
+      panelBankSectionConfigRef={panelBankSectionConfigRef}
       currentPage={currentPage}
       setCurrentPage={setCurrentPage}
       flowConfig={flowConfig}

@@ -7,9 +7,9 @@ import {Button, Input, Modal} from 'semantic-ui-react';
 import * as Panel2 from '../panel';
 import {PanelTable, RowActionItems} from '../PanelTable/PanelTable';
 import {
+  getLocalArtifactDataNode,
   getLocalArtifactDataTableState,
   opObjectNameToURI,
-  getLocalArtifactDataNode,
   opObjectsToName,
 } from './util';
 

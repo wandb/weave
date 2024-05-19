@@ -12,9 +12,10 @@ import * as v11 from './v11';
 import * as v12 from './v12';
 import * as v13 from './v13';
 import * as v14 from './v14';
+import * as v15 from './v15';
 
-export type {Scale, ScaleType} from './v14';
 export type {Signals} from './v12';
+export type {Scale, ScaleType} from './v14';
 
 export const PLOT_DIMS_UI = v2.PLOT_DIMS_UI;
 export const MARK_OPTIONS = v7.MARK_OPTIONS;
@@ -39,7 +40,8 @@ export const {migrate} = migrator
   .add(v11.migrate)
   .add(v12.migrate)
   .add(v13.migrate)
-  .add(v14.migrate);
+  .add(v14.migrate)
+  .add(v15.migrate);
 
 export type AnyPlotConfig = Parameters<typeof migrate>[number];
 export type PlotConfig = ReturnType<typeof migrate>;

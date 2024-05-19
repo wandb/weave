@@ -125,20 +125,6 @@ def user_by_api_key_in_env(
 
 
 @pytest.fixture(scope=determine_scope)
-def user_by_http_headers_in_env(
-    bootstrap_user: LocalBackendFixturePayload, serial
-) -> Generator[LocalBackendFixturePayload, None, None]:
-    with unittest.mock.patch.dict(
-        os.environ,
-        {
-            "WEAVE_WANDB_COOKIE": bootstrap_user.cookie,
-        },
-    ):
-        with from_environment():
-            yield bootstrap_user
-
-
-@pytest.fixture(scope=determine_scope)
 def user_by_api_key_netrc(
     bootstrap_user: LocalBackendFixturePayload,
 ) -> Generator[LocalBackendFixturePayload, None, None]:
@@ -189,6 +175,13 @@ def pytest_addoption(parser):
         default="function",  # or "function" or "session" or "module"
         help='cli to set scope of fixture "user-scope"',
     )
+
+    parser.addoption(
+        "--job-num",
+        default=None,
+        help='cli to set "job-num"',
+    )
+
     parser.addoption(
         "--base-url",
         default=f"{wandb_server_host}:{LOCAL_BASE_PORT}",
@@ -212,6 +205,13 @@ def pytest_addoption(parser):
         action="store_true",
         default=False,
         help="Run tests in debug mode",
+    )
+
+    parser.addoption(
+        "--weave-server",
+        action="store",
+        default="sqlite",
+        help="Specify the client object to use: sqlite or clickhouse",
     )
 
 
@@ -404,3 +404,28 @@ def fixture_fn(base_url, wandb_server_tag, wandb_server_pull):
         pytest.fail("wandb server is not running")
 
     yield fixture_util
+
+
+@pytest.fixture(scope=determine_scope)
+def dev_only_admin_env_override() -> Generator[None, None, None]:
+    new_env = {}
+    admin_path = "../config/.admin.env"
+    if not os.path.exists(admin_path):
+        print(
+            f"WARNING: Could not find admin env file at {admin_path}. Please follow instructions in README.md to create one."
+        )
+        yield
+        return
+    with open(admin_path) as file:
+        for line in file:
+            # skip comments and blank lines
+            if line.startswith("#") or line.strip().__len__() == 0:
+                continue
+            # otherwise treat lines as environment variables in a KEY=VALUE combo
+            key, value = line.split("=", 1)
+            new_env[key.strip()] = value.strip()
+    with unittest.mock.patch.dict(
+        os.environ,
+        new_env,
+    ):
+        yield

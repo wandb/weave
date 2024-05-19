@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import contextlib
 import contextvars
@@ -9,7 +8,6 @@ import time
 import threading
 import typing
 import traceback
-
 
 # Configuration
 from . import wandb_api
@@ -43,11 +41,17 @@ from . import trace_local
 from . import ref_base
 from . import object_context
 from . import memo
+from . import context_state
+from . import op_execute
 
 # Language Features
+from . import eager
 from . import language_nullability
 
 from . import parallelism
+
+if typing.TYPE_CHECKING:
+    from .graph_client import GraphClient
 
 TRACE_LOCAL = trace_local.TraceLocal()
 
@@ -60,6 +64,7 @@ class OpExecuteStats(typing.TypedDict):
     already_executed: int
     count: int
     total_time: float
+    bytes_read_to_arrow: int
 
 
 class OpExecuteSummaryStats(OpExecuteStats):
@@ -78,6 +83,7 @@ class ExecuteStats:
         execution_time: float,
         cache_used: bool,
         already_executed: bool,
+        bytes_read_to_arrow: int,
     ):
         op_stats = self.op_stats.setdefault(
             node.from_op.name,
@@ -86,12 +92,14 @@ class ExecuteStats:
                 "total_time": 0,
                 "cache_used": 0,
                 "already_executed": 0,
+                "bytes_read_to_arrow": 0,
             },
         )
         op_stats["cache_used"] += int(cache_used)
         op_stats["already_executed"] += int(already_executed)
         op_stats["count"] += 1
         op_stats["total_time"] += execution_time
+        op_stats["bytes_read_to_arrow"] += bytes_read_to_arrow
 
     def merge(self, other: "ExecuteStats"):
         for op_name, op_stats in other.op_stats.items():
@@ -103,6 +111,9 @@ class ExecuteStats:
                 self.op_stats[op_name]["cache_used"] += op_stats["cache_used"]
                 self.op_stats[op_name]["already_executed"] += op_stats[
                     "already_executed"
+                ]
+                self.op_stats[op_name]["bytes_read_to_arrow"] += op_stats[
+                    "bytes_read_to_arrow"
                 ]
 
     def op_summary(self) -> dict[str, OpExecuteSummaryStats]:
@@ -124,12 +135,14 @@ class ExecuteStats:
             "total_time": 0,
             "cache_used": 0,
             "already_executed": 0,
+            "bytes_read_to_arrow": 0,
         }
         for op_stats in self.op_stats.values():
             summary["count"] += op_stats["count"]
             summary["total_time"] += op_stats["total_time"]
             summary["cache_used"] += op_stats["cache_used"]
             summary["already_executed"] += op_stats["already_executed"]
+            summary["bytes_read_to_arrow"] += op_stats["bytes_read_to_arrow"]
         return summary
 
 
@@ -214,6 +227,7 @@ def execute_nodes(nodes, no_cache=False) -> value_or_error.ValueOrErrors[typing.
                             ),
                         )
                     )
+
                     fg = forward_graph.ForwardGraph()
                     compile_results = compile_results.safe_apply(fg.add_node)
 
@@ -263,7 +277,11 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
         for op_name, group_iter in groups:
             group = list(group_iter)
             op_def = registry_mem.memory_registry.get_op(op_name)
-            if parallel_budget != 1 and op_policy.should_run_in_parallel(op_name):
+            if (
+                parallel_budget != 1
+                and len(group) > 1
+                and op_policy.should_run_in_parallel(op_name)
+            ):
                 # Parallel threaded case
                 num_threads = min(len(group), parallel_budget)
                 remaining_budget_per_thread = (
@@ -286,6 +304,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         result_report = {
                             "cache_used": False,
                             "already_executed": False,
+                            "bytes_read_to_arrow": 0,
                         }
                     return (
                         x,
@@ -308,6 +327,7 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         duration,
                         report["cache_used"],
                         report.get("already_executed") or False,
+                        report["bytes_read_to_arrow"],
                     )
 
             else:
@@ -356,15 +376,28 @@ def execute_forward(fg: forward_graph.ForwardGraph, no_cache=False) -> ExecuteSt
                         if value_or_error.DEBUG:
                             raise
                         forward_node.set_result(forward_graph.ErrorResult(e))
-                        report = {"cache_used": False, "already_executed": False}
+                        report = {
+                            "cache_used": False,
+                            "already_executed": False,
+                            "bytes_read_to_arrow": 0,
+                        }
                     finally:
                         if span is not None:
                             span.finish()
+
+                    if span is not None:
+                        span.set_metric(
+                            "bytes_read_to_arrow",
+                            report["bytes_read_to_arrow"],
+                            True,
+                        )
+
                     stats.add_node(
                         forward_node.node,
                         time.time() - start_time,
                         report["cache_used"],
                         report.get("already_executed") or False,
+                        report.get("bytes_read_to_arrow") or 0,
                     )
         for forward_node in running_now:
             for downstream_forward_node in forward_node.input_to:
@@ -401,13 +434,6 @@ def execute_async_op(
     job.start()
 
 
-def execute_sync_op(
-    op_def: op_def.OpDef,
-    inputs: Mapping[str, typing.Any],
-):
-    return op_def.resolve_fn(**inputs)
-
-
 def is_run_op(op_call: graph.Op):
     self_node = op_call.inputs.get("self")
     t = None
@@ -418,9 +444,29 @@ def is_run_op(op_call: graph.Op):
     return False
 
 
+def get_bytes_read_to_arrow(node: graph.Node, result: typing.Any) -> int:
+    from .ops_arrow import ArrowWeaveList
+
+    # deref if we have a ref
+    result = ref_base.deref(result)
+
+    if (
+        isinstance(node, graph.OutputNode)
+        and node.from_op.name in op_policy.ARROW_FS_OPS
+    ):
+        if node.from_op.name.startswith("mapped"):
+            return sum(
+                r._arrow_data.nbytes for r in result if isinstance(r, ArrowWeaveList)
+            )
+        if isinstance(result, ArrowWeaveList):
+            return result._arrow_data.nbytes
+    return 0
+
+
 class NodeExecutionReport(typing.TypedDict):
     cache_used: bool
     already_executed: typing.Optional[bool]
+    bytes_read_to_arrow: int
 
 
 # This function is not called in prod - but helpful when debugging
@@ -461,19 +507,25 @@ def execute_forward_node(
 ) -> NodeExecutionReport:
     node = forward_node.node
     if fg.has_result(node):
-        return {"cache_used": False, "already_executed": True}
+        return {"cache_used": False, "already_executed": True, "bytes_read_to_arrow": 0}
 
     op_def = registry_mem.memory_registry.get_op(node.from_op.name)
 
     cache_mode = environment.cache_mode()
+    client_cache_key = context_state.get_client_cache_key()
     if cache_mode == environment.CacheMode.MINIMAL:
         no_cache = True
         if op_policy.should_cache(op_def.simple_name):
-            no_cache = False
+            if op_def.pure or client_cache_key is not None:
+                no_cache = False
 
     use_cache = not no_cache
     if isinstance(node, graph.ConstNode):
-        return {"cache_used": False}
+        return {
+            "cache_used": False,
+            "already_executed": False,
+            "bytes_read_to_arrow": 0,
+        }
 
     # This is expensive!
     logging.debug(
@@ -491,20 +543,30 @@ def execute_forward_node(
             input_refs[input_name] = fg.get_result(input_node)
             if isinstance(input_refs[input_name], forward_graph.ErrorResult):
                 forward_node.set_result(input_refs[input_name])
-                return {"cache_used": False, "already_executed": False}
+                return {
+                    "cache_used": False,
+                    "already_executed": False,
+                    "bytes_read_to_arrow": 0,
+                }
 
         run_key = None
         if use_cache or op_def.is_async:
             # Compute the run ID, which is deterministic if the op is pure
-            run_key = trace_local.make_run_key(op_def, input_refs)
+            run_key = trace_local.make_run_key(
+                op_def, input_refs, impure_cache_key=client_cache_key
+            )
 
-        if run_key and op_def.pure:
+        if run_key:
             run = TRACE_LOCAL.get_run_val(run_key)
             if run is not None and run != None:  # stupid box none makes us check !=
                 # Watch out, we handle loading async runs in different ways.
                 if op_def.is_async:
                     forward_node.set_result(TRACE_LOCAL.get_run(run_key))
-                    return {"cache_used": True, "already_executed": False}
+                    return {
+                        "cache_used": True,
+                        "already_executed": False,
+                        "bytes_read_to_arrow": 0,
+                    }
                 else:
                     if run.output is not None:
                         output_ref = run.output
@@ -529,7 +591,13 @@ def execute_forward_node(
 
                         forward_node.set_result(output_ref)
 
-                        return {"cache_used": True, "already_executed": False}
+                        return {
+                            "cache_used": True,
+                            "already_executed": False,
+                            "bytes_read_to_arrow": get_bytes_read_to_arrow(
+                                node, output
+                            ),
+                        }
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
         inputs = {
@@ -548,6 +616,11 @@ def execute_forward_node(
             run = TRACE_LOCAL.new_run(run_key, inputs=input_refs)  # type: ignore
             execute_async_op(op_def, input_refs, run_key)
             forward_node.set_result(run)
+            return {
+                "cache_used": False,
+                "already_executed": False,
+                "bytes_read_to_arrow": 0,
+            }
     else:
         result: typing.Any
         with tracer.trace("execute-sync"):
@@ -563,7 +636,7 @@ def execute_forward_node(
                         next(iter(inputs.values())), box.box(result)
                     )
             else:
-                result = execute_sync_op(op_def, inputs)
+                result = op_execute.execute_op(op_def, inputs)
 
         with tracer.trace("execute-write-cache"):
             ref = ref_base.get_ref(result)
@@ -597,4 +670,8 @@ def execute_forward_node(
             ):
                 logging.debug("Saving run")
                 TRACE_LOCAL.new_run(run_key, inputs=input_refs, output=result)
-    return {"cache_used": False, "already_executed": False}
+        return {
+            "cache_used": False,
+            "already_executed": False,
+            "bytes_read_to_arrow": get_bytes_read_to_arrow(node, result),
+        }

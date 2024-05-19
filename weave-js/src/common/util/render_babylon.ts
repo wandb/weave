@@ -27,9 +27,9 @@ import * as BabylonViewer from '@babylonjs/viewer';
 import _ from 'lodash';
 
 import {Camera3DControl} from '../components/MediaCard';
+import clamp from './clamp';
 // Standard Imports
 import {onNextExitFullscreen} from './fullscreen';
-import clamp from './clamp';
 import {
   Category,
   getVertexCompatiblePositionsAndColors,

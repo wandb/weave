@@ -14,6 +14,8 @@ from .tagged_value_type import TaggedValueType
 from ... import box
 from ... import weave_types as types
 from . import tag_store
+from ...arrow.arrow_tags import awl_add_arrow_tags
+from ...arrow.list_ import ArrowWeaveList
 from .opdef_util import (
     get_first_arg,
     should_flow_tags,
@@ -64,9 +66,6 @@ def propagate_arrow_tags(
     args: list[typing.Any],
     kwargs: dict[str, typing.Any],
 ) -> typing.Any:
-    from ...ops_arrow.arrow_tags import awl_add_arrow_tags
-    from ...ops_arrow import ArrowWeaveList
-
     tag_type: typing.Optional[types.Type]
 
     _, first_arg_val = get_first_arg(op_def, args, kwargs)
@@ -143,7 +142,7 @@ def flow_tags(
     return output
 
 
-# This function is responcible for post-processing the results of a resolve_fn.
+# This function is responsible for post-processing the results of a resolve_fn.
 # Specifically, it will take one of 3 actions:
 # 1. If `_should_tag_op_def_outputs` is true, then it will tag the output with the input.
 # 2. Else If `_should_flow_tags`, then it will flow the tags from the input to the output.

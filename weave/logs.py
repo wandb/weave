@@ -8,7 +8,6 @@ import pathlib
 import logging
 import logging.config
 from logging.handlers import WatchedFileHandler
-from flask.logging import wsgi_errors_stream
 from pythonjsonlogger import jsonlogger
 import typing
 import contextlib
@@ -16,6 +15,11 @@ import contextvars
 import warnings
 
 from . import environment
+
+try:
+    from flask.logging import wsgi_errors_stream
+except ModuleNotFoundError:
+    wsgi_errors_stream = None  # type: ignore
 
 
 class LogFormat(enum.Enum):
@@ -196,7 +200,7 @@ def enable_stream_logging(
     handler: logging.Handler
     logger = logger or logging.getLogger("root")
 
-    if wsgi_stream_settings is not None:
+    if wsgi_errors_stream and wsgi_stream_settings is not None:
         handler = logging.StreamHandler(wsgi_errors_stream)  # type: ignore
         setup_handler(handler, wsgi_stream_settings)
         logger.addHandler(handler)

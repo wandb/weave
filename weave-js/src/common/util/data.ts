@@ -11,18 +11,20 @@ import * as _ from 'lodash';
  * @return {Object}        Return a new object who represent the diff
  *
  */
-export function difference<T, G>(object: T, base: G): Partial<T> | Partial<G> {
-  function changes(object2: any, base2: any) {
-    return _.transform(object2, (result: any, value, key) => {
-      if (!_.isEqual(value, base2[key])) {
-        result[key] =
-          _.isObject(value) && _.isObject(base2[key])
-            ? changes(value, base2[key])
+export function difference(origObj: any, newObj: any) {
+  const changes = (objA: any, objB: any) => {
+    let arrayIndexCounter = 0;
+    return _.transform(objA, (result: any, value: any, key: any) => {
+      if (!_.isEqual(value, objB[key])) {
+        const resultKey = _.isArray(objB) ? arrayIndexCounter++ : key;
+        result[resultKey] =
+          _.isObject(value) && _.isObject(objB[key])
+            ? changes(value, objB[key])
             : value;
       }
     });
-  }
-  return changes(object, base);
+  };
+  return changes(newObj, origObj);
 }
 
 export function randID(length: number) {

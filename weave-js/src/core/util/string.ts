@@ -1,6 +1,6 @@
 import _ from 'lodash';
 
-// Splits a string on the first occurence of delim. If delim isn't present, returns [s, null]
+// Splits a string on the first occurrence of delim. If delim isn't present, returns [s, null]
 export function splitOnce(s: string, delim: string): [string, string | null] {
   const delimLoc = _.indexOf(s, delim);
   if (delimLoc === -1) {
@@ -56,3 +56,26 @@ export function indent(s: string, level: number) {
   }
   return result + s;
 }
+
+export const maybePluralize = (count: number, noun: string, suffix = 's') =>
+  `${count} ${noun}${count !== 1 ? suffix : ''}`;
+export const maybePluralizeWord = (count: number, noun: string, suffix = 's') =>
+  `${noun}${count !== 1 ? suffix : ''}`;
+
+// Return a new string with all occurrences of a character at the start of the input removed.
+export const trimStartChar = (str: string, char: string): string => {
+  let s = str;
+  while (s.startsWith(char)) {
+    s = s.slice(1);
+  }
+  return s;
+};
+
+// Return a new string with all occurrences of a character at the end of the input removed.
+export const trimEndChar = (str: string, char: string): string => {
+  let s = str;
+  while (s[s.length - 1] === char) {
+    s = s.slice(0, s.length - 1);
+  }
+  return s;
+};

@@ -18,8 +18,8 @@ import {
 } from './ChildPanel';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
-import {PanelContextProvider, usePanelContext} from './PanelContext';
 import {useUpdateConfig2} from './PanelComp';
+import {PanelContextProvider, usePanelContext} from './PanelContext';
 
 type PanelSectionsConfig = {
   section: NodeOrVoidNode;

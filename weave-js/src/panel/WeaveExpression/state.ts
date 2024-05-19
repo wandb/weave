@@ -210,41 +210,28 @@ export class WeaveExpressionState {
     this.trace(`💎 processText()`, newText, stack);
 
     this.stack = stack;
-    const p =
-      newText.length > 0
-        ? this.weave
-            .expression(newText, stack)
-            .then(parseResult => {
-              if (this.parsePromise !== p) {
-                this.trace(`parse result is stale, ignoring`);
-                return;
-              } else {
-                this.parsePromise = null;
-              }
-              this.trace(`got parse result`, parseResult);
-              this.parseState = parseResult;
-              this.set('tsRoot', parseResult.parseTree);
-              this.clearSuggestions();
-              this.postUpdate('parse complete');
-              this.processParseState();
-            })
-            .catch(err => {
-              Sentry.captureException(err);
-              this.trace(`parse error`, err);
-              this.parsePromise = null;
-              this.postUpdate('parse failed');
-            })
-        : new Promise<void>(resolve => {
-            this.trace(`text is empty`);
-            // Empty text, no need to parse
-            this.parseState = {
-              expr: voidNode(),
-            };
-            this.clearSuggestions();
-            this.postUpdate('clear expression complete');
-            this.processParseState();
-            resolve();
-          });
+    const p = this.weave
+      .expression(newText, stack)
+      .then(parseResult => {
+        if (this.parsePromise !== p) {
+          this.trace(`parse result is stale, ignoring`);
+          return;
+        } else {
+          this.parsePromise = null;
+        }
+        this.trace(`got parse result`, parseResult);
+        this.parseState = parseResult;
+        this.set('tsRoot', parseResult.parseTree);
+        this.clearSuggestions();
+        this.postUpdate('parse complete');
+        this.processParseState();
+      })
+      .catch(err => {
+        Sentry.captureException(err);
+        this.trace(`parse error`, err);
+        this.parsePromise = null;
+        this.postUpdate('parse failed');
+      });
     this.parsePromise = p;
   }
 

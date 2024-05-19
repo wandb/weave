@@ -1,3 +1,4 @@
+import {useWeaveRefinementInReactHooksDisabled} from '@wandb/weave/context';
 import {Node, pushFrame, Stack, WeaveInterface} from '@wandb/weave/core';
 
 import {
@@ -98,9 +99,53 @@ async function refineTableStateExpressions(
 const refineTableStatesExpressions = vectorizePromiseFn(
   refineTableStateExpressions
 );
-export const useTableStateWithRefinedExpressions = makePromiseUsable(
+const useTableStateWithRefinedExpressionsUnguarded = makePromiseUsable(
   refineTableStateExpressions
 );
-export const useTableStatesWithRefinedExpressions = makePromiseUsable(
+const useTableStatesWithRefinedExpressionsUnguarded = makePromiseUsable(
   refineTableStatesExpressions
 );
+
+export const useTableStateWithRefinedExpressions: typeof useTableStateWithRefinedExpressionsUnguarded =
+  (tableState, inputNode, stack, weave) => {
+    const disableRefinement = useWeaveRefinementInReactHooksDisabled();
+    // In dashUI, no-op. We manage document refinement in panelTree
+    if (disableRefinement) {
+      return {
+        initialLoading: false,
+        loading: false,
+        result: tableState,
+      };
+    }
+
+    // We can ignore this, dashUi is a feature flag that doesn't change during a session
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useTableStateWithRefinedExpressionsUnguarded(
+      tableState,
+      inputNode,
+      stack,
+      weave
+    );
+  };
+
+export const useTableStatesWithRefinedExpressions: typeof useTableStatesWithRefinedExpressionsUnguarded =
+  (list, inputNode, stack, weave) => {
+    const disableRefinement = useWeaveRefinementInReactHooksDisabled();
+    // In dashUI, no-op. We manage document refinement in panelTree
+    if (disableRefinement) {
+      return {
+        initialLoading: false,
+        loading: false,
+        result: list,
+      };
+    }
+
+    // We can ignore this, dashUi is a feature flag that doesn't change during a session
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useTableStatesWithRefinedExpressionsUnguarded(
+      list,
+      inputNode,
+      stack,
+      weave
+    );
+  };

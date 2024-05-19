@@ -1,3 +1,6 @@
+import {Popup} from 'semantic-ui-react';
+import styled from 'styled-components';
+
 import {
   hexToRGB,
   MOON_650,
@@ -5,8 +8,6 @@ import {
   OBLIVION,
   WHITE,
 } from '../common/css/globals.styles';
-import {Popup} from 'semantic-ui-react';
-import styled from 'styled-components';
 
 export const Tooltip = styled(Popup).attrs({
   basic: true, // This removes the pointing arrow.

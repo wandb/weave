@@ -191,13 +191,14 @@ const extractTaggedPropertyTypes = (
   let pTypes: TypedDictType['propertyTypes'] = {};
   if (isTaggedValue(type)) {
     const dict = type.value as TypedDictType;
+    const propTypes = typedDictPropertyTypes(dict);
     pTypes = _.fromPairs(
-      Object.keys(dict.propertyTypes).map(k => {
-        return [k, taggedValue(type.tag, dict.propertyTypes[k] as Type)];
+      Object.keys(propTypes).map(k => {
+        return [k, taggedValue(type.tag, propTypes[k] as Type)];
       })
     );
   } else if (isTypedDict(type)) {
-    pTypes = type.propertyTypes;
+    pTypes = typedDictPropertyTypes(type);
   }
   return pTypes;
 };

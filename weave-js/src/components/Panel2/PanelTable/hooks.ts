@@ -5,7 +5,7 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 import {useDeepMemo} from '@wandb/weave/hookUtils';
-import React, {useCallback} from 'react';
+import React, {useCallback, useRef} from 'react';
 
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as Table from './tableState';
@@ -30,8 +30,8 @@ export function useUpdatePanelConfig(
 
 type PromiseFn = (...args: any[]) => Promise<any>;
 type Loadable<T> =
-  | {loading: false; result: T}
-  | {loading: true; result: undefined};
+  | {initialLoading: boolean; loading: false; result: T}
+  | {initialLoading: boolean; loading: true; result: undefined};
 
 // backport of Awaited which was introduced first-class in TS4.5
 // source: https://stackoverflow.com/a/49889856
@@ -56,6 +56,7 @@ export function makePromiseUsable<
 >(promiseFn: PF): (...args: PT) => Loadable<RT> {
   return (...inputArgs: PT) => {
     const args = useDeepMemo(inputArgs);
+    const initialLoading = useRef(true);
     const calledWithArgsRef = React.useRef<PT>();
     const [promiseResult, setPromiseResult] = React.useState<
       {resultFromArgs: PT; result: RT} | undefined
@@ -72,6 +73,7 @@ export function makePromiseUsable<
         // latest call. If they are not equal, then we skip the update (since it is outdated).
         // However, if they are equal, then we update the promise result.
         if (argsEqual(args, calledWithArgsRef.current)) {
+          initialLoading.current = false;
           setPromiseResult({resultFromArgs: args, result: res});
         }
       });
@@ -88,10 +90,15 @@ export function makePromiseUsable<
         !argsEqual(args, promiseResult.resultFromArgs)
       ) {
         // Then return loading
-        return {loading: true, result: undefined};
+        return {
+          initialLoading: initialLoading.current,
+          loading: true,
+          result: undefined,
+        };
       } else {
         // Else return the promise results
         return {
+          initialLoading: initialLoading.current,
           loading: false,
           result: promiseResult.result,
         };

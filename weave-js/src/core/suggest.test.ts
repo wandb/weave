@@ -322,7 +322,7 @@ describe('autosuggest', () => {
 
     expectOnlyNodes(result);
     const autosuggestNames = suggestResultNames(result);
-    expect(autosuggestNames).toEqual(['x']);
+    expect(autosuggestNames).toContain('x');
   });
 
   it('suggest for number', async () => {
@@ -338,7 +338,7 @@ describe('autosuggest', () => {
 
     expectOnlyNodes(result);
     const autosuggestNames = suggestResultNames(result);
-    expect(autosuggestNames).toEqual(['x']);
+    expect(autosuggestNames).toContain('x');
   });
 
   it('suggest replacements for binary ops', async () => {

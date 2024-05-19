@@ -3,8 +3,9 @@
 // This fixes a bug where weave python didnt know how to deserialize these types
 
 import * as weave from '@wandb/weave/core';
-import * as v12 from './v12';
+
 import {toWeaveType} from '../../toWeaveType';
+import * as v12 from './v12';
 
 export type Signals = Omit<v12.PlotConfig['signals'], 'domain'> & {
   domain: {

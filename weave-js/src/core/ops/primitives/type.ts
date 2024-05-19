@@ -25,7 +25,7 @@ export const opTypeString = makeOp({
 export const opTypeName = makeOp({
   hidden: true,
   name: 'type-name',
-  argTypes: {type: {type: 'type' as any}},
+  argTypes: {type: 'type'},
   returnType: 'string',
   resolver: async (inputs, forwardGraph, forwardOp, context) => {
     const weaveType: Type = inputs.type;

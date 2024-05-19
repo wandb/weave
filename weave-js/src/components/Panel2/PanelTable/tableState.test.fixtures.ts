@@ -1,5 +1,3 @@
-import {WeaveApp} from '../../..';
-import * as Table from './tableState';
 import {
   constString,
   createLocalClient,
@@ -15,7 +13,9 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 
+import {WeaveApp} from '../../..';
 import * as ServerApiTest from '../../../core/_external/backendProviders/serverApiTest2';
+import * as Table from './tableState';
 
 export function testClient() {
   return createLocalClient(new ServerApiTest.Client());

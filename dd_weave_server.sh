@@ -3,6 +3,7 @@
 DD_SERVICE="weave-python" DD_ENV="dev-$(whoami)" DD_LOGS_INJECTION=true \
 	DD_TRACE_PROPAGATION_STYLE_EXTRACT=b3,datadog \
 	DD_TRACE_PROPAGATION_STYLE_INJECT=b3,datadog \
+	WEAVE_DISABLE_ANALYTICS=true \	
 	WEAVE_SERVER_ENABLE_LOGGING=true \
 	FLASK_ENV=development \
 	FLASK_APP=weave.weave_server \

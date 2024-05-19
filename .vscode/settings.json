@@ -1,6 +1,4 @@
 {
-    "python.linting.mypyEnabled": true,
-    "python.linting.enabled": true,
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python.testing.cwd": "./weave",
@@ -8,5 +6,9 @@
     "search.exclude": {
         "weave/frontend": true
     },
-    "black-formatter.importStrategy": "fromEnvironment"
+    "files.insertFinalNewline": true,
+    "black-formatter.importStrategy": "fromEnvironment",
+    "cSpell.words": [
+        "Weaveflow"
+    ]
 }

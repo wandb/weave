@@ -1,4 +1,5 @@
 import typing
+import copy
 from weave import box, graph
 from weave.artifact_wandb import likely_commit_hash
 from weave.language_features.tagging import tag_store
@@ -12,35 +13,52 @@ from . import mappers_python_def
 from .language_features.tagging import tagged_value_type
 import dataclasses
 from weave import weave_internal, context, storage
-from .ops_primitives import weave_api
+
+# from .ops_primitives import weave_api
+from . import artifact_local
 
 
 class RefToPyRef(mappers.Mapper):
-    def apply(self, obj: ref_base.Ref):
-        if _uri_is_local_artifact(obj.uri):
-            obj = _local_ref_to_published_ref(obj)
+    def apply(self, obj: typing.Any):
+        ref = ref_base.get_ref(obj)
+        if ref is None:
+            raise errors.WeaveSerializeError(f"Ref mapper encountered non-ref: {obj}")
+        if _uri_is_local_artifact(ref.uri):
+            ref = _ref_to_published_ref(ref)
 
-        return obj
+        return ref
 
 
 class FunctionToPyFunction(mappers.Mapper):
+    def __init__(self, type_, mapper, artifact_, path):
+        super().__init__(type_, mapper, artifact_, path)
+        self.artifact = artifact_
+
     def apply(self, obj):
         res = graph.map_nodes_full([obj], _node_publish_mapper)[0]
+
+        # Find any op gets and add cross-artifact dependencies.
+        # We want to do this after we have recursively published any
+        # local artifacts above.
+        def _node_dep_mapper(node: graph.Node) -> graph.Node:
+            if _node_is_op_get(node):
+                node = typing.cast(graph.OutputNode, node)
+                uri = _uri_of_get_node(node)
+                self.artifact.add_artifact_reference(uri)
+            return node
+
+        graph.map_nodes_full([res], _node_dep_mapper)
         return res
 
 
 class ObjectToPyDict(mappers_python_def.ObjectToPyDict):
     def apply(self, obj):
-        try:
-            res = super().apply(obj)
-            copy_obj = dataclasses.copy.copy(obj)
-            for prop_name, prop_serializer in self._property_serializers.items():
-                if prop_serializer is not None:
-                    setattr(copy_obj, prop_name, res[prop_name])
-            obj = copy_obj
-        except Exception as e:
-            print(e)
-            pass
+        res = super().apply(obj)
+        copy_obj = copy.copy(obj)
+        for prop_name, prop_serializer in self._property_serializers.items():
+            if prop_serializer is not None:
+                setattr(copy_obj, prop_name, res[prop_name])
+        obj = copy_obj
         return obj
 
 
@@ -65,8 +83,20 @@ class TaggedValueToPy(tagged_value_type.TaggedValueToPy):
         return value
 
 
+class DefaultToPy(mappers.Mapper):
+    def apply(self, obj: typing.Any) -> typing.Any:
+        return obj
+
+
+class Identity(mappers.Mapper):
+    def apply(self, obj: typing.Any) -> typing.Any:
+        return obj
+
+
 def map_to_python_remote_(type, mapper, artifact, path=[], mapper_options=None):
-    if isinstance(type, types.Function):
+    if isinstance(type, types.TypeType):
+        return Identity(type, mapper, artifact, path)
+    elif isinstance(type, types.Function):
         return FunctionToPyFunction(type, mapper, artifact, path)
     elif isinstance(type, types.RefType):
         return RefToPyRef(type, mapper, artifact, path)
@@ -85,14 +115,15 @@ def map_to_python_remote_(type, mapper, artifact, path=[], mapper_options=None):
         return TaggedValueToPy(type, mapper, artifact, path)
     elif isinstance(type, types.Const):
         return mappers_python_def.ConstToPyConst(type, mapper, artifact, path)
-
-    return mappers.Mapper(type, mapper, artifact, path)
+    return DefaultToPy(type, mapper, artifact, path)
 
 
 map_to_python_remote = mappers.make_mapper(map_to_python_remote_)
 
 
 def _node_publish_mapper(node: graph.Node) -> typing.Optional[graph.Node]:
+    from .ops_primitives import weave_api
+
     if _node_is_op_get(node):
         node = typing.cast(graph.OutputNode, node)
         uri = _uri_of_get_node(node)
@@ -156,9 +187,23 @@ def _local_op_get_to_published_op_get(node: graph.Node) -> graph.Node:
     return new_node
 
 
-def _local_ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
+def _ref_to_published_ref(ref: ref_base.Ref) -> ref_base.Ref:
+    if isinstance(ref, artifact_local.LocalArtifactRef):
+        return _local_ref_to_published_ref(ref)
+
     node = ref_to_node(ref)
 
     if node is None:
         raise errors.WeaveSerializeError(f"Failed to serialize {ref} to published ref")
     return _local_op_get_to_pub_ref(node)
+
+
+def _local_ref_to_published_ref(ref: artifact_local.LocalArtifactRef) -> ref_base.Ref:
+    obj = ref.get()
+    name = ref.name
+    version = None
+    if not likely_commit_hash(ref.version):
+        version = ref.version
+    return storage._direct_publish(
+        obj, name, branch_name=version, assume_weave_type=ref.type
+    )

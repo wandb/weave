@@ -2,8 +2,7 @@ import dataclasses
 import datetime
 import inspect
 import math
-
-import pandas as pd
+import typing
 
 from . import mappers
 from . import storage
@@ -15,8 +14,10 @@ from . import box
 from . import mappers_python
 from . import val_const
 from . import artifact_fs
+from . import graph_client_context
 from . import timestamp as weave_timestamp
 from .language_features.tagging import tagged_value_type
+from .partial_object import PartialObjectType, PartialObject
 
 
 class TypedDictToPyDict(mappers_weave.TypedDictMapper):
@@ -45,13 +46,21 @@ class ObjectToPyDict(mappers_weave.ObjectMapper):
         result = {"_type": self.type.name}
         for prop_name, prop_serializer in self._property_serializers.items():
             if prop_serializer is not None:
-                v = prop_serializer.apply(getattr(obj, prop_name))
-                result[prop_name] = v
+                obj_val = getattr(obj, prop_name, None)
+                if obj_val is None:
+                    # Shortcut if there is a None here. In boards there are some cases where
+                    # we have incorrect types that are missing optional designation. Fixes
+                    # plotboard.cy.ts
+                    result[prop_name] = None
+                else:
+                    result[prop_name] = prop_serializer.apply(obj_val)
         return result
 
 
 class ObjectDictToObject(mappers_weave.ObjectMapper):
     def apply(self, obj):
+        from .op_def_type import OpDefType
+
         # Only add keys that are accepted by the constructor.
         # This is used for Panels where we have an Class-level id attribute
         # that we want to include in the serialized representation.
@@ -62,26 +71,70 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         instance_class = result_type._instance_classes()[0]
         constructor_sig = inspect.signature(instance_class)
         for k, serializer in self._property_serializers.items():
-            if k in constructor_sig.parameters:
-                # None haxxx
-                # TODO: remove
+            if serializer.type != OpDefType() and k in constructor_sig.parameters:
                 obj_val = obj.get(k)
-                if obj_val is not None:
-                    v = serializer.apply(obj_val)
-                    result[k] = v
+                if obj_val is None:
+                    # Shortcut if there is a None here. In boards there are some cases where
+                    # we have incorrect types that are missing optional designation. Fixes
+                    # plotboard.cy.ts
+                    result[k] = None
+                else:
+                    result[k] = serializer.apply(obj_val)
 
         for prop_name, prop_type in result_type.type_vars.items():
             if isinstance(prop_type, types.Const):
                 result[prop_name] = prop_type.val
 
+        # deserialize op methods separately
+        op_methods = {}
+        for k, serializer in self._property_serializers.items():
+            if (
+                obj.get(k) is not None
+                and isinstance(serializer, DefaultFromPy)
+                and serializer.type == OpDefType()
+            ):
+                op_methods[k] = serializer.apply(obj.get(k))
+
         if "artifact" in constructor_sig.parameters and "artifact" not in result:
             result["artifact"] = self._artifact
         try:
-            return instance_class(**result)
+            # Construct a new class, inheriting from the original instance_class
+            # with overridden op methods. The op_methods are unbound on the class,
+            # and will bind self upon construction as usual.
+            if self.type._relocatable:
+                # Attach fields to the relocated object, so we can
+                # detect and reconstruct later.
+                new_class = type(
+                    instance_class.__name__,
+                    (instance_class,),
+                    op_methods,
+                )
+
+                return new_class(**result)
+            else:
+                return instance_class(**result)
         except:
-            raise errors.WeaveSerializeError(
+            err = errors.WeaveSerializeError(
                 "Failed to construct %s with %s" % (instance_class, result)
             )
+            err.fingerprint = ["failed-to-construct", instance_class, result]
+            raise err
+
+
+class GQLClassWithKeysToPyDict(mappers_weave.GQLMapper):
+    def apply(self, obj: PartialObject):
+        result = {}
+        for k, prop_serializer in self._property_serializers.items():
+            result[k] = prop_serializer.apply(obj.get(k, None))
+        return result
+
+
+class PyDictToGQLClassWithKeys(mappers_weave.GQLMapper):
+    def apply(self, obj: dict) -> PartialObject:
+        deserialized_obj = {}
+        for k, prop_serializer in self._property_serializers.items():
+            deserialized_obj[k] = prop_serializer.apply(obj.get(k, None))
+        return self.type.keyless_weave_type_class.instance_class(deserialized_obj)
 
 
 class ListToPyList(mappers_weave.ListMapper):
@@ -91,7 +144,7 @@ class ListToPyList(mappers_weave.ListMapper):
 
 class UnionToPyUnion(mappers_weave.UnionMapper):
     def apply(self, obj):
-        obj_type = types.TypeRegistry.type_of(obj)
+        obj_type = types.type_of_with_refs(obj)
         for i, (member_type, member_mapper) in enumerate(
             zip(self.type.members, self._member_mappers)
         ):
@@ -186,11 +239,6 @@ class StringToPyString(mappers.Mapper):
 
 class TimestampToPyTimestamp(mappers.Mapper):
     def apply(self, obj: datetime.datetime):
-        # TODO: I have no idea why, but Eval.ipynb ends up with a pandas
-        # Timestamp here. This is clearly not the correct fix, but we need to
-        # get CI working again.
-        if isinstance(obj, pd.Timestamp):
-            obj = obj.to_pydatetime()
         return weave_timestamp.python_datetime_to_ms(obj)
 
 
@@ -217,6 +265,8 @@ class UnknownToPyUnknown(mappers.Mapper):
     def apply(self, obj):
         # This should never be called. Unknown for the object type
         # of empty lists
+        # PR: return None instead of crash
+        return None
         raise Exception("invalid %s" % obj)
 
 
@@ -227,7 +277,17 @@ class RefToPyRef(mappers_weave.RefMapper):
         super().__init__(type_, mapper, artifact, path)
         self._use_stable_refs = use_stable_refs
 
-    def apply(self, obj: ref_base.Ref):
+    def apply(self, obj: typing.Any):
+        if not isinstance(obj, ref_base.Ref):
+            # type_of_with_refs(obj) returns a Ref Type, so that we'll
+            # use this Ref mapper. We'll save the ref that points to the
+            # object instead of a copy of the object.
+            obj = ref_base.get_ref(obj)
+            if obj is None:
+                raise errors.WeaveSerializeError(
+                    "Ref mapper cannot serialize non-ref object %s" % obj
+                )
+
         try:
             if self._use_stable_refs:
                 return obj.uri
@@ -271,22 +331,40 @@ class DefaultToPy(mappers.Mapper):
         self._use_stable_refs = use_stable_refs
 
     def apply(self, obj):
+        from . import op_def
+
         try:
             return self.type.instance_to_dict(obj)
         except NotImplementedError:
             pass
         # If the ref exists elsewhere, just return its uri.
         # TODO: This doesn't deal with MemArtifactRef!
+        gc = graph_client_context.get_graph_client()
+
         existing_ref = storage._get_ref(obj)
         if isinstance(existing_ref, artifact_fs.FilesystemArtifactRef):
-            if existing_ref.is_saved:
+            if (
+                # If we have a graph_client (weaveflow), only save
+                # a nested ref here if it is a ref to the same storage
+                # engine.
+                not gc
+                or (gc and gc.ref_is_own(existing_ref))
+            ) and existing_ref.is_saved:
                 if self._use_stable_refs:
                     uri = existing_ref.uri
                 else:
                     uri = existing_ref.initial_uri
                 return str(uri)
+
         ref = None
-        if isinstance(obj, ref_base.Ref):
+
+        if gc and isinstance(obj, op_def.OpDef):
+            # This is a hack to ensure op_defs are always published as
+            # top-level objects. This should be achieved by a policy
+            # instead. There is a parallel policy in to_weavejs_with_refs
+            # at the moment.
+            ref = gc.save_object(obj, obj.name, "latest")
+        elif isinstance(obj, ref_base.Ref):
             ref = obj
         elif isinstance(obj, str):
             try:
@@ -355,6 +433,8 @@ def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return TypeToPyType(type, mapper, artifact, path)
+    elif isinstance(type, PartialObjectType):
+        return GQLClassWithKeysToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):
         return TypedDictToPyDict(type, mapper, artifact, path)
     elif isinstance(type, types.Dict):
@@ -400,6 +480,8 @@ def map_from_python_(type: types.Type, mapper, artifact, path=[], mapper_options
     if isinstance(type, types.TypeType):
         # If we're actually serializing a type itself
         return PyTypeToType(type, mapper, artifact, path)
+    elif isinstance(type, PartialObjectType):
+        return PyDictToGQLClassWithKeys(type, mapper, artifact, path)
     elif isinstance(type, types.ObjectType):
         return ObjectDictToObject(type, mapper, artifact, path)
     elif isinstance(type, types.TypedDict):

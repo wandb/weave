@@ -1,9 +1,8 @@
 import {
   GRAY_350,
-  GRAY_500,
   SCROLLBAR_STYLES,
 } from '@wandb/weave/common/css/globals.styles';
-import styled, {css} from 'styled-components';
+import styled from 'styled-components';
 
 export const Container = styled.div`
   display: flex;
@@ -11,11 +10,13 @@ export const Container = styled.div`
   overflow: hidden;
   height: 100%;
 `;
+Container.displayName = 'S.Container';
 
 export const Header = styled.div`
   padding: 12px 0;
   border-bottom: 1px solid ${GRAY_350};
 `;
+Header.displayName = 'S.Header';
 
 export const HeaderTop = styled.div<{lessLeftPad?: boolean}>`
   display: flex;
@@ -23,26 +24,24 @@ export const HeaderTop = styled.div<{lessLeftPad?: boolean}>`
   align-items: center;
   padding: 0 8px 0 ${p => (p.lessLeftPad ? 8 : 12)}px;
 `;
+HeaderTop.displayName = 'S.HeaderTop';
 
-export const HeaderTopLeft = styled.div<{canGoBack?: boolean}>`
+export const HeaderTopLeft = styled.div`
   display: flex;
   align-items: center;
-  ${p =>
-    p.canGoBack &&
-    css`
-      color: ${GRAY_500};
-      cursor: pointer;
-    `}
 `;
+HeaderTopLeft.displayName = 'S.HeaderTopLeft';
 
 export const HeaderTopRight = styled.div`
   display: flex;
   align-items: center;
 `;
+HeaderTopRight.displayName = 'S.HeaderTopRight';
 
 export const HeaderTopText = styled.div`
   font-weight: 600;
 `;
+HeaderTopText.displayName = 'S.HeaderTopText';
 
 export const HeaderTitle = styled.div`
   font-family: 'Inconsolata', monospace;
@@ -51,6 +50,7 @@ export const HeaderTitle = styled.div`
   margin-top: 8px;
   padding: 0 12px;
 `;
+HeaderTitle.displayName = 'S.HeaderTitle';
 
 export const Body = styled.div`
   flex-grow: 1;
@@ -58,3 +58,4 @@ export const Body = styled.div`
   overflow-y: auto;
   ${SCROLLBAR_STYLES}
 `;
+Body.displayName = 'S.Body';

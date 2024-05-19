@@ -84,7 +84,7 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
             if "packedBins" in val:
                 bins = []
                 bin_min = val["packedBins"]["min"]
-                for i in range(val["packedBins"]["count"]):
+                for i in range(int(val["packedBins"]["count"])):
                     bins.append(bin_min)
                     bin_min += val["packedBins"]["size"]
             else:

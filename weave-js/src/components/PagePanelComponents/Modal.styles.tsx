@@ -1,5 +1,5 @@
-import styled from 'styled-components';
 import {MOON_800, MOON_850} from '@wandb/weave/common/css/color.styles';
+import styled from 'styled-components';
 
 export const Title = styled.div`
   color: ${MOON_850};

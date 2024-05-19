@@ -1,6 +1,7 @@
 import _ from 'lodash';
 
 import {
+  isDict,
   isListLike,
   isTypedDictLike,
   listObjectType,
@@ -61,7 +62,12 @@ const typedDictOrListPathVal = (val: any, path: string[]): any => {
 
 export const typedDictPathType = (type: Type, path: string[]): Type => {
   return nullableTaggable(type, t => {
-    if (!isTypedDictLike(t)) {
+    if (isDict(t)) {
+      if (path.length === 1) {
+        return t.objectType;
+      }
+      return typedDictPathType(t.objectType, path.slice(1));
+    } else if (!isTypedDictLike(t)) {
       return 'none';
     }
     const key = path[0];

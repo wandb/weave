@@ -1,6 +1,6 @@
 import {
-  DEFAULT_SANITIZATION_SCHEMA,
   buildSanitizationSchema,
+  DEFAULT_SANITIZATION_SCHEMA,
   generateHTML,
   isMarkdown,
 } from './markdown';

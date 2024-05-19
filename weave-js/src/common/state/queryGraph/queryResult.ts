@@ -1,11 +1,14 @@
 import * as _ from 'lodash';
 
 export interface Row {
-  [key: string]: any;
+  [key: string | number]: any;
 }
 
-function fixColNameForVega(name: string) {
-  return name.replace(/\.\//g, '_');
+export function fixColNameForVega(name: string | number) {
+  // custom charts can feed in numbers as column names
+  // https://weightsandbiases.slack.com/archives/C01KQ5KTDC3/p1691760054418779
+  const safeName = typeof name === 'number' ? String(name) : name;
+  return safeName.replace(/\.\//g, '_');
 }
 
 export function flattenNested(rows: Row[]): Row[] {

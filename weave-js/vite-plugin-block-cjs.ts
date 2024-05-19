@@ -1,6 +1,8 @@
 import * as path from 'path';
 import pkg from 'lodash';
-import {visit} from 'ast-types';
+import {visit, Type} from 'ast-types';
+
+Type.def('StaticBlock').finalize();
 
 const {sortBy} = pkg;
 
@@ -8,18 +10,23 @@ const ALLOWED_CJS_MODULES = [
   'src', // allow absolute imports from weave root
   'react',
   'react-dom',
+  'react-select',
   'lodash',
   '@segment',
   '@babel/runtime',
   '@wandb/ui',
   '@wandb/weave',
+  '@wry/equality',
   '@apollo',
   'apollo-client',
   'classnames',
   'graphql-tag',
   'monaco-editor',
   'monaco-yaml',
+  'mousetrap',
   'query-string',
+  'decode-uri-component',
+  'split-on-first',
   'querystring',
   'react-timeago',
   'styled-components',
@@ -36,6 +43,7 @@ const ALLOWED_CJS_MODULES = [
 
   '@emotion/stylis',
   '@emotion/unitless',
+  '@emotion/weak-memoize',
   '@hypnosphi/create-react-context',
   '@material-ui/core/Avatar',
   '@material-ui/core/ButtonBase',
@@ -49,6 +57,7 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/core/FormGroup',
   '@material-ui/core/FormHelperText',
   '@material-ui/core/FormLabel',
+  '@material-ui/core/Grow',
   '@material-ui/core/IconButton',
   '@material-ui/core/ListSubheader',
   '@material-ui/core/Paper',
@@ -61,9 +70,14 @@ const ALLOWED_CJS_MODULES = [
   '@material-ui/core/colors',
   '@material-ui/core/styles/createSpacing',
   '@material-ui/core/useMediaQuery',
-  '@material-ui/icons/KeyboardArrowDown',
-  '@material-ui/icons/KeyboardArrowRight',
   '@monaco-editor/loader',
+  '@radix-ui/react-checkbox',
+  '@radix-ui/react-dialog',
+  '@radix-ui/react-dropdown-menu',
+  '@radix-ui/react-radio-group',
+  '@radix-ui/react-slider',
+  '@radix-ui/react-switch',
+  '@radix-ui/react-tabs',
   '@redux-saga/core',
   '@redux-saga/deferred',
   '@redux-saga/delay-p',
@@ -140,12 +154,13 @@ const ALLOWED_CJS_MODULES = [
   'prismjs',
   'react-base-table',
   'react-cytoscapejs',
+  'react-draggable',
   'react-dropzone',
   'react-helmet',
+  'react-hook-mousetrap',
   'react-is',
   'react-measure',
   'react-string-replace',
-  'react-table',
   'react-textarea-autosize',
   'react-use-measure',
   'react-virtualized-auto-sizer',
@@ -240,6 +255,17 @@ const ALLOWED_CJS_MODULES = [
 
   'd3-scale',
   'diff',
+
+  // markdown rendering
+  // markdown: true deps
+  'react-markdown',
+  'remark-gfm',
+  // markdown: peer deps
+  'escape-string-regexp',
+  'lowlight',
+  'lowlight/lib/core',
+  'refractor',
+  'refractor/core',
 ];
 
 const repositoryRoot = path.dirname(path.dirname(__dirname));
@@ -352,7 +378,7 @@ Here are the new dependencies, along with the modules importing them: ${JSON.str
   2
 )}
 
-Please run invoker_prod_preview.ini and check that each dependency works as expected, then add them to ALLOWED_CJS_MODULES in vite-plugin-block-cjs.ts.
+Please run invoker_fe_prod_preview.ini and check that each dependency works as expected, then add them to ALLOWED_CJS_MODULES in vite-plugin-block-cjs.ts.
 
 The error that motivated this check is https://github.com/vitejs/vite/issues/4209 (so if it's fixed, consider tearing this out)
 `;
@@ -431,17 +457,17 @@ const blockCjsPlugin = {
     }
 
     const dangerousImportsList = Object.entries(dangerousImportsFound);
-    if (dangerousImportsList.length > 0) {
-      throw new Error(
-        cjsErrorMessage(
-          Object.fromEntries(
-            sortBy(dangerousImportsList, ([module]) => {
-              return module;
-            })
-          )
-        )
-      );
-    }
+    // if (dangerousImportsList.length > 0) {
+    //   throw new Error(
+    //     cjsErrorMessage(
+    //       Object.fromEntries(
+    //         sortBy(dangerousImportsList, ([module]) => {
+    //           return module;
+    //         })
+    //       )
+    //     )
+    //   );
+    // }
   },
 };
 

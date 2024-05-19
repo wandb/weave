@@ -1,10 +1,10 @@
-import getConfig from '../../../config';
 import React from 'react';
 import {Icon, Menu, Popup} from 'semantic-ui-react';
 import {Editor} from 'slate';
 import {ThemeProvider} from 'styled-components';
 
 import {WeaveActionContextProvider} from '../../../actions';
+import getConfig from '../../../config';
 import {useWeaveContext, useWeaveFeaturesContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import Sidebar from '../../Sidebar/Sidebar';

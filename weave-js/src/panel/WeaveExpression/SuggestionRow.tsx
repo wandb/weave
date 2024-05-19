@@ -1,10 +1,11 @@
-import React from 'react';
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import {IconInfo} from '../../components/Panel2/Icons';
 import type {AutosuggestResult} from '@wandb/weave/core';
-import styled from 'styled-components';
-import * as S from './styles';
 import _ from 'lodash';
+import React from 'react';
+import styled from 'styled-components';
+
+import {IconInfo} from '../../components/Panel2/Icons';
+import * as S from './styles';
 
 export const Row = styled.div`
   position: relative;

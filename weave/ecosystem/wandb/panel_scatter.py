@@ -34,13 +34,13 @@ class Scatter(weave.Panel):
         input_node = self.input_node
         unnested = weave.ops.unnest(input_node)
         return ScatterConfig(
-            x_fn=weave.define_fn(
+            x_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type}, lambda item: item  # type: ignore
             ),
-            y_fn=weave.define_fn(
+            y_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type}, lambda item: item  # type: ignore
             ),
-            label_fn=weave.define_fn(
+            label_fn=weave_internal.define_fn(
                 {"item": unnested.type.object_type}, lambda item: item  # type: ignore
             ),
         )

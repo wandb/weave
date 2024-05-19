@@ -117,6 +117,7 @@ class TableState:
         name="",
         panel_def: typing.Optional[PanelDef] = None,
         groupby: bool = False,
+        sort_dir: typing.Optional[str] = None,
     ):
         col_id = self._new_col_id()
         if panel_def is None:
@@ -127,6 +128,8 @@ class TableState:
         if groupby:
             self.enable_groupby(col_id)
         self.update_col(col_id, select_expr)
+        if sort_dir:
+            self.enable_sort(col_id, dir=sort_dir)
         return col_id
 
     def set_groupby(self, col_ids):

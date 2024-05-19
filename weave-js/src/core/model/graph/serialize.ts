@@ -321,18 +321,62 @@ export function serialize(graphs: EditingNode[]): BatchedGraphs {
   };
 }
 
+const expensiveOpNames = new Set([
+  'get',
+  'set',
+  // Marking `getReturnType` and `Ref-type` as inexpensive for now so that the
+  // weave app can bundle them into the same graph. This is typically used to
+  // determine the combined column type, so it should be done in one shot. This
+  // is a short term optimization until we have the new object store.
+  // 'getReturnType',
+  // 'Ref-type',
+  'ref',
+]);
+
+// Heuristic to determine if an op is expensive. We should merge
+// all subgraphs with non-expensive ops into a single graph, since
+// the network latency will dominate the cost.
+
+const opIsExpensive = (op: EditingOp): boolean => {
+  const opName = op.name;
+  if (expensiveOpNames.has(opName)) {
+    return true;
+  } else if (opName.startsWith('root-')) {
+    return true;
+  } else if (opName.includes('refine')) {
+    return true;
+  } else if (opName.includes('panel')) {
+    return true;
+  }
+  return false;
+};
+
 // Given an array of graph entry points, produce an array of disjoint subgraphs
 function getDisjointGraphs(
-  graphs: EditingNode[]
+  graphs: EditingNode[],
+  mergeInexpensiveOps: boolean = false
 ): [EditingNode[][], number[][]] {
-  const nodeSubgraphMap: Map<EditingNode, number> = new Map();
+  const hasher = new MemoizedHasher();
+  const nodeSubgraphMap: Map<string | EditingNode, number> = new Map();
+  const subgraphSet = (node: EditingNode, subgraph: number) => {
+    const key = node.nodeType === 'output' ? hasher.nodeId(node) : node;
+    nodeSubgraphMap.set(key, subgraph);
+  };
+  const subgraphGet = (node: EditingNode) => {
+    const key = node.nodeType === 'output' ? hasher.nodeId(node) : node;
+    return nodeSubgraphMap.get(key);
+  };
+  const expensiveSubgraphs: Set<number> = new Set();
 
   let currentSubgraph = 0;
   let nextSubgraph = 1;
 
   function markSubgraph(node: EditingNode, subgraph: number) {
-    nodeSubgraphMap.set(node, subgraph);
+    subgraphSet(node, subgraph);
     if (node.nodeType === 'output') {
+      if (opIsExpensive(node.fromOp)) {
+        expensiveSubgraphs.add(subgraph);
+      }
       Object.values(node.fromOp.inputs).forEach(input => {
         markSubgraph(input, subgraph);
       });
@@ -341,7 +385,7 @@ function getDisjointGraphs(
 
   // Return true if we've encountered an existing subgraph
   function walkAndCheck(node: EditingNode, root: EditingNode): boolean {
-    const existingSubgraph = nodeSubgraphMap.get(node);
+    const existingSubgraph = subgraphGet(node);
     if (existingSubgraph != null) {
       // encountered an existing subgraph, assign root and its descendants to existing subgraph
       markSubgraph(root, existingSubgraph);
@@ -349,10 +393,13 @@ function getDisjointGraphs(
     }
 
     // Otherwise, assign node to current subgraph
-    nodeSubgraphMap.set(node, currentSubgraph);
+    subgraphSet(node, currentSubgraph);
 
     // Recurse into inputs
     if (node.nodeType === 'output') {
+      if (opIsExpensive(node.fromOp)) {
+        expensiveSubgraphs.add(currentSubgraph);
+      }
       for (const input of Object.values(node.fromOp.inputs)) {
         if (walkAndCheck(input, root)) {
           return true;
@@ -375,7 +422,7 @@ function getDisjointGraphs(
   const originalIndexes: number[][] = [];
   for (let i = 0; i < graphs.length; i++) {
     const graph = graphs[i];
-    const subgraph = nodeSubgraphMap.get(graph)!;
+    const subgraph = subgraphGet(graph)!;
     if (result[subgraph] == null) {
       result[subgraph] = [];
       originalIndexes[subgraph] = [];
@@ -384,14 +431,35 @@ function getDisjointGraphs(
     originalIndexes[subgraph].push(i);
   }
 
+  if (mergeInexpensiveOps) {
+    let inexpensiveSubgraph = -1;
+    for (let i = 0; i < result.length; i++) {
+      if (!expensiveSubgraphs.has(i)) {
+        if (inexpensiveSubgraph === -1) {
+          inexpensiveSubgraph = i;
+        } else {
+          // Merge subgraph i into inexpensiveSubgraph
+          result[inexpensiveSubgraph].push(...result[i]);
+          originalIndexes[inexpensiveSubgraph].push(...originalIndexes[i]);
+          result[i] = [];
+          originalIndexes[i] = [];
+        }
+      }
+    }
+  }
+
   return [result, originalIndexes];
 }
 
 export function serializeMulti(
-  graphs: EditingNode[]
+  graphs: EditingNode[],
+  mergeInexpensiveOps: boolean = false
 ): [BatchedGraphs[], number[][]] {
   // Serialize graphs into disjoint BatchedGraphs
-  const [disjointGraphs, originalIndexes] = getDisjointGraphs(graphs);
+  const [disjointGraphs, originalIndexes] = getDisjointGraphs(
+    graphs,
+    mergeInexpensiveOps
+  );
   return [disjointGraphs.map(serialize), originalIndexes];
 }
 

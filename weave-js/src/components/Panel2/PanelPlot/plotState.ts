@@ -30,10 +30,13 @@ import {
   WeaveInterface,
   withNamedTag,
 } from '@wandb/weave/core';
-import {immerable, produce} from 'immer';
+import {produce} from 'immer';
 import _ from 'lodash';
 
+import {IconName} from '../../Icon';
 import * as TableState from '../PanelTable/tableState';
+import {DimensionLike} from './DimensionLike';
+import {DimName, DimState} from './types';
 import {
   AnyPlotConfig,
   AxisSelections,
@@ -70,33 +73,7 @@ export const DASHBOARD_DIM_NAME_MAP: {
   lineStyle: 'Style',
 };
 
-export const DIM_NAME_MAP: {
-  [K in keyof SeriesConfig['dims'] | 'mark' | 'lineStyle']: string;
-} = {
-  pointSize: 'Size',
-  pointShape: 'Shape',
-  x: 'X Dim',
-  y: 'Y Dim',
-  label: 'Color',
-  color: 'Color',
-  mark: 'Mark',
-  tooltip: 'Tooltip',
-  y2: 'Y2 Dim',
-  lineStyle: 'Style',
-};
-
-export type DimType =
-  | 'optionSelect'
-  | 'weaveExpression'
-  | 'group'
-  | 'dropdownWithExpression';
-export type DimName = keyof typeof DIM_NAME_MAP;
 export type DropdownWithExpressionMode = 'dropdown' | 'expression';
-
-interface DimState {
-  value: any;
-  compareValue: string;
-}
 
 export function isGroup(dim: DimensionLike): dim is MultiFieldDimension {
   return dim.type === 'group';
@@ -122,70 +99,6 @@ export function isDropdownWithExpression(
   dim: DimensionLike
 ): dim is DropdownWithExpressionDimension {
   return dim.type === 'dropdownWithExpression';
-}
-
-/* A DimensionLike object is as a container for the state of a single config panel UI component
- or group of related components for a single series. DimensionLike objects can be compared
- to other DimensionLike objects, and can perform immutable state updates on SeriesConfig
- objects.
- */
-export abstract class DimensionLike {
-  readonly type: DimType;
-  readonly name: DimName;
-  readonly series: SeriesConfig;
-
-  // lets us use produce() to create new instances of these classes via mutation
-  public [immerable] = true;
-
-  protected readonly weave: WeaveInterface;
-
-  protected constructor(
-    type: DimType,
-    name: DimName,
-    series: SeriesConfig,
-    weave: WeaveInterface
-  ) {
-    this.type = type;
-    this.name = name;
-    this.series = series;
-    this.weave = weave;
-  }
-
-  withSeries(series: SeriesConfig): DimensionLike {
-    return produce(this, draft => {
-      draft.series = series;
-    });
-  }
-
-  // abstract method to impute a series with the default value for this dimension, returning a new series
-  abstract imputeThisSeriesWithDefaultState(): SeriesConfig;
-
-  // given another series, return
-  abstract imputeOtherSeriesWithThisState(s: SeriesConfig): SeriesConfig;
-
-  isVoid(): boolean {
-    return _.isEqual(
-      this.state().compareValue,
-      this.defaultState().compareValue
-    );
-  }
-
-  // return true if two dimensions are the same type, have the same state, have the same name, and
-  // have equal children. optionally return true if at least one of the dimensions is in the void state
-  equals(other: DimensionLike, tolerateVoid: boolean = false): boolean {
-    return (
-      this.type === other.type &&
-      this.name === other.name &&
-      (_.isEqual(this.state().compareValue, other.state().compareValue) ||
-        (tolerateVoid && (this.isVoid() || other.isVoid())))
-    );
-  }
-
-  // default state of the dimension, e.g., mark setting = undefined for mark, null expression for weave
-  abstract defaultState(): DimState;
-
-  // current state of the dimension e.g., mark setting for mark, or table Select function for expression dim
-  abstract state(): DimState;
 }
 
 export type ExpressionDimName = keyof PlotConfig['series'][number]['dims'];
@@ -314,11 +227,12 @@ class YDimensionWithConditionalY2 extends MultiFieldDimension {
   }
 }
 
-type DropdownOption = {
+export type DropdownOption = {
   key: string;
   value: any;
   text: string;
   representableAsExpression?: boolean;
+  icon?: IconName;
 };
 
 class DropDownDimension extends DimensionLike {
@@ -375,20 +289,47 @@ const lineStyleOptions = LINE_SHAPES.map(o => ({
   representableAsExpression: o !== 'series',
 }));
 
+const markShapeIcons: Record<string, IconName> = {
+  auto: 'magic-wand-stick',
+  point: 'chart-scatterplot',
+  bar: 'chart-vertical-bars',
+  boxplot: 'box-plot',
+  line: 'linear-scale',
+  area: 'area',
+};
+
 const markOptions = [
-  {key: 'auto' as const, value: null, text: 'auto' as const},
+  {
+    key: 'auto' as const,
+    value: null,
+    text: 'auto' as const,
+    icon: markShapeIcons.auto,
+  },
   ...MARK_OPTIONS.map(o => ({
     key: o,
     value: o,
     text: o,
+    icon: markShapeIcons[o],
   })),
 ];
+
+const pointShapeIcons: Record<string, IconName> = {
+  circle: 'circle',
+  square: 'square',
+  cross: 'cross',
+  diamond: 'diamond',
+  'triangle-up': 'triangle-up',
+  'triangle-down': 'triangle-down',
+  'triangle-right': 'triangle-right',
+  'triangle-left': 'triangle-left',
+};
 
 const pointShapeOptions = POINT_SHAPES.map(o => ({
   key: o,
   value: o,
   text: o === 'series' ? 'Encode from series' : o,
   representableAsExpression: o !== 'series',
+  icon: pointShapeIcons[o],
 }));
 
 export const dimensionTypeOptions = [
@@ -645,10 +586,10 @@ export const dimConstructors: Record<
 
 export function setDefaultSeriesNames(
   config: PlotConfig,
-  enableDashUi: boolean
+  redesignedPlotConfigEnabled: boolean
 ): PlotConfig {
   return produce(config, draft => {
-    if (enableDashUi) {
+    if (redesignedPlotConfigEnabled) {
       draft.series.forEach((s, i) => {
         if (s.seriesName == null) {
           s.seriesName = `Series ${i + 1}`;
@@ -1010,7 +951,7 @@ function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
     y: {},
     color: {},
   };
-  const legendSettings: PlotConfig['legendSettings'] = {
+  const legendSettings: v1.PlotConfig['legendSettings'] = {
     color: {},
   };
 
@@ -1041,37 +982,26 @@ function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
   // If we have a list of dictionaries, try to make a good guess at filling in the dimensions
   if (isAssignableTo(exampleRow.type, typedDict({}))) {
     const propertyTypes = allObjPaths(nullableTaggableValue(exampleRow.type));
-    let xCandidate: string | null = null;
-    let yCandidate: string | null = null;
-    let labelCandidate: string | null = null;
-    let mediaCandidate: string | null = null;
-    // Assign the first two numeric columns to x an y if available
+    const columnTypes: Record<string, string[]> = {
+      timestamp: [],
+      number: [],
+      string: [],
+      media: [],
+    };
     for (const propertyKey of propertyTypes) {
+      const propertyKeyStr = propertyKey.path.join('.');
       if (
         isAssignableTo(propertyKey.type, {
           type: 'timestamp',
           unit: 'ms',
         })
       ) {
-        // always set xaxis to date if it exists
-        xCandidate = propertyKey.path.join('.');
-      }
-      if (isAssignableTo(propertyKey.type, maybe('number'))) {
-        if (xCandidate == null) {
-          xCandidate = propertyKey.path.join('.');
-        } else if (yCandidate == null) {
-          yCandidate = propertyKey.path.join('.');
-        }
+        columnTypes.timestamp.push(propertyKeyStr);
+      } else if (isAssignableTo(propertyKey.type, maybe('number'))) {
+        columnTypes.number.push(propertyKeyStr);
       } else if (isAssignableTo(propertyKey.type, maybe('string'))) {
-        // don't default to the run name field
-        if (
-          labelCandidate == null &&
-          propertyKey.path.indexOf('runname') === -1
-        ) {
-          labelCandidate = propertyKey.path.join('.');
-        }
+        columnTypes.string.push(propertyKeyStr);
       } else if (
-        mediaCandidate == null &&
         isAssignableTo(
           propertyKey.type,
           maybe(
@@ -1087,9 +1017,33 @@ function defaultPlotCommon(inputNode: Node, stack: Stack): v1.PlotConfig {
           )
         )
       ) {
-        mediaCandidate = propertyKey.path.join('.');
+        columnTypes.media.push(propertyKeyStr);
       }
     }
+
+    // Assign x and y. x prefers timestamp, then number, then string.
+    // y prefers number, then string.
+    // x and y can not be the same column.
+    const xCandidates = [
+      ...columnTypes.timestamp,
+      ...columnTypes.number,
+      ...columnTypes.string,
+    ];
+    const xCandidate = xCandidates.length > 0 ? xCandidates[0] : null;
+    const yCandidates = [...columnTypes.number, ...columnTypes.string].filter(
+      item => item !== xCandidate
+    );
+    const yCandidate = yCandidates.length > 0 ? yCandidates[0] : null;
+
+    // don't default to the run name field
+    const labelCandidates = columnTypes.string.filter(
+      item => item.split('.').indexOf('runname') === -1
+    );
+    const labelCandidate =
+      labelCandidates.length > 0 ? labelCandidates[0] : null;
+
+    const mediaCandidate =
+      columnTypes.media.length > 0 ? columnTypes.media[0] : null;
 
     if (xCandidate != null && yCandidate != null) {
       tableState = TableState.updateColumnSelect(

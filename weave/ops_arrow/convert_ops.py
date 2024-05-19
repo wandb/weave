@@ -1,9 +1,9 @@
 from ..api import op
 from .. import weave_types as types
 
-from .arrow import ArrowWeaveListType
+from ..arrow.arrow import ArrowWeaveListType
 
-from . import convert
+from ..arrow import convert
 
 
 @op(

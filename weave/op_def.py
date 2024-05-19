@@ -3,6 +3,7 @@ import copy
 import contextvars
 import contextlib
 import typing
+from typing import Sequence, Iterator
 import inspect
 
 from weave.weavejs_fixes import fixup_node
@@ -17,7 +18,10 @@ from . import weave_internal
 from . import pyfunc_type_util
 from . import engine_trace
 from . import memo
-from . import weavify
+from . import op_execute
+from . import object_context
+from .run import Run
+from . import graph_client_context
 
 from .language_features.tagging import (
     opdef_util,
@@ -26,6 +30,12 @@ from .language_features.tagging import (
     tagged_value_type,
 )
 from . import language_autocall
+from . import op_def_type
+
+
+if typing.TYPE_CHECKING:
+    from .run_streamtable_span import RunStreamTableSpan
+    from . import weave_client
 
 
 _no_refine: contextvars.ContextVar[bool] = contextvars.ContextVar(
@@ -202,7 +212,6 @@ class OpDef:
     location: typing.Optional[uris.WeaveURI]
     is_builtin: bool = False
     weave_fn: typing.Optional[graph.Node]
-    _decl_locals: typing.Dict[str, typing.Any]
     instance: typing.Union[None, graph.Node]
     hidden: bool
     pure: bool
@@ -247,7 +256,6 @@ class OpDef:
         weave_fn: typing.Optional[graph.Node] = None,
         *,
         plugins=None,
-        _decl_locals=None,  # These are python locals() from the enclosing scope.
     ):
         self.name = name
         self.input_type = input_type
@@ -264,7 +272,6 @@ class OpDef:
             if is_builtin is not None
             else context_state.get_loading_built_ins()
         )
-        self._decl_locals = _decl_locals
         self.version = None
         self.location = None
         self.instance = None
@@ -307,18 +314,47 @@ class OpDef:
         )
         return self.output_type(new_input_type)
 
+    def is_gql_root_resolver(self):
+        from . import gql_op_plugin
+
+        return self in gql_op_plugin._ROOT_RESOLVERS
+
     def lazy_call(_self, *args, **kwargs):
         bound_params = _self.bind_params(args, kwargs)
         # Don't try to refine if there are variable nodes, we are building a
         # function in that case!
         final_output_type: types.Type
 
+        # If there are variables in the graph, prior to refining, try to replace them
+        # with their values. This is currently only used in Panel construction paths, to
+        # allow refinement to happen. We may want to move to a more general
+        # Stack/Context for variables like we have in JS, but this works for now.
+        def _replace_var_with_val(n):
+            if isinstance(n, graph.VarNode) and hasattr(n, "_var_val"):
+                return n._var_val
+            return None
+
+        refine_params = {k: graph.resolve_vars(n) for k, n in bound_params.items()}
+
+        # Turn this on to debug scenarios where we don't correctly refine during
+        # panel construction (will throw an error instead of letting it happen).
+        # if refine_enabled():
+        #     for arg_name, arg_node in refine_params.items():
+        #         graph_vars = graph.expr_vars(arg_node)
+        #         if graph_vars:
+        #             raise ValueError(
+        #                 "arg contained graph vars (%s): %s"
+        #                 % (arg_name, [v.name for v in graph_vars])
+        #             )
+
         if (
             refine_enabled()
             and _self.refine_output_type
-            and not any(graph.expr_vars(arg_node) for arg_node in bound_params.values())
+            and not any(
+                graph.expr_vars(arg_node) for arg_node in refine_params.values()
+            )
         ):
-            called_refine_output_type = _self.refine_output_type(**bound_params)
+            called_refine_output_type = _self.refine_output_type(**refine_params)
             tracer = engine_trace.tracer()  # type: ignore
             with tracer.trace("refine.%s" % _self.uri):
                 # api's use auto-creates client. TODO: Fix inline import
@@ -345,11 +381,18 @@ class OpDef:
         return dispatch.RuntimeOutputNode(final_output_type, _self.uri, bound_params)
 
     def eager_call(_self, *args, **kwargs):
-        if _self.is_async:
+        if (
+            _self.name == "get"
+            or _self.name == "root-project"
+            or any(isinstance(n, graph.Node) for n in args)
+        ) or (any(isinstance(n, graph.Node) for n in kwargs.values())):
             output_node = _self.lazy_call(*args, **kwargs)
-            return weave_internal.use(output_node)
-        else:
-            return _self.resolve_fn(*args, **kwargs)
+            return output_node
+
+        sig = pyfunc_type_util.get_signature(_self.raw_resolve_fn)
+        params = sig.bind(*args, **kwargs)
+        with object_context.object_context():
+            return op_execute.execute_op(_self, params.arguments)
 
     def resolve_fn(__self, *args, **kwargs):
         return process_opdef_resolve_fn.process_opdef_resolve_fn(
@@ -612,3 +655,6 @@ def callable_output_type_to_dict(input_type, output_type, op_name):
     except errors.WeaveMakeFunctionError as e:
         # print(f"Failed to transform op {op_name}: Invalid output type function")
         return types.Any().to_dict()
+
+
+op_def_type.OpDefType.instance_classes = OpDef

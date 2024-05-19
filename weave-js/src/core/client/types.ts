@@ -17,4 +17,6 @@ export interface Client {
   isPolling(): boolean;
   addOnPollingChangeListener(callback: (polling: boolean) => void): void;
   removeOnPollingChangeListener(callback: (polling: boolean) => void): void;
+  clearCacheForNode(node: Node<any>): Promise<void>;
+  isWeavePythonBackend(): boolean;
 }

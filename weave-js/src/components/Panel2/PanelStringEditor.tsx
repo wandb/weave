@@ -42,6 +42,7 @@ export const PanelStringEditor: React.FC<PanelStringEditorProps> = props => {
 export const Spec: Panel2.PanelSpec = {
   hidden: false,
   id: 'StringEditor',
+  icon: 'pencil-edit',
   Component: PanelStringEditor,
   inputType,
 };
