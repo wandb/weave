@@ -161,7 +161,7 @@ weave.init('intro-example')
 # We create our model with our system prompt.
 model = ExtractFruitsModel(name='gpt4',
                            model_name='gpt-4-0125-preview',
-                           prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: {sentence}')
+                           prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor": <str>) from the following text, as json: {sentence}')
 sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
 "Pounits are a bright green color and are more savory than sweet.",
 "Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them."]
