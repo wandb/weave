@@ -50,7 +50,7 @@
     "@segment/analytics.js-core": "^4.1.11",
     "@segment/analytics.js-integration-segmentio": "^4.4.7",
     "@sentry/react": "^6.17.3",
-    "@testing-library/jest-dom": "5.11.8",
+    "@testing-library/jest-dom": "6.4.5",
     "@testing-library/react": "11.2.3",
     "@testing-library/user-event": "14.4.3",
     "@types/query-string": "^6.3.0",

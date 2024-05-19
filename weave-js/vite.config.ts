@@ -179,6 +179,7 @@ export default defineConfig(({mode, command}) => {
     test: {
       globals: true,
       environment: 'jsdom',
+      setupFiles: ['./src/setupTests.ts'],
       alias: [
         {
           find: /.*\.wasm$/,
