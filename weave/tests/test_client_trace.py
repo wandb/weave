@@ -139,7 +139,6 @@ def test_trace_server_call_start_and_end(client):
         "summary": None,
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
-        "deleted_at": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -177,7 +176,6 @@ def test_trace_server_call_start_and_end(client):
         "summary": {"c": 5},
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
-        "deleted_at": None,
     }
 
 
