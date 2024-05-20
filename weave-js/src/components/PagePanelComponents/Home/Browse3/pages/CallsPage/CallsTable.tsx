@@ -25,7 +25,6 @@ import {
 } from '@mui/x-data-grid-pro';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
-import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import _ from 'lodash';
 import React, {
@@ -72,7 +71,6 @@ import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {BoringColumnInfo} from '../CallPage/BoringColumnInfo';
-import {OverflowMenu} from '../CallPage/OverflowMenu';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
@@ -470,8 +468,6 @@ export const CallsTable: FC<{
     );
   }, [uniqueSpanNames]);
 
-  const [selectedCalls, setSelectedCalls] = useState<CallSchema[]>([]);
-
   // CPR (Tim) - (GeneralRefactoring): Yeah, there is going to be a lot here. A few general notes:
   // * For readability: would be clean to extract each field def into a function
   // * Perhaps consider reducing the min-width for a lot of these
@@ -492,29 +488,14 @@ export const CallsTable: FC<{
             return rowParams.row.call.spanName;
           }
           return (
-            <>
-              <Checkbox
-                size="small"
-                style={{marginRight: '8px', marginTop: '0px'}}
-                checked={selectedCalls.includes(rowParams.row.call)}
-                onClick={() => {
-                  setSelectedCalls(prev => {
-                    if (prev.includes(rowParams.row.call)) {
-                      return prev.filter(call => call !== rowParams.row.call);
-                    }
-                    return [...prev, rowParams.row.call];
-                  });
-                }}
-              />
-              <CallLink
-                entityName={entity}
-                projectName={project}
-                opName={opVersionRefOpName(opVersion)}
-                callId={rowParams.row.id}
-                fullWidth={true}
-                preservePath={preservePath}
-              />
-            </>
+            <CallLink
+              entityName={entity}
+              projectName={project}
+              opName={opVersionRefOpName(opVersion)}
+              callId={rowParams.row.id}
+              fullWidth={true}
+              preservePath={preservePath}
+            />
           );
         },
       },
@@ -900,8 +881,6 @@ export const CallsTable: FC<{
     preservePath,
     newSpans,
     tableStats,
-    selectedCalls,
-    setSelectedCalls,
   ]);
 
   // CPR (tim) - (GeneralRefactoring): Again, move to a hook
@@ -1059,11 +1038,6 @@ export const CallsTable: FC<{
               }}
             />
           )}
-          <OverflowMenu
-            selectedCalls={selectedCalls}
-            refetch={calls.refetch}
-            setSelectedCalls={setSelectedCalls}
-          />
         </>
       }>
       {/* <React.Fragment key={callsKey}> */}
