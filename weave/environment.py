@@ -136,7 +136,7 @@ def analytics_disabled() -> bool:
 
 
 def weave_server_url() -> str:
-    base_url = wandb_base_url()
+    base_url = wandb_frontend_base_url()
     default = "https://weave.wandb.ai"
     if base_url != "https://api.wandb.ai":
         default = base_url + "/weave"
