@@ -14,38 +14,6 @@ import {useClosePeekOrNavigateUp} from '../../context';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
-const CallName = styled.p`
-  font-size: 16px;
-  line-height: 18px;
-  font-weight: 600;
-  letter-spacing: 0px;
-  text-align: left;
-`;
-CallName.displayName = 'S.CallName';
-
-const DialogContent = styled(MaterialDialogContent)`
-  padding: 0 32px !important;
-`;
-DialogContent.displayName = 'S.DialogContent';
-
-const DialogTitle = styled(MaterialDialogTitle)`
-  padding: 32px 32px 16px 32px !important;
-
-  h2 {
-    font-weight: 600;
-    font-size: 24px;
-    line-height: 30px;
-  }
-`;
-DialogTitle.displayName = 'S.DialogTitle';
-
-const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
-  justify-content: ${({$align}) =>
-    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
-  padding: 32px 16px 16px 16px !important;
-`;
-DialogActions.displayName = 'S.DialogActions';
-
 export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
   refetch?: () => void;
@@ -90,6 +58,38 @@ export const OverflowMenu: FC<{
     </>
   );
 };
+
+const CallName = styled.p`
+  font-size: 16px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0px;
+  text-align: left;
+`;
+CallName.displayName = 'S.CallName';
+
+const DialogContent = styled(MaterialDialogContent)`
+  padding: 0 32px !important;
+`;
+DialogContent.displayName = 'S.DialogContent';
+
+const DialogTitle = styled(MaterialDialogTitle)`
+  padding: 32px 32px 16px 32px !important;
+
+  h2 {
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 30px;
+  }
+`;
+DialogTitle.displayName = 'S.DialogTitle';
+
+const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
+  justify-content: ${({$align}) =>
+    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
+  padding: 32px 16px 16px 16px !important;
+`;
+DialogActions.displayName = 'S.DialogActions';
 
 const MAX_DELETED_CALLS_TO_SHOW = 10;
 
