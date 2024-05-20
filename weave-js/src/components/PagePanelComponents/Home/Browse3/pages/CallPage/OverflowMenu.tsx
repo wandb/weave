@@ -1,28 +1,23 @@
+import {
+  Dialog,
+  DialogActions as MaterialDialogActions,
+  DialogContent as MaterialDialogContent,
+  DialogTitle as MaterialDialogTitle,
+} from '@material-ui/core';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
 import {IconDelete} from '@wandb/weave/components/Icon';
-import React, {Dispatch, FC, SetStateAction, useState} from 'react';
-import {Modal} from 'semantic-ui-react';
+import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
 import {useClosePeekOrNavigateUp} from '../../context';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
-const CallName = styled.p`
-  font-size: 16px;
-  line-height: 18px;
-  font-weight: 600;
-  letter-spacing: 0px;
-  text-align: left;
-`;
-CallName.displayName = 'S.CallName';
-
 export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
-  setSelectedCalls?: Dispatch<SetStateAction<CallSchema[]>>;
   refetch?: () => void;
-}> = ({selectedCalls, setSelectedCalls, refetch}) => {
+}> = ({selectedCalls, refetch}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
@@ -44,7 +39,6 @@ export const OverflowMenu: FC<{
           calls={selectedCalls}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
-          setSelectedCalls={setSelectedCalls}
           refetch={refetch}
         />
       )}
@@ -65,15 +59,46 @@ export const OverflowMenu: FC<{
   );
 };
 
+const CallName = styled.p`
+  font-size: 16px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0px;
+  text-align: left;
+`;
+CallName.displayName = 'S.CallName';
+
+const DialogContent = styled(MaterialDialogContent)`
+  padding: 0 32px !important;
+`;
+DialogContent.displayName = 'S.DialogContent';
+
+const DialogTitle = styled(MaterialDialogTitle)`
+  padding: 32px 32px 16px 32px !important;
+
+  h2 {
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 30px;
+  }
+`;
+DialogTitle.displayName = 'S.DialogTitle';
+
+const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
+  justify-content: ${({$align}) =>
+    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
+  padding: 32px 32px 16px 32px !important;
+`;
+DialogActions.displayName = 'S.DialogActions';
+
 const MAX_DELETED_CALLS_TO_SHOW = 10;
 
 const ConfirmDeleteModal: FC<{
   calls: CallSchema[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
-  setSelectedCalls?: Dispatch<SetStateAction<CallSchema[]>>;
   refetch?: () => void;
-}> = ({calls, confirmDelete, setConfirmDelete, setSelectedCalls, refetch}) => {
+}> = ({calls, confirmDelete, setConfirmDelete, refetch}) => {
   const {useCallsDelete} = useWFHooks();
   const callsDelete = useCallsDelete();
   const close = useClosePeekOrNavigateUp();
@@ -98,18 +123,18 @@ const ConfirmDeleteModal: FC<{
       setDeleteLoading(false);
       setConfirmDelete(false);
       refetch?.();
-      setSelectedCalls?.(curCalls => curCalls?.filter(c => !calls.includes(c)));
       close();
     });
   };
 
   return (
-    <Modal
+    <Dialog
       open={confirmDelete}
       onClose={() => setConfirmDelete(false)}
-      size="tiny">
-      <Modal.Header>Delete {calls.length > 1 ? 'calls' : 'call'}</Modal.Header>
-      <Modal.Content>
+      maxWidth="xs"
+      fullWidth>
+      <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
+      <DialogContent>
         {error != null ? (
           <p style={{color: 'red'}}>{error}</p>
         ) : (
@@ -126,8 +151,8 @@ const ConfirmDeleteModal: FC<{
             and {calls.length - MAX_DELETED_CALLS_TO_SHOW} more...
           </p>
         )}
-      </Modal.Content>
-      <Modal.Actions>
+      </DialogContent>
+      <DialogActions $align="left">
         <Button
           variant="ghost"
           disabled={deleteLoading}
@@ -143,7 +168,7 @@ const ConfirmDeleteModal: FC<{
           onClick={onDelete}>
           {calls.length > 1 ? 'Delete calls' : 'Delete call'}
         </Button>
-      </Modal.Actions>
-    </Modal>
+      </DialogActions>
+    </Dialog>
   );
 };
