@@ -71,7 +71,7 @@ def _log_retry(retry_state: tenacity.RetryCallState) -> None:
     )
 
 
-def _log_failure(retry_state: tenacity.RetryCallState):
+def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
     print(
         f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
         file=sys.stderr,
