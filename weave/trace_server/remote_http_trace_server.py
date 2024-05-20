@@ -45,7 +45,7 @@ def _is_retryable_exception(e: Exception) -> bool:
     if isinstance(e, ValidationError):
         return False
 
-    # Don't retry on 4xx (except 429)
+    # Don't retry on HTTP 4xx (except 429)
     if isinstance(e, requests.HTTPError):
         code_class = e.response.status_code // 100
         if code_class == 4 and e.response.status_code != 429:
