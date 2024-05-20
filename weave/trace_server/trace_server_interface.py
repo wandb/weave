@@ -140,6 +140,8 @@ class CallReadRes(BaseModel):
 
 class CallsDeleteReq(BaseModel):
     project_id: str
+    # wb_user_id gets generated from auth params
+    wb_user_id: typing.Optional[str] = None
     call_ids: typing.List[str]
 
 
