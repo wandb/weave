@@ -854,15 +854,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             settings=settings,
         )
 
-    def _insert_call_batch(self, batch: typing.List[CallCHInsertable]) -> None:
+    def _insert_call_batch(self, batch: typing.List) -> None:
         self._insert_call_parts_batch(
             batch=batch,
             column_names=all_call_insert_columns,
         )
 
-    def _insert_call_delete_batch(
-        self, batch: typing.List[CallDeleteCHInsertable]
-    ) -> None:
+    def _insert_call_delete_batch(self, batch: typing.List) -> None:
         self._insert_call_parts_batch(
             batch=batch,
             column_names=all_call_delete_columns,
