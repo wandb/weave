@@ -59,7 +59,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
         id,
         anySimpleState(wb_run_id) as wb_run_id,
-        anySimpleState(wb_user_id) as wb_user_id,
+        anyIf(wb_user_id, deleted_at IS NULL) as wb_user_id,
         anySimpleState(trace_id) as trace_id,
         anySimpleState(parent_id) as parent_id,
         anySimpleState(op_name) as op_name,
@@ -72,7 +72,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs,
-        anySimpleState(deleted_at) as deleted_at  -- **** Add deleted_at to the view ****
+        anySimpleState(deleted_at) as deleted_at_agg  -- **** Add deleted_at_agg to the view ****
     FROM call_parts
     GROUP BY project_id,
         id;
