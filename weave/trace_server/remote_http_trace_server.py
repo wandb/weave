@@ -2,7 +2,7 @@ import io
 import json
 import sys
 import typing as t
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import requests
 import tenacity
 
@@ -41,25 +41,30 @@ REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
 
 
 def _is_retryable_exception(e: Exception) -> bool:
+    # Don't retry pydantic validation errors
+    if isinstance(e, ValidationError):
+        return False
+
+    # Don't retry on 4xx (except 429)
     if isinstance(e, requests.HTTPError):
         code_class = e.response.status_code // 100
         if code_class == 4 and e.response.status_code != 429:
             return False  # Bad request, not rate limited
 
-    # Retry on all other exceptions
+    # Otherwise, retry: OSError, ConnectionError, ConnectionResetError, IOError, etc...
     return True
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
     print(
-        f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: {retry_state.outcome.exception()}",
+        f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
         file=sys.stderr,
     )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState):
     print(
-        f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: {retry_state.outcome.exception()}",
+        f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
         file=sys.stderr,
     )
     return retry_state.outcome.result()
