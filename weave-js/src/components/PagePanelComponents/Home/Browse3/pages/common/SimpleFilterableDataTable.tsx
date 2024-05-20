@@ -8,7 +8,7 @@ import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {useInitializingFilter, useURLSearchParamsDict} from '../util';
+import {useControllableState, useURLSearchParamsDict} from '../util';
 
 type FilterableTablePropsType<
   DataRowType extends GridValidRowModel,
@@ -75,8 +75,8 @@ export const FilterableTable = <
 >(
   props: FilterableTablePropsType<DataRowType, CompositeFilterType>
 ) => {
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
+  const [filter, setFilter] = useControllableState(
+    (props.initialFilter ?? {}) as CompositeFilterType,
     props.onFilterUpdate
   );
 

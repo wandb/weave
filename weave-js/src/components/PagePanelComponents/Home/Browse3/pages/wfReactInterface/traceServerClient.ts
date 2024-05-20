@@ -208,6 +208,7 @@ export class TraceServerClient {
             }
             const calls: TraceCallSchema[] = [];
             const lines = content.split('\n');
+            let earlyTermination = false;
 
             lines.forEach((line, lineIndex) => {
               try {
@@ -226,6 +227,7 @@ export class TraceServerClient {
                   console.debug(
                     `Early stream termination, performing a new request resuming from ${newReq.offset}`
                   );
+                  earlyTermination = true;
                   this.callsSteamQuery(newReq)
                     .then(innerRes => {
                       calls.push(...innerRes.calls);
@@ -242,8 +244,9 @@ export class TraceServerClient {
                 }
               }
             });
-
-            resolve({calls});
+            if (!earlyTermination) {
+              resolve({calls});
+            }
           })
           .catch(err => {
             reject(err);
