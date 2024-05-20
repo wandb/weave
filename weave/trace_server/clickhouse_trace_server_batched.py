@@ -70,6 +70,13 @@ class CallEndCHInsertable(BaseModel):
     output_refs: typing.List[str]
 
 
+class CallDeleteCHInsertable(BaseModel):
+    project_id: str
+    id: str
+    deleted_at: datetime.datetime
+    wb_user_id: str
+
+
 CallCHInsertable = typing.Union[CallStartCHInsertable, CallEndCHInsertable]
 
 
@@ -106,6 +113,8 @@ class SelectableCHCallSchema(BaseModel):
 all_call_insert_columns = list(
     CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
 )
+
+all_call_delete_columns = list(CallDeleteCHInsertable.model_fields.keys())
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 
@@ -336,11 +345,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             all_calls=all_calls,
         )
 
-        # create insert payload for all descendants (and parents)
-        data = [(req.project_id, d, deleted_at) for d in all_descendants]
-        self._insert(
-            "call_parts", data=data, column_names=["project_id", "id", "deleted_at"]
-        )
+        insertables = [
+            CallDeleteCHInsertable(
+                project_id=req.project_id,
+                id=call_id,
+                deleted_at=deleted_at,
+                wb_user_id=req.wb_user_id,
+            )
+            for call_id in all_descendants
+        ]
+        self._insert_calls_delete(ch_delete_calls=insertables)
+
         return tsi.CallsDeleteRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -819,18 +834,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # def __del__(self) -> None:
     #     self.ch_client.close()
 
-    def _insert_call_batch(self, batch: typing.List) -> None:
-        if batch:
-            settings = {}
-            if self._use_async_insert:
-                settings["async_insert"] = 1
-                settings["wait_for_async_insert"] = 0
-            self._insert(
-                "call_parts",
-                data=batch,
-                column_names=all_call_insert_columns,
-                settings=settings,
-            )
+    def _insert_call_parts_batch(
+        self,
+        batch: typing.List,
+        column_names: typing.List[str],
+    ) -> None:
+        if not batch:
+            return
+
+        settings = {}
+        if self._use_async_insert:
+            settings["async_insert"] = 1
+            settings["wait_for_async_insert"] = 0
+
+        self._insert(
+            "call_parts",
+            data=batch,
+            column_names=column_names,
+            settings=settings,
+        )
+
+    def _insert_call_batch(self, batch: typing.List[CallCHInsertable]) -> None:
+        self._insert_call_parts_batch(
+            batch=batch,
+            column_names=all_call_insert_columns,
+        )
+
+    def _insert_call_delete_batch(
+        self, batch: typing.List[CallDeleteCHInsertable]
+    ) -> None:
+        self._insert_call_parts_batch(
+            batch=batch,
+            column_names=all_call_delete_columns,
+        )
 
     def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
         # Generate and run the query to get the call from the database
@@ -1099,6 +1135,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch.append(row)
         if self._flush_immediately:
             self._flush_calls()
+
+    def _insert_calls_delete(
+        self, ch_delete_calls: typing.List[CallDeleteCHInsertable]
+    ) -> None:
+        """Marks calls deleted by inserting deletion rows, in batch."""
+        batch = []
+        for ch_delete_call in ch_delete_calls:
+            parameters = ch_delete_call.model_dump()
+            row = []
+            for key in all_call_delete_columns:
+                row.append(parameters.get(key, None))
+            batch.append(row)
+        self._insert_call_delete_batch(batch)
 
     def _flush_calls(self) -> None:
         self._insert_call_batch(self._call_batch)
