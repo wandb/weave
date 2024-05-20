@@ -258,27 +258,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if req.filter.input_refs:
                 conditions.append(
-                    f"hasAny(input_refs, {param_builder.add_param(req.filter.input_refs)})"
+                    f"hasAny(input_refs, {_param_slot(param_builder.add_param(req.filter.input_refs), 'Array(String)')})"
                 )
 
             if req.filter.output_refs:
                 conditions.append(
-                    f"hasAny(output_refs, {param_builder.add_param(req.filter.output_refs)})"
+                    f"hasAny(output_refs, {_param_slot(param_builder.add_param(req.filter.output_refs), 'Array(String)')})"
                 )
 
             if req.filter.parent_ids:
                 conditions.append(
-                    f"parent_id IN {param_builder.add_param(req.filter.parent_ids)})"
+                    f"parent_id IN {_param_slot(param_builder.add_param(req.filter.parent_ids), 'Array(String)')}"
                 )
 
             if req.filter.trace_ids:
                 conditions.append(
-                    f"trace_id IN {param_builder.add_param(req.filter.trace_ids)})"
+                    f"trace_id IN {_param_slot(param_builder.add_param(req.filter.trace_ids), 'Array(String)')}"
                 )
 
             if req.filter.call_ids:
                 conditions.append(
-                    f"id IN {param_builder.add_param(req.filter.call_ids)})"
+                    f"id IN {_param_slot(param_builder.add_param(req.filter.call_ids), 'Array(String)')}"
                 )
 
             if req.filter.trace_roots_only:
@@ -286,12 +286,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if req.filter.wb_user_ids:
                 conditions.append(
-                    f"wb_user_id IN {param_builder.add_param(req.filter.wb_user_ids)})"
+                    f"wb_user_id IN {_param_slot(param_builder.add_param(req.filter.wb_user_ids), 'Array(String)')})"
                 )
 
             if req.filter.wb_run_ids:
                 conditions.append(
-                    f"wb_run_id IN {param_builder.add_param(req.filter.wb_run_ids)})"
+                    f"wb_run_id IN {_param_slot(param_builder.add_param(req.filter.wb_run_ids), 'Array(String)')})"
                 )
 
         if req.filter_by:
