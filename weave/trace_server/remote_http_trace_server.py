@@ -43,7 +43,7 @@ REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
 def _is_retryable_exception(e: Exception) -> bool:
     if isinstance(e, requests.HTTPError):
         code_class = e.response.status_code // 100
-        if code_class == 4 and e.response_status_code != 429:
+        if code_class == 4 and e.response.status_code != 429:
             return False  # Bad request, not rate limited
 
     # Retry on all other exceptions
