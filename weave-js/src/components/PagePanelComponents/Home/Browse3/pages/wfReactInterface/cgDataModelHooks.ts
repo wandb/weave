@@ -91,6 +91,7 @@ import {
   CallKey,
   CallSchema,
   Loadable,
+  LoadableWithError,
   LoadableWithRefetch,
   ObjectVersionFilter,
   ObjectVersionKey,
@@ -278,7 +279,7 @@ const useOpVersions = (
   filter: OpVersionFilter,
   limit?: number,
   opts?: {skip?: boolean}
-): Loadable<OpVersionSchema[]> => {
+): LoadableWithError<OpVersionSchema[]> => {
   let dataNode = useOpVersionsNode(entity, project, filter);
   if (limit) {
     dataNode = opLimit({arr: dataNode, limit: constNumber(limit)});
@@ -290,6 +291,7 @@ const useOpVersions = (
     if (opts?.skip) {
       return {
         loading: false,
+        error: null,
         result: [],
       };
     }
@@ -309,6 +311,7 @@ const useOpVersions = (
     if (dataValue.loading) {
       return {
         loading: true,
+        error: null,
         result,
       };
     } else {
@@ -325,6 +328,7 @@ const useOpVersions = (
       });
       return {
         loading: false,
+        error: null,
         result,
       };
     }
@@ -398,7 +402,7 @@ const useRootObjectVersions = (
   filter: ObjectVersionFilter,
   limit?: number,
   opts?: {skip?: boolean}
-): Loadable<ObjectVersionSchema[]> => {
+): LoadableWithError<ObjectVersionSchema[]> => {
   let dataNode = useRootObjectVersionsNode(entity, project, filter);
   if (limit) {
     dataNode = opLimit({arr: dataNode, limit: constNumber(limit)});
@@ -409,6 +413,7 @@ const useRootObjectVersions = (
     if (opts?.skip) {
       return {
         loading: false,
+        error: null,
         result: [],
       };
     }
@@ -439,6 +444,7 @@ const useRootObjectVersions = (
     if (dataValue.loading) {
       return {
         loading: true,
+        error: null,
         result,
       };
     } else {
@@ -458,6 +464,7 @@ const useRootObjectVersions = (
       });
       return {
         loading: false,
+        error: null,
         result,
       };
     }

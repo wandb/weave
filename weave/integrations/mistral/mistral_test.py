@@ -20,6 +20,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
     return call_output
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -71,6 +72,7 @@ def test_mistral_quickstart(client: weave.weave_client.WeaveClient) -> None:
     assert output.usage.total_tokens == model_usage["total_tokens"] == 309
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -119,6 +121,7 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
     assert output.usage.total_tokens == model_usage["total_tokens"] == 307
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
@@ -173,6 +176,7 @@ def test_mistral_quickstart_with_stream(client: weave.weave_client.WeaveClient) 
     assert output.usage.total_tokens == model_usage["total_tokens"] == 284
 
 
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
