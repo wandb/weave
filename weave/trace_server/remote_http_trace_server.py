@@ -48,10 +48,19 @@ def _is_retryable_exception(e: Exception) -> bool:
     # Don't retry on HTTP 4xx (except 429)
     if isinstance(e, requests.HTTPError):
         code_class = e.response.status_code // 100
-        if code_class == 4 and e.response.status_code != 429:
-            return False  # Bad request, not rate limited
 
-    # Otherwise, retry: OSError, ConnectionError, ConnectionResetError, IOError, etc...
+        # Bad request, not rate-limiting
+        if code_class == 4 and e.response.status_code != 429:
+            return False
+
+        # Unknown server error
+        # TODO(np): We need to fix the server to return proper status codes
+        # for downstream 401, 403, 404, etc... Those should propagate back to
+        # the client.
+        if e.response.status_code == 500:
+            return False
+
+    # Otherwise, retry: Non-500 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
     return True
 
 
