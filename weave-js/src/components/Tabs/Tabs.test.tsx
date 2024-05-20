@@ -2,6 +2,7 @@ import {render, screen, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import {MemoryRouter} from 'react-router-dom';
+import {vi} from 'vitest';
 
 import * as Tabs from './';
 
@@ -29,7 +30,7 @@ describe('Tabs', () => {
   });
 
   it('invokes onValueChange on tab change', async () => {
-    const mock = jest.fn();
+    const mock = vi.fn();
     render(
       <Tabs.Root value="1" onValueChange={mock}>
         <Tabs.List>
@@ -45,7 +46,7 @@ describe('Tabs', () => {
   });
 
   it('supports disabled tabs', async () => {
-    const mock = jest.fn();
+    const mock = vi.fn();
     render(
       <Tabs.Root value="1" onValueChange={mock}>
         <Tabs.List>
