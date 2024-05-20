@@ -69,7 +69,6 @@ class TestRemoteHTTPTraceServer(unittest.TestCase):
             self.server.call_start(tsi.CallStartReq(start=start))
 
     def test_invalid_no_retry(self):
-        call_id = generate_id()
         with self.assertRaises(ValidationError):
             self.server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
 

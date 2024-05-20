@@ -105,7 +105,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
+        wait=tenacity.wait_exponential_jitter(
+            min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -148,7 +150,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
+        wait=tenacity.wait_exponential_jitter(
+            min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -187,7 +191,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
+        wait=tenacity.wait_exponential_jitter(
+            min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -308,7 +314,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
+        wait=tenacity.wait_exponential_jitter(
+            min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
@@ -326,7 +334,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @tenacity.retry(
         stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
-        wait=tenacity.wait_exponential(min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL),
+        wait=tenacity.wait_exponential_jitter(
+            min=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
         retry=tenacity.retry_if_exception(_is_retryable_exception),
         before_sleep=_log_retry,
         retry_error_callback=_log_failure,
