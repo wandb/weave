@@ -46,9 +46,9 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         "weave_type": encoded["weave_type"],
         "files": file_digests,
     }
-    load_op_uri = encoded.get("load_op_uri")
+    load_op_uri = encoded.get("load_op")
     if load_op_uri:
-        result["load_op_uri"] = load_op_uri
+        result["load_op"] = load_op_uri
     return result
 
 
