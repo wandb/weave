@@ -856,20 +856,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
-                (
-                    field,
-                    param_builder,
-                    _,
-                ) = _transform_external_calls_field_to_internal_calls_field(field)
-                parameters.update(param_builder.get_params())
-
                 assert direction in [
                     "ASC",
                     "DESC",
                     "asc",
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
-                order_parts.append(f"{field} {direction}")
+
+                if _is_dynamic_field(field):
+                    # Prioritize existence, then cast to float, then str
+                    options = [
+                        ("exists", "desc"),
+                        ("float", direction),
+                        ("str", direction),
+                    ]
+                else:
+                    options = [(field, direction)]
+                for cast, direct in options:
+                    (
+                        inner_field,
+                        param_builder,
+                        _,
+                    ) = _transform_external_calls_field_to_internal_calls_field(
+                        field, cast
+                    )
+                    parameters.update(param_builder.get_params())
+
+                    order_parts.append(f"{inner_field} {direct}")
 
             order_by_part = ", ".join(order_parts)
             order_by_part = f"ORDER BY {order_by_part}"
@@ -1386,6 +1399,16 @@ def _quote_json_path(path: str) -> str:
     return ".".join(dot_parts_final)
 
 
+def _is_dynamic_field(field: str) -> bool:
+    return (
+        field in ["inputs", "output", "attributes", "summary"]
+        or field.startswith("inputs.")
+        or field.startswith("output.")
+        or field.startswith("attributes.")
+        or field.startswith("summary.")
+    )
+
+
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: typing.Optional[str] = None,
@@ -1428,26 +1451,31 @@ def _transform_external_calls_field_to_internal_calls_field(
     raw_fields_used.add(field)
     if json_path is not None:
         json_path_param_name = param_builder.add_param(json_path)
-        method = "toString"
-        if cast is not None:
-            if cast == "int":
-                method = "toInt64OrNull"
-            elif cast == "float":
-                method = "toFloat64OrNull"
-            elif cast == "bool":
-                method = "toUInt8OrNull"
-            elif cast == "str":
-                method = "toString"
-            else:
-                raise ValueError(f"Unknown cast: {cast}")
-        field = (
-            method
-            + "(JSON_VALUE("
-            + field
-            + ", {"
-            + json_path_param_name
-            + ":String}))"
-        )
+        if cast == "exists":
+            field = (
+                "(JSON_EXISTS(" + field + ", {" + json_path_param_name + ":String}))"
+            )
+        else:
+            method = "toString"
+            if cast is not None:
+                if cast == "int":
+                    method = "toInt64OrNull"
+                elif cast == "float":
+                    method = "toFloat64OrNull"
+                elif cast == "bool":
+                    method = "toUInt8OrNull"
+                elif cast == "str":
+                    method = "toString"
+                else:
+                    raise ValueError(f"Unknown cast: {cast}")
+            field = (
+                method
+                + "(JSON_VALUE("
+                + field
+                + ", {"
+                + json_path_param_name
+                + ":String}))"
+            )
 
     return field, param_builder, raw_fields_used
 

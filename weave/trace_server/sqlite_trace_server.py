@@ -365,7 +365,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     field = "attributes_dump" + field[len("attributes") :]
                 elif field.startswith("summary"):
                     field = "summary_dump" + field[len("summary") :]
-                
 
                 assert direction in [
                     "ASC",
