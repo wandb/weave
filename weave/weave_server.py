@@ -421,7 +421,7 @@ def frontend_env():
         "ONPREM": environment.weave_onprem(),
         "WEAVE_BACKEND_HOST": environment.weave_backend_host(),
         "TRACE_BACKEND_BASE_URL": environment.trace_backend_base_url(),
-        "WANDB_BASE_URL": environment.wandb_base_url(),
+        "WANDB_BASE_URL": environment.wandb_frontend_base_url(),
         "DD_ENV": environment.dd_env(),
         "ENV_IS_CI": environment.env_is_ci(),
     }
