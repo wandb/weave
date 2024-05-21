@@ -275,6 +275,16 @@ const useOpVersion = (
   }, [cachedOpVersion, dataValue.loading, dataValue.result, key]);
 };
 
+const useCallsStats = (
+  entity: string,
+  project: string,
+  filter: CallFilter,
+  filterBy?: any,
+  opts?: {skip?: boolean}
+): Loadable<any> => {
+  throw new Error('Not implemented');
+};
+
 const useOpVersions = (
   entity: string,
   project: string,
@@ -1078,6 +1088,7 @@ const useFileContent = (
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsStats,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

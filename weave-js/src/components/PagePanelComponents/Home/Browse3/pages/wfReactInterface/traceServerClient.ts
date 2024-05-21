@@ -137,6 +137,16 @@ export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
 };
 
+export type TraceCallsQueryStatsReq = {
+  project_id: string;
+  filter?: TraceCallsFilter;
+  filter_by?: FilterBy;
+};
+
+export type TraceCallsQueryStatsRes = {
+  count: number;
+};
+
 interface TraceObjectsFilter {
   base_object_classes?: string[];
   object_ids?: string[];
@@ -243,6 +253,14 @@ export class TraceServerClient {
         req
       );
     };
+  callsQueryStats: (
+    req: TraceCallsQueryStatsReq
+  ) => Promise<TraceCallsQueryStatsRes> = req => {
+    return this.makeRequest<TraceCallsQueryStatsReq, TraceCallsQueryStatsRes>(
+      '/calls/query_stats',
+      req
+    );
+  };
   callsSteamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       const res = this.makeRequest<TraceCallsQueryReq, string>(

@@ -25,7 +25,7 @@ export const useCallsForQuery = (
   gridSort: GridSortModel,
   gridPage: GridPaginationModel
 ) => {
-  const {useCalls} = useWFHooks();
+  const {useCalls, useCallsStats} = useWFHooks();
   const lowLevelFilter: CallFilter = useMemo(() => {
     return convertHighLevelFilterToLowLevelFilter(filter);
   }, [filter]);
@@ -38,9 +38,6 @@ export const useCallsForQuery = (
     const atLeast = limit + 1;
     return Math.ceil(atLeast / INCREMENT) * INCREMENT;
   }, [limit]);
-
-  // TODO: Implement a count endpoint (or (short term) - figure out some way to get
-  // the system to know there are more pages)
 
   const sortBy = useDeepMemo(
     useMemo(() => {
@@ -99,9 +96,19 @@ export const useCallsForQuery = (
     filterBy
   );
 
+  const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy);
+
   const callResults = useMemo(() => {
     return calls.result ?? [];
   }, [calls]);
+
+  const total = useMemo(() => {
+    if (callsStats.loading || callsStats.result == null) {
+      return offset + callResults.length;
+    } else {
+      return callsStats.result.count;
+    }
+  }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
   const limitedResults = useMemo(() => {
     return callResults.slice(0, limit);
@@ -110,7 +117,7 @@ export const useCallsForQuery = (
   return {
     loading: calls.loading,
     result: limitedResults,
-    total: offset + callResults.length, // TODO: Implement a count endpoint
+    total,
   };
 };
 

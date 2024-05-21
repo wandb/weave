@@ -291,6 +291,39 @@ const useCalls = (
   }, [callRes, entity, project, opts?.skip]);
 };
 
+const useCallsStats = makeTraceServerEndpointHook<
+  'callsQueryStats',
+  [string, string, CallFilter, traceServerClient.FilterBy?, {skip?: boolean}?],
+  traceServerClient.TraceCallsQueryStatsRes
+>(
+  'callsQueryStats',
+  (
+    entity: string,
+    project: string,
+    filter: CallFilter,
+    filterBy?: traceServerClient.FilterBy,
+    opts?: {skip?: boolean}
+  ) => ({
+    params: {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        op_names: filter.opVersionRefs,
+        input_refs: filter.inputObjectVersionRefs,
+        output_refs: filter.outputObjectVersionRefs,
+        parent_ids: filter.parentIds,
+        trace_ids: filter.traceId ? [filter.traceId] : undefined,
+        call_ids: filter.callIds,
+        trace_roots_only: filter.traceRootsOnly,
+        wb_run_ids: filter.runIds,
+        wb_user_ids: filter.userIds,
+      },
+      filter_by: filterBy,
+    },
+    skip: opts?.skip,
+  }),
+  (res): traceServerClient.TraceCallsQueryStatsRes => res
+);
+
 const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
@@ -1076,6 +1109,7 @@ const convertISOToDate = (iso: string) => {
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsStats,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

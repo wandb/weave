@@ -158,6 +158,13 @@ export type WFDataModelHooksInterface = {
     filterBy?: traceServerClient.FilterBy,
     opts?: {skip?: boolean}
   ) => Loadable<CallSchema[]>;
+  useCallsStats: (
+    entity: string,
+    project: string,
+    filter: CallFilter,
+    filterBy?: traceServerClient.FilterBy,
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClient.TraceCallsQueryStatsRes>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
