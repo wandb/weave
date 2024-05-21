@@ -304,7 +304,7 @@ export const CallsTable: FC<{
 
   // CPR (Tim) - (Ref Expansion): Column Expansion needs to be moved to a "table state" object in the future
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
-    new Set<string>().add('input.example')
+    new Set<string>().add('inputs.example')
   );
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
@@ -398,7 +398,7 @@ export const CallsTable: FC<{
         ..._.mapKeys(
           _.omitBy(args, v => v == null),
           (v, k) => {
-            return 'input.' + k;
+            return 'inputs.' + k;
           }
         ),
         ..._.mapKeys(
@@ -454,8 +454,6 @@ export const CallsTable: FC<{
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedRefCols, tableStats]);
-
-  // CPR (Tim) - (CC+Hidden): This gets removed as well
 
   // CPR (Tim) - (GeneralRefactoring): Preferably this is passed in from the top, not
   // something where we inspect URLs deep in a component. At the
@@ -698,6 +696,7 @@ export const CallsTable: FC<{
                 </ErrorBoundary>
               );
             }
+            console.log(cellParams.row, field);
             return <NotApplicable />;
           },
         });
@@ -736,6 +735,7 @@ export const CallsTable: FC<{
         Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
           k => !k.startsWith('_')
         );
+
     addColumnGroup('inputs', inputOrder);
 
     // Add output columns
