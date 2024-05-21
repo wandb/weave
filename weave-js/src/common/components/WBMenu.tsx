@@ -156,7 +156,10 @@ export const WBMenu = React.forwardRef<HTMLDivElement, WBMenuProps>(
             if (newHighlightedIndex >= options.length) {
               newHighlightedIndex = options.findIndex(el => !el.disabled);
             } else if (newHighlightedIndex < 0) {
-              newHighlightedIndex = options.findLastIndex(el => !el.disabled);
+              // @ts-ignore
+              newHighlightedIndex = options.findLastIndex(
+                (el: WBMenuOption) => !el.disabled
+              );
             }
           }
           if (newHighlightedIndex >= 0) {
