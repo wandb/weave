@@ -215,7 +215,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         ? computedOptions
         : computedOptions.map(opt => ({
             ...opt,
-            content: <OptionWithTooltip key={opt.value} text={opt.text} />,
+            content: <OptionWithTooltip text={opt.text as string} />,
           })),
       resultLimit,
       searchQuery,
@@ -429,7 +429,9 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       }
       return (
         <div className="text">
-          <OptionWithTooltip text={selectedOption ? selectedOption.text : ''} />
+          <OptionWithTooltip
+            text={selectedOption ? (selectedOption.text as string) : ''}
+          />
         </div>
       );
     };
@@ -469,7 +471,11 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
 
 export default ModifiedDropdown;
 
-const OptionWithTooltip = ({text}: any) => {
+type OptionWithTooltipProps = {
+  text: string | null;
+};
+
+const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const optionRef = useRef<HTMLDivElement>(null);
 
