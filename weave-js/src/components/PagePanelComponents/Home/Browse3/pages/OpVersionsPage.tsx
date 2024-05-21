@@ -6,6 +6,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
@@ -181,6 +182,9 @@ export const FilterableOpVersionsTable: React.FC<{
 
   if (filteredOpVersions.loading) {
     return <Loading centered />;
+  }
+  if (filteredOpVersions.error) {
+    return <ErrorPanel />;
   }
 
   // TODO: Only show the empty state if unfiltered
