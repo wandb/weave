@@ -147,8 +147,6 @@ export const CallsTable: FC<{
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
-  const apiRefIsReady =
-    apiRef.current && Object.keys(apiRef.current).length > 0;
 
   // Register Export Button
   useEffect(() => {
@@ -450,6 +448,33 @@ export const CallsTable: FC<{
     columnsWithRefs,
     expandedRefCols,
   ]);
+
+  // This whole thing is not working...
+  // // TODO: Should extract this to a common place - good list of the things we are
+  // // maintaining outside
+  // const resetManualModelState = useCallback(() => {
+  //   setExpandedRefCols(new Set<string>());
+  //   setAllDynamicColumnNames([]);
+  //   setFilterModel({items: []});
+  //   setSortModel([{field: 'started_at', sort: 'desc'}]);
+  //   setPaginationModel({
+  //     pageSize: defaultPageSize,
+  //     page: 0,
+  //   });
+  //   setPinnedColumnsModel({left: ['op_name']});
+  // }, []);
+
+  // useEffect(() => {
+  //   if (
+  //     effectiveFilter.opVersionRefs?.length === 1 ||
+  //     effectiveFilter.opVersionRefs?.length === 0
+  //   ) {
+  //     console.log('resetting');
+  //     resetManualModelState();
+  //   }
+  // }, [effectiveFilter.opVersionRefs, resetManualModelState]);
+
+  // console.log({allDynamicColumnNames});
 
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
