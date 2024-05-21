@@ -114,7 +114,7 @@ import {useOpVersionOptions} from './callsTableFilter';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
-import {useCallsForQuery} from './callsTableQuery';
+import {refIsExpandable, useCallsForQuery} from './callsTableQuery';
 
 const VisibilityAlert = styled.div`
   background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
@@ -404,7 +404,7 @@ export const CallsTable: FC<{
     const refColumns = new Set<string>();
     tableData.forEach(row => {
       Object.keys(row).forEach(key => {
-        if (isRef((row as any)[key])) {
+        if (refIsExpandable((row as any)[key])) {
           refColumns.add(key);
         }
       });
@@ -528,21 +528,33 @@ export const CallsTable: FC<{
         return node;
       });
     };
-
+    console.log(allDynamicColumnNames, groupingModel);
     groupingModel = walkGroupingModel(groupingModel, node => {
       if ('groupId' in node) {
-        if (expandedRefCols.has(node.groupId)) {
-          console.log(node.groupId, expandedRefCols);
-          // node.renderHeaderGroup = params => {
-          //   return (
-          //     <ExpandHeader
-          //       headerName={node.groupId.split('.').slice(-1)[0]}
-          //       field={node.groupId}
-          //       hasExpand
-          //       onExpand={onExpand}
-          //     />
-          //   );
-          // };
+        const key = node.groupId;
+        if (expandedRefCols.has(key)) {
+          console.log('expandedRefCols', key);
+          node.renderHeaderGroup = () => {
+            return (
+              <CollapseHeader
+                headerName={key.split('.').slice(-1)[0]}
+                field={key}
+                onCollapse={onCollapse}
+              />
+            );
+          };
+        } else if (columnsWithRefs.has(key)) {
+          console.log('expandedRefCols', key);
+          node.renderHeaderGroup = () => {
+            return (
+              <ExpandHeader
+                headerName={key.split('.').slice(-1)[0]}
+                field={key}
+                hasExpand
+                onExpand={onExpand}
+              />
+            );
+          };
         }
       }
       return node;
@@ -962,7 +974,7 @@ function addToTree(
     headerName: fields[0],
     groupId: fullPath
       .split('.')
-      .slice(0, depth + 2)
+      .slice(0, depth + 1)
       .join('.'),
     children: [],
   };

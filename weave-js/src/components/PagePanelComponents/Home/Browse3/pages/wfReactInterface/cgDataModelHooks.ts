@@ -161,6 +161,7 @@ const useCalls = (
   offset?: number,
   sortBy?: any,
   filterBy?: any,
+  expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   let runsNode = fnRunsNode(

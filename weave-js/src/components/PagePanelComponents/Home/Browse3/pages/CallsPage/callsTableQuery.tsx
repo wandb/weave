@@ -7,12 +7,11 @@ import {
 import {useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {FilterBy} from '../wfReactInterface/traceServerClient';
-import {
-  CallFilter,
-  CallSchema,
-} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
 /**
@@ -91,7 +90,8 @@ export const useCallsForQuery = (
     limit,
     offset,
     sortBy,
-    filterBy
+    filterBy,
+    expandedColumns
   );
 
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy);
@@ -108,24 +108,10 @@ export const useCallsForQuery = (
     }
   }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
-  // Do the expansion
-
-  const expandedResults = useExpandedCalls(callResults, expandedColumns);
-
   return {
-    loading: calls.loading || expandedResults.loading,
-    result: expandedResults.result,
+    loading: calls.loading,
+    result: callResults,
     total,
-  };
-};
-
-const useExpandedCalls = (
-  calls: CallSchema[],
-  expandedColumns: Set<string>
-) => {
-  return {
-    loading: false,
-    result: calls,
   };
 };
 
@@ -141,4 +127,21 @@ const convertHighLevelFilterToLowLevelFilter = (
       ? [effectiveFilter.parentId]
       : undefined,
   };
+};
+
+export const refIsExpandable = (ref: string): boolean => {
+  if (!isRef(ref)) {
+    return false;
+  }
+  const parsed = parseRef(ref);
+  if (isWeaveObjectRef(parsed)) {
+    return (
+      parsed.weaveKind === 'object' ||
+      // parsed.weaveKind === 'op' ||
+      (parsed.weaveKind === 'table' &&
+        parsed.artifactRefExtra != null &&
+        parsed.artifactRefExtra.length > 0)
+    );
+  }
+  return false;
 };
