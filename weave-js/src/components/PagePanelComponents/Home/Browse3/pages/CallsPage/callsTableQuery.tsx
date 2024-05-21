@@ -9,7 +9,10 @@ import {useMemo} from 'react';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {useWFHooks} from '../wfReactInterface/context';
 import {FilterBy} from '../wfReactInterface/traceServerClient';
-import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallFilter,
+  CallSchema,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
 /**
@@ -23,7 +26,8 @@ export const useCallsForQuery = (
   filter: WFHighLevelCallFilter,
   gridFilter: GridFilterModel,
   gridSort: GridSortModel,
-  gridPage: GridPaginationModel
+  gridPage: GridPaginationModel,
+  expandedColumns: Set<string>
 ) => {
   const {useCalls, useCallsStats} = useWFHooks();
   const lowLevelFilter: CallFilter = useMemo(() => {
@@ -104,14 +108,24 @@ export const useCallsForQuery = (
     }
   }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
-  const limitedResults = useMemo(() => {
-    return callResults.slice(0, limit);
-  }, [callResults, limit]);
+  // Do the expansion
+
+  const expandedResults = useExpandedCalls(callResults, expandedColumns);
 
   return {
-    loading: calls.loading,
-    result: limitedResults,
+    loading: calls.loading || expandedResults.loading,
+    result: expandedResults.result,
     total,
+  };
+};
+
+const useExpandedCalls = (
+  calls: CallSchema[],
+  expandedColumns: Set<string>
+) => {
+  return {
+    loading: false,
+    result: calls,
   };
 };
 

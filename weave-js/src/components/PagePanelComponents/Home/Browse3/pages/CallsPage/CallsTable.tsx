@@ -107,6 +107,13 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {isRef} from '../common/util';
+import {
+  convertISOToDate,
+  traceCallLatencyS,
+  traceCallStatusCode,
+} from '../wfReactInterface/tsDataModelHooks';
 
 const VisibilityAlert = styled.div`
   background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
@@ -182,6 +189,7 @@ export const CallsTable: FC<{
   // 2. Filter (Unstructured Filter)
   // 3. Sort
   // 4. Pagination
+  // 5. Expansion
   //
   // The following sections set up the state for these aspects
 
@@ -217,6 +225,21 @@ export const CallsTable: FC<{
     page: 0,
   });
 
+  // 5. Expansion
+  const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
+    new Set<string>().add('inputs.example')
+  );
+  const onExpand = (col: string) => {
+    setExpandedRefCols(prevState => new Set(prevState).add(col));
+  };
+  const onCollapse = (col: string) => {
+    setExpandedRefCols(prevState => {
+      const newSet = new Set(prevState);
+      newSet.delete(col);
+      return newSet;
+    });
+  };
+
   // Fetch the calls
   const calls = useCallsForQuery(
     entity,
@@ -224,7 +247,8 @@ export const CallsTable: FC<{
     effectiveFilter,
     filterModel,
     sortModel,
-    paginationModel
+    paginationModel,
+    expandedRefCols
   );
 
   // Scrappy: we want to only update result once loading is done
@@ -242,6 +266,20 @@ export const CallsTable: FC<{
       setCallsTotal(calls.total ?? 0);
     }
   }, [callsLoading, calls.total, callsTotal]);
+
+  // Construct Flattened Table Data
+
+  const tableData: TraceCallSchema[] = useMemo(() => {
+    return callsResult.map(
+      r =>
+        flattenObject(
+          r.traceCall ?? {},
+          undefined,
+          undefined,
+          true
+        ) as TraceCallSchema & {[key: string]: string}
+    );
+  }, [callsResult]);
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -300,160 +338,25 @@ export const CallsTable: FC<{
     [effectiveFilter.parentId, parentIdOptions]
   );
 
-  // END OF CPR FACTORED CODE
-
-  // CPR (Tim) - (Ref Expansion): Column Expansion needs to be moved to a "table state" object in the future
-  const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
-    new Set<string>().add('inputs.example')
+  // Determine what sort of view we are looking at based on the filter
+  const isSingleOpVersion = useMemo(
+    () => effectiveFilter.opVersionRefs?.length === 1,
+    [effectiveFilter.opVersionRefs]
   );
-  const onExpand = (col: string) => {
-    setExpandedRefCols(prevState => new Set(prevState).add(col));
-  };
-  const onCollapse = (col: string) => {
-    setExpandedRefCols(prevState => {
-      const newSet = new Set(prevState);
-      newSet.delete(col);
-      return newSet;
-    });
-  };
-
-  // CPR (Tim) - (Ref Expansion): This is going to go away completely once we move to remove expansion
-  const [expandedColInfo, setExpandedColInfo] = useState<ExtraColumns>({});
-
-  // CPR (Tim) - (CC+Hidden): We should change `isSingleOpVersion` and `isSingleOp` to be derived from the filter, not requiring a full pass
-  const isSingleOpVersion = useMemo(() => {
-    return _.uniq(callsResult.map(span => span.rawSpan.name)).length === 1;
-  }, [callsResult]);
-  const uniqueSpanNames = useMemo(() => {
-    return _.uniq(callsResult.map(span => span.spanName));
-  }, [callsResult]);
-  const isSingleOp = useMemo(() => {
-    return uniqueSpanNames.length === 1;
-  }, [uniqueSpanNames]);
-
-  // CPR (Tim) - (Flattening): This needs to be removed completely - we should not need to put `_result` in anywhere.
-  // In fact, it should be removed from the read client as well. When we flatten the data, we can handle
-  // primitive collisions with containers there.
-  const newSpans = useMemo(
+  const isSingleOp = useMemo(
     () =>
-      callsResult.map(s => ({
-        ...s,
-        output: s.rawSpan.output == null ? {_result: null} : s.rawSpan.output,
-      })),
-    [callsResult]
+      effectiveFilter.opVersionRefs?.length === 1 &&
+      effectiveFilter.opVersionRefs[0].includes(':*'),
+    [effectiveFilter.opVersionRefs]
+  );
+  const preservePath = useMemo(
+    () =>
+      effectiveFilter.opVersionRefs?.length === 1 &&
+      effectiveFilter.opVersionRefs[0].includes('predict_and_score:'),
+    [effectiveFilter.opVersionRefs]
   );
 
-  // CPR (Tim) - (Flattening): This is not a generally correct - why are we doing this?!?
-  let onlyOneOutputResult = true;
-  for (const s of newSpans) {
-    // get display keys
-    const keys = Object.keys(
-      _.omitBy(
-        flattenObject(s.rawSpan.output!),
-        (v, k) => v == null || (k.startsWith('_') && k !== '_result')
-      )
-    );
-    // ensure there is only one output _result
-    if (keys.length > 1 || (keys[0] && keys[0] !== '_result')) {
-      onlyOneOutputResult = false;
-      break;
-    }
-  }
-
-  // CPR (Tim) - (Flattening): The vast majority of this is going to roll into the calls hook that we create
-  // Specifically: the flattening of the data. We should make this a highly structured and
-  // typed output. Moreover, since sorting is moving to the backend, we don't need anything
-  // fancy here: just the id and the flattened call.
-  const tableData = useMemo(() => {
-    return newSpans.map((call: CallSchema) => {
-      const argOrder = call.rawSpan.inputs._input_order;
-      let args: Record<string, any> = {};
-      if (call.rawSpan.inputs._keys) {
-        for (const key of call.rawSpan.inputs._keys) {
-          args[key] = call.rawSpan.inputs[key];
-        }
-      } else {
-        args = _.fromPairs(
-          Object.entries(call.rawSpan.inputs).filter(
-            ([k, c]) => c != null && !k.startsWith('_')
-          )
-        );
-      }
-
-      if (argOrder) {
-        args = _.fromPairs(argOrder.map((k: string) => [k, args[k]]));
-      }
-
-      return {
-        id: call.callId,
-        call,
-        loading: callsLoading,
-        opVersion: call.opVersionRef,
-        isRoot: call.parentId == null,
-        trace_id: call.traceId,
-        status_code: call.rawSpan.status_code,
-        started_at: call.rawSpan.timestamp, // This illustrates a problem in the system - need to use the same field names!
-        userId: call.userId,
-        latency: call.rawSpan.summary.latency_s,
-        ..._.mapKeys(
-          _.omitBy(args, v => v == null),
-          (v, k) => {
-            return 'inputs.' + k;
-          }
-        ),
-        ..._.mapKeys(
-          _.omitBy(
-            flattenObject(call.rawSpan.output!),
-            (v, k) => v == null || (k.startsWith('_') && k !== '_result')
-          ),
-          (v, k) => {
-            // If there is only one output _result, we don't need to nest it
-            if (onlyOneOutputResult && k === '_result') {
-              return 'output';
-            }
-            return 'output.' + k;
-          }
-        ),
-        ..._.mapKeys(
-          flattenObject(call.rawFeedback ?? {}),
-          (v, k) => 'feedback.' + k
-        ),
-        ..._.mapKeys(
-          flattenObject(call.rawSpan.attributes ?? {}),
-          (v, k) => 'attributes.' + k
-        ),
-      };
-    });
-  }, [callsLoading, onlyOneOutputResult, newSpans]);
-
-  // CPR (Tim) - (CC+Hidden): Move table stats (and derivative calcs) into the new hook
-  const tableStats = useMemo(() => {
-    return computeTableStats(tableData);
-  }, [tableData]);
-
-  // CPR (Tim) - (Ref Expansion): This entire block goes away when we move to our new hook model. We don't
-  // need to calculate new columns as they are already going to be part of the data itself
-  const getRefsType = useGetRefsType();
-  useEffect(() => {
-    const fetchData = async () => {
-      for (const col of expandedRefCols) {
-        if (!(col in expandedColInfo)) {
-          const refs = columnRefs(tableStats, col);
-          const refTypes = await getRefsType(refs);
-          const extraCols = getExtraColumns(refTypes);
-          if (tableStats.rowCount !== 0) {
-            setExpandedColInfo(prevState => ({
-              ...prevState,
-              [col]: extraCols,
-            }));
-          }
-        }
-      }
-    };
-
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedRefCols, tableStats]);
+  // END OF CPR FACTORED CODE
 
   // CPR (Tim) - (GeneralRefactoring): Preferably this is passed in from the top, not
   // something where we inspect URLs deep in a component. At the
@@ -484,40 +387,69 @@ export const CallsTable: FC<{
     }
   }, [rowIds, peekId]);
 
-  // CPR (Tim) - (GeneralRefactoring): Pull out into it's own function
-  // Custom logic to control path preservation preference
-  const preservePath = useMemo(() => {
-    return (
-      uniqueSpanNames.length === 1 &&
-      isPredictAndScoreOp(opNiceName(uniqueSpanNames[0]))
-    );
-  }, [uniqueSpanNames]);
-
   // CPR (Tim) - (GeneralRefactoring): Yeah, there is going to be a lot here. A few general notes:
   // * For readability: would be clean to extract each field def into a function
   // * Perhaps consider reducing the min-width for a lot of these
+
+  // const [dynamicColumnList, setDynamicColumnList] = useState<Set<string>>(
+  //   new Set<string>()
+  // );
+  // useEffect(() => {
+  //   setDynamicColumnList(oldSet => {
+
+  //   })
+  // }, [])
+  const columnsWithRefs = useMemo(() => {
+    const refColumns = new Set<string>();
+    tableData.forEach(row => {
+      Object.keys(row).forEach(key => {
+        if (isRef((row as any)[key])) {
+          refColumns.add(key);
+        }
+      });
+    });
+
+    return refColumns;
+  }, [tableData]);
+
+  const allDynamicColumnNames = useMemo(() => {
+    const columns = new Set<string>();
+    tableData.forEach(row => {
+      Object.keys(row).forEach(key => {
+        if (
+          key.startsWith('attributes') ||
+          key.startsWith('inputs') ||
+          key.startsWith('output') ||
+          key.startsWith('summary')
+        ) {
+          columns.add(key);
+        }
+      });
+    });
+    return _.sortBy([...columns]);
+  }, [tableData]);
+
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
       {
-        field: 'span_id',
+        field: 'op_name',
         headerName: 'Trace',
         minWidth: 100,
         // This filter should be controlled by the custom filter
         // in the header
         filterable: false,
-        sortable: false,
         width: 250,
         hideable: false,
         renderCell: rowParams => {
-          const opVersion = rowParams.row.call.opVersionRef;
-          if (opVersion == null) {
-            return rowParams.row.call.spanName;
+          const op_name = rowParams.row.op_name;
+          if (!isRef(op_name)) {
+            return op_name;
           }
           return (
             <CallLink
               entityName={entity}
               projectName={project}
-              opName={opVersionRefOpName(opVersion)}
+              opName={opVersionRefOpName(op_name)}
               callId={rowParams.row.id}
               fullWidth={true}
               preservePath={preservePath}
@@ -528,7 +460,7 @@ export const CallsTable: FC<{
       ...(isSingleOp && !isSingleOpVersion
         ? [
             {
-              field: 'opVersionIndex',
+              field: 'derived.op_version',
               headerName: 'Op Version',
               type: 'number',
               align: 'right' as const,
@@ -537,7 +469,7 @@ export const CallsTable: FC<{
               filterable: false,
               resizable: false,
               renderCell: (cellParams: any) => (
-                <OpVersionIndexText opVersionRef={cellParams.row.opVersion} />
+                <OpVersionIndexText opVersionRef={cellParams.row.op_name} />
               ),
             },
           ]
@@ -555,7 +487,7 @@ export const CallsTable: FC<{
       //   },
       // },
       {
-        field: 'status_code',
+        field: 'derived.status_code',
         headerName: 'Status',
         headerAlign: 'center',
         sortable: false,
@@ -568,282 +500,269 @@ export const CallsTable: FC<{
         renderCell: cellParams => {
           return (
             <div style={{margin: 'auto'}}>
-              <StatusChip value={cellParams.row.status_code} iconOnly />
+              <StatusChip
+                value={traceCallStatusCode(cellParams.row)}
+                iconOnly
+              />
             </div>
           );
         },
       },
     ];
 
-    // CPR (Tim) - (Flattening): I still don't understand how inputs/outputs/attributes/summary aren't
-    // all handled in the same generic way. Lets do that! Also, we don't have any concept
-    // of "_keys" anymore, so we can remove all that junk. The flattening will be done before-hand.
-    const colGroupingModel: GridColumnGroupingModel = [];
-    const row0 = newSpans[0];
-    if (row0 == null) {
-      return {cols: [], colGroupingModel: []};
-    }
+    const tree = buildTree([...allDynamicColumnNames]);
+    const groupingModel: GridColumnGroupingModel = tree.children.filter(
+      c => 'groupId' in c
+    ) as GridColumnGroup[];
 
-    const attributesKeys: {[key: string]: true} = {};
-    newSpans.forEach(span => {
-      for (const [k, v] of Object.entries(
-        flattenObject(span.rawSpan.attributes ?? {})
-      )) {
-        if (v != null && k !== '_keys') {
-          attributesKeys[k] = true;
-        }
-      }
-    });
-
-    const attributesOrder = Object.keys(attributesKeys);
-    const attributesGrouping = buildTree(attributesOrder, 'attributes');
-    colGroupingModel.push(attributesGrouping);
-    for (const key of attributesOrder) {
-      if (!key.startsWith('_')) {
-        cols.push({
-          flex: 1,
-          minWidth: 150,
-          field: 'attributes.' + key,
-          headerName: key.split('.').slice(-1)[0],
-          renderCell: cellParams => {
-            return renderCell((cellParams.row as any)['attributes.' + key]);
-          },
-        });
-      }
-    }
-
-    // CPR (Tim) - (Flattening): Yeah, this is going to change likely.
-    // Gets the children of a expanded group field(a ref that has been expanded)
-    // returns an array of column definitions, for the children
-    const getGroupChildren = (groupField: string) => {
-      // start children array with self
-      const colGroupChildren = [{field: groupField}];
-      // get the expanded columns for the group field
-      const expandCols = expandedColInfo[groupField] ?? [];
-      // for each expanded column, add a column definition
-      for (const col of expandCols) {
-        // Don't show name or description column for expanded refs
-        if (col.path === 'name' || col.path === 'description') {
-          continue;
-        }
-        const expandField = groupField + '.' + col.path;
-        cols.push({
-          flex: 1,
-          field: expandField,
-          // Sorting on expanded ref columns is not supported
-          sortable: false,
-          // Filtering on expanded ref columns is not supported
-          filterable: false,
-          renderHeader: headerParams => (
-            <CustomGroupedColumnHeader field={headerParams.field} />
-          ),
-          renderCell: cellParams => {
-            const weaveRef = (cellParams.row as any)[groupField];
-            if (weaveRef === undefined) {
-              return <NotApplicable />;
-            }
-            return (
-              <ErrorBoundary>
-                <RefValue weaveRef={weaveRef} attribute={col.path} />
-              </ErrorBoundary>
-            );
-          },
-        });
-        colGroupChildren.push({field: expandField});
-      }
-      return colGroupChildren;
-    };
-
-    const addColumnGroup = (groupName: string, colOrder: string[]) => {
-      const colGroup: GridColumnGroup = {
-        groupId: groupName,
-        children: [],
-      };
-
-      for (const key of colOrder) {
-        const field = groupName + '.' + key;
-        const fields = key.split('.');
-        const isExpanded = expandedRefCols.has(field);
-        cols.push({
-          ...(isExpanded
-            ? {
-                // if the ref is expanded it will only be an icon and we want to give the ref icon less column space
-                width: 100,
-              }
-            : {
-                flex: 1,
-                minWidth: 150,
-              }),
-          field,
-          renderHeader: () => {
-            const hasExpand = columnHasRefs(tableStats, field);
-            return (
-              <ExpandHeader
-                // if the field is a flattened field, use the last key as the header
-                headerName={isExpanded ? 'Ref' : fields.slice(-1)[0]}
-                field={field}
-                hasExpand={hasExpand && !isExpanded}
-                onExpand={onExpand}
-              />
-            );
-          },
-          renderCell: cellParams => {
-            if (field in cellParams.row) {
-              const value = (cellParams.row as any)[field];
-              return (
-                <ErrorBoundary>
-                  <CellValue value={value} isExpanded={isExpanded} />
-                </ErrorBoundary>
-              );
-            }
-            console.log(cellParams.row, field);
-            return <NotApplicable />;
-          },
-        });
-
-        // if ref is expanded add the ref children to the colGroup
-        if (isExpanded) {
-          colGroup.children.push({
-            groupId: field,
-            headerName: key,
-            // Nests all the children here
-            children: getGroupChildren(field),
-            renderHeaderGroup: () => {
-              return (
-                <CollapseGroupHeader
-                  headerName={key}
-                  field={field}
-                  onCollapse={onCollapse}
-                />
-              );
-            },
-          });
-        } else {
-          // if ref is not expanded add the column to the colGroup
-          addToTree(colGroup, fields, field, 0);
-        }
-      }
-      colGroupingModel.push(colGroup);
-    };
-
-    // CPR (Tim) - (Flattening): Refactor this away
-    // Add input columns
-    const inputOrder = !isSingleOpVersion
-      ? getInputColumns(tableStats)
-      : row0.rawSpan.inputs._arg_order ??
-        row0.rawSpan.inputs._keys ??
-        Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
-          k => !k.startsWith('_')
-        );
-
-    addColumnGroup('inputs', inputOrder);
-
-    // Add output columns
-    if (!onlyOneOutputResult) {
-      // All output keys as we don't have the order key yet.
-      const outputKeys: {[key: string]: true} = {};
-      newSpans.forEach(span => {
-        for (const [k, v] of Object.entries(
-          flattenObject(span.rawSpan.output ?? {})
-        )) {
-          if (v != null && (!k.startsWith('_') || k === '_result')) {
-            outputKeys[k] = true;
-          }
-        }
-      });
-
-      const outputOrder = Object.keys(outputKeys);
-      addColumnGroup('output', outputOrder);
-      // CPR (Tim) - (Flattening): Pretty sure this else branch goes away (or rather the one above.)
-    } else {
-      // If there is only one output _result, we don't need to do all the work on outputs
-      // we add one special group from the _result and allow it to be expanded one level
-      const colGroup: GridColumnGroup = {
-        groupId: 'outputs',
-        children: [],
-        headerName: 'outputs',
-        renderHeaderGroup: () => {
-          return (
-            <CollapseGroupHeader
-              headerName={'output'}
-              field={'output'}
-              onCollapse={onCollapse}
-            />
-          );
-        },
-      };
-
-      const isExpanded = expandedRefCols.has('output');
-      cols.push({
-        ...(isExpanded
-          ? {
-              // if the ref is expanded it will only be an icon and we want to give the ref icon less column space
-              width: 100,
-            }
-          : {
-              flex: 1,
-              minWidth: 150,
-            }),
-        field: 'output',
-        renderHeader: () => {
-          const hasExpand = columnHasRefs(tableStats, 'output');
-          return (
-            <ExpandHeader
-              // if the field is a flattened field, use the last key as the header
-              headerName={isExpanded ? 'Ref' : 'outputs'}
-              field={'output'}
-              hasExpand={hasExpand && !isExpanded}
-              onExpand={onExpand}
-            />
-          );
-        },
-        renderCell: cellParams => {
-          return (
-            <ErrorBoundary>
-              <CellValue
-                value={(cellParams.row as any).output}
-                isExpanded={isExpanded}
-              />
-            </ErrorBoundary>
-          );
-        },
-      });
-
-      // if ref is expanded add the ref children to the colGroup
-      if (isExpanded) {
-        colGroup.children.push(...getGroupChildren('output'));
-      }
-      colGroupingModel.push(colGroup);
-    }
-
-    const feedbackKeys: {[key: string]: true} = {};
-    newSpans.forEach(span => {
-      for (const [k, v] of Object.entries(
-        flattenObject(span.rawFeedback ?? {})
-      )) {
-        if (v != null && k !== '_keys') {
-          feedbackKeys[k] = true;
-        }
-      }
-    });
-
-    const feedbackOrder = Object.keys(feedbackKeys);
-    const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
-    colGroupingModel.push(feedbackGrouping);
-    for (const key of feedbackOrder) {
+    for (const key of allDynamicColumnNames) {
       cols.push({
         flex: 1,
         minWidth: 150,
-        field: 'feedback.' + key,
+        field: key,
         headerName: key.split('.').slice(-1)[0],
         renderCell: cellParams => {
-          return renderCell((cellParams.row as any)['feedback.' + key]);
+          const val = (cellParams.row as any)[key];
+          if (val === undefined) {
+            return <NotApplicable />;
+          }
+          return renderCell(val);
         },
       });
     }
 
+    // // CPR (Tim) - (Flattening): Yeah, this is going to change likely.
+    // // Gets the children of a expanded group field(a ref that has been expanded)
+    // // returns an array of column definitions, for the children
+    // const getGroupChildren = (groupField: string) => {
+    //   // start children array with self
+    //   const colGroupChildren = [{field: groupField}];
+    //   // get the expanded columns for the group field
+    //   const expandCols = expandedColInfo[groupField] ?? [];
+    //   // for each expanded column, add a column definition
+    //   for (const col of expandCols) {
+    //     // Don't show name or description column for expanded refs
+    //     if (col.path === 'name' || col.path === 'description') {
+    //       continue;
+    //     }
+    //     const expandField = groupField + '.' + col.path;
+    //     cols.push({
+    //       flex: 1,
+    //       field: expandField,
+    //       // Sorting on expanded ref columns is not supported
+    //       sortable: false,
+    //       // Filtering on expanded ref columns is not supported
+    //       filterable: false,
+    //       renderHeader: headerParams => (
+    //         <CustomGroupedColumnHeader field={headerParams.field} />
+    //       ),
+    //       renderCell: cellParams => {
+    //         const weaveRef = (cellParams.row as any)[groupField];
+    //         if (weaveRef === undefined) {
+    //           return <NotApplicable />;
+    //         }
+    //         return (
+    //           <ErrorBoundary>
+    //             <RefValue weaveRef={weaveRef} attribute={col.path} />
+    //           </ErrorBoundary>
+    //         );
+    //       },
+    //     });
+    //     colGroupChildren.push({field: expandField});
+    //   }
+    //   return colGroupChildren;
+    // };
+
+    // const addColumnGroup = (groupName: string, colOrder: string[]) => {
+    //   const colGroup: GridColumnGroup = {
+    //     groupId: groupName,
+    //     children: [],
+    //   };
+
+    //   for (const key of colOrder) {
+    //     const field = groupName + '.' + key;
+    //     const fields = key.split('.');
+    //     const isExpanded = expandedRefCols.has(field);
+    //     cols.push({
+    //       ...(isExpanded
+    //         ? {
+    //             // if the ref is expanded it will only be an icon and we want to give the ref icon less column space
+    //             width: 100,
+    //           }
+    //         : {
+    //             flex: 1,
+    //             minWidth: 150,
+    //           }),
+    //       field,
+    //       renderHeader: () => {
+    //         const hasExpand = columnHasRefs(tableStats, field);
+    //         return (
+    //           <ExpandHeader
+    //             // if the field is a flattened field, use the last key as the header
+    //             headerName={isExpanded ? 'Ref' : fields.slice(-1)[0]}
+    //             field={field}
+    //             hasExpand={hasExpand && !isExpanded}
+    //             onExpand={onExpand}
+    //           />
+    //         );
+    //       },
+    //       renderCell: cellParams => {
+    //         if (field in cellParams.row) {
+    //           const value = (cellParams.row as any)[field];
+    //           return (
+    //             <ErrorBoundary>
+    //               <CellValue value={value} isExpanded={isExpanded} />
+    //             </ErrorBoundary>
+    //           );
+    //         }
+    //         console.log(cellParams.row, field);
+    //         return <NotApplicable />;
+    //       },
+    //     });
+
+    //     // if ref is expanded add the ref children to the colGroup
+    //     if (isExpanded) {
+    //       colGroup.children.push({
+    //         groupId: field,
+    //         headerName: key,
+    //         // Nests all the children here
+    //         children: getGroupChildren(field),
+    //         renderHeaderGroup: () => {
+    //           return (
+    //             <CollapseGroupHeader
+    //               headerName={key}
+    //               field={field}
+    //               onCollapse={onCollapse}
+    //             />
+    //           );
+    //         },
+    //       });
+    //     } else {
+    //       // if ref is not expanded add the column to the colGroup
+    //       addToTree(colGroup, fields, field, 0);
+    //     }
+    //   }
+    //   colGroupingModel.push(colGroup);
+    // };
+
+    // // CPR (Tim) - (Flattening): Refactor this away
+    // // Add input columns
+    // const inputOrder = !isSingleOpVersion
+    //   ? getInputColumns(tableStats)
+    //   : row0.rawSpan.inputs._arg_order ??
+    //     row0.rawSpan.inputs._keys ??
+    //     Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
+    //       k => !k.startsWith('_')
+    //     );
+
+    // addColumnGroup('inputs', inputOrder);
+
+    // // Add output columns
+    // if (!onlyOneOutputResult) {
+    //   // All output keys as we don't have the order key yet.
+    //   const outputKeys: {[key: string]: true} = {};
+    //   newSpans.forEach(span => {
+    //     for (const [k, v] of Object.entries(
+    //       flattenObject(span.rawSpan.output ?? {})
+    //     )) {
+    //       if (v != null && (!k.startsWith('_') || k === '_result')) {
+    //         outputKeys[k] = true;
+    //       }
+    //     }
+    //   });
+
+    //   const outputOrder = Object.keys(outputKeys);
+    //   addColumnGroup('output', outputOrder);
+    //   // CPR (Tim) - (Flattening): Pretty sure this else branch goes away (or rather the one above.)
+    // } else {
+    //   // If there is only one output _result, we don't need to do all the work on outputs
+    //   // we add one special group from the _result and allow it to be expanded one level
+    //   const colGroup: GridColumnGroup = {
+    //     groupId: 'outputs',
+    //     children: [],
+    //     headerName: 'outputs',
+    //     renderHeaderGroup: () => {
+    //       return (
+    //         <CollapseGroupHeader
+    //           headerName={'output'}
+    //           field={'output'}
+    //           onCollapse={onCollapse}
+    //         />
+    //       );
+    //     },
+    //   };
+
+    //   const isExpanded = expandedRefCols.has('output');
+    //   cols.push({
+    //     ...(isExpanded
+    //       ? {
+    //           // if the ref is expanded it will only be an icon and we want to give the ref icon less column space
+    //           width: 100,
+    //         }
+    //       : {
+    //           flex: 1,
+    //           minWidth: 150,
+    //         }),
+    //     field: 'output',
+    //     renderHeader: () => {
+    //       const hasExpand = columnHasRefs(tableStats, 'output');
+    //       return (
+    //         <ExpandHeader
+    //           // if the field is a flattened field, use the last key as the header
+    //           headerName={isExpanded ? 'Ref' : 'outputs'}
+    //           field={'output'}
+    //           hasExpand={hasExpand && !isExpanded}
+    //           onExpand={onExpand}
+    //         />
+    //       );
+    //     },
+    //     renderCell: cellParams => {
+    //       return (
+    //         <ErrorBoundary>
+    //           <CellValue
+    //             value={(cellParams.row as any).output}
+    //             isExpanded={isExpanded}
+    //           />
+    //         </ErrorBoundary>
+    //       );
+    //     },
+    //   });
+
+    //   // if ref is expanded add the ref children to the colGroup
+    //   if (isExpanded) {
+    //     colGroup.children.push(...getGroupChildren('output'));
+    //   }
+    //   colGroupingModel.push(colGroup);
+    // }
+
+    // const feedbackKeys: {[key: string]: true} = {};
+    // newSpans.forEach(span => {
+    //   for (const [k, v] of Object.entries(
+    //     flattenObject(span.rawFeedback ?? {})
+    //   )) {
+    //     if (v != null && k !== '_keys') {
+    //       feedbackKeys[k] = true;
+    //     }
+    //   }
+    // });
+
+    // const feedbackOrder = Object.keys(feedbackKeys);
+    // const feedbackGrouping = buildTree(feedbackOrder, 'feedback');
+    // colGroupingModel.push(feedbackGrouping);
+    // for (const key of feedbackOrder) {
+    //   cols.push({
+    //     flex: 1,
+    //     minWidth: 150,
+    //     field: 'feedback.' + key,
+    //     headerName: key.split('.').slice(-1)[0],
+    //     renderCell: cellParams => {
+    //       return renderCell((cellParams.row as any)['feedback.' + key]);
+    //     },
+    //   });
+    // }
+
     cols.push({
-      field: 'userId',
+      field: 'wb_user_id',
       headerName: 'User',
       headerAlign: 'center',
       width: 50,
@@ -854,11 +773,17 @@ export const CallsTable: FC<{
       sortable: false,
       resizable: false,
       disableColumnMenu: true,
-      renderCell: cellParams => <UserLink username={cellParams.row.userId} />,
+      renderCell: cellParams => {
+        const user_id = cellParams.row.wb_user_id;
+        if (user_id == null) {
+          return null;
+        }
+        return <UserLink username={user_id} />;
+      },
     });
 
     if (!ioColumnsOnly) {
-      cols.push({
+      const startedAtCol: GridColDef<(typeof tableData)[number]> = {
         field: 'started_at',
         headerName: 'Called',
         // Should have custom timestamp filter here.
@@ -866,19 +791,20 @@ export const CallsTable: FC<{
         width: 100,
         minWidth: 100,
         maxWidth: 100,
-        renderCell: (cellParams: any) => {
+        renderCell: cellParams => {
           return (
             <Timestamp
-              value={cellParams.row.started_at / 1000}
+              value={convertISOToDate(cellParams.row.started_at) / 1000}
               format="relative"
             />
           );
         },
-      });
+      };
+      cols.push(startedAtCol);
     }
 
     cols.push({
-      field: 'latency',
+      field: 'derived.latency',
       headerName: 'Latency',
       width: 100,
       minWidth: 100,
@@ -887,50 +813,26 @@ export const CallsTable: FC<{
       filterable: false,
       sortable: false,
       renderCell: cellParams => {
-        if (cellParams.row.status_code === 'UNSET') {
+        const status_code = traceCallStatusCode(cellParams.row);
+        if (status_code === 'UNSET') {
           // Call is still in progress, latency will be 0.
           // Displaying nothing seems preferable to being misleading.
           return null;
         }
-        return monthRoundedTime(cellParams.row.latency);
+        return monthRoundedTime(traceCallLatencyS(cellParams.row));
       },
     });
 
-    return {cols, colGroupingModel};
+    return {cols, colGroupingModel: groupingModel};
   }, [
-    expandedColInfo,
-    expandedRefCols,
-    ioColumnsOnly,
     isSingleOp,
     isSingleOpVersion,
-    onlyOneOutputResult,
+    allDynamicColumnNames,
+    ioColumnsOnly,
     entity,
     project,
     preservePath,
-    newSpans,
-    tableStats,
   ]);
-
-  // CPR (tim) - (GeneralRefactoring): Again, move to a hook
-  const autosized = useRef(false);
-  // const {peekingRouter} = useWeaveflowRouteContext();
-  // const history = useHistory();
-  useEffect(() => {
-    if (!apiRefIsReady) {
-      return;
-    }
-    if (autosized.current) {
-      return;
-    }
-    if (callsLoading) {
-      return;
-    }
-    autosized.current = true;
-    apiRef.current.autosizeColumns({
-      includeHeaders: true,
-      expand: true,
-    });
-  }, [apiRef, callsLoading, apiRefIsReady]);
 
   // CPR (Tim) - (GeneralRefactoring): These will get extracted into their own controls (at least sorting will)
   const initialStateRaw: ComponentProps<typeof DataGridPro>['initialState'] =
@@ -939,7 +841,7 @@ export const CallsTable: FC<{
         return undefined;
       }
       return {
-        pinnedColumns: {left: ['span_id']},
+        pinnedColumns: {left: ['op_name']},
       };
     }, [callsLoading]);
 
@@ -954,7 +856,9 @@ export const CallsTable: FC<{
   // see https://github.com/mui/mui-x/issues/6206
   useEffect(() => {
     if (apiRefIsReady && columns != null && initialState != null) {
-      apiRef.current.restoreState(initialState);
+      apiRef.current.restoreState({
+        pinnedColumns: {left: ['op_name']},
+      });
     }
   }, [columns, initialState, apiRef, apiRefIsReady]);
 
@@ -1115,6 +1019,7 @@ export const CallsTable: FC<{
         experimentalFeatures={{columnGrouping: true}}
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
+        // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
         sx={{
@@ -1236,12 +1141,12 @@ function addToTree(
   addToTree(newNode, fields.slice(1), fullPath, depth + 1);
 }
 
-function buildTree(strings: string[], rootGroupName: string): GridColumnGroup {
-  const root: GridColumnGroup = {groupId: rootGroupName, children: []};
+function buildTree(strings: string[]): GridColumnGroup {
+  const root: GridColumnGroup = {groupId: '', children: []};
 
   for (const str of strings) {
     const fields = str.split('.');
-    addToTree(root, fields, rootGroupName + '.' + str, 0);
+    addToTree(root, fields, str, 0);
   }
 
   return root;

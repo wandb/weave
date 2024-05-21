@@ -1007,25 +1007,37 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 
 /// Converters ///
 
+export const traceCallStatusCode = (traceCall: traceServerClient.TraceCallSchema) => {
+  if (traceCall.exception) {
+    return 'ERROR';
+  } else if (traceCall.ended_at) {
+    return 'SUCCESS';
+  } else {
+    return 'UNSET';
+  }
+}
+
+export const traceCallLatencyS = (traceCall: traceServerClient.TraceCallSchema) => {
+  const startDate = convertISOToDate(traceCall.started_at);
+  const endDate = traceCall.ended_at
+    ? convertISOToDate(traceCall.ended_at)
+    : null;
+  let latencyS = 0;
+  if (startDate && endDate) {
+    latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
+  }
+  return latencyS;
+}
+
 const traceCallToLegacySpan = (
   traceCall: traceServerClient.TraceCallSchema
 ): RawSpanFromStreamTableEra => {
   const startDate = convertISOToDate(traceCall.started_at);
   const endDate = traceCall.ended_at
-    ? convertISOToDate(traceCall.ended_at)
-    : null;
-  let statusCode = 'UNSET';
-  if (traceCall.exception) {
-    statusCode = 'ERROR';
-  } else if (traceCall.ended_at) {
-    statusCode = 'SUCCESS';
-  }
-  let latencyS = 0;
-  if (startDate && endDate) {
-    latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
-  }
+  ? convertISOToDate(traceCall.ended_at)
+  : null;
   const summary = {
-    latency_s: latencyS,
+    latency_s: traceCallLatencyS(traceCall),
     ...(traceCall.summary ?? {}),
   };
 
@@ -1053,7 +1065,7 @@ const traceCallToLegacySpan = (
     name: traceCall.op_name,
     inputs: traceCall.inputs,
     output,
-    status_code: statusCode,
+    status_code: traceCallStatusCode(traceCall),
     exception: traceCall.exception,
     attributes: traceCall.attributes,
     summary,
@@ -1095,12 +1107,13 @@ const traceCallToUICallSchema = (
     rawFeedback: {},
     userId: traceCall.wb_user_id ?? null,
     runId: traceCall.wb_run_id ?? null,
+    traceCall,
   };
 };
 
 /// Utility Functions ///
 
-const convertISOToDate = (iso: string) => {
+export const convertISOToDate = (iso: string): Date => {
   return new Date(iso);
 };
 

@@ -44,6 +44,7 @@ export type CallSchema = CallKey & {
   rawFeedback?: any;
   userId: string | null;
   runId: string | null;
+  traceCall?: traceServerClient.TraceCallSchema; // this will eventually be the entire call schema
 };
 
 export type CallFilter = {
