@@ -18,7 +18,6 @@ from .. import errors
 from .. import environment
 from .. import storage
 from .. import artifact_fs
-from .. import infer_types
 
 from . import serializer
 
@@ -44,26 +43,6 @@ def type_code(type_: Any) -> str:
             return f"{type_.__origin__}[{args}]"
     else:
         return type_.__name__
-
-
-def generate_referenced_type_code(type_: Any) -> Optional[str]:
-    # Given a function that may have type annotations, generate non-redundant
-    # code that declares any referenced types and their referenced types and
-    # so on.
-
-    # Absolutely horrible and hacky. This is not recursive in a tree/graph
-    # way, its linear, so it'll only produce one TypedDict if there are many.
-    # Using this to get the versioned object notebook working.
-    if infer_types.is_typed_dict_like(type_):
-        result = f"class {type_.__name__}(typing.TypedDict):\n"  # type: ignore
-        for k in type_.__annotations__:
-            result += f"    {k}: {type_code(type_.__annotations__[k])}\n"
-        return result
-    elif isinstance(type_, py_types.GenericAlias) or isinstance(
-        type_, typing._GenericAlias  # type: ignore
-    ):
-        return generate_referenced_type_code(type_.__args__[0])
-    return None
 
 
 def arg_names(args: ast.arguments) -> set[str]:
@@ -215,7 +194,8 @@ class GetCodeDepsResult(typing.TypedDict):
 
 
 def get_code_deps(
-    fn: typing.Callable, artifact: artifact_fs.FilesystemArtifact
+    fn: Union[typing.Callable, type],  # A function or a class
+    artifact: artifact_fs.FilesystemArtifact,
 ) -> GetCodeDepsResult:
     """Given a python function, return source code that contains the dependencies of that function.
 
@@ -259,7 +239,11 @@ def get_code_deps(
         var_value = None
         if isinstance(fn, py_types.FunctionType):
             var_value = resolve_var(fn, var_name)
-        # var_value = fn.__globals__.get(var_name)
+        if var_value is None:
+            # Try to resolve the variable from the module that the
+            # item appears within.
+            module = inspect.getmodule(fn)
+            var_value = module.__dict__.get(var_name)
         if var_value is None:
             if getattr(builtins, var_name, None):
                 # Its a builtin, carry on
@@ -272,7 +256,7 @@ def get_code_deps(
             if var_value.__name__ != var_name:
                 import_line += f" as {var_name}"
             import_code.append(import_line)
-        elif isinstance(var_value, (py_types.FunctionType, type)):
+        elif isinstance(var_value, (py_types.FunctionType, Op, type)):
             if var_value.__module__ == fn.__module__:
                 # For now, if the function is in another module.
                 # we just import it. This is ok for libraries, but not
@@ -293,11 +277,18 @@ def get_code_deps(
                 if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
                     pass
 
-                import_line = f"from {var_value.__module__} import {var_value.__name__}"
-                if var_value.__name__ != var_name:
-                    import_line += f"as {var_name}"
+                if isinstance(var_value, Op):
+                    warnings.append(
+                        f"Cross-module op dependencies are not yet serializable {var_value}"
+                    )
+                else:
+                    import_line = (
+                        f"from {var_value.__module__} import {var_value.__name__}"
+                    )
+                    if var_value.__name__ != var_name:
+                        import_line += f"as {var_name}"
 
-                import_code.append(import_line)
+                    import_code.append(import_line)
 
         else:
             if (
@@ -311,6 +302,8 @@ def get_code_deps(
                 import_code.append(import_line)
             else:
                 try:
+                    # This relies on old Weave type mechanism.
+                    # TODO: Update to use new Weave trace serialization mechanism.
                     json_val = storage.to_json_with_refs(
                         var_value, artifact, path=[var_name]
                     )
@@ -411,17 +404,6 @@ def save_instance(
         else:
             # print(message)
             pass
-
-    # This is hacky handling of TypedDict annotations. Fixes
-    # 2_images_gen notebook test.
-    # Create TypedDict types for referenced TypedDicts
-    resolve_annotations = obj.resolve_fn.__annotations__
-    for k, type_ in resolve_annotations.items():
-        gen_type_code = generate_referenced_type_code(type_)
-        if gen_type_code is not None:
-            code.append(gen_type_code)
-            if "typing" in gen_type_code:
-                import_code.insert(0, "import typing")
 
     op_function_code = textwrap.dedent(inspect.getsource(obj.resolve_fn))
     if "op()" not in op_function_code:

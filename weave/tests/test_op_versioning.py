@@ -420,7 +420,7 @@ def some_d(v: int) -> SomeDict:
 """
 
 
-def test_op_return_typeddict_annotation(client):
+def test_op_return_typeddict_annotation(client, strict_op_saving):
     class SomeDict(typing.TypedDict):
         val: int
 
