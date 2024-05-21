@@ -529,6 +529,7 @@ export const CallsTable: FC<{
         // This filter should be controlled by the custom filter
         // in the header
         filterable: false,
+        sortable: false,
         width: 250,
         hideable: false,
         renderCell: rowParams => {
@@ -679,8 +680,7 @@ export const CallsTable: FC<{
 
     const addColumnGroup = (groupName: string, colOrder: string[]) => {
       const colGroup: GridColumnGroup = {
-        // input -> inputs, output -> outputs
-        groupId: groupName + 's',
+        groupId: groupName,
         children: [],
       };
 
@@ -758,7 +758,7 @@ export const CallsTable: FC<{
         Object.keys(_.omitBy(row0.rawSpan.inputs, v => v == null)).filter(
           k => !k.startsWith('_')
         );
-    addColumnGroup('input', inputOrder);
+    addColumnGroup('inputs', inputOrder);
 
     // Add output columns
     if (!onlyOneOutputResult) {
@@ -907,6 +907,7 @@ export const CallsTable: FC<{
       maxWidth: 100,
       // Should probably have a custom filter here.
       filterable: false,
+      sortable: false,
       renderCell: cellParams => {
         if (cellParams.row.status_code === 'UNSET') {
           // Call is still in progress, latency will be 0.
