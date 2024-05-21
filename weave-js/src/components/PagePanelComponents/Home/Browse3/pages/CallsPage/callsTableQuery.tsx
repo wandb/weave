@@ -33,12 +33,6 @@ export const useCallsForQuery = (
   const offset = gridPage.page * gridPage.pageSize;
   const limit = gridPage.pageSize;
 
-  const overLimit = useMemo(() => {
-    const INCREMENT = 50; // this is pretty lame that we have to do this. The data grid thrashes between different sized
-    const atLeast = limit + 1;
-    return Math.ceil(atLeast / INCREMENT) * INCREMENT;
-  }, [limit]);
-
   const sortBy = useDeepMemo(
     useMemo(() => {
       return gridSort.map(sort => {
@@ -90,7 +84,7 @@ export const useCallsForQuery = (
     entity,
     project,
     lowLevelFilter,
-    overLimit,
+    limit,
     offset,
     sortBy,
     filterBy

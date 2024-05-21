@@ -216,7 +216,7 @@ export const CallsTable: FC<{
 
   // 4. Pagination
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
-    pageSize: 3,
+    pageSize: 100,
     page: 0,
   });
 
@@ -1142,14 +1142,11 @@ export const CallsTable: FC<{
           // FILTER SECTION END
           // PAGINATION SECTION START
           pagination
-          // Auto page size is pretty nice except when resizing on not-first page
-          autoPageSize
           rowCount={callsTotal}
           paginationMode="server"
           paginationModel={paginationModel}
           onPaginationModelChange={newModel => setPaginationModel(newModel)}
-          // Empty list required to disable showing selector
-          pageSizeOptions={[]}
+          pageSizeOptions={[100]}
           // PAGINATION SECTION END
           rowHeight={38}
           columns={columns.cols as any}
