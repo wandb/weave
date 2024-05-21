@@ -146,19 +146,17 @@ def decode_custom_obj(
         if not isinstance(ref, ObjectRef):
             raise ValueError(f"Expected ObjectRef, got {load_instance_op_uri}")
         wc = require_graph_client()
-        # Can return None if op load fails. I think this might happen
-        # if a library is not installed?
-        # TODO: check this. We need to raise an error in this case
-        # if a library is not installed!
         load_instance_op = wc.get(ref)
+        if load_instance_op == None:  # == to check for None or BoxedNone
+            raise ValueError(
+                f"Failed to load op needed to decoded object of type {weave_type}. See logs above for more information."
+            )
 
     if load_instance_op is None:
         serializer = get_serializer_by_id(weave_type["type"])
         if serializer is None:
             raise ValueError(f"No serializer found for {weave_type}")
         load_instance_op = serializer.load
-        # wb_type = types.TypeRegistry.type_from_dict(weave_type)
-        # load_instance_op = wb_type.load_instance
 
     art = MemTraceFilesArtifact(
         encoded_path_contents,

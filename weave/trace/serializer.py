@@ -1,3 +1,39 @@
+"""Pluggable object serializers for Weave
+
+Example:
+
+```
+import faiss
+
+
+from weave.trace import serializer
+
+
+def save_instance(obj: faiss.Index, artifact, name: str) -> None:
+    with artifact.writeable_file_path(f"{name}.faissindex") as write_path:
+        faiss.write_index(obj, write_path)
+
+
+def load_instance(
+    artifact,
+    name: str,
+) -> faiss.Index:
+    return faiss.read_index(artifact.path(f"{name}.faissindex"))
+
+
+serializer.register_serializer(faiss.Index, save_instance, load_instance)
+```
+
+After the register_serializer call, if the user tries to save an object
+that has a faiss.Index attribute, Weave will store the full FAISS index
+instead of just a repr string.
+
+We will also save the load_instance method as an op, and add a reference
+to the load op from the saved object, so that the object can be correctly
+deserialized in a Python runtime that does not have the serializer
+registered.
+"""
+
 from typing import Callable, Any, Optional
 from dataclasses import dataclass
 
