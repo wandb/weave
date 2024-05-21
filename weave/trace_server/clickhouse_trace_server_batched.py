@@ -851,7 +851,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if self._use_async_insert:
                 settings["async_insert"] = 1
                 settings["wait_for_async_insert"] = 0
-
             self._insert(
                 "call_parts",
                 data=batch,
