@@ -443,6 +443,43 @@ def test_op_return_typeddict_annotation(client, strict_op_saving):
     assert op2(2) == {"val": 2}
 
 
+EXPECTED_RETURN_CUSTOM_CLASS_CODE = """import weave
+
+class MyCoolClass:
+    val: int
+
+    def __init__(self, val):
+        self.val = val
+
+@weave.op()
+def some_d(v: int):
+    return MyCoolClass(v)
+"""
+
+
+def test_op_return_return_custom_class(client, strict_op_saving):
+    class MyCoolClass:
+        val: int
+
+        def __init__(self, val):
+            self.val = val
+
+    @weave.op()
+    def some_d(v: int):
+        return MyCoolClass(v)
+
+    assert some_d(1).val == 1
+
+    ref = weave.obj_ref(some_d)
+    assert ref is not None
+
+    saved_code = get_saved_code(client, ref)
+    print("SAVED_CODE")
+    print(saved_code)
+
+    assert saved_code == EXPECTED_RETURN_CUSTOM_CLASS_CODE
+
+
 def test_op_basic_execution(client):
     @weave.op()
     def adder(v: int) -> int:
