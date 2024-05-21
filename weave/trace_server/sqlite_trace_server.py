@@ -365,8 +365,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     field = "attributes_dump" + field[len("attributes") :]
                 elif field.startswith("summary"):
                     field = "summary_dump" + field[len("summary") :]
-                elif field == ("latency"):
-                    field = "ended_at - started_at"
+                
 
                 assert direction in [
                     "ASC",

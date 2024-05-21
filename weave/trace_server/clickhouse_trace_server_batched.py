@@ -862,8 +862,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     _,
                 ) = _transform_external_calls_field_to_internal_calls_field(field)
                 parameters.update(param_builder.get_params())
-                if field == ("latency"):
-                    field = "ended_at - started_at"
 
                 assert direction in [
                     "ASC",
