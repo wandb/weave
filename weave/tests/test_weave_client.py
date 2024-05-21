@@ -5,6 +5,7 @@ import requests
 import pytest
 import pydantic
 from pydantic import BaseModel
+import json
 import weave
 import asyncio
 from weave import op_def, Evaluation
@@ -17,6 +18,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     DICT_KEY_EDGE_NAME,
 )
+from weave.trace.serializer import register_serializer
 
 from weave.trace import refs
 from weave.trace.tests.testutil import ObjectRefStrMatcher
@@ -350,7 +352,7 @@ def test_opdef(client):
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_saveload_customtype(client):
+def test_saveload_op(client):
     @weave.op()
     def add2(x, y):
         return x + y
@@ -366,6 +368,33 @@ def test_saveload_customtype(client):
     assert obj2["a"].name == "op-add2"
     assert isinstance(obj2["b"], op_def.OpDef)
     assert obj2["b"].name == "op-add3"
+
+
+def test_saveload_customtype(client):
+
+    class MyCustomObj:
+        a: int
+        b: str
+
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+    def custom_obj_save(obj, artifact, name) -> None:
+        with artifact.new_file(f"{name}.json") as f:
+            json.dump({"a": obj.a, "b": obj.b}, f)
+
+    def custom_obj_load(artifact, name):
+        with artifact.open(f"{name}.json") as f:
+            json_obj = json.load(f)
+            return MyCustomObj(json_obj["a"], json_obj["b"])
+
+    register_serializer(MyCustomObj, custom_obj_save, custom_obj_load)
+
+    obj = MyCustomObj(5, "x")
+    ref = client.save_object(obj, "my-obj")
+    obj2 = client.get(ref)
+    assert isinstance(obj2, MyCustomObj)
 
 
 def test_save_unknown_type(client):
@@ -631,16 +660,15 @@ def test_large_files(client):
         def __init__(self, a):
             self.a = a
 
-    class CoolCustomThingType(weave.types.Type):
-        instance_classes = CoolCustomThing
+    def save_instance(obj, artifact, name):
+        with artifact.new_file(name) as f:
+            f.write(obj.a * 10000005)
 
-        def save_instance(self, obj, artifact, name):
-            with artifact.new_file(name) as f:
-                f.write(obj.a * 10000005)
+    def load_instance(artifact, name, extra=None):
+        with artifact.open(name) as f:
+            return CoolCustomThing(f.read())
 
-        def load_instance(self, artifact, name, extra=None):
-            with artifact.open(name) as f:
-                return CoolCustomThing(f.read())
+    register_serializer(CoolCustomThing, save_instance, load_instance)
 
     ref = client.save_object(CoolCustomThing("x"), "my-obj")
     res = client.get(ref)

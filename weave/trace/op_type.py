@@ -14,20 +14,19 @@ from typing import Any, Callable, Union, Optional
 
 from .. import errors
 from .. import context_state
-from .. import weave_types as types
-from .. import registry_mem
 from .. import errors
 from .. import environment
 from .. import storage
 from .. import artifact_fs
 from .. import infer_types
 
+from . import serializer
+
 
 from weave.trace.refs import ObjectRef
 
 
-if typing.TYPE_CHECKING:
-    from .op import Op
+from .op import Op
 
 
 def type_code(type_: Any) -> str:
@@ -387,110 +386,112 @@ def dedupe_list(original_list: list[str]) -> list[str]:
     return deduped
 
 
-class OpType(types.Type):
-    def save_instance(
-        self, obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
-    ) -> None:
-        # Type annotations are not well handled at the moment.
-        # Get import statements for any annotations
-        # code += (
-        #     "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
-        #     + "\n\n"
-        # )
+def save_instance(
+    obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
+) -> None:
+    # Type annotations are not well handled at the moment.
+    # Get import statements for any annotations
+    # code += (
+    #     "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
+    #     + "\n\n"
+    # )
 
-        result = get_code_deps(obj.resolve_fn, artifact)
-        import_code = result["import_code"]
-        code = result["code"]
-        warnings = result["warnings"]
-        if warnings:
-            message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
-            for warning in warnings:
-                message += "\n  " + warning
-            if context_state.get_strict_op_saving():
-                raise errors.WeaveOpSerializeError(message)
-            else:
-                # print(message)
-                pass
+    result = get_code_deps(obj.resolve_fn, artifact)
+    import_code = result["import_code"]
+    code = result["code"]
+    warnings = result["warnings"]
+    if warnings:
+        message = f"Warning: Incomplete serialization for op {obj}. This op may not be reloadable"
+        for warning in warnings:
+            message += "\n  " + warning
+        if context_state.get_strict_op_saving():
+            raise errors.WeaveOpSerializeError(message)
+        else:
+            # print(message)
+            pass
 
-        # This is hacky handling of TypedDict annotations. Fixes
-        # 2_images_gen notebook test.
-        # Create TypedDict types for referenced TypedDicts
-        resolve_annotations = obj.resolve_fn.__annotations__
-        for k, type_ in resolve_annotations.items():
-            gen_type_code = generate_referenced_type_code(type_)
-            if gen_type_code is not None:
-                code.append(gen_type_code)
-                if "typing" in gen_type_code:
-                    import_code.insert(0, "import typing")
+    # This is hacky handling of TypedDict annotations. Fixes
+    # 2_images_gen notebook test.
+    # Create TypedDict types for referenced TypedDicts
+    resolve_annotations = obj.resolve_fn.__annotations__
+    for k, type_ in resolve_annotations.items():
+        gen_type_code = generate_referenced_type_code(type_)
+        if gen_type_code is not None:
+            code.append(gen_type_code)
+            if "typing" in gen_type_code:
+                import_code.insert(0, "import typing")
 
-        code.append(textwrap.dedent(inspect.getsource(obj.resolve_fn)))
-        with artifact.new_file(f"{name}.py") as f:
-            import_block = "\n".join(import_code)
-            import_lines = ["import weave"] + import_block.split("\n")
-            import_lines = dedupe_list(import_lines)
-            import_lines = [l for l in import_lines if "weave.api" not in l]
-            import_block = "\n".join(import_lines)
-            code_block = "\n".join(code)
-            f.write(f"{import_block}\n\n{code_block}")
+    op_function_code = textwrap.dedent(inspect.getsource(obj.resolve_fn))
+    if "op()" not in op_function_code:
+        op_function_code = "@weave.op()\n" + op_function_code
+    code.append(op_function_code)
 
-    def load_instance(
-        self,
-        artifact: artifact_fs.FilesystemArtifact,
-        name: str,
-        extra: Optional[list[str]] = None,
-    ) -> Optional["Op"]:
-        if environment.wandb_production():
-            # Returning None here instead of erroring allows the Weaveflow app
-            # to reference op defs without crashing.
+    with artifact.new_file(f"{name}.py") as f:
+        import_block = "\n".join(import_code)
+        import_lines = ["import weave"] + import_block.split("\n")
+        import_lines = dedupe_list(import_lines)
+        import_lines = [l for l in import_lines if "weave.api" not in l]
+        import_block = "\n".join(import_lines)
+        code_block = "\n".join(code)
+        f.write(f"{import_block}\n\n{code_block}")
+
+
+def load_instance(
+    artifact: artifact_fs.FilesystemArtifact,
+    name: str,
+) -> Optional["Op"]:
+    if environment.wandb_production():
+        # Returning None here instead of erroring allows the Weaveflow app
+        # to reference op defs without crashing.
+        return None
+
+    file_name = f"{name}.py"
+    module_path = artifact.path(file_name)
+
+    # Python import caching means we can't just import "obj.py" here
+    # because serialized ops would be cached at the "obj" key. We include
+    # the version in the module name to avoid this. Since version names
+    # are content hashes, this is correct.
+    #
+    art_and_version_dir = module_path[: -(1 + len(file_name))]
+    art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
+    module_dir = art_dir
+    import_name = (
+        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
+    )
+
+    sys.path.insert(0, os.path.abspath(module_dir))
+    with context_state.no_op_register():
+        try:
+            mod = __import__(import_name, fromlist=[module_dir])
+        except Exception as e:
+            print("Op loading exception. This might be fine!", e)
+            import traceback
+
+            traceback.print_exc()
             return None
+    sys.path.pop(0)
 
-        file_name = f"{name}.py"
-        module_path = artifact.path(file_name)
-
-        # Python import caching means we can't just import "obj.py" here
-        # because serialized ops would be cached at the "obj" key. We include
-        # the version in the module name to avoid this. Since version names
-        # are content hashes, this is correct.
-        #
-        art_and_version_dir = module_path[: -(1 + len(file_name))]
-        art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
-        module_dir = art_dir
-        import_name = (
-            version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
+    # In the case where the saved op calls another op, we will have multiple
+    # ops in the file. The file will look like
+    # op1 = weave.ref('...').get()
+    # @weave.op()
+    # def op2():
+    #     op1()
+    #
+    # We need to get the last declared op in the module. We can't do this
+    # simply by iterating module attributes, because order is not guaranteed,
+    # so we resort to looking at the source ast.
+    last_op_function = find_last_weave_op_function(inspect.getsource(mod))
+    if last_op_function is None:
+        print(
+            f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
         )
+        return None
 
-        sys.path.insert(0, os.path.abspath(module_dir))
-        with context_state.no_op_register():
-            try:
-                mod = __import__(import_name, fromlist=[module_dir])
-            except Exception as e:
-                print("Op loading exception. This might be fine!", e)
-                import traceback
+    od: "Op" = getattr(mod, last_op_function.name)
 
-                traceback.print_exc()
-                return None
-        sys.path.pop(0)
-
-        # In the case where the saved op calls another op, we will have multiple
-        # ops in the file. The file will look like
-        # op1 = weave.ref('...').get()
-        # @weave.op()
-        # def op2():
-        #     op1()
-        #
-        # We need to get the last declared op in the module. We can't do this
-        # simply by iterating module attributes, because order is not guaranteed,
-        # so we resort to looking at the source ast.
-        last_op_function = find_last_weave_op_function(inspect.getsource(mod))
-        if last_op_function is None:
-            print(
-                f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
-            )
-            return None
-
-        od: "Op" = getattr(mod, last_op_function.name)
-
-        return od
+    return od
 
 
 def fully_qualified_opname(wrap_fn: Callable) -> str:
@@ -500,3 +501,6 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     elif op_module_file.endswith(".pyc"):
         op_module_file = op_module_file[:-4]
     return "file://" + op_module_file + "." + wrap_fn.__name__
+
+
+serializer.register_serializer(Op, save_instance, load_instance)
