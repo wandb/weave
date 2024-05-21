@@ -223,21 +223,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         conditions = []
         param_builder = ParamBuilder()
+        raw_fields_used = set()
 
         if req.filter:
-            filter_conds, _ = _process_calls_filter_to_conditions(
+            filter_conds, _, fields_used = _process_calls_filter_to_conditions(
                 req.filter, param_builder
             )
+            raw_fields_used.update(fields_used)
             conditions.extend(filter_conds)
 
         if req.filter_by:
-            filter_by_conds, _ = _process_calls_filter_by_to_conditions(
+            filter_by_conds, _, fields_used = _process_calls_filter_by_to_conditions(
                 req.filter_by, param_builder
             )
+            raw_fields_used.update(fields_used)
             conditions.extend(filter_by_conds)
 
         stats = self._calls_query_stats_raw(
             req.project_id,
+            columns=list(raw_fields_used),
             conditions=conditions,
             parameters=param_builder.get_params(),
         )
@@ -251,13 +255,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         param_builder = ParamBuilder()
 
         if req.filter:
-            filter_conds, _ = _process_calls_filter_to_conditions(
-                req.filter, param_builder
-            )
+            (
+                filter_conds,
+                _,
+                _,
+            ) = _process_calls_filter_to_conditions(req.filter, param_builder)
             conditions.extend(filter_conds)
 
         if req.filter_by:
-            filter_by_conds, _ = _process_calls_filter_by_to_conditions(
+            filter_by_conds, _, _ = _process_calls_filter_by_to_conditions(
                 req.filter_by, param_builder
             )
             conditions.extend(filter_by_conds)
@@ -853,6 +859,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 (
                     field,
                     param_builder,
+                    _,
                 ) = _transform_external_calls_field_to_internal_calls_field(field)
                 parameters.update(param_builder.get_params())
                 if field == ("latency"):
@@ -901,6 +908,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _calls_query_stats_raw(
         self,
         project_id: str,
+        columns: typing.Optional[typing.List[str]] = None,
         conditions: typing.Optional[typing.List[str]] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.Dict:
@@ -915,10 +923,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         conditions_part = _combine_conditions(conditions, "AND")
 
+        if columns == None:
+            columns = ["id"]
+        columns = typing.cast(typing.List[str], columns)
+        if len(columns) == 0:
+            columns = ["id"]
+        # Stop injection
+        assert (
+            set(columns) - set(all_call_select_columns) == set()
+        ), f"Invalid columns: {columns}"
+        merged_cols = []
+        for col in columns:
+            if col in ["project_id", "id"]:
+                merged_cols.append(f"{col} AS {col}")
+            elif col in ["input_refs", "output_refs"]:
+                merged_cols.append(f"array_concat_agg({col}) AS {col}")
+            else:
+                merged_cols.append(f"any({col}) AS {col}")
+        select_columns_part = ", ".join(merged_cols)
+
         query_str = f"""
             SELECT COUNT(*)
             FROM (
-                SELECT id
+                SELECT {select_columns_part}
                 FROM calls_merged
                 WHERE project_id = {{project_id: String}}
                 GROUP BY project_id, id
@@ -1350,8 +1377,9 @@ def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: typing.Optional[str] = None,
     param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[str, ParamBuilder]:
+) -> tuple[str, ParamBuilder, set[str]]:
     param_builder = param_builder or ParamBuilder()
+    raw_fields_used = set()
     json_path = None
     if field == "inputs" or field.startswith("inputs."):
         if field == "inputs":
@@ -1384,6 +1412,7 @@ def _transform_external_calls_field_to_internal_calls_field(
     if field not in all_call_select_columns:
         raise ValueError(f"Unknown field: {field}")
 
+    raw_fields_used.add(field)
     if json_path is not None:
         json_path_param_name = param_builder.add_param(json_path)
         method = "toString"
@@ -1407,14 +1436,15 @@ def _transform_external_calls_field_to_internal_calls_field(
             + ":String}))"
         )
 
-    return field, param_builder
+    return field, param_builder, raw_fields_used
 
 
 def _process_calls_filter_to_conditions(
     filter: tsi._CallsFilter, param_builder: typing.Optional[ParamBuilder] = None
-) -> tuple[list[str], ParamBuilder]:
+) -> tuple[list[str], ParamBuilder, set[str]]:
     param_builder = param_builder or ParamBuilder()
     conditions = []
+    raw_fields_used = set()
 
     if filter.op_names:
         # We will build up (0 or 1) + N conditions for the op_version_refs
@@ -1435,12 +1465,14 @@ def _process_calls_filter_to_conditions(
             or_conditions.append(
                 f"op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
             )
+            raw_fields_used.add("op_name")
 
         for name in wildcarded_names:
             like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
             or_conditions.append(
                 f"op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
             )
+            raw_fields_used.add("op_name")
 
         if or_conditions:
             conditions.append(_combine_conditions(or_conditions, "OR"))
@@ -1449,48 +1481,57 @@ def _process_calls_filter_to_conditions(
         conditions.append(
             f"hasAny(input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
+        raw_fields_used.add("input_refs")
 
     if filter.output_refs:
         conditions.append(
             f"hasAny(output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
+        raw_fields_used.add("output_refs")
 
     if filter.parent_ids:
         conditions.append(
             f"parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
+        raw_fields_used.add("parent_id")
 
     if filter.trace_ids:
         conditions.append(
             f"trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
+        raw_fields_used.add("trace_id")
 
     if filter.call_ids:
         conditions.append(
             f"id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
+        raw_fields_used.add("id")
 
     if filter.trace_roots_only:
         conditions.append("parent_id IS NULL")
+        raw_fields_used.add("parent_id")
 
     if filter.wb_user_ids:
         conditions.append(
             f"wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
         )
+        raw_fields_used.add("wb_user_id")
 
     if filter.wb_run_ids:
         conditions.append(
             f"wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
         )
+        raw_fields_used.add("wb_run_id")
 
-    return conditions, param_builder
+    return conditions, param_builder, raw_fields_used
 
 
 def _process_calls_filter_by_to_conditions(
     filter_by: tsi._FilterBy, param_builder: typing.Optional[ParamBuilder] = None
-) -> tuple[list[str], ParamBuilder]:
+) -> tuple[list[str], ParamBuilder, set[str]]:
     param_builder = param_builder or ParamBuilder()
     conditions = []
+    raw_fields_used = set()
     # This is the mongo-style filter_by
     def process_operation(operation: tsi._Operation) -> str:
         cond = None
@@ -1534,9 +1575,14 @@ def _process_calls_filter_by_to_conditions(
                 _python_value_to_ch_type(operand.value_),
             )
         elif isinstance(operand, tsi._FieldSelect):
-            field, _ = _transform_external_calls_field_to_internal_calls_field(
+            (
+                field,
+                _,
+                fields_used,
+            ) = _transform_external_calls_field_to_internal_calls_field(
                 operand.field_, operand.cast_, param_builder
             )
+            raw_fields_used.update(fields_used)
             return field
         elif isinstance(
             operand,
@@ -1558,4 +1604,4 @@ def _process_calls_filter_by_to_conditions(
 
     conditions.append(filter_cond)
 
-    return conditions, param_builder
+    return conditions, param_builder, raw_fields_used
