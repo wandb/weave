@@ -46,7 +46,7 @@ def _is_retryable_exception(e: Exception) -> bool:
         return False
 
     # Don't retry on HTTP 4xx (except 429)
-    if isinstance(e, requests.HTTPError):
+    if isinstance(e, requests.HTTPError) and e.response is not None:
         code_class = e.response.status_code // 100
 
         # Bad request, not rate-limiting

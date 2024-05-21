@@ -19,7 +19,6 @@ import {
   GridColDef,
   GridColumnGroup,
   GridColumnGroupingModel,
-  GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
   GridRowSelectionModel,
@@ -67,13 +66,11 @@ import {
   columnRefs,
   computeTableStats,
   getInputColumns,
-  useColumnVisibility,
 } from '../../../Browse2/tableStats';
 import {WeaveHeaderExtrasContext} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
-import {BoringColumnInfo} from '../CallPage/BoringColumnInfo';
 import {Empty} from '../common/Empty';
 import {
   EMPTY_PROPS_EVALUATIONS,
