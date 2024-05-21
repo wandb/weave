@@ -19,7 +19,7 @@ export const Header = styled.div`
 `;
 Header.displayName = 'S.Header';
 
-export const CollapseGroupHeader = ({
+export const CollapseHeader = ({
   headerName,
   field,
   onCollapse,
