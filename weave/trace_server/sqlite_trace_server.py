@@ -272,6 +272,71 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
 
+        if req.filter_by:
+            # This is the mongo-style filter_by
+            def process_operation(operation: tsi._Operation) -> str:
+                cond = None
+
+                if isinstance(operation, tsi._AndOperation):
+                    lhs_part = process_operand(operation.and_[0])
+                    rhs_part = process_operand(operation.and_[1])
+                    cond = f"({lhs_part} AND {rhs_part})"
+                elif isinstance(operation, tsi._OrOperation):
+                    lhs_part = process_operand(operation.or_[0])
+                    rhs_part = process_operand(operation.or_[1])
+                    cond = f"({lhs_part} OR {rhs_part})"
+                elif isinstance(operation, tsi._NotOperation):
+                    operand_part = process_operand(operation.not_)
+                    cond = f"(NOT ({operand_part}))"
+                elif isinstance(operation, tsi._EqOperation):
+                    lhs_part = process_operand(operation.eq_[0])
+                    rhs_part = process_operand(operation.eq_[1])
+                    cond = f"({lhs_part} = {rhs_part})"
+                elif isinstance(operation, tsi._GtOperation):
+                    lhs_part = process_operand(operation.gt_[0])
+                    rhs_part = process_operand(operation.gt_[1])
+                    cond = f"({lhs_part} > {rhs_part})"
+                elif isinstance(operation, tsi._GteOperation):
+                    lhs_part = process_operand(operation.gte_[0])
+                    rhs_part = process_operand(operation.gte_[1])
+                    cond = f"({lhs_part} >= {rhs_part})"
+                elif isinstance(operation, tsi._LikeOperation):
+                    lhs_part = process_operand(operation.like_[0])
+                    rhs_part = process_operand(operation.like_[1])
+                    cond = f"({lhs_part} LIKE {rhs_part})"
+                else:
+                    raise ValueError(f"Unknown operation type: {operation}")
+
+                return cond
+
+            def process_operand(operand: tsi._Operand) -> str:
+                if isinstance(operand, tsi._RawValue):
+                    return json.dumps(operand.value_)
+                elif isinstance(operand, tsi._FieldSelect):
+                    field = _transform_external_calls_field_to_internal_calls_field(
+                        operand.field_, operand.cast_
+                    )
+                    return field
+                elif isinstance(
+                    operand,
+                    (
+                        tsi._AndOperation,
+                        tsi._OrOperation,
+                        tsi._NotOperation,
+                        tsi._EqOperation,
+                        tsi._GtOperation,
+                        tsi._GteOperation,
+                        tsi._LikeOperation,
+                    ),
+                ):
+                    return process_operation(operand)
+                else:
+                    raise ValueError(f"Unknown operand type: {operand}")
+
+            filter_cond = process_operation(req.filter_by.filter)
+
+            conds.append(filter_cond)
+
         query = f"SELECT * FROM calls WHERE project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
@@ -692,3 +757,59 @@ def get_base_object_class(val: Any) -> Optional[str]:
                             elif "_class_name" in val:
                                 return val["_class_name"]
     return None
+
+
+def _transform_external_calls_field_to_internal_calls_field(
+    field: str,
+    cast: Optional[str] = None,
+) -> str:
+    json_path = None
+    if field == "inputs" or field.startswith("inputs."):
+        if field == "inputs":
+            json_path = "$"
+        else:
+            json_path = "$." + field[len("inputs.") :]
+        field = "inputs"
+    elif field == "output" or field.startswith("output."):
+        if field == "output":
+            json_path = "$"
+        else:
+            json_path = "$." + field[len("output.") :]
+        field = "output"
+    elif field == "attributes" or field.startswith("attributes."):
+        if field == "attributes":
+            json_path = "$"
+        else:
+            json_path = "$." + field[len("attributes.") :]
+        field = "attributes"
+    elif field == "summary" or field.startswith("summary."):
+        if field == "summary":
+            json_path = "$"
+        else:
+            json_path = "$." + field[len("summary.") :]
+        field = "summary"
+
+    if json_path is not None:
+        sql_type = "TEXT"
+        if cast is not None:
+            if cast == "int":
+                sql_type = "INT"
+            elif cast == "float":
+                sql_type = "FLOAT"
+            elif cast == "bool":
+                sql_type = "BOOL"
+            elif cast == "str":
+                sql_type = "TEXT"
+            else:
+                raise ValueError(f"Unknown cast: {cast}")
+        field = (
+            "CAST(json_extract("
+            + json.dumps(field)
+            + ", '"
+            + json_path
+            + "') AS "
+            + sql_type
+            + ")"
+        )
+
+    return field

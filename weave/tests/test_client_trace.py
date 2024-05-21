@@ -12,6 +12,7 @@ import weave
 from weave import weave_client
 from weave import context_state
 from weave.trace.vals import MissingSelfInstanceError, TraceObject
+from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from ..trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -701,6 +702,8 @@ def test_trace_call_sort(client):
 
 
 def test_trace_call_filter(client):
+    is_sql_lite = isinstance(client.server, SqliteTraceServer)
+
     @weave.op()
     def basic_op(in_val: dict, delay) -> dict:
         import time
@@ -767,7 +770,10 @@ def test_trace_call_filter(client):
         ),
         # not gt = lte
         (
-            6,
+            6
+            + (
+                1 if is_sql_lite else 0
+            ),  # SQLLite casting transforms strings to 0, instead of NULL
             {
                 "not_": {
                     "gt_": [
@@ -779,7 +785,10 @@ def test_trace_call_filter(client):
         ),
         # not gte = lt
         (
-            5,
+            5
+            + (
+                1 if is_sql_lite else 0
+            ),  # SQLLite casting transforms strings to 0, instead of NULL
             {
                 "not_": {
                     "gte_": [
@@ -791,7 +800,10 @@ def test_trace_call_filter(client):
         ),
         # like all
         (
-            13,
+            13
+            + (
+                -2 if is_sql_lite else 0
+            ),  # SQLLite returns NULL for non-existent fields rather than ''.
             {"like_": [{"field_": "inputs.in_val.str"}, {"value_": "%"}]},
         ),
         # like select
@@ -823,7 +835,10 @@ def test_trace_call_filter(client):
         ),
         # or
         (
-            5,
+            5
+            + (
+                1 if is_sql_lite else 0
+            ),  # SQLLite casting transforms strings to 0, instead of NULL
             {
                 "or_": [
                     {
