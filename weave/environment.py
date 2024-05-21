@@ -144,7 +144,7 @@ def weave_server_url() -> str:
 
 
 def wandb_base_url() -> str:
-    pod_url = os.getenv("WANDB_POD_BASE_URL", "").rstrip("/")
+    pod_url = os.getenv("WANDB_PRIVATE_BASE_URL", "").rstrip("/")
     return pod_url if pod_url != "" else wandb_frontend_base_url()
 
 
