@@ -360,10 +360,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             for call_id in all_descendants
         ]
-        print(
-            f"Deleting {len(insertables)} calls:\n   ",
-            "\n    ".join([i.id for i in insertables]),
-        )
         for call in insertables:
             self._insert_call(call)
 
