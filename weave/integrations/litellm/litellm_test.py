@@ -8,10 +8,10 @@ from .litellm import litellm_patcher
 
 
 class Nearly:
-    def __init__(self, v):
+    def __init__(self, v: float) -> None:
         self.v = v
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return abs(self.v - other) < 2
 
 
