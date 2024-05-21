@@ -14,7 +14,6 @@
 import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
 import {Box, Typography} from '@mui/material';
 import {
-  DataGridPro,
   GridApiPro,
   GridColDef,
   GridColumnGroup,
@@ -22,6 +21,7 @@ import {
   GridColumnNode,
   GridFilterModel,
   GridPaginationModel,
+  GridPinnedColumns,
   GridRowSelectionModel,
   GridSortModel,
   useGridApiRef,
@@ -31,7 +31,6 @@ import {Button} from '@wandb/weave/components/Button';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import _ from 'lodash';
 import React, {
-  ComponentProps,
   FC,
   useCallback,
   useContext,
@@ -44,7 +43,6 @@ import styled from 'styled-components';
 import {hexToRGB} from '../../../../../../common/css/utils';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {monthRoundedTime} from '../../../../../../common/util/time';
-import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef} from '../../../../../../react';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {LoadingDots} from '../../../../../LoadingDots';
@@ -196,9 +194,10 @@ export const CallsTable: FC<{
       : sortModelInner;
   }, [sortModelInner]);
 
+  const defaultPageSize = 100;
   // 4. Pagination
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
-    pageSize: 100,
+    pageSize: defaultPageSize,
     page: 0,
   });
 
@@ -333,6 +332,10 @@ export const CallsTable: FC<{
     [effectiveFilter.opVersionRefs]
   );
 
+  // DataGrid Model Management
+  const [pinnedColumnsModel, setPinnedColumnsModel] =
+    useState<GridPinnedColumns>({left: ['op_name']});
+
   // END OF CPR FACTORED CODE
 
   // CPR (Tim) - (GeneralRefactoring): Preferably this is passed in from the top, not
@@ -364,18 +367,6 @@ export const CallsTable: FC<{
     }
   }, [rowIds, peekId]);
 
-  // CPR (Tim) - (GeneralRefactoring): Yeah, there is going to be a lot here. A few general notes:
-  // * For readability: would be clean to extract each field def into a function
-  // * Perhaps consider reducing the min-width for a lot of these
-
-  // const [dynamicColumnList, setDynamicColumnList] = useState<Set<string>>(
-  //   new Set<string>()
-  // );
-  // useEffect(() => {
-  //   setDynamicColumnList(oldSet => {
-
-  //   })
-  // }, [])
   const columnsWithRefs = useMemo(() => {
     const refColumns = new Set<string>();
     tableData.forEach(row => {
@@ -412,17 +403,35 @@ export const CallsTable: FC<{
   const [allDynamicColumnNames, setAllDynamicColumnNames] = useState(
     allCurrentDynamicColumnNames
   );
+  const columnIsRefExpanded = useCallback(
+    (col: string) => {
+      if (expandedRefCols.has(col)) {
+        return true;
+      }
+      for (const refCol of expandedRefCols) {
+        if (col.startsWith(refCol + '.')) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [expandedRefCols]
+  );
   useEffect(() => {
     setAllDynamicColumnNames(current => {
       // All dynamic columns are:
       // allCurrentDynamicColumnNames + (setAllDynamicColumnNamesCurrent - columnsWithRefs)
       const columnsWithRefsList = Array.from(columnsWithRefs);
       const currentDynamicColumnNames = current.filter(c => {
+        if (columnIsRefExpanded(c)) {
+          return false;
+        }
         for (const refCol of columnsWithRefsList) {
           if (c.startsWith(refCol)) {
             return false;
           }
         }
+
         return true;
       });
 
@@ -435,7 +444,16 @@ export const CallsTable: FC<{
         )
       );
     });
-  }, [allCurrentDynamicColumnNames, columnsWithRefs]);
+  }, [
+    allCurrentDynamicColumnNames,
+    columnIsRefExpanded,
+    columnsWithRefs,
+    expandedRefCols,
+  ]);
+
+  const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
+    Record<string, number>
+  >({});
 
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
@@ -535,12 +553,11 @@ export const CallsTable: FC<{
         return node;
       });
     };
-    console.log(allDynamicColumnNames, groupingModel);
+
     groupingModel = walkGroupingModel(groupingModel, node => {
       if ('groupId' in node) {
         const key = node.groupId;
         if (expandedRefCols.has(key)) {
-          console.log('expandedRefCols', key);
           node.renderHeaderGroup = () => {
             return (
               <CollapseHeader
@@ -551,7 +568,6 @@ export const CallsTable: FC<{
             );
           };
         } else if (columnsWithRefs.has(key)) {
-          console.log('expandedRefCols', key);
           node.renderHeaderGroup = () => {
             return (
               <ExpandHeader
@@ -572,6 +588,9 @@ export const CallsTable: FC<{
         flex: 1,
         minWidth: 150,
         field: key,
+        // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+        filterable: !columnIsRefExpanded(key),
+        sortable: !columnIsRefExpanded(key),
         headerName: key.split('.').slice(-1)[0],
         renderCell: cellParams => {
           const val = (cellParams.row as any)[key];
@@ -673,6 +692,13 @@ export const CallsTable: FC<{
       },
     });
 
+    cols.forEach(col => {
+      if (col.field in userDefinedColumnWidths) {
+        col.width = userDefinedColumnWidths[col.field];
+        col.flex = 0;
+      }
+    });
+
     return {cols, colGroupingModel: groupingModel};
   }, [
     isSingleOp,
@@ -684,35 +710,9 @@ export const CallsTable: FC<{
     preservePath,
     expandedRefCols,
     columnsWithRefs,
+    columnIsRefExpanded,
+    userDefinedColumnWidths,
   ]);
-
-  // CPR (Tim) - (GeneralRefactoring): These will get extracted into their own controls (at least sorting will)
-  const initialStateRaw: ComponentProps<typeof DataGridPro>['initialState'] =
-    useMemo(() => {
-      if (callsLoading) {
-        return undefined;
-      }
-      return {
-        pinnedColumns: {left: ['op_name']},
-      };
-    }, [callsLoading]);
-
-  // Various interactions (correctly) cause new data to be loaded, which causes
-  // a trickle of state updates. However, if the ultimate state is the same,
-  // we don't want to re-render the table.
-  const initialState = useDeepMemo(initialStateRaw);
-
-  // Tim (CPR): This whole section can be simplified I believe
-  // This is a workaround.
-  // initialState won't take effect if columns are not set.
-  // see https://github.com/mui/mui-x/issues/6206
-  useEffect(() => {
-    if (apiRefIsReady && columns != null && initialState != null) {
-      apiRef.current.restoreState({
-        pinnedColumns: {left: ['op_name']},
-      });
-    }
-  }, [columns, initialState, apiRef, apiRefIsReady]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -841,7 +841,7 @@ export const CallsTable: FC<{
         apiRef={apiRef}
         loading={callsLoading}
         rows={tableData}
-        initialState={initialState}
+        // initialState={initialState}
         // onColumnVisibilityModelChange={newModel =>
         //   setColumnVisibilityModel(newModel)
         // }
@@ -862,7 +862,7 @@ export const CallsTable: FC<{
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={newModel => setPaginationModel(newModel)}
-        pageSizeOptions={[100]}
+        pageSizeOptions={[defaultPageSize]}
         // PAGINATION SECTION END
         rowHeight={38}
         columns={columns.cols as any}
@@ -872,6 +872,16 @@ export const CallsTable: FC<{
         // columnGroupingModel={groupingModel}
         columnGroupingModel={columns.colGroupingModel}
         hideFooterSelectedRowCount
+        onColumnWidthChange={newCol => {
+          setUserDefinedColumnWidths(curr => {
+            return {
+              ...curr,
+              [newCol.colDef.field]: newCol.colDef.computedWidth,
+            };
+          });
+        }}
+        pinnedColumns={pinnedColumnsModel}
+        onPinnedColumnsChange={newModel => setPinnedColumnsModel(newModel)}
         sx={{
           borderRadius: 0,
         }}
