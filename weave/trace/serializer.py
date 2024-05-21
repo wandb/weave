@@ -15,7 +15,7 @@ class Serializer:
 SERIALIZERS = []
 
 
-def register_serializer(target_class: type, save: Callable, load: Callable):
+def register_serializer(target_class: type, save: Callable, load: Callable) -> None:
     SERIALIZERS.append(Serializer(target_class, save, load))
 
 
