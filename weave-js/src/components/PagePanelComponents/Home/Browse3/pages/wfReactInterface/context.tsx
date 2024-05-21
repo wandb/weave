@@ -120,6 +120,7 @@ export const useProjectHasTraceServerCalls = (
     undefined,
     undefined,
     undefined,
+    undefined,
     {
       skip: !hasTraceServer,
     }
@@ -155,6 +156,7 @@ export const useProjectHasTraceServerData = (
     project,
     {},
     1,
+    undefined,
     undefined,
     undefined,
     undefined,

@@ -11,6 +11,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {isRef} from '../common/util';
 // import {refStringToRefDict} from '../wfInterface/naive';
 import {
   callCache,
@@ -196,7 +197,8 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
     }
   }, [cachedCall, callRes, key]);
 };
-const useCalls = (
+
+const useCallsNoExpansion = (
   entity: string,
   project: string,
   filter: CallFilter,
@@ -289,6 +291,111 @@ const useCalls = (
       };
     }
   }, [callRes, entity, project, opts?.skip]);
+};
+
+const useCalls = (
+  entity: string,
+  project: string,
+  filter: CallFilter,
+  limit?: number,
+  offset?: number,
+  sortBy?: traceServerClient.SortBy[],
+  filterBy?: traceServerClient.FilterBy,
+  expandedRefColumns?: Set<string>,
+  opts?: {skip?: boolean}
+): Loadable<CallSchema[]> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const calls = useCallsNoExpansion(
+    entity,
+    project,
+    filter,
+    limit,
+    offset,
+    sortBy,
+    filterBy,
+    opts
+  );
+
+  const [expandedCalls, setExpandedCalls] = useState<CallSchema[]>([]);
+  const [isExpanding, setIsExpanding] = useState(false);
+
+  useEffect(() => {
+    if (calls.loading || calls.result == null) {
+      return;
+    }
+
+    const doExpansionIteration = async (
+      traceCalls: traceServerClient.TraceCallSchema[]
+    ) => {
+      const refsNeeded = new Set<string>();
+      const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
+      traceCalls.forEach(call => {
+        expandedRefColumnsList.forEach(col => {
+          const colParts = col.split('.');
+          let value: any = call;
+          for (const part of colParts) {
+            if (value == null) {
+              break;
+            }
+            if (typeof value !== 'object' || !(part in value)) {
+              value = null;
+              break;
+            }
+            value = value[part];
+          }
+          if (isRef(value)) {
+            refsNeeded.add(value);
+          }
+        });
+      });
+
+      const refsNeededArray = Array.from(refsNeeded);
+
+      if (refsNeededArray.length === 0) {
+        setExpandedCalls(traceCalls.map(traceCallToUICallSchema));
+        setIsExpanding(false);
+        return;
+      }
+
+      setIsExpanding(true);
+      const refsData = await directFetchRefsData(
+        refsNeededArray,
+        getTsClient()
+      );
+      const refsDataMap = new Map<string, any>();
+      refsNeededArray.forEach((ref, i) => {
+        refsDataMap.set(ref, refsData[i]);
+      });
+
+      const expandedTraceCalls = traceCalls.map(call => {
+        call = _.cloneDeep(call);
+        expandedRefColumnsList.forEach(col => {
+          const colParts = col.split('.');
+          let value: any = call;
+          for (const part of colParts) {
+            if (value == null) {
+              break;
+            }
+            if (typeof value !== 'object' || !(part in value)) {
+              value = null;
+              break;
+            }
+            value = value[part];
+          }
+          if (isRef(value) && refsDataMap.has(value)) {
+            _.set(call, col, refsDataMap.get(value));
+          }
+        });
+        return call;
+      });
+
+      doExpansionIteration(expandedTraceCalls);
+    };
+
+    doExpansionIteration(calls.result.map(c => c.traceCall!));
+  }, [calls.loading, calls.result, expandedRefColumns, getTsClient]);
+
+  return {loading: calls.loading || isExpanding, result: expandedCalls};
 };
 
 const useCallsStats = makeTraceServerEndpointHook<
@@ -670,6 +777,7 @@ const useChildCallsForCompare = (
     undefined,
     undefined,
     undefined,
+    undefined,
     {skip: skipParent}
   );
 
@@ -687,6 +795,7 @@ const useChildCallsForCompare = (
       parentIds: subParentCallIds,
       opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
     },
+    undefined,
     undefined,
     undefined,
     undefined,
@@ -713,6 +822,34 @@ const useChildCallsForCompare = (
   ]);
 
   return result;
+};
+
+const directFetchRefsData = async (
+  refUris: string[],
+  client: traceServerClient.TraceServerClient
+): Promise<any[]> => {
+  const needed: string[] = [];
+  const cached: Record<string, any> = {};
+  refUris.forEach(sUri => {
+    const res = refDataCache.get(sUri);
+    if (res == null) {
+      needed.push(sUri);
+    } else {
+      cached[sUri] = res;
+    }
+  });
+
+  const batchResults = await client.readBatch({
+    refs: needed,
+  });
+
+  needed.forEach((uri, i) => {
+    const val = batchResults.vals[i];
+    refDataCache.set(uri, val);
+    cached[uri] = val;
+  });
+
+  return refUris.map(uri => cached[uri]);
 };
 
 const useRefsData = (

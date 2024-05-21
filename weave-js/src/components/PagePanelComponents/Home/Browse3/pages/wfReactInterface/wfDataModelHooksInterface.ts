@@ -157,6 +157,7 @@ export type WFDataModelHooksInterface = {
     offset?: number,
     sortBy?: traceServerClient.SortBy[],
     filterBy?: traceServerClient.FilterBy,
+    expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean}
   ) => Loadable<CallSchema[]>;
   useCallsStats: (

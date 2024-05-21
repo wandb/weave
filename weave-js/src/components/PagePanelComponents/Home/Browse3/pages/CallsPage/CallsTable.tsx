@@ -36,7 +36,6 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import styled from 'styled-components';
@@ -44,12 +43,6 @@ import styled from 'styled-components';
 import {hexToRGB} from '../../../../../../common/css/utils';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {monthRoundedTime} from '../../../../../../common/util/time';
-import {
-  isObjectTypeLike,
-  isTypedDictLike,
-  Type,
-  typedDictPropertyTypes,
-} from '../../../../../../core';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef} from '../../../../../../react';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
@@ -58,16 +51,8 @@ import {Timestamp} from '../../../../../Timestamp';
 import {flattenObject} from '../../../Browse2/browse2Util';
 import {CellValue} from '../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../Browse2/CollapseGroupHeader';
-import {CustomGroupedColumnHeader} from '../../../Browse2/CustomGroupedColumnHeader';
 import {ExpandHeader} from '../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
-import {RefValue} from '../../../Browse2/RefValue';
-import {
-  columnHasRefs,
-  columnRefs,
-  computeTableStats,
-  getInputColumns,
-} from '../../../Browse2/tableStats';
 import {WeaveHeaderExtrasContext} from '../../context';
 import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -77,21 +62,15 @@ import {
   EMPTY_PROPS_EVALUATIONS,
   EMPTY_PROPS_TRACES,
 } from '../common/EmptyContent';
-import {isPredictAndScoreOp} from '../common/heuristics';
-import {CallLink, opNiceName} from '../common/Links';
+import {CallLink} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {StatusChip} from '../common/StatusChip';
 import {isRef} from '../common/util';
 import {
-  renderCell,
   truncateID,
   useControllableState,
   useURLSearchParamsDict,
 } from '../util';
-import {
-  DICT_KEY_EDGE_NAME,
-  OBJECT_ATTR_EDGE_NAME,
-} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {
@@ -165,10 +144,6 @@ export const CallsTable: FC<{
   hideControls,
   ioColumnsOnly,
 }) => {
-  // Load Context
-  const {
-    derived: {useGetRefsType},
-  } = useWFHooks();
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
   // Setup Ref to underlying table
@@ -571,7 +546,11 @@ export const CallsTable: FC<{
           if (val === undefined) {
             return <NotApplicable />;
           }
-          return <CellValue value={val} />;
+          return (
+            <ErrorBoundary>
+              <CellValue value={val} />
+            </ErrorBoundary>
+          );
         },
       };
       if (expandedRefCols.has(key)) {
@@ -1016,52 +995,6 @@ const OpVersionIndexText = ({opVersionRef}: OpVersionIndexTextProps) => {
   return opVersion.result ? (
     <span>v{opVersion.result.versionIndex}</span>
   ) : null;
-};
-
-type ExtraColumns = Record<string, Array<{label: string; path: string}>>;
-
-const isExpandableType = (type: Type): boolean => {
-  return isObjectTypeLike(type) || isTypedDictLike(type);
-};
-
-const getExtraColumns = (
-  result: Type[]
-): Array<{label: string; path: string}> => {
-  const cols: {[label: string]: string} = {};
-  for (const refInfo of result) {
-    if (isObjectTypeLike(refInfo)) {
-      const keys = Object.keys(refInfo).filter(
-        k => k !== 'type' && !k.startsWith('_')
-      );
-      keys.forEach(k => {
-        const innerType = (refInfo as any)[k] as Type;
-        if (isExpandableType(innerType)) {
-          const subKeys = getExtraColumns([innerType]);
-          subKeys.forEach(sk => {
-            cols[k + '.' + sk.label] =
-              k + `/${OBJECT_ATTR_EDGE_NAME}/` + sk.path;
-          });
-        } else {
-          cols[k] = k;
-        }
-      });
-    } else if (isTypedDictLike(refInfo)) {
-      const propTypes = typedDictPropertyTypes(refInfo);
-      const keys = Object.keys(propTypes);
-      keys.forEach(k => {
-        const innerType = propTypes[k] as Type;
-        if (isExpandableType(innerType)) {
-          const subKeys = getExtraColumns([innerType]);
-          subKeys.forEach(sk => {
-            cols[k + '.' + sk.label] = k + `/${DICT_KEY_EDGE_NAME}/` + sk.path;
-          });
-        } else {
-          cols[k] = k;
-        }
-      });
-    }
-  }
-  return Object.entries(cols).map(([label, path]) => ({label, path}));
 };
 
 // Get the tail of the peekPath (ignore query params)
