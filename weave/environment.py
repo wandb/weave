@@ -136,7 +136,7 @@ def analytics_disabled() -> bool:
 
 
 def weave_server_url() -> str:
-    base_url = wandb_base_url()
+    base_url = wandb_frontend_base_url()
     default = "https://weave.wandb.ai"
     if base_url != "https://api.wandb.ai":
         default = base_url + "/weave"
@@ -144,6 +144,11 @@ def weave_server_url() -> str:
 
 
 def wandb_base_url() -> str:
+    pod_url = os.getenv("WANDB_PRIVATE_BASE_URL", "").rstrip("/")
+    return pod_url if pod_url != "" else wandb_frontend_base_url()
+
+
+def wandb_frontend_base_url() -> str:
     settings = Settings()
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
 

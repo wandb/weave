@@ -6,6 +6,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
@@ -20,7 +21,7 @@ import {
   OpVersionsLink,
 } from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useInitializingFilter, useURLSearchParamsDict} from './util';
+import {useControllableState, useURLSearchParamsDict} from './util';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
@@ -37,8 +38,8 @@ export const OpVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
+  const [filter, setFilter] = useControllableState(
+    props.initialFilter ?? {},
     props.onFilterUpdate
   );
 
@@ -181,6 +182,9 @@ export const FilterableOpVersionsTable: React.FC<{
 
   if (filteredOpVersions.loading) {
     return <Loading centered />;
+  }
+  if (filteredOpVersions.error) {
+    return <ErrorPanel />;
   }
 
   // TODO: Only show the empty state if unfiltered

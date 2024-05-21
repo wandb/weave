@@ -58,6 +58,7 @@ import {ReactComponent as ImportEmailAt} from '../../assets/icons/icon-email-at.
 import {ReactComponent as ImportEmailEnvelope} from '../../assets/icons/icon-email-envelope.svg';
 import {ReactComponent as ImportExpandRight} from '../../assets/icons/icon-expand-right.svg';
 import {ReactComponent as ImportExpandUncollapse} from '../../assets/icons/icon-expand-uncollapse.svg';
+import {ReactComponent as ImportExportShareUpload} from '../../assets/icons/icon-export-share-upload.svg';
 import {ReactComponent as ImportFacebookSocial} from '../../assets/icons/icon-facebook-social.svg';
 import {ReactComponent as ImportFailed} from '../../assets/icons/icon-failed.svg';
 import {ReactComponent as ImportFilterAlt} from '../../assets/icons/icon-filter-alt.svg';
@@ -199,6 +200,8 @@ import {ReactComponent as ImportTag} from '../../assets/icons/icon-tag.svg';
 import {ReactComponent as ImportTensorflowLogo} from '../../assets/icons/icon-tensorflow-logo.svg';
 import {ReactComponent as ImportTextLanguage} from '../../assets/icons/icon-text-language.svg';
 import {ReactComponent as ImportTextLanguageAlt} from '../../assets/icons/icon-text-language-alt.svg';
+import {ReactComponent as ImportThumbsDown} from '../../assets/icons/icon-thumbs-down.svg';
+import {ReactComponent as ImportThumbsUp} from '../../assets/icons/icon-thumbs-up.svg';
 import {ReactComponent as ImportTriangleDown} from '../../assets/icons/icon-triangle-down.svg';
 import {ReactComponent as ImportTriangleLeft} from '../../assets/icons/icon-triangle-left.svg';
 import {ReactComponent as ImportTriangleRight} from '../../assets/icons/icon-triangle-right.svg';
@@ -415,6 +418,9 @@ export const IconExpandRight = (props: SVGIconProps) => (
 );
 export const IconExpandUncollapse = (props: SVGIconProps) => (
   <ImportExpandUncollapse {...updateIconProps(props)} />
+);
+export const IconExportShareUpload = (props: SVGIconProps) => (
+  <ImportExportShareUpload {...updateIconProps(props)} />
 );
 export const IconFacebookSocial = (props: SVGIconProps) => (
   <ImportFacebookSocial {...updateIconProps(props)} />
@@ -839,6 +845,12 @@ export const IconTextLanguage = (props: SVGIconProps) => (
 export const IconTextLanguageAlt = (props: SVGIconProps) => (
   <ImportTextLanguageAlt {...updateIconProps(props)} />
 );
+export const IconThumbsDown = (props: SVGIconProps) => (
+  <ImportThumbsDown {...updateIconProps(props)} />
+);
+export const IconThumbsUp = (props: SVGIconProps) => (
+  <ImportThumbsUp {...updateIconProps(props)} />
+);
 export const IconTriangleDown = (props: SVGIconProps) => (
   <ImportTriangleDown {...updateIconProps(props)} />
 );
@@ -986,6 +998,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'email-envelope': IconEmailEnvelope,
   'expand-right': IconExpandRight,
   'expand-uncollapse': IconExpandUncollapse,
+  'export-share-upload': IconExportShareUpload,
   'facebook-social': IconFacebookSocial,
   failed: IconFailed,
   'filter-alt': IconFilterAlt,
@@ -1127,6 +1140,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'tensorflow-logo': IconTensorflowLogo,
   'text-language': IconTextLanguage,
   'text-language-alt': IconTextLanguageAlt,
+  'thumbs-down': IconThumbsDown,
+  'thumbs-up': IconThumbsUp,
   'triangle-down': IconTriangleDown,
   'triangle-left': IconTriangleLeft,
   'triangle-right': IconTriangleRight,

@@ -8,6 +8,7 @@ import {
   USE_TABLE_FOR_ARRAYS,
   WeaveCHTable,
 } from './DataTableView';
+import {ValueViewImage} from './ValueViewImage';
 import {ValueViewNumber} from './ValueViewNumber';
 import {
   isProbablyTimestamp,
@@ -53,6 +54,9 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
 
   if (data.valueType === 'string') {
+    if (data.value.startsWith('data:image/')) {
+      return <ValueViewImage value={data.value} />;
+    }
     return <ValueViewString value={data.value} isExpanded={isExpanded} />;
   }
 

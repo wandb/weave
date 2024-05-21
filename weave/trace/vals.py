@@ -4,6 +4,7 @@ import dataclasses
 import operator
 import typing
 from pydantic import BaseModel
+from pydantic import v1 as pydantic_v1
 
 from weave.trace.op import Op
 from weave.trace.refs import (
@@ -20,7 +21,7 @@ from weave.table import Table
 from weave.trace.serialize import from_json
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.graph_client_context import require_graph_client
+from weave.graph_client_context import get_graph_client
 from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     _TableRowFilter,
@@ -133,7 +134,14 @@ def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> 
 
     new_ref = ref.with_attr(attr_name)
 
-    gc = require_graph_client()
+    gc = get_graph_client()
+
+    if gc is None:
+        # In the case that the graph client has been closed but the user still
+        # maintains a reference to this object, we should gracefully fallback
+        # to the raw value.
+        return val_attr_val
+
     return make_trace_obj(
         val_attr_val,
         new_ref,
@@ -167,7 +175,12 @@ class TraceObject(Tracable):
         val_attr_val = object.__getattribute__(self._val, __name)
         result = attribute_access_result(self, val_attr_val, __name)
         # Store the result on _val so we don't deref next time.
-        object.__setattr__(self._val, __name, result)
+        try:
+            object.__setattr__(self._val, __name, result)
+        except AttributeError:
+            # Happens if self._val.<name> is a property. Return the raw value instead
+            # of a Traceable value.
+            return val_attr_val
         return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
@@ -448,7 +461,10 @@ def make_trace_obj(
             )
         val = val.__get__(parent, type(parent))
     box_val = box.box(val)
-    setattr(box_val, "ref", new_ref)
+    if isinstance(box_val, pydantic_v1.BaseModel):
+        box_val.__dict__["ref"] = new_ref
+    else:
+        setattr(box_val, "ref", new_ref)
     return box_val
 
 

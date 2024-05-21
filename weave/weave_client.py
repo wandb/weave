@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Any, Sequence, Union, Optional, TypedDict
+from typing import Any, Sequence, Union, Optional, TypedDict, Dict
 import dataclasses
 import typing
 import uuid
@@ -264,6 +264,7 @@ class WeaveClient:
         self.entity = entity
         self.project = project
         self.server = server
+        self._anonymous_ops: dict[str, Op] = {}
 
         if ensure_project_exists:
             self.server.ensure_project_exists(entity, project)
@@ -433,11 +434,16 @@ class WeaveClient:
         inputs: dict,
         attributes: dict = {},
     ) -> Call:
+        if isinstance(op, str):
+            if op not in self._anonymous_ops:
+                self._anonymous_ops[op] = _build_anonymous_op(op)
+            op = self._anonymous_ops[op]
         if isinstance(op, Op):
             op_def_ref = self._save_op(op)
             op_str = op_def_ref.uri()
         else:
             op_str = op
+
         self.save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
@@ -463,6 +469,7 @@ class WeaveClient:
             parent._children.append(call)
 
         current_wb_run_id = safe_current_wb_run_id()
+        check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
         start = StartedCallSchemaForInsert(
             project_id=self._project_id(),
             id=call_id,
@@ -475,6 +482,7 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
+        run_context.push_call(call)
         return call
 
     @trace_sentry.global_trace_sentry.watch()
@@ -482,7 +490,8 @@ class WeaveClient:
         self, call: Call, output: Any = None, exception: Optional[BaseException] = None
     ) -> None:
         self.save_nested_objects(output)
-        output = map_to_refs(output)
+        original_output = output
+        output = map_to_refs(original_output)
         call.output = output
 
         # Summary handling
@@ -492,6 +501,16 @@ class WeaveClient:
         elif isinstance(output, dict) and "usage" in output and "model" in output:
             summary["usage"] = {}
             summary["usage"][output["model"]] = {"requests": 1, **output["usage"]}
+        elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
+            # Handle the cases where we are emitting an object instead of a pre-serialized dict
+            # In fact, this is going to become the more common case
+            model = original_output.model
+            usage = original_output.usage
+            if isinstance(usage, pydantic.BaseModel):
+                usage = usage.model_dump(exclude_unset=True)
+            if isinstance(usage, dict) and isinstance(model, str):
+                summary["usage"] = {}
+                summary["usage"][model] = {"requests": 1, **usage}
 
         # Exception Handling
         exception_str: Optional[str] = None
@@ -519,6 +538,7 @@ class WeaveClient:
         #     call.op_name, {"successes": 0, "errors": 0}
         # )["successes"] += 1
         call.summary = summary
+        run_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
@@ -590,3 +610,34 @@ def safe_current_wb_run_id() -> Optional[str]:
         return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
     except ImportError:
         return None
+
+
+def check_wandb_run_matches(
+    wandb_run_id: Optional[str], weave_entity: str, weave_project: str
+) -> None:
+    if wandb_run_id:
+        # ex: "entity/project/run_id"
+        wandb_entity, wandb_project, _ = wandb_run_id.split("/")
+        if wandb_entity != weave_entity or wandb_project != weave_project:
+            raise ValueError(
+                f'Project Mismatch: weave and wandb must be initialized using the same project. Found wandb.init targeting project "{wandb_entity}/{wandb_project}" and weave.init targeting project "{weave_entity}/{weave_project}". To fix, please use the same project for both library initializations.'
+            )
+
+
+def _build_anonymous_op(name: str, config: Optional[Dict] = None) -> Op:
+    if config is None:
+
+        def op_fn(*args, **kwargs):  # type: ignore
+            # Code-capture unavailable for this op
+            pass
+
+    else:
+
+        def op_fn(*args, **kwargs):  # type: ignore
+            # Code-capture unavailable for this op
+            op_config = config
+
+    op_fn.__name__ = name
+    op = Op(op_fn)
+    op.name = name
+    return op
