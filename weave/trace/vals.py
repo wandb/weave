@@ -16,7 +16,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
 )
-from weave import box
+from weave import box, context_state
 from weave.table import Table
 from weave.trace.serialize import from_json
 from weave.trace.errors import InternalError
@@ -135,6 +135,19 @@ def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> 
     new_ref = ref.with_attr(attr_name)
 
     gc = get_graph_client()
+
+    # If the user has not intentionally init ever,
+    # do a one-time init to try and de-ref
+    if not context_state.get_has_init_ever():
+        from weave.weave_init import init_weave
+
+        init_client = init_weave(f"{val_attr_val.entity}/{val_attr_val.project}", ensure_project_exists=False)
+        gc = get_graph_client()
+        try:
+            res = make_trace_obj(val_attr_val, new_ref, gc.server, None, self)
+        finally:
+            init_client.reset()
+        return res
 
     if gc is None:
         # In the case that the graph client has been closed but the user still

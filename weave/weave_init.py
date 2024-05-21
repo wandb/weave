@@ -142,6 +142,8 @@ def init_weave(
         }
     )
 
+    context_state.set_has_init_ever(True)
+
     return init_client
 
 

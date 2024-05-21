@@ -60,6 +60,21 @@ _no_op_register: contextvars.ContextVar[typing.Optional[bool]] = contextvars.Con
 )
 
 
+# Set to true if the user has ever intentionally done weave.init()
+# This allows us in `vals.py` to either:
+#   1. Temporarily init to de-ref an object if the user has not init; or
+#   2. Return just the ref if the graph client has closed.
+_has_init_ever: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "has_init_ever", default=False
+)
+
+def get_has_init_ever() -> bool:
+    return _has_init_ever.get()
+
+def set_has_init_ever(val: bool):
+    _has_init_ever.set(val)
+
+
 # Set to true if we're in the process of loading builtin functions
 # this prevents us from storing the op as an artifact
 _loading_built_ins: contextvars.ContextVar[bool] = contextvars.ContextVar(
