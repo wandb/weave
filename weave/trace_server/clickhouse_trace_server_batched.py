@@ -1374,8 +1374,18 @@ def _param_slot(param_name: str, param_type: str) -> str:
 
 
 def _quote_json_path(path: str) -> str:
-    parts = path.split(".")
-    return ".".join(f'"{part}"' for part in parts)
+    dot_parts = path.split(".")
+    dot_parts_final = []
+    for part in dot_parts:
+        bracket_parts = part.split("[")
+        bracket_parts_final = []
+        for bracket_part in bracket_parts:
+            if bracket_part.endswith("]"):
+                bracket_parts_final.append(bracket_part)
+            else:
+                bracket_parts_final.append(f'"{bracket_part}"')
+        dot_parts_final.append("[".join(bracket_parts_final))
+    return ".".join(dot_parts_final)
 
 
 def _transform_external_calls_field_to_internal_calls_field(
