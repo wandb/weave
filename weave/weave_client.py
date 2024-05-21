@@ -419,10 +419,12 @@ class WeaveClient:
         )
         return response.objs
 
-    def _save_op(self, op: Op) -> Ref:
+    def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
         if op.ref is not None:
             return op.ref
-        op_def_ref = self._save_object(op, op.name)
+        if name is None:
+            name = op.name
+        op_def_ref = self._save_object(op, name)
         op.ref = op_def_ref  # type: ignore
         return op_def_ref
 

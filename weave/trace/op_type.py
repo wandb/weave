@@ -256,7 +256,9 @@ def get_code_deps(
     import_code = []
     code = []
     for var_name in external_vars:
-        var_value = resolve_var(fn, var_name)
+        var_value = None
+        if isinstance(fn, py_types.FunctionType):
+            var_value = resolve_var(fn, var_name)
         # var_value = fn.__globals__.get(var_name)
         if var_value is None:
             if getattr(builtins, var_name, None):
@@ -270,7 +272,7 @@ def get_code_deps(
             if var_value.__name__ != var_name:
                 import_line += f" as {var_name}"
             import_code.append(import_line)
-        elif isinstance(var_value, py_types.FunctionType):
+        elif isinstance(var_value, (py_types.FunctionType, type)):
             if var_value.__module__ == fn.__module__:
                 # For now, if the function is in another module.
                 # we just import it. This is ok for libraries, but not
@@ -284,7 +286,7 @@ def get_code_deps(
                 import_code += fn_import_code
 
                 code += fn_code
-                code.append(inspect.getsource(var_value))
+                code.append(textwrap.dedent(inspect.getsource(var_value)))
 
                 warnings += fn_warnings
             else:

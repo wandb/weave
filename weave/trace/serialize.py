@@ -45,7 +45,7 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
         "files": file_digests,
-        # "load_op": encoded["load_op"],
+        "load_op": encoded["load_op"],
     }
 
 

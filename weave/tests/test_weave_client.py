@@ -18,7 +18,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     DICT_KEY_EDGE_NAME,
 )
-from weave.trace.serializer import register_serializer
+from weave.trace.serializer import register_serializer, get_serializer_for_obj
 
 from weave.trace import refs
 from weave.trace.tests.testutil import ObjectRefStrMatcher
@@ -370,7 +370,7 @@ def test_saveload_op(client):
     assert obj2["b"].name == "op-add3"
 
 
-def test_saveload_customtype(client):
+def test_saveload_customtype(client, strict_op_saving):
     class MyCustomObj:
         a: int
         b: str
@@ -392,8 +392,16 @@ def test_saveload_customtype(client):
 
     obj = MyCustomObj(5, "x")
     ref = client.save_object(obj, "my-obj")
+
+    # Hack the serializer so that it's loader no longer exists, to ensure
+    # it can't be called.
+    serializer = get_serializer_for_obj(obj)
+    serializer.load = None
+
     obj2 = client.get(ref)
-    assert isinstance(obj2, MyCustomObj)
+    assert obj2.__class__.__name__ == "MyCustomObj"
+    assert obj2.a == 5
+    assert obj2.b == "x"
 
 
 def test_save_unknown_type(client):
