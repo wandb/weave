@@ -41,12 +41,15 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             FileCreateReq(project_id=project_id, name=name, content=val)
         )
         file_digests[name] = file_response.digest
-    return {
+    result = {
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
         "files": file_digests,
-        "load_op": encoded["load_op"],
     }
+    load_op_uri = encoded.get("load_op_uri")
+    if load_op_uri:
+        result["load_op_uri"] = load_op_uri
+    return result
 
 
 REP_LIMIT = 1000
