@@ -371,7 +371,6 @@ def test_saveload_op(client):
 
 
 def test_saveload_customtype(client):
-
     class MyCustomObj:
         a: int
         b: str
