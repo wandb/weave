@@ -415,7 +415,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        raise NotImplementedError()
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                filter_by=req.filter_by,
+            )
+        ).calls
+        return tsi.CallsQueryStatsRes(
+            count=len(calls),
+        )
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
