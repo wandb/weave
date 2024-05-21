@@ -1006,8 +1006,10 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
-
-export const traceCallStatusCode = (traceCall: traceServerClient.TraceCallSchema) => {
+type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
+export const traceCallStatusCode = (
+  traceCall: traceServerClient.TraceCallSchema
+): StatusCodeType => {
   if (traceCall.exception) {
     return 'ERROR';
   } else if (traceCall.ended_at) {
@@ -1015,9 +1017,11 @@ export const traceCallStatusCode = (traceCall: traceServerClient.TraceCallSchema
   } else {
     return 'UNSET';
   }
-}
+};
 
-export const traceCallLatencyS = (traceCall: traceServerClient.TraceCallSchema) => {
+export const traceCallLatencyS = (
+  traceCall: traceServerClient.TraceCallSchema
+) => {
   const startDate = convertISOToDate(traceCall.started_at);
   const endDate = traceCall.ended_at
     ? convertISOToDate(traceCall.ended_at)
@@ -1027,15 +1031,15 @@ export const traceCallLatencyS = (traceCall: traceServerClient.TraceCallSchema) 
     latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
   }
   return latencyS;
-}
+};
 
 const traceCallToLegacySpan = (
   traceCall: traceServerClient.TraceCallSchema
 ): RawSpanFromStreamTableEra => {
   const startDate = convertISOToDate(traceCall.started_at);
   const endDate = traceCall.ended_at
-  ? convertISOToDate(traceCall.ended_at)
-  : null;
+    ? convertISOToDate(traceCall.ended_at)
+    : null;
   const summary = {
     latency_s: traceCallLatencyS(traceCall),
     ...(traceCall.summary ?? {}),

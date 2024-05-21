@@ -80,6 +80,7 @@ import {isPredictAndScoreOp} from '../common/heuristics';
 import {CallLink, opNiceName} from '../common/Links';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {StatusChip} from '../common/StatusChip';
+import {isRef} from '../common/util';
 import {
   renderCell,
   truncateID,
@@ -91,6 +92,12 @@ import {
   OBJECT_ATTR_EDGE_NAME,
 } from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {
+  convertISOToDate,
+  traceCallLatencyS,
+  traceCallStatusCode,
+} from '../wfReactInterface/tsDataModelHooks';
 import {
   objectVersionNiceString,
   opVersionRefOpName,
@@ -107,13 +114,6 @@ import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
 import {useCallsForQuery} from './callsTableQuery';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
-import {isRef} from '../common/util';
-import {
-  convertISOToDate,
-  traceCallLatencyS,
-  traceCallStatusCode,
-} from '../wfReactInterface/tsDataModelHooks';
 
 const VisibilityAlert = styled.div`
   background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
@@ -413,7 +413,7 @@ export const CallsTable: FC<{
   }, [tableData]);
 
   const allDynamicColumnNames = useMemo(() => {
-    const columns = new Set<string>();
+    const dynamicColumns = new Set<string>();
     tableData.forEach(row => {
       Object.keys(row).forEach(key => {
         if (
@@ -422,11 +422,11 @@ export const CallsTable: FC<{
           key.startsWith('output') ||
           key.startsWith('summary')
         ) {
-          columns.add(key);
+          dynamicColumns.add(key);
         }
       });
     });
-    return _.sortBy([...columns]);
+    return _.sortBy([...dynamicColumns]);
   }, [tableData]);
 
   const columns = useMemo(() => {
@@ -774,11 +774,11 @@ export const CallsTable: FC<{
       resizable: false,
       disableColumnMenu: true,
       renderCell: cellParams => {
-        const user_id = cellParams.row.wb_user_id;
-        if (user_id == null) {
+        const userId = cellParams.row.wb_user_id;
+        if (userId == null) {
           return null;
         }
-        return <UserLink username={user_id} />;
+        return <UserLink username={userId} />;
       },
     });
 
@@ -794,7 +794,7 @@ export const CallsTable: FC<{
         renderCell: cellParams => {
           return (
             <Timestamp
-              value={convertISOToDate(cellParams.row.started_at) / 1000}
+              value={convertISOToDate(cellParams.row.started_at).getSeconds() / 1000}
               format="relative"
             />
           );
@@ -813,8 +813,7 @@ export const CallsTable: FC<{
       filterable: false,
       sortable: false,
       renderCell: cellParams => {
-        const status_code = traceCallStatusCode(cellParams.row);
-        if (status_code === 'UNSET') {
+        if (traceCallStatusCode(cellParams.row) === 'UNSET') {
           // Call is still in progress, latency will be 0.
           // Displaying nothing seems preferable to being misleading.
           return null;
