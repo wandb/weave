@@ -136,20 +136,20 @@ def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> 
 
     gc = get_graph_client()
 
-    # If the user has not intentionally init ever,
-    # do a one-time init to try and de-ref
-    if not context_state.get_has_init_ever():
-        from weave.weave_init import init_weave
-
-        init_client = init_weave(f"{val_attr_val.entity}/{val_attr_val.project}", ensure_project_exists=False)
-        gc = get_graph_client()
-        try:
-            res = make_trace_obj(val_attr_val, new_ref, gc.server, None, self)
-        finally:
-            init_client.reset()
-        return res
-
     if gc is None:
+        # If the user has not intentionally init ever,
+        # do a one-time init to try and de-ref
+        if not context_state.get_has_init_ever():
+            from weave.weave_init import init_weave
+
+            init_client = init_weave(f"{val_attr_val.entity}/{val_attr_val.project}", ensure_project_exists=False)
+            gc = get_graph_client()
+            try:
+                res = make_trace_obj(val_attr_val, new_ref, gc.server, None, self)
+            finally:
+                init_client.reset()
+            return res
+            
         # In the case that the graph client has been closed but the user still
         # maintains a reference to this object, we should gracefully fallback
         # to the raw value.
