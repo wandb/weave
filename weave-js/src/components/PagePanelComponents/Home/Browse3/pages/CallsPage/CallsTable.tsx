@@ -458,26 +458,7 @@ export const CallsTable: FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedRefCols, tableStats]);
 
-  // CPR (Tim) - (CC+Hidden): I really want to just always show everything - this hiding
-  // feels more confusing than it is worth and also is costly. Remove.
-  const [forceShowAll, setForceShowAll] = useState(false);
-  const {allShown, columnVisibilityModel: defaultVisibilityModel} =
-    useColumnVisibility(tableStats, isSingleOpVersion);
-
-  // CPR (Tim) - (GeneralRefactoring): Move all GridModel controls to a common place
-  const [columnVisibilityModel, setColumnVisibilityModel] =
-    useState<GridColumnVisibilityModel>(defaultVisibilityModel);
-
   // CPR (Tim) - (CC+Hidden): This gets removed as well
-  useEffect(() => {
-    if (forceShowAll) {
-      // If not specified, columns default to visible.
-      setColumnVisibilityModel({});
-    }
-  }, [forceShowAll]);
-
-  // CPR (Tim) - (CC+Hidden): This gets removed as well
-  const showVisibilityAlert = !allShown && !forceShowAll;
 
   // CPR (Tim) - (GeneralRefactoring): Preferably this is passed in from the top, not
   // something where we inspect URLs deep in a component. At the
@@ -991,7 +972,7 @@ export const CallsTable: FC<{
   // CPR (Tim) - (GeneralRefactoring): Remove this, and add a slot for empty content that can be calculated
   // in the parent component
   const isEvaluateTable = useCurrentFilterIsEvaluationsFilter(
-    effectiveFilter,
+    filter,
     entity,
     project
   );
@@ -1087,125 +1068,108 @@ export const CallsTable: FC<{
           )}
         </>
       }>
-      {/* <React.Fragment key={callsKey}> */}
-      <React.Fragment>
-        {showVisibilityAlert && (
-          <VisibilityAlert>
-            <VisibilityAlertText>
-              Columns having many empty values have been hidden.
-            </VisibilityAlertText>
-            <VisibilityAlertAction onClick={() => setForceShowAll(true)}>
-              Show all
-            </VisibilityAlertAction>
-          </VisibilityAlert>
-        )}
-        <BoringColumnInfo
-          tableStats={tableStats}
-          columns={columns.cols as any}
-        />
-        <StyledDataGrid
-          // Start Column Menu
-          // ColumnMenu is needed to support pinning and column visibility
-          disableColumnMenu={false}
-          // ColumnFilter is definitely useful
-          disableColumnFilter={false}
-          disableMultipleColumnsFiltering={false}
-          // ColumnPinning seems to be required in DataGridPro, else it crashes.
-          // However, in this case it is also useful.
-          disableColumnPinning={false}
-          // ColumnReorder is definitely useful
-          disableColumnReorder={false}
-          // ColumnResize is definitely useful
-          disableColumnResize={false}
-          // ColumnSelector is definitely useful
-          disableColumnSelector={false}
-          disableMultipleColumnsSorting={true}
-          // End Column Menu
-          columnHeaderHeight={40}
-          apiRef={apiRef}
-          loading={callsLoading}
-          rows={tableData}
-          initialState={initialState}
-          onColumnVisibilityModelChange={newModel =>
-            setColumnVisibilityModel(newModel)
-          }
-          columnVisibilityModel={columnVisibilityModel}
-          // SORT SECTION START
-          sortingMode="server"
-          sortModel={sortModel}
-          onSortModelChange={newModel => setSortModel(newModel)}
-          // SORT SECTION END
-          // FILTER SECTION START
-          filterMode="server"
-          filterModel={filterModel}
-          onFilterModelChange={newModel => setFilterModel(newModel)}
-          // FILTER SECTION END
-          // PAGINATION SECTION START
-          pagination
-          rowCount={callsTotal}
-          paginationMode="server"
-          paginationModel={paginationModel}
-          onPaginationModelChange={newModel => setPaginationModel(newModel)}
-          pageSizeOptions={[100]}
-          // PAGINATION SECTION END
-          rowHeight={38}
-          columns={columns.cols as any}
-          experimentalFeatures={{columnGrouping: true}}
-          disableRowSelectionOnClick
-          rowSelectionModel={rowSelectionModel}
-          columnGroupingModel={columns.colGroupingModel}
-          hideFooterSelectedRowCount
-          sx={{
-            borderRadius: 0,
-          }}
-          slots={{
-            noRowsOverlay: () => {
-              const isEmpty = callsResult.length === 0;
-              if (!callsLoading && isEmpty) {
-                // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
-                if (isEvaluateTable) {
-                  return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-                } else if (effectiveFilter.traceRootsOnly) {
-                  return <Empty {...EMPTY_PROPS_TRACES} />;
-                }
+      <StyledDataGrid
+        // Start Column Menu
+        // ColumnMenu is needed to support pinning and column visibility
+        disableColumnMenu={false}
+        // ColumnFilter is definitely useful
+        disableColumnFilter={false}
+        disableMultipleColumnsFiltering={false}
+        // ColumnPinning seems to be required in DataGridPro, else it crashes.
+        // However, in this case it is also useful.
+        disableColumnPinning={false}
+        // ColumnReorder is definitely useful
+        disableColumnReorder={false}
+        // ColumnResize is definitely useful
+        disableColumnResize={false}
+        // ColumnSelector is definitely useful
+        disableColumnSelector={false}
+        disableMultipleColumnsSorting={true}
+        // End Column Menu
+        columnHeaderHeight={40}
+        apiRef={apiRef}
+        loading={callsLoading}
+        rows={tableData}
+        initialState={initialState}
+        // onColumnVisibilityModelChange={newModel =>
+        //   setColumnVisibilityModel(newModel)
+        // }
+        // columnVisibilityModel={columnVisibilityModel}
+        // SORT SECTION START
+        sortingMode="server"
+        sortModel={sortModel}
+        onSortModelChange={newModel => setSortModel(newModel)}
+        // SORT SECTION END
+        // FILTER SECTION START
+        filterMode="server"
+        filterModel={filterModel}
+        onFilterModelChange={newModel => setFilterModel(newModel)}
+        // FILTER SECTION END
+        // PAGINATION SECTION START
+        pagination
+        rowCount={callsTotal}
+        paginationMode="server"
+        paginationModel={paginationModel}
+        onPaginationModelChange={newModel => setPaginationModel(newModel)}
+        pageSizeOptions={[100]}
+        // PAGINATION SECTION END
+        rowHeight={38}
+        columns={columns.cols as any}
+        experimentalFeatures={{columnGrouping: true}}
+        disableRowSelectionOnClick
+        rowSelectionModel={rowSelectionModel}
+        columnGroupingModel={columns.colGroupingModel}
+        hideFooterSelectedRowCount
+        sx={{
+          borderRadius: 0,
+        }}
+        slots={{
+          noRowsOverlay: () => {
+            const isEmpty = callsResult.length === 0;
+            if (!callsLoading && isEmpty) {
+              // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
+              if (isEvaluateTable) {
+                return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
+              } else if (effectiveFilter.traceRootsOnly) {
+                return <Empty {...EMPTY_PROPS_TRACES} />;
               }
-              return (
-                <Box
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  <Typography color="textSecondary">
-                    No calls found.{' '}
-                    {clearFilters != null ? (
-                      <>
-                        Try{' '}
-                        <A
-                          onClick={() => {
-                            clearFilters();
-                          }}>
-                          clearing the filters
-                        </A>{' '}
-                        or l
-                      </>
-                    ) : (
-                      'L'
-                    )}
-                    earn more about how to log calls by visiting{' '}
-                    <TargetBlank href="https://wandb.me/weave">
-                      the docs
-                    </TargetBlank>
-                    .
-                  </Typography>
-                </Box>
-              );
-            },
-          }}
-        />
-      </React.Fragment>
+            }
+            return (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                <Typography color="textSecondary">
+                  No calls found.{' '}
+                  {clearFilters != null ? (
+                    <>
+                      Try{' '}
+                      <A
+                        onClick={() => {
+                          clearFilters();
+                        }}>
+                        clearing the filters
+                      </A>{' '}
+                      or l
+                    </>
+                  ) : (
+                    'L'
+                  )}
+                  earn more about how to log calls by visiting{' '}
+                  <TargetBlank href="https://wandb.me/weave">
+                    the docs
+                  </TargetBlank>
+                  .
+                </Typography>
+              </Box>
+            );
+          },
+        }}
+      />
     </FilterLayoutTemplate>
   );
 };
