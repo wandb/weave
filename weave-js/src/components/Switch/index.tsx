@@ -2,10 +2,10 @@ import * as Switch from '@radix-ui/react-switch';
 import React from 'react';
 import {twMerge} from 'tailwind-merge';
 
-export type SwitchSize = 'small' | 'normal';
+export type SwitchSize = 'small' | 'medium';
 export const Root = ({
   className,
-  size = 'normal',
+  size = 'medium',
   ...props
 }: React.ComponentProps<typeof Switch.Root> & {size?: SwitchSize}) => (
   <Switch.Root
@@ -22,7 +22,7 @@ export const Root = ({
 
 export const Thumb = ({
   className,
-  size = 'normal',
+  size = 'medium',
   ...props
 }: React.ComponentProps<typeof Switch.Thumb> & {
   checked: boolean;
@@ -30,10 +30,10 @@ export const Thumb = ({
 }) => (
   <Switch.Thumb
     className={twMerge(
-      ' rounded-full bg-white transition-transform duration-100 ease-out',
+      'rounded-full bg-white transition-transform duration-100 ease-out',
       size === 'small' ? 'h-[14px] w-[14px]' : 'h-[22px] w-[22px]',
       size === 'small' && props.checked ? 'translate-x-12' : '',
-      size === 'normal' && props.checked ? 'translate-x-20' : '',
+      size === 'medium' && props.checked ? 'translate-x-20' : '',
       props.checked ? '' : 'translate-x-0',
       className
     )}
