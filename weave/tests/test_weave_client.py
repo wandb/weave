@@ -245,7 +245,6 @@ def test_calls_delete(client):
     _call0_child2 = client.create_call("x", call0_child1, {"a": 5, "b": 12})
     call1 = client.create_call("y", None, {"a": 6, "b": 11})
 
-    print([f"{x.id} {x.parent_id} \n" for x in list(client.calls())])
     assert len(list(client.calls())) == 4
 
     result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
