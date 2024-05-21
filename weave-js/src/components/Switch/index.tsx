@@ -34,7 +34,7 @@ export const Thumb = ({
       size === 'small' ? 'h-[14px] w-[14px]' : 'h-[22px] w-[22px]',
       size === 'small' && props.checked ? 'translate-x-12' : '',
       size === 'medium' && props.checked ? 'translate-x-20' : '',
-      props.checked ? '' : 'translate-x-0',
+      !props.checked && 'translate-x-0',
       className
     )}
     {...props}
