@@ -919,7 +919,19 @@ def test_trace_call_filter(client):
 
         if len(inner_res.calls) != count:
             failed_cases.append(
-                f"Query {filter_by} expected {count}, but found {len(inner_res.calls)}"
+                f"(ALL) Query {filter_by} expected {count}, but found {len(inner_res.calls)}"
+            )
+
+        inner_res = get_client_trace_server(client).calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id=get_client_project_id(client),
+                filter_by=tsi._FilterBy.model_validate({"filter": filter_by}),
+            )
+        )
+
+        if inner_res.count != count:
+            failed_cases.append(
+                f"(Stats) Query {filter_by} expected {count}, but found {inner_res.count}"
             )
 
     if failed_cases:

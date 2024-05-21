@@ -248,6 +248,18 @@ class CallsQueryRes(BaseModel):
     calls: typing.List[CallSchema]
 
 
+class CallsQueryStatsReq(BaseModel):
+    project_id: str
+    filter: typing.Optional[_CallsFilter] = None
+    filter_by: typing.Optional[
+        _FilterBy
+    ] = None  # should this be moved inside of "filter?"
+
+
+class CallsQueryStatsRes(BaseModel):
+    count: int
+
+
 class OpCreateReq(BaseModel):
     op_obj: ObjSchemaForInsert
 
@@ -389,6 +401,10 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
+        ...
+
+    @abc.abstractmethod
+    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
         ...
 
     # Op API

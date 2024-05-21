@@ -414,6 +414,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        raise NotImplementedError()
+
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
 

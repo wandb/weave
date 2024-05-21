@@ -220,6 +220,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        conditions = []
+        param_builder = ParamBuilder()
+
+        if req.filter:
+            filter_conds, _ = _process_calls_filter_to_conditions(
+                req.filter, param_builder
+            )
+            conditions.extend(filter_conds)
+
+        if req.filter_by:
+            filter_by_conds, _ = _process_calls_filter_by_to_conditions(
+                req.filter_by, param_builder
+            )
+            conditions.extend(filter_by_conds)
+
+        stats = self._calls_query_stats_raw(
+            req.project_id,
+            conditions=conditions,
+            parameters=param_builder.get_params(),
+        )
+
+        return tsi.CallsQueryStatsRes(count=stats["count"])
+
     def calls_query_stream(
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
@@ -227,140 +251,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         param_builder = ParamBuilder()
 
         if req.filter:
-            if req.filter.op_names:
-                # We will build up (0 or 1) + N conditions for the op_version_refs
-                # If there are any non-wildcarded names, then we at least have an IN condition
-                # If there are any wildcarded names, then we have a LIKE condition for each
-
-                or_conditions: typing.List[str] = []
-
-                non_wildcarded_names: typing.List[str] = []
-                wildcarded_names: typing.List[str] = []
-                for name in req.filter.op_names:
-                    if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                        wildcarded_names.append(name)
-                    else:
-                        non_wildcarded_names.append(name)
-
-                if non_wildcarded_names:
-                    or_conditions.append(
-                        f"op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
-                    )
-
-                for name in wildcarded_names:
-                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-                    or_conditions.append(
-                        f"op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
-                    )
-
-                if or_conditions:
-                    conditions.append(_combine_conditions(or_conditions, "OR"))
-
-            if req.filter.input_refs:
-                conditions.append(
-                    f"hasAny(input_refs, {_param_slot(param_builder.add_param(req.filter.input_refs), 'Array(String)')})"
-                )
-
-            if req.filter.output_refs:
-                conditions.append(
-                    f"hasAny(output_refs, {_param_slot(param_builder.add_param(req.filter.output_refs), 'Array(String)')})"
-                )
-
-            if req.filter.parent_ids:
-                conditions.append(
-                    f"parent_id IN {_param_slot(param_builder.add_param(req.filter.parent_ids), 'Array(String)')}"
-                )
-
-            if req.filter.trace_ids:
-                conditions.append(
-                    f"trace_id IN {_param_slot(param_builder.add_param(req.filter.trace_ids), 'Array(String)')}"
-                )
-
-            if req.filter.call_ids:
-                conditions.append(
-                    f"id IN {_param_slot(param_builder.add_param(req.filter.call_ids), 'Array(String)')}"
-                )
-
-            if req.filter.trace_roots_only:
-                conditions.append("parent_id IS NULL")
-
-            if req.filter.wb_user_ids:
-                conditions.append(
-                    f"wb_user_id IN {_param_slot(param_builder.add_param(req.filter.wb_user_ids), 'Array(String)')})"
-                )
-
-            if req.filter.wb_run_ids:
-                conditions.append(
-                    f"wb_run_id IN {_param_slot(param_builder.add_param(req.filter.wb_run_ids), 'Array(String)')})"
-                )
+            filter_conds, _ = _process_calls_filter_to_conditions(
+                req.filter, param_builder
+            )
+            conditions.extend(filter_conds)
 
         if req.filter_by:
-            # This is the mongo-style filter_by
-            def process_operation(operation: tsi._Operation) -> str:
-                cond = None
-
-                if isinstance(operation, tsi._AndOperation):
-                    lhs_part = process_operand(operation.and_[0])
-                    rhs_part = process_operand(operation.and_[1])
-                    cond = f"({lhs_part} AND {rhs_part})"
-                elif isinstance(operation, tsi._OrOperation):
-                    lhs_part = process_operand(operation.or_[0])
-                    rhs_part = process_operand(operation.or_[1])
-                    cond = f"({lhs_part} OR {rhs_part})"
-                elif isinstance(operation, tsi._NotOperation):
-                    operand_part = process_operand(operation.not_)
-                    cond = f"(NOT ({operand_part}))"
-                elif isinstance(operation, tsi._EqOperation):
-                    lhs_part = process_operand(operation.eq_[0])
-                    rhs_part = process_operand(operation.eq_[1])
-                    cond = f"({lhs_part} = {rhs_part})"
-                elif isinstance(operation, tsi._GtOperation):
-                    lhs_part = process_operand(operation.gt_[0])
-                    rhs_part = process_operand(operation.gt_[1])
-                    cond = f"({lhs_part} > {rhs_part})"
-                elif isinstance(operation, tsi._GteOperation):
-                    lhs_part = process_operand(operation.gte_[0])
-                    rhs_part = process_operand(operation.gte_[1])
-                    cond = f"({lhs_part} >= {rhs_part})"
-                elif isinstance(operation, tsi._LikeOperation):
-                    lhs_part = process_operand(operation.like_[0])
-                    rhs_part = process_operand(operation.like_[1])
-                    cond = f"({lhs_part} LIKE {rhs_part})"
-                else:
-                    raise ValueError(f"Unknown operation type: {operation}")
-
-                return cond
-
-            def process_operand(operand: tsi._Operand) -> str:
-                if isinstance(operand, tsi._RawValue):
-                    return _param_slot(
-                        param_builder.add_param(operand.value_),
-                        _python_value_to_ch_type(operand.value_),
-                    )
-                elif isinstance(operand, tsi._FieldSelect):
-                    field, _ = _transform_external_calls_field_to_internal_calls_field(
-                        operand.field_, operand.cast_, param_builder
-                    )
-                    return field
-                elif isinstance(
-                    operand,
-                    (
-                        tsi._AndOperation,
-                        tsi._OrOperation,
-                        tsi._NotOperation,
-                        tsi._EqOperation,
-                        tsi._GtOperation,
-                        tsi._GteOperation,
-                        tsi._LikeOperation,
-                    ),
-                ):
-                    return process_operation(operand)
-                else:
-                    raise ValueError(f"Unknown operand type: {operand}")
-
-            filter_cond = process_operation(req.filter_by.filter)
-
-            conditions.append(filter_cond)
+            filter_by_conds, _ = _process_calls_filter_by_to_conditions(
+                req.filter_by, param_builder
+            )
+            conditions.extend(filter_by_conds)
 
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
@@ -990,13 +890,51 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {offset_part}
         """
         print("query_str", query_str)
-        raw_res = self._query(
+        raw_res = self._query_stream(
             query_str,
             parameters,
         )
 
         for row in raw_res:
             yield dict(zip(columns, row))
+
+    def _calls_query_stats_raw(
+        self,
+        project_id: str,
+        conditions: typing.Optional[typing.List[str]] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> typing.Dict:
+        if not parameters:
+            parameters = {}
+        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
+
+        parameters["project_id"] = project_id
+
+        if not conditions:
+            conditions = ["1 = 1"]
+
+        conditions_part = _combine_conditions(conditions, "AND")
+
+        query_str = f"""
+            SELECT COUNT(*)
+            FROM (
+                SELECT id
+                FROM calls_merged
+                WHERE project_id = {{project_id: String}}
+                GROUP BY project_id, id
+                HAVING {conditions_part}
+            )
+        """
+
+        raw_res = self._query(
+            query_str,
+            parameters,
+        )
+        rows = raw_res.result_rows
+        count = 0
+        if rows and len(rows) == 1 and len(rows[0]) == 1:
+            count = rows[0][0]
+        return dict(count=count)
 
     def _select_objs_query(
         self,
@@ -1016,7 +954,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if parameters is None:
             parameters = {}
-        query_result = self._query(
+        query_result = self._query_stream(
             f"""
             SELECT 
                 project_id,
@@ -1073,7 +1011,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
         migrator.apply_migrations(self._database)
 
-    def _query(
+    def _query_stream(
         self,
         query: str,
         parameters: typing.Dict[str, typing.Any],
@@ -1086,6 +1024,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) as stream:
             for row in stream:
                 yield row
+
+    def _query(
+        self,
+        query: str,
+        parameters: typing.Dict[str, typing.Any],
+        column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> QueryResult:
+        print("Running query: " + query + " with parameters: " + str(parameters))
+        parameters = _process_parameters(parameters)
+        res = self.ch_client.query(
+            query, parameters=parameters, column_formats=column_formats, use_none=True
+        )
+        print("Summary: " + json.dumps(res.summary, indent=2))
+        return res
 
     def _insert(
         self,
@@ -1456,3 +1408,154 @@ def _transform_external_calls_field_to_internal_calls_field(
         )
 
     return field, param_builder
+
+
+def _process_calls_filter_to_conditions(
+    filter: tsi._CallsFilter, param_builder: typing.Optional[ParamBuilder] = None
+) -> tuple[list[str], ParamBuilder]:
+    param_builder = param_builder or ParamBuilder()
+    conditions = []
+
+    if filter.op_names:
+        # We will build up (0 or 1) + N conditions for the op_version_refs
+        # If there are any non-wildcarded names, then we at least have an IN condition
+        # If there are any wildcarded names, then we have a LIKE condition for each
+
+        or_conditions: typing.List[str] = []
+
+        non_wildcarded_names: typing.List[str] = []
+        wildcarded_names: typing.List[str] = []
+        for name in filter.op_names:
+            if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                wildcarded_names.append(name)
+            else:
+                non_wildcarded_names.append(name)
+
+        if non_wildcarded_names:
+            or_conditions.append(
+                f"op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
+            )
+
+        for name in wildcarded_names:
+            like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+            or_conditions.append(
+                f"op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
+            )
+
+        if or_conditions:
+            conditions.append(_combine_conditions(or_conditions, "OR"))
+
+    if filter.input_refs:
+        conditions.append(
+            f"hasAny(input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+        )
+
+    if filter.output_refs:
+        conditions.append(
+            f"hasAny(output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+        )
+
+    if filter.parent_ids:
+        conditions.append(
+            f"parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+        )
+
+    if filter.trace_ids:
+        conditions.append(
+            f"trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
+        )
+
+    if filter.call_ids:
+        conditions.append(
+            f"id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+        )
+
+    if filter.trace_roots_only:
+        conditions.append("parent_id IS NULL")
+
+    if filter.wb_user_ids:
+        conditions.append(
+            f"wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+        )
+
+    if filter.wb_run_ids:
+        conditions.append(
+            f"wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+        )
+
+    return conditions, param_builder
+
+
+def _process_calls_filter_by_to_conditions(
+    filter_by: tsi._FilterBy, param_builder: typing.Optional[ParamBuilder] = None
+) -> tuple[list[str], ParamBuilder]:
+    param_builder = param_builder or ParamBuilder()
+    conditions = []
+    # This is the mongo-style filter_by
+    def process_operation(operation: tsi._Operation) -> str:
+        cond = None
+
+        if isinstance(operation, tsi._AndOperation):
+            lhs_part = process_operand(operation.and_[0])
+            rhs_part = process_operand(operation.and_[1])
+            cond = f"({lhs_part} AND {rhs_part})"
+        elif isinstance(operation, tsi._OrOperation):
+            lhs_part = process_operand(operation.or_[0])
+            rhs_part = process_operand(operation.or_[1])
+            cond = f"({lhs_part} OR {rhs_part})"
+        elif isinstance(operation, tsi._NotOperation):
+            operand_part = process_operand(operation.not_)
+            cond = f"(NOT ({operand_part}))"
+        elif isinstance(operation, tsi._EqOperation):
+            lhs_part = process_operand(operation.eq_[0])
+            rhs_part = process_operand(operation.eq_[1])
+            cond = f"({lhs_part} = {rhs_part})"
+        elif isinstance(operation, tsi._GtOperation):
+            lhs_part = process_operand(operation.gt_[0])
+            rhs_part = process_operand(operation.gt_[1])
+            cond = f"({lhs_part} > {rhs_part})"
+        elif isinstance(operation, tsi._GteOperation):
+            lhs_part = process_operand(operation.gte_[0])
+            rhs_part = process_operand(operation.gte_[1])
+            cond = f"({lhs_part} >= {rhs_part})"
+        elif isinstance(operation, tsi._LikeOperation):
+            lhs_part = process_operand(operation.like_[0])
+            rhs_part = process_operand(operation.like_[1])
+            cond = f"({lhs_part} LIKE {rhs_part})"
+        else:
+            raise ValueError(f"Unknown operation type: {operation}")
+
+        return cond
+
+    def process_operand(operand: tsi._Operand) -> str:
+        if isinstance(operand, tsi._RawValue):
+            return _param_slot(
+                param_builder.add_param(operand.value_),  # type: ignore
+                _python_value_to_ch_type(operand.value_),
+            )
+        elif isinstance(operand, tsi._FieldSelect):
+            field, _ = _transform_external_calls_field_to_internal_calls_field(
+                operand.field_, operand.cast_, param_builder
+            )
+            return field
+        elif isinstance(
+            operand,
+            (
+                tsi._AndOperation,
+                tsi._OrOperation,
+                tsi._NotOperation,
+                tsi._EqOperation,
+                tsi._GtOperation,
+                tsi._GteOperation,
+                tsi._LikeOperation,
+            ),
+        ):
+            return process_operation(operand)
+        else:
+            raise ValueError(f"Unknown operand type: {operand}")
+
+    filter_cond = process_operation(filter_by.filter)
+
+    conditions.append(filter_cond)
+
+    return conditions, param_builder
