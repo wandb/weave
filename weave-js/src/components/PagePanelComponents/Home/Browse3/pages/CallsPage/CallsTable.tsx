@@ -33,6 +33,7 @@ import _ from 'lodash';
 import React, {
   ComponentProps,
   FC,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -388,7 +389,8 @@ export const CallsTable: FC<{
     return refColumns;
   }, [tableData]);
 
-  const allDynamicColumnNames = useMemo(() => {
+  const allCurrentDynamicColumnNames = useMemo(() => {
+    // const allDynamicColumnNames = useMemo(() => {
     const dynamicColumns = new Set<string>();
     tableData.forEach(row => {
       Object.keys(row).forEach(key => {
@@ -404,6 +406,36 @@ export const CallsTable: FC<{
     });
     return _.sortBy([...dynamicColumns]);
   }, [tableData]);
+
+  // Wow this is a pretty crazy idea to maintain a list of all dynamic columns
+  // so we don't blow away old ones
+  const [allDynamicColumnNames, setAllDynamicColumnNames] = useState(
+    allCurrentDynamicColumnNames
+  );
+  useEffect(() => {
+    setAllDynamicColumnNames(current => {
+      // All dynamic columns are:
+      // allCurrentDynamicColumnNames + (setAllDynamicColumnNamesCurrent - columnsWithRefs)
+      const columnsWithRefsList = Array.from(columnsWithRefs);
+      const currentDynamicColumnNames = current.filter(c => {
+        for (const refCol of columnsWithRefsList) {
+          if (c.startsWith(refCol)) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      return _.sortBy(
+        Array.from(
+          new Set([
+            ...currentDynamicColumnNames,
+            ...allCurrentDynamicColumnNames,
+          ])
+        )
+      );
+    });
+  }, [allCurrentDynamicColumnNames, columnsWithRefs]);
 
   const columns = useMemo(() => {
     const cols: Array<GridColDef<(typeof tableData)[number]>> = [
@@ -612,7 +644,7 @@ export const CallsTable: FC<{
           return (
             <Timestamp
               value={
-                convertISOToDate(cellParams.row.started_at).getSeconds() / 1000
+                convertISOToDate(cellParams.row.started_at).getTime() / 1000
               }
               format="relative"
             />
@@ -683,12 +715,10 @@ export const CallsTable: FC<{
   }, [columns, initialState, apiRef, apiRefIsReady]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
-  const clearFilters = useMemo(() => {
-    if (Object.keys(filter ?? {}).length > 0) {
-      return () => setFilter({});
-    }
-    return null;
-  }, [filter, setFilter]);
+  const clearFilters = useCallback(() => {
+    setFilter({});
+    setFilterModel({items: []});
+  }, [setFilter]);
 
   // CPR (Tim) - (GeneralRefactoring): Remove this, and add a slot for empty content that can be calculated
   // in the parent component
@@ -852,7 +882,10 @@ export const CallsTable: FC<{
               // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
               if (isEvaluateTable) {
                 return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-              } else if (effectiveFilter.traceRootsOnly) {
+              } else if (
+                effectiveFilter.traceRootsOnly &&
+                filterModel.items.length === 0
+              ) {
                 return <Empty {...EMPTY_PROPS_TRACES} />;
               }
             }

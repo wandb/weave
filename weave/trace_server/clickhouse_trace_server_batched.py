@@ -1373,6 +1373,11 @@ def _param_slot(param_name: str, param_type: str) -> str:
     return f"{{{param_name}:{param_type}}}"
 
 
+def _quote_json_path(path: str) -> str:
+    parts = path.split(".")
+    return ".".join(f'"{part}"' for part in parts)
+
+
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: typing.Optional[str] = None,
@@ -1385,25 +1390,25 @@ def _transform_external_calls_field_to_internal_calls_field(
         if field == "inputs":
             json_path = "$"
         else:
-            json_path = "$." + field[len("inputs.") :]
+            json_path = "$." + _quote_json_path(field[len("inputs.") :])
         field = "inputs_dump"
     elif field == "output" or field.startswith("output."):
         if field == "output":
             json_path = "$"
         else:
-            json_path = "$." + field[len("output.") :]
+            json_path = "$." + _quote_json_path(field[len("output.") :])
         field = "output_dump"
     elif field == "attributes" or field.startswith("attributes."):
         if field == "attributes":
             json_path = "$"
         else:
-            json_path = "$." + field[len("attributes.") :]
+            json_path = "$." + _quote_json_path(field[len("attributes.") :])
         field = "attributes_dump"
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
         else:
-            json_path = "$." + field[len("summary.") :]
+            json_path = "$." + _quote_json_path(field[len("summary.") :])
         field = "summary_dump"
     else:
         assert field in all_call_select_columns, f"Invalid order_by field: {field}"
