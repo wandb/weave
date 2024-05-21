@@ -76,8 +76,14 @@ class CallDeleteCHInsertable(BaseModel):
     deleted_at: datetime.datetime
     wb_user_id: typing.Optional[str] = None
 
+    # boo
+    input_refs: typing.List[str] = []
+    output_refs: typing.List[str] = []
 
-CallCHInsertable = typing.Union[CallStartCHInsertable, CallEndCHInsertable]
+
+CallCHInsertable = typing.Union[
+    CallStartCHInsertable, CallEndCHInsertable, CallDeleteCHInsertable
+]
 
 
 # Very critical that this matches the calls table schema! This should
@@ -111,10 +117,10 @@ class SelectableCHCallSchema(BaseModel):
 
 
 all_call_insert_columns = list(
-    CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
+    CallStartCHInsertable.model_fields.keys()
+    | CallEndCHInsertable.model_fields.keys()
+    | CallDeleteCHInsertable.model_fields.keys()
 )
-
-all_call_delete_columns = list(CallDeleteCHInsertable.model_fields.keys())
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 
@@ -322,7 +328,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        deleted_at = datetime.datetime.now()
         proj_cond = "project_id = {project_id: String}"
         proj_params = {"project_id": req.project_id}
 
@@ -345,16 +350,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             all_calls=all_calls,
         )
 
+        deleted_at = datetime.datetime.now()
         insertables = [
             CallDeleteCHInsertable(
                 project_id=req.project_id,
                 id=call_id,
-                deleted_at=deleted_at,
                 wb_user_id=req.wb_user_id,
+                deleted_at=deleted_at,
             )
             for call_id in all_descendants
         ]
-        self._insert_calls_delete(ch_delete_calls=insertables)
+        print(
+            f"Deleting {len(insertables)} calls:\n   ",
+            "\n    ".join([i.id for i in insertables]),
+        )
+        for call in insertables:
+            self._insert_call(call)
 
         return tsi.CallsDeleteRes()
 
@@ -834,37 +845,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # def __del__(self) -> None:
     #     self.ch_client.close()
 
-    def _insert_call_parts_batch(
-        self,
-        batch: typing.List,
-        column_names: typing.List[str],
-    ) -> None:
-        if not batch:
-            return
-
-        settings = {}
-        if self._use_async_insert:
-            settings["async_insert"] = 1
-            settings["wait_for_async_insert"] = 0
-
-        self._insert(
-            "call_parts",
-            data=batch,
-            column_names=column_names,
-            settings=settings,
-        )
-
     def _insert_call_batch(self, batch: typing.List) -> None:
-        self._insert_call_parts_batch(
-            batch=batch,
-            column_names=all_call_insert_columns,
-        )
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                settings["wait_for_async_insert"] = 0
 
-    def _insert_call_delete_batch(self, batch: typing.List) -> None:
-        self._insert_call_parts_batch(
-            batch=batch,
-            column_names=all_call_delete_columns,
-        )
+            self._insert(
+                "call_parts",
+                data=batch,
+                column_names=all_call_insert_columns,
+                settings=settings,
+            )
 
     def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
         # Generate and run the query to get the call from the database
@@ -1133,19 +1126,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch.append(row)
         if self._flush_immediately:
             self._flush_calls()
-
-    def _insert_calls_delete(
-        self, ch_delete_calls: typing.List[CallDeleteCHInsertable]
-    ) -> None:
-        """Marks calls deleted by inserting deletion rows, in batch."""
-        batch = []
-        for ch_delete_call in ch_delete_calls:
-            parameters = ch_delete_call.model_dump()
-            row = []
-            for key in all_call_delete_columns:
-                row.append(parameters.get(key, None))
-            batch.append(row)
-        self._insert_call_delete_batch(batch)
 
     def _flush_calls(self) -> None:
         self._insert_call_batch(self._call_batch)
