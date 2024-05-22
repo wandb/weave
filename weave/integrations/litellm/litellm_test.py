@@ -119,6 +119,7 @@ async def test_litellm_quickstart_async(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
+@pytest.mark.asyncio
 def test_litellm_quickstart_stream(
     client: weave.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
