@@ -6,6 +6,7 @@ import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ExceptionAlert} from './Exceptions';
+import {OverflowMenu} from './OverflowMenu';
 
 export const Overview = styled.div`
   display: flex;
@@ -25,9 +26,16 @@ export const CallName = styled.div`
 `;
 CallName.displayName = 'S.CallName';
 
+export const OverflowBin = styled.div`
+  align-items: right;
+  margin-left: auto;
+`;
+OverflowBin.displayName = 'S.OverflowBin';
+
 export const CallOverview: React.FC<{
   call: CallSchema;
-}> = ({call}) => {
+  refetchCalls?: () => void;
+}> = ({call, refetchCalls}) => {
   const opName = opNiceName(call.spanName);
 
   const statusCode = call.rawSpan.status_code;
@@ -38,6 +46,9 @@ export const CallOverview: React.FC<{
         <CallName>{opName}</CallName>
         <CallId callId={call.callId} />
         <StatusChip value={statusCode} iconOnly />
+        <OverflowBin>
+          <OverflowMenu selectedCalls={[call]} refetch={refetchCalls} />
+        </OverflowBin>
       </Overview>
       {call.rawSpan.exception && (
         <ExceptionAlert exception={call.rawSpan.exception} />

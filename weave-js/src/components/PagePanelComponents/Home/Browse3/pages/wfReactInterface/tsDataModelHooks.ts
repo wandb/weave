@@ -28,6 +28,7 @@ import {
   CallSchema,
   Loadable,
   LoadableWithError,
+  LoadableWithRefetch,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -202,16 +203,27 @@ const useCalls = (
   filter: CallFilter,
   limit?: number,
   opts?: {skip?: boolean}
-): Loadable<CallSchema[]> => {
+): LoadableWithRefetch<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
+
+  const [lastFetch, setLastFetch] = useState<number | null>(null);
+  const refetch = useCallback(() => {
+    // Reset last fetched timestamp, triggering a refetch
+    setLastFetch(null);
+  }, []);
+
   useEffect(() => {
     if (opts?.skip) {
       return;
     }
+    if (lastFetch !== null) {
+      return;
+    }
+    setLastFetch(new Date().getTime());
     setCallRes(null);
     loadingRef.current = true;
     const req: traceServerClient.TraceCallsQueryReq = {
@@ -239,13 +251,23 @@ const useCalls = (
       setCallRes({calls: []});
     };
     getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
+  }, [
+    entity,
+    project,
+    deepFilter,
+    limit,
+    opts?.skip,
+    lastFetch,
+    setLastFetch,
+    getTsClient,
+  ]);
 
   return useMemo(() => {
     if (opts?.skip) {
       return {
         loading: false,
         result: [],
+        refetch,
       };
     }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
@@ -255,6 +277,7 @@ const useCalls = (
       return {
         loading: true,
         result: [],
+        refetch,
       };
     } else {
       allResults.forEach(call => {
@@ -270,11 +293,27 @@ const useCalls = (
       return {
         loading: false,
         result,
+        refetch,
       };
     }
-  }, [callRes, entity, project, opts?.skip]);
+  }, [callRes, entity, project, opts?.skip, refetch]);
 };
 
+const useCallsDelete = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const callsDelete = useCallback(
+    (projectID, callIDs): Promise<void> => {
+      return getTsClient().callsDelete({
+        project_id: projectID,
+        call_ids: callIDs,
+      });
+    },
+    [getTsClient]
+  );
+
+  return callsDelete;
+};
 const useOpVersion = (
   // Null value skips
   key: OpVersionKey | null
@@ -1054,6 +1093,7 @@ const convertISOToDate = (iso: string) => {
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsDelete,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

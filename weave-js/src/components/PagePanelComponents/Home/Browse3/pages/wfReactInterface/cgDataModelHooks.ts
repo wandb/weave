@@ -92,6 +92,7 @@ import {
   CallSchema,
   Loadable,
   LoadableWithError,
+  LoadableWithRefetch,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -159,7 +160,7 @@ const useCalls = (
   filter: CallFilter,
   limit?: number,
   opts?: {skip?: boolean}
-): Loadable<CallSchema[]> => {
+): LoadableWithRefetch<CallSchema[]> => {
   let runsNode = fnRunsNode(
     {
       entityName: entity,
@@ -1072,9 +1073,16 @@ const useFileContent = (
   throw new Error('Not implemented');
 };
 
+const useCallsDelete =
+  () =>
+  (projectID: string, callIDs: string[]): Promise<void> => {
+    throw new Error('Not implemented');
+  };
+
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsDelete,
   useOpVersion,
   useOpVersions,
   useObjectVersion,
