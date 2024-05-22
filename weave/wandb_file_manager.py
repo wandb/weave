@@ -41,7 +41,7 @@ def _file_path(uri: artifact_wandb.WeaveWBArtifactURI, md5_hex: str) -> str:
 def _local_path_and_download_url(
     art_uri: artifact_wandb.WeaveWBArtifactURI,
     manifest: artifact_wandb.WandbArtifactManifest,
-    base_url: typing.Optional[str],
+    base_url: typing.Optional[str] = None,
 ) -> typing.Optional[typing.Tuple[str, str]]:
     path = art_uri.path
     if path is None:
@@ -53,8 +53,8 @@ def _local_path_and_download_url(
     if manifest_entry is None:
         return None
     md5_hex = hashutil.b64_to_hex_id(hashutil.B64MD5(manifest_entry["digest"]))
-    file_path = _file_path(art_uri, md5_hex)
     base_url = base_url or weave_env.wandb_base_url()
+    file_path = _file_path(art_uri, md5_hex)
     if manifest.storage_layout == artifact_wandb.WandbArtifactManifest.StorageLayout.V1:
         return file_path, "{}/artifacts/{}/{}/{}".format(
             base_url, art_uri.entity_name, md5_hex, urllib.parse.quote(file_name)
@@ -134,7 +134,7 @@ class WandbFileManagerAsync:
     async def local_path_and_download_url(
         self,
         art_uri: artifact_wandb.WeaveWBArtifactURI,
-        base_url: typing.Optional[str],
+        base_url: typing.Optional[str] = None,
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
@@ -298,7 +298,7 @@ class WandbFileManager:
     def local_path_and_download_url(
         self,
         art_uri: artifact_wandb.WeaveWBArtifactURI,
-        base_url: typing.Optional[str],
+        base_url: typing.Optional[str] = None,
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
