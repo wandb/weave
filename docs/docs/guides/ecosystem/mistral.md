@@ -17,7 +17,7 @@ Weave automatically tracks and logs LLM calls made via the [MistralAI Python lib
 2. Initialize Weave in your Python script:
    ```python
    import weave
-   weave.init("my_llm_project")
+   weave.init("cheese_recommender")
    ```
    :::note
    We patch the mistral `chat_completion` method for you to keep track of your LLM calls.
