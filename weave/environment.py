@@ -144,14 +144,13 @@ def weave_server_url() -> str:
 
 
 def wandb_base_url() -> str:
-    pod_url = os.getenv("WANDB_PRIVATE_BASE_URL", "").rstrip("/")
-    return pod_url if pod_url != "" else wandb_frontend_base_url()
-
-
-def wandb_frontend_base_url() -> str:
     settings = Settings()
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
 
+
+def wandb_frontend_base_url() -> str:
+    public_url = os.getenv("WANDB_PUBLIC_BASE_URL", "").rstrip("/")
+    return public_url if public_url != "" else wandb_base_url()
 
 # use filesystem.get_filesystem_dir() instead of directly accessing the env var
 def weave_filesystem_dir() -> str:
