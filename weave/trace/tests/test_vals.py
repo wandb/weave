@@ -35,5 +35,6 @@ def test_traceobject_access_after_init_termination(client):
     from weave import context_state
 
     context_state._graph_client.set(None)
+    context_state._has_init_ever.set(True)
 
     assert my_obj.val == 1
