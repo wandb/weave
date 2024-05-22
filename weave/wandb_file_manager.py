@@ -52,7 +52,7 @@ def _local_path_and_download_url(
     if manifest_entry is None:
         return None
     md5_hex = hashutil.b64_to_hex_id(hashutil.B64MD5(manifest_entry["digest"]))
-    base_url = weave_env.wandb_base_url()
+    base_url = weave_env.wandb_frontend_base_url()
     file_path = _file_path(art_uri, md5_hex)
     if manifest.storage_layout == artifact_wandb.WandbArtifactManifest.StorageLayout.V1:
         return file_path, "{}/artifacts/{}/{}/{}".format(
