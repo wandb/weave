@@ -623,7 +623,17 @@ export const CallsTable: FC<{
         filterable: !columnIsRefExpanded(key),
         sortable: !columnIsRefExpanded(key),
         filterOperators: allOperators,
-        headerName: key.split('.').slice(-1)[0],
+        headerName: key,
+        renderHeader: () => {
+          return (
+            <div
+              style={{
+                fontWeight: 600,
+              }}>
+              {key.split('.').slice(-1)[0]}
+            </div>
+          );
+        },
         renderCell: cellParams => {
           const val = (cellParams.row as any)[key];
           if (val === undefined) {
