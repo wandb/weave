@@ -19,7 +19,7 @@ rich>=13.7.0
 aiohttp>=3.8.3
 aiofiles>=22.1.0
 aioprocessing>=2.0.1
-Werkzeug>=2.0.0
+Werkzeug>=3.0.3  # CVE 2024-34069 
 janus>=1.0.0
 
 # we use this for logger, could probably skip it
@@ -38,3 +38,5 @@ analytics-python>=1.2.9
 
 # Used for version parsing in integrations.
 packaging>=21.0
+
+tenacity>=8.3.0

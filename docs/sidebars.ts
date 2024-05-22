@@ -59,6 +59,9 @@ const sidebars: SidebarsConfig = {
           link: { type: "doc", id: "guides/tools/index" },
           items: ["guides/tools/serve", "guides/tools/deploy"],
         },
+        {
+          type: "doc", id: "guides/platform/index",
+        },
       ],
     },
     {
