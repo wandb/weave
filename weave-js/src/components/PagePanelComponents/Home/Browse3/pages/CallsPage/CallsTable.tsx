@@ -263,7 +263,6 @@ export const CallsTable: FC<{
     });
     return _.sortBy([...dynamicColumns]);
   }, [tableData]);
-  console.log({tableData, allCurrentDynamicColumnNames});
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -441,21 +440,6 @@ export const CallsTable: FC<{
     expandedRefCols,
   ]);
 
-  // This whole thing is not working...
-  // // TODO: Should extract this to a common place - good list of the things we are
-  // // maintaining outside
-  // const resetManualModelState = useCallback(() => {
-  //   setExpandedRefCols(new Set<string>());
-  //   setAllDynamicColumnNames([]);
-  //   setFilterModel({items: []});
-  //   setSortModel([{field: 'started_at', sort: 'desc'}]);
-  //   setPaginationModel({
-  //     pageSize: defaultPageSize,
-  //     page: 0,
-  //   });
-  //   setPinnedColumnsModel({left: ['op_name']});
-  // }, []);
-
   useEffect(() => {
     if (effectiveFilter) {
       setAllDynamicColumnNames([]);
@@ -463,9 +447,6 @@ export const CallsTable: FC<{
       setAllDynamicColumnNames([]);
     }
   }, [effectiveFilter]);
-  // }, [effectiveFilter.opVersionRefs, resetManualModelState]);
-
-  // console.log({allDynamicColumnNames});
 
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
