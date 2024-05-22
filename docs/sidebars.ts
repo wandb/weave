@@ -51,7 +51,7 @@ const sidebars: SidebarsConfig = {
           type: "category",
           label: "Ecosystem",
           link: { type: "doc", id: "guides/ecosystem/index" },
-          items: ["guides/ecosystem/openai"],
+          items: ["guides/ecosystem/openai", "guides/ecosystem/mistral"],
         },
         {
           type: "category",
