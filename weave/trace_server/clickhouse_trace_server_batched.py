@@ -74,7 +74,7 @@ class CallDeleteCHInsertable(BaseModel):
     project_id: str
     id: str
     deleted_at: datetime.datetime
-    updated_by: typing.Optional[str]
+    wb_user_id: typing.Optional[str]
 
     # boo
     input_refs: typing.List[str] = []
@@ -114,7 +114,6 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
-    updated_by: typing.Optional[str] = None
 
 
 all_call_insert_columns = list(
@@ -356,7 +355,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             CallDeleteCHInsertable(
                 project_id=req.project_id,
                 id=call_id,
-                updated_by=req.wb_user_id,
+                wb_user_id=req.wb_user_id,
                 deleted_at=deleted_at,
             )
             for call_id in all_descendants

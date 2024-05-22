@@ -1,25 +1,16 @@
 /*
-This migration adds:
-    * `deleted_at` to
-        - the object_versions, call_parts, and calls_merged tables
-        - the object_versions_deduped and calls_merged_view views
-    * `updated_by` to
-        - the object_versions table, call_parts, and calls_merged tables
-        - the object_versions_deduped and calls_merged_view views
+This migration undoes adding the `deleted_at` column to: 
+    - the object_versions, call_parts, and calls_merged tables
+    - the object_versions_deduped and calls_merged_view views
 */
 
-ALTER TABLE object_versions
-    ADD COLUMN deleted_at Nullable(DateTime64(3)) DEFAULT NULL;
-
-ALTER TABLE object_versions
-    ADD COLUMN updated_by Nullable(String) DEFAULT NULL;
+ALTER TABLE object_versions DROP COLUMN deleted_at;
 
 CREATE OR REPLACE VIEW object_versions_deduped as
     SELECT project_id,
         object_id,
         created_at,
-        deleted_at,  -- **** Add deleted_at to the view ****
-        updated_by,  -- **** Add updated_by to the view ****
+        -- **** remove deleted_at from view ****
         kind,
         base_object_class,
         refs,
@@ -57,18 +48,6 @@ CREATE OR REPLACE VIEW object_versions_deduped as
         object_id,
         created_at;
 
-ALTER TABLE call_parts
-    ADD COLUMN deleted_at Nullable(DateTime64(3)) DEFAULT NULL;
-
-ALTER TABLE call_parts
-    ADD COLUMN updated_by Nullable(String) DEFAULT NULL;
-
-ALTER TABLE calls_merged
-    ADD COLUMN deleted_at SimpleAggregateFunction(any, Nullable(DateTime64(3)));
-
-ALTER TABLE calls_merged
-    ADD COLUMN updated_by SimpleAggregateFunction(any, Nullable(String));
-
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
         id,
@@ -85,9 +64,12 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(output_dump) as output_dump,
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
-        array_concat_aggSimpleState(output_refs) as output_refs,
-        anySimpleState(deleted_at) as deleted_at,  -- **** Add deleted_at to the view ****
-        anySimpleState(updated_by) as updated_by  -- **** Add updated_by to the view ****
+        array_concat_aggSimpleState(output_refs) as output_refs
+        -- **** remove deleted_at from view ****
     FROM call_parts
     GROUP BY project_id,
         id;
+
+ALTER TABLE calls_merged DROP COLUMN deleted_at;
+
+ALTER TABLE call_parts DROP COLUMN deleted_at;
