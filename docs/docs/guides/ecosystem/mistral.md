@@ -37,9 +37,9 @@ chat_response = client.chat(
 )
 ```
 
-Weave will now track and log all LLM calls made through the MistralAI library. You can view the logs and insights in the Weave web interface.
+Weave will now track and log all LLM calls made through the MistralAI library. You can view the traces in the Weave web interface.
 
-[![mistral_trace.png](mistral_trace.png)](https://wandb.ai/capecape/mistralai_project/weave/calls)
+[![mistral_trace.png](imgs/mistral_trace.png)](https://wandb.ai/capecape/mistralai_project/weave/calls)
 
 ## Wrapping with your own ops
 
@@ -62,3 +62,6 @@ cheese_recommender(region="France", model="mistral-large-latest")
 cheese_recommender(region="Spain", model="mistral-large-latest")
 cheese_recommender(region="Netherlands", model="mistral-large-latest")
 ```
+
+[![mistral_ops.png](imgs/mistral_ops.png)](https://wandb.ai/capecape/mistralai_project/weave/calls)
+
