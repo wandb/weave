@@ -41,6 +41,7 @@ class CallSchema(BaseModel):
     wb_run_id: typing.Optional[str] = None
 
     deleted_at: typing.Optional[datetime.datetime] = None
+    updated_by: typing.Optional[str] = None
 
 
 # Essentially a partial of StartedCallSchema. Mods:
