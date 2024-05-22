@@ -133,23 +133,6 @@ const useDirectUrlNodeWithExpiration = (
   }, [fileNode, ttl, fileNodeRef, resultRef, asOfRef]);
 };
 
-// Function to check if the URL contains ":8080" and replace it with current window location
-// This is needed because sometimes the signed URL returned by the backend contains ":8080" which is not accessible from the frontend
-const checkDirectURL = (url: string) => {
-  const wandbAppPort = ':8080';
-  const {protocol, hostname} = window.location;
-  const portIndex = url.indexOf(wandbAppPort);
-
-  if (portIndex !== -1) {
-    // Extract the part after ":8080"
-    const afterPort = url.substring(portIndex + wandbAppPort.length);
-    // Construct the new URL
-    return `${protocol}//${hostname}${afterPort}`;
-  }
-  // Return the original URL if ":8080" is not found
-  return url;
-};
-
 export const useSignedUrlWithExpiration = (
   fileNode:
     | Node<{
@@ -167,14 +150,13 @@ export const useSignedUrlWithExpiration = (
       if (directUrl.result != null) {
         // in some environments (local) directUrl can already be the signed URL
         if (!(directUrl.result as string).includes('/artifactsV2/')) {
-          setSignedUrl(checkDirectURL(directUrl.result as string));
+          setSignedUrl(directUrl.result as string);
           return;
         }
 
         // eslint-disable-next-line wandb/no-unprefixed-urls
         const response = await fetch(
-          checkDirectURL(directUrl.result) +
-            '?redirect=false&content-disposition=inline',
+          directUrl.result + '?redirect=false&content-disposition=inline',
           {
             credentials: 'include',
             method: 'GET',
