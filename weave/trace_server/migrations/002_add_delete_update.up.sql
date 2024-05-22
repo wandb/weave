@@ -67,7 +67,7 @@ ALTER TABLE calls_merged
     ADD COLUMN deleted_at SimpleAggregateFunction(any, Nullable(DateTime64(3)));
 
 ALTER TABLE calls_merged
-    ADD COLUMN updated_by Nullable(String) DEFAULT NULL;
+    ADD COLUMN updated_by SimpleAggregateFunction(any, Nullable(String));
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
