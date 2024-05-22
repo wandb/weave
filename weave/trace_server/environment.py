@@ -22,7 +22,7 @@ def wf_clickhouse_pass() -> str:
 
 
 def wf_clickhouse_database() -> str:
-    """The password of the clickhouse server."""
+    """The name of the clickhouse database."""
     return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
 
 

@@ -266,6 +266,7 @@ const ALLOWED_CJS_MODULES = [
   'lowlight/lib/core',
   'refractor',
   'refractor/core',
+  'yet-another-react-lightbox',
 ];
 
 const repositoryRoot = path.dirname(path.dirname(__dirname));

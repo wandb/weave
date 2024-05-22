@@ -7,6 +7,7 @@ import {
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
@@ -112,6 +113,9 @@ export const FilterableObjectVersionsTable: React.FC<{
 
   if (filteredObjectVersions.loading) {
     return <Loading centered />;
+  }
+  if (filteredObjectVersions.error) {
+    return <ErrorPanel />;
   }
 
   // TODO: Only show the empty state if no filters other than baseObjectClass
