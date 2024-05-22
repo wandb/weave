@@ -1,5 +1,6 @@
-from typing import Union, Any
 import dataclasses
+from typing import Any, Union
+
 from ..trace_server import refs_internal
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME

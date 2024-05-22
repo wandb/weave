@@ -1,11 +1,7 @@
 import typing
-from . import init_message
+
+from . import autopatch, context_state, errors, init_message, trace_sentry, weave_client
 from .trace_server import remote_http_trace_server, sqlite_trace_server
-from . import context_state
-from . import errors
-from . import autopatch
-from . import weave_client
-from . import trace_sentry
 
 
 class InitializedClient:
@@ -17,12 +13,14 @@ class InitializedClient:
         self.serverless_io_service_token = context_state._serverless_io_service.set(
             True
         )
+        self.has_init_ever = context_state._has_init_ever.set(True)
 
     def reset(self) -> None:
         context_state._graph_client.reset(self.graph_client_token)
         context_state._ref_tracking_enabled.reset(self.ref_tracking_token)
         context_state._eager_mode.reset(self.eager_mode_token)
         context_state._serverless_io_service.reset(self.serverless_io_service_token)
+        context_state._has_init_ever.reset(self.has_init_ever)
 
 
 def get_username() -> typing.Optional[str]:

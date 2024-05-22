@@ -1,32 +1,33 @@
-import inspect
-from typing import Iterator, Literal, Any, Union, Optional, Generator, SupportsIndex
 import dataclasses
+import inspect
 import operator
 import typing
+from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.trace.op import Op
-from weave.trace.refs import (
-    RefWithExtra,
-    ObjectRef,
-    TableRef,
-    DICT_KEY_EDGE_NAME,
-    OBJECT_ATTR_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    TABLE_ROW_ID_EDGE_NAME,
-)
 from weave import box, context_state
+from weave.graph_client_context import get_graph_client
 from weave.table import Table
-from weave.trace.serialize import from_json
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
-from weave.graph_client_context import get_graph_client
+from weave.trace.op import Op
+from weave.trace.refs import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
+    OBJECT_ATTR_EDGE_NAME,
+    TABLE_ROW_ID_EDGE_NAME,
+    ObjectRef,
+    RefWithExtra,
+    TableRef,
+)
+from weave.trace.serialize import from_json
 from weave.trace_server.trace_server_interface import (
+    ObjReadReq,
+    TableQueryReq,
     TraceServerInterface,
     _TableRowFilter,
-    TableQueryReq,
-    ObjReadReq,
 )
 
 
@@ -142,14 +143,20 @@ def attribute_access_result(self: object, val_attr_val: Any, attr_name: str) -> 
         if not context_state.get_has_init_ever():
             from weave.weave_init import init_weave
 
-            init_client = init_weave(f"{val_attr_val.entity}/{val_attr_val.project}", ensure_project_exists=False)
-            gc = get_graph_client()
+            init_client = init_weave(
+                f"{val_attr_val.entity}/{val_attr_val.project}",
+                ensure_project_exists=False,
+            )
+
+            temp_gc = get_graph_client()
+            assert temp_gc is not None
+
             try:
-                res = make_trace_obj(val_attr_val, new_ref, gc.server, None, self)
+                res = make_trace_obj(val_attr_val, new_ref, temp_gc.server, None, self)
             finally:
                 init_client.reset()
             return res
-            
+
         # In the case that the graph client has been closed but the user still
         # maintains a reference to this object, we should gracefully fallback
         # to the raw value.

@@ -68,8 +68,10 @@ _has_init_ever: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "has_init_ever", default=False
 )
 
+
 def get_has_init_ever() -> bool:
     return _has_init_ever.get()
+
 
 def set_has_init_ever(val: bool):
     _has_init_ever.set(val)
