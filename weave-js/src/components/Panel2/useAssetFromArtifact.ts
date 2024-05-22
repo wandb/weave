@@ -145,18 +145,36 @@ export const useSignedUrlWithExpiration = (
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const directUrlNode = useDirectUrlNodeWithExpiration(fileNode, ttl);
   const directUrl = CGReact.useNodeValue(directUrlNode);
+
+  const replacePort = (url: string) => {
+    console.log('replacePort')
+    const port = ':8080';
+    const replacement = window.WEAVE_CONFIG.WANDB_BASE_URL;
+    const portIndex = url.indexOf(port);
+  
+    if (portIndex !== -1) {
+      // Extract the part after ":8080"
+      const afterPort = url.substring(portIndex + port.length);
+      // Construct the new URL
+      return `${replacement}${afterPort}`;
+    }
+  
+    // Return the original URL if ":8080" is not found
+    return url;
+  }
+
   useEffect(() => {
     const resolveSignedUrl = async () => {
       if (directUrl.result != null) {
         // in some environments (local) directUrl can already be the signed URL
         if (!(directUrl.result as string).includes('/artifactsV2/')) {
-          setSignedUrl(directUrl.result as string);
+          setSignedUrl(replacePort(directUrl.result as string));
           return;
         }
 
         // eslint-disable-next-line wandb/no-unprefixed-urls
         const response = await fetch(
-          directUrl.result + '?redirect=false&content-disposition=inline',
+          replacePort(directUrl.result )+ '?redirect=false&content-disposition=inline',
           {
             credentials: 'include',
             method: 'GET',
