@@ -1,6 +1,11 @@
 import {
+  getGridBooleanOperators,
+  getGridDateOperators,
+  getGridNumericOperators,
+  getGridStringOperators,
   GridFilterItem,
   GridFilterModel,
+  GridFilterOperator,
   GridPaginationModel,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
@@ -50,29 +55,22 @@ export const useCallsForQuery = (
   const filterByRaw = useMemo(() => {
     const setItems = gridFilter.items.filter(item => item.value !== undefined);
 
-    const operationConverter = (item: GridFilterItem) => {
-      // TODO: This needs to be muc much more sophisticated
-      if (item.operator === 'contains') {
-        return {
-          like_: [{field_: item.field}, {value_: '%' + item.value + '%'}], // TODO: escape % and _
-        };
-      } else {
-        throw new Error('Unsupported operator');
-      }
-    };
+    const convertedItems = setItems
+      .map(operationConverter)
+      .filter(item => item !== null) as Array<FilterBy['filter']>;
 
-    if (setItems.length === 0) {
+    if (convertedItems.length === 0) {
       return undefined;
     }
 
-    if (setItems.length === 1) {
-      return operationConverter(setItems[0]);
+    if (convertedItems.length === 1) {
+      return convertedItems[0];
     }
 
     const operation = gridFilter.logicOperator === 'or' ? 'or_' : 'and_'; // and is default
 
     return {
-      [operation]: setItems.map(operationConverter),
+      [operation]: convertedItems,
     };
   }, [gridFilter]);
 
@@ -144,4 +142,168 @@ export const refIsExpandable = (ref: string): boolean => {
     );
   }
   return false;
+};
+
+const operatorListAsMap = (operators: GridFilterOperator[]) => {
+  return operators.reduce((acc, operator) => {
+    acc[operator.value] = operator;
+    return acc;
+  }, {} as Record<string, GridFilterOperator>);
+};
+
+const stringOperators = operatorListAsMap(getGridStringOperators());
+const numberOperators = operatorListAsMap(getGridNumericOperators());
+const booleanOperators = operatorListAsMap(getGridBooleanOperators());
+const dateTimeOperators = operatorListAsMap(getGridDateOperators(true));
+
+const allGeneralPurposeOperators = {
+  string: {
+    contains: stringOperators.contains,
+    equals: stringOperators.equals,
+    startsWith: stringOperators.startsWith,
+    endsWith: stringOperators.endsWith,
+  },
+  number: {
+    '=': numberOperators['='],
+    '!=': numberOperators['!='],
+    '>': numberOperators['>'],
+    '>=': numberOperators['>='],
+    '<': numberOperators['<'],
+    '<=': numberOperators['<='],
+  },
+  bool: {
+    is: booleanOperators.is,
+  },
+  date: {
+    after: dateTimeOperators.after,
+    before: dateTimeOperators.before,
+  },
+  any: {
+    isEmpty: stringOperators.isEmpty,
+    isNotEmpty: stringOperators.isEmpty,
+  },
+};
+
+export const allOperators = Object.entries(allGeneralPurposeOperators).flatMap(
+  ([type, operators]) =>
+    Object.entries(operators).map(([label, operator]) => {
+      return {
+        ...operator,
+        value: `(${type}): ${label}`,
+        label: `(${type}): ${label}`,
+      };
+    })
+);
+
+const operationConverter = (
+  item: GridFilterItem
+): null | FilterBy['filter'] => {
+  if (item.operator === '(any): isEmpty') {
+    return {
+      eq_: [{field_: item.field}, {value_: ''}],
+    };
+  } else if (item.operator === '(any): isNotEmpty') {
+    return {
+      not_: {
+        eq_: [{field_: item.field}, {value_: ''}],
+      },
+    };
+  } else if (item.operator === '(string): contains') {
+    return {
+      like_: [{field_: item.field}, {value_: '%' + item.value + '%'}],
+    };
+  } else if (item.operator === '(string): equals') {
+    return {
+      eq_: [{field_: item.field}, {value_: item.value}],
+    };
+  } else if (item.operator === '(string): startsWith') {
+    return {
+      like_: [{field_: item.field}, {value_: '%' + item.value}],
+    };
+  } else if (item.operator === '(string): endsWith') {
+    return {
+      like_: [{field_: item.field}, {value_: item.value + '%'}],
+    };
+  } else if (item.operator === '(number): =') {
+    if (item.value === '') {
+      return null;
+    }
+    const val = parseFloat(item.value);
+    return {
+      eq_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+    };
+  } else if (item.operator === '(number): !=') {
+    if (item.value === '') {
+      return null;
+    }
+    const val = parseFloat(item.value);
+    return {
+      not_: {
+        eq_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+      },
+    };
+  } else if (item.operator === '(number): >') {
+    if (item.value === '') {
+      return null;
+    }
+    const val = parseFloat(item.value);
+    return {
+      gt_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+    };
+  } else if (item.operator === '(number): >=') {
+    if (item.value === '') {
+      return null;
+    }
+    const val = parseFloat(item.value);
+    return {
+      gte_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+    };
+  } else if (item.operator === '(number): <') {
+    if (item.value === '') {
+      return null;
+    }
+    const val = parseFloat(item.value);
+    return {
+      not_: {
+        gte_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+      },
+    };
+  } else if (item.operator === '(number): <=') {
+    if (item.value === '') {
+      return null;
+    }
+    const val = parseFloat(item.value);
+    return {
+      not_: {
+        lte_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+      },
+    };
+  } else if (item.operator === '(bool): is') {
+    if (item.value === '') {
+      return null;
+    }
+    return {
+      eq_: [{field_: item.field}, {value_: item.value}],
+    };
+  } else if (item.operator === '(date): after') {
+    if (item.value === '') {
+      return null;
+    }
+    const secs = new Date(item.value).getTime();
+    return {
+      gt_: [{field_: item.field, cast_: 'float'}, {value_: secs / 1000}],
+    };
+  } else if (item.operator === '(date): before') {
+    if (item.value === '') {
+      return null;
+    }
+    const secs = new Date(item.value).getTime();
+    return {
+      not_: {
+        gt_: [{field_: item.field, cast_: 'float'}, {value_: secs / 1000}],
+      },
+    };
+  } else {
+    throw new Error('Unsupported operator');
+  }
 };

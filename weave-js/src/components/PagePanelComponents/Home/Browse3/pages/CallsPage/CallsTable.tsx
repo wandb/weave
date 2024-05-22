@@ -92,7 +92,11 @@ import {useOpVersionOptions} from './callsTableFilter';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from './callsTableFilter';
 import {useInputObjectVersionOptions} from './callsTableFilter';
 import {useOutputObjectVersionOptions} from './callsTableFilter';
-import {refIsExpandable, useCallsForQuery} from './callsTableQuery';
+import {
+  allOperators,
+  refIsExpandable,
+  useCallsForQuery,
+} from './callsTableQuery';
 
 const VisibilityAlert = styled.div`
   background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
@@ -547,6 +551,8 @@ export const CallsTable: FC<{
         // Again, the underlying value is not obvious to the user,
         // so the default free-form filter is likely more confusing than helpful.
         filterable: false,
+        // type: 'singleSelect',
+        // valueOptions: ['SUCCESS', 'ERROR', 'PENDING'],
         width: 59,
         renderCell: cellParams => {
           return (
@@ -616,6 +622,7 @@ export const CallsTable: FC<{
         // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
         filterable: !columnIsRefExpanded(key),
         sortable: !columnIsRefExpanded(key),
+        filterOperators: allOperators,
         headerName: key.split('.').slice(-1)[0],
         renderCell: cellParams => {
           const val = (cellParams.row as any)[key];
@@ -680,7 +687,8 @@ export const CallsTable: FC<{
         field: 'started_at',
         headerName: 'Called',
         // Should have custom timestamp filter here.
-        filterable: false,
+        filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
+        sortable: true,
         width: 100,
         minWidth: 100,
         maxWidth: 100,
