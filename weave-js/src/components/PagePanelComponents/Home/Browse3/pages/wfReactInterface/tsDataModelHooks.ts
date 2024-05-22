@@ -321,6 +321,7 @@ const useCalls = (
 
   useEffect(() => {
     if (calls.loading || calls.result == null) {
+      setExpandedCalls([]);
       return;
     }
 
@@ -394,8 +395,10 @@ const useCalls = (
 
     doExpansionIteration(calls.result.map(c => c.traceCall!));
   }, [calls.loading, calls.result, expandedRefColumns, getTsClient]);
-
-  return {loading: calls.loading || isExpanding, result: expandedCalls};
+  const loading = calls.loading || isExpanding;
+  return useMemo(() => {
+    return {loading, result: loading ? [] : expandedCalls};
+  }, [expandedCalls, loading]);
 };
 
 const useCallsStats = makeTraceServerEndpointHook<

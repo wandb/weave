@@ -81,10 +81,7 @@ import {
   objectVersionNiceString,
   opVersionRefOpName,
 } from '../wfReactInterface/utilities';
-import {
-  CallSchema,
-  OpVersionKey,
-} from '../wfReactInterface/wfDataModelHooksInterface';
+import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {getEffectiveFilter} from './callsTableFilter';
@@ -229,21 +226,9 @@ export const CallsTable: FC<{
     expandedRefCols
   );
 
-  // Scrappy: we want to only update result once loading is done
-
   const callsLoading = calls.loading;
-  const [callsResult, setCallsResult] = useState<CallSchema[]>([]);
-  useEffect(() => {
-    if (!callsLoading) {
-      setCallsResult(calls.result ?? []);
-    }
-  }, [callsLoading, calls.result, callsResult]);
-  const [callsTotal, setCallsTotal] = useState<number>(0);
-  useEffect(() => {
-    if (!callsLoading) {
-      setCallsTotal(calls.total ?? 0);
-    }
-  }, [callsLoading, calls.total, callsTotal]);
+  const callsResult = calls.result;
+  const callsTotal = calls.total;
 
   // Construct Flattened Table Data
 
@@ -258,6 +243,27 @@ export const CallsTable: FC<{
         ) as TraceCallSchema & {[key: string]: string}
     );
   }, [callsResult]);
+
+  // Maintain an ever-growing set of unique columns. It must be reset
+  // when `effectiveFilter` changes.
+  const allCurrentDynamicColumnNames = useMemo(() => {
+    // const allDynamicColumnNames = useMemo(() => {
+    const dynamicColumns = new Set<string>();
+    tableData.forEach(row => {
+      Object.keys(row).forEach(key => {
+        if (
+          key.startsWith('attributes') ||
+          key.startsWith('inputs') ||
+          key.startsWith('output') ||
+          key.startsWith('summary')
+        ) {
+          dynamicColumns.add(key);
+        }
+      });
+    });
+    return _.sortBy([...dynamicColumns]);
+  }, [tableData]);
+  console.log({tableData, allCurrentDynamicColumnNames});
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -382,24 +388,6 @@ export const CallsTable: FC<{
     return refColumns;
   }, [tableData]);
 
-  const allCurrentDynamicColumnNames = useMemo(() => {
-    // const allDynamicColumnNames = useMemo(() => {
-    const dynamicColumns = new Set<string>();
-    tableData.forEach(row => {
-      Object.keys(row).forEach(key => {
-        if (
-          key.startsWith('attributes') ||
-          key.startsWith('inputs') ||
-          key.startsWith('output') ||
-          key.startsWith('summary')
-        ) {
-          dynamicColumns.add(key);
-        }
-      });
-    });
-    return _.sortBy([...dynamicColumns]);
-  }, [tableData]);
-
   // Wow this is a pretty crazy idea to maintain a list of all dynamic columns
   // so we don't blow away old ones
   const [allDynamicColumnNames, setAllDynamicColumnNames] = useState(
@@ -468,14 +456,13 @@ export const CallsTable: FC<{
   //   setPinnedColumnsModel({left: ['op_name']});
   // }, []);
 
-  // useEffect(() => {
-  //   if (
-  //     effectiveFilter.opVersionRefs?.length === 1 ||
-  //     effectiveFilter.opVersionRefs?.length === 0
-  //   ) {
-  //     console.log('resetting');
-  //     resetManualModelState();
-  //   }
+  useEffect(() => {
+    if (effectiveFilter) {
+      setAllDynamicColumnNames([]);
+    } else {
+      setAllDynamicColumnNames([]);
+    }
+  }, [effectiveFilter]);
   // }, [effectiveFilter.opVersionRefs, resetManualModelState]);
 
   // console.log({allDynamicColumnNames});

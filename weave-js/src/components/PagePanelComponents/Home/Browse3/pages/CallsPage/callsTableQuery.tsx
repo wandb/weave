@@ -106,11 +106,13 @@ export const useCallsForQuery = (
     }
   }, [callResults.length, callsStats.loading, callsStats.result, offset]);
 
-  return {
-    loading: calls.loading,
-    result: callResults,
-    total,
-  };
+  return useMemo(() => {
+    return {
+      loading: calls.loading,
+      result: calls.loading ? [] : callResults,
+      total: calls.loading ? 0 : total,
+    };
+  }, [callResults, calls.loading, total]);
 };
 
 const convertHighLevelFilterToLowLevelFilter = (
