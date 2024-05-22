@@ -152,6 +152,7 @@ def wandb_frontend_base_url() -> str:
     public_url = os.getenv("WANDB_PUBLIC_BASE_URL", "").rstrip("/")
     return public_url if public_url != "" else wandb_base_url()
 
+
 # use filesystem.get_filesystem_dir() instead of directly accessing the env var
 def weave_filesystem_dir() -> str:
     # WEAVE_LOCAL_ARTIFACT_DIR should be renamed to WEAVE_FILESYSTEM_DIR

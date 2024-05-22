@@ -137,7 +137,7 @@ const useDirectUrlNodeWithExpiration = (
 // This is needed because sometimes the signed URL returned by the backend contains ":8080" which is not accessible from the frontend
 const checkDirectURL = (url: string) => {
   const wandbAppPort = ':8080';
-  const { protocol, hostname } = window.location;
+  const {protocol, hostname} = window.location;
   const portIndex = url.indexOf(wandbAppPort);
 
   if (portIndex !== -1) {
@@ -148,7 +148,7 @@ const checkDirectURL = (url: string) => {
   }
   // Return the original URL if ":8080" is not found
   return url;
-}
+};
 
 export const useSignedUrlWithExpiration = (
   fileNode:
@@ -173,7 +173,8 @@ export const useSignedUrlWithExpiration = (
 
         // eslint-disable-next-line wandb/no-unprefixed-urls
         const response = await fetch(
-          checkDirectURL(directUrl.result )+ '?redirect=false&content-disposition=inline',
+          checkDirectURL(directUrl.result) +
+            '?redirect=false&content-disposition=inline',
           {
             credentials: 'include',
             method: 'GET',
