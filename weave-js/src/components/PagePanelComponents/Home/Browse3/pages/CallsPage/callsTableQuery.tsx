@@ -110,7 +110,7 @@ export const useCallsForQuery = (
     return {
       loading: calls.loading,
       result: calls.loading ? [] : callResults,
-      total: calls.loading ? 0 : total,
+      total,
     };
   }, [callResults, calls.loading, total]);
 };
