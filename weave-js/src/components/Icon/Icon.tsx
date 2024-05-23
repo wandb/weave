@@ -1,6 +1,7 @@
 import React, {ElementType, SVGProps} from 'react';
 
 import {ReactComponent as ImportAddNew} from '../../assets/icons/icon-add-new.svg';
+import {ReactComponent as ImportAddReaction} from '../../assets/icons/icon-add-reaction.svg';
 import {ReactComponent as ImportAdminShieldSafe} from '../../assets/icons/icon-admin-shield-safe.svg';
 import {ReactComponent as ImportAmazonSagemaker} from '../../assets/icons/icon-amazon-sagemaker.svg';
 import {ReactComponent as ImportArea} from '../../assets/icons/icon-area.svg';
@@ -247,6 +248,9 @@ const updateIconProps = (props: SVGIconProps) => {
 };
 export const IconAddNew = (props: SVGIconProps) => (
   <ImportAddNew {...updateIconProps(props)} />
+);
+export const IconAddReaction = (props: SVGIconProps) => (
+  <ImportAddReaction {...updateIconProps(props)} />
 );
 export const IconAdminShieldSafe = (props: SVGIconProps) => (
   <ImportAdminShieldSafe {...updateIconProps(props)} />
@@ -941,6 +945,7 @@ export const IconZoomInTool = (props: SVGIconProps) => (
 
 const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'add-new': IconAddNew,
+  'add-reaction': IconAddReaction,
   'admin-shield-safe': IconAdminShieldSafe,
   'amazon-sagemaker': IconAmazonSagemaker,
   area: IconArea,
