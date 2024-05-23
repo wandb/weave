@@ -46,6 +46,7 @@ Weave will now track and log all LLM calls made through the MistralAI library. Y
 Weave ops make results *reproducible* by automatically versioning code as you experiment, and they capture their inputs and outputs. Simply create a function decorated with [`@weave.op()`](https://wandb.github.io/weave/guides/tracking/ops) that calls into [`mistralai.client.MistralClient.chat()`](https://docs.mistral.ai/capabilities/completion/) and Weave will track the inputs and outputs for you. Let's see how we can do this for our cheese recommender:
 
 ```python
+# highlight-next-line
 @weave.op()
 def cheese_recommender(region:str, model:str) -> str:
     "Recommend the best cheese in a given region"
