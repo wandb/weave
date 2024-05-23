@@ -1,6 +1,7 @@
 export {
   Icon,
   IconAddNew,
+  IconAddReaction,
   IconAdminShieldSafe,
   IconAmazonSagemaker,
   IconArea,

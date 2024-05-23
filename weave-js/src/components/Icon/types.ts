@@ -1,5 +1,6 @@
 export const IconNames = {
   AddNew: 'add-new',
+  AddReaction: 'add-reaction',
   AdminShieldSafe: 'admin-shield-safe',
   AmazonSagemaker: 'amazon-sagemaker',
   Area: 'area',
