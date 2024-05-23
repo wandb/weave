@@ -278,9 +278,13 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   // the expansion. Importantly, when the column is clicked, we do some
   // bookkeeping to add the expanded ref to the `expandedRefs` state. This
   // triggers a set of state updates to populate the expanded data.
-  const [expandedIds, setExpandedIds] = useState<Array<string | number>>(
-    isExpanded ? rows.filter(r => !r.isExpandableRef).map(r => r.id) : []
-  );
+  const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
+  useEffect(() => {
+    setExpandedIds(
+      isExpanded ? rows.filter(r => !r.isExpandableRef).map(r => r.id) : []
+    );
+  }, [isExpanded, rows, setExpandedIds]);
+
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
       headerName: 'Path',
