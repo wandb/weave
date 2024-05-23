@@ -20,7 +20,7 @@ For example:
 # 1. first init weave
 weave.init('instructor-example')
 
-# 2. then patch the model vendor library
+# 2. then patch the model vendor library, e.g. OpenAI in this case
 client = instructor.from_openai(OpenAI())
 ```
 :::
