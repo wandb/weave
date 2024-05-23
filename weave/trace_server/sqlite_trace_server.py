@@ -346,6 +346,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     summary=json.loads(row[13]) if row[13] else None,
                     wb_user_id=row[14],
                     wb_run_id=row[15],
+                    updated_by=row[17],
                 )
                 for row in query_result
             ]
