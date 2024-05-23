@@ -27,21 +27,11 @@ export class ErrorBoundary extends Component<Props, State> {
       weaveErrorToDDPayload(error)
     );
 
-    console.log('ErrorBoundary: ', error.message);
-    Sentry.withScope(scope => {
-      scope.setTag('weave_error', 'true');
-      Sentry.captureException(error);
+    Sentry.captureException(error, {
+      tags: {
+        weaveErrorBoundary: 'true',
+      },
     });
-
-    try {
-      if (!!Sentry?.getCurrentHub()?.getClient()?.getOptions()?.dsn) {
-        console.log('ErrorBoundary: sentry is inited');
-      } else {
-        console.log('ErrorBoundary: sentry is not inited');
-      }
-    } catch (e) {
-      console.log('ErrorBoundary: sentry is not inited');
-    }
   }
 
   public render() {
