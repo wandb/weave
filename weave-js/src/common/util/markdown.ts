@@ -7,6 +7,7 @@ import katex from 'rehype-katex';
 import parseHTML from 'rehype-parse';
 import rehypeRaw from 'rehype-raw';
 import sanitize from 'rehype-sanitize';
+import rehypeSlug from 'rehype-slug';
 import stringify from 'rehype-stringify';
 import emoji from 'remark-emoji';
 import math from 'remark-math';
@@ -14,7 +15,6 @@ import parse from 'remark-parse';
 import remark2rehype from 'remark-rehype';
 import {Plugin, unified} from 'unified';
 import visit from 'unist-util-visit';
-import rehypeSlug from 'rehype-slug';
 
 import {blankifyLinks, shiftHeadings} from './html';
 
