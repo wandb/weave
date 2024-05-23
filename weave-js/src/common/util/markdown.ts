@@ -14,6 +14,7 @@ import parse from 'remark-parse';
 import remark2rehype from 'remark-rehype';
 import {Plugin, unified} from 'unified';
 import visit from 'unist-util-visit';
+import rehypeSlug from 'rehype-slug';
 
 import {blankifyLinks, shiftHeadings} from './html';
 
@@ -64,12 +65,14 @@ export function generateHTML(markdown: string, rules?: SanitizationRules) {
     // remark2rehype allows the use of rehype plugins after it in the chain,
     // but it doesn't have its own types, so we're `any`ing here and trusting
     // that the rehype plugins we pass in afterwards will work.
+    .use(rehypeSlug)
     .use(katex)
     .use(rehypeRaw)
     .use(sanitize, sanitizationSchema)
     .use(stringify)
     .use(sanitize, sanitizationSchema)
     .processSync(markdown);
+
   if (typeof vfile.value === 'string') {
     vfile.value = blankifyLinks(vfile.value);
     vfile.value = shiftHeadings(vfile.value);
