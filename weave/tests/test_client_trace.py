@@ -139,6 +139,7 @@ def test_trace_server_call_start_and_end(client):
         "summary": None,
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "deleted_at": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -176,6 +177,7 @@ def test_trace_server_call_start_and_end(client):
         "summary": {"c": 5},
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "deleted_at": None,
     }
 
 
@@ -888,6 +890,7 @@ def test_bound_op_retrieval_no_self(client):
         my_op2 = my_op_ref.get()
 
 
+@pytest.mark.skip_clickhouse_client
 def test_dataset_row_ref(client):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)

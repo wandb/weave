@@ -176,12 +176,14 @@ const weaveRefStringToRefDict = (uri: string): WFNaiveRefDict => {
     scheme,
     entityName: entity,
     projectName: project,
-    artifactName,
     weaveKind,
-    artifactVersion: versionCommitHash,
     artifactRefExtra,
   } = parsed;
-
+  let {artifactName, artifactVersion: versionCommitHash} = parsed;
+  if (parsed.weaveKind === 'table') {
+    artifactName = versionCommitHash;
+    versionCommitHash = '';
+  }
   const refExtraTuples: WFNaiveRefDict['refExtraTuples'] = [];
   if (artifactRefExtra) {
     const refExtraParts = artifactRefExtra.split('/');

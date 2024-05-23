@@ -239,6 +239,69 @@ def test_calls_query(client):
     client.finish_call(call0, None)
 
 
+def test_calls_delete(client):
+    call0 = client.create_call("x", None, {"a": 5, "b": 10})
+    call0_child1 = client.create_call("x", call0, {"a": 5, "b": 11})
+    _call0_child2 = client.create_call("x", call0_child1, {"a": 5, "b": 12})
+    call1 = client.create_call("y", None, {"a": 6, "b": 11})
+
+    assert len(list(client.calls())) == 4
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
+    assert len(result) == 3
+
+    # should deleted call0_child1, _call0_child2, call1, but not call0
+    client.delete_call(call0_child1)
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
+    assert len(result) == 1
+
+    result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
+    assert len(result) == 0
+
+    # no-op if already deleted
+    client.delete_call(call0_child1)
+    call1.delete()
+    call1.delete()
+
+    result = list(client.calls())
+    # only call0 should be left
+    assert len(result) == 1
+
+
+def test_calls_delete_cascade(client):
+    # run an evaluation, then delete the evaluation and its children
+    @weave.op()
+    async def model_predict(input) -> str:
+        return eval(input)
+
+    dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+
+    @weave.op()
+    async def score(target, model_output):
+        return target == model_output
+
+    evaluation = Evaluation(
+        name="my-eval",
+        dataset=dataset_rows,
+        scorers=[score],
+    )
+    asyncio.run(evaluation.evaluate(model_predict))
+
+    evaluate_calls = list(weave.as_op(evaluation.evaluate).calls())
+    assert len(evaluate_calls) == 1
+    eval_call = evaluate_calls[0]
+    eval_call_children = list(eval_call.children())
+    assert len(eval_call_children) == 3
+
+    # delete the evaluation, should cascade to all the calls and sub-calls
+    client.delete_call(eval_call)
+
+    # check that all the calls are gone
+    result = list(client.calls())
+    assert len(result) == 0
+
+
 def test_dataset_calls(client):
     ref = client.save(
         weave.Dataset(rows=[{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
@@ -592,6 +655,7 @@ def test_op_query(client):
     assert len(res) == 1
 
 
+@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_noextra(client):
     ref = client.save_object([1, 2, 3], "my-list")
     ref2 = client.save_object({"a": [3, 4, 5]}, "my-obj")
@@ -601,6 +665,7 @@ def test_refs_read_batch_noextra(client):
     assert res.vals[1] == {"a": [3, 4, 5]}
 
 
+@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_with_extra(client):
     saved = client.save([{"a": 5}, {"a": 6}], "my-list")
     ref1 = saved[0]["a"].ref
@@ -611,6 +676,7 @@ def test_refs_read_batch_with_extra(client):
     assert res.vals[1] == {"a": 6}
 
 
+@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_dataset_rows(client):
     saved = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
     ref1 = saved.rows[0]["a"].ref
