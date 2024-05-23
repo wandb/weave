@@ -1,4 +1,5 @@
 import {datadogRum} from '@datadog/browser-rum';
+import * as Sentry from '@sentry/react';
 import React, {Component, ErrorInfo, ReactNode} from 'react';
 
 import {weaveErrorToDDPayload} from '../errors';
@@ -25,6 +26,12 @@ export class ErrorBoundary extends Component<Props, State> {
       'weave_panel_error_boundary',
       weaveErrorToDDPayload(error)
     );
+
+    Sentry.captureException(error, {
+      tags: {
+        weaveErrorBoundary: 'true',
+      },
+    });
   }
 
   public render() {
