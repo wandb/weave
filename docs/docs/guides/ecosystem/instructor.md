@@ -5,27 +5,30 @@ hide_table_of_contents: false
 
 # Instructor
 
-Weave works seamlessly the [Instructor Python library](https://github.com/jxnl/instructor), giving you the better, more consistent structured outputs with Instructor and full observability with Weave.
+Weave works seamlessly with [Instructor](https://github.com/jxnl/instructor), giving you the better, more consistent structured outputs with Instructor and full observability with Weave.
 
-If you haven't used Instructor you can find the docuementation [here](https://python.useinstructor.com/) as well as our course, [LLM Engineering: Structured Outputs](https://www.wandb.courses/courses/steering-language-models) created by Jason Liu, the creator of Instructor.
+If you haven't used Instructor you can find the docuementation [here](https://python.useinstructor.com/) and check out our course, "LLM Engineering: Structured Outputs" [here](https://www.wandb.courses/courses/steering-language-models) created by Jason Liu, the creator of Instructor.
 
-If you haven't logged a Trace to Weave yet then start wth the quickstart [here](../../quickstart) and optionally take a deeper look at Tracing[here](../tracking/tracing).
+If you haven't logged a Trace to Weave yet then start wth the quickstart [here](../../quickstart) and optionally take a deeper look at Tracing [here](../tracking/tracing).
 
-:::note
-Ensure to call `weave.init` before calling the Instructor patching of the model vendor client.
+## Basic Usage
 
-For example: 
+Using Instructor and Weave is easy, just ensure to call `weave.init` before calling Instructor's patching of the model vendor client.
 
 ```
+import weave
+import instructor
+
 # 1. first init weave
 weave.init('instructor-example')
 
 # 2. then patch the model vendor library, e.g. OpenAI in this case
 client = instructor.from_openai(OpenAI())
-```
-:::
 
-## Example
+# 3. call your LLM ...
+```
+
+## Full Example
 
 1. Install Instructor:
    ```bash
