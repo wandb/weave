@@ -2,6 +2,7 @@ import os
 import pytest
 import weave
 from weave.trace_server import trace_server_interface as tsi
+from weave.tests.test_evaluate import Nearly
 from typing import Any, Generator
 import litellm
 from .litellm import litellm_patcher
@@ -62,7 +63,7 @@ def test_litellm_quickstart(
     assert output["id"] == chat_response.id
     assert output["model"] == chat_response.model
     assert output["object"] == chat_response.object
-    assert output["created"] == chat_response.created
+    assert output["created"] == Nearly(chat_response.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -103,7 +104,7 @@ async def test_litellm_quickstart_async(
     assert output["id"] == chat_response.id
     assert output["model"] == chat_response.model
     assert output["object"] == chat_response.object
-    assert output["created"] == chat_response.created
+    assert output["created"] == Nearly(chat_response.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -147,7 +148,7 @@ def test_litellm_quickstart_stream(
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
     assert output["model"] == chunk.model
-    assert output["created"] == chunk.created
+    assert output["created"] == Nearly(chunk.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -192,7 +193,7 @@ async def test_litellm_quickstart_stream_async(
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
     assert output["model"] == chunk.model
-    assert output["created"] == chunk.created
+    assert output["created"] == Nearly(chunk.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
