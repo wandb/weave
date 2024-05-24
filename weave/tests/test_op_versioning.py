@@ -492,7 +492,6 @@ def some_d(v: int):
 
 
 def test_op_nested_function(client, strict_op_saving):
-
     @weave.op()
     def some_d(v: int):
         def internal_fn(x):
