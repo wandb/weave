@@ -2,10 +2,17 @@ import os
 import pytest
 import weave
 from weave.trace_server import trace_server_interface as tsi
-from weave.tests.test_evaluate import Nearly
 from typing import Any, Generator
 import litellm
 from .litellm import litellm_patcher
+
+
+class NearlyInt:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def __eq__(self, other: Any) -> bool:
+        return abs(self.value - other) <= 1
 
 
 def _get_call_output(call: tsi.CallSchema) -> Any:
@@ -63,7 +70,7 @@ def test_litellm_quickstart(
     assert output["id"] == chat_response.id
     assert output["model"] == chat_response.model
     assert output["object"] == chat_response.object
-    assert output["created"] == Nearly(chat_response.created)
+    assert output["created"] == NearlyInt(chat_response.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -104,7 +111,7 @@ async def test_litellm_quickstart_async(
     assert output["id"] == chat_response.id
     assert output["model"] == chat_response.model
     assert output["object"] == chat_response.object
-    assert output["created"] == Nearly(chat_response.created)
+    assert output["created"] == NearlyInt(chat_response.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -148,7 +155,7 @@ def test_litellm_quickstart_stream(
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
     assert output["model"] == chunk.model
-    assert output["created"] == Nearly(chunk.created)
+    assert output["created"] == NearlyInt(chunk.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
@@ -193,7 +200,7 @@ async def test_litellm_quickstart_stream_async(
     assert output["choices"][0]["finish_reason"] == "stop"
     assert output["id"] == chunk.id
     assert output["model"] == chunk.model
-    assert output["created"] == Nearly(chunk.created)
+    assert output["created"] == NearlyInt(chunk.created)
     summary = call.summary
     assert summary is not None
     model_usage = summary["usage"][output["model"]]
