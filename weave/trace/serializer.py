@@ -45,6 +45,13 @@ class Serializer:
     load: Callable
 
     def id(self) -> str:
+        ser_id = self.target_class.__module__ + "." + self.target_class.__name__
+        if ser_id.startswith("weave."):
+            # Special case for weave.Op (which is current weave.trace.op.Op).
+            # The id is just Op, since we've already already stored this as
+            # "Op" in the database.
+            if ser_id.endswith(".Op"):
+                return "Op"
         return self.target_class.__name__
 
 
