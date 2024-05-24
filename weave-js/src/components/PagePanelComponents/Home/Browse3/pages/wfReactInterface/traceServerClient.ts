@@ -78,6 +78,11 @@ export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
 };
 
+export type TraceCallsDeleteReq = {
+  project_id: string;
+  call_ids: string[];
+};
+
 interface TraceObjectsFilter {
   base_object_classes?: string[];
   object_ids?: string[];
@@ -177,6 +182,9 @@ export class TraceServerClient {
     this.scheduleReadBatch();
   }
 
+  callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
+    return this.makeRequest<TraceCallsDeleteReq, void>('/calls/delete', req);
+  };
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
