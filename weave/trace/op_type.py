@@ -196,6 +196,7 @@ class GetCodeDepsResult(typing.TypedDict):
 def get_code_deps(
     fn: Union[typing.Callable, type],  # A function or a class
     artifact: artifact_fs.FilesystemArtifact,
+    depth: int = 0,
 ) -> GetCodeDepsResult:
     """Given a python function, return source code that contains the dependencies of that function.
 
@@ -219,6 +220,11 @@ def get_code_deps(
                 dependencies are available for the function body.
             warnings: list[str], any warnings that occurred during the process.
     """
+    if depth > 20:
+        warnings = [
+            "Recursion depth exceeded in get_code_deps, this may indicate circular depenencies, which are not yet handled."
+        ]
+        return {"import_code": [], "code": [], "warnings": warnings}
     # Generates repeats.
     warnings: list[str] = []
 
@@ -239,6 +245,9 @@ def get_code_deps(
         var_value = None
         if isinstance(fn, py_types.FunctionType):
             var_value = resolve_var(fn, var_name)
+        if var_value == fn:
+            # If the variable is the function itself (recursion), we don't need to include it
+            continue
         if var_value is None:
             # Try to resolve the variable from the module that the
             # item appears within.
@@ -258,11 +267,7 @@ def get_code_deps(
             import_code.append(import_line)
         elif isinstance(var_value, (py_types.FunctionType, Op, type)):
             if var_value.__module__ == fn.__module__:
-                # For now, if the function is in another module.
-                # we just import it. This is ok for libraries, but not
-                # if the user has functions declared within their
-                # package but outside of the op module.
-                result = get_code_deps(var_value, artifact)
+                result = get_code_deps(var_value, artifact, depth + 1)
                 fn_warnings = result["warnings"]
                 fn_import_code = result["import_code"]
                 fn_code = result["code"]
@@ -274,6 +279,10 @@ def get_code_deps(
 
                 warnings += fn_warnings
             else:
+                # For now, if the function is in another module.
+                # we just import it. This is ok for libraries, but not
+                # if the user has functions declared within their
+                # package but outside of the op module.
                 if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
                     pass
 
@@ -327,21 +336,6 @@ def get_code_deps(
     return {"import_code": import_code, "code": code, "warnings": warnings}
 
 
-def get_import_statements_for_annotations(func: Callable) -> list[str]:
-    """Ensures we have imports for all the types used in the function annotations."""
-    annotations = func.__annotations__
-    imports_needed = set()
-
-    for annotation in annotations.values():
-        if hasattr(annotation, "__module__") and hasattr(annotation, "__name__"):
-            module_name = annotation.__module__
-            class_name = annotation.__name__
-            if module_name != "builtins":
-                imports_needed.add(f"from {module_name} import {class_name}")
-
-    return list(imports_needed)
-
-
 def find_last_weave_op_function(
     source_code: str,
 ) -> Union[ast.FunctionDef, ast.AsyncFunctionDef, None]:
@@ -384,13 +378,6 @@ def dedupe_list(original_list: list[str]) -> list[str]:
 def save_instance(
     obj: "Op", artifact: artifact_fs.FilesystemArtifact, name: str
 ) -> None:
-    # Type annotations are not well handled at the moment.
-    # Get import statements for any annotations
-    # code += (
-    #     "\n".join(get_import_statements_for_annotations(obj.raw_resolve_fn))
-    #     + "\n\n"
-    # )
-
     result = get_code_deps(obj.resolve_fn, artifact)
     import_code = result["import_code"]
     code = result["code"]
