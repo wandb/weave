@@ -220,13 +220,12 @@ def get_code_deps(
                 dependencies are available for the function body.
             warnings: list[str], any warnings that occurred during the process.
     """
+    warnings: list[str] = []
     if depth > 20:
         warnings = [
             "Recursion depth exceeded in get_code_deps, this may indicate circular depenencies, which are not yet handled."
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
-    # Generates repeats.
-    warnings: list[str] = []
 
     source = textwrap.dedent(inspect.getsource(fn))
     try:
