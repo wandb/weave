@@ -480,6 +480,39 @@ def test_op_return_return_custom_class(client, strict_op_saving):
     assert saved_code == EXPECTED_RETURN_CUSTOM_CLASS_CODE
 
 
+EXPECTED_NESTED_FUNCTION_CODE = """import weave
+
+@weave.op()
+def some_d(v: int):
+    def internal_fn(x):
+        return x + 3
+
+    return internal_fn(v)
+"""
+
+
+def test_op_nested_function(client, strict_op_saving):
+
+    @weave.op()
+    def some_d(v: int):
+        def internal_fn(x):
+            return x + 3
+
+        return internal_fn(v)
+
+    assert some_d(1) == 4
+
+    ref = weave.obj_ref(some_d)
+    assert ref is not None
+
+    saved_code = get_saved_code(client, ref)
+    print("SAVED_CODE")
+    print(saved_code)
+
+    assert saved_code == EXPECTED_NESTED_FUNCTION_CODE
+    assert weave.ref(ref.uri()).get()(2) == 5
+
+
 def test_op_basic_execution(client):
     @weave.op()
     def adder(v: int) -> int:

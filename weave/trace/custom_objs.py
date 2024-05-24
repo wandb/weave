@@ -108,7 +108,9 @@ def encode_custom_obj(obj: Any) -> Optional[dict]:
     serializer.save(obj, art, "obj")
 
     # Save the load_instance function as an op, and store a reference
-    # to that op in the saved value record.
+    # to that op in the saved value record. We don't do this if what
+    # we're saving is actually an op, since that would be self-referential
+    # (the op loading code is always present, we don't need to save/load it).
     load_op_uri = None
     if serializer.id() != "Op":
         # Ensure load_instance is an op
