@@ -41,11 +41,15 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             FileCreateReq(project_id=project_id, name=name, content=val)
         )
         file_digests[name] = file_response.digest
-    return {
+    result = {
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
         "files": file_digests,
     }
+    load_op_uri = encoded.get("load_op")
+    if load_op_uri:
+        result["load_op"] = load_op_uri
+    return result
 
 
 REP_LIMIT = 1000
@@ -97,7 +101,9 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 )
             elif val_type == "CustomWeaveType":
                 files = _load_custom_obj_files(project_id, server, obj["files"])
-                return custom_objs.decode_custom_obj(obj["weave_type"], files)
+                return custom_objs.decode_custom_obj(
+                    obj["weave_type"], files, obj.get("load_op")
+                )
             else:
                 return ObjectRecord(
                     {k: from_json(v, project_id, server) for k, v in obj.items()}
