@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 
 if not import_failed:
 
-    def _run_to_dict(run: Run, as_input=False) -> dict:
+    def _run_to_dict(run: Run, as_input: bool = False) -> dict:
         run_dict = run.json(
             exclude={
                 "child_runs",
@@ -39,7 +39,6 @@ if not import_failed:
         run_dict = json.loads(run_dict)
         if as_input:
             run_dict["inputs"] = run.inputs.copy() if run.inputs is not None else None
-            # no need to log inputs in end events
         else:
             run_dict["outputs"] = (
                 run.outputs.copy() if run.outputs is not None else None,
