@@ -14,7 +14,6 @@ from weave import box
 
 from weave import context_state
 
-from weave.trace.op_type import OpType
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
@@ -152,9 +151,6 @@ class Op:
         if self._on_output_handler is not None:
             raise ValueError("Cannot set on_output_handler multiple times")
         self._on_output_handler = on_output
-
-
-OpType.instance_classes = Op
 
 
 class BoundOp(Op):

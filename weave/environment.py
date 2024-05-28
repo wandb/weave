@@ -136,7 +136,7 @@ def analytics_disabled() -> bool:
 
 
 def weave_server_url() -> str:
-    base_url = wandb_base_url()
+    base_url = wandb_frontend_base_url()
     default = "https://weave.wandb.ai"
     if base_url != "https://api.wandb.ai":
         default = base_url + "/weave"
@@ -146,6 +146,11 @@ def weave_server_url() -> str:
 def wandb_base_url() -> str:
     settings = Settings()
     return os.environ.get("WANDB_BASE_URL", settings.base_url).rstrip("/")
+
+
+def wandb_frontend_base_url() -> str:
+    public_url = os.getenv("WANDB_PUBLIC_BASE_URL", "").rstrip("/")
+    return public_url if public_url != "" else wandb_base_url()
 
 
 # use filesystem.get_filesystem_dir() instead of directly accessing the env var
