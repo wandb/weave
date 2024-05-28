@@ -153,7 +153,7 @@ export type WFDataModelHooksInterface = {
     filter: CallFilter,
     limit?: number,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
-  ) => LoadableWithRefetch<CallSchema[]>;
+  ) => Loadable<CallSchema[]>;
   useCallsDeleteFunc: () => (
     projectID: string,
     callIDs: string[]
