@@ -89,6 +89,7 @@ const ObjectViewerSectionNonEmpty = ({
   const [mode, setMode] = useState(
     isSimpleData(data) || isExpanded ? 'expanded' : 'collapsed'
   );
+  const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
 
   const body = useMemo(() => {
     if (mode === 'collapsed' || mode === 'expanded') {
@@ -97,6 +98,8 @@ const ObjectViewerSectionNonEmpty = ({
           apiRef={apiRef}
           data={data}
           isExpanded={mode === 'expanded'}
+          expandedIds={expandedIds}
+          setExpandedIds={setExpandedIds}
         />
       );
     }
@@ -112,7 +115,7 @@ const ObjectViewerSectionNonEmpty = ({
       );
     }
     return null;
-  }, [apiRef, mode, data]);
+  }, [apiRef, mode, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -126,6 +129,14 @@ const ObjectViewerSectionNonEmpty = ({
     },
     [apiRef]
   );
+  const getGroupIds = useCallback(() => {
+    const rowIds = apiRef.current.getAllRowIds();
+    rowIds.filter(rowId => {
+      const rowNode = apiRef.current.getRowNode(rowId);
+      return rowNode && rowNode.type === 'group';
+    });
+    return rowIds;
+  }, [apiRef]);
 
   // Re-clicking the button will reapply collapse/expand
   const onClickCollapsed = () => {
@@ -133,12 +144,14 @@ const ObjectViewerSectionNonEmpty = ({
       setTreeExpanded(false);
     }
     setMode('collapsed');
+    setExpandedIds([]);
   };
   const onClickExpanded = () => {
     if (mode === 'expanded') {
       setTreeExpanded(true);
     }
     setMode('expanded');
+    setExpandedIds(getGroupIds());
   };
 
   return (
