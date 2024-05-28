@@ -1,3 +1,5 @@
+ALTER TABLE call_parts ORDER BY (project_id, id);
+
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
         id,

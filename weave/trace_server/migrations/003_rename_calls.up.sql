@@ -6,7 +6,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(trace_id) as trace_id,
         anySimpleState(parent_id) as parent_id,
         -- **** use most recent op_name ****
-        argMaxSimpleState(op_name, call_parts.created_at) as op_name,
+        anyLastSimpleState(op_name) as op_name,
         anySimpleState(started_at) as started_at,
         anySimpleState(attributes_dump) as attributes_dump,
         anySimpleState(inputs_dump) as inputs_dump,
