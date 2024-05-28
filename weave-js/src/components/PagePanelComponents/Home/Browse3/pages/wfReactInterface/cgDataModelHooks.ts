@@ -1072,10 +1072,10 @@ const useFileContent = (
   throw new Error('Not implemented');
 };
 
-const useCallsDeleteFunc = (): {
-  callsDelete: (projectID: string, callIDs: string[]) => Promise<void>;
-  onDelete: () => void;
-} => {
+const useCallsDeleteFunc = (): ((
+  projectID: string,
+  callIDs: string[]
+) => Promise<void>) => {
   throw new Error('Not implemented');
 };
 
