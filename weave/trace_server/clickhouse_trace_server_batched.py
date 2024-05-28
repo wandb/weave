@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+from collections import defaultdict
 import threading
 from contextlib import contextmanager
 import datetime
@@ -9,7 +10,7 @@ import hashlib
 import dataclasses
 
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.query import QueryResult
+from clickhouse_connect.driver.query import QueryResult, StreamContext
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect
@@ -34,6 +35,8 @@ MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
 
 FILE_CHUNK_SIZE = 100000
+
+MAX_DELETE_CALLS_COUNT = 100
 
 
 class NotFoundError(Exception):
@@ -67,7 +70,20 @@ class CallEndCHInsertable(BaseModel):
     output_refs: typing.List[str]
 
 
-CallCHInsertable = typing.Union[CallStartCHInsertable, CallEndCHInsertable]
+class CallDeleteCHInsertable(BaseModel):
+    project_id: str
+    id: str
+    deleted_at: datetime.datetime
+    wb_user_id: typing.Optional[str]
+
+    # boo
+    input_refs: typing.List[str] = []
+    output_refs: typing.List[str] = []
+
+
+CallCHInsertable = typing.Union[
+    CallStartCHInsertable, CallEndCHInsertable, CallDeleteCHInsertable
+]
 
 
 # Very critical that this matches the calls table schema! This should
@@ -97,9 +113,13 @@ class SelectableCHCallSchema(BaseModel):
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
 
+    deleted_at: typing.Optional[datetime.datetime] = None
+
 
 all_call_insert_columns = list(
-    CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
+    CallStartCHInsertable.model_fields.keys()
+    | CallEndCHInsertable.model_fields.keys()
+    | CallDeleteCHInsertable.model_fields.keys()
 )
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
@@ -217,6 +237,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallReadRes(call=_ch_call_to_call_schema(self._call_read(req)))
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        stream = self.calls_query_stream(req)
+        return tsi.CallsQueryRes(calls=list(stream))
+
+    def calls_query_stream(
+        self, req: tsi.CallsQueryReq
+    ) -> typing.Iterator[tsi.CallSchema]:
         conditions = []
         parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
         if req.filter:
@@ -291,10 +317,56 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if not req.sort_by
             else [(s.field, s.direction) for s in req.sort_by],
         )
-        calls = [
-            _ch_call_dict_to_call_schema_dict(ch_dict) for ch_dict in ch_call_dicts
+        for ch_dict in ch_call_dicts:
+            yield tsi.CallSchema.model_validate(
+                _ch_call_dict_to_call_schema_dict(ch_dict)
+            )
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
+            raise RequestTooLarge(
+                f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
+            )
+
+        proj_cond = "project_id = {project_id: String}"
+        proj_params = {"project_id": req.project_id}
+
+        # get all parents
+        parents = self._select_calls_query(
+            req.project_id,
+            conditions=[proj_cond, "id IN {ids: Array(String)}"],
+            parameters=proj_params | {"ids": req.call_ids},
+        )
+
+        # get all calls with trace_ids matching parents
+        all_calls = self._select_calls_query(
+            req.project_id,
+            conditions=[proj_cond, "trace_id IN {trace_ids: Array(String)}"],
+            parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
+        )
+
+        all_descendants = find_call_descendants(
+            root_ids=req.call_ids,
+            all_calls=all_calls,
+        )
+
+        deleted_at = datetime.datetime.now()
+        insertables = [
+            CallDeleteCHInsertable(
+                project_id=req.project_id,
+                id=call_id,
+                wb_user_id=req.wb_user_id,
+                deleted_at=deleted_at,
+            )
+            for call_id in all_descendants
         ]
-        return tsi.CallsQueryRes(calls=calls)
+        self._flush_immediately = False
+        for insertable in insertables:
+            self._insert_call(insertable)
+        self._flush_calls()
+        self._flush_immediately = True
+
+        return tsi.CallsDeleteRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -762,6 +834,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             port=self._port,
             user=self._user,
             password=self._password,
+            secure=self._port == 8443,
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
@@ -832,7 +905,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[typing.Dict]:
+    ) -> typing.Iterable[typing.Dict]:
         if not parameters:
             parameters = {}
         parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
@@ -920,7 +993,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             FROM calls_merged
             WHERE project_id = {{project_id: String}}
             GROUP BY project_id, id
-            HAVING {conditions_part}
+            HAVING deleted_at IS NULL AND
+                {conditions_part}
             {order_by_part}
             {limit_part}
             {offset_part}
@@ -928,10 +1002,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters,
         )
 
-        dicts = []
-        for row in raw_res.result_rows:
-            dicts.append(dict(zip(columns, row)))
-        return dicts
+        for row in raw_res:
+            yield dict(zip(columns, row))
 
     def _select_objs_query(
         self,
@@ -953,19 +1025,51 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters = {}
         query_result = self._query(
             f"""
-            SELECT *
+            SELECT 
+                project_id,
+                object_id,
+                created_at,
+                kind,
+                base_object_class,
+                refs,
+                val_dump,
+                digest,
+                is_op,
+                _version_index_plus_1,
+                version_index,
+                version_count,
+                is_latest
             FROM object_versions_deduped
-            WHERE project_id = {{project_id: String}}
-            AND {conditions_part}
+            WHERE project_id = {{project_id: String}} AND
+                {conditions_part}
             {limit_part}
         """,
             {"project_id": project_id, **parameters},
         )
         result: typing.List[SelectableCHObjSchema] = []
-        for row in query_result.result_rows:
+        for row in query_result:
             result.append(
                 SelectableCHObjSchema.model_validate(
-                    dict(zip(query_result.column_names, row))
+                    dict(
+                        zip(
+                            [
+                                "project_id",
+                                "object_id",
+                                "created_at",
+                                "kind",
+                                "base_object_class",
+                                "refs",
+                                "val_dump",
+                                "digest",
+                                "is_op",
+                                "_version_index_plus_1",
+                                "version_index",
+                                "version_count",
+                                "is_latest",
+                            ],
+                            row,
+                        )
+                    )
                 )
             )
 
@@ -981,14 +1085,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query: str,
         parameters: typing.Dict[str, typing.Any],
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> QueryResult:
+    ) -> typing.Iterator[QueryResult]:
         print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
-        res = self.ch_client.query(
+        with self.ch_client.query_rows_stream(
             query, parameters=parameters, column_formats=column_formats, use_none=True
-        )
-        print("Summary: " + json.dumps(res.summary, indent=2))
-        return res
+        ) as stream:
+            for row in stream:
+                yield row
 
     def _insert(
         self,
@@ -1257,3 +1361,32 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
         raise ValueError(f"Invalid operator: {operator}")
     combined = f" {operator} ".join([f"({c})" for c in conditions])
     return f"({combined})"
+
+
+def find_call_descendants(
+    root_ids: typing.List[str],
+    all_calls: typing.List[SelectableCHCallSchema],
+) -> typing.List[str]:
+    # make a map of call_id to children list
+    children_map = defaultdict(list)
+    for call in all_calls:
+        if call.parent_id is not None:
+            children_map[call.parent_id].append(call.id)
+
+    # do DFS to get all descendants
+    def find_all_descendants(root_ids: typing.List[str]) -> typing.Set[str]:
+        descendants = set()
+        stack = root_ids
+
+        while stack:
+            current_id = stack.pop()
+            if current_id not in descendants:
+                descendants.add(current_id)
+                stack += children_map.get(current_id, [])
+
+        return descendants
+
+    # Find descendants for each initial id
+    descendants = find_all_descendants(root_ids)
+
+    return list(descendants)

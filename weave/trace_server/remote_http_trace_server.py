@@ -1,8 +1,10 @@
 import io
 import json
+import sys
 import typing as t
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import requests
+import tenacity
 
 from weave.trace_server import environment as wf_env
 
@@ -30,6 +32,53 @@ class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
 
 
+REMOTE_REQUEST_BYTES_LIMIT = (
+    (32 - 1) * 1024 * 1024
+)  # 32 MiB (real limit) - 1 MiB (buffer)
+
+REMOTE_REQUEST_RETRY_DURATION = 60 * 60 * 36  # 36 hours
+REMOTE_REQUEST_RETRY_MAX_INTERVAL = 60 * 5  # 5 minutes
+
+
+def _is_retryable_exception(e: Exception) -> bool:
+    # Don't retry pydantic validation errors
+    if isinstance(e, ValidationError):
+        return False
+
+    # Don't retry on HTTP 4xx (except 429)
+    if isinstance(e, requests.HTTPError):
+        code_class = e.response.status_code // 100
+
+        # Bad request, not rate-limiting
+        if code_class == 4 and e.response.status_code != 429:
+            return False
+
+        # Unknown server error
+        # TODO(np): We need to fix the server to return proper status codes
+        # for downstream 401, 403, 404, etc... Those should propagate back to
+        # the client.
+        if e.response.status_code == 500:
+            return False
+
+    # Otherwise, retry: Non-500 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...
+    return True
+
+
+def _log_retry(retry_state: tenacity.RetryCallState) -> None:
+    print(
+        f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
+        file=sys.stderr,
+    )
+
+
+def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
+    print(
+        f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
+        file=sys.stderr,
+    )
+    return retry_state.outcome.result()
+
+
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
 
@@ -54,17 +103,61 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: t.Tuple[str, str]) -> None:
         self._auth = auth
 
-    def _flush_calls(self, batch: t.List) -> None:
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential_jitter(
+            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
+        reraise=True,
+    )
+    def _flush_calls(
+        self,
+        batch: t.List,
+        *,
+        _should_update_batch_size: bool = True,
+    ) -> None:
         if len(batch) == 0:
             return
+
         data = Batch(batch=batch).model_dump_json()
+        encoded_data = data.encode("utf-8")
+        encoded_bytes = len(encoded_data)
+
+        # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
+        estimated_bytes_per_item = encoded_bytes / len(batch)
+        if _should_update_batch_size and estimated_bytes_per_item > 0:
+            target_batch_size = int(
+                REMOTE_REQUEST_BYTES_LIMIT // estimated_bytes_per_item
+            )
+            self.call_processor.max_batch_size = max(1, target_batch_size)
+
+        # If the batch is too big, recursively split it in half
+        if encoded_bytes > REMOTE_REQUEST_BYTES_LIMIT and len(batch) > 1:
+            split_idx = int(len(batch) // 2)
+            self._flush_calls(batch[:split_idx], _should_update_batch_size=False)
+            self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
+            return
+
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
-            data=data.encode("utf-8"),
+            data=encoded_data,
             auth=self._auth,
         )
         r.raise_for_status()
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential_jitter(
+            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
+        reraise=True,
+    )
     def _generic_request(
         self,
         url: str,
@@ -96,6 +189,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r.raise_for_status()
         return res_model.model_validate(r.json())
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential_jitter(
+            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
+        reraise=True,
+    )
     def server_info(self) -> ServerInfoRes:
         r = requests.get(self.trace_server_url + "/server_info")
         r.raise_for_status()
@@ -148,6 +251,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsQueryRes:
         return self._generic_request(
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
+        )
+
+    def calls_delete(
+        self, req: t.Union[tsi.CallsDeleteReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallsDeleteRes:
+        return self._generic_request(
+            "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
         )
 
     # Op API
@@ -209,6 +319,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
         )
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential_jitter(
+            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
+        reraise=True,
+    )
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         r = requests.post(
             self.trace_server_url + "/files/create",
@@ -219,6 +339,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_delay(REMOTE_REQUEST_RETRY_DURATION),
+        wait=tenacity.wait_exponential_jitter(
+            initial=1, max=REMOTE_REQUEST_RETRY_MAX_INTERVAL
+        ),
+        retry=tenacity.retry_if_exception(_is_retryable_exception),
+        before_sleep=_log_retry,
+        retry_error_callback=_log_failure,
+        reraise=True,
+    )
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         r = requests.post(
             self.trace_server_url + "/files/content",

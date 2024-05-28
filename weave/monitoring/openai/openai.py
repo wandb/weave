@@ -224,8 +224,7 @@ def log_run(
         client.finish_call(run, output)
 
     try:
-        with run_context.current_run(run):
-            yield finish_run
+        yield finish_run
     except Exception as e:
         client.fail_call(run, e)
         raise

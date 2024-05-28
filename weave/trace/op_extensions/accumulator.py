@@ -3,6 +3,7 @@ from typing import (
     Any,
     AsyncIterator,
     Callable,
+    Dict,
     Generator,
     Generic,
     Iterator,
@@ -18,7 +19,13 @@ S = TypeVar("S")
 V = TypeVar("V")
 
 
-def add_accumulator(op: Op, accumulator: Callable[[S, V], S]) -> Op:
+def add_accumulator(
+    op: Op,
+    accumulator: Callable[[S, V], S],
+    *,
+    should_accumulate: Optional[Callable[[Dict], bool]] = None,
+    on_finish_post_processor: Optional[Callable[[Any], Any]] = None,
+) -> Op:
     """This is to be used internally only - specifically designed for integrations with streaming libraries.
 
     Add an accumulator to an op. The accumulator will be called with the output of the op
@@ -46,8 +53,21 @@ def add_accumulator(op: Op, accumulator: Callable[[S, V], S]) -> Op:
     ```
     """
 
-    def on_output(value: Iterator[V], on_finish: FinishCallbackType) -> Iterator:
-        return _build_iterator_from_accumulator_for_op(value, accumulator, on_finish)
+    def on_output(
+        value: Iterator[V], on_finish: FinishCallbackType, inputs: Dict
+    ) -> Iterator:
+        def wrapped_on_finish(value: Any, e: Optional[BaseException] = None) -> None:
+            if on_finish_post_processor is not None:
+                value = on_finish_post_processor(value)
+            on_finish(value, e)
+
+        if should_accumulate is None or should_accumulate(inputs):
+            return _build_iterator_from_accumulator_for_op(
+                value, accumulator, wrapped_on_finish
+            )
+        else:
+            wrapped_on_finish(value)
+            return value
 
     op._set_on_output_handler(on_output)
     return op
@@ -155,7 +175,7 @@ class _IteratorWrapper(Generic[V]):
             value = await self._iterator.__anext__()  # type: ignore
             self._on_yield(value)
             return value
-        except StopIteration:
+        except StopAsyncIteration:
             self._call_on_close_once()
             raise
         except Exception as e:

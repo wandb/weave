@@ -84,7 +84,12 @@ def num_tokens_from_messages(
     num_tokens = 3  # Prime with assistant
     for message in messages:
         num_tokens += config.per_message
-        if message.get("content") is not None:
+        # message['content'] is a list when we're sending images.
+        # TODO: This doesn't account for image tokens, we just skip this
+        # case!
+        if message.get("content") is not None and not isinstance(
+            message.get("content"), list
+        ):
             num_tokens += len(encoding.encode(message["content"]))
         if message["role"] == "user":
             num_tokens += config.per_name

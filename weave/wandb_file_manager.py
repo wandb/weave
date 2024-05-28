@@ -50,6 +50,7 @@ def _local_path_and_download_url(
         artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
     ],
     manifest: artifact_wandb.WandbArtifactManifest,
+    base_url: typing.Optional[str] = None,
 ) -> typing.Optional[typing.Tuple[str, str]]:
     path = art_uri.path
     if path is None:
@@ -61,7 +62,7 @@ def _local_path_and_download_url(
     if manifest_entry is None:
         return None
     md5_hex = hashutil.b64_to_hex_id(hashutil.B64MD5(manifest_entry["digest"]))
-    base_url = weave_env.wandb_base_url()
+    base_url = base_url or weave_env.wandb_base_url()
     file_path = _file_path(art_uri, md5_hex)
     if manifest.storage_layout == artifact_wandb.WandbArtifactManifest.StorageLayout.V1:
         return file_path, "{}/artifacts/{}/{}/{}".format(
@@ -171,6 +172,7 @@ class WandbFileManagerAsync:
         art_uri: typing.Union[
             artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
         ],
+        base_url: typing.Optional[str] = None,
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
@@ -180,7 +182,7 @@ class WandbFileManagerAsync:
         manifest = await self.manifest(art_uri)
         if manifest is None:
             return None
-        return _local_path_and_download_url(art_uri, manifest)
+        return _local_path_and_download_url(art_uri, manifest, base_url)
 
     async def ensure_file(
         self,
@@ -270,7 +272,9 @@ class WandbFileManagerAsync:
             )
         with tracer.trace("wandb_file_manager.direct_url") as span:
             span.set_tag("uri", str(art_uri))
-            res = await self.local_path_and_download_url(art_uri)
+            res = await self.local_path_and_download_url(
+                art_uri, base_url=weave_env.wandb_frontend_base_url()
+            )
             if res is None:
                 return None
             return res[1]
@@ -364,6 +368,7 @@ class WandbFileManager:
         art_uri: typing.Union[
             artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
         ],
+        base_url: typing.Optional[str] = None,
     ) -> typing.Optional[typing.Tuple[str, str]]:
         path = art_uri.path
         if path is None:
@@ -373,7 +378,7 @@ class WandbFileManager:
         manifest = self.manifest(art_uri)
         if manifest is None:
             return None
-        return _local_path_and_download_url(art_uri, manifest)
+        return _local_path_and_download_url(art_uri, manifest, base_url)
 
     def ensure_file_downloaded(
         self,
@@ -455,7 +460,9 @@ class WandbFileManager:
             )
         with tracer.trace("wandb_file_manager.direct_url") as span:
             span.set_tag("uri", str(art_uri))
-            res = self.local_path_and_download_url(art_uri)
+            res = self.local_path_and_download_url(
+                art_uri, base_url=weave_env.wandb_frontend_base_url()
+            )
             if res is None:
                 return None
             return res[1]

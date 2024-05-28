@@ -1,3 +1,6 @@
+import './ModifiedDropdown.less';
+
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import _ from 'lodash';
 import memoize from 'memoize-one';
 import React, {
@@ -131,13 +134,15 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       if (firstRenderRef.current) {
         return;
       }
-      doSearch(searchQuery);
-      if (prevDoSearch !== doSearch) {
-        prevDoSearch?.cancel();
-        doSearch.flush();
+      if (search !== false) {
+        doSearch(searchQuery);
+        if (prevDoSearch !== doSearch) {
+          prevDoSearch?.cancel();
+          doSearch.flush();
+        }
       }
       // eslint-disable-next-line
-    }, [searchQuery, doSearch]);
+    }, [searchQuery, doSearch, search]);
     useEffect(() => {
       firstRenderRef.current = false;
     }, []);
@@ -212,13 +217,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         ? computedOptions
         : computedOptions.map(opt => ({
             ...opt,
-            content: (
-              <div
-                style={{padding: '13px 18px', margin: '-13px -18px'}}
-                onClick={() => setSearchQuery('')}>
-                {opt.text}
-              </div>
-            ),
+            content: <OptionWithTooltip text={opt.text as string} />,
           })),
       resultLimit,
       searchQuery,
@@ -425,7 +424,19 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       ) : (
         <>{children}</>
       );
-
+    const selectedOption = propsOptions.find(opt => opt.value === value);
+    const renderTrigger = () => {
+      if (searchQuery) {
+        return '';
+      }
+      return (
+        <div className="text">
+          <OptionWithTooltip
+            text={selectedOption ? (selectedOption.text as string) : ''}
+          />
+        </div>
+      );
+    };
     return wrapWithDragDrop(
       <Dropdown
         {...passProps}
@@ -433,7 +444,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
         lazyLoad
         selectOnNavigation={false}
         searchQuery={searchQuery}
-        search={opts => opts}
+        search={search !== false ? opts => opts : false}
         renderLabel={renderLabel}
         onSearchChange={(e, data) => {
           props.onSearchChange?.(e, data);
@@ -450,6 +461,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
             }
           }
         }}
+        trigger={renderTrigger()}
       />
     );
   },
@@ -460,3 +472,50 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
 );
 
 export default ModifiedDropdown;
+
+type OptionWithTooltipProps = {
+  text: string | null;
+};
+
+const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const optionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (optionRef.current) {
+      setShowTooltip(
+        optionRef.current.scrollWidth > optionRef.current.clientWidth
+      );
+    }
+  }, [text]);
+
+  return (
+    <div
+      ref={optionRef}
+      style={{
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}>
+      {showTooltip ? (
+        <Tooltip
+          content={
+            <span
+              style={{
+                display: 'inline-block',
+                maxWidth: 300,
+                overflowWrap: 'anywhere',
+              }}>
+              {text}
+            </span>
+          }
+          size="small"
+          position="bottom center"
+          trigger={<span>{text}</span>}
+        />
+      ) : (
+        text
+      )}
+    </div>
+  );
+};

@@ -30,8 +30,7 @@ export const TabUseDataset = ({
   const label = isParentObject ? 'dataset version' : isRow ? 'row' : 'object';
   let pythonName = isValidVarName(name) ? name : 'dataset';
   if (isRow) {
-    pythonName +=
-      '_row' + ref.artifactRefExtra?.substring(ROW_PATH_PREFIX.length);
+    pythonName += '_row';
   }
 
   // TODO: Row references are not yet supported, you get:
