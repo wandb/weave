@@ -33,7 +33,7 @@ if not import_failed:
             },
             exclude_unset=True,
             exclude_none=True,
-            # exclude_defaults=True
+            exclude_defaults=True,
         )
 
         run_dict = json.loads(run_dict)
@@ -44,11 +44,6 @@ if not import_failed:
             run_dict["outputs"] = (
                 run.outputs.copy() if run.outputs is not None else None,
             )
-
-        # if run.start_time is not None:
-        #     run_dict["start_time"] = datetime.datetime.timestamp(run.start_time) * 1000
-        # if run.end_time is not None:
-        #     run_dict["end_time"] = datetime.datetime.timestamp(run.end_time) * 1000
 
         run_dict = {k: v for k, v in run_dict.items() if v}
         return run_dict
@@ -76,7 +71,6 @@ if not import_failed:
                 # TO:DO, Figure out how to handle the run name. It errors in the UI
                 run_name = run.name.replace("<", "-").replace(">", "")
                 parent_id = run.parent_run_id
-                print("Opening", run.id, "-->", parent_id)
                 call = self.gc.create_call(
                     # Make sure to add the run name once the UI issue is figured out
                     f"langchain.{run.run_type.capitalize()}.{run_name}",
@@ -94,7 +88,6 @@ if not import_failed:
                 # Finish the call.
                 run_id = run.id
                 parent_id = run.parent_run_id
-                print("Closing", run_id, "-->", parent_id)
                 call = self._call_map.pop(run_id)
                 run_dict = _run_to_dict(run, as_input=False)
                 self.gc.finish_call(call, run_dict)
@@ -102,7 +95,6 @@ if not import_failed:
         def _update_run_error(self, run: Run) -> None:
             call = self._call_map.pop(run.id)
             if call:
-                print("Erroring", run.id, "-->", run.parent_run_id)
                 self.gc.finish_call(
                     call, _run_to_dict(run), exception=Exception(run.error)
                 )
