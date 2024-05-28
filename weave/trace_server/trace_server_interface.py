@@ -40,6 +40,8 @@ class CallSchema(BaseModel):
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
 
+    deleted_at: typing.Optional[datetime.datetime] = None
+
 
 # Essentially a partial of StartedCallSchema. Mods:
 # - id is not required (will be generated)
@@ -90,6 +92,7 @@ class ObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
+    deleted_at: typing.Optional[datetime.datetime] = None
     digest: str
     version_index: int
     is_latest: int
@@ -133,6 +136,17 @@ class CallReadReq(BaseModel):
 
 class CallReadRes(BaseModel):
     call: CallSchema
+
+
+class CallsDeleteReq(BaseModel):
+    project_id: str
+    # wb_user_id gets generated from auth params
+    wb_user_id: typing.Optional[str] = None
+    call_ids: typing.List[str]
+
+
+class CallsDeleteRes(BaseModel):
+    pass
 
 
 class _CallsFilter(BaseModel):
@@ -401,6 +415,11 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
+        ...
+
+    
+    @abc.abstractmethod
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
         ...
 
     @abc.abstractmethod

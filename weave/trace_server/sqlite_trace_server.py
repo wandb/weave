@@ -85,7 +85,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 output_refs TEXT,
                 summary TEXT,
                 wb_user_id TEXT,
-                wb_run_id TEXT
+                wb_run_id TEXT,
+                deleted_at TEXT
             )
         """
         )
@@ -101,7 +102,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 val_dump TEXT,
                 digest TEXT UNIQUE,
                 version_index INTEGER,
-                is_latest INTEGER
+                is_latest INTEGER,
+                deleted_at TEXT
             )
         """
         )
@@ -272,6 +274,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
 
+
         if req.filter_by:
             # This is the mongo-style filter_by
             def process_operation(operation: tsi._Operation) -> str:
@@ -337,7 +340,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             conds.append(filter_cond)
 
-        query = f"SELECT * FROM calls WHERE project_id = '{req.project_id}'"
+        query = f"SELECT * FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
+
 
         conditions_part = " AND ".join(conds)
 
@@ -377,7 +381,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 order_parts.append(f"{field} {direction}")
 
             order_by_part = ", ".join(order_parts)
-            query += f"ORDER BY {order_by_part}"
+            query += f" ORDER BY {order_by_part}"
 
         limit = req.limit or -1
         if limit:
@@ -412,6 +416,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         calls = self.calls_query(
             tsi.CallsQueryReq(
@@ -423,6 +428,50 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryStatsRes(
             count=len(calls),
         )
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        # update row with a deleted_at field set to now
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            recursive_query = """
+                WITH RECURSIVE Descendants AS (
+                    SELECT id
+                    FROM calls
+                    WHERE project_id = ? AND 
+                        deleted_at IS NULL AND 
+                        parent_id IN (SELECT id FROM calls WHERE id IN ({}))
+                    
+                    UNION ALL
+                    
+                    SELECT c.id
+                    FROM calls c
+                    JOIN Descendants d ON c.parent_id = d.id
+                    WHERE c.deleted_at IS NULL
+                )
+                SELECT id FROM Descendants;
+            """.format(
+                ", ".join("?" * len(req.call_ids))
+            )
+
+            params = [req.project_id] + req.call_ids
+            cursor.execute(recursive_query, params)
+            all_ids = [x[0] for x in cursor.fetchall()] + req.call_ids
+
+            # set deleted_at for all children and parents
+            delete_query = """
+                UPDATE calls
+                SET deleted_at = CURRENT_TIMESTAMP
+                WHERE deleted_at is NULL AND 
+                    id IN ({})
+            """.format(
+                ", ".join("?" * len(all_ids))
+            )
+            print("MUTATION", delete_query)
+            cursor.execute(delete_query, all_ids)
+            conn.commit()
+
+        return tsi.CallsDeleteRes()
+
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -479,9 +528,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        conds = [
-            f"object_id = '{req.object_id}'",
-        ]
+        conds = [f"object_id = '{req.object_id}'"]
         if req.digest == "latest":
             conds.append("is_latest = 1")
         else:
@@ -711,7 +758,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         pred = " AND ".join(conditions or ["1 = 1"])
         cursor.execute(
-            """SELECT * FROM objects WHERE project_id = ? AND """ + pred,
+            """SELECT * FROM objects WHERE deleted_at IS NULL AND project_id = ? AND """
+            + pred,
             (project_id,),
         )
         query_result = cursor.fetchall()
