@@ -322,6 +322,7 @@ const useCalls = (
   useEffect(() => {
     if (calls.loading || calls.result == null) {
       setExpandedCalls([]);
+      setIsExpanding(true);
       return;
     }
 

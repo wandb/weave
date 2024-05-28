@@ -20,6 +20,7 @@ import {
   GridColumnGroupingModel,
   GridColumnNode,
   GridFilterModel,
+  GridLeafColumn,
   GridPaginationModel,
   GridPinnedColumns,
   GridRowSelectionModel,
@@ -227,8 +228,14 @@ export const CallsTable: FC<{
   );
 
   const callsLoading = calls.loading;
-  const callsResult = calls.result;
-  const callsTotal = calls.total;
+  const [callsResult, setCallsResult] = useState(calls.result);
+  const [callsTotal, setCallsTotal] = useState(calls.total);
+  useEffect(() => {
+    if (!calls.loading) {
+      setCallsResult(calls.result);
+      setCallsTotal(calls.total);
+    }
+  }, [calls]);
 
   // Construct Flattened Table Data
 
@@ -552,10 +559,11 @@ export const CallsTable: FC<{
         return node;
       });
     };
-
+    const groupIds = new Set<string>();
     groupingModel = walkGroupingModel(groupingModel, node => {
       if ('groupId' in node) {
         const key = node.groupId;
+        groupIds.add(key);
         if (expandedRefCols.has(key)) {
           node.renderHeaderGroup = () => {
             return (
@@ -614,7 +622,12 @@ export const CallsTable: FC<{
           );
         },
       };
-      if (expandedRefCols.has(key)) {
+
+      if (groupIds.has(key)) {
+        col.renderHeader = () => {
+          return <></>;
+        };
+      } else if (expandedRefCols.has(key)) {
         col.renderHeader = () => {
           return (
             <CollapseHeader
@@ -1015,6 +1028,62 @@ function addToTree(
   addToTree(newNode, fields.slice(1), fullPath, depth + 1);
 }
 
+function nodeIsGroup(node: GridColumnNode): node is GridColumnGroup {
+  return 'groupId' in node;
+}
+
+function pushLeavesIntoGroupsForGroup(group: GridColumnGroup): GridColumnGroup {
+  const originalChildren = group.children;
+
+  const childrenLeaves: {[key: string]: GridLeafColumn} = Object.fromEntries(
+    group.children
+      .filter((child): child is GridLeafColumn => !nodeIsGroup(child))
+      .map(child => [child.field, child])
+  );
+
+  const childrenGroups: {[key: string]: GridColumnGroup} = Object.fromEntries(
+    group.children
+      .filter((child): child is GridColumnGroup => nodeIsGroup(child))
+      .map(child => [child.groupId, child])
+  );
+
+  // First, push leaves into groups
+  Object.keys(childrenLeaves).forEach(childKey => {
+    let found = false;
+    Object.keys(childrenGroups).forEach(groupKey => {
+      if (!found && groupKey.startsWith(childKey)) {
+        childrenGroups[groupKey].children.push(childrenLeaves[childKey]);
+        found = true;
+      }
+    });
+    if (found) {
+      delete childrenLeaves[childKey];
+    }
+  });
+
+  // Next, apply the same logic to the groups
+  Object.keys(childrenGroups).forEach(key => {
+    childrenGroups[key] = pushLeavesIntoGroupsForGroup(childrenGroups[key]);
+  });
+
+  const finalChildren = originalChildren
+    .map(child => {
+      if (nodeIsGroup(child)) {
+        return childrenGroups[child.groupId];
+      } else {
+        return childrenLeaves[child.field];
+      }
+    })
+    .filter((child): child is GridColumnNode => !!child);
+
+  const newGroup: GridColumnGroup = {
+    ...group,
+    children: finalChildren,
+  };
+
+  return newGroup;
+}
+
 function buildTree(strings: string[]): GridColumnGroup {
   const root: GridColumnGroup = {groupId: '', children: []};
 
@@ -1023,7 +1092,7 @@ function buildTree(strings: string[]): GridColumnGroup {
     addToTree(root, fields, str, 0);
   }
 
-  return root;
+  return pushLeavesIntoGroupsForGroup(root);
 }
 
 type OpVersionIndexTextProps = {
