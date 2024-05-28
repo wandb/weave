@@ -174,16 +174,32 @@ export class TraceServerClient {
       }>
     >
   > = {};
+  private onDeleteListeners: Array<() => void>;
 
   constructor(baseUrl: string) {
     this.readBatchCollectors = [];
     this.inFlightFetchesRequests = {};
     this.baseUrl = baseUrl;
     this.scheduleReadBatch();
+    this.onDeleteListeners = [];
   }
 
+  onCallDelete: (onDeleteCallback: () => void) => void = cb => {
+    this.onDeleteListeners.push(cb);
+    return () => {
+      this.onDeleteListeners = this.onDeleteListeners.filter(
+        listener => listener !== cb
+      );
+    };
+  };
   callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
-    return this.makeRequest<TraceCallsDeleteReq, void>('/calls/delete', req);
+    const res = this.makeRequest<TraceCallsDeleteReq, void>(
+      '/calls/delete',
+      req
+    ).then(() => {
+      this.onDeleteListeners.forEach(listener => listener());
+    });
+    return res;
   };
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {

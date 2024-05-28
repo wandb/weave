@@ -202,16 +202,13 @@ const useCalls = (
   project: string,
   filter: CallFilter,
   limit?: number,
-  opts?: {skip?: boolean}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): LoadableWithRefetch<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
-
-  // Listen to callsDelete to refresh if deleted
-  const {onDelete} = useCallsDeleteFunc();
 
   const doFetch = useCallback(() => {
     setCallRes(null);
@@ -243,12 +240,19 @@ const useCalls = (
     getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
   }, [entity, project, deepFilter, limit, getTsClient]);
 
+  // register doFetch as a callback after deletion
   useEffect(() => {
-    if (opts?.skip || !onDelete) {
+    if (opts?.refetchOnDelete) {
+      return getTsClient().onCallDelete(doFetch);
+    }
+  }, [opts?.refetchOnDelete, getTsClient, doFetch]);
+
+  useEffect(() => {
+    if (opts?.skip) {
       return;
     }
     doFetch();
-  }, [doFetch, opts?.skip, onDelete]);
+  }, [opts?.skip, doFetch]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -298,6 +302,7 @@ const useCallsDeleteFunc = () => {
           call_ids: callIDs,
         })
         .then(() => {
+          // remove from cache
           callIDs.forEach(callId => {
             callCache.del({
               entity: projectID.split('/')[0],
@@ -310,15 +315,7 @@ const useCallsDeleteFunc = () => {
     [getTsClient]
   );
 
-  const onDelete = useCallback(() => {
-    // function is recreated when callsDelete fires
-    if (!callsDelete) {
-      return;
-    }
-    return;
-  }, [callsDelete]);
-
-  return {callsDelete, onDelete};
+  return callsDelete;
 };
 
 const useOpVersion = (

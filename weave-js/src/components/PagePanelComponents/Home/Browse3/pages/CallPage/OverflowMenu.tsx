@@ -10,9 +10,10 @@ import {IconDelete} from '@wandb/weave/components/Icon';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
-import {useClosePeekOrNavigateUp} from '../../context';
+import {useClosePeek} from '../../context';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import { useHistory } from 'react-router-dom';
 
 export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
@@ -100,8 +101,8 @@ const ConfirmDeleteModal: FC<{
   refetch?: () => void;
 }> = ({calls, confirmDelete, setConfirmDelete, refetch}) => {
   const {useCallsDeleteFunc} = useWFHooks();
-  const {callsDelete} = useCallsDeleteFunc();
-  const close = useClosePeekOrNavigateUp();
+  const callsDelete = useCallsDeleteFunc();
+  const closePeek = useClosePeek();
 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -122,7 +123,7 @@ const ConfirmDeleteModal: FC<{
     ).then(() => {
       setDeleteLoading(false);
       setConfirmDelete(false);
-      close();
+      closePeek();
     });
   };
 
