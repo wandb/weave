@@ -139,6 +139,7 @@ def test_trace_server_call_start_and_end(client):
         "summary": None,
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "deleted_at": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -176,6 +177,7 @@ def test_trace_server_call_start_and_end(client):
         "summary": {"c": 5},
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "deleted_at": None,
     }
 
 
@@ -680,7 +682,7 @@ def test_trace_call_sort(client):
     for i in range(3):
         basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
 
-    for (first, last, sort_by) in [
+    for first, last, sort_by in [
         (2, 0, [tsi._SortBy(field="started_at", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),
