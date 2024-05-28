@@ -1,4 +1,4 @@
-# **Weave by Weights & Biases**
+ # **Weave by Weights & Biases**
 
 Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
 
