@@ -13,12 +13,10 @@ import styled from 'styled-components';
 import {useClosePeek} from '../../context';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import { useHistory } from 'react-router-dom';
 
 export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
-  refetch?: () => void;
-}> = ({selectedCalls, refetch}) => {
+}> = ({selectedCalls}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
@@ -40,7 +38,6 @@ export const OverflowMenu: FC<{
           calls={selectedCalls}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
-          refetch={refetch}
         />
       )}
       <PopupDropdown
@@ -98,8 +95,7 @@ const ConfirmDeleteModal: FC<{
   calls: CallSchema[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
-  refetch?: () => void;
-}> = ({calls, confirmDelete, setConfirmDelete, refetch}) => {
+}> = ({calls, confirmDelete, setConfirmDelete}) => {
   const {useCallsDeleteFunc} = useWFHooks();
   const callsDelete = useCallsDeleteFunc();
   const closePeek = useClosePeek();

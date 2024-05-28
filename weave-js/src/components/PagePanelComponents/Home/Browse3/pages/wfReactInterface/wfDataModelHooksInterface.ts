@@ -27,10 +27,6 @@ export type LoadableWithError<T> = {
   error: Error | null;
 };
 
-export type LoadableWithRefetch<T> = Loadable<T> & {
-  refetch?: () => void;
-};
-
 export type CallKey = {
   entity: string;
   project: string;

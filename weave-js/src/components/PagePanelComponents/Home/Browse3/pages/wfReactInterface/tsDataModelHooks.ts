@@ -28,7 +28,6 @@ import {
   CallSchema,
   Loadable,
   LoadableWithError,
-  LoadableWithRefetch,
   ObjectVersionFilter,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -203,7 +202,7 @@ const useCalls = (
   filter: CallFilter,
   limit?: number,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
-): LoadableWithRefetch<CallSchema[]> => {
+): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
@@ -259,7 +258,6 @@ const useCalls = (
       return {
         loading: false,
         result: [],
-        refetch: doFetch,
       };
     }
     const allResults = (callRes?.calls ?? []).map(traceCallToUICallSchema);
@@ -269,7 +267,6 @@ const useCalls = (
       return {
         loading: true,
         result: [],
-        refetch: doFetch,
       };
     } else {
       allResults.forEach(call => {
@@ -285,10 +282,9 @@ const useCalls = (
       return {
         loading: false,
         result,
-        refetch: doFetch,
       };
     }
-  }, [callRes, entity, project, opts?.skip, doFetch]);
+  }, [callRes, entity, project, opts?.skip]);
 };
 
 const useCallsDeleteFunc = () => {
