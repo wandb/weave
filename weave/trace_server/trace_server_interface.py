@@ -417,7 +417,6 @@ class TraceServerInterface:
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         ...
 
-    
     @abc.abstractmethod
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
         ...

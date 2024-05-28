@@ -1413,7 +1413,6 @@ def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
     return f"({combined})"
 
 
-
 def find_call_descendants(
     root_ids: typing.List[str],
     all_calls: typing.List[SelectableCHCallSchema],

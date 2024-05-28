@@ -274,7 +274,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
 
-
         if req.filter_by:
             # This is the mongo-style filter_by
             def process_operation(operation: tsi._Operation) -> str:
@@ -341,7 +340,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conds.append(filter_cond)
 
         query = f"SELECT * FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
-
 
         conditions_part = " AND ".join(conds)
 
@@ -416,7 +414,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
-
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         calls = self.calls_query(
             tsi.CallsQueryReq(
@@ -471,7 +468,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conn.commit()
 
         return tsi.CallsDeleteRes()
-
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()

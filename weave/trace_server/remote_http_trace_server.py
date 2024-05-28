@@ -253,7 +253,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
         )
 
-
     def calls_query_stats(
         self, req: t.Union[tsi.CallsQueryStatsReq, t.Dict[str, t.Any]]
     ) -> tsi.CallsQueryStatsRes:
