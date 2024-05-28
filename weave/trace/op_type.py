@@ -227,11 +227,15 @@ def get_code_deps(
         ]
         return {"import_code": [], "code": [], "warnings": warnings}
 
-    source = textwrap.dedent(inspect.getsource(fn))
+    try:
+        source = textwrap.dedent(inspect.getsource(fn))
+    except OSError:
+        warnings.append(f"Could not get source of {fn}.")
+        return {"import_code": [], "code": [], "warnings": warnings}
     try:
         parsed = ast.parse(source)
     except SyntaxError:
-        warnings.append(f"Could not parse source of function {fn}.")
+        warnings.append(f"Could not parse source of {fn}.")
         return {"import_code": [], "code": [], "warnings": warnings}
 
     visitor = ExternalVariableFinder()
@@ -274,7 +278,10 @@ def get_code_deps(
                 import_code += fn_import_code
 
                 code += fn_code
-                code.append(textwrap.dedent(inspect.getsource(var_value)))
+                try:
+                    code.append(textwrap.dedent(inspect.getsource(var_value)))
+                except OSError:
+                    warnings.append(f"Could not get source of {var_value}.")
 
                 warnings += fn_warnings
             else:

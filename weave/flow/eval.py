@@ -142,6 +142,9 @@ class Evaluation(Object):
         scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
+            if model_output == None:
+                scores[scorer_name] = None
+                continue
             if isinstance(score_fn, Op):
                 score_signature = score_fn.signature
             else:
