@@ -812,17 +812,19 @@ def test_trace_call_filter(client):
                 1 if is_sql_lite else 0
             ),  # SQLLite casting transforms strings to 0, instead of NULL
             {
-                "not_": {
-                    "gt_": [
-                        {
-                            "convert_": {
-                                "input": {"get_field_": "inputs.in_val.prim"},
-                                "to": "int",
-                            }
-                        },
-                        {"literal_": 5},
-                    ]
-                }
+                "not_": [
+                    {
+                        "gt_": [
+                            {
+                                "convert_": {
+                                    "input": {"get_field_": "inputs.in_val.prim"},
+                                    "to": "int",
+                                }
+                            },
+                            {"literal_": 5},
+                        ]
+                    }
+                ]
             },
         ),
         # not gte = lt
@@ -832,17 +834,19 @@ def test_trace_call_filter(client):
                 1 if is_sql_lite else 0
             ),  # SQLLite casting transforms strings to 0, instead of NULL
             {
-                "not_": {
-                    "gte_": [
-                        {
-                            "convert_": {
-                                "input": {"get_field_": "inputs.in_val.prim"},
-                                "to": "int",
-                            }
-                        },
-                        {"literal_": 5},
-                    ]
-                }
+                "not_": [
+                    {
+                        "gte_": [
+                            {
+                                "convert_": {
+                                    "input": {"get_field_": "inputs.in_val.prim"},
+                                    "to": "int",
+                                }
+                            },
+                            {"literal_": 5},
+                        ]
+                    }
+                ]
             },
         ),
         # like all
@@ -851,12 +855,12 @@ def test_trace_call_filter(client):
             + (
                 -2 if is_sql_lite else 0
             ),  # SQLLite returns NULL for non-existent fields rather than ''.
-            {"like_": [{"get_field_": "inputs.in_val.str"}, {"literal_": ""}]},
+            {"substr_": [{"get_field_": "inputs.in_val.str"}, {"literal_": ""}]},
         ),
         # like select
         (
             10,
-            {"like_": [{"get_field_": "inputs.in_val.str"}, {"literal_": "str"}]},
+            {"substr_": [{"get_field_": "inputs.in_val.str"}, {"literal_": "str"}]},
         ),
         # and
         (
@@ -864,17 +868,21 @@ def test_trace_call_filter(client):
             {
                 "and_": [
                     {
-                        "not_": {
-                            "gt_": [
-                                {
-                                    "convert_": {
-                                        "input": {"get_field_": "inputs.in_val.prim"},
-                                        "to": "int",
-                                    }
-                                },
-                                {"literal_": 7},
-                            ]
-                        }
+                        "not_": [
+                            {
+                                "gt_": [
+                                    {
+                                        "convert_": {
+                                            "input": {
+                                                "get_field_": "inputs.in_val.prim"
+                                            },
+                                            "to": "int",
+                                        }
+                                    },
+                                    {"literal_": 7},
+                                ]
+                            }
+                        ]
                     },
                     {
                         "gte_": [
@@ -899,17 +907,21 @@ def test_trace_call_filter(client):
             {
                 "or_": [
                     {
-                        "not_": {
-                            "gt_": [
-                                {
-                                    "convert_": {
-                                        "input": {"get_field_": "inputs.in_val.prim"},
-                                        "to": "int",
-                                    }
-                                },
-                                {"literal_": 3},
-                            ]
-                        }
+                        "not_": [
+                            {
+                                "gt_": [
+                                    {
+                                        "convert_": {
+                                            "input": {
+                                                "get_field_": "inputs.in_val.prim"
+                                            },
+                                            "to": "int",
+                                        }
+                                    },
+                                    {"literal_": 3},
+                                ]
+                            }
+                        ]
                     },
                     {
                         "gte_": [
@@ -949,7 +961,7 @@ def test_trace_call_filter(client):
                     {
                         "convert_": {
                             "input": {"get_field_": "inputs.in_val.prim"},
-                            "to": "str",
+                            "to": "string",
                         }
                     },
                 ]

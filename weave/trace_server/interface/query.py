@@ -57,10 +57,12 @@ class GetFieldOperator(BaseModel):
 class ConvertOperation(BaseModel):
     convert_: "ConvertSpec"
 
+
 class ConvertSpec(BaseModel):
     input: "Operand"
     # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
     to: typing.Literal["double", "string", "int", "bool"]
+
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/
 class AndOperation(BaseModel):
@@ -101,7 +103,6 @@ class SubstrOperation(BaseModel):
 
 
 # Convenience type for all Operands and Operations
-Operand = typing.Union[LiteralOperation, GetFieldOperator, "Operation"]
 Operation = typing.Union[
     AndOperation,
     OrOperation,
@@ -110,6 +111,9 @@ Operation = typing.Union[
     GtOperation,
     GteOperation,
     SubstrOperation,
+]
+Operand = typing.Union[
+    LiteralOperation, GetFieldOperator, ConvertOperation, "Operation"
 ]
 
 
