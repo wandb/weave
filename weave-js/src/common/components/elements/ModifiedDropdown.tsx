@@ -58,6 +58,14 @@ const simpleSearch = (options: DropdownItemProps[], query: string) => {
     .value();
 };
 
+const getOptionProps = (opt: Option, hideText: boolean) => {
+  const {text, ...props} = opt;
+  props.text = hideText ? null : (
+    <OptionWithTooltip text={opt.text as string} />
+  );
+  return props;
+};
+
 export interface ModifiedDropdownExtraProps {
   debounceTime?: number;
   enableReordering?: boolean;
@@ -212,14 +220,6 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       }
       return itemCount() >= itemLimit;
     }, [itemLimit, itemCount]);
-
-    const getOptionProps = (opt: Option, hideText: boolean) => {
-      const {text, ...props} = opt;
-      props.text = hideText ? null : (
-        <OptionWithTooltip text={opt.text as string} />
-      );
-      return props;
-    };
 
     const computedOptions = searchQuery ? options : propsOptions;
     const displayOptions = getDisplayOptions(
