@@ -477,6 +477,10 @@ const useAllDynamicColumnNames = (
   }, [currentDynamicColumnNames, shouldIgnoreColumn]);
 
   useEffect(() => {
+    // Here, we reset the dynamic column names when the filter changes.
+    // Both branches of the if statement are the same. I just wanted to
+    // ensure that the `resetDep` is included in the dependency array.
+    // Perhaps there is a better way to do this?
     if (resetDep) {
       setAllDynamicColumnNames([]);
     } else {

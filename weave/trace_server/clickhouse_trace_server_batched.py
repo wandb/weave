@@ -1559,32 +1559,14 @@ def _transform_external_calls_field_to_internal_calls_field(
     param_builder = param_builder or ParamBuilder()
     raw_fields_used = set()
     json_path = None
-    if field == "inputs" or field.startswith("inputs."):
-        if field == "inputs":
-            json_path = "$"
-        else:
-            json_path = _quote_json_path(field[len("inputs.") :])
-        field = "inputs_dump"
-    elif field == "output" or field.startswith("output."):
-        if field == "output":
-            json_path = "$"
-        else:
-            json_path = _quote_json_path(field[len("output.") :])
-        field = "output_dump"
-    elif field == "attributes" or field.startswith("attributes."):
-        if field == "attributes":
-            json_path = "$"
-        else:
-            json_path = _quote_json_path(field[len("attributes.") :])
-        field = "attributes_dump"
-    elif field == "summary" or field.startswith("summary."):
-        if field == "summary":
-            json_path = "$"
-        else:
-            json_path = _quote_json_path(field[len("summary.") :])
-        field = "summary_dump"
-    else:
-        assert field in all_call_select_columns, f"Invalid order_by field: {field}"
+    for prefix in ["inputs", "output", "attributes", "summary"]:
+        if field == prefix or field.startswith(prefix + "."):
+            if field == prefix:
+                json_path = "$"
+            else:
+                json_path = _quote_json_path(field[len(prefix + ".") :])
+            field = prefix + "_dump"
+            break
 
     # validate field
     if field not in all_call_select_columns:
