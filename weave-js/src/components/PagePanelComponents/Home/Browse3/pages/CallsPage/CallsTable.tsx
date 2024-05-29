@@ -24,6 +24,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -201,12 +202,18 @@ export const CallsTable: FC<{
   const callsLoading = calls.loading;
   const [callsResult, setCallsResult] = useState(calls.result);
   const [callsTotal, setCallsTotal] = useState(calls.total);
+  const callsEffectiveFilter = useRef(effectiveFilter);
   useEffect(() => {
-    if (!calls.loading) {
+    if (callsEffectiveFilter.current !== effectiveFilter) {
+      setCallsResult([]);
+      setCallsTotal(0);
+      callsEffectiveFilter.current = effectiveFilter;
+    } else if (!calls.loading) {
       setCallsResult(calls.result);
       setCallsTotal(calls.total);
+      callsEffectiveFilter.current = effectiveFilter;
     }
-  }, [calls]);
+  }, [calls, effectiveFilter]);
 
   // Construct Flattened Table Data
   const tableData: TraceCallSchema[] = useMemo(
@@ -492,8 +499,11 @@ export const CallsTable: FC<{
         }}
         slots={{
           noRowsOverlay: () => {
+            if (callsLoading) {
+              return <></>;
+            }
             const isEmpty = callsResult.length === 0;
-            if (!callsLoading && isEmpty) {
+            if (isEmpty) {
               // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
               if (isEvaluateTable) {
                 return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
