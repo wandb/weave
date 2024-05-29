@@ -915,7 +915,7 @@ def test_trace_call_filter(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter_by=tsi._FilterBy.model_validate({"filter": filter_by}),
+                filter_by=tsi.FilterBy.model_validate({"filter": filter_by}),
             )
         )
 
@@ -927,7 +927,7 @@ def test_trace_call_filter(client):
         inner_res = get_client_trace_server(client).calls_query_stats(
             tsi.CallsQueryStatsReq(
                 project_id=get_client_project_id(client),
-                filter_by=tsi._FilterBy.model_validate({"filter": filter_by}),
+                filter_by=tsi.FilterBy.model_validate({"filter": filter_by}),
             )
         )
 

@@ -1664,7 +1664,7 @@ def _process_calls_filter_to_conditions(
 
 
 def _process_calls_filter_by_to_conditions(
-    filter_by: tsi._FilterBy, param_builder: typing.Optional[ParamBuilder] = None
+    filter_by: tsi.FilterBy, param_builder: typing.Optional[ParamBuilder] = None
 ) -> tuple[list[str], ParamBuilder, set[str]]:
     param_builder = param_builder or ParamBuilder()
     conditions = []
