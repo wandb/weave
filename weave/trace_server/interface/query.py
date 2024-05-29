@@ -53,7 +53,19 @@ class LiteralOperation(BaseModel):
 # Note: currently only the shorthand form is supported.
 # Field should be a key of `CallSchema`. For dictionary fields (`attributes`,
 # `inputs`, `outputs`, `summary`), the field can be dot-separated.
+# Here we support "dot notation" for accessing nested fields:
+# https://www.mongodb.com/docs/manual/core/document/#dot-notation
 class GetFieldOperator(BaseModel):
+    # Tim: We will likely want to revisit this before making it public. Here are some concerns:
+    # 1. Mongo explicitly says that `getField` is used to access fields without dot notation - this
+    #    is not how we are handling it here - we are using dot notation - this could be resolved by
+    #    supporting the `$field.with.path` shorthand.
+    # 2. As Jamie pointed out, the parsing of this field is not very robust and susceptible to issues when:
+    #    - The field part name contains a dot
+    #    - The field part name is a valid integer (currently interpreted as a list index)
+    #    - The field part name contains a double quote (will result in failed lookup - see `_quote_json_path` in `clickhouse_trace_server_batched.py`)
+    #    These issues could be resolved by using an alternative syntax (perhaps backticks, square brackets, etc.). However
+    #    this would diverge from the current Mongo syntax.
     get_field_: str = Field(alias="$getField")
 
 

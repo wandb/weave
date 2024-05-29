@@ -1527,7 +1527,10 @@ def _param_slot(param_name: str, param_type: str) -> str:
 def _quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
-    notation (required by clickhouse)"""
+    notation (required by clickhouse)
+
+    See comments on `GetFieldOperator` for current limitations
+    """
     parts = path.split(".")
     parts_final = []
     for part in parts:
