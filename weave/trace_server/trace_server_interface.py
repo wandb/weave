@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from .interface.filter_by import FilterBy
 
+
 class CallSchema(BaseModel):
     id: str
     project_id: str
