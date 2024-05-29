@@ -1,5 +1,5 @@
 """
-This file contains the interface definition for the Trace Server FilterBy model. It
+This file contains the interface definition for the Trace Server Query model. It
 is heavily inspired by the MongoDB query language, but is a subset of the full
 MongoDB query language. In particular, we have made the following simplifications:
 * We only support the "aggregation" operators, not the "query" operators. This is purely
@@ -22,7 +22,7 @@ import typing
 from pydantic import BaseModel
 
 
-class FilterBy(BaseModel):
+class Query(BaseModel):
     # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
     # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
     # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr

@@ -3,7 +3,7 @@ import datetime
 import typing
 from pydantic import BaseModel
 
-from .interface.filter_by import FilterBy
+from .interface.filter_by import Query
 
 
 class CallSchema(BaseModel):
@@ -178,9 +178,7 @@ class CallsQueryReq(BaseModel):
     offset: typing.Optional[int] = None
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
-    filter_by: typing.Optional[
-        FilterBy
-    ] = None  # should this be moved inside of "filter?"
+    query: typing.Optional[Query] = None
 
 
 class CallsQueryRes(BaseModel):
@@ -190,9 +188,7 @@ class CallsQueryRes(BaseModel):
 class CallsQueryStatsReq(BaseModel):
     project_id: str
     filter: typing.Optional[_CallsFilter] = None
-    filter_by: typing.Optional[
-        FilterBy
-    ] = None  # should this be moved inside of "filter?"
+    query: typing.Optional[Query] = None
 
 
 class CallsQueryStatsRes(BaseModel):

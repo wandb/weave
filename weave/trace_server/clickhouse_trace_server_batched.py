@@ -253,9 +253,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raw_fields_used.update(fields_used)
             conditions.extend(filter_conds)
 
-        if req.filter_by:
+        if req.query:
             filter_by_conds, _, fields_used = _process_calls_filter_by_to_conditions(
-                req.filter_by, param_builder
+                req.query, param_builder
             )
             raw_fields_used.update(fields_used)
             conditions.extend(filter_by_conds)
@@ -283,9 +283,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ) = _process_calls_filter_to_conditions(req.filter, param_builder)
             conditions.extend(filter_conds)
 
-        if req.filter_by:
+        if req.query:
             filter_by_conds, _, _ = _process_calls_filter_by_to_conditions(
-                req.filter_by, param_builder
+                req.query, param_builder
             )
             conditions.extend(filter_by_conds)
 
@@ -1666,7 +1666,7 @@ def _process_calls_filter_to_conditions(
 
 
 def _process_calls_filter_by_to_conditions(
-    filter_by: tsi.FilterBy, param_builder: typing.Optional[ParamBuilder] = None
+    filter_by: tsi.Query, param_builder: typing.Optional[ParamBuilder] = None
 ) -> tuple[list[str], ParamBuilder, set[str]]:
     param_builder = param_builder or ParamBuilder()
     conditions = []

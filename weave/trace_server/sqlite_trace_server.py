@@ -275,7 +275,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
 
-        if req.filter_by:
+        if req.query:
             # This is the mongo-style filter_by
             def process_operation(operation: tsi_filter_by.Operation) -> str:
                 cond = None
@@ -336,7 +336,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 else:
                     raise ValueError(f"Unknown operand type: {operand}")
 
-            filter_cond = process_operation(req.filter_by.expr_)
+            filter_cond = process_operation(req.query.expr_)
 
             conds.append(filter_cond)
 
@@ -420,7 +420,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 filter=req.filter,
-                filter_by=req.filter_by,
+                query=req.query,
             )
         ).calls
         return tsi.CallsQueryStatsRes(
