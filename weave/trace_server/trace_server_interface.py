@@ -10,6 +10,8 @@ class CallSchema(BaseModel):
 
     # Name of the calling function (op)
     op_name: str
+    # Optional display name of the call
+    display_name: typing.Optional[str] = None
 
     ## Trace ID
     trace_id: str

@@ -173,11 +173,9 @@ class Call:
         return client.delete_call(call=self)
 
     def rename(self, new_name: str) -> "Call":
+        print(f"\nRenaming call {self.op_name}  ---->  {new_name}")
         client = graph_client_context.require_graph_client()
-        res = client.rename_call(call=self, display_name=new_name)
-        if res.error:
-            raise ValueError(f"Failed to rename call: {res.error}")
-
+        client.rename_call(call=self, display_name=new_name)
         self.display_name = new_name
         return self
 
@@ -238,6 +236,7 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
         summary=server_call.summary,
+        display_name=server_call.display_name,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -573,12 +572,12 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def rename_call(self, call: Call, new_name: str) -> None:
+    def rename_call(self, call: Call, display_name: str) -> None:
         self.server.call_rename(
             CallRenameReq(
                 project_id=self._project_id(),
                 id=call.id,
-                display_name=new_name,
+                display_name=display_name,
             )
         )
 

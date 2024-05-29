@@ -108,6 +108,7 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
+    display_name: typing.Optional[str] = None
 
     trace_id: str
     parent_id: typing.Optional[str] = None
@@ -392,6 +393,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             wb_user_id=req.wb_user_id,
             display_name=req.display_name,
         )
+        print(f"\n\n\n*** {renamed_insertable.model_dump_json()} ***\n")
         self._insert_call(renamed_insertable)
 
         return tsi.CallRenameRes()

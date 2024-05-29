@@ -86,7 +86,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 summary TEXT,
                 wb_user_id TEXT,
                 wb_run_id TEXT,
-                deleted_at TEXT
+                deleted_at TEXT,
+                display_name TEXT
             )
         """
         )
@@ -346,6 +347,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     summary=json.loads(row[13]) if row[13] else None,
                     wb_user_id=row[14],
                     wb_run_id=row[15],
+                    display_name=row[16],
                 )
                 for row in query_result
             ]
