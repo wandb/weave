@@ -99,13 +99,13 @@ class GteOperation(BaseModel):
 # however, rather than support a full regex match right now, we will
 # support a substring match. We can add regex support later if needed.
 class ContainsOperation(BaseModel):
-    contains_: "InstrSpec"
+    contains_: "ContainsSpec"
 
 
-class InstrSpec(BaseModel):
+class ContainsSpec(BaseModel):
     input: "Operand"
     substr: "Operand"
-    ignore_case: typing.Optional[bool] = False
+    case_insensitive: typing.Optional[bool] = False
 
 
 # Convenience type for all Operands and Operations

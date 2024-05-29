@@ -47,7 +47,7 @@ type GteOperation = {
 type ContainsSpec = {
   input: Operand;
   substr: Operand;
-  ignore_case?: boolean;
+  case_insensitive?: boolean;
 };
 
 type ContainsOperation = {
