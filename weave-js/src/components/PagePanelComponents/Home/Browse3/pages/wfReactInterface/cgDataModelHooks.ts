@@ -158,6 +158,10 @@ const useCalls = (
   project: string,
   filter: CallFilter,
   limit?: number,
+  offset?: number,
+  sortBy?: any,
+  query?: any,
+  expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   let runsNode = fnRunsNode(
@@ -270,6 +274,16 @@ const useOpVersion = (
       };
     }
   }, [cachedOpVersion, dataValue.loading, dataValue.result, key]);
+};
+
+const useCallsStats = (
+  entity: string,
+  project: string,
+  filter: CallFilter,
+  query?: any,
+  opts?: {skip?: boolean}
+): Loadable<any> => {
+  throw new Error('Not implemented');
 };
 
 const useOpVersions = (
@@ -1082,6 +1096,7 @@ const useCallsDeleteFunc = (): ((
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsStats,
   useCallsDeleteFunc,
   useOpVersion,
   useOpVersions,

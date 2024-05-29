@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
+import {Query} from './traceServerClientInterface/query';
+
 export type KeyedDictType = {
   [key: string]: any;
   _keys?: string[];
@@ -67,15 +69,29 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
+export type SortBy = {field: string; direction: 'asc' | 'desc'};
+
 export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
   offset?: number;
+  sort_by?: SortBy[];
+  query?: Query;
 };
 
 export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
+};
+
+export type TraceCallsQueryStatsReq = {
+  project_id: string;
+  filter?: TraceCallsFilter;
+  query?: Query;
+};
+
+export type TraceCallsQueryStatsRes = {
+  count: number;
 };
 
 export type TraceCallsDeleteReq = {
@@ -217,6 +233,14 @@ export class TraceServerClient {
         req
       );
     };
+  callsQueryStats: (
+    req: TraceCallsQueryStatsReq
+  ) => Promise<TraceCallsQueryStatsRes> = req => {
+    return this.makeRequest<TraceCallsQueryStatsReq, TraceCallsQueryStatsRes>(
+      '/calls/query_stats',
+      req
+    );
+  };
   callsSteamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       const res = this.makeRequest<TraceCallsQueryReq, string>(

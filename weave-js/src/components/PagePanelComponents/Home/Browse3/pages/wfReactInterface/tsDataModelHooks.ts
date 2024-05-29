@@ -11,7 +11,6 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-// import {refStringToRefDict} from '../wfInterface/naive';
 import {
   callCache,
   objectVersionCache,
@@ -21,6 +20,8 @@ import {
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
+import {Query} from './traceServerClientInterface/query';
+import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
@@ -207,11 +208,15 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
     }
   }, [cachedCall, callRes, key]);
 };
-const useCalls = (
+
+const useCallsNoExpansion = (
   entity: string,
   project: string,
   filter: CallFilter,
   limit?: number,
+  offset?: number,
+  sortBy?: traceServerClient.SortBy[],
+  query?: Query,
   opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -221,6 +226,9 @@ const useCalls = (
   const deepFilter = useDeepMemo(filter);
 
   const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
     setCallRes(null);
     loadingRef.current = true;
     const req: traceServerClient.TraceCallsQueryReq = {
@@ -237,6 +245,9 @@ const useCalls = (
         wb_user_ids: deepFilter.userIds,
       },
       limit,
+      offset,
+      sort_by: sortBy,
+      query,
     };
     const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -248,7 +259,17 @@ const useCalls = (
       setCallRes({calls: []});
     };
     getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, limit, getTsClient]);
+  }, [
+    entity,
+    project,
+    deepFilter,
+    limit,
+    opts?.skip,
+    getTsClient,
+    offset,
+    sortBy,
+    query,
+  ]);
 
   // register doFetch as a callback after deletion
   useEffect(() => {
@@ -298,6 +319,78 @@ const useCalls = (
     }
   }, [callRes, entity, project, opts?.skip]);
 };
+
+const useCalls = (
+  entity: string,
+  project: string,
+  filter: CallFilter,
+  limit?: number,
+  offset?: number,
+  sortBy?: traceServerClient.SortBy[],
+  query?: Query,
+  expandedRefColumns?: Set<string>,
+  opts?: {skip?: boolean; refetchOnDelete?: boolean}
+): Loadable<CallSchema[]> => {
+  const calls = useCallsNoExpansion(
+    entity,
+    project,
+    filter,
+    limit,
+    offset,
+    sortBy,
+    query,
+    opts
+  );
+
+  // This is a temporary solution until the trace server supports
+  // backend expansions of refs. We should expect to see this go away, and
+  // this entire function replaced with the contents of `useCallsNoExpansion`.
+  const {expandedCalls, isExpanding} = useClientSideCallRefExpansion(
+    calls,
+    expandedRefColumns
+  );
+
+  const loading = calls.loading || isExpanding;
+  return useMemo(() => {
+    return {
+      loading,
+      result: loading ? [] : expandedCalls.map(traceCallToUICallSchema),
+    };
+  }, [expandedCalls, loading]);
+};
+
+const useCallsStats = makeTraceServerEndpointHook<
+  'callsQueryStats',
+  [string, string, CallFilter, Query?, {skip?: boolean}?],
+  traceServerClient.TraceCallsQueryStatsRes
+>(
+  'callsQueryStats',
+  (
+    entity: string,
+    project: string,
+    filter: CallFilter,
+    query?: Query,
+    opts?: {skip?: boolean}
+  ) => ({
+    params: {
+      project_id: projectIdFromParts({entity, project}),
+      filter: {
+        op_names: filter.opVersionRefs,
+        input_refs: filter.inputObjectVersionRefs,
+        output_refs: filter.outputObjectVersionRefs,
+        parent_ids: filter.parentIds,
+        trace_ids: filter.traceId ? [filter.traceId] : undefined,
+        call_ids: filter.callIds,
+        trace_roots_only: filter.traceRootsOnly,
+        wb_run_ids: filter.runIds,
+        wb_user_ids: filter.userIds,
+      },
+      query,
+    },
+    skip: opts?.skip,
+  }),
+  (res): traceServerClient.TraceCallsQueryStatsRes => res
+);
 
 const useCallsDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
@@ -668,6 +761,10 @@ const useChildCallsForCompare = (
         : [],
     },
     undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
     {skip: skipParent}
   );
 
@@ -685,6 +782,10 @@ const useChildCallsForCompare = (
       parentIds: subParentCallIds,
       opVersionRefs: selectedOpVersionRef ? [selectedOpVersionRef] : [],
     },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
     undefined,
     {skip: skipChild}
   );
@@ -1001,6 +1102,32 @@ const useRefsType = (refUris: string[]): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
+type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
+export const traceCallStatusCode = (
+  traceCall: traceServerClient.TraceCallSchema
+): StatusCodeType => {
+  if (traceCall.exception) {
+    return 'ERROR';
+  } else if (traceCall.ended_at) {
+    return 'SUCCESS';
+  } else {
+    return 'UNSET';
+  }
+};
+
+export const traceCallLatencyS = (
+  traceCall: traceServerClient.TraceCallSchema
+) => {
+  const startDate = convertISOToDate(traceCall.started_at);
+  const endDate = traceCall.ended_at
+    ? convertISOToDate(traceCall.ended_at)
+    : null;
+  let latencyS = 0;
+  if (startDate && endDate) {
+    latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
+  }
+  return latencyS;
+};
 
 const traceCallToLegacySpan = (
   traceCall: traceServerClient.TraceCallSchema
@@ -1009,18 +1136,8 @@ const traceCallToLegacySpan = (
   const endDate = traceCall.ended_at
     ? convertISOToDate(traceCall.ended_at)
     : null;
-  let statusCode = 'UNSET';
-  if (traceCall.exception) {
-    statusCode = 'ERROR';
-  } else if (traceCall.ended_at) {
-    statusCode = 'SUCCESS';
-  }
-  let latencyS = 0;
-  if (startDate && endDate) {
-    latencyS = (endDate.getTime() - startDate.getTime()) / 1000;
-  }
   const summary = {
-    latency_s: latencyS,
+    latency_s: traceCallLatencyS(traceCall),
     ...(traceCall.summary ?? {}),
   };
 
@@ -1048,7 +1165,7 @@ const traceCallToLegacySpan = (
     name: traceCall.op_name,
     inputs: traceCall.inputs,
     output,
-    status_code: statusCode,
+    status_code: traceCallStatusCode(traceCall),
     exception: traceCall.exception,
     attributes: traceCall.attributes,
     summary,
@@ -1090,12 +1207,13 @@ const traceCallToUICallSchema = (
     rawFeedback: {},
     userId: traceCall.wb_user_id ?? null,
     runId: traceCall.wb_run_id ?? null,
+    traceCall,
   };
 };
 
 /// Utility Functions ///
 
-const convertISOToDate = (iso: string) => {
+export const convertISOToDate = (iso: string): Date => {
   return new Date(iso);
 };
 
@@ -1104,6 +1222,7 @@ const convertISOToDate = (iso: string) => {
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsStats,
   useCallsDeleteFunc,
   useOpVersion,
   useOpVersions,
