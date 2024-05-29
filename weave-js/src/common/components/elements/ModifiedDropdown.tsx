@@ -66,6 +66,7 @@ export interface ModifiedDropdownExtraProps {
   resultLimit?: number;
   resultLimitMessage?: string;
   style?: CSSProperties;
+  hideText?: boolean;
 
   optionTransform?(option: Option): Option;
 }
@@ -82,6 +83,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       options: propsOptions,
       search,
       value,
+      hideText = false,
     } = props;
 
     const {
@@ -211,20 +213,22 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       return itemCount() >= itemLimit;
     }, [itemLimit, itemCount]);
 
+    const getOptionProps = (opt: Option, hideText: boolean) => {
+      const {text, ...props} = opt;
+      props.text = hideText ? (
+        {}
+      ) : (
+        <OptionWithTooltip text={opt.text as string} />
+      );
+
+      return props;
+    };
+
     const computedOptions = searchQuery ? options : propsOptions;
     const displayOptions = getDisplayOptions(
       multiple
         ? computedOptions
-        : computedOptions.map(opt => ({
-            key: opt.key,
-            value: opt.value,
-            text: opt.text,
-            content: opt.label ? (
-              opt.label
-            ) : (
-              <OptionWithTooltip text={opt.text as string} />
-            ),
-          })),
+        : computedOptions.map(opt => getOptionProps(opt, hideText) as Option),
       resultLimit,
       searchQuery,
       value
