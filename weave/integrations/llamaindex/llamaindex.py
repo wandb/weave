@@ -11,7 +11,15 @@ try:
     from llama_index.core.callbacks.base_handler import BaseCallbackHandler
     from llama_index.core.callbacks.schema import CBEventType, EventPayload
 except ImportError:
+    # This occurs if llama_index is not installed.
     import_failed = True
+except Exception:
+    # This occurs if llama_index is installed but there is an error in the import or some other error occured in the interaction between packages.
+    import_failed = True
+    print(
+        "Failed to autopatch llama_index. If you are tracing Llama calls, please upgrade llama_index to be version>=0.10.35"
+    )
+
 
 from typing import Any, Dict, List, Optional, Tuple
 
