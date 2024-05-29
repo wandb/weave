@@ -303,9 +303,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     lhs_part = process_operand(operation.gte_[0])
                     rhs_part = process_operand(operation.gte_[1])
                     cond = f"({lhs_part} >= {rhs_part})"
-                elif isinstance(operation, tsi_query.SubstrOperation):
-                    lhs_part = process_operand(operation.substr_[0])
-                    rhs_part = process_operand(operation.substr_[1])
+                elif isinstance(operation, tsi_query.ContainsOperation):
+                    lhs_part = process_operand(operation.contains_.input)
+                    rhs_part = process_operand(operation.contains_.substr)
+                    if operation.contains_.case_insensitive:
+                        lhs_part = f"LOWER({lhs_part})"
+                        rhs_part = f"LOWER({rhs_part})"
                     cond = f"instr({lhs_part}, {rhs_part})"
                 else:
                     raise ValueError(f"Unknown operation type: {operation}")
@@ -343,7 +346,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         tsi_query.EqOperation,
                         tsi_query.GtOperation,
                         tsi_query.GteOperation,
-                        tsi_query.SubstrOperation,
+                        tsi_query.ContainsOperation,
                     ),
                 ):
                     return process_operation(operand)

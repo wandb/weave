@@ -196,7 +196,10 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     };
   } else if (item.operator === '(string): contains') {
     return {
-      substr_: [{get_field_: item.field}, {literal_: item.value}],
+      contains_: {
+        input: {get_field_: item.field},
+        substr: {literal_: item.value},
+      },
     };
   } else if (item.operator === '(string): equals') {
     return {

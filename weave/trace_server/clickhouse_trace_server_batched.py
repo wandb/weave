@@ -1751,10 +1751,13 @@ def _process_calls_query_to_conditions(
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
-        elif isinstance(operation, tsi_query.SubstrOperation):
-            lhs_part = process_operand(operation.substr_[0])
-            rhs_part = process_operand(operation.substr_[1])
-            cond = f"position({lhs_part}, {rhs_part}) > 0"
+        elif isinstance(operation, tsi_query.ContainsOperation):
+            lhs_part = process_operand(operation.contains_.input)
+            rhs_part = process_operand(operation.contains_.substr)
+            position_operation = "position"
+            if operation.contains_.case_insensitive:
+                position_operation = "positionCaseInsensitive"
+            cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
             raise ValueError(f"Unknown operation type: {operation}")
 
@@ -1799,7 +1802,7 @@ def _process_calls_query_to_conditions(
                 tsi_query.EqOperation,
                 tsi_query.GtOperation,
                 tsi_query.GteOperation,
-                tsi_query.SubstrOperation,
+                tsi_query.ContainsOperation,
             ),
         ):
             return process_operation(operand)

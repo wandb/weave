@@ -14,7 +14,7 @@ MongoDB query language. In particular, we have made the following simplification
     in the future as needed.
     * One notable omission here is the lack of support for "$field" as a shorthand for the "getField"
         operator.
-* We have _added_ a `substr_` operator which is not in the MongoDB query language. This is a simple
+* We have _added_ a `contains_` operator which is not in the MongoDB query language. This is a simple
     substring match operator.
 """
 
@@ -98,8 +98,14 @@ class GteOperation(BaseModel):
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/regexMatch/,
 # however, rather than support a full regex match right now, we will
 # support a substring match. We can add regex support later if needed.
-class SubstrOperation(BaseModel):
-    substr_: typing.Tuple["Operand", "Operand"]
+class ContainsOperation(BaseModel):
+    contains_: "InstrSpec"
+
+
+class InstrSpec(BaseModel):
+    input: "Operand"
+    substr: "Operand"
+    ignore_case: typing.Optional[bool] = False
 
 
 # Convenience type for all Operands and Operations
@@ -110,7 +116,7 @@ Operation = typing.Union[
     EqOperation,
     GtOperation,
     GteOperation,
-    SubstrOperation,
+    ContainsOperation,
 ]
 Operand = typing.Union[
     LiteralOperation, GetFieldOperator, ConvertOperation, "Operation"
@@ -126,4 +132,4 @@ NotOperation.model_rebuild()
 EqOperation.model_rebuild()
 GtOperation.model_rebuild()
 GteOperation.model_rebuild()
-SubstrOperation.model_rebuild()
+ContainsOperation.model_rebuild()

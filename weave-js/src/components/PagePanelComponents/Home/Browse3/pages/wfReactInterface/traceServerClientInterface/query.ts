@@ -44,8 +44,14 @@ type GteOperation = {
   gte_: [Operand, Operand];
 };
 
-type SubstrOperation = {
-  substr_: [Operand, Operand];
+type ContainsSpec = {
+  input: Operand;
+  substr: Operand;
+  ignore_case?: boolean;
+};
+
+type ContainsOperation = {
+  contains_: ContainsSpec;
 };
 
 type Operation =
@@ -55,7 +61,7 @@ type Operation =
   | EqOperation
   | GtOperation
   | GteOperation
-  | SubstrOperation;
+  | ContainsOperation;
 
 type Operand =
   | LiteralOperation

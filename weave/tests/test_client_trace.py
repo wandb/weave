@@ -855,12 +855,41 @@ def test_trace_call_filter(client):
             + (
                 -2 if is_sql_lite else 0
             ),  # SQLLite returns NULL for non-existent fields rather than ''.
-            {"substr_": [{"get_field_": "inputs.in_val.str"}, {"literal_": ""}]},
+            {
+                "contains_": {
+                    "input": {"get_field_": "inputs.in_val.str"},
+                    "substr": {"literal_": ""},
+                }
+            },
         ),
         # like select
         (
             10,
-            {"substr_": [{"get_field_": "inputs.in_val.str"}, {"literal_": "str"}]},
+            {
+                "contains_": {
+                    "input": {"get_field_": "inputs.in_val.str"},
+                    "substr": {"literal_": "str"},
+                }
+            },
+        ),
+        (
+            0,
+            {
+                "contains_": {
+                    "input": {"get_field_": "inputs.in_val.str"},
+                    "substr": {"literal_": "STR"},
+                }
+            },
+        ),
+        (
+            10,
+            {
+                "contains_": {
+                    "input": {"get_field_": "inputs.in_val.str"},
+                    "substr": {"literal_": "STR"},
+                    "case_insensitive": True,
+                }
+            },
         ),
         # and
         (
