@@ -293,6 +293,9 @@ const useCallsNoExpansion = (
   }, [callRes, entity, project, opts?.skip]);
 };
 
+export const EXPANDED_REF_REF_KEY = "__ref__"
+export const EXPANDED_REF_VAL_KEY = "__val__"
+
 const useCalls = (
   entity: string,
   project: string,
@@ -385,7 +388,15 @@ const useCalls = (
             value = value[part];
           }
           if (isRef(value) && refsDataMap.has(value)) {
-            _.set(call, col, refsDataMap.get(value));
+            const refObj = refsDataMap.get(value); 
+            // let setObj = refObj;
+            // if (typeof setObj === 'object' && !Array.isArray(setObj)) {
+            //   setObj = {...setObj, "ref__": value};
+            // }
+            _.set(call, col, {
+              [EXPANDED_REF_REF_KEY]: value,
+              [EXPANDED_REF_VAL_KEY]: refObj,
+            });
           }
         });
         return call;

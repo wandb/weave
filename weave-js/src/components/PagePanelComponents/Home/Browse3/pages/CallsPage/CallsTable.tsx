@@ -75,6 +75,8 @@ import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {
   convertISOToDate,
+  EXPANDED_REF_REF_KEY,
+  EXPANDED_REF_VAL_KEY,
   traceCallLatencyS,
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
@@ -240,15 +242,41 @@ export const CallsTable: FC<{
   // Construct Flattened Table Data
 
   const tableData: TraceCallSchema[] = useMemo(() => {
-    return callsResult.map(
-      r =>
-        flattenObject(
-          r.traceCall ?? {},
-          undefined,
-          undefined,
-          true
-        ) as TraceCallSchema & {[key: string]: string}
-    );
+    return callsResult.map(r => {
+      const flattened = flattenObject(
+        r.traceCall ?? {},
+        undefined,
+        undefined
+        // true
+      ) as TraceCallSchema & {[key: string]: string};
+
+      const cleaned = {} as TraceCallSchema & {[key: string]: string};
+      Object.keys(flattened).forEach(key => {
+        let newKey = key;
+        if (key.endsWith('.' + EXPANDED_REF_REF_KEY)) {
+          newKey = newKey.replace('.' + EXPANDED_REF_REF_KEY, '');
+          if (
+            flattened[
+              newKey.replace(
+                '.' + EXPANDED_REF_REF_KEY,
+                '.' + EXPANDED_REF_VAL_KEY
+              )
+            ] !== undefined
+          ) {
+            return;
+          }
+        }
+        if (newKey.includes('.' + EXPANDED_REF_VAL_KEY)) {
+          newKey = newKey.replace('.' + EXPANDED_REF_VAL_KEY, '');
+        }
+        if (newKey.includes('._')) {
+          return;
+        }
+        cleaned[newKey] = flattened[key];
+      });
+
+      return cleaned;
+    });
   }, [callsResult]);
 
   // Maintain an ever-growing set of unique columns. It must be reset
