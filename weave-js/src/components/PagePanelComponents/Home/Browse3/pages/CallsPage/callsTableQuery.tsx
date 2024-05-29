@@ -15,7 +15,7 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
-import {FilterBy} from '../wfReactInterface/traceServerClientInterface/filterBy';
+import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
@@ -57,7 +57,7 @@ export const useCallsForQuery = (
 
     const convertedItems = setItems
       .map(operationConverter)
-      .filter(item => item !== null) as Array<FilterBy['filter']>;
+      .filter(item => item !== null) as Array<Query['expr_']>;
 
     if (convertedItems.length === 0) {
       return undefined;
@@ -74,11 +74,11 @@ export const useCallsForQuery = (
     };
   }, [gridFilter]);
 
-  const filterBy: FilterBy | undefined = useMemo(() => {
+  const filterBy: Query | undefined = useMemo(() => {
     if (filterByRaw === undefined) {
       return undefined;
     }
-    return {filter: filterByRaw} as FilterBy;
+    return {expr_: filterByRaw} as Query;
   }, [filterByRaw]);
 
   const calls = useCalls(
@@ -197,9 +197,7 @@ export const allOperators = Object.entries(allGeneralPurposeOperators).flatMap(
     })
 );
 
-const operationConverter = (
-  item: GridFilterItem
-): null | FilterBy['filter'] => {
+const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
   if (item.operator === '(any): isEmpty') {
     return {
       eq_: [{field_: item.field}, {value_: ''}],

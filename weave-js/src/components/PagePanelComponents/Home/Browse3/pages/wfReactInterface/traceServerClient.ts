@@ -16,7 +16,7 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
-import {FilterBy} from './traceServerClientInterface/filterBy';
+import {Query} from './traceServerClientInterface/query';
 
 export type KeyedDictType = {
   [key: string]: any;
@@ -77,7 +77,7 @@ export type TraceCallsQueryReq = {
   limit?: number;
   offset?: number;
   sort_by?: SortBy[];
-  filter_by?: FilterBy;
+  query?: Query;
 };
 
 export type TraceCallsQueryRes = {
@@ -87,7 +87,7 @@ export type TraceCallsQueryRes = {
 export type TraceCallsQueryStatsReq = {
   project_id: string;
   filter?: TraceCallsFilter;
-  filter_by?: FilterBy;
+  query?: Query;
 };
 
 export type TraceCallsQueryStatsRes = {

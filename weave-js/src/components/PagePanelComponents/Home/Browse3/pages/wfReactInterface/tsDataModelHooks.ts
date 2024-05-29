@@ -22,7 +22,7 @@ import {
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
-import {FilterBy} from './traceServerClientInterface/filterBy';
+import {Query} from './traceServerClientInterface/query';
 import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
@@ -206,7 +206,7 @@ const useCallsNoExpansion = (
   limit?: number,
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
-  filterBy?: FilterBy,
+  filterBy?: Query,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -236,7 +236,7 @@ const useCallsNoExpansion = (
       limit,
       offset,
       sort_by: sortBy,
-      filter_by: filterBy,
+      query: filterBy,
     };
     const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -304,7 +304,7 @@ const useCalls = (
   limit?: number,
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
-  filterBy?: FilterBy,
+  filterBy?: Query,
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
@@ -416,7 +416,7 @@ const useCalls = (
 
 const useCallsStats = makeTraceServerEndpointHook<
   'callsQueryStats',
-  [string, string, CallFilter, FilterBy?, {skip?: boolean}?],
+  [string, string, CallFilter, Query?, {skip?: boolean}?],
   traceServerClient.TraceCallsQueryStatsRes
 >(
   'callsQueryStats',
@@ -424,7 +424,7 @@ const useCallsStats = makeTraceServerEndpointHook<
     entity: string,
     project: string,
     filter: CallFilter,
-    filterBy?: FilterBy,
+    filterBy?: Query,
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -440,7 +440,7 @@ const useCallsStats = makeTraceServerEndpointHook<
         wb_run_ids: filter.runIds,
         wb_user_ids: filter.userIds,
       },
-      filter_by: filterBy,
+      query: filterBy,
     },
     skip: opts?.skip,
   }),
