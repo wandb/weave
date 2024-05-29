@@ -138,7 +138,7 @@ class Evaluation(Object):
             model_output = None
         model_latency = time.time() - model_start_time
 
-        scores = {}
+        scores: dict = {}
         scorers = typing.cast(list[Union[Op, Scorer]], self.scorers or [])
         for scorer in scorers:
             scorer_name, score_fn, _ = get_scorer_attributes(scorer)
