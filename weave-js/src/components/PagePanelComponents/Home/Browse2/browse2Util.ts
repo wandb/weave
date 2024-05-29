@@ -1,8 +1,7 @@
 export const flattenObject = (
   obj: {[key: string]: any},
   parentKey: string = '',
-  result: {[key: string]: any} = {},
-  stripUnderscore: boolean = false
+  result: {[key: string]: any} = {}
 ) => {
   if (typeof obj !== 'object' || obj === null) {
     return obj;
@@ -11,14 +10,12 @@ export const flattenObject = (
   keys.forEach(key => {
     if (!obj.hasOwnProperty(key)) {
       return;
-    } else if (stripUnderscore && key.startsWith('_')) {
-      return;
     }
     const newKey = parentKey ? `${parentKey}.${key}` : key;
     if (Array.isArray(obj[key])) {
       result[newKey] = obj[key];
     } else if (typeof obj[key] === 'object') {
-      flattenObject(obj[key], newKey, result, stripUnderscore);
+      flattenObject(obj[key], newKey, result);
     } else {
       result[newKey] = obj[key];
     }

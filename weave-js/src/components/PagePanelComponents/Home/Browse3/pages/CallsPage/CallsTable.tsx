@@ -243,12 +243,9 @@ export const CallsTable: FC<{
 
   const tableData: TraceCallSchema[] = useMemo(() => {
     return callsResult.map(r => {
-      const flattened = flattenObject(
-        r.traceCall ?? {},
-        undefined,
-        undefined
-        // true
-      ) as TraceCallSchema & {[key: string]: string};
+      const flattened = flattenObject(r.traceCall ?? {}) as TraceCallSchema & {
+        [key: string]: string;
+      };
 
       const cleaned = {} as TraceCallSchema & {[key: string]: string};
       Object.keys(flattened).forEach(key => {
