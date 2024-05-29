@@ -289,7 +289,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     rhs_part = process_operand(operation.or_[1])
                     cond = f"({lhs_part} OR {rhs_part})"
                 elif isinstance(operation, tsi_filter_by.NotOperation):
-                    operand_part = process_operand(operation.not_)
+                    operand_part = process_operand(operation.not_[0])
                     cond = f"(NOT ({operand_part}))"
                 elif isinstance(operation, tsi_filter_by.EqOperation):
                     lhs_part = process_operand(operation.eq_[0])
@@ -303,7 +303,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     lhs_part = process_operand(operation.gte_[0])
                     rhs_part = process_operand(operation.gte_[1])
                     cond = f"({lhs_part} >= {rhs_part})"
-                elif isinstance(operation, tsi_filter_by.LikeOperation):
+                elif isinstance(operation, tsi_filter_by.SubstrOperation):
                     lhs_part = process_operand(operation.like_[0])
                     rhs_part = process_operand(operation.like_[1])
                     cond = f"({lhs_part} LIKE {rhs_part})"
@@ -313,9 +313,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 return cond
 
             def process_operand(operand: tsi_filter_by.Operand) -> str:
-                if isinstance(operand, tsi_filter_by.RawValue):
-                    return json.dumps(operand.value_)
-                elif isinstance(operand, tsi_filter_by.FieldSelect):
+                if isinstance(operand, tsi_filter_by.LiteralOperation):
+                    return json.dumps(operand.literal_)
+                elif isinstance(operand, tsi_filter_by.GetFieldOperator):
                     field = _transform_external_calls_field_to_internal_calls_field(
                         operand.field_, operand.cast_
                     )
@@ -329,14 +329,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         tsi_filter_by.EqOperation,
                         tsi_filter_by.GtOperation,
                         tsi_filter_by.GteOperation,
-                        tsi_filter_by.LikeOperation,
+                        tsi_filter_by.SubstrOperation,
                     ),
                 ):
                     return process_operation(operand)
                 else:
                     raise ValueError(f"Unknown operand type: {operand}")
 
-            filter_cond = process_operation(req.filter_by.filter)
+            filter_cond = process_operation(req.filter_by.expr_)
 
             conds.append(filter_cond)
 

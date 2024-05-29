@@ -1676,15 +1676,21 @@ def _process_calls_filter_by_to_conditions(
         cond = None
 
         if isinstance(operation, tsi_filter_by.AndOperation):
-            lhs_part = process_operand(operation.and_[0])
-            rhs_part = process_operand(operation.and_[1])
-            cond = f"({lhs_part} AND {rhs_part})"
+            if len(operation.and_) == 0:
+                raise ValueError("Empty AND operation")
+            elif len(operation.and_) == 1:
+                return process_operand(operation.and_[0])
+            parts = [process_operand(op) for op in operation.and_]
+            cond = f"({' AND '.join(parts)})"
         elif isinstance(operation, tsi_filter_by.OrOperation):
-            lhs_part = process_operand(operation.or_[0])
-            rhs_part = process_operand(operation.or_[1])
-            cond = f"({lhs_part} OR {rhs_part})"
+            if len(operation.or_) == 0:
+                raise ValueError("Empty OR operation")
+            elif len(operation.or_) == 1:
+                return process_operand(operation.or_[0])
+            parts = [process_operand(op) for op in operation.or_]
+            cond = f"({' OR '.join(parts)})"
         elif isinstance(operation, tsi_filter_by.NotOperation):
-            operand_part = process_operand(operation.not_)
+            operand_part = process_operand(operation.not_[0])
             cond = f"(NOT ({operand_part}))"
         elif isinstance(operation, tsi_filter_by.EqOperation):
             lhs_part = process_operand(operation.eq_[0])
@@ -1698,7 +1704,7 @@ def _process_calls_filter_by_to_conditions(
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
-        elif isinstance(operation, tsi_filter_by.LikeOperation):
+        elif isinstance(operation, tsi_filter_by.SubstrOperation):
             lhs_part = process_operand(operation.like_[0])
             rhs_part = process_operand(operation.like_[1])
             cond = f"({lhs_part} LIKE {rhs_part})"
@@ -1708,12 +1714,12 @@ def _process_calls_filter_by_to_conditions(
         return cond
 
     def process_operand(operand: tsi_filter_by.Operand) -> str:
-        if isinstance(operand, tsi_filter_by.RawValue):
+        if isinstance(operand, tsi_filter_by.LiteralOperation):
             return _param_slot(
-                param_builder.add_param(operand.value_),  # type: ignore
-                _python_value_to_ch_type(operand.value_),
+                param_builder.add_param(operand.literal_),  # type: ignore
+                _python_value_to_ch_type(operand.literal_),
             )
-        elif isinstance(operand, tsi_filter_by.FieldSelect):
+        elif isinstance(operand, tsi_filter_by.GetFieldOperator):
             (
                 field,
                 _,
@@ -1732,14 +1738,14 @@ def _process_calls_filter_by_to_conditions(
                 tsi_filter_by.EqOperation,
                 tsi_filter_by.GtOperation,
                 tsi_filter_by.GteOperation,
-                tsi_filter_by.LikeOperation,
+                tsi_filter_by.SubstrOperation,
             ),
         ):
             return process_operation(operand)
         else:
             raise ValueError(f"Unknown operand type: {operand}")
 
-    filter_cond = process_operation(filter_by.filter)
+    filter_cond = process_operation(filter_by.expr_)
 
     conditions.append(filter_cond)
 

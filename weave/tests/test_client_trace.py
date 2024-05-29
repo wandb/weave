@@ -806,12 +806,12 @@ def test_trace_call_filter(client):
             + (
                 -2 if is_sql_lite else 0
             ),  # SQLLite returns NULL for non-existent fields rather than ''.
-            {"like_": [{"field_": "inputs.in_val.str"}, {"value_": "%"}]},
+            {"like_": [{"field_": "inputs.in_val.str"}, {"value_": ""}]},
         ),
         # like select
         (
             10,
-            {"like_": [{"field_": "inputs.in_val.str"}, {"value_": "str%"}]},
+            {"like_": [{"field_": "inputs.in_val.str"}, {"value_": "str"}]},
         ),
         # and
         (
