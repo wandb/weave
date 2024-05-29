@@ -76,13 +76,27 @@ class CallDeleteCHInsertable(BaseModel):
     deleted_at: datetime.datetime
     wb_user_id: typing.Optional[str]
 
-    # boo
+    # required types
+    input_refs: typing.List[str] = []
+    output_refs: typing.List[str] = []
+
+
+class CallRenameCHInsertable(BaseModel):
+    project_id: str
+    id: str
+    display_name: str
+    wb_user_id: typing.Optional[str]
+
+    # required types
     input_refs: typing.List[str] = []
     output_refs: typing.List[str] = []
 
 
 CallCHInsertable = typing.Union[
-    CallStartCHInsertable, CallEndCHInsertable, CallDeleteCHInsertable
+    CallStartCHInsertable,
+    CallEndCHInsertable,
+    CallDeleteCHInsertable,
+    CallRenameCHInsertable,
 ]
 
 
@@ -120,6 +134,7 @@ all_call_insert_columns = list(
     CallStartCHInsertable.model_fields.keys()
     | CallEndCHInsertable.model_fields.keys()
     | CallDeleteCHInsertable.model_fields.keys()
+    | CallRenameCHInsertable.model_fields.keys()
 )
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
@@ -313,9 +328,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
             limit=req.limit,
             offset=req.offset,
-            order_by=None
-            if not req.sort_by
-            else [(s.field, s.direction) for s in req.sort_by],
+            order_by=(
+                None
+                if not req.sort_by
+                else [(s.field, s.direction) for s in req.sort_by]
+            ),
         )
         for ch_dict in ch_call_dicts:
             yield tsi.CallSchema.model_validate(
@@ -367,6 +384,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = True
 
         return tsi.CallsDeleteRes()
+
+    def call_rename(self, req: tsi.CallRenameReq) -> tsi.CallRenameRes:
+        renamed_insertable = CallRenameCHInsertable(
+            project_id=req.project_id,
+            id=req.call_id,
+            wb_user_id=req.wb_user_id,
+            display_name=req.display_name,
+        )
+        self._insert_call(renamed_insertable)
+
+        return tsi.CallRenameRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()

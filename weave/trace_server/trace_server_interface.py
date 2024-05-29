@@ -149,6 +149,18 @@ class CallsDeleteRes(BaseModel):
     pass
 
 
+class CallRenameReq(BaseModel):
+    project_id: str
+    id: str
+    # wb_user_id gets generated from auth params
+    wb_user_id: typing.Optional[str] = None
+    display_name: str
+
+
+class CallRenameRes(BaseModel):
+    pass
+
+
 class _CallsFilter(BaseModel):
     op_names: typing.Optional[typing.List[str]] = None
     input_refs: typing.Optional[typing.List[str]] = None
@@ -309,50 +321,42 @@ class TraceServerInterface:
 
     # Call API
     @abc.abstractmethod
-    def call_start(self, req: CallStartReq) -> CallStartRes:
-        ...
+    def call_start(self, req: CallStartReq) -> CallStartRes: ...
 
     @abc.abstractmethod
-    def call_end(self, req: CallEndReq) -> CallEndRes:
-        ...
+    def call_end(self, req: CallEndReq) -> CallEndRes: ...
 
     @abc.abstractmethod
-    def call_read(self, req: CallReadReq) -> CallReadRes:
-        ...
+    def call_read(self, req: CallReadReq) -> CallReadRes: ...
 
     @abc.abstractmethod
-    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
-        ...
+    def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
 
     @abc.abstractmethod
-    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-        ...
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
+
+    @abc.abstractmethod
+    def call_rename(self, req: CallRenameReq) -> CallRenameRes: ...
 
     # Op API
     @abc.abstractmethod
-    def op_create(self, req: OpCreateReq) -> OpCreateRes:
-        ...
+    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
 
     @abc.abstractmethod
-    def op_read(self, req: OpReadReq) -> OpReadRes:
-        ...
+    def op_read(self, req: OpReadReq) -> OpReadRes: ...
 
     @abc.abstractmethod
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes:
-        ...
+    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Obj API
     @abc.abstractmethod
-    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
-        ...
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
 
     @abc.abstractmethod
-    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        ...
+    def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
 
     @abc.abstractmethod
-    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
-        ...
+    def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
 
     @abc.abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes:

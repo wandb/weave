@@ -5,8 +5,8 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleStateIf(wb_user_id, isNotNull(call_parts.started_at)) as wb_user_id,
         anySimpleState(trace_id) as trace_id,
         anySimpleState(parent_id) as parent_id,
-        -- **** use most recent op_name ****
-        anyLastSimpleState(op_name) as op_name,
+        -- **** simple op_name agg ****
+        anySimpleState(op_name) as op_name,
         anySimpleState(started_at) as started_at,
         anySimpleState(attributes_dump) as attributes_dump,
         anySimpleState(inputs_dump) as inputs_dump,
@@ -19,3 +19,9 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     FROM call_parts
     GROUP BY project_id,
         id;
+
+ALTER TABLE calls_merged DROP COLUMN display_name;
+
+ALTER TABLE call_parts DROP COLUMN display_name;
+ALTER TABLE call_parts MODIFY ORDER BY (project_id, id);
+

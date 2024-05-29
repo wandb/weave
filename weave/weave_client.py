@@ -23,6 +23,7 @@ from weave.trace.object_record import (
 from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
+    CallRenameReq,
     CallsDeleteReq,
     ObjSchema,
     RefsReadBatchReq,
@@ -142,6 +143,7 @@ class Call:
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
+    display_name: Optional[str] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -169,6 +171,15 @@ class Call:
     def delete(self) -> bool:
         client = graph_client_context.require_graph_client()
         return client.delete_call(call=self)
+
+    def rename(self, new_name: str) -> "Call":
+        client = graph_client_context.require_graph_client()
+        res = client.rename_call(call=self, display_name=new_name)
+        if res.error:
+            raise ValueError(f"Failed to rename call: {res.error}")
+
+        self.display_name = new_name
+        return self
 
 
 class CallsIter:
@@ -558,6 +569,16 @@ class WeaveClient:
             CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def rename_call(self, call: Call, new_name: str) -> None:
+        self.server.call_rename(
+            CallRenameReq(
+                project_id=self._project_id(),
+                id=call.id,
+                display_name=new_name,
             )
         )
 
