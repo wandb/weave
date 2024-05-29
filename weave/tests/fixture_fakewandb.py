@@ -366,6 +366,31 @@ class SetupResponse:
             res = op_add_tag(res, tag_payload)
         return res
 
+    def mock_artifact_by_id_as_node(
+        self,
+        artifact,
+        tag_payload={
+            # In the future, we should make these actual run and project objects so we can chain ops
+            "fake_run": "test_run",
+            "fake_project": "test_project",
+        },
+    ):
+        artifact_uri = WeaveWBArtifactByIDURI.parse(
+            f"wandb-artifact-by-id:///__wb_artifacts_by_id__/{artifact.id}/{artifact.name}:{artifact.commit_hash}"
+        )
+
+        self.fake_io.add_artifact(artifact, artifact_uri)
+        res = weave.save(
+            WandbArtifact(
+                "test_name",
+                None,
+                artifact_uri,
+            )
+        )
+        if tag_payload:
+            res = op_add_tag(res, tag_payload)
+        return res
+
 
 class PatchedSDKArtifact(wandb.Artifact):
     @property
@@ -471,4 +496,16 @@ artifactAlias_payload = {
     "alias": "custom_alias",
     "artifact": artifactVersion_payload,
     "artifactCollection": artifactSequence_payload,
+}
+artifactSequence_no_entity_payload = {
+    "id": "QXJ0aWZhY3RDb2xsZWN0aW9uOjE4MDQ0MjY=",
+    "name": "test_res_1fwmcd3q",
+    "project": None,
+    "defaultArtifactType": defaultArtifactType_payload,
+}
+artifactVersion_no_entity_payload = {
+    "id": "QXJ0aWZhY3Q6MTQxODgyNDA=",
+    "versionIndex": 0,
+    "commitHash": "303db33c9f9264768626",
+    "artifactSequence": artifactSequence_no_entity_payload,
 }

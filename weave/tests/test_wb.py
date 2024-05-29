@@ -54,6 +54,29 @@ file_path_response = {
     }
 }
 
+file_path_no_entity_response = {
+    "project_518fa79465d8ffaeb91015dce87e092f": {
+        **fwb.project_payload,  # type: ignore
+        "artifactType_46d22fef09db004187bb8da4b5e98c58": {
+            **fwb.defaultArtifactType_payload,  # type: ignore
+            "artifactCollections_c1233b7003317090ab5e2a75db4ad965": {
+                "edges": [
+                    {
+                        "node": {
+                            **fwb.artifactSequence_payload,  # type: ignore
+                            "artifacts_c1233b7003317090ab5e2a75db4ad965": {
+                                "edges": [
+                                    {"node": fwb.artifactVersion_no_entity_payload}
+                                ]
+                            },
+                        }
+                    }
+                ]
+            },
+        },
+    }
+}
+
 artifact_browser_response = {
     "project_518fa79465d8ffaeb91015dce87e092f": {
         **fwb.project_payload,  # type: ignore
@@ -341,6 +364,18 @@ def test_table_col_order_and_unknown_types(fake_wandb):
 
 def test_missing_file(fake_wandb):
     fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_response)
+    node = (
+        ops.project("stacey", "mendeleev")
+        .artifactType("test_results")
+        .artifacts()[0]
+        .versions()[0]
+        .file("does_not_exist")
+    )
+    assert weave.use(node) == None
+
+
+def test_missing_file_no_entity(fake_wandb):
+    fake_wandb.fake_api.add_mock(lambda q, ndx: file_path_no_entity_response)
     node = (
         ops.project("stacey", "mendeleev")
         .artifactType("test_results")
@@ -1761,7 +1796,6 @@ def test_artifact_path_character_escaping():
 
 
 def _do_test_gql_artifact_dir_path(node):
-    print(node, flush=True)
     dir_node = node.file("")
     dir_type_node = dir_node.pathReturnType("")
     dir_file_type_node = dir_node.pathReturnType("test_results.table.json")
@@ -1824,6 +1858,47 @@ def test_filesystem_artifact_dir_dict(fake_wandb):
                 "size": 879,
                 "type": "file",
                 "url": "https://api.wandb.ai/artifacts/test_entity/23f694a1ce4ce2bd5481337025410230/test_results.table.json",
+            },
+            "google_link": {
+                "birthArtifactID": "TODO",
+                "digest": "https://www.google.com",
+                "fullPath": "google_link",
+                "size": 0,
+                "type": "file",
+                "ref": "https://www.google.com",
+                "url": "https://www.google.com",
+            },
+        },
+    }
+
+
+def test_filesystem_artifact_by_id_dir_dict(fake_wandb):
+    table = wandb.Table(
+        data=[[1, wandb.Image(np.zeros((32, 32)))]], columns=["a", "image"]
+    )
+    art = wandb.Artifact("test_name", "test_type")
+    art.add(table, "test_results")
+    art.add_reference("https://www.google.com", "google_link")
+    art_node = fake_wandb.mock_artifact_by_id_as_node(art)
+    assert weave.use(_as_w0_dict_(art_node.file(""))) == {
+        "fullPath": "",
+        "size": 954,
+        "dirs": {
+            "media": {
+                "fullPath": "media/images/842c574e85966d3269f6.png",
+                "size": 75,
+                "dirs": {"images": 1},
+                "files": {},
+            }
+        },
+        "files": {
+            "test_results.table.json": {
+                "birthArtifactID": "TODO",
+                "digest": "I/aUoc5M4r1UgTNwJUECMA==",
+                "fullPath": "test_results.table.json",
+                "size": 879,
+                "type": "file",
+                "url": "https://api.wandb.ai/artifacts/_/23f694a1ce4ce2bd5481337025410230/test_results.table.json",
             },
             "google_link": {
                 "birthArtifactID": "TODO",

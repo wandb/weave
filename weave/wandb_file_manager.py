@@ -165,7 +165,7 @@ class WandbFileManagerAsync:
             print("inside async manifest")
             if not isinstance(manifest, cache.LruTimeWindowCache.NotFound):
                 return manifest
-            print(f"query manifest {art_uri.__class__}",  flush=True)
+            print(f"query manifest {art_uri.__class__}", flush=True)
             manifest = await self._manifest(art_uri, manifest_path)
             self._manifests.set(manifest_path, manifest)
             return manifest
