@@ -160,7 +160,7 @@ const useCalls = (
   limit?: number,
   offset?: number,
   sortBy?: any,
-  filterBy?: any,
+  query?: any,
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
@@ -280,7 +280,7 @@ const useCallsStats = (
   entity: string,
   project: string,
   filter: CallFilter,
-  filterBy?: any,
+  query?: any,
   opts?: {skip?: boolean}
 ): Loadable<any> => {
   throw new Error('Not implemented');

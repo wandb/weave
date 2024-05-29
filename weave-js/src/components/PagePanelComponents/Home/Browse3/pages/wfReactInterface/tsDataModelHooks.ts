@@ -206,7 +206,7 @@ const useCallsNoExpansion = (
   limit?: number,
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
-  filterBy?: Query,
+  query?: Query,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -236,7 +236,7 @@ const useCallsNoExpansion = (
       limit,
       offset,
       sort_by: sortBy,
-      query: filterBy,
+      query: query,
     };
     const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -257,7 +257,7 @@ const useCallsNoExpansion = (
     getTsClient,
     offset,
     sortBy,
-    filterBy,
+    query,
   ]);
 
   return useMemo(() => {
@@ -304,7 +304,7 @@ const useCalls = (
   limit?: number,
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
-  filterBy?: Query,
+  query?: Query,
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
@@ -316,7 +316,7 @@ const useCalls = (
     limit,
     offset,
     sortBy,
-    filterBy,
+    query,
     opts
   );
 
@@ -436,7 +436,7 @@ const useCallsStats = makeTraceServerEndpointHook<
     entity: string,
     project: string,
     filter: CallFilter,
-    filterBy?: Query,
+    query?: Query,
     opts?: {skip?: boolean}
   ) => ({
     params: {
@@ -452,7 +452,7 @@ const useCallsStats = makeTraceServerEndpointHook<
         wb_run_ids: filter.runIds,
         wb_user_ids: filter.userIds,
       },
-      query: filterBy,
+      query: query,
     },
     skip: opts?.skip,
   }),
