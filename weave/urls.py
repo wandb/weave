@@ -10,7 +10,7 @@ WEAVE_SLUG = "weave"
 
 
 def remote_project_root_url(entity_name: str, project_name: str) -> str:
-    return f"{wb_util.app_url(environment.wandb_base_url())}/{entity_name}/{quote(project_name)}"
+    return f"{wb_util.app_url(environment.wandb_frontend_base_url())}/{entity_name}/{quote(project_name)}"
 
 
 def remote_project_weave_root_url(entity_name: str, project_name: str) -> str:
