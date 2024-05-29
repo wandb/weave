@@ -554,6 +554,8 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
         home_sequence_name, commit_hash, artifact_id
     )
     print(f"\n\nlogging artifact_by_id uri: ===> \n{uri}\n\n", flush=True)
+    # todo: postman query returns null project for user querying an artifact from a team they're
+    # not a member of. but through weave somehow project is not null. is that a dev issue? 
     if artifactVersion["artifactSequence"]["project"] is not None:
         entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
         project_name = artifactVersion["artifactSequence"]["project"]["name"]

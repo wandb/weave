@@ -122,6 +122,7 @@ class WandbFileManagerAsync:
             async with self.fs.open_read(manifest_path) as f:
                 return artifact_wandb.WandbArtifactManifest(json.loads(await f.read()))
         except FileNotFoundError:
+            print(f"could not find manifest at path ===> {manifest_path}")
             pass
         # Download
         print(f"download manifest via id ===> {art_uri.__class__}", flush=True)
@@ -161,8 +162,10 @@ class WandbFileManagerAsync:
             assert art_uri.version is not None
             manifest_path = self.manifest_path(art_uri)
             manifest = self._manifests.get(manifest_path)
+            print("inside async manifest")
             if not isinstance(manifest, cache.LruTimeWindowCache.NotFound):
                 return manifest
+            print(f"query manifest {art_uri.__class__}",  flush=True)
             manifest = await self._manifest(art_uri, manifest_path)
             self._manifests.set(manifest_path, manifest)
             return manifest

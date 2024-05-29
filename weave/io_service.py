@@ -407,6 +407,7 @@ class Server:
             ] = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
         except errors.WeaveInternalError:
             uri = artifact_wandb.WeaveWBArtifactByIDURI.parse(artifact_uri)
+            print(f"except error uri ===> {uri}")
         return await self.wandb_file_manager.manifest(uri)
 
     async def handle_ensure_file(self, artifact_uri: str) -> typing.Optional[str]:
