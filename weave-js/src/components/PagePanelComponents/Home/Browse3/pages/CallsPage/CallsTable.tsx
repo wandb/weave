@@ -3,12 +3,7 @@
  *    * (Ongoing) Continue to re-organize symbols / files
  *    * Address Refactor Groups (Labelled with CPR)
  *        * (GeneralRefactoring) Moving code around
- *        * (Ref Expansion) In-Mem Expansion Behind Hook
- *        * (Flattening) Refactor the flattening logic to be uniform and consistent
- *        * (CC+Hidden) Temp Disable CC and Hidden Fields (Optional)
- *    * Implement Controlled State for Sort / Filter / Pagination
- *    * Implement the custom hook that populates the data (in-memory to start):
- *        * Sort/Filter/Pagination/Expansion all done behind the hook!
+ *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
 import {Autocomplete, Chip, FormControl, ListItem} from '@mui/material';
@@ -26,7 +21,6 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import * as Colors from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import _ from 'lodash';
@@ -38,9 +32,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import styled from 'styled-components';
 
-import {hexToRGB} from '../../../../../../common/css/utils';
 import {A, TargetBlank} from '../../../../../../common/util/links';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {parseRef} from '../../../../../../react';
@@ -83,7 +75,10 @@ import {
   objectVersionNiceString,
   opVersionRefOpName,
 } from '../wfReactInterface/utilities';
-import {OpVersionKey} from '../wfReactInterface/wfDataModelHooksInterface';
+import {
+  CallSchema,
+  OpVersionKey,
+} from '../wfReactInterface/wfDataModelHooksInterface';
 import {useCurrentFilterIsEvaluationsFilter} from './CallsPage';
 import {buildTree} from './callsTableBuildTree';
 import {WFHighLevelCallFilter} from './callsTableFilter';
@@ -97,34 +92,6 @@ import {
   refIsExpandable,
   useCallsForQuery,
 } from './callsTableQuery';
-
-const VisibilityAlert = styled.div`
-  background-color: ${hexToRGB(Colors.MOON_950, 0.04)};
-  color: ${Colors.MOON_800};
-  padding: 6px 12px;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-VisibilityAlert.displayName = 'S.VisibilityAlert';
-
-const VisibilityAlertText = styled.div`
-  white-space: nowrap;
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-VisibilityAlertText.displayName = 'S.VisibilityAlertText';
-
-const VisibilityAlertAction = styled.div`
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-`;
-VisibilityAlertAction.displayName = 'S.VisibilityAlertAction';
 
 const OP_FILTER_GROUP_HEADER = 'Op';
 
@@ -207,6 +174,8 @@ export const CallsTable: FC<{
   const [expandedRefCols, setExpandedRefCols] = useState<Set<string>>(
     new Set<string>().add('inputs.example')
   );
+
+  // Helpers to handle expansion
   const onExpand = (col: string) => {
     setExpandedRefCols(prevState => new Set(prevState).add(col));
   };
@@ -217,6 +186,23 @@ export const CallsTable: FC<{
       return newSet;
     });
   };
+
+  // Helper to determine if a column is expanded or
+  // a child of an expanded column
+  const columnIsRefExpanded = useCallback(
+    (col: string) => {
+      if (expandedRefCols.has(col)) {
+        return true;
+      }
+      for (const refCol of expandedRefCols) {
+        if (col.startsWith(refCol + '.')) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [expandedRefCols]
+  );
 
   // Fetch the calls
   const calls = useCallsForQuery(
@@ -229,6 +215,15 @@ export const CallsTable: FC<{
     expandedRefCols
   );
 
+  // Here, we only update our local state once the calls have loaded.
+  // If we were not to do this, we would see a flicker of an empty table
+  // before the calls are loaded. Since the columns are data-driven, this
+  // flicker also includes the columns disappearing and reappearing. This
+  // is not ideal. Instead, we wait for the calls to load, and then update
+  // our local state with the new data. The MUI data grid will show the "old"
+  // data (perhaps between a page / filter / sort change) until the new data
+  // is available. However, since we pass the loading state to the MUI data
+  // grid, it will show a loading spinner in the meantime over the old data.
   const callsLoading = calls.loading;
   const [callsResult, setCallsResult] = useState(calls.result);
   const [callsTotal, setCallsTotal] = useState(calls.total);
@@ -240,61 +235,23 @@ export const CallsTable: FC<{
   }, [calls]);
 
   // Construct Flattened Table Data
+  const tableData: TraceCallSchema[] = useMemo(
+    () => prepareFlattenedCallDataForTable(callsResult),
+    [callsResult]
+  );
 
-  const tableData: TraceCallSchema[] = useMemo(() => {
-    return callsResult.map(r => {
-      const flattened = flattenObject(r.traceCall ?? {}) as TraceCallSchema & {
-        [key: string]: string;
-      };
-
-      const cleaned = {} as TraceCallSchema & {[key: string]: string};
-      Object.keys(flattened).forEach(key => {
-        let newKey = key;
-        if (key.endsWith('.' + EXPANDED_REF_REF_KEY)) {
-          newKey = newKey.replace('.' + EXPANDED_REF_REF_KEY, '');
-          if (
-            flattened[
-              newKey.replace(
-                '.' + EXPANDED_REF_REF_KEY,
-                '.' + EXPANDED_REF_VAL_KEY
-              )
-            ] !== undefined
-          ) {
-            return;
-          }
-        }
-        if (newKey.includes('.' + EXPANDED_REF_VAL_KEY)) {
-          newKey = newKey.replaceAll('.' + EXPANDED_REF_VAL_KEY, '');
-        }
-        if (newKey.includes('._')) {
-          return;
-        }
-        cleaned[newKey] = flattened[key];
-      });
-
-      return cleaned;
-    });
-  }, [callsResult]);
-
-  // Maintain an ever-growing set of unique columns. It must be reset
-  // when `effectiveFilter` changes.
-  const allCurrentDynamicColumnNames = useMemo(() => {
-    // const allDynamicColumnNames = useMemo(() => {
-    const dynamicColumns = new Set<string>();
-    tableData.forEach(row => {
-      Object.keys(row).forEach(key => {
-        if (
-          key.startsWith('attributes') ||
-          key.startsWith('inputs') ||
-          key.startsWith('output') ||
-          key.startsWith('summary')
-        ) {
-          dynamicColumns.add(key);
-        }
-      });
-    });
-    return _.sortBy([...dynamicColumns]);
-  }, [tableData]);
+  // Column Management: Build the columns needed for the table
+  const {columns, setUserDefinedColumnWidths} = useCallsTableColumns(
+    entity,
+    project,
+    effectiveFilter,
+    tableData,
+    expandedRefCols,
+    onCollapse,
+    onExpand,
+    columnIsRefExpanded,
+    ioColumnsOnly
+  );
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -353,24 +310,6 @@ export const CallsTable: FC<{
     [effectiveFilter.parentId, parentIdOptions]
   );
 
-  // Determine what sort of view we are looking at based on the filter
-  const isSingleOpVersion = useMemo(
-    () => effectiveFilter.opVersionRefs?.length === 1,
-    [effectiveFilter.opVersionRefs]
-  );
-  const isSingleOp = useMemo(
-    () =>
-      effectiveFilter.opVersionRefs?.length === 1 &&
-      effectiveFilter.opVersionRefs[0].includes(':*'),
-    [effectiveFilter.opVersionRefs]
-  );
-  const preservePath = useMemo(
-    () =>
-      effectiveFilter.opVersionRefs?.length === 1 &&
-      effectiveFilter.opVersionRefs[0].includes('predict_and_score:'),
-    [effectiveFilter.opVersionRefs]
-  );
-
   // DataGrid Model Management
   const [pinnedColumnsModel, setPinnedColumnsModel] =
     useState<GridPinnedColumns>({left: ['op_name']});
@@ -405,363 +344,6 @@ export const CallsTable: FC<{
       }
     }
   }, [rowIds, peekId]);
-
-  const columnsWithRefs = useMemo(() => {
-    const refColumns = new Set<string>();
-    tableData.forEach(row => {
-      Object.keys(row).forEach(key => {
-        if (refIsExpandable((row as any)[key])) {
-          refColumns.add(key);
-        }
-      });
-    });
-
-    return refColumns;
-  }, [tableData]);
-
-  // Wow this is a pretty crazy idea to maintain a list of all dynamic columns
-  // so we don't blow away old ones
-  const [allDynamicColumnNames, setAllDynamicColumnNames] = useState(
-    allCurrentDynamicColumnNames
-  );
-  const columnIsRefExpanded = useCallback(
-    (col: string) => {
-      if (expandedRefCols.has(col)) {
-        return true;
-      }
-      for (const refCol of expandedRefCols) {
-        if (col.startsWith(refCol + '.')) {
-          return true;
-        }
-      }
-      return false;
-    },
-    [expandedRefCols]
-  );
-  useEffect(() => {
-    setAllDynamicColumnNames(current => {
-      // All dynamic columns are:
-      // allCurrentDynamicColumnNames + (setAllDynamicColumnNamesCurrent - columnsWithRefs)
-      const columnsWithRefsList = Array.from(columnsWithRefs);
-      const currentDynamicColumnNames = current.filter(c => {
-        if (columnIsRefExpanded(c)) {
-          return false;
-        }
-        for (const refCol of columnsWithRefsList) {
-          if (c.startsWith(refCol)) {
-            return false;
-          }
-        }
-
-        return true;
-      });
-
-      return _.sortBy(
-        Array.from(
-          new Set([
-            ...currentDynamicColumnNames,
-            ...allCurrentDynamicColumnNames,
-          ])
-        )
-      );
-    });
-  }, [
-    allCurrentDynamicColumnNames,
-    columnIsRefExpanded,
-    columnsWithRefs,
-    expandedRefCols,
-  ]);
-
-  useEffect(() => {
-    if (effectiveFilter) {
-      setAllDynamicColumnNames([]);
-    } else {
-      setAllDynamicColumnNames([]);
-    }
-  }, [effectiveFilter]);
-
-  const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
-    Record<string, number>
-  >({});
-
-  const columns = useMemo(() => {
-    const cols: Array<GridColDef<(typeof tableData)[number]>> = [
-      {
-        field: 'op_name',
-        headerName: 'Trace',
-        minWidth: 100,
-        // This filter should be controlled by the custom filter
-        // in the header
-        filterable: false,
-        width: 250,
-        hideable: false,
-        renderCell: rowParams => {
-          const op_name = rowParams.row.op_name;
-          if (!isRef(op_name)) {
-            return op_name;
-          }
-          return (
-            <CallLink
-              entityName={entity}
-              projectName={project}
-              opName={opVersionRefOpName(op_name)}
-              callId={rowParams.row.id}
-              fullWidth={true}
-              preservePath={preservePath}
-            />
-          );
-        },
-      },
-      ...(isSingleOp && !isSingleOpVersion
-        ? [
-            {
-              field: 'derived.op_version',
-              headerName: 'Op Version',
-              type: 'number',
-              align: 'right' as const,
-              disableColumnMenu: true,
-              sortable: false,
-              filterable: false,
-              resizable: false,
-              renderCell: (cellParams: any) => (
-                <OpVersionIndexText opVersionRef={cellParams.row.op_name} />
-              ),
-            },
-          ]
-        : []),
-      // {
-      //   field: 'run_id',
-      //   headerName: 'Run',
-      //   disableColumnMenu: true,
-      //   renderCell: cellParams => {
-      //     return (
-      //       <div style={{margin: 'auto'}}>
-      //         {cellParams.row.call.runId ?? <NotApplicable />}
-      //       </div>
-      //     );
-      //   },
-      // },
-      {
-        field: 'derived.status_code',
-        headerName: 'Status',
-        headerAlign: 'center',
-        sortable: false,
-        disableColumnMenu: true,
-        resizable: false,
-        // Again, the underlying value is not obvious to the user,
-        // so the default free-form filter is likely more confusing than helpful.
-        filterable: false,
-        // type: 'singleSelect',
-        // valueOptions: ['SUCCESS', 'ERROR', 'PENDING'],
-        width: 59,
-        renderCell: cellParams => {
-          return (
-            <div style={{margin: 'auto'}}>
-              <StatusChip
-                value={traceCallStatusCode(cellParams.row)}
-                iconOnly
-              />
-            </div>
-          );
-        },
-      },
-    ];
-
-    const tree = buildTree([...allDynamicColumnNames]);
-    let groupingModel: GridColumnGroupingModel = tree.children.filter(
-      c => 'groupId' in c
-    ) as GridColumnGroup[];
-
-    const walkGroupingModel = (
-      nodes: GridColumnNode[],
-      fn: (node: GridColumnNode) => GridColumnNode
-    ) => {
-      return nodes.map(node => {
-        node = fn(node);
-        if ('children' in node) {
-          node.children = walkGroupingModel(node.children, fn);
-        }
-        return node;
-      });
-    };
-    const groupIds = new Set<string>();
-    groupingModel = walkGroupingModel(groupingModel, node => {
-      if ('groupId' in node) {
-        const key = node.groupId;
-        groupIds.add(key);
-        if (expandedRefCols.has(key)) {
-          node.renderHeaderGroup = () => {
-            return (
-              <CollapseHeader
-                headerName={key.split('.').slice(-1)[0]}
-                field={key}
-                onCollapse={onCollapse}
-              />
-            );
-          };
-        } else if (columnsWithRefs.has(key)) {
-          node.renderHeaderGroup = () => {
-            return (
-              <ExpandHeader
-                headerName={key.split('.').slice(-1)[0]}
-                field={key}
-                hasExpand
-                onExpand={onExpand}
-              />
-            );
-          };
-        }
-      }
-      return node;
-    }) as GridColumnGroupingModel;
-
-    for (const key of allDynamicColumnNames) {
-      const col: GridColDef<TraceCallSchema> = {
-        flex: 1,
-        minWidth: 150,
-        field: key,
-        // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-        filterable: !columnIsRefExpanded(key),
-        sortable: !columnIsRefExpanded(key),
-        filterOperators: allOperators,
-        headerName: key,
-        renderHeader: () => {
-          return (
-            <div
-              style={{
-                fontWeight: 600,
-              }}>
-              {key.split('.').slice(-1)[0]}
-            </div>
-          );
-        },
-        renderCell: cellParams => {
-          const val = (cellParams.row as any)[key];
-          if (val === undefined) {
-            return <NotApplicable />;
-          }
-          return (
-            <ErrorBoundary>
-              <CellValue value={val} />
-            </ErrorBoundary>
-          );
-        },
-      };
-
-      if (groupIds.has(key)) {
-        col.renderHeader = () => {
-          return <></>;
-        };
-      } else if (expandedRefCols.has(key)) {
-        col.renderHeader = () => {
-          return (
-            <CollapseHeader
-              headerName={key.split('.').slice(-1)[0]}
-              field={key}
-              onCollapse={onCollapse}
-            />
-          );
-        };
-      } else if (columnsWithRefs.has(key)) {
-        col.renderHeader = () => {
-          return (
-            <ExpandHeader
-              headerName={key.split('.').slice(-1)[0]}
-              field={key}
-              hasExpand
-              onExpand={onExpand}
-            />
-          );
-        };
-      }
-      cols.push(col);
-    }
-
-    cols.push({
-      field: 'wb_user_id',
-      headerName: 'User',
-      headerAlign: 'center',
-      width: 50,
-      // Might be confusing to enable as-is, because the user sees name /
-      // email but the underlying data is userId.
-      filterable: false,
-      align: 'center',
-      sortable: false,
-      resizable: false,
-      disableColumnMenu: true,
-      renderCell: cellParams => {
-        const userId = cellParams.row.wb_user_id;
-        if (userId == null) {
-          return null;
-        }
-        return <UserLink username={userId} />;
-      },
-    });
-
-    if (!ioColumnsOnly) {
-      const startedAtCol: GridColDef<(typeof tableData)[number]> = {
-        field: 'started_at',
-        headerName: 'Called',
-        // Should have custom timestamp filter here.
-        filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
-        sortable: true,
-        width: 100,
-        minWidth: 100,
-        maxWidth: 100,
-        renderCell: cellParams => {
-          return (
-            <Timestamp
-              value={
-                convertISOToDate(cellParams.row.started_at).getTime() / 1000
-              }
-              format="relative"
-            />
-          );
-        },
-      };
-      cols.push(startedAtCol);
-    }
-
-    cols.push({
-      field: 'derived.latency',
-      headerName: 'Latency',
-      width: 100,
-      minWidth: 100,
-      maxWidth: 100,
-      // Should probably have a custom filter here.
-      filterable: false,
-      sortable: false,
-      renderCell: cellParams => {
-        if (traceCallStatusCode(cellParams.row) === 'UNSET') {
-          // Call is still in progress, latency will be 0.
-          // Displaying nothing seems preferable to being misleading.
-          return null;
-        }
-        return monthRoundedTime(traceCallLatencyS(cellParams.row));
-      },
-    });
-
-    cols.forEach(col => {
-      if (col.field in userDefinedColumnWidths) {
-        col.width = userDefinedColumnWidths[col.field];
-        col.flex = 0;
-      }
-    });
-
-    return {cols, colGroupingModel: groupingModel};
-  }, [
-    isSingleOp,
-    isSingleOpVersion,
-    allDynamicColumnNames,
-    ioColumnsOnly,
-    entity,
-    project,
-    preservePath,
-    expandedRefCols,
-    columnsWithRefs,
-    columnIsRefExpanded,
-    userDefinedColumnWidths,
-  ]);
 
   // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
   const clearFilters = useCallback(() => {
@@ -1072,3 +654,531 @@ const ExportRunsTableButton = ({
     </Button>
   </Box>
 );
+
+const useCallsTableColumns = (
+  entity: string,
+  project: string,
+  effectiveFilter: WFHighLevelCallFilter,
+  tableData: TraceCallSchema[],
+  expandedRefCols: Set<string>,
+  onCollapse: (col: string) => void,
+  onExpand: (col: string) => void,
+  columnIsRefExpanded: (col: string) => boolean,
+  ioColumnsOnly: boolean | undefined
+) => {
+  const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
+    Record<string, number>
+  >({});
+
+  // Determine which columns have refs to expand. Followup: this might want
+  // to be an ever-growing list. Instead, this is recalculated on each page.
+  // This is used to determine which columns should be expandable / collapsible.
+  const columnsWithRefs = useMemo(() => {
+    const refColumns = new Set<string>();
+    tableData.forEach(row => {
+      Object.keys(row).forEach(key => {
+        if (refIsExpandable((row as any)[key])) {
+          refColumns.add(key);
+        }
+      });
+    });
+
+    return refColumns;
+  }, [tableData]);
+
+  const shouldIgnoreColumn = useCallback(
+    (col: string) => {
+      if (columnIsRefExpanded(col)) {
+        return true;
+      }
+      const columnsWithRefsList = Array.from(columnsWithRefs);
+      for (const refCol of columnsWithRefsList) {
+        if (col.startsWith(refCol)) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [columnIsRefExpanded, columnsWithRefs]
+  );
+
+  const allDynamicColumnNames = useAllDynamicColumnNames(
+    tableData,
+    shouldIgnoreColumn,
+    effectiveFilter
+  );
+
+  // Determine what sort of view we are looking at based on the filter
+  const isSingleOpVersion = useMemo(
+    () => effectiveFilter.opVersionRefs?.length === 1,
+    [effectiveFilter.opVersionRefs]
+  );
+  const isSingleOp = useMemo(
+    () =>
+      effectiveFilter.opVersionRefs?.length === 1 &&
+      effectiveFilter.opVersionRefs[0].includes(':*'),
+    [effectiveFilter.opVersionRefs]
+  );
+  const preservePath = useMemo(
+    () =>
+      effectiveFilter.opVersionRefs?.length === 1 &&
+      effectiveFilter.opVersionRefs[0].includes('predict_and_score:'),
+    [effectiveFilter.opVersionRefs]
+  );
+
+  const columns = useMemo(
+    () =>
+      buildCallsTableColumns(
+        entity,
+        project,
+        preservePath,
+        isSingleOp,
+        isSingleOpVersion,
+        allDynamicColumnNames,
+        expandedRefCols,
+        onCollapse,
+        columnsWithRefs,
+        onExpand,
+        columnIsRefExpanded,
+        ioColumnsOnly,
+        userDefinedColumnWidths
+      ),
+    [
+      entity,
+      project,
+      preservePath,
+      isSingleOp,
+      isSingleOpVersion,
+      allDynamicColumnNames,
+      expandedRefCols,
+      onCollapse,
+      columnsWithRefs,
+      onExpand,
+      columnIsRefExpanded,
+      ioColumnsOnly,
+      userDefinedColumnWidths,
+    ]
+  );
+
+  return useMemo(() => {
+    return {
+      columns,
+      setUserDefinedColumnWidths,
+    };
+  }, [columns, setUserDefinedColumnWidths]);
+};
+
+function buildCallsTableColumns(
+  entity: string,
+  project: string,
+  preservePath: boolean,
+  isSingleOp: boolean,
+  isSingleOpVersion: boolean,
+  allDynamicColumnNames: string[],
+  expandedRefCols: Set<string>,
+  onCollapse: (col: string) => void,
+  columnsWithRefs: Set<string>,
+  onExpand: (col: string) => void,
+  columnIsRefExpanded: (col: string) => boolean,
+  ioColumnsOnly: boolean | undefined,
+  userDefinedColumnWidths: Record<string, number>
+): {
+  cols: Array<GridColDef<TraceCallSchema>>;
+  colGroupingModel: GridColumnGroupingModel;
+} {
+  const cols: Array<GridColDef<TraceCallSchema>> = [
+    {
+      field: 'op_name',
+      headerName: 'Trace',
+      minWidth: 100,
+      // This filter should be controlled by the custom filter
+      // in the header
+      filterable: false,
+      width: 250,
+      hideable: false,
+      renderCell: rowParams => {
+        const op_name = rowParams.row.op_name;
+        if (!isRef(op_name)) {
+          return op_name;
+        }
+        return (
+          <CallLink
+            entityName={entity}
+            projectName={project}
+            opName={opVersionRefOpName(op_name)}
+            callId={rowParams.row.id}
+            fullWidth={true}
+            preservePath={preservePath}
+          />
+        );
+      },
+    },
+    ...(isSingleOp && !isSingleOpVersion
+      ? [
+          {
+            field: 'derived.op_version',
+            headerName: 'Op Version',
+            type: 'number',
+            align: 'right' as const,
+            disableColumnMenu: true,
+            sortable: false,
+            filterable: false,
+            resizable: false,
+            renderCell: (cellParams: any) => (
+              <OpVersionIndexText opVersionRef={cellParams.row.op_name} />
+            ),
+          },
+        ]
+      : []),
+    // {
+    //   field: 'run_id',
+    //   headerName: 'Run',
+    //   disableColumnMenu: true,
+    //   renderCell: cellParams => {
+    //     return (
+    //       <div style={{margin: 'auto'}}>
+    //         {cellParams.row.call.runId ?? <NotApplicable />}
+    //       </div>
+    //     );
+    //   },
+    // },
+    {
+      field: 'derived.status_code',
+      headerName: 'Status',
+      headerAlign: 'center',
+      sortable: false,
+      disableColumnMenu: true,
+      resizable: false,
+      // Again, the underlying value is not obvious to the user,
+      // so the default free-form filter is likely more confusing than helpful.
+      filterable: false,
+      // type: 'singleSelect',
+      // valueOptions: ['SUCCESS', 'ERROR', 'PENDING'],
+      width: 59,
+      renderCell: cellParams => {
+        return (
+          <div style={{margin: 'auto'}}>
+            <StatusChip value={traceCallStatusCode(cellParams.row)} iconOnly />
+          </div>
+        );
+      },
+    },
+  ];
+
+  const tree = buildTree([...allDynamicColumnNames]);
+  let groupingModel: GridColumnGroupingModel = tree.children.filter(
+    c => 'groupId' in c
+  ) as GridColumnGroup[];
+
+  const walkGroupingModel = (
+    nodes: GridColumnNode[],
+    fn: (node: GridColumnNode) => GridColumnNode
+  ) => {
+    return nodes.map(node => {
+      node = fn(node);
+      if ('children' in node) {
+        node.children = walkGroupingModel(node.children, fn);
+      }
+      return node;
+    });
+  };
+  const groupIds = new Set<string>();
+  groupingModel = walkGroupingModel(groupingModel, node => {
+    if ('groupId' in node) {
+      const key = node.groupId;
+      groupIds.add(key);
+      if (expandedRefCols.has(key)) {
+        node.renderHeaderGroup = () => {
+          return (
+            <CollapseHeader
+              headerName={key.split('.').slice(-1)[0]}
+              field={key}
+              onCollapse={onCollapse}
+            />
+          );
+        };
+      } else if (columnsWithRefs.has(key)) {
+        node.renderHeaderGroup = () => {
+          return (
+            <ExpandHeader
+              headerName={key.split('.').slice(-1)[0]}
+              field={key}
+              hasExpand
+              onExpand={onExpand}
+            />
+          );
+        };
+      }
+    }
+    return node;
+  }) as GridColumnGroupingModel;
+
+  for (const key of allDynamicColumnNames) {
+    const col: GridColDef<TraceCallSchema> = {
+      flex: 1,
+      minWidth: 150,
+      field: key,
+      // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+      filterable: !columnIsRefExpanded(key),
+      sortable: !columnIsRefExpanded(key),
+      filterOperators: allOperators,
+      headerName: key,
+      renderHeader: () => {
+        return (
+          <div
+            style={{
+              fontWeight: 600,
+            }}>
+            {key.split('.').slice(-1)[0]}
+          </div>
+        );
+      },
+      renderCell: cellParams => {
+        const val = (cellParams.row as any)[key];
+        if (val === undefined) {
+          return <NotApplicable />;
+        }
+        return (
+          <ErrorBoundary>
+            <CellValue value={val} />
+          </ErrorBoundary>
+        );
+      },
+    };
+
+    if (groupIds.has(key)) {
+      col.renderHeader = () => {
+        return <></>;
+      };
+    } else if (expandedRefCols.has(key)) {
+      col.renderHeader = () => {
+        return (
+          <CollapseHeader
+            headerName={key.split('.').slice(-1)[0]}
+            field={key}
+            onCollapse={onCollapse}
+          />
+        );
+      };
+    } else if (columnsWithRefs.has(key)) {
+      col.renderHeader = () => {
+        return (
+          <ExpandHeader
+            headerName={key.split('.').slice(-1)[0]}
+            field={key}
+            hasExpand
+            onExpand={onExpand}
+          />
+        );
+      };
+    }
+    cols.push(col);
+  }
+
+  cols.push({
+    field: 'wb_user_id',
+    headerName: 'User',
+    headerAlign: 'center',
+    width: 50,
+    // Might be confusing to enable as-is, because the user sees name /
+    // email but the underlying data is userId.
+    filterable: false,
+    align: 'center',
+    sortable: false,
+    resizable: false,
+    disableColumnMenu: true,
+    renderCell: cellParams => {
+      const userId = cellParams.row.wb_user_id;
+      if (userId == null) {
+        return null;
+      }
+      return <UserLink username={userId} />;
+    },
+  });
+
+  if (!ioColumnsOnly) {
+    const startedAtCol: GridColDef<TraceCallSchema> = {
+      field: 'started_at',
+      headerName: 'Called',
+      // Should have custom timestamp filter here.
+      filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
+      sortable: true,
+      width: 100,
+      minWidth: 100,
+      maxWidth: 100,
+      renderCell: cellParams => {
+        return (
+          <Timestamp
+            value={convertISOToDate(cellParams.row.started_at).getTime() / 1000}
+            format="relative"
+          />
+        );
+      },
+    };
+    cols.push(startedAtCol);
+  }
+
+  cols.push({
+    field: 'derived.latency',
+    headerName: 'Latency',
+    width: 100,
+    minWidth: 100,
+    maxWidth: 100,
+    // Should probably have a custom filter here.
+    filterable: false,
+    sortable: false,
+    renderCell: cellParams => {
+      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+        // Call is still in progress, latency will be 0.
+        // Displaying nothing seems preferable to being misleading.
+        return null;
+      }
+      return monthRoundedTime(traceCallLatencyS(cellParams.row));
+    },
+  });
+
+  cols.forEach(col => {
+    if (col.field in userDefinedColumnWidths) {
+      col.width = userDefinedColumnWidths[col.field];
+      col.flex = 0;
+    }
+  });
+
+  return {cols, colGroupingModel: groupingModel};
+}
+
+/**
+ * This function is responsible for taking the raw calls data and flattening it
+ * into a format that can be consumed by the MUI Data Grid. Importantly, we strip
+ * away the legacy `CallSchema` wrapper and just operate on the inner `TraceCallSchema`
+ *
+ * Specifically it does 3 things:
+ * 1. Flattens the nested object structure of the calls data
+ * 2. Removes any keys that start with underscore
+ * 3. Converts expanded values to their actual values. This takes two forms:
+ *    1. If expanded value is a dictionary, then the flattened data will look like:
+ *      {
+ *        [EXPANDED_REF_REF_KEY]: 'weave://...',
+ *        [EXPANDED_REF_VAL_KEY].sub_key_x: 'value_x',
+ *         ...
+ *      }
+ *      In this case, we want to remove the [EXPANDED_REF_REF_KEY] and [EXPANDED_REF_VAL_KEY] from the paths,
+ *      leaving everything else. The result is that the ref is left at the primitive position for the data.
+ *     2. If the expanded value is a primitive, then the flattened data will look like:
+ *      {
+ *        [EXPANDED_REF_REF_KEY]: 'weave://...',
+ *        [EXPANDED_REF_VAL_KEY]: 'value'
+ *      }
+ *      In this case, we don't have a place to put the ref value, so we just remove it.
+ */
+function prepareFlattenedCallDataForTable(
+  callsResult: CallSchema[]
+): Array<TraceCallSchema & {[key: string]: string}> {
+  return callsResult.map(r => {
+    // First, flatten the inner trace call (this is the on-wire format)
+    const flattened = flattenObject(r.traceCall ?? {}) as TraceCallSchema & {
+      [key: string]: string;
+    };
+
+    // Next, process some of the keys.
+    const cleaned = {} as TraceCallSchema & {[key: string]: string};
+    Object.keys(flattened).forEach(key => {
+      let newKey = key;
+
+      // If the key ends with the expanded ref key, then we have 2 cases
+      if (key.endsWith('.' + EXPANDED_REF_REF_KEY)) {
+        const keyRoot = newKey.slice(0, -EXPANDED_REF_REF_KEY.length - 1);
+
+        // Case 1: the refVal is a primitive and we just need to toss away the ref key
+        const refValIsPrimitive =
+          flattened[newKey + '.' + EXPANDED_REF_VAL_KEY] !== undefined;
+        if (refValIsPrimitive) {
+          return;
+
+          // Case 2: the refVal is a dictionary and we just remove the ref part of the path
+        } else {
+          newKey = keyRoot;
+        }
+      }
+
+      // Next, we remove all path parts that are the expanded ref val key
+      if (newKey.includes('.' + EXPANDED_REF_VAL_KEY)) {
+        newKey = newKey.replaceAll('.' + EXPANDED_REF_VAL_KEY, '');
+      }
+
+      // Finally, we remove any keys that start with underscore
+      if (newKey.includes('._')) {
+        return;
+      }
+
+      // and add the cleaned key to the cleaned object
+      cleaned[newKey] = flattened[key];
+    });
+
+    return cleaned;
+  });
+}
+
+/**
+ * This function maintains an ever-growing list of dynamic column names. It is used to
+ * determine which dynamic columns (e.g. attributes, inputs, outputs) are present in the
+ * table data. If we page/filter/sort we don't want to lose the columns that were present
+ * in the previous data.
+ */
+const useAllDynamicColumnNames = (
+  tableData: TraceCallSchema[],
+  shouldIgnoreColumn: (col: string) => boolean,
+  resetDep: any
+) => {
+  // 1. Maintain an ever-growing set of unique columns. It must be reset
+  // when `effectiveFilter` changes.
+  const currentDynamicColumnNames = useMemo(() => {
+    const dynamicColumns = new Set<string>();
+    tableData.forEach(row => {
+      Object.keys(row).forEach(key => {
+        if (
+          key.startsWith('attributes') ||
+          key.startsWith('inputs') ||
+          key.startsWith('output') ||
+          key.startsWith('summary')
+        ) {
+          dynamicColumns.add(key);
+        }
+      });
+    });
+    return _.sortBy([...dynamicColumns]);
+  }, [tableData]);
+
+  // Wow this is a pretty crazy idea to maintain a list of all dynamic columns
+  // so we don't blow away old ones
+  const [allDynamicColumnNames, setAllDynamicColumnNames] = useState(
+    currentDynamicColumnNames
+  );
+
+  useEffect(() => {
+    setAllDynamicColumnNames(last => {
+      const lastDynamicColumnNames = last.filter(c => {
+        if (shouldIgnoreColumn(c)) {
+          return false;
+        }
+        return true;
+      });
+
+      return _.sortBy(
+        Array.from(
+          new Set([...lastDynamicColumnNames, ...currentDynamicColumnNames])
+        )
+      );
+    });
+  }, [currentDynamicColumnNames, shouldIgnoreColumn]);
+
+  useEffect(() => {
+    if (resetDep) {
+      setAllDynamicColumnNames([]);
+    } else {
+      setAllDynamicColumnNames([]);
+    }
+  }, [resetDep]);
+
+  return allDynamicColumnNames;
+};
