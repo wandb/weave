@@ -17,7 +17,7 @@ from .trace_server_interface_util import (
     bytes_digest,
 )
 from . import trace_server_interface as tsi
-from .interface import filter_by as tsi_filter_by
+from .interface import query as tsi_query
 
 from weave.trace import refs
 from weave.trace_server.trace_server_interface_util import (
@@ -276,34 +276,34 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 conds += [f"wb_run_id IN ({in_expr})"]
 
         if req.query:
-            # This is the mongo-style filter_by
-            def process_operation(operation: tsi_filter_by.Operation) -> str:
+            # This is the mongo-style query
+            def process_operation(operation: tsi_query.Operation) -> str:
                 cond = None
 
-                if isinstance(operation, tsi_filter_by.AndOperation):
+                if isinstance(operation, tsi_query.AndOperation):
                     lhs_part = process_operand(operation.and_[0])
                     rhs_part = process_operand(operation.and_[1])
                     cond = f"({lhs_part} AND {rhs_part})"
-                elif isinstance(operation, tsi_filter_by.OrOperation):
+                elif isinstance(operation, tsi_query.OrOperation):
                     lhs_part = process_operand(operation.or_[0])
                     rhs_part = process_operand(operation.or_[1])
                     cond = f"({lhs_part} OR {rhs_part})"
-                elif isinstance(operation, tsi_filter_by.NotOperation):
+                elif isinstance(operation, tsi_query.NotOperation):
                     operand_part = process_operand(operation.not_[0])
                     cond = f"(NOT ({operand_part}))"
-                elif isinstance(operation, tsi_filter_by.EqOperation):
+                elif isinstance(operation, tsi_query.EqOperation):
                     lhs_part = process_operand(operation.eq_[0])
                     rhs_part = process_operand(operation.eq_[1])
                     cond = f"({lhs_part} = {rhs_part})"
-                elif isinstance(operation, tsi_filter_by.GtOperation):
+                elif isinstance(operation, tsi_query.GtOperation):
                     lhs_part = process_operand(operation.gt_[0])
                     rhs_part = process_operand(operation.gt_[1])
                     cond = f"({lhs_part} > {rhs_part})"
-                elif isinstance(operation, tsi_filter_by.GteOperation):
+                elif isinstance(operation, tsi_query.GteOperation):
                     lhs_part = process_operand(operation.gte_[0])
                     rhs_part = process_operand(operation.gte_[1])
                     cond = f"({lhs_part} >= {rhs_part})"
-                elif isinstance(operation, tsi_filter_by.SubstrOperation):
+                elif isinstance(operation, tsi_query.SubstrOperation):
                     lhs_part = process_operand(operation.like_[0])
                     rhs_part = process_operand(operation.like_[1])
                     cond = f"({lhs_part} LIKE {rhs_part})"
@@ -312,10 +312,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
                 return cond
 
-            def process_operand(operand: tsi_filter_by.Operand) -> str:
-                if isinstance(operand, tsi_filter_by.LiteralOperation):
+            def process_operand(operand: tsi_query.Operand) -> str:
+                if isinstance(operand, tsi_query.LiteralOperation):
                     return json.dumps(operand.literal_)
-                elif isinstance(operand, tsi_filter_by.GetFieldOperator):
+                elif isinstance(operand, tsi_query.GetFieldOperator):
                     field = _transform_external_calls_field_to_internal_calls_field(
                         operand.field_, operand.cast_
                     )
@@ -323,13 +323,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 elif isinstance(
                     operand,
                     (
-                        tsi_filter_by.AndOperation,
-                        tsi_filter_by.OrOperation,
-                        tsi_filter_by.NotOperation,
-                        tsi_filter_by.EqOperation,
-                        tsi_filter_by.GtOperation,
-                        tsi_filter_by.GteOperation,
-                        tsi_filter_by.SubstrOperation,
+                        tsi_query.AndOperation,
+                        tsi_query.OrOperation,
+                        tsi_query.NotOperation,
+                        tsi_query.EqOperation,
+                        tsi_query.GtOperation,
+                        tsi_query.GteOperation,
+                        tsi_query.SubstrOperation,
                     ),
                 ):
                     return process_operation(operand)

@@ -3,7 +3,7 @@ import datetime
 import typing
 from pydantic import BaseModel
 
-from .interface.filter_by import Query
+from .interface.query import Query
 
 
 class CallSchema(BaseModel):

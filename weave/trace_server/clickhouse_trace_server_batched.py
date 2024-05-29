@@ -28,7 +28,7 @@ from .trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
-from .interface import filter_by as tsi_filter_by
+from .interface import query as tsi_query
 
 from . import refs_internal
 
@@ -254,11 +254,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions.extend(filter_conds)
 
         if req.query:
-            filter_by_conds, _, fields_used = _process_calls_filter_by_to_conditions(
+            query_conds, _, fields_used = _process_calls_query_to_conditions(
                 req.query, param_builder
             )
             raw_fields_used.update(fields_used)
-            conditions.extend(filter_by_conds)
+            conditions.extend(query_conds)
 
         stats = self._calls_query_stats_raw(
             req.project_id,
@@ -284,10 +284,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conditions.extend(filter_conds)
 
         if req.query:
-            filter_by_conds, _, _ = _process_calls_filter_by_to_conditions(
+            query_conds, _, _ = _process_calls_query_to_conditions(
                 req.query, param_builder
             )
-            conditions.extend(filter_by_conds)
+            conditions.extend(query_conds)
 
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
@@ -1665,46 +1665,46 @@ def _process_calls_filter_to_conditions(
     return conditions, param_builder, raw_fields_used
 
 
-def _process_calls_filter_by_to_conditions(
-    filter_by: tsi.Query, param_builder: typing.Optional[ParamBuilder] = None
+def _process_calls_query_to_conditions(
+    query: tsi.Query, param_builder: typing.Optional[ParamBuilder] = None
 ) -> tuple[list[str], ParamBuilder, set[str]]:
     param_builder = param_builder or ParamBuilder()
     conditions = []
     raw_fields_used = set()
-    # This is the mongo-style filter_by
-    def process_operation(operation: tsi_filter_by.Operation) -> str:
+    # This is the mongo-style query
+    def process_operation(operation: tsi_query.Operation) -> str:
         cond = None
 
-        if isinstance(operation, tsi_filter_by.AndOperation):
+        if isinstance(operation, tsi_query.AndOperation):
             if len(operation.and_) == 0:
                 raise ValueError("Empty AND operation")
             elif len(operation.and_) == 1:
                 return process_operand(operation.and_[0])
             parts = [process_operand(op) for op in operation.and_]
             cond = f"({' AND '.join(parts)})"
-        elif isinstance(operation, tsi_filter_by.OrOperation):
+        elif isinstance(operation, tsi_query.OrOperation):
             if len(operation.or_) == 0:
                 raise ValueError("Empty OR operation")
             elif len(operation.or_) == 1:
                 return process_operand(operation.or_[0])
             parts = [process_operand(op) for op in operation.or_]
             cond = f"({' OR '.join(parts)})"
-        elif isinstance(operation, tsi_filter_by.NotOperation):
+        elif isinstance(operation, tsi_query.NotOperation):
             operand_part = process_operand(operation.not_[0])
             cond = f"(NOT ({operand_part}))"
-        elif isinstance(operation, tsi_filter_by.EqOperation):
+        elif isinstance(operation, tsi_query.EqOperation):
             lhs_part = process_operand(operation.eq_[0])
             rhs_part = process_operand(operation.eq_[1])
             cond = f"({lhs_part} = {rhs_part})"
-        elif isinstance(operation, tsi_filter_by.GtOperation):
+        elif isinstance(operation, tsi_query.GtOperation):
             lhs_part = process_operand(operation.gt_[0])
             rhs_part = process_operand(operation.gt_[1])
             cond = f"({lhs_part} > {rhs_part})"
-        elif isinstance(operation, tsi_filter_by.GteOperation):
+        elif isinstance(operation, tsi_query.GteOperation):
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
-        elif isinstance(operation, tsi_filter_by.SubstrOperation):
+        elif isinstance(operation, tsi_query.SubstrOperation):
             lhs_part = process_operand(operation.like_[0])
             rhs_part = process_operand(operation.like_[1])
             cond = f"({lhs_part} LIKE {rhs_part})"
@@ -1713,13 +1713,13 @@ def _process_calls_filter_by_to_conditions(
 
         return cond
 
-    def process_operand(operand: tsi_filter_by.Operand) -> str:
-        if isinstance(operand, tsi_filter_by.LiteralOperation):
+    def process_operand(operand: tsi_query.Operand) -> str:
+        if isinstance(operand, tsi_query.LiteralOperation):
             return _param_slot(
                 param_builder.add_param(operand.literal_),  # type: ignore
                 _python_value_to_ch_type(operand.literal_),
             )
-        elif isinstance(operand, tsi_filter_by.GetFieldOperator):
+        elif isinstance(operand, tsi_query.GetFieldOperator):
             (
                 field,
                 _,
@@ -1732,20 +1732,20 @@ def _process_calls_filter_by_to_conditions(
         elif isinstance(
             operand,
             (
-                tsi_filter_by.AndOperation,
-                tsi_filter_by.OrOperation,
-                tsi_filter_by.NotOperation,
-                tsi_filter_by.EqOperation,
-                tsi_filter_by.GtOperation,
-                tsi_filter_by.GteOperation,
-                tsi_filter_by.SubstrOperation,
+                tsi_query.AndOperation,
+                tsi_query.OrOperation,
+                tsi_query.NotOperation,
+                tsi_query.EqOperation,
+                tsi_query.GtOperation,
+                tsi_query.GteOperation,
+                tsi_query.SubstrOperation,
             ),
         ):
             return process_operation(operand)
         else:
             raise ValueError(f"Unknown operand type: {operand}")
 
-    filter_cond = process_operation(filter_by.expr_)
+    filter_cond = process_operation(query.expr_)
 
     conditions.append(filter_cond)
 

@@ -53,11 +53,14 @@ class GetFieldOperator(BaseModel):
     get_field_: str
 
 
-# https://www.mongodb.com/docs/manual/reference/operator/aggregation/type/
-class TypeOperation(BaseModel):
-    # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
-    type_: typing.Literal["double", "string", "int", "bool"]
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/convert/
+class ConvertOperation(BaseModel):
+    convert_: "ConvertSpec"
 
+class ConvertSpec(BaseModel):
+    input: "Operand"
+    # Subset of https://www.mongodb.com/docs/manual/reference/bson-types/#std-label-bson-types
+    to: typing.Literal["double", "string", "int", "bool"]
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/
 class AndOperation(BaseModel):

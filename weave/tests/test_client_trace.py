@@ -734,41 +734,76 @@ def test_trace_call_filter(client):
     basic_op(42, 0.1)
 
     failed_cases = []
-    for (count, filter_by) in [
+    for (count, query) in [
         # Base Case - simple True
         (
             13,
-            {"eq_": [{"value_": 1}, {"value_": 1}]},
+            {"eq_": [{"literal_": 1}, {"literal_": 1}]},
         ),
         # Base Case - simple false
         (
             0,
-            {"eq_": [{"value_": 1}, {"value_": 2}]},
+            {"eq_": [{"literal_": 1}, {"literal_": 2}]},
         ),
         # eq
         (
             1,
-            {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.prim", "cast_": "int"}]},
+            {
+                "eq_": [
+                    {"literal_": 5},
+                    {
+                        "convert_": {
+                            "input": {"get_field_": "inputs.in_val.prim"},
+                            "to": "int",
+                        }
+                    },
+                ]
+            },
         ),
         # eq - string
         (
             1,
-            {"eq_": [{"value_": "simple_primitive"}, {"field_": "inputs.in_val"}]},
+            {
+                "eq_": [
+                    {"literal_": "simple_primitive"},
+                    {"get_field_": "inputs.in_val"},
+                ]
+            },
         ),
         # eq - string out
         (
             1,
-            {"eq_": [{"value_": "simple_primitive"}, {"field_": "output"}]},
+            {"eq_": [{"literal_": "simple_primitive"}, {"get_field_": "output"}]},
         ),
         # gt
         (
             4,
-            {"gt_": [{"field_": "inputs.in_val.prim", "cast_": "int"}, {"value_": 5}]},
+            {
+                "gt_": [
+                    {
+                        "convert_": {
+                            "input": {"get_field_": "inputs.in_val.prim"},
+                            "to": "int",
+                        }
+                    },
+                    {"literal_": 5},
+                ]
+            },
         ),
         # gte
         (
             5,
-            {"gte_": [{"field_": "inputs.in_val.prim", "cast_": "int"}, {"value_": 5}]},
+            {
+                "gte_": [
+                    {
+                        "convert_": {
+                            "input": {"get_field_": "inputs.in_val.prim"},
+                            "to": "int",
+                        }
+                    },
+                    {"literal_": 5},
+                ]
+            },
         ),
         # not gt = lte
         (
@@ -779,8 +814,13 @@ def test_trace_call_filter(client):
             {
                 "not_": {
                     "gt_": [
-                        {"field_": "inputs.in_val.prim", "cast_": "int"},
-                        {"value_": 5},
+                        {
+                            "convert_": {
+                                "input": {"get_field_": "inputs.in_val.prim"},
+                                "to": "int",
+                            }
+                        },
+                        {"literal_": 5},
                     ]
                 }
             },
@@ -794,8 +834,13 @@ def test_trace_call_filter(client):
             {
                 "not_": {
                     "gte_": [
-                        {"field_": "inputs.in_val.prim", "cast_": "int"},
-                        {"value_": 5},
+                        {
+                            "convert_": {
+                                "input": {"get_field_": "inputs.in_val.prim"},
+                                "to": "int",
+                            }
+                        },
+                        {"literal_": 5},
                     ]
                 }
             },
@@ -806,12 +851,12 @@ def test_trace_call_filter(client):
             + (
                 -2 if is_sql_lite else 0
             ),  # SQLLite returns NULL for non-existent fields rather than ''.
-            {"like_": [{"field_": "inputs.in_val.str"}, {"value_": ""}]},
+            {"like_": [{"get_field_": "inputs.in_val.str"}, {"literal_": ""}]},
         ),
         # like select
         (
             10,
-            {"like_": [{"field_": "inputs.in_val.str"}, {"value_": "str"}]},
+            {"like_": [{"get_field_": "inputs.in_val.str"}, {"literal_": "str"}]},
         ),
         # and
         (
@@ -821,15 +866,25 @@ def test_trace_call_filter(client):
                     {
                         "not_": {
                             "gt_": [
-                                {"field_": "inputs.in_val.prim", "cast_": "int"},
-                                {"value_": 7},
+                                {
+                                    "convert_": {
+                                        "input": {"get_field_": "inputs.in_val.prim"},
+                                        "to": "int",
+                                    }
+                                },
+                                {"literal_": 7},
                             ]
                         }
                     },
                     {
                         "gte_": [
-                            {"field_": "inputs.in_val.prim", "cast_": "int"},
-                            {"value_": 5},
+                            {
+                                "convert_": {
+                                    "input": {"get_field_": "inputs.in_val.prim"},
+                                    "to": "int",
+                                }
+                            },
+                            {"literal_": 5},
                         ]
                     },
                 ]
@@ -846,29 +901,57 @@ def test_trace_call_filter(client):
                     {
                         "not_": {
                             "gt_": [
-                                {"field_": "inputs.in_val.prim", "cast_": "int"},
-                                {"value_": 3},
+                                {
+                                    "convert_": {
+                                        "input": {"get_field_": "inputs.in_val.prim"},
+                                        "to": "int",
+                                    }
+                                },
+                                {"literal_": 3},
                             ]
                         }
                     },
                     {
                         "gte_": [
-                            {"field_": "inputs.in_val.prim", "cast_": "int"},
-                            {"value_": 9},
+                            {
+                                "convert_": {
+                                    "input": {"get_field_": "inputs.in_val.prim"},
+                                    "to": "int",
+                                }
+                            },
+                            {"literal_": 9},
                         ]
                     },
                 ]
             },
         ),
         # Invalid type - safely return none
-        (0, {"eq_": [{"value_": 5}, {"field_": "inputs.in_val.str", "cast_": "int"}]}),
+        (
+            0,
+            {
+                "eq_": [
+                    {"literal_": 5},
+                    {
+                        "convert_": {
+                            "input": {"get_field_": "inputs.in_val.str"},
+                            "to": "int",
+                        }
+                    },
+                ]
+            },
+        ),
         # Cast across type
         (
             1,
             {
                 "eq_": [
-                    {"value_": "5"},
-                    {"field_": "inputs.in_val.prim", "cast_": "str"},
+                    {"literal_": "5"},
+                    {
+                        "convert_": {
+                            "input": {"get_field_": "inputs.in_val.prim"},
+                            "to": "str",
+                        }
+                    },
                 ]
             },
         ),
@@ -877,8 +960,15 @@ def test_trace_call_filter(client):
             4,
             {
                 "gt_": [
-                    {"field_": "inputs.in_val.list[0]", "cast_": "int"},
-                    {"value_": 5},
+                    {
+                        "convert_": {
+                            "input": {
+                                "get_field_": "inputs.in_val.list.0"
+                            },  # changing this to a dot instead of [0]
+                            "to": "int",
+                        }
+                    },
+                    {"literal_": 5},
                 ]
             },
         ),
@@ -886,8 +976,13 @@ def test_trace_call_filter(client):
             4,
             {
                 "gt_": [
-                    {"field_": "inputs.in_val.dict.inner", "cast_": "int"},
-                    {"value_": 5},
+                    {
+                        "convert_": {
+                            "input": {"get_field_": "inputs.in_val.dict.inner"},
+                            "to": "int",
+                        }
+                    },
+                    {"literal_": 5},
                 ]
             },
         ),
@@ -895,8 +990,8 @@ def test_trace_call_filter(client):
             4,
             {
                 "gt_": [
-                    {"field_": "output.prim", "cast_": "int"},
-                    {"value_": 5},
+                    {"convert_": {"input": {"get_field_": "output.prim"}, "to": "int"}},
+                    {"literal_": 5},
                 ]
             },
         ),
@@ -904,36 +999,58 @@ def test_trace_call_filter(client):
             4,
             {
                 "gt_": [
-                    {"field_": "output.list[0]", "cast_": "int"},
-                    {"value_": 5},
+                    {
+                        "convert_": {
+                            "input": {"get_field_": "output.list.0"},
+                            "to": "int",
+                        }
+                    },
+                    {"literal_": 5},
                 ]
             },
         ),
-        (4, {"gt_": [{"field_": "output.dict.inner", "cast_": "int"}, {"value_": 5}]}),
+        (
+            4,
+            {
+                "gt_": [
+                    {
+                        "convert_": {
+                            "input": {"get_field_": "output.dict.inner"},
+                            "to": "int",
+                        }
+                    },
+                    {"literal_": 5},
+                ]
+            },
+        ),
     ]:
-        print(f"TEST CASE [{count}]", filter_by)
+        print(f"TEST CASE [{count}]", query)
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter_by=tsi.FilterBy.model_validate({"filter": filter_by}),
+            tsi.CallsQueryReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    query={"expr_": query},
+                )
             )
         )
 
         if len(inner_res.calls) != count:
             failed_cases.append(
-                f"(ALL) Query {filter_by} expected {count}, but found {len(inner_res.calls)}"
+                f"(ALL) Query {query} expected {count}, but found {len(inner_res.calls)}"
             )
 
         inner_res = get_client_trace_server(client).calls_query_stats(
-            tsi.CallsQueryStatsReq(
-                project_id=get_client_project_id(client),
-                filter_by=tsi.FilterBy.model_validate({"filter": filter_by}),
+            tsi.CallsQueryStatsReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    query={"expr_": query},
+                )
             )
         )
 
         if inner_res.count != count:
             failed_cases.append(
-                f"(Stats) Query {filter_by} expected {count}, but found {inner_res.count}"
+                f"(Stats) Query {query} expected {count}, but found {inner_res.count}"
             )
 
     if failed_cases:
