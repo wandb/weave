@@ -686,10 +686,10 @@ def test_trace_call_sort(client):
     for first, last, sort_by in [
         (2, 0, [tsi._SortBy(field="started_at", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="inputs.in_val.list[0]", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
         (2, 0, [tsi._SortBy(field="output.prim", direction="desc")]),
-        (2, 0, [tsi._SortBy(field="output.list[0]", direction="desc")]),
+        (2, 0, [tsi._SortBy(field="output.list.0", direction="desc")]),
         (2, 0, [tsi._SortBy(field="output.dict.inner", direction="desc")]),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
