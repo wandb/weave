@@ -69,12 +69,14 @@ export const useCallsTableColumns = (
 
   const shouldIgnoreColumn = useCallback(
     (col: string) => {
+      // Captures the case where the column is already expanded.
       if (columnIsRefExpanded(col)) {
         return true;
       }
       const columnsWithRefsList = Array.from(columnsWithRefs);
+      // Captures the case where the column has just been expanded.
       for (const refCol of columnsWithRefsList) {
-        if (col.startsWith(refCol)) {
+        if (col.startsWith(refCol + '.')) {
           return true;
         }
       }
@@ -299,8 +301,9 @@ function buildCallsTableColumns(
       minWidth: 150,
       field: key,
       // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-      filterable: !columnIsRefExpanded(key),
-      sortable: !columnIsRefExpanded(key),
+      filterable: !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
+      // CPR (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
+      sortable: !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
       filterOperators: allOperators,
       headerName: key,
       renderHeader: () => {

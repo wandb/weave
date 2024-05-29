@@ -293,10 +293,7 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const secs = new Date(item.value).getTime();
     return {
-      gt_: [
-        {convert_: {input: {get_field_: item.field}, to: 'double'}},
-        {literal_: secs / 1000},
-      ],
+      gt_: [{get_field_: item.field}, {literal_: secs / 1000}],
     };
   } else if (item.operator === '(date): before') {
     if (item.value === '') {
@@ -306,10 +303,7 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     return {
       not_: [
         {
-          gt_: [
-            {convert_: {input: {get_field_: item.field}, to: 'double'}},
-            {literal_: secs / 1000},
-          ],
+          gt_: [{get_field_: item.field}, {literal_: secs / 1000}],
         },
       ],
     };
