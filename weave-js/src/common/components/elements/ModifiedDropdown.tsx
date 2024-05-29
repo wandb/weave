@@ -215,12 +215,9 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
 
     const getOptionProps = (opt: Option, hideText: boolean) => {
       const {text, ...props} = opt;
-      props.text = hideText ? (
-        {}
-      ) : (
+      props.text = hideText ? null : (
         <OptionWithTooltip text={opt.text as string} />
       );
-
       return props;
     };
 
