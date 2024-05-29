@@ -162,8 +162,6 @@ const allGeneralPurposeOperators = {
   string: {
     contains: stringOperators.contains,
     equals: stringOperators.equals,
-    startsWith: stringOperators.startsWith,
-    endsWith: stringOperators.endsWith,
   },
   number: {
     '=': numberOperators['='],
@@ -212,19 +210,11 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     };
   } else if (item.operator === '(string): contains') {
     return {
-      substr_: [{get_field_: item.field}, {literal_: '%' + item.value + '%'}],
+      substr_: [{get_field_: item.field}, {literal_: item.value}],
     };
   } else if (item.operator === '(string): equals') {
     return {
       eq_: [{get_field_: item.field}, {literal_: item.value}],
-    };
-  } else if (item.operator === '(string): startsWith') {
-    return {
-      substr_: [{get_field_: item.field}, {literal_: '%' + item.value}],
-    };
-  } else if (item.operator === '(string): endsWith') {
-    return {
-      substr_: [{get_field_: item.field}, {literal_: item.value + '%'}],
     };
   } else if (item.operator === '(number): =') {
     if (item.value === '') {

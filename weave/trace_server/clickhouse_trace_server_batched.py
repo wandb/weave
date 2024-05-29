@@ -1704,7 +1704,7 @@ def _process_calls_query_to_conditions(
         elif isinstance(operation, tsi_query.SubstrOperation):
             lhs_part = process_operand(operation.substr_[0])
             rhs_part = process_operand(operation.substr_[1])
-            cond = f"position({lhs_part}, {rhs_part}) = 1"
+            cond = f"position({lhs_part}, {rhs_part}) > 0"
         else:
             raise ValueError(f"Unknown operation type: {operation}")
 
