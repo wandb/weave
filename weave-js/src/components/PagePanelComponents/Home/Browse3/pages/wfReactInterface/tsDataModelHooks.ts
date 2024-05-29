@@ -236,7 +236,7 @@ const useCallsNoExpansion = (
       limit,
       offset,
       sort_by: sortBy,
-      query: query,
+      query,
     };
     const onSuccess = (res: traceServerClient.TraceCallsQueryRes) => {
       loadingRef.current = false;
@@ -340,7 +340,11 @@ const useCalls = (
           const colParts = col.split('.');
           let value: any = call;
           for (const part of colParts) {
-            while (typeof value === 'object' && value != null && EXPANDED_REF_VAL_KEY in value) {
+            while (
+              typeof value === 'object' &&
+              value != null &&
+              EXPANDED_REF_VAL_KEY in value
+            ) {
               value = value[EXPANDED_REF_VAL_KEY];
             }
             if (value == null) {
@@ -352,7 +356,11 @@ const useCalls = (
             }
             value = value[part];
           }
-          while (typeof value === 'object' && value != null && EXPANDED_REF_VAL_KEY in value) {
+          while (
+            typeof value === 'object' &&
+            value != null &&
+            EXPANDED_REF_VAL_KEY in value
+          ) {
             value = value[EXPANDED_REF_VAL_KEY];
           }
           if (isRef(value)) {
@@ -386,7 +394,11 @@ const useCalls = (
           let value: any = call;
           const path: string[] = [];
           for (const part of colParts) {
-            while (typeof value === 'object' && value != null && EXPANDED_REF_VAL_KEY in value) {
+            while (
+              typeof value === 'object' &&
+              value != null &&
+              EXPANDED_REF_VAL_KEY in value
+            ) {
               value = value[EXPANDED_REF_VAL_KEY];
               path.push(EXPANDED_REF_VAL_KEY);
             }
@@ -400,7 +412,11 @@ const useCalls = (
             value = value[part];
             path.push(part);
           }
-          while (typeof value === 'object' && value != null && EXPANDED_REF_VAL_KEY in value) {
+          while (
+            typeof value === 'object' &&
+            value != null &&
+            EXPANDED_REF_VAL_KEY in value
+          ) {
             value = value[EXPANDED_REF_VAL_KEY];
             path.push(EXPANDED_REF_VAL_KEY);
           }
@@ -452,7 +468,7 @@ const useCallsStats = makeTraceServerEndpointHook<
         wb_run_ids: filter.runIds,
         wb_user_ids: filter.userIds,
       },
-      query: query,
+      query,
     },
     skip: opts?.skip,
   }),

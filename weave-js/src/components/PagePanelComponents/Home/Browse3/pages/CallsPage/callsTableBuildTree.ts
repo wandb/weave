@@ -1,5 +1,8 @@
-import { GridColumnGroup, GridColumnNode, GridLeafColumn } from '@mui/x-data-grid-pro';
-
+import {
+  GridColumnGroup,
+  GridColumnNode,
+  GridLeafColumn,
+} from '@mui/x-data-grid-pro';
 
 /// Start of RunsTable.tsx move over
 function addToTree(
@@ -43,13 +46,13 @@ function nodeIsGroup(node: GridColumnNode): node is GridColumnGroup {
 function pushLeavesIntoGroupsForGroup(group: GridColumnGroup): GridColumnGroup {
   const originalChildren = group.children;
 
-  const childrenLeaves: { [key: string]: GridLeafColumn; } = Object.fromEntries(
+  const childrenLeaves: {[key: string]: GridLeafColumn} = Object.fromEntries(
     group.children
       .filter((child): child is GridLeafColumn => !nodeIsGroup(child))
       .map(child => [child.field, child])
   );
 
-  const childrenGroups: { [key: string]: GridColumnGroup; } = Object.fromEntries(
+  const childrenGroups: {[key: string]: GridColumnGroup} = Object.fromEntries(
     group.children
       .filter((child): child is GridColumnGroup => nodeIsGroup(child))
       .map(child => [child.groupId, child])
@@ -92,7 +95,7 @@ function pushLeavesIntoGroupsForGroup(group: GridColumnGroup): GridColumnGroup {
   return newGroup;
 }
 export function buildTree(strings: string[]): GridColumnGroup {
-  const root: GridColumnGroup = { groupId: '', children: [] };
+  const root: GridColumnGroup = {groupId: '', children: []};
 
   for (const str of strings) {
     const fields = str.split('.');
