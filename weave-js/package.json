@@ -65,6 +65,7 @@
     "cytoscape-dagre": "^2.2.2",
     "diff": "^5.1.0",
     "downloadjs": "^1.4.7",
+    "emoji-picker-react": "^4.9.3",
     "graphql": "=16.6.0",
     "handlebars": "^4.7.7",
     "hast-util-sanitize": "^4.0.0",
