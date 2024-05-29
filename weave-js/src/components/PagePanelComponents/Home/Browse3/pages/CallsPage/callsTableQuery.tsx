@@ -12,17 +12,20 @@ import {
 import {useMemo} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
-import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {Query} from '../wfReactInterface/traceServerClientInterface/query';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 
 /**
- * Given a calls query, resolve the calls and return them. This hook will
- * serve as an in-memory stepping stone to a more sophisticated backend
- * implementation.
+ * This Hook is responsible for bridging the gap between the CallsTable
+ * component and the underlying data hooks. In particular, it takes a high level
+ * filter, column filter, sort def, page def, and expanded columns and returns
+ * the associated calls. Internally, we convert each of these data structures
+ * from their higher level representation to the lower-level API representation.
+ *
+ * Moreover, we also handle extracting the counts for a given query which is used to
+ * determine the total number of calls for pagination.
  */
 export const useCallsForQuery = (
   entity: string,
@@ -127,23 +130,6 @@ const convertHighLevelFilterToLowLevelFilter = (
       ? [effectiveFilter.parentId]
       : undefined,
   };
-};
-
-export const refIsExpandable = (ref: string): boolean => {
-  if (!isRef(ref)) {
-    return false;
-  }
-  const parsed = parseRef(ref);
-  if (isWeaveObjectRef(parsed)) {
-    return (
-      parsed.weaveKind === 'object' ||
-      // parsed.weaveKind === 'op' ||
-      (parsed.weaveKind === 'table' &&
-        parsed.artifactRefExtra != null &&
-        parsed.artifactRefExtra.length > 0)
-    );
-  }
-  return false;
 };
 
 const operatorListAsMap = (operators: GridFilterOperator[]) => {

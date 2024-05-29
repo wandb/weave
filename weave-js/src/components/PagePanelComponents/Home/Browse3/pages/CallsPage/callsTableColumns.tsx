@@ -14,6 +14,7 @@ import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {monthRoundedTime} from '../../../../../../common/util/time';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {Timestamp} from '../../../../../Timestamp';
 import {CellValue} from '../../../Browse2/CellValue';
@@ -33,7 +34,7 @@ import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {OpVersionIndexText} from './CallsTable';
 import {buildTree} from './callsTableBuildTree';
 import {WFHighLevelCallFilter} from './callsTableFilter';
-import {allOperators, refIsExpandable} from './callsTableQuery';
+import {allOperators} from './callsTableQuery';
 
 export const useCallsTableColumns = (
   entity: string,
@@ -487,4 +488,21 @@ const useAllDynamicColumnNames = (
   }, [resetDep]);
 
   return allDynamicColumnNames;
+};
+
+const refIsExpandable = (ref: string): boolean => {
+  if (!isRef(ref)) {
+    return false;
+  }
+  const parsed = parseRef(ref);
+  if (isWeaveObjectRef(parsed)) {
+    return (
+      parsed.weaveKind === 'object' ||
+      // parsed.weaveKind === 'op' ||
+      (parsed.weaveKind === 'table' &&
+        parsed.artifactRefExtra != null &&
+        parsed.artifactRefExtra.length > 0)
+    );
+  }
+  return false;
 };
