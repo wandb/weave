@@ -1,7 +1,10 @@
+
 import datetime
 import typing
 
 from pydantic import BaseModel
+
+
 
 
 class CallStartCHInsertable(BaseModel):
@@ -117,3 +120,4 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
+

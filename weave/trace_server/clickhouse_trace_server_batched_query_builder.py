@@ -1,4 +1,21 @@
+
+
+
+
+
+
+
 import typing
+
+
+
+
+
+
+
+
+
+
 
 
 from . import clickhouse_trace_server_batched_schema as schema
@@ -9,6 +26,7 @@ from .trace_server_interface_util import (
 )
 from . import trace_server_interface as tsi
 from .interface import query as tsi_query
+
 
 
 param_builder_count = 0
@@ -61,6 +79,9 @@ def _quote_json_path(path: str) -> str:
     return "$" + "".join(parts_final)
 
 
+
+
+
 def transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: typing.Optional[str] = None,
@@ -94,9 +115,7 @@ def transform_external_calls_field_to_internal_calls_field(
             json_path = _quote_json_path(field[len("summary.") :])
         field = "summary_dump"
     else:
-        assert (
-            field in schema.all_call_select_columns
-        ), f"Invalid order_by field: {field}"
+        assert field in schema.all_call_select_columns, f"Invalid order_by field: {field}"
 
     # validate field
     if field not in schema.all_call_select_columns:
@@ -222,6 +241,7 @@ def process_calls_filter_to_conditions(
     return conditions, param_builder, raw_fields_used
 
 
+
 def process_calls_query_to_conditions(
     query: tsi.Query, param_builder: typing.Optional[ParamBuilder] = None
 ) -> tuple[list[str], ParamBuilder, set[str]]:
@@ -321,7 +341,6 @@ def process_calls_query_to_conditions(
     conditions.append(filter_cond)
 
     return conditions, param_builder, raw_fields_used
-
 
 def combine_conditions(conditions: typing.List[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
