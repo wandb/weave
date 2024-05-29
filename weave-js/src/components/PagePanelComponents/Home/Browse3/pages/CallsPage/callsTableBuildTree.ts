@@ -1,10 +1,55 @@
+/**
+ * This file is responsible for building a tree structure consumable by the x-data-grid-pro component,
+ * given a list of strings representing the paths of the columns. Given a list of strings like:
+ * `['a.b.c', 'a.b.d', 'a.e', 'f']`, we want to build a tree like:
+ * ```
+ * root
+ * ├── a (group)
+ * │   ├── a.b (group)
+ * │   │   ├── a.b.c (leaf)
+ * │   │   └── a.b.d (leaf)
+ * │   └── a.e (leaf)
+ * └── f (leaf)
+ * ```
+ *
+ * Note, there is a special case where a leaf column is a prefix of a group column. In this case, the leaf column
+ * should be pushed into the group column. For example, given the list of strings `['a.b', 'a.b.c']`, we want to build
+ * a tree like:
+ * ```
+ * root
+ * └── a (group)
+ *     └── a.b (group)
+ *         ├── a.b (leaf) // This is a special case (notice that the leaf is inside the group)
+ *         └── a.b.c (leaf)
+ * ```
+ *
+ * However, we would not want to push a leaf column into a group column if the leaf column is not a prefix of the group
+ * for example, given the list of strings `['a.b', 'a.c']`, we want to build a tree like:
+ * ```
+ * root
+ * └── a (group)
+ *     ├── a.b (leaf) // This is not a special case (notice that the leaf is not inside the group)
+ *     └── a.c (leaf)
+ * ```
+ */
+
 import {
   GridColumnGroup,
   GridColumnNode,
   GridLeafColumn,
 } from '@mui/x-data-grid-pro';
 
-/// Start of RunsTable.tsx move over
+export function buildTree(strings: string[]): GridColumnGroup {
+  const root: GridColumnGroup = {groupId: '', children: []};
+
+  for (const str of strings) {
+    const fields = str.split('.');
+    addToTree(root, fields, str, 0);
+  }
+
+  return pushLeavesIntoGroupsForGroup(root);
+}
+
 function addToTree(
   node: GridColumnGroup,
   fields: string[],
@@ -72,7 +117,7 @@ function pushLeavesIntoGroupsForGroup(group: GridColumnGroup): GridColumnGroup {
     }
   });
 
-  // Next, apply the same logic to the groups
+  // Next, recursively apply the same logic to the groups
   Object.keys(childrenGroups).forEach(key => {
     childrenGroups[key] = pushLeavesIntoGroupsForGroup(childrenGroups[key]);
   });
@@ -93,14 +138,4 @@ function pushLeavesIntoGroupsForGroup(group: GridColumnGroup): GridColumnGroup {
   };
 
   return newGroup;
-}
-export function buildTree(strings: string[]): GridColumnGroup {
-  const root: GridColumnGroup = {groupId: '', children: []};
-
-  for (const str of strings) {
-    const fields = str.split('.');
-    addToTree(root, fields, str, 0);
-  }
-
-  return pushLeavesIntoGroupsForGroup(root);
 }

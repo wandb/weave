@@ -163,9 +163,10 @@ class _CallsFilter(BaseModel):
     wb_run_ids: typing.Optional[typing.List[str]] = None
 
 
-# Field should be a key of `CallSchema`. For dictionary fields (`attributes`,
-# `inputs`, `outputs`, `summary`), the field can be dot-separated.
 class _SortBy(BaseModel):
+    # Field should be a key of `CallSchema`. For dictionary fields
+    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
+    # dot-separated.
     field: str  # Consider changing this to _FieldSelect
     # Direction should be either 'asc' or 'desc'
     direction: typing.Literal["asc", "desc"]
