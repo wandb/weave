@@ -5,7 +5,9 @@ import {useHistory} from 'react-router-dom';
 
 import {Button} from '../../../../../Button';
 import {Browse2OpDefCode} from '../../../Browse2/Browse2OpDefCode';
-import {TRACETREE_PARAM, useWeaveflowCurrentRouteContext} from '../../context';
+import {TRACETREE_PARAM, useClosePeek, useWeaveflowCurrentRouteContext} from '../../context';
+import { Empty } from '../common/Empty';
+import { EMPTY_PROPS_CALL } from '../common/EmptyContent';
 import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
@@ -24,6 +26,7 @@ export const CallPage: FC<{
   path?: string;
 }> = props => {
   const {useCall} = useWFHooks();
+  const close = useClosePeek();
 
   const call = useCall({
     entity: props.entity,
@@ -33,7 +36,17 @@ export const CallPage: FC<{
   if (call.loading) {
     return <CenteredAnimatedLoader />;
   } else if (call.result === null) {
-    return <div>Call not found</div>;
+    return (
+      <>
+        <Button
+          icon='close'
+          variant='ghost'
+          onClick={() => close()}
+          style={{ position: 'absolute', top: 0, right: 0, margin: '10px' }}
+        />
+        <Empty {...EMPTY_PROPS_CALL}/>
+      </>
+    )
   }
   return <CallPageInnerVertical {...props} call={call.result} />;
 };

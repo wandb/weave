@@ -117,3 +117,23 @@ export const EMPTY_PROPS_OBJECTS: EmptyProps = {
     </>
   ),
 };
+
+export const EMPTY_PROPS_CALL: EmptyProps = {
+  icon: 'layout-tabs' as const,
+  heading: 'Call not found',
+  description:
+    'Use traces to track all inputs & outputs of functions within your application. Debug, monitor or drill-down into tricky examples',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="http://wandb.me/weave_traces">
+        tracing basics
+      </TargetBlank>{' '}
+      or see traces in action by{' '}
+      <TargetBlank href="http://wandb.me/weave_quickstart">
+        following our quickstart guide
+      </TargetBlank>
+      .
+    </>
+  ),
+};
