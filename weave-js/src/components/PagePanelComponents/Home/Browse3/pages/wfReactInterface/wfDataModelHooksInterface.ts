@@ -11,6 +11,8 @@
 
 import * as Types from '../../../../../../core/model/types';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
+import * as traceServerClient from './traceServerClient'; // TODO: This import is not ideal, should delete this whole interface
+import {Query} from './traceServerClientInterface/query'; // TODO: This import is not ideal, should delete this whole interface
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -43,6 +45,7 @@ export type CallSchema = CallKey & {
   rawFeedback?: any;
   userId: string | null;
   runId: string | null;
+  traceCall?: traceServerClient.TraceCallSchema; // this will eventually be the entire call schema
 };
 
 export type CallFilter = {
@@ -152,12 +155,24 @@ export type WFDataModelHooksInterface = {
     project: string,
     filter: CallFilter,
     limit?: number,
+    offset?: number,
+    sortBy?: traceServerClient.SortBy[],
+    query?: Query,
+    expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean; refetchOnDelete?: boolean}
   ) => Loadable<CallSchema[]>;
+  useCallsStats: (
+    entity: string,
+    project: string,
+    filter: CallFilter,
+    query?: Query,
+    opts?: {skip?: boolean}
+  ) => Loadable<traceServerClient.TraceCallsQueryStatsRes>;
   useCallsDeleteFunc: () => (
     projectID: string,
     callIDs: string[]
   ) => Promise<void>;
+
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,
