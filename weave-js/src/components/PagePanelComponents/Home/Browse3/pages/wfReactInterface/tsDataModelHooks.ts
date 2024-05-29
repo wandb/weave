@@ -22,6 +22,7 @@ import {
 import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
+import {FilterBy} from './traceServerClientInterface/filterBy';
 import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
@@ -205,7 +206,7 @@ const useCallsNoExpansion = (
   limit?: number,
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
-  filterBy?: traceServerClient.FilterBy,
+  filterBy?: FilterBy,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -303,7 +304,7 @@ const useCalls = (
   limit?: number,
   offset?: number,
   sortBy?: traceServerClient.SortBy[],
-  filterBy?: traceServerClient.FilterBy,
+  filterBy?: FilterBy,
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
@@ -415,7 +416,7 @@ const useCalls = (
 
 const useCallsStats = makeTraceServerEndpointHook<
   'callsQueryStats',
-  [string, string, CallFilter, traceServerClient.FilterBy?, {skip?: boolean}?],
+  [string, string, CallFilter, FilterBy?, {skip?: boolean}?],
   traceServerClient.TraceCallsQueryStatsRes
 >(
   'callsQueryStats',
@@ -423,7 +424,7 @@ const useCallsStats = makeTraceServerEndpointHook<
     entity: string,
     project: string,
     filter: CallFilter,
-    filterBy?: traceServerClient.FilterBy,
+    filterBy?: FilterBy,
     opts?: {skip?: boolean}
   ) => ({
     params: {

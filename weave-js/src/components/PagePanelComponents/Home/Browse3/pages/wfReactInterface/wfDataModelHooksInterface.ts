@@ -12,6 +12,7 @@
 import * as Types from '../../../../../../core/model/types';
 import {KNOWN_BASE_OBJECT_CLASSES, OP_CATEGORIES} from './constants';
 import * as traceServerClient from './traceServerClient'; // TODO: This import is not ideal, should delete this whole interface
+import {FilterBy} from './traceServerClientInterface/filterBy'; // TODO: This import is not ideal, should delete this whole interface
 
 export type OpCategory = (typeof OP_CATEGORIES)[number];
 export type KnownBaseObjectClassType =
@@ -156,7 +157,7 @@ export type WFDataModelHooksInterface = {
     limit?: number,
     offset?: number,
     sortBy?: traceServerClient.SortBy[],
-    filterBy?: traceServerClient.FilterBy,
+    filterBy?: FilterBy,
     expandedRefColumns?: Set<string>,
     opts?: {skip?: boolean}
   ) => Loadable<CallSchema[]>;
@@ -164,7 +165,7 @@ export type WFDataModelHooksInterface = {
     entity: string,
     project: string,
     filter: CallFilter,
-    filterBy?: traceServerClient.FilterBy,
+    filterBy?: FilterBy,
     opts?: {skip?: boolean}
   ) => Loadable<traceServerClient.TraceCallsQueryStatsRes>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
