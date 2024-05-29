@@ -19,14 +19,14 @@ MongoDB query language. In particular, we have made the following simplification
 """
 
 import typing
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Query(BaseModel):
     # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
     # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
     # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr
-    expr_: "Operation"
+    expr_: "Operation" = Field(alias="$expr")
     # In the future, we could have other top-level Query Operators as described here:
     # https://www.mongodb.com/docs/manual/reference/operator/query/
 
@@ -42,7 +42,7 @@ class Query(BaseModel):
 class LiteralOperation(BaseModel):
     literal_: typing.Union[
         str, int, float, bool, dict[str, "LiteralOperation"], list["LiteralOperation"]
-    ]
+    ] = Field(alias="$literal")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/getField/
@@ -50,12 +50,12 @@ class LiteralOperation(BaseModel):
 # Field should be a key of `CallSchema`. For dictionary fields (`attributes`,
 # `inputs`, `outputs`, `summary`), the field can be dot-separated.
 class GetFieldOperator(BaseModel):
-    get_field_: str
+    get_field_: str = Field(alias="$getField")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/convert/
 class ConvertOperation(BaseModel):
-    convert_: "ConvertSpec"
+    convert_: "ConvertSpec" = Field(alias="$convert")
 
 
 class ConvertSpec(BaseModel):
@@ -66,32 +66,32 @@ class ConvertSpec(BaseModel):
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/
 class AndOperation(BaseModel):
-    and_: typing.List["Operand"]
+    and_: typing.List["Operand"] = Field(alias="$and")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/or/
 class OrOperation(BaseModel):
-    or_: typing.List["Operand"]
+    or_: typing.List["Operand"] = Field(alias="$or")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/not/
 class NotOperation(BaseModel):
-    not_: typing.Tuple["Operand"]
+    not_: typing.Tuple["Operand"] = Field(alias="$not")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/eq/
 class EqOperation(BaseModel):
-    eq_: typing.Tuple["Operand", "Operand"]
+    eq_: typing.Tuple["Operand", "Operand"] = Field(alias="$eq")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/gt/
 class GtOperation(BaseModel):
-    gt_: typing.Tuple["Operand", "Operand"]
+    gt_: typing.Tuple["Operand", "Operand"] = Field(alias="$gt")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/gte/
 class GteOperation(BaseModel):
-    gte_: typing.Tuple["Operand", "Operand"]
+    gte_: typing.Tuple["Operand", "Operand"] = Field(alias="$gte")
 
 
 # This is not technically in the Mongo spec. Mongo has:
@@ -99,7 +99,7 @@ class GteOperation(BaseModel):
 # however, rather than support a full regex match right now, we will
 # support a substring match. We can add regex support later if needed.
 class ContainsOperation(BaseModel):
-    contains_: "ContainsSpec"
+    contains_: "ContainsSpec" = Field(alias="$contains")
 
 
 class ContainsSpec(BaseModel):

@@ -60,7 +60,7 @@ export const useCallsForQuery = (
 
     const convertedItems = setItems
       .map(operationConverter)
-      .filter(item => item !== null) as Array<Query['expr_']>;
+      .filter(item => item !== null) as Array<Query['$expr']>;
 
     if (convertedItems.length === 0) {
       return undefined;
@@ -81,7 +81,7 @@ export const useCallsForQuery = (
     if (filterByRaw === undefined) {
       return undefined;
     }
-    return {expr_: filterByRaw} as Query;
+    return {$expr: filterByRaw} as Query;
   }, [filterByRaw]);
 
   const calls = useCalls(
@@ -181,29 +181,29 @@ export const allOperators = Object.entries(allGeneralPurposeOperators).flatMap(
     })
 );
 
-const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
+const operationConverter = (item: GridFilterItem): null | Query['$expr'] => {
   if (item.operator === '(any): isEmpty') {
     return {
-      eq_: [{get_field_: item.field}, {literal_: ''}],
+      $eq: [{$getField: item.field}, {$literal: ''}],
     };
   } else if (item.operator === '(any): isNotEmpty') {
     return {
-      not_: [
+      $not: [
         {
-          eq_: [{get_field_: item.field}, {literal_: ''}],
+          $eq: [{$getField: item.field}, {$literal: ''}],
         },
       ],
     };
   } else if (item.operator === '(string): contains') {
     return {
-      contains_: {
-        input: {get_field_: item.field},
-        substr: {literal_: item.value},
+      $contains: {
+        input: {$getField: item.field},
+        substr: {$literal: item.value},
       },
     };
   } else if (item.operator === '(string): equals') {
     return {
-      eq_: [{get_field_: item.field}, {literal_: item.value}],
+      $eq: [{$getField: item.field}, {$literal: item.value}],
     };
   } else if (item.operator === '(number): =') {
     if (item.value === '') {
@@ -211,9 +211,9 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      eq_: [
-        {convert_: {input: {get_field_: item.field}, to: 'double'}},
-        {literal_: val},
+      $eq: [
+        {$convert: {input: {$getField: item.field}, to: 'double'}},
+        {$literal: val},
       ],
     };
   } else if (item.operator === '(number): !=') {
@@ -222,11 +222,11 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      not_: [
+      $not: [
         {
-          eq_: [
-            {convert_: {input: {get_field_: item.field}, to: 'double'}},
-            {literal_: val},
+          $eq: [
+            {$convert: {input: {$getField: item.field}, to: 'double'}},
+            {$literal: val},
           ],
         },
       ],
@@ -237,9 +237,9 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      gt_: [
-        {convert_: {input: {get_field_: item.field}, to: 'double'}},
-        {literal_: val},
+      $gt: [
+        {$convert: {input: {$getField: item.field}, to: 'double'}},
+        {$literal: val},
       ],
     };
   } else if (item.operator === '(number): >=') {
@@ -248,9 +248,9 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      gte_: [
-        {convert_: {input: {get_field_: item.field}, to: 'double'}},
-        {literal_: val},
+      $gte: [
+        {$convert: {input: {$getField: item.field}, to: 'double'}},
+        {$literal: val},
       ],
     };
   } else if (item.operator === '(number): <') {
@@ -259,11 +259,11 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      not_: [
+      $not: [
         {
-          gte_: [
-            {convert_: {input: {get_field_: item.field}, to: 'double'}},
-            {literal_: val},
+          $gte: [
+            {$convert: {input: {$getField: item.field}, to: 'double'}},
+            {$literal: val},
           ],
         },
       ],
@@ -274,11 +274,11 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      not_: [
+      $not: [
         {
-          gt_: [
-            {convert_: {input: {get_field_: item.field}, to: 'double'}},
-            {literal_: val},
+          $gt: [
+            {$convert: {input: {$getField: item.field}, to: 'double'}},
+            {$literal: val},
           ],
         },
       ],
@@ -288,7 +288,7 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
       return null;
     }
     return {
-      eq_: [{get_field_: item.field}, {literal_: item.value}],
+      $eq: [{$getField: item.field}, {$literal: item.value}],
     };
   } else if (item.operator === '(date): after') {
     if (item.value === '') {
@@ -296,7 +296,7 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const secs = new Date(item.value).getTime();
     return {
-      gt_: [{get_field_: item.field}, {literal_: secs / 1000}],
+      $gt: [{$getField: item.field}, {$literal: secs / 1000}],
     };
   } else if (item.operator === '(date): before') {
     if (item.value === '') {
@@ -304,9 +304,9 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const secs = new Date(item.value).getTime();
     return {
-      not_: [
+      $not: [
         {
-          gt_: [{get_field_: item.field}, {literal_: secs / 1000}],
+          $gt: [{$getField: item.field}, {$literal: secs / 1000}],
         },
       ],
     };

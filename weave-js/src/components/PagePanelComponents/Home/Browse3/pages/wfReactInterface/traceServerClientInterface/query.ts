@@ -1,5 +1,5 @@
 type LiteralOperation = {
-  literal_:
+  $literal:
     | string
     | number
     | boolean
@@ -8,7 +8,7 @@ type LiteralOperation = {
 };
 
 type GetFieldOperator = {
-  get_field_: string;
+  $getField: string;
 };
 
 type ConvertSpec = {
@@ -17,31 +17,31 @@ type ConvertSpec = {
 };
 
 type ConvertOperation = {
-  convert_: ConvertSpec;
+  $convert: ConvertSpec;
 };
 
 type AndOperation = {
-  and_: Operand[];
+  $and: Operand[];
 };
 
 type OrOperation = {
-  or_: Operand[];
+  $or: Operand[];
 };
 
 type NotOperation = {
-  not_: [Operand];
+  $not: [Operand];
 };
 
 type EqOperation = {
-  eq_: [Operand, Operand];
+  $eq: [Operand, Operand];
 };
 
 type GtOperation = {
-  gt_: [Operand, Operand];
+  $gt: [Operand, Operand];
 };
 
 type GteOperation = {
-  gte_: [Operand, Operand];
+  $gte: [Operand, Operand];
 };
 
 type ContainsSpec = {
@@ -51,7 +51,7 @@ type ContainsSpec = {
 };
 
 type ContainsOperation = {
-  contains_: ContainsSpec;
+  $contains: ContainsSpec;
 };
 
 type Operation =
@@ -70,5 +70,5 @@ type Operand =
   | Operation;
 
 export type Query = {
-  expr_: Operation;
+  $expr: Operation;
 };

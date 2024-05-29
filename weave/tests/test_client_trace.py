@@ -738,22 +738,22 @@ def test_trace_call_filter(client):
         # Base Case - simple True
         (
             13,
-            {"eq_": [{"literal_": 1}, {"literal_": 1}]},
+            {"$eq": [{"$literal": 1}, {"$literal": 1}]},
         ),
         # Base Case - simple false
         (
             0,
-            {"eq_": [{"literal_": 1}, {"literal_": 2}]},
+            {"$eq": [{"$literal": 1}, {"$literal": 2}]},
         ),
         # eq
         (
             1,
             {
-                "eq_": [
-                    {"literal_": 5},
+                "$eq": [
+                    {"$literal": 5},
                     {
-                        "convert_": {
-                            "input": {"get_field_": "inputs.in_val.prim"},
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
                             "to": "int",
                         }
                     },
@@ -764,29 +764,29 @@ def test_trace_call_filter(client):
         (
             1,
             {
-                "eq_": [
-                    {"literal_": "simple_primitive"},
-                    {"get_field_": "inputs.in_val"},
+                "$eq": [
+                    {"$literal": "simple_primitive"},
+                    {"$getField": "inputs.in_val"},
                 ]
             },
         ),
         # eq - string out
         (
             1,
-            {"eq_": [{"literal_": "simple_primitive"}, {"get_field_": "output"}]},
+            {"$eq": [{"$literal": "simple_primitive"}, {"$getField": "output"}]},
         ),
         # gt
         (
             4,
             {
-                "gt_": [
+                "$gt": [
                     {
-                        "convert_": {
-                            "input": {"get_field_": "inputs.in_val.prim"},
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
                             "to": "int",
                         }
                     },
-                    {"literal_": 5},
+                    {"$literal": 5},
                 ]
             },
         ),
@@ -794,14 +794,14 @@ def test_trace_call_filter(client):
         (
             5,
             {
-                "gte_": [
+                "$gte": [
                     {
-                        "convert_": {
-                            "input": {"get_field_": "inputs.in_val.prim"},
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
                             "to": "int",
                         }
                     },
-                    {"literal_": 5},
+                    {"$literal": 5},
                 ]
             },
         ),
@@ -812,16 +812,16 @@ def test_trace_call_filter(client):
                 1 if is_sql_lite else 0
             ),  # SQLLite casting transforms strings to 0, instead of NULL
             {
-                "not_": [
+                "$not": [
                     {
-                        "gt_": [
+                        "$gt": [
                             {
-                                "convert_": {
-                                    "input": {"get_field_": "inputs.in_val.prim"},
+                                "$convert": {
+                                    "input": {"$getField": "inputs.in_val.prim"},
                                     "to": "int",
                                 }
                             },
-                            {"literal_": 5},
+                            {"$literal": 5},
                         ]
                     }
                 ]
@@ -834,16 +834,16 @@ def test_trace_call_filter(client):
                 1 if is_sql_lite else 0
             ),  # SQLLite casting transforms strings to 0, instead of NULL
             {
-                "not_": [
+                "$not": [
                     {
-                        "gte_": [
+                        "$gte": [
                             {
-                                "convert_": {
-                                    "input": {"get_field_": "inputs.in_val.prim"},
+                                "$convert": {
+                                    "input": {"$getField": "inputs.in_val.prim"},
                                     "to": "int",
                                 }
                             },
-                            {"literal_": 5},
+                            {"$literal": 5},
                         ]
                     }
                 ]
@@ -856,9 +856,9 @@ def test_trace_call_filter(client):
                 -2 if is_sql_lite else 0
             ),  # SQLLite returns NULL for non-existent fields rather than ''.
             {
-                "contains_": {
-                    "input": {"get_field_": "inputs.in_val.str"},
-                    "substr": {"literal_": ""},
+                "$contains": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": ""},
                 }
             },
         ),
@@ -866,27 +866,27 @@ def test_trace_call_filter(client):
         (
             10,
             {
-                "contains_": {
-                    "input": {"get_field_": "inputs.in_val.str"},
-                    "substr": {"literal_": "str"},
+                "$contains": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": "str"},
                 }
             },
         ),
         (
             0,
             {
-                "contains_": {
-                    "input": {"get_field_": "inputs.in_val.str"},
-                    "substr": {"literal_": "STR"},
+                "$contains": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": "STR"},
                 }
             },
         ),
         (
             10,
             {
-                "contains_": {
-                    "input": {"get_field_": "inputs.in_val.str"},
-                    "substr": {"literal_": "STR"},
+                "$contains": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": "STR"},
                     "case_insensitive": True,
                 }
             },
@@ -895,33 +895,33 @@ def test_trace_call_filter(client):
         (
             3,
             {
-                "and_": [
+                "$and": [
                     {
-                        "not_": [
+                        "$not": [
                             {
-                                "gt_": [
+                                "$gt": [
                                     {
-                                        "convert_": {
+                                        "$convert": {
                                             "input": {
-                                                "get_field_": "inputs.in_val.prim"
+                                                "$getField": "inputs.in_val.prim"
                                             },
                                             "to": "int",
                                         }
                                     },
-                                    {"literal_": 7},
+                                    {"$literal": 7},
                                 ]
                             }
                         ]
                     },
                     {
-                        "gte_": [
+                        "$gte": [
                             {
-                                "convert_": {
-                                    "input": {"get_field_": "inputs.in_val.prim"},
+                                "$convert": {
+                                    "input": {"$getField": "inputs.in_val.prim"},
                                     "to": "int",
                                 }
                             },
-                            {"literal_": 5},
+                            {"$literal": 5},
                         ]
                     },
                 ]
@@ -934,33 +934,33 @@ def test_trace_call_filter(client):
                 1 if is_sql_lite else 0
             ),  # SQLLite casting transforms strings to 0, instead of NULL
             {
-                "or_": [
+                "$or": [
                     {
-                        "not_": [
+                        "$not": [
                             {
-                                "gt_": [
+                                "$gt": [
                                     {
-                                        "convert_": {
+                                        "$convert": {
                                             "input": {
-                                                "get_field_": "inputs.in_val.prim"
+                                                "$getField": "inputs.in_val.prim"
                                             },
                                             "to": "int",
                                         }
                                     },
-                                    {"literal_": 3},
+                                    {"$literal": 3},
                                 ]
                             }
                         ]
                     },
                     {
-                        "gte_": [
+                        "$gte": [
                             {
-                                "convert_": {
-                                    "input": {"get_field_": "inputs.in_val.prim"},
+                                "$convert": {
+                                    "input": {"$getField": "inputs.in_val.prim"},
                                     "to": "int",
                                 }
                             },
-                            {"literal_": 9},
+                            {"$literal": 9},
                         ]
                     },
                 ]
@@ -970,11 +970,11 @@ def test_trace_call_filter(client):
         (
             0,
             {
-                "eq_": [
-                    {"literal_": 5},
+                "$eq": [
+                    {"$literal": 5},
                     {
-                        "convert_": {
-                            "input": {"get_field_": "inputs.in_val.str"},
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.str"},
                             "to": "int",
                         }
                     },
@@ -985,11 +985,11 @@ def test_trace_call_filter(client):
         (
             1,
             {
-                "eq_": [
-                    {"literal_": "5"},
+                "$eq": [
+                    {"$literal": "5"},
                     {
-                        "convert_": {
-                            "input": {"get_field_": "inputs.in_val.prim"},
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
                             "to": "string",
                         }
                     },
@@ -1000,67 +1000,67 @@ def test_trace_call_filter(client):
         (
             4,
             {
-                "gt_": [
+                "$gt": [
                     {
-                        "convert_": {
+                        "$convert": {
                             "input": {
-                                "get_field_": "inputs.in_val.list.0"
+                                "$getField": "inputs.in_val.list.0"
                             },  # changing this to a dot instead of [0]
                             "to": "int",
                         }
                     },
-                    {"literal_": 5},
+                    {"$literal": 5},
                 ]
             },
         ),
         (
             4,
             {
-                "gt_": [
+                "$gt": [
                     {
-                        "convert_": {
-                            "input": {"get_field_": "inputs.in_val.dict.inner"},
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.dict.inner"},
                             "to": "int",
                         }
                     },
-                    {"literal_": 5},
+                    {"$literal": 5},
                 ]
             },
         ),
         (
             4,
             {
-                "gt_": [
-                    {"convert_": {"input": {"get_field_": "output.prim"}, "to": "int"}},
-                    {"literal_": 5},
+                "$gt": [
+                    {"$convert": {"input": {"$getField": "output.prim"}, "to": "int"}},
+                    {"$literal": 5},
                 ]
             },
         ),
         (
             4,
             {
-                "gt_": [
+                "$gt": [
                     {
-                        "convert_": {
-                            "input": {"get_field_": "output.list.0"},
+                        "$convert": {
+                            "input": {"$getField": "output.list.0"},
                             "to": "int",
                         }
                     },
-                    {"literal_": 5},
+                    {"$literal": 5},
                 ]
             },
         ),
         (
             4,
             {
-                "gt_": [
+                "$gt": [
                     {
-                        "convert_": {
-                            "input": {"get_field_": "output.dict.inner"},
+                        "$convert": {
+                            "input": {"$getField": "output.dict.inner"},
                             "to": "int",
                         }
                     },
-                    {"literal_": 5},
+                    {"$literal": 5},
                 ]
             },
         ),
@@ -1070,7 +1070,7 @@ def test_trace_call_filter(client):
             tsi.CallsQueryReq.model_validate(
                 dict(
                     project_id=get_client_project_id(client),
-                    query={"expr_": query},
+                    query={"$expr": query},
                 )
             )
         )
@@ -1079,12 +1079,11 @@ def test_trace_call_filter(client):
             failed_cases.append(
                 f"(ALL) Query {query} expected {count}, but found {len(inner_res.calls)}"
             )
-
         inner_res = get_client_trace_server(client).calls_query_stats(
             tsi.CallsQueryStatsReq.model_validate(
                 dict(
                     project_id=get_client_project_id(client),
-                    query={"expr_": query},
+                    query={"$expr": query},
                 )
             )
         )
