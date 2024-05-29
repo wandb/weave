@@ -19,7 +19,9 @@ export const useCallsForQuery = (
     return convertHighLevelFilterToLowLevelFilter(filter);
   }, [filter]);
 
-  const calls = useCalls(entity, project, lowLevelFilter);
+  const calls = useCalls(entity, project, lowLevelFilter, undefined, {
+    refetchOnDelete: true,
+  });
   return calls;
 };
 

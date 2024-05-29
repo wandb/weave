@@ -48,8 +48,19 @@ const projectIdFromParts = ({
   project: string;
 }) => `${entity}/${project}`;
 
+// Trace server client keys that are promises
+type TraceServerClientPromiseKeys = {
+  [K in keyof traceServerClient.TraceServerClient]: traceServerClient.TraceServerClient[K] extends (
+    ...args: any
+  ) => Promise<any>
+    ? K extends 'onCallDelete'
+      ? never
+      : K
+    : never;
+}[keyof traceServerClient.TraceServerClient];
+
 const makeTraceServerEndpointHook = <
-  FN extends keyof traceServerClient.TraceServerClient,
+  FN extends TraceServerClientPromiseKeys,
   Input extends any[],
   Output
 >(
@@ -113,7 +124,7 @@ const makeTraceServerEndpointHook = <
 };
 
 const useMakeTraceServerEndpoint = <
-  FN extends keyof traceServerClient.TraceServerClient,
+  FN extends TraceServerClientPromiseKeys,
   Input extends any[],
   Output
 >(
@@ -201,17 +212,15 @@ const useCalls = (
   project: string,
   filter: CallFilter,
   limit?: number,
-  opts?: {skip?: boolean}
+  opts?: {skip?: boolean; refetchOnDelete?: boolean}
 ): Loadable<CallSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallsQueryRes | null>(null);
   const deepFilter = useDeepMemo(filter);
-  useEffect(() => {
-    if (opts?.skip) {
-      return;
-    }
+
+  const doFetch = useCallback(() => {
     setCallRes(null);
     loadingRef.current = true;
     const req: traceServerClient.TraceCallsQueryReq = {
@@ -239,7 +248,22 @@ const useCalls = (
       setCallRes({calls: []});
     };
     getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
-  }, [entity, project, deepFilter, limit, opts?.skip, getTsClient]);
+  }, [entity, project, deepFilter, limit, getTsClient]);
+
+  // register doFetch as a callback after deletion
+  useEffect(() => {
+    if (opts?.refetchOnDelete) {
+      return getTsClient().registerOnDeleteListener(doFetch);
+    }
+    return () => {};
+  }, [opts?.refetchOnDelete, getTsClient, doFetch]);
+
+  useEffect(() => {
+    if (opts?.skip) {
+      return;
+    }
+    doFetch();
+  }, [opts?.skip, doFetch]);
 
   return useMemo(() => {
     if (opts?.skip) {
@@ -273,6 +297,32 @@ const useCalls = (
       };
     }
   }, [callRes, entity, project, opts?.skip]);
+};
+
+const useCallsDeleteFunc = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const callsDelete = useCallback(
+    (projectID: string, callIDs: string[]): Promise<void> => {
+      return getTsClient()
+        .callsDelete({
+          project_id: projectID,
+          call_ids: callIDs,
+        })
+        .then(() => {
+          callIDs.forEach(callId => {
+            callCache.del({
+              entity: projectID.split('/')[0],
+              project: projectID.split('/')[1],
+              callId,
+            });
+          });
+        });
+    },
+    [getTsClient]
+  );
+
+  return callsDelete;
 };
 
 const useOpVersion = (
@@ -1054,6 +1104,7 @@ const convertISOToDate = (iso: string) => {
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsDeleteFunc,
   useOpVersion,
   useOpVersions,
   useObjectVersion,
