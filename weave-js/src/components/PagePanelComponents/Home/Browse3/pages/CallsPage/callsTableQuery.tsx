@@ -15,7 +15,7 @@ import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {isRef} from '../common/util';
 import {useWFHooks} from '../wfReactInterface/context';
-import {FilterBy} from '../wfReactInterface/traceServerClient';
+import {FilterBy} from '../wfReactInterface/traceServerClientInterface/filterBy';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 

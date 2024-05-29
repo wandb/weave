@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
+import {FilterBy} from './traceServerClientInterface/filterBy';
+
 export type KeyedDictType = {
   [key: string]: any;
   _keys?: string[];
@@ -65,61 +67,6 @@ interface TraceCallsFilter {
   trace_roots_only?: boolean;
   wb_run_ids?: string[];
   wb_user_ids?: string[];
-}
-
-type RawValue =
-  | string
-  | number
-  | boolean
-  | {[key: string]: RawValue}
-  | RawValue[];
-
-interface FieldSelect {
-  field_: string;
-  cast_?: 'str' | 'int' | 'float' | 'bool';
-}
-
-type Operand = RawValue | FieldSelect | Operation;
-
-interface AndOperation {
-  and_: [Operand, Operand];
-}
-
-interface OrOperation {
-  or_: [Operand, Operand];
-}
-
-interface NotOperation {
-  not_: Operand;
-}
-
-interface EqOperation {
-  eq_: [Operand, Operand];
-}
-
-interface GtOperation {
-  gt_: [Operand, Operand];
-}
-
-interface GteOperation {
-  gte_: [Operand, Operand];
-}
-
-interface LikeOperation {
-  like_: [Operand, Operand];
-}
-
-type Operation =
-  | AndOperation
-  | OrOperation
-  | NotOperation
-  | EqOperation
-  | GtOperation
-  | GteOperation
-  | LikeOperation;
-
-export interface FilterBy {
-  filter: Operation;
 }
 
 export type SortBy = {field: string; direction: 'asc' | 'desc'};
