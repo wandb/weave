@@ -217,8 +217,10 @@ class Evaluation(Object):
             scorer_name, _, summarize_fn = get_scorer_attributes(scorer)
             scorer_scores = eval_table.column("scores").column(scorer_name)
             summary[scorer_name] = summarize_fn(scorer_scores)  # type: ignore
+        latency_col = eval_table.column("model_latency")
+        non_none_latencies = [l for l in latency_col if l is not None]
         summary["model_latency"] = {
-            "mean": float(np.mean(eval_table.column("model_latency"))),
+            "mean": float(np.mean(non_none_latencies)),
             # "stderr": stderr(list(eval_table.column("model_latency"))),
         }
         return summary

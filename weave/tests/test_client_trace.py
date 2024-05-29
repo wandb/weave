@@ -682,7 +682,7 @@ def test_trace_call_sort(client):
     for i in range(3):
         basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
 
-    for (first, last, sort_by) in [
+    for first, last, sort_by in [
         (2, 0, [tsi._SortBy(field="started_at", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.prim", direction="desc")]),
         (2, 0, [tsi._SortBy(field="inputs.in_val.list.0", direction="desc")]),

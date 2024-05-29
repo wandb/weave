@@ -5,6 +5,7 @@ import requests
 import pytest
 import pydantic
 from pydantic import BaseModel
+import json
 import weave
 import asyncio
 from weave import op_def, Evaluation
@@ -17,6 +18,7 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     DICT_KEY_EDGE_NAME,
 )
+from weave.trace.serializer import register_serializer, get_serializer_for_obj
 
 from weave.trace import refs
 from weave.trace.tests.testutil import ObjectRefStrMatcher
@@ -198,7 +200,7 @@ def test_call_create(client):
     client.finish_call(call, "hello")
     result = client.call(call.id)
     expected = weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:SP4LIwNDvmCFjxXhKSA1JysAqEB0x39RH03gXjBLOkc",
+        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -219,7 +221,7 @@ def test_calls_query(client):
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:SP4LIwNDvmCFjxXhKSA1JysAqEB0x39RH03gXjBLOkc",
+        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -227,7 +229,7 @@ def test_calls_query(client):
         id=call0.id,
     )
     assert result[1] == weave_client.Call(
-        op_name="weave:///shawn/test-project/op/x:SP4LIwNDvmCFjxXhKSA1JysAqEB0x39RH03gXjBLOkc",
+        op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=call0.id,
@@ -413,7 +415,7 @@ def test_opdef(client):
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_saveload_customtype(client):
+def test_saveload_op(client):
     @weave.op()
     def add2(x, y):
         return x + y
@@ -429,6 +431,40 @@ def test_saveload_customtype(client):
     assert obj2["a"].name == "op-add2"
     assert isinstance(obj2["b"], op_def.OpDef)
     assert obj2["b"].name == "op-add3"
+
+
+def test_saveload_customtype(client, strict_op_saving):
+    class MyCustomObj:
+        a: int
+        b: str
+
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+    def custom_obj_save(obj, artifact, name) -> None:
+        with artifact.new_file(f"{name}.json") as f:
+            json.dump({"a": obj.a, "b": obj.b}, f)
+
+    def custom_obj_load(artifact, name):
+        with artifact.open(f"{name}.json") as f:
+            json_obj = json.load(f)
+            return MyCustomObj(json_obj["a"], json_obj["b"])
+
+    register_serializer(MyCustomObj, custom_obj_save, custom_obj_load)
+
+    obj = MyCustomObj(5, "x")
+    ref = client.save_object(obj, "my-obj")
+
+    # Hack the serializer so that it's loader no longer exists, to ensure
+    # it can't be called.
+    serializer = get_serializer_for_obj(obj)
+    serializer.load = None
+
+    obj2 = client.get(ref)
+    assert obj2.__class__.__name__ == "MyCustomObj"
+    assert obj2.a == 5
+    assert obj2.b == "x"
 
 
 def test_save_unknown_type(client):
@@ -694,16 +730,15 @@ def test_large_files(client):
         def __init__(self, a):
             self.a = a
 
-    class CoolCustomThingType(weave.types.Type):
-        instance_classes = CoolCustomThing
+    def save_instance(obj, artifact, name):
+        with artifact.new_file(name) as f:
+            f.write(obj.a * 10000005)
 
-        def save_instance(self, obj, artifact, name):
-            with artifact.new_file(name) as f:
-                f.write(obj.a * 10000005)
+    def load_instance(artifact, name, extra=None):
+        with artifact.open(name) as f:
+            return CoolCustomThing(f.read())
 
-        def load_instance(self, artifact, name, extra=None):
-            with artifact.open(name) as f:
-                return CoolCustomThing(f.read())
+    register_serializer(CoolCustomThing, save_instance, load_instance)
 
     ref = client.save_object(CoolCustomThing("x"), "my-obj")
     res = client.get(ref)
