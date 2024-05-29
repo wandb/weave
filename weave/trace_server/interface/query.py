@@ -8,13 +8,11 @@ MongoDB query language. In particular, we have made the following simplification
     more expressive aggregation language is more expressive and can be used for both direct queries,
     but also for column comparison and calculations. We can add support for the "query" operators
     in the future if needed.
-* Instead of using a dollar sign ($) prefix for the operators, we use an underscore (_) suffix. This
-    is simply to satisfy the python requirements for variable names.
 * We only support a subset of the operators / shorthand forms for now. We can add more operators
     in the future as needed.
     * One notable omission here is the lack of support for "$field" as a shorthand for the "getField"
         operator.
-* We have _added_ a `contains_` operator which is not in the MongoDB query language. This is a simple
+* We have _added_ a `$contains` operator which is not in the MongoDB query language. This is a simple
     substring match operator.
 """
 
