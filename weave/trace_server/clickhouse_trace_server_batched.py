@@ -14,10 +14,12 @@ from clickhouse_connect.driver.query import QueryResult, StreamContext
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect
-from pydantic import BaseModel
+
 
 from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
+from . import clickhouse_trace_server_batched_query_builder as query_builder
+from . import clickhouse_trace_server_batched_schema as schema
 from .errors import RequestTooLarge
 
 from .trace_server_interface_util import (
@@ -25,7 +27,6 @@ from .trace_server_interface_util import (
     generate_id,
     str_digest,
     bytes_digest,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
 from .interface import query as tsi_query
@@ -42,121 +43,6 @@ MAX_DELETE_CALLS_COUNT = 100
 
 class NotFoundError(Exception):
     pass
-
-
-class CallStartCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-    op_name: str
-    started_at: datetime.datetime
-    attributes_dump: str
-    inputs_dump: str
-    input_refs: typing.List[str]
-    output_refs: typing.List[str] = []  # sadly, this is required
-
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-
-class CallEndCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    ended_at: datetime.datetime
-    exception: typing.Optional[str] = None
-    summary_dump: str
-    output_dump: str
-    input_refs: typing.List[str] = []  # sadly, this is required
-    output_refs: typing.List[str]
-
-
-class CallDeleteCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    deleted_at: datetime.datetime
-    wb_user_id: typing.Optional[str]
-
-    # boo
-    input_refs: typing.List[str] = []
-    output_refs: typing.List[str] = []
-
-
-CallCHInsertable = typing.Union[
-    CallStartCHInsertable, CallEndCHInsertable, CallDeleteCHInsertable
-]
-
-
-# Very critical that this matches the calls table schema! This should
-# essentially be the DB version of CallSchema with the addition of the
-# created_at and updated_at fields
-class SelectableCHCallSchema(BaseModel):
-    project_id: str
-    id: str
-
-    op_name: str
-
-    trace_id: str
-    parent_id: typing.Optional[str] = None
-
-    started_at: datetime.datetime
-    ended_at: typing.Optional[datetime.datetime] = None
-    exception: typing.Optional[str] = None
-
-    attributes_dump: str
-    inputs_dump: str
-    output_dump: typing.Optional[str] = None
-    summary_dump: typing.Optional[str] = None
-
-    input_refs: typing.List[str]
-    output_refs: typing.List[str]
-
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
-
-    deleted_at: typing.Optional[datetime.datetime] = None
-
-
-all_call_insert_columns = list(
-    CallStartCHInsertable.model_fields.keys()
-    | CallEndCHInsertable.model_fields.keys()
-    | CallDeleteCHInsertable.model_fields.keys()
-)
-
-all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
-
-# Let's just make everything required for now ... can optimize when we implement column selection
-required_call_columns = list(set(all_call_select_columns) - set([]))
-
-
-class ObjCHInsertable(BaseModel):
-    project_id: str
-    kind: str
-    base_object_class: typing.Optional[str]
-    object_id: str
-    refs: typing.List[str]
-    val_dump: str
-    digest: str
-
-
-class SelectableCHObjSchema(BaseModel):
-    project_id: str
-    object_id: str
-    created_at: datetime.datetime
-    refs: typing.List[str]
-    val_dump: str
-    kind: str
-    base_object_class: typing.Optional[str]
-    digest: str
-    version_index: int
-    is_latest: int
-
-
-all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
-all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
-
-# Let's just make everything required for now ... can optimize when we implement column selection
-required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -243,18 +129,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         conditions = []
-        param_builder = ParamBuilder()
+        param_builder = query_builder.ParamBuilder()
         raw_fields_used = set()
 
         if req.filter:
-            filter_conds, _, fields_used = _process_calls_filter_to_conditions(
+            (
+                filter_conds,
+                _,
+                fields_used,
+            ) = query_builder.process_calls_filter_to_conditions(
                 req.filter, param_builder
             )
             raw_fields_used.update(fields_used)
             conditions.extend(filter_conds)
 
         if req.query:
-            query_conds, _, fields_used = _process_calls_query_to_conditions(
+            (
+                query_conds,
+                _,
+                fields_used,
+            ) = query_builder.process_calls_query_to_conditions(
                 req.query, param_builder
             )
             raw_fields_used.update(fields_used)
@@ -273,18 +167,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
         conditions = []
-        param_builder = ParamBuilder()
+        param_builder = query_builder.ParamBuilder()
 
         if req.filter:
-            (
-                filter_conds,
-                _,
-                _,
-            ) = _process_calls_filter_to_conditions(req.filter, param_builder)
+            (filter_conds, _, _,) = query_builder.process_calls_filter_to_conditions(
+                req.filter, param_builder
+            )
             conditions.extend(filter_conds)
 
         if req.query:
-            query_conds, _, _ = _process_calls_query_to_conditions(
+            query_conds, _, _ = query_builder.process_calls_query_to_conditions(
                 req.query, param_builder
             )
             conditions.extend(query_conds)
@@ -334,7 +226,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         deleted_at = datetime.datetime.now()
         insertables = [
-            CallDeleteCHInsertable(
+            schema.CallDeleteCHInsertable(
                 project_id=req.project_id,
                 id=call_id,
                 wb_user_id=req.wb_user_id,
@@ -391,7 +283,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         digest = str_digest(json_val)
 
         req_obj = req.obj
-        ch_obj = ObjCHInsertable(
+        ch_obj = schema.ObjCHInsertable(
             project_id=req_obj.project_id,
             object_id=req_obj.object_id,
             kind=get_kind(req.obj.val),
@@ -529,7 +421,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if conditions:
             conds.extend(conditions)
 
-        predicate = _combine_conditions(conds, "AND")
+        predicate = query_builder.combine_conditions(conds, "AND")
         query = f"""
                 SELECT tr.digest, tr.val_dump
                 FROM (
@@ -584,7 +476,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         def make_ref_cache_key(ref: refs_internal.InternalObjectRef) -> str:
             return f"{ref.project_id}/{ref.name}/{ref.version}"
 
-        def make_obj_cache_key(obj: SelectableCHObjSchema) -> str:
+        def make_obj_cache_key(obj: schema.SelectableCHObjSchema) -> str:
             return f"{obj.project_id}/{obj.object_id}/{obj.digest}"
 
         def get_object_refs_root_val(
@@ -610,7 +502,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 parameters[version_param_key] = ref.version
 
             if len(conds) > 0:
-                conditions = [_combine_conditions(conds, "OR")]
+                conditions = [query_builder.combine_conditions(conds, "OR")]
                 objs = self._select_objs_query(
                     ref.project_id, conditions=conditions, parameters=parameters
                 )
@@ -835,11 +727,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._insert(
                 "call_parts",
                 data=batch,
-                column_names=all_call_insert_columns,
+                column_names=schema.all_call_insert_columns,
                 settings=settings,
             )
 
-    def _call_read(self, req: tsi.CallReadReq) -> SelectableCHCallSchema:
+    def _call_read(self, req: tsi.CallReadReq) -> schema.SelectableCHCallSchema:
         # Generate and run the query to get the call from the database
         ch_calls = self._select_calls_query(
             req.project_id,
@@ -863,7 +755,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[SelectableCHCallSchema]:
+    ) -> typing.List[schema.SelectableCHCallSchema]:
         dicts = self._select_calls_query_raw(
             project_id,
             columns=columns,
@@ -894,15 +786,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         parameters["project_id"] = project_id
         if columns == None:
-            columns = all_call_select_columns
+            columns = schema.all_call_select_columns
         columns = typing.cast(typing.List[str], columns)
 
-        remaining_columns = set(columns) - set(required_call_columns)
-        columns = required_call_columns + list(remaining_columns)
+        remaining_columns = set(columns) - set(schema.required_call_columns)
+        columns = schema.required_call_columns + list(remaining_columns)
 
         # Stop injection
         assert (
-            set(columns) - set(all_call_select_columns) == set()
+            set(columns) - set(schema.all_call_select_columns) == set()
         ), f"Invalid columns: {columns}"
         merged_cols = []
         for col in columns:
@@ -917,7 +809,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not conditions:
             conditions = ["1 = 1"]
 
-        conditions_part = _combine_conditions(conditions, "AND")
+        conditions_part = query_builder.combine_conditions(conditions, "AND")
 
         order_by_part = "ORDER BY started_at ASC"
         if order_by is not None:
@@ -944,7 +836,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         inner_field,
                         param_builder,
                         _,
-                    ) = _transform_external_calls_field_to_internal_calls_field(
+                    ) = query_builder.transform_external_calls_field_to_internal_calls_field(
                         field, cast
                     )
                     parameters.update(param_builder.get_params())
@@ -975,7 +867,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {limit_part}
             {offset_part}
         """
-        print("query_str", query_str)
         raw_res = self._query_stream(
             query_str,
             parameters,
@@ -1000,7 +891,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not conditions:
             conditions = ["1 = 1"]
 
-        conditions_part = _combine_conditions(conditions, "AND")
+        conditions_part = query_builder.combine_conditions(conditions, "AND")
 
         if columns == None:
             columns = ["id"]
@@ -1009,7 +900,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             columns = ["id"]
         # Stop injection
         assert (
-            set(columns) - set(all_call_select_columns) == set()
+            set(columns) - set(schema.all_call_select_columns) == set()
         ), f"Invalid columns: {columns}"
         merged_cols = []
         for col in columns:
@@ -1048,11 +939,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions: typing.Optional[typing.List[str]] = None,
         limit: typing.Optional[int] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.List[SelectableCHObjSchema]:
+    ) -> typing.List[schema.SelectableCHObjSchema]:
         if not conditions:
             conditions = ["1 = 1"]
 
-        conditions_part = _combine_conditions(conditions, "AND")
+        conditions_part = query_builder.combine_conditions(conditions, "AND")
 
         limit_part = ""
         if limit != None:
@@ -1083,10 +974,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """,
             {"project_id": project_id, **parameters},
         )
-        result: typing.List[SelectableCHObjSchema] = []
+        result: typing.List[schema.SelectableCHObjSchema] = []
         for row in query_result:
             result.append(
-                SelectableCHObjSchema.model_validate(
+                schema.SelectableCHObjSchema.model_validate(
                     dict(
                         zip(
                             [
@@ -1167,10 +1058,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 raise RequestTooLarge("Could not insert record")
             raise
 
-    def _insert_call(self, ch_call: CallCHInsertable) -> None:
+    def _insert_call(self, ch_call: schema.CallCHInsertable) -> None:
         parameters = ch_call.model_dump()
         row = []
-        for key in all_call_insert_columns:
+        for key in schema.all_call_insert_columns:
             row.append(parameters.get(key, None))
         self._call_batch.append(row)
         if self._flush_immediately:
@@ -1239,11 +1130,11 @@ def _nullable_any_dump_to_any(
 
 def _raw_call_dict_to_ch_call(
     call: typing.Dict[str, typing.Any]
-) -> SelectableCHCallSchema:
-    return SelectableCHCallSchema.model_validate(call)
+) -> schema.SelectableCHCallSchema:
+    return schema.SelectableCHCallSchema.model_validate(call)
 
 
-def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
+def _ch_call_to_call_schema(ch_call: schema.SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
         id=ch_call.id,
@@ -1282,7 +1173,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
     )
 
 
-def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
+def _ch_obj_to_obj_schema(ch_obj: schema.SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
         project_id=ch_obj.project_id,
         object_id=ch_obj.object_id,
@@ -1298,12 +1189,12 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
 
 def _start_call_for_insert_to_ch_insertable_start_call(
     start_call: tsi.StartedCallSchemaForInsert,
-) -> CallStartCHInsertable:
+) -> schema.CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
-    return CallStartCHInsertable(
+    return schema.CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
         trace_id=trace_id,
@@ -1320,10 +1211,10 @@ def _start_call_for_insert_to_ch_insertable_start_call(
 
 def _end_call_for_insert_to_ch_insertable_end_call(
     end_call: tsi.EndedCallSchemaForInsert,
-) -> CallEndCHInsertable:
+) -> schema.CallEndCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
-    return CallEndCHInsertable(
+    return schema.CallEndCHInsertable(
         project_id=end_call.project_id,
         id=end_call.id,
         exception=end_call.exception,
@@ -1350,10 +1241,10 @@ def _process_parameters(
 
 # def _partial_obj_schema_to_ch_obj(
 #     partial_obj: tsi.ObjSchemaForInsert,
-# ) -> ObjCHInsertable:
+# ) -> schema.ObjCHInsertable:
 #     version_hash = version_hash_for_object(partial_obj)
 
-#     return ObjCHInsertable(
+#     return schema.ObjCHInsertable(
 #         id=uuid.uuid4(),
 #         project_id=partial_obj.project_id,
 #         name=partial_obj.name,
@@ -1407,16 +1298,9 @@ def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
         return (False, -1)
 
 
-def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
-    if operator not in ("AND", "OR"):
-        raise ValueError(f"Invalid operator: {operator}")
-    combined = f" {operator} ".join([f"({c})" for c in conditions])
-    return f"({combined})"
-
-
 def find_call_descendants(
     root_ids: typing.List[str],
-    all_calls: typing.List[SelectableCHCallSchema],
+    all_calls: typing.List[schema.SelectableCHCallSchema],
 ) -> typing.List[str]:
     # make a map of call_id to children list
     children_map = defaultdict(list)
@@ -1443,56 +1327,6 @@ def find_call_descendants(
     return list(descendants)
 
 
-param_builder_count = 0
-
-
-class ParamBuilder:
-    def __init__(self, prefix: typing.Optional[str] = None):
-        global param_builder_count
-        param_builder_count += 1
-        self._params: typing.Dict[str, typing.Any] = {}
-        self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
-
-    def add_param(self, param_value: typing.Any) -> str:
-        param_name = self._prefix + str(len(self._params))
-        self._params[param_name] = param_value
-        return param_name
-
-    def get_params(self) -> typing.Dict[str, typing.Any]:
-        return {**self._params}
-
-
-def _python_value_to_ch_type(value: typing.Any) -> str:
-    if isinstance(value, str):
-        return "String"
-    elif isinstance(value, int):
-        return "UInt64"
-    elif isinstance(value, float):
-        return "Float64"
-    elif isinstance(value, bool):
-        return "UInt8"
-    elif value is None:
-        return "Nullable(String)"
-    else:
-        raise ValueError(f"Unknown value type: {value}")
-
-
-def _param_slot(param_name: str, param_type: str) -> str:
-    return f"{{{param_name}:{param_type}}}"
-
-
-def _quote_json_path(path: str) -> str:
-    parts = path.split(".")
-    parts_final = []
-    for part in parts:
-        try:
-            int(part)
-            parts_final.append("[" + part + "]")
-        except ValueError:
-            parts_final.append('."' + part + '"')
-    return "$" + "".join(parts_final)
-
-
 def _is_dynamic_field(field: str) -> bool:
     return (
         field in ["inputs", "output", "attributes", "summary"]
@@ -1501,263 +1335,3 @@ def _is_dynamic_field(field: str) -> bool:
         or field.startswith("attributes.")
         or field.startswith("summary.")
     )
-
-
-def _transform_external_calls_field_to_internal_calls_field(
-    field: str,
-    cast: typing.Optional[str] = None,
-    param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[str, ParamBuilder, set[str]]:
-    param_builder = param_builder or ParamBuilder()
-    raw_fields_used = set()
-    json_path = None
-    if field == "inputs" or field.startswith("inputs."):
-        if field == "inputs":
-            json_path = "$"
-        else:
-            json_path = _quote_json_path(field[len("inputs.") :])
-        field = "inputs_dump"
-    elif field == "output" or field.startswith("output."):
-        if field == "output":
-            json_path = "$"
-        else:
-            json_path = _quote_json_path(field[len("output.") :])
-        field = "output_dump"
-    elif field == "attributes" or field.startswith("attributes."):
-        if field == "attributes":
-            json_path = "$"
-        else:
-            json_path = _quote_json_path(field[len("attributes.") :])
-        field = "attributes_dump"
-    elif field == "summary" or field.startswith("summary."):
-        if field == "summary":
-            json_path = "$"
-        else:
-            json_path = _quote_json_path(field[len("summary.") :])
-        field = "summary_dump"
-    else:
-        assert field in all_call_select_columns, f"Invalid order_by field: {field}"
-
-    # validate field
-    if field not in all_call_select_columns:
-        raise ValueError(f"Unknown field: {field}")
-
-    raw_fields_used.add(field)
-    if json_path is not None:
-        json_path_param_name = param_builder.add_param(json_path)
-        if cast == "exists":
-            field = (
-                "(JSON_EXISTS(" + field + ", {" + json_path_param_name + ":String}))"
-            )
-        else:
-            method = "toString"
-            if cast is not None:
-                if cast == "int":
-                    method = "toInt64OrNull"
-                elif cast == "float":
-                    method = "toFloat64OrNull"
-                elif cast == "bool":
-                    method = "toUInt8OrNull"
-                elif cast == "str":
-                    method = "toString"
-                else:
-                    raise ValueError(f"Unknown cast: {cast}")
-            field = (
-                method
-                + "(JSON_VALUE("
-                + field
-                + ", {"
-                + json_path_param_name
-                + ":String}))"
-            )
-
-    return field, param_builder, raw_fields_used
-
-
-def _process_calls_filter_to_conditions(
-    filter: tsi._CallsFilter,
-    param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[list[str], ParamBuilder, set[str]]:
-    param_builder = param_builder or ParamBuilder()
-    conditions = []
-    raw_fields_used = set()
-
-    if filter.op_names:
-        # We will build up (0 or 1) + N conditions for the op_version_refs
-        # If there are any non-wildcarded names, then we at least have an IN condition
-        # If there are any wildcarded names, then we have a LIKE condition for each
-
-        or_conditions: typing.List[str] = []
-
-        non_wildcarded_names: typing.List[str] = []
-        wildcarded_names: typing.List[str] = []
-        for name in filter.op_names:
-            if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                wildcarded_names.append(name)
-            else:
-                non_wildcarded_names.append(name)
-
-        if non_wildcarded_names:
-            or_conditions.append(
-                f"op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
-            )
-            raw_fields_used.add("op_name")
-
-        for name in wildcarded_names:
-            like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-            or_conditions.append(
-                f"op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
-            )
-            raw_fields_used.add("op_name")
-
-        if or_conditions:
-            conditions.append(_combine_conditions(or_conditions, "OR"))
-
-    if filter.input_refs:
-        conditions.append(
-            f"hasAny(input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
-        )
-        raw_fields_used.add("input_refs")
-
-    if filter.output_refs:
-        conditions.append(
-            f"hasAny(output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
-        )
-        raw_fields_used.add("output_refs")
-
-    if filter.parent_ids:
-        conditions.append(
-            f"parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("parent_id")
-
-    if filter.trace_ids:
-        conditions.append(
-            f"trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("trace_id")
-
-    if filter.call_ids:
-        conditions.append(
-            f"id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
-        )
-        raw_fields_used.add("id")
-
-    if filter.trace_roots_only:
-        conditions.append("parent_id IS NULL")
-        raw_fields_used.add("parent_id")
-
-    if filter.wb_user_ids:
-        conditions.append(
-            f"wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
-        )
-        raw_fields_used.add("wb_user_id")
-
-    if filter.wb_run_ids:
-        conditions.append(
-            f"wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
-        )
-        raw_fields_used.add("wb_run_id")
-
-    return conditions, param_builder, raw_fields_used
-
-
-def _process_calls_query_to_conditions(
-    query: tsi.Query, param_builder: typing.Optional[ParamBuilder] = None
-) -> tuple[list[str], ParamBuilder, set[str]]:
-    param_builder = param_builder or ParamBuilder()
-    conditions = []
-    raw_fields_used = set()
-    # This is the mongo-style query
-    def process_operation(operation: tsi_query.Operation) -> str:
-        cond = None
-
-        if isinstance(operation, tsi_query.AndOperation):
-            if len(operation.and_) == 0:
-                raise ValueError("Empty AND operation")
-            elif len(operation.and_) == 1:
-                return process_operand(operation.and_[0])
-            parts = [process_operand(op) for op in operation.and_]
-            cond = f"({' AND '.join(parts)})"
-        elif isinstance(operation, tsi_query.OrOperation):
-            if len(operation.or_) == 0:
-                raise ValueError("Empty OR operation")
-            elif len(operation.or_) == 1:
-                return process_operand(operation.or_[0])
-            parts = [process_operand(op) for op in operation.or_]
-            cond = f"({' OR '.join(parts)})"
-        elif isinstance(operation, tsi_query.NotOperation):
-            operand_part = process_operand(operation.not_[0])
-            cond = f"(NOT ({operand_part}))"
-        elif isinstance(operation, tsi_query.EqOperation):
-            lhs_part = process_operand(operation.eq_[0])
-            rhs_part = process_operand(operation.eq_[1])
-            cond = f"({lhs_part} = {rhs_part})"
-        elif isinstance(operation, tsi_query.GtOperation):
-            lhs_part = process_operand(operation.gt_[0])
-            rhs_part = process_operand(operation.gt_[1])
-            cond = f"({lhs_part} > {rhs_part})"
-        elif isinstance(operation, tsi_query.GteOperation):
-            lhs_part = process_operand(operation.gte_[0])
-            rhs_part = process_operand(operation.gte_[1])
-            cond = f"({lhs_part} >= {rhs_part})"
-        elif isinstance(operation, tsi_query.SubstrOperation):
-            lhs_part = process_operand(operation.substr_[0])
-            rhs_part = process_operand(operation.substr_[1])
-            cond = f"position({lhs_part}, {rhs_part}) > 0"
-        else:
-            raise ValueError(f"Unknown operation type: {operation}")
-
-        return cond
-
-    def process_operand(operand: tsi_query.Operand) -> str:
-        if isinstance(operand, tsi_query.LiteralOperation):
-            return _param_slot(
-                param_builder.add_param(operand.literal_),  # type: ignore
-                _python_value_to_ch_type(operand.literal_),
-            )
-        elif isinstance(operand, tsi_query.GetFieldOperator):
-            (
-                field,
-                _,
-                fields_used,
-            ) = _transform_external_calls_field_to_internal_calls_field(
-                operand.get_field_, None, param_builder
-            )
-            raw_fields_used.update(fields_used)
-            return field
-        elif isinstance(operand, tsi_query.ConvertOperation):
-            field = process_operand(operand.convert_.input)
-            convert_to = operand.convert_.to
-            if convert_to == "int":
-                method = "toInt64OrNull"
-            elif convert_to == "double":
-                method = "toFloat64OrNull"
-            elif convert_to == "bool":
-                method = "toUInt8OrNull"
-            elif convert_to == "string":
-                method = "toString"
-            else:
-                raise ValueError(f"Unknown cast: {convert_to}")
-            return f"{method}({field})"
-        elif isinstance(
-            operand,
-            (
-                tsi_query.AndOperation,
-                tsi_query.OrOperation,
-                tsi_query.NotOperation,
-                tsi_query.EqOperation,
-                tsi_query.GtOperation,
-                tsi_query.GteOperation,
-                tsi_query.SubstrOperation,
-            ),
-        ):
-            return process_operation(operand)
-        else:
-            raise ValueError(f"Unknown operand type: {operand}")
-
-    filter_cond = process_operation(query.expr_)
-
-    conditions.append(filter_cond)
-
-    return conditions, param_builder, raw_fields_used
