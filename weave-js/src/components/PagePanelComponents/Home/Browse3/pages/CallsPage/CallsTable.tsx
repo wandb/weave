@@ -51,7 +51,7 @@ import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
 import {
   EXPANDED_REF_REF_KEY,
   EXPANDED_REF_VAL_KEY,
-} from '../wfReactInterface/tsDataModelHooks';
+} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {
   CallSchema,

@@ -11,8 +11,6 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
-import {isRef} from '../common/util';
-// import {refStringToRefDict} from '../wfInterface/naive';
 import {
   callCache,
   objectVersionCache,
@@ -23,6 +21,7 @@ import {WANDB_ARTIFACT_REF_PREFIX, WEAVE_REF_PREFIX} from './constants';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import {Query} from './traceServerClientInterface/query';
+import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {refUriToObjectVersionKey, refUriToOpVersionKey} from './utilities';
 import {
   CallFilter,
@@ -294,9 +293,6 @@ const useCallsNoExpansion = (
   }, [callRes, entity, project, opts?.skip]);
 };
 
-export const EXPANDED_REF_REF_KEY = '__ref__';
-export const EXPANDED_REF_VAL_KEY = '__val__';
-
 const useCalls = (
   entity: string,
   project: string,
@@ -308,7 +304,6 @@ const useCalls = (
   expandedRefColumns?: Set<string>,
   opts?: {skip?: boolean}
 ): Loadable<CallSchema[]> => {
-  const getTsClient = useGetTraceServerClientContext();
   const calls = useCallsNoExpansion(
     entity,
     project,
@@ -320,125 +315,20 @@ const useCalls = (
     opts
   );
 
-  const [expandedCalls, setExpandedCalls] = useState<CallSchema[]>([]);
-  const [isExpanding, setIsExpanding] = useState(false);
+  // This is a temporary solution until the trace server supports
+  // backend expansions of refs. We should expect to see this go away, and
+  // this entire function replaced with the contents of `useCallsNoExpansion`.
+  const {expandedCalls, isExpanding} = useClientSideCallRefExpansion(
+    calls,
+    expandedRefColumns
+  );
 
-  useEffect(() => {
-    if (calls.loading || calls.result == null) {
-      setExpandedCalls([]);
-      setIsExpanding(true);
-      return;
-    }
-
-    const doExpansionIteration = async (
-      traceCalls: traceServerClient.TraceCallSchema[]
-    ) => {
-      const refsNeeded = new Set<string>();
-      const expandedRefColumnsList = Array.from(expandedRefColumns ?? []);
-      traceCalls.forEach(call => {
-        expandedRefColumnsList.forEach(col => {
-          const colParts = col.split('.');
-          let value: any = call;
-          for (const part of colParts) {
-            while (
-              typeof value === 'object' &&
-              value != null &&
-              EXPANDED_REF_VAL_KEY in value
-            ) {
-              value = value[EXPANDED_REF_VAL_KEY];
-            }
-            if (value == null) {
-              break;
-            }
-            if (typeof value !== 'object' || !(part in value)) {
-              value = null;
-              break;
-            }
-            value = value[part];
-          }
-          while (
-            typeof value === 'object' &&
-            value != null &&
-            EXPANDED_REF_VAL_KEY in value
-          ) {
-            value = value[EXPANDED_REF_VAL_KEY];
-          }
-          if (isRef(value)) {
-            refsNeeded.add(value);
-          }
-        });
-      });
-
-      const refsNeededArray = Array.from(refsNeeded);
-
-      if (refsNeededArray.length === 0) {
-        setExpandedCalls(traceCalls.map(traceCallToUICallSchema));
-        setIsExpanding(false);
-        return;
-      }
-
-      setIsExpanding(true);
-      const refsData = await directFetchRefsData(
-        refsNeededArray,
-        getTsClient()
-      );
-      const refsDataMap = new Map<string, any>();
-      refsNeededArray.forEach((ref, i) => {
-        refsDataMap.set(ref, refsData[i]);
-      });
-
-      const expandedTraceCalls = traceCalls.map(call => {
-        call = _.cloneDeep(call);
-        expandedRefColumnsList.forEach(col => {
-          const colParts = col.split('.');
-          let value: any = call;
-          const path: string[] = [];
-          for (const part of colParts) {
-            while (
-              typeof value === 'object' &&
-              value != null &&
-              EXPANDED_REF_VAL_KEY in value
-            ) {
-              value = value[EXPANDED_REF_VAL_KEY];
-              path.push(EXPANDED_REF_VAL_KEY);
-            }
-            if (value == null) {
-              break;
-            }
-            if (typeof value !== 'object' || !(part in value)) {
-              value = null;
-              break;
-            }
-            value = value[part];
-            path.push(part);
-          }
-          while (
-            typeof value === 'object' &&
-            value != null &&
-            EXPANDED_REF_VAL_KEY in value
-          ) {
-            value = value[EXPANDED_REF_VAL_KEY];
-            path.push(EXPANDED_REF_VAL_KEY);
-          }
-          if (isRef(value) && refsDataMap.has(value)) {
-            const refObj = refsDataMap.get(value);
-            _.set(call, path, {
-              [EXPANDED_REF_REF_KEY]: value,
-              [EXPANDED_REF_VAL_KEY]: refObj,
-            });
-          }
-        });
-        return call;
-      });
-
-      doExpansionIteration(expandedTraceCalls);
-    };
-
-    doExpansionIteration(calls.result.map(c => c.traceCall!));
-  }, [calls.loading, calls.result, expandedRefColumns, getTsClient]);
   const loading = calls.loading || isExpanding;
   return useMemo(() => {
-    return {loading, result: loading ? [] : expandedCalls};
+    return {
+      loading,
+      result: loading ? [] : expandedCalls.map(traceCallToUICallSchema),
+    };
   }, [expandedCalls, loading]);
 };
 
@@ -868,34 +758,6 @@ const useChildCallsForCompare = (
   return result;
 };
 
-const directFetchRefsData = async (
-  refUris: string[],
-  client: traceServerClient.TraceServerClient
-): Promise<any[]> => {
-  const needed: string[] = [];
-  const cached: Record<string, any> = {};
-  refUris.forEach(sUri => {
-    const res = refDataCache.get(sUri);
-    if (res == null) {
-      needed.push(sUri);
-    } else {
-      cached[sUri] = res;
-    }
-  });
-
-  const batchResults = await client.readBatch({
-    refs: needed,
-  });
-
-  needed.forEach((uri, i) => {
-    const val = batchResults.vals[i];
-    refDataCache.set(uri, val);
-    cached[uri] = val;
-  });
-
-  return refUris.map(uri => cached[uri]);
-};
-
 const useRefsData = (
   refUris: string[],
   tableQuery?: TableQuery
@@ -1268,7 +1130,7 @@ const projectIdToParts = (projectId: string) => {
   return {entity, project};
 };
 
-const traceCallToUICallSchema = (
+export const traceCallToUICallSchema = (
   traceCall: traceServerClient.TraceCallSchema
 ): CallSchema => {
   const {entity, project} = projectIdToParts(traceCall.project_id);
