@@ -226,6 +226,9 @@ const useCallsNoExpansion = (
   const deepFilter = useDeepMemo(filter);
 
   const doFetch = useCallback(() => {
+    if (opts?.skip) {
+      return;
+    }
     setCallRes(null);
     loadingRef.current = true;
     const req: traceServerClient.TraceCallsQueryReq = {
