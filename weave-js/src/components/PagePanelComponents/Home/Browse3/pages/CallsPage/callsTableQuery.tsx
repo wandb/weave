@@ -200,29 +200,31 @@ export const allOperators = Object.entries(allGeneralPurposeOperators).flatMap(
 const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
   if (item.operator === '(any): isEmpty') {
     return {
-      eq_: [{field_: item.field}, {value_: ''}],
+      eq_: [{get_field_: item.field}, {literal_: ''}],
     };
   } else if (item.operator === '(any): isNotEmpty') {
     return {
-      not_: {
-        eq_: [{field_: item.field}, {value_: ''}],
-      },
+      not_: [
+        {
+          eq_: [{get_field_: item.field}, {literal_: ''}],
+        },
+      ],
     };
   } else if (item.operator === '(string): contains') {
     return {
-      like_: [{field_: item.field}, {value_: '%' + item.value + '%'}],
+      substr_: [{get_field_: item.field}, {literal_: '%' + item.value + '%'}],
     };
   } else if (item.operator === '(string): equals') {
     return {
-      eq_: [{field_: item.field}, {value_: item.value}],
+      eq_: [{get_field_: item.field}, {literal_: item.value}],
     };
   } else if (item.operator === '(string): startsWith') {
     return {
-      like_: [{field_: item.field}, {value_: '%' + item.value}],
+      substr_: [{get_field_: item.field}, {literal_: '%' + item.value}],
     };
   } else if (item.operator === '(string): endsWith') {
     return {
-      like_: [{field_: item.field}, {value_: item.value + '%'}],
+      substr_: [{get_field_: item.field}, {literal_: item.value + '%'}],
     };
   } else if (item.operator === '(number): =') {
     if (item.value === '') {
@@ -230,7 +232,10 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      eq_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+      eq_: [
+        {convert_: {input: {get_field_: item.field}, to: 'double'}},
+        {literal_: val},
+      ],
     };
   } else if (item.operator === '(number): !=') {
     if (item.value === '') {
@@ -238,9 +243,14 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      not_: {
-        eq_: [{field_: item.field, cast_: 'float'}, {value_: val}],
-      },
+      not_: [
+        {
+          eq_: [
+            {convert_: {input: {get_field_: item.field}, to: 'double'}},
+            {literal_: val},
+          ],
+        },
+      ],
     };
   } else if (item.operator === '(number): >') {
     if (item.value === '') {
@@ -248,7 +258,10 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      gt_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+      gt_: [
+        {convert_: {input: {get_field_: item.field}, to: 'double'}},
+        {literal_: val},
+      ],
     };
   } else if (item.operator === '(number): >=') {
     if (item.value === '') {
@@ -256,7 +269,10 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      gte_: [{field_: item.field, cast_: 'float'}, {value_: val}],
+      gte_: [
+        {convert_: {input: {get_field_: item.field}, to: 'double'}},
+        {literal_: val},
+      ],
     };
   } else if (item.operator === '(number): <') {
     if (item.value === '') {
@@ -264,9 +280,14 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      not_: {
-        gte_: [{field_: item.field, cast_: 'float'}, {value_: val}],
-      },
+      not_: [
+        {
+          gte_: [
+            {convert_: {input: {get_field_: item.field}, to: 'double'}},
+            {literal_: val},
+          ],
+        },
+      ],
     };
   } else if (item.operator === '(number): <=') {
     if (item.value === '') {
@@ -274,16 +295,21 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const val = parseFloat(item.value);
     return {
-      not_: {
-        lte_: [{field_: item.field, cast_: 'float'}, {value_: val}],
-      },
+      not_: [
+        {
+          gt_: [
+            {convert_: {input: {get_field_: item.field}, to: 'double'}},
+            {literal_: val},
+          ],
+        },
+      ],
     };
   } else if (item.operator === '(bool): is') {
     if (item.value === '') {
       return null;
     }
     return {
-      eq_: [{field_: item.field}, {value_: item.value}],
+      eq_: [{get_field_: item.field}, {literal_: item.value}],
     };
   } else if (item.operator === '(date): after') {
     if (item.value === '') {
@@ -291,7 +317,10 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const secs = new Date(item.value).getTime();
     return {
-      gt_: [{field_: item.field, cast_: 'float'}, {value_: secs / 1000}],
+      gt_: [
+        {convert_: {input: {get_field_: item.field}, to: 'double'}},
+        {literal_: secs / 1000},
+      ],
     };
   } else if (item.operator === '(date): before') {
     if (item.value === '') {
@@ -299,9 +328,14 @@ const operationConverter = (item: GridFilterItem): null | Query['expr_'] => {
     }
     const secs = new Date(item.value).getTime();
     return {
-      not_: {
-        gt_: [{field_: item.field, cast_: 'float'}, {value_: secs / 1000}],
-      },
+      not_: [
+        {
+          gt_: [
+            {convert_: {input: {get_field_: item.field}, to: 'double'}},
+            {literal_: secs / 1000},
+          ],
+        },
+      ],
     };
   } else {
     throw new Error('Unsupported operator');
