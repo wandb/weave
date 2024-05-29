@@ -70,7 +70,7 @@ export const useCallsForQuery = (
       return convertedItems[0];
     }
 
-    const operation = gridFilter.logicOperator === 'or' ? 'or_' : 'and_'; // and is default
+    const operation = gridFilter.logicOperator === 'or' ? '$or' : '$and'; // and is default
 
     return {
       [operation]: convertedItems,
