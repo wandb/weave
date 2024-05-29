@@ -1086,10 +1086,18 @@ const useFileContent = (
   throw new Error('Not implemented');
 };
 
+const useCallsDeleteFunc = (): ((
+  projectID: string,
+  callIDs: string[]
+) => Promise<void>) => {
+  throw new Error('Not implemented');
+};
+
 export const cgWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
   useCallsStats,
+  useCallsDeleteFunc,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

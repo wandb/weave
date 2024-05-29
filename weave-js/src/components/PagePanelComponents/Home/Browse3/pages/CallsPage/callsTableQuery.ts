@@ -92,7 +92,10 @@ export const useCallsForQuery = (
     offset,
     sortBy,
     filterBy,
-    expandedColumns
+    expandedColumns,
+    {
+      refetchOnDelete: true
+    }
   );
 
   const callsStats = useCallsStats(entity, project, lowLevelFilter, filterBy);
