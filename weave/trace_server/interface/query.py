@@ -1,19 +1,25 @@
 """
 This file contains the interface definition for the Trace Server Query model. It
 is heavily inspired by the MongoDB query language, but is a subset of the full
-MongoDB query language. In particular, we have made the following simplifications:
-* We only support the "aggregation" operators, not the "query" operators. This is purely
-    for simplicity and because the "aggregation" operators are more powerful. The Mongo docs
-    language has evolved over time and the primary query language is column-oriented. However, the
-    more expressive aggregation language is more expressive and can be used for both direct queries,
-    but also for column comparison and calculations. We can add support for the "query" operators
-    in the future if needed.
-* We only support a subset of the operators / shorthand forms for now. We can add more operators
-    in the future as needed.
-    * One notable omission here is the lack of support for "$field" as a shorthand for the "getField"
-        operator.
-* We have _added_ a `$contains` operator which is not in the MongoDB query language. This is a simple
-    substring match operator.
+MongoDB query language. In particular, we have made the following
+simplifications:
+
+* We only support the "aggregation" operators, not the "query" operators. This is
+    purely for simplicity and because the "aggregation" operators are more powerful.
+    The Mongo docs language has evolved over time and the primary query language
+    is column-oriented. However, the more expressive aggregation language can be
+    used for both direct queries, but also for column comparison and
+    calculations. We can add support for the "query" operators in the future if
+    needed. 
+    
+* We only support a subset of the operators / shorthand forms for now. We can add
+    more operators in the future as needed.
+    
+    * One notable omission here is the lack of support for "$field" as a shorthand for
+        the "getField"  operator.
+    
+* We have _added_ a `$contains` operator which is not in the MongoDB query
+    language. This is a simple substring match operator.
 """
 
 import typing

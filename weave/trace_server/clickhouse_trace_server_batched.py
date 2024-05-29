@@ -959,7 +959,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
                 # For each option, build the order by term
                 for cast, direct in options:
-                    # Future refactor: this entire section should be moved into it's own helper
+                    # Future refactor: this entire section should be moved into its own helper
                     # method and hoisted out of this function
                     (
                         inner_field,
@@ -1542,7 +1542,7 @@ def _quote_json_path(path: str) -> str:
 def _is_dynamic_field(field: str) -> bool:
     """Dynamic fields are fields that are arbitrary values produced by the user."""
     return (
-        field in ["inputs", "output", "attributes", "summary"]
+        field in ("inputs", "output", "attributes", "summary")
         or field.startswith("inputs.")
         or field.startswith("output.")
         or field.startswith("attributes.")

@@ -708,9 +708,6 @@ def test_trace_call_filter(client):
 
     @weave.op()
     def basic_op(in_val: dict, delay) -> dict:
-        import time
-
-        time.sleep(delay)
         return in_val
 
     for i in range(10):
@@ -810,7 +807,7 @@ def test_trace_call_filter(client):
             6
             + (
                 1 if is_sql_lite else 0
-            ),  # SQLLite casting transforms strings to 0, instead of NULL
+            ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
                     {
@@ -832,7 +829,7 @@ def test_trace_call_filter(client):
             5
             + (
                 1 if is_sql_lite else 0
-            ),  # SQLLite casting transforms strings to 0, instead of NULL
+            ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
                     {
@@ -854,7 +851,7 @@ def test_trace_call_filter(client):
             13
             + (
                 -2 if is_sql_lite else 0
-            ),  # SQLLite returns NULL for non-existent fields rather than ''.
+            ),  # SQLite returns NULL for non-existent fields rather than ''.
             {
                 "$contains": {
                     "input": {"$getField": "inputs.in_val.str"},
@@ -932,7 +929,7 @@ def test_trace_call_filter(client):
             5
             + (
                 1 if is_sql_lite else 0
-            ),  # SQLLite casting transforms strings to 0, instead of NULL
+            ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$or": [
                     {
