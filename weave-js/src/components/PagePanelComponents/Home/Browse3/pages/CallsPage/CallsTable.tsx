@@ -79,7 +79,6 @@ export const CallsTable: FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelCallFilter) => void;
   hideControls?: boolean;
-  ioColumnsOnly?: boolean;
 }> = ({
   entity,
   project,
@@ -87,7 +86,6 @@ export const CallsTable: FC<{
   onFilterUpdate,
   frozenFilter,
   hideControls,
-  ioColumnsOnly,
 }) => {
   const {addExtra, removeExtra} = useContext(WeaveHeaderExtrasContext);
 
@@ -230,8 +228,7 @@ export const CallsTable: FC<{
     expandedRefCols,
     onCollapse,
     onExpand,
-    columnIsRefExpanded,
-    ioColumnsOnly
+    columnIsRefExpanded
   );
 
   // Now, there are 4 primary controls:

@@ -44,8 +44,7 @@ export const useCallsTableColumns = (
   expandedRefCols: Set<string>,
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
-  columnIsRefExpanded: (col: string) => boolean,
-  ioColumnsOnly: boolean | undefined
+  columnIsRefExpanded: (col: string) => boolean
 ) => {
   const [userDefinedColumnWidths, setUserDefinedColumnWidths] = useState<
     Record<string, number>
@@ -123,7 +122,6 @@ export const useCallsTableColumns = (
         columnsWithRefs,
         onExpand,
         columnIsRefExpanded,
-        ioColumnsOnly,
         userDefinedColumnWidths
       ),
     [
@@ -138,7 +136,6 @@ export const useCallsTableColumns = (
       columnsWithRefs,
       onExpand,
       columnIsRefExpanded,
-      ioColumnsOnly,
       userDefinedColumnWidths,
     ]
   );
@@ -162,7 +159,6 @@ function buildCallsTableColumns(
   columnsWithRefs: Set<string>,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  ioColumnsOnly: boolean | undefined,
   userDefinedColumnWidths: Record<string, number>
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
@@ -379,27 +375,25 @@ function buildCallsTableColumns(
     },
   });
 
-  if (!ioColumnsOnly) {
-    const startedAtCol: GridColDef<TraceCallSchema> = {
-      field: 'started_at',
-      headerName: 'Called',
-      // Should have custom timestamp filter here.
-      filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
-      sortable: true,
-      width: 100,
-      minWidth: 100,
-      maxWidth: 100,
-      renderCell: cellParams => {
-        return (
-          <Timestamp
-            value={convertISOToDate(cellParams.row.started_at).getTime() / 1000}
-            format="relative"
-          />
-        );
-      },
-    };
-    cols.push(startedAtCol);
-  }
+  const startedAtCol: GridColDef<TraceCallSchema> = {
+    field: 'started_at',
+    headerName: 'Called',
+    // Should have custom timestamp filter here.
+    filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
+    sortable: true,
+    width: 100,
+    minWidth: 100,
+    maxWidth: 100,
+    renderCell: cellParams => {
+      return (
+        <Timestamp
+          value={convertISOToDate(cellParams.row.started_at).getTime() / 1000}
+          format="relative"
+        />
+      );
+    },
+  };
+  cols.push(startedAtCol);
 
   cols.push({
     field: 'derived.latency',
