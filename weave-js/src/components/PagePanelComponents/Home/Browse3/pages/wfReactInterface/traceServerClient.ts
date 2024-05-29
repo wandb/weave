@@ -184,14 +184,23 @@ export class TraceServerClient {
     this.onDeleteListeners = [];
   }
 
-  onCallDelete: (onDeleteCallback: () => void) => void = cb => {
-    this.onDeleteListeners.push(cb);
+  /**
+   * Registers a callback to be called when a delete operation occurs.
+   * This method is purely for local notification within the client
+   *    and does not interact with the REST API.
+   *
+   * @param callback A function to be called when a delete operation is triggered.
+   * @returns A function to unregister the callback.
+   */
+  public registerOnDeleteListener(callback: () => void): () => void {
+    this.onDeleteListeners.push(callback);
     return () => {
       this.onDeleteListeners = this.onDeleteListeners.filter(
-        listener => listener !== cb
+        listener => listener !== callback
       );
     };
-  };
+  }
+
   callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
     const res = this.makeRequest<TraceCallsDeleteReq, void>(
       '/calls/delete',

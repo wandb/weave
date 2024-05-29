@@ -48,8 +48,19 @@ const projectIdFromParts = ({
   project: string;
 }) => `${entity}/${project}`;
 
+// Trace server client keys that are promises
+type TraceServerClientPromiseKeys = {
+  [K in keyof traceServerClient.TraceServerClient]: traceServerClient.TraceServerClient[K] extends (
+    ...args: any
+  ) => Promise<any>
+    ? K extends 'onCallDelete'
+      ? never
+      : K
+    : never;
+}[keyof traceServerClient.TraceServerClient];
+
 const makeTraceServerEndpointHook = <
-  FN extends keyof traceServerClient.TraceServerClient,
+  FN extends TraceServerClientPromiseKeys,
   Input extends any[],
   Output
 >(
@@ -113,7 +124,7 @@ const makeTraceServerEndpointHook = <
 };
 
 const useMakeTraceServerEndpoint = <
-  FN extends keyof traceServerClient.TraceServerClient,
+  FN extends TraceServerClientPromiseKeys,
   Input extends any[],
   Output
 >(
@@ -242,8 +253,9 @@ const useCalls = (
   // register doFetch as a callback after deletion
   useEffect(() => {
     if (opts?.refetchOnDelete) {
-      return getTsClient().onCallDelete(doFetch);
+      return getTsClient().registerOnDeleteListener(doFetch);
     }
+    return () => {};
   }, [opts?.refetchOnDelete, getTsClient, doFetch]);
 
   useEffect(() => {
@@ -298,7 +310,6 @@ const useCallsDeleteFunc = () => {
           call_ids: callIDs,
         })
         .then(() => {
-          // remove from cache
           callIDs.forEach(callId => {
             callCache.del({
               entity: projectID.split('/')[0],
