@@ -242,24 +242,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryRes(calls=list(stream))
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        """Returns a stats object for the given query. This is useful for counts or other
+        aggregate statistics that are not directly queryable from the calls themselves.
+        """
         conditions = []
         param_builder = ParamBuilder()
         raw_fields_used = set()
 
+        # First, apply the application filter
         if req.filter:
-            filter_conds, _, fields_used = _process_calls_filter_to_conditions(
+            filter_conds, fields_used = _process_calls_filter_to_conditions(
                 req.filter, param_builder
             )
             raw_fields_used.update(fields_used)
             conditions.extend(filter_conds)
 
+        # Next, apply the query filter
         if req.query:
-            query_conds, _, fields_used = _process_calls_query_to_conditions(
+            query_conds, fields_used = _process_calls_query_to_conditions(
                 req.query, param_builder
             )
             raw_fields_used.update(fields_used)
             conditions.extend(query_conds)
 
+        # Perform the query against the database
         stats = self._calls_query_stats_raw(
             req.project_id,
             columns=list(raw_fields_used),
@@ -267,38 +273,46 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=param_builder.get_params(),
         )
 
+        # Return the marshaled response
         return tsi.CallsQueryStatsRes(count=stats["count"])
 
     def calls_query_stream(
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
+        """Returns a stream of calls that match the given query."""
         conditions = []
         param_builder = ParamBuilder()
 
+        # First, apply the application filter
         if req.filter:
-            (
-                filter_conds,
-                _,
-                _,
-            ) = _process_calls_filter_to_conditions(req.filter, param_builder)
+            (filter_conds, _) = _process_calls_filter_to_conditions(
+                req.filter, param_builder
+            )
             conditions.extend(filter_conds)
 
+        # Next, apply the query filter
         if req.query:
-            query_conds, _, _ = _process_calls_query_to_conditions(
+            query_conds, _ = _process_calls_query_to_conditions(
                 req.query, param_builder
             )
             conditions.extend(query_conds)
 
+        # Perform the query against the database
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
             conditions=conditions,
             parameters=param_builder.get_params(),
             limit=req.limit,
             offset=req.offset,
+            # This order-by clause creation should probably be moved into this function
+            # and passed down as a processed object. It will follow the same patterns as
+            # the filters and queries.
             order_by=None
             if not req.sort_by
             else [(s.field, s.direction) for s in req.sort_by],
         )
+
+        # Yield the marshaled response
         for ch_dict in ch_call_dicts:
             yield tsi.CallSchema.model_validate(
                 _ch_call_dict_to_call_schema_dict(ch_dict)
@@ -930,6 +944,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
 
+                # For each order by field, if it is a dynamic field, we generate
+                # 3 order by terms: one for existence, one for float casting, and one for string casting.
+                # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
                 if _is_dynamic_field(field):
                     # Prioritize existence, then cast to float, then str
                     options = [
@@ -939,7 +956,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     ]
                 else:
                     options = [(field, direction)]
+
+                # For each option, build the order by term
                 for cast, direct in options:
+                    # Future refactor: this entire section should be moved into it's own helper
+                    # method and hoisted out of this function
                     (
                         inner_field,
                         param_builder,
@@ -975,7 +996,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             {limit_part}
             {offset_part}
         """
-        print("query_str", query_str)
         raw_res = self._query_stream(
             query_str,
             parameters,
@@ -991,6 +1011,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         conditions: typing.Optional[typing.List[str]] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.Dict:
+        """Generates and executes a query to get stats for a calls query."""
         if not parameters:
             parameters = {}
         parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
@@ -1123,6 +1144,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: typing.Dict[str, typing.Any],
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.Iterator[QueryResult]:
+        """Streams the results of a query from the database."""
         print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
         with self.ch_client.query_rows_stream(
@@ -1137,6 +1159,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         parameters: typing.Dict[str, typing.Any],
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> QueryResult:
+        """Directly queries the database and returns the result."""
         print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
         res = self.ch_client.query(
@@ -1447,6 +1470,24 @@ param_builder_count = 0
 
 
 class ParamBuilder:
+    """ParamBuilder helps with the construction of parameterized clickhouse queries.
+    It is used in a number of functions/routines that build queries to ensure that
+    the queries are parameterized and safe from injection attacks. Specifically, a caller
+    would use it as follows:
+
+    ```
+    pb = ParamBuilder()
+    param_name = pb.add_param("some_value")
+    query = f"SELECT * FROM some_table WHERE some_column = {{{param_name}:String}}"
+    parameters = pb.get_params()
+    # Execute the query with the parameters
+    ```
+
+    With queries that have many construction phases, it is recommended to use the
+    same ParamBuilder instance to ensure that the parameter names are unique across
+    the query.
+    """
+
     def __init__(self, prefix: typing.Optional[str] = None):
         global param_builder_count
         param_builder_count += 1
@@ -1463,6 +1504,7 @@ class ParamBuilder:
 
 
 def _python_value_to_ch_type(value: typing.Any) -> str:
+    """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
         return "String"
     elif isinstance(value, int):
@@ -1478,10 +1520,14 @@ def _python_value_to_ch_type(value: typing.Any) -> str:
 
 
 def _param_slot(param_name: str, param_type: str) -> str:
+    """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"
 
 
 def _quote_json_path(path: str) -> str:
+    """Helper function to quote a json path for use in a clickhouse query. Moreover,
+    this converts index operations from dot notation (conforms to Mongo) to bracket
+    notation (required by clickhouse)"""
     parts = path.split(".")
     parts_final = []
     for part in parts:
@@ -1494,6 +1540,7 @@ def _quote_json_path(path: str) -> str:
 
 
 def _is_dynamic_field(field: str) -> bool:
+    """Dynamic fields are fields that are arbitrary values produced by the user."""
     return (
         field in ["inputs", "output", "attributes", "summary"]
         or field.startswith("inputs.")
@@ -1508,6 +1555,7 @@ def _transform_external_calls_field_to_internal_calls_field(
     cast: typing.Optional[str] = None,
     param_builder: typing.Optional[ParamBuilder] = None,
 ) -> tuple[str, ParamBuilder, set[str]]:
+    """Transforms a request for a dot-notation field to a clickhouse field."""
     param_builder = param_builder or ParamBuilder()
     raw_fields_used = set()
     json_path = None
@@ -1577,7 +1625,8 @@ def _transform_external_calls_field_to_internal_calls_field(
 def _process_calls_filter_to_conditions(
     filter: tsi._CallsFilter,
     param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[list[str], ParamBuilder, set[str]]:
+) -> tuple[list[str], set[str]]:
+    """Converts a CallsFilter to a list of conditions for a clickhouse query."""
     param_builder = param_builder or ParamBuilder()
     conditions = []
     raw_fields_used = set()
@@ -1659,12 +1708,13 @@ def _process_calls_filter_to_conditions(
         )
         raw_fields_used.add("wb_run_id")
 
-    return conditions, param_builder, raw_fields_used
+    return conditions, raw_fields_used
 
 
 def _process_calls_query_to_conditions(
     query: tsi.Query, param_builder: typing.Optional[ParamBuilder] = None
-) -> tuple[list[str], ParamBuilder, set[str]]:
+) -> tuple[list[str], set[str]]:
+    """Converts a Query to a list of conditions for a clickhouse query."""
     param_builder = param_builder or ParamBuilder()
     conditions = []
     raw_fields_used = set()
@@ -1760,4 +1810,4 @@ def _process_calls_query_to_conditions(
 
     conditions.append(filter_cond)
 
-    return conditions, param_builder, raw_fields_used
+    return conditions, raw_fields_used
