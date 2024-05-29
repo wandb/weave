@@ -1,15 +1,21 @@
-from typing import Any
 import typing
+from typing import Any
+
+from requests import HTTPError
 
 from weave import box
 from weave.trace import custom_objs
-from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.object_record import ObjectRecord
+from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace_server.trace_server_interface import (
-    TraceServerInterface,
     FileContentReadReq,
     FileCreateReq,
+    TraceServerInterface,
 )
+
+
+def handle_http_error(e: HTTPError) -> None:
+    raise HTTPError(f"{e.response.json()}") from e
 
 
 def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
@@ -37,9 +43,10 @@ def to_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         return fallback_encode(obj)
     file_digests = {}
     for name, val in encoded["files"].items():
-        file_response = server.file_create(
-            FileCreateReq(project_id=project_id, name=name, content=val)
-        )
+        try:
+            file_response = server.file_create(FileCreateReq(project_id=project_id, name=name, content=val))
+        except HTTPError as e:
+            handle_http_error(e)
         file_digests[name] = file_response.digest
     result = {
         "_type": encoded["_type"],
@@ -71,19 +78,13 @@ def fallback_encode(obj: Any) -> Any:
 
 
 def isinstance_namedtuple(obj: Any) -> bool:
-    return (
-        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
-    )
+    return isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
 
 
-def _load_custom_obj_files(
-    project_id: str, server: TraceServerInterface, file_digests: dict
-) -> typing.Dict[str, bytes]:
+def _load_custom_obj_files(project_id: str, server: TraceServerInterface, file_digests: dict) -> typing.Dict[str, bytes]:
     loaded_files: typing.Dict[str, bytes] = {}
     for name, digest in file_digests.items():
-        file_response = server.file_content_read(
-            FileContentReadReq(project_id=project_id, digest=digest)
-        )
+        file_response = server.file_content_read(FileContentReadReq(project_id=project_id, digest=digest))
         loaded_files[name] = file_response.content
     return loaded_files
 
@@ -96,18 +97,12 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         if val_type is not None:
             del obj["_type"]
             if val_type == "ObjectRecord":
-                return ObjectRecord(
-                    {k: from_json(v, project_id, server) for k, v in obj.items()}
-                )
+                return ObjectRecord({k: from_json(v, project_id, server) for k, v in obj.items()})
             elif val_type == "CustomWeaveType":
                 files = _load_custom_obj_files(project_id, server, obj["files"])
-                return custom_objs.decode_custom_obj(
-                    obj["weave_type"], files, obj.get("load_op")
-                )
+                return custom_objs.decode_custom_obj(obj["weave_type"], files, obj.get("load_op"))
             else:
-                return ObjectRecord(
-                    {k: from_json(v, project_id, server) for k, v in obj.items()}
-                )
+                return ObjectRecord({k: from_json(v, project_id, server) for k, v in obj.items()})
         return {k: from_json(v, project_id, server) for k, v in obj.items()}
     elif isinstance(obj, str) and obj.startswith("weave://"):
         return parse_uri(obj)
