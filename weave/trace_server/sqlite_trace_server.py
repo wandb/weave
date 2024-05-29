@@ -304,9 +304,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     rhs_part = process_operand(operation.gte_[1])
                     cond = f"({lhs_part} >= {rhs_part})"
                 elif isinstance(operation, tsi_query.SubstrOperation):
-                    lhs_part = process_operand(operation.like_[0])
-                    rhs_part = process_operand(operation.like_[1])
-                    cond = f"({lhs_part} LIKE {rhs_part})"
+                    lhs_part = process_operand(operation.substr_[0])
+                    rhs_part = process_operand(operation.substr_[1])
+                    cond = f"instr({lhs_part}, {rhs_part})"
                 else:
                     raise ValueError(f"Unknown operation type: {operation}")
 
@@ -317,9 +317,23 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     return json.dumps(operand.literal_)
                 elif isinstance(operand, tsi_query.GetFieldOperator):
                     field = _transform_external_calls_field_to_internal_calls_field(
-                        operand.field_, operand.cast_
+                        operand.get_field_, None
                     )
                     return field
+                elif isinstance(operand, tsi_query.ConvertOperation):
+                    field = process_operand(operand.convert_.input)
+                    convert_to = operand.convert_.to
+                    if convert_to == "int":
+                        sql_type = "INT"
+                    elif convert_to == "double":
+                        sql_type = "FLOAT"
+                    elif convert_to == "bool":
+                        sql_type = "BOOL"
+                    elif convert_to == "string":
+                        sql_type = "TEXT"
+                    else:
+                        raise ValueError(f"Unknown cast: {convert_to}")
+                    return f"CAST({field} AS {sql_type})"
                 elif isinstance(
                     operand,
                     (
@@ -814,6 +828,18 @@ def get_base_object_class(val: Any) -> Optional[str]:
     return None
 
 
+def _quote_json_path(path: str) -> str:
+    parts = path.split(".")
+    parts_final = []
+    for part in parts:
+        try:
+            int(part)
+            parts_final.append("[" + part + "]")
+        except ValueError:
+            parts_final.append('."' + part + '"')
+    return "$" + "".join(parts_final)
+
+
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
     cast: Optional[str] = None,
@@ -823,25 +849,25 @@ def _transform_external_calls_field_to_internal_calls_field(
         if field == "inputs":
             json_path = "$"
         else:
-            json_path = "$." + field[len("inputs.") :]
+            json_path = _quote_json_path(field[len("inputs.") :])
         field = "inputs"
     elif field == "output" or field.startswith("output."):
         if field == "output":
             json_path = "$"
         else:
-            json_path = "$." + field[len("output.") :]
+            json_path = _quote_json_path(field[len("output.") :])
         field = "output"
     elif field == "attributes" or field.startswith("attributes."):
         if field == "attributes":
             json_path = "$"
         else:
-            json_path = "$." + field[len("attributes.") :]
+            json_path = _quote_json_path(field[len("attributes.") :])
         field = "attributes"
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
         else:
-            json_path = "$." + field[len("summary.") :]
+            json_path = _quote_json_path(field[len("summary.") :])
         field = "summary"
 
     if json_path is not None:

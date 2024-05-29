@@ -1482,18 +1482,15 @@ def _param_slot(param_name: str, param_type: str) -> str:
 
 
 def _quote_json_path(path: str) -> str:
-    dot_parts = path.split(".")
-    dot_parts_final = []
-    for part in dot_parts:
-        bracket_parts = part.split("[")
-        bracket_parts_final = []
-        for bracket_part in bracket_parts:
-            if bracket_part.endswith("]"):
-                bracket_parts_final.append(bracket_part)
-            else:
-                bracket_parts_final.append(f'"{bracket_part}"')
-        dot_parts_final.append("[".join(bracket_parts_final))
-    return ".".join(dot_parts_final)
+    parts = path.split(".")
+    parts_final = []
+    for part in parts:
+        try:
+            int(part)
+            parts_final.append("[" + part + "]")
+        except ValueError:
+            parts_final.append('."' + part + '"')
+    return "$" + "".join(parts_final)
 
 
 def _is_dynamic_field(field: str) -> bool:
@@ -1518,25 +1515,25 @@ def _transform_external_calls_field_to_internal_calls_field(
         if field == "inputs":
             json_path = "$"
         else:
-            json_path = "$." + _quote_json_path(field[len("inputs.") :])
+            json_path = _quote_json_path(field[len("inputs.") :])
         field = "inputs_dump"
     elif field == "output" or field.startswith("output."):
         if field == "output":
             json_path = "$"
         else:
-            json_path = "$." + _quote_json_path(field[len("output.") :])
+            json_path = _quote_json_path(field[len("output.") :])
         field = "output_dump"
     elif field == "attributes" or field.startswith("attributes."):
         if field == "attributes":
             json_path = "$"
         else:
-            json_path = "$." + _quote_json_path(field[len("attributes.") :])
+            json_path = _quote_json_path(field[len("attributes.") :])
         field = "attributes_dump"
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
         else:
-            json_path = "$." + _quote_json_path(field[len("summary.") :])
+            json_path = _quote_json_path(field[len("summary.") :])
         field = "summary_dump"
     else:
         assert field in all_call_select_columns, f"Invalid order_by field: {field}"
@@ -1705,9 +1702,9 @@ def _process_calls_query_to_conditions(
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.SubstrOperation):
-            lhs_part = process_operand(operation.like_[0])
-            rhs_part = process_operand(operation.like_[1])
-            cond = f"({lhs_part} LIKE {rhs_part})"
+            lhs_part = process_operand(operation.substr_[0])
+            rhs_part = process_operand(operation.substr_[1])
+            cond = f"position({lhs_part}, {rhs_part}) = 1"
         else:
             raise ValueError(f"Unknown operation type: {operation}")
 
@@ -1725,10 +1722,24 @@ def _process_calls_query_to_conditions(
                 _,
                 fields_used,
             ) = _transform_external_calls_field_to_internal_calls_field(
-                operand.field_, operand.cast_, param_builder
+                operand.get_field_, None, param_builder
             )
             raw_fields_used.update(fields_used)
             return field
+        elif isinstance(operand, tsi_query.ConvertOperation):
+            field = process_operand(operand.convert_.input)
+            convert_to = operand.convert_.to
+            if convert_to == "int":
+                method = "toInt64OrNull"
+            elif convert_to == "double":
+                method = "toFloat64OrNull"
+            elif convert_to == "bool":
+                method = "toUInt8OrNull"
+            elif convert_to == "string":
+                method = "toString"
+            else:
+                raise ValueError(f"Unknown cast: {convert_to}")
+            return f"{method}({field})"
         elif isinstance(
             operand,
             (
