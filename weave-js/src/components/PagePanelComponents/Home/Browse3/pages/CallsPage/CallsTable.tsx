@@ -264,7 +264,7 @@ export const CallsTable: FC<{
           }
         }
         if (newKey.includes('.' + EXPANDED_REF_VAL_KEY)) {
-          newKey = newKey.replace('.' + EXPANDED_REF_VAL_KEY, '');
+          newKey = newKey.replaceAll('.' + EXPANDED_REF_VAL_KEY, '');
         }
         if (newKey.includes('._')) {
           return;
@@ -1076,7 +1076,7 @@ function pushLeavesIntoGroupsForGroup(group: GridColumnGroup): GridColumnGroup {
   Object.keys(childrenLeaves).forEach(childKey => {
     let found = false;
     Object.keys(childrenGroups).forEach(groupKey => {
-      if (!found && groupKey.startsWith(childKey)) {
+      if (!found && childKey.startsWith(groupKey)) {
         childrenGroups[groupKey].children.push(childrenLeaves[childKey]);
         found = true;
       }

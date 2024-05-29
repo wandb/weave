@@ -340,6 +340,9 @@ const useCalls = (
           const colParts = col.split('.');
           let value: any = call;
           for (const part of colParts) {
+            while (typeof value === 'object' && value != null && EXPANDED_REF_VAL_KEY in value) {
+              value = value[EXPANDED_REF_VAL_KEY];
+            }
             if (value == null) {
               break;
             }
@@ -348,6 +351,9 @@ const useCalls = (
               break;
             }
             value = value[part];
+          }
+          while (typeof value === 'object' && value != null && EXPANDED_REF_VAL_KEY in value) {
+            value = value[EXPANDED_REF_VAL_KEY];
           }
           if (isRef(value)) {
             refsNeeded.add(value);
@@ -378,7 +384,12 @@ const useCalls = (
         expandedRefColumnsList.forEach(col => {
           const colParts = col.split('.');
           let value: any = call;
+          const path: string[] = [];
           for (const part of colParts) {
+            while (typeof value === 'object' && value != null && EXPANDED_REF_VAL_KEY in value) {
+              value = value[EXPANDED_REF_VAL_KEY];
+              path.push(EXPANDED_REF_VAL_KEY);
+            }
             if (value == null) {
               break;
             }
@@ -387,14 +398,15 @@ const useCalls = (
               break;
             }
             value = value[part];
+            path.push(part);
+          }
+          while (typeof value === 'object' && value != null && EXPANDED_REF_VAL_KEY in value) {
+            value = value[EXPANDED_REF_VAL_KEY];
+            path.push(EXPANDED_REF_VAL_KEY);
           }
           if (isRef(value) && refsDataMap.has(value)) {
             const refObj = refsDataMap.get(value);
-            // let setObj = refObj;
-            // if (typeof setObj === 'object' && !Array.isArray(setObj)) {
-            //   setObj = {...setObj, "ref__": value};
-            // }
-            _.set(call, col, {
+            _.set(call, path, {
               [EXPANDED_REF_REF_KEY]: value,
               [EXPANDED_REF_VAL_KEY]: refObj,
             });
