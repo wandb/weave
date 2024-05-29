@@ -84,7 +84,6 @@ export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
 };
 
-
 export type TraceCallsQueryStatsReq = {
   project_id: string;
   filter?: TraceCallsFilter;
@@ -93,12 +92,12 @@ export type TraceCallsQueryStatsReq = {
 
 export type TraceCallsQueryStatsRes = {
   count: number;
-}
+};
 
 export type TraceCallsDeleteReq = {
   project_id: string;
   call_ids: string[];
-}
+};
 
 interface TraceObjectsFilter {
   base_object_classes?: string[];

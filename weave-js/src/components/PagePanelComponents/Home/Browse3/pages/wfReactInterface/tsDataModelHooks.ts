@@ -317,7 +317,6 @@ const useCallsNoExpansion = (
   }, [callRes, entity, project, opts?.skip]);
 };
 
-
 const useCalls = (
   entity: string,
   project: string,
@@ -390,7 +389,6 @@ const useCallsStats = makeTraceServerEndpointHook<
   (res): traceServerClient.TraceCallsQueryStatsRes => res
 );
 
-
 const useCallsDeleteFunc = () => {
   const getTsClient = useGetTraceServerClientContext();
 
@@ -416,7 +414,6 @@ const useCallsDeleteFunc = () => {
 
   return callsDelete;
 };
-
 
 const useOpVersion = (
   // Null value skips

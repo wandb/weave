@@ -94,7 +94,7 @@ export const useCallsForQuery = (
     filterBy,
     expandedColumns,
     {
-      refetchOnDelete: true
+      refetchOnDelete: true,
     }
   );
 
