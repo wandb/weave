@@ -1,5 +1,5 @@
 import pytest
-from typing import Any, Generator, Optional
+from typing import Any, Generator, List, Optional, Tuple
 
 import dspy
 from weave.weave_client import WeaveClient
@@ -74,6 +74,17 @@ def fake_api_key() -> Generator[None, None, None]:
             os.environ["OPENAI_API_KEY"] = orig_key
 
 
+def assert_calls(client: WeaveClient, expected_calls: List[Tuple[str, int]]):
+    weave_server_respose = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client._project_id())
+    )
+    flattened_call_response = [
+        (op_name_from_ref(c.op_name), d)
+        for (c, d) in flatten_calls(weave_server_respose.calls)
+    ]
+    assert flattened_call_response == expected_calls
+
+
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -83,16 +94,96 @@ def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
     gpt3_turbo("hello! this is a raw prompt to GPT-3.5")
-    weave_server_respose = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
+    assert_calls(
+        client,
+        expected_calls=[
+            ("GPT3.__init__", 0),
+            ("GPT3.__call__", 0),
+            ("GPT3.request", 1),
+            ("GPT3.basic_request", 2),
+        ],
     )
-    flattened_call_response = [
-        (op_name_from_ref(c.op_name), d)
-        for (c, d) in flatten_calls(weave_server_respose.calls)
-    ]
-    assert flattened_call_response == [
-        ("GPT3.__init__", 0),
-        ("GPT3.__call__", 0),
-        ("GPT3.request", 1),
-        ("GPT3.basic_request", 2),
-    ]
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_dspy_signature(client: WeaveClient, fake_api_key: None) -> None:
+    gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
+    dspy.configure(lm=gpt3_turbo)
+    sentence = "it's a charming and often affecting journey."  # example from the SST-2 dataset.
+    dspy.Predict("sentence -> sentiment")
+    assert_calls(
+        client,
+        expected_calls=[
+            ("GPT3.__init__", 0),
+            ("Predict.__init__", 0),
+            ("Predict.__call__", 0),
+            ("Predict.forward", 1),
+            ("GPT3.__call__", 2),
+            ("GPT3.request", 3),
+            ("GPT3.basic_request", 4),
+            ("openai.chat.completions.create", 5),
+        ],
+    )
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_dspy_inline_signature(client: WeaveClient, fake_api_key: None) -> None:
+    gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
+    dspy.configure(lm=gpt3_turbo)
+    document = """The 21-year-old made seven appearances for the Hammers and netted his only goal for them in a Europa League qualification round match against Andorran side FC Lustrains last season. Lee had two loan spells in League One last term, with Blackpool and then Colchester United. He scored twice for the U's but was unable to save them from relegation. The length of Lee's contract with the promoted Tykes has not been revealed. Find all the latest football transfers on our dedicated page."""
+    summarize = dspy.ChainOfThought("document -> summary")
+    response = summarize(document=document)
+    assert_calls(
+        client,
+        expected_calls=[
+            ("GPT3.__init__", 0),
+            ("ChainOfThought.__init__", 0),
+            ("ChainOfThought.__call__", 0),
+            ("ChainOfThought.forward", 1),
+            ("GPT3.__call__", 2),
+            ("GPT3.request", 3),
+            ("GPT3.basic_request", 4),
+        ],
+    )
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_dspy_custom_signature(client: WeaveClient, fake_api_key: None) -> None:
+    gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
+    dspy.configure(lm=gpt3_turbo)
+
+    class Emotion(dspy.Signature):
+        """Classify emotion among sadness, joy, love, anger, fear, surprise."""
+
+        sentence = dspy.InputField()
+        sentiment = dspy.OutputField()
+
+    sentence = "i started feeling a little vulnerable when the giant spotlight started blinding me"  # from dair-ai/emotion
+
+    classify = dspy.Predict(Emotion)
+    classify(sentence=sentence)
+    assert_calls(
+        client,
+        expected_calls=[
+            ("GPT3.__init__", 0),
+            ("Predict.__init__", 0),
+            ("Predict.__call__", 0),
+            ("Predict.forward", 1),
+            ("GPT3.__call__", 2),
+            ("GPT3.request", 3),
+            ("GPT3.basic_request", 4),
+            ("openai.chat.completions.create", 5),
+        ],
+    )

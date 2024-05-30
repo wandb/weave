@@ -3,10 +3,6 @@ import importlib
 import weave
 from weave.trace.patcher import SymbolPatcher, MultiPatcher
 
-from dsp.modules import LM
-from dspy import OpenAI
-from dspy import Signature, Retrieve
-
 
 def get_patched_lm_functions(
     base_symbol: str, lm_class_name: str
