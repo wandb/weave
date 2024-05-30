@@ -72,16 +72,11 @@ def test_simple_chain_invoke(client: WeaveClient) -> None:
 
 
 def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
-    # print(calls)
-    flattened = flatten_calls(calls)
-    for call in flattened:
-        print(call)
-        print("-"*80)
     assert len(calls) == 8
+    flattened = flatten_calls(calls)
 
-    # flattened = flatten_calls(calls)
-    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
-    print(got)
+    # got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+
     # exp = [
     #     ("langchain.Chain.RunnableSequence", 0),
     #     ("langchain.Prompt.PromptTemplate", 1),
@@ -89,6 +84,7 @@ def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
     #     ("openai.chat.completions.create", 2),
     # ]
     # assert got == exp
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
@@ -118,11 +114,24 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
 
 
 def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
-    print(len(calls))
+    assert len(calls) == 10
     flattened = flatten_calls(calls)
-    for call in flattened:
-        print(call)
-        print("-"*80)
+
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+
+    exp = [
+        ("langchain.Chain.RunnableSequence", 0),
+        ("langchain.Chain.RunnableParallel context question ", 1),
+        ("langchain.Chain.RunnableSequence", 2),
+        ("langchain.Retriever.Retriever", 3),
+        ("langchain.Chain.format_docs", 3),
+        ("langchain.Chain.RunnablePassthrough", 2),
+        ("langchain.Prompt.ChatPromptTemplate", 1),
+        ("langchain.Llm.ChatOpenAI", 1),
+        ("openai.chat.completions.create", 2),
+        ("langchain.Parser.StrOutputParser", 1),
+    ]
+    assert got == exp
 
 
 @pytest.mark.skip_clickhouse_client
@@ -132,15 +141,16 @@ def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
     before_record_request=filter_body,
 )
 def test_simple_rag_chain(client: WeaveClient) -> None:
-    from langchain_community.document_loaders import TextLoader
+    from typing import List
+
     from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_community.document_loaders import TextLoader
     from langchain_community.vectorstores import Chroma
-    from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+    from langchain_core.documents import Document
+    from langchain_core.output_parsers import StrOutputParser
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.runnables import RunnablePassthrough
-    from langchain_core.output_parsers import StrOutputParser
-    from langchain_core.documents import Document
-    from typing import List
+    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
     from .langchain import WeaveTracer
 
@@ -154,29 +164,30 @@ def test_simple_rag_chain(client: WeaveClient) -> None:
     retriever = vectorstore.as_retriever()
 
     prompt = ChatPromptTemplate.from_template(
-        "You are an assistant for question-answering tasks. " 
+        "You are an assistant for question-answering tasks. "
         "Use the following pieces of retrieved context to answer the question. "
         "If you don't know the answer, just say that you don't know. "
         "Use three sentences maximum and keep the answer concise.\n"
-        "Question: {question}\nContext: {context}\nAnswer:")
+        "Question: {question}\nContext: {context}\nAnswer:"
+    )
 
     llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 
-    def format_docs(documents: List[Document]) -> List[str]:
+    def format_docs(documents: List[Document]) -> str:
         return "\n\n".join(doc.page_content for doc in documents)
 
     # Chain
     rag_chain = (
-            {"context": retriever | format_docs, "question": RunnablePassthrough()}
-            | prompt
-            | llm
-            | StrOutputParser()
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
     )
 
-    rag_chain.invoke({"question": "What is the essay about?"}, config={"callbacks": [WeaveTracer()]})
+    rag_chain.invoke(
+        input="What is the essay about?",
+        config={"callbacks": [WeaveTracer()]},
+    )
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_correct_calls_for_rag_chain(res.calls)
-
-
-
