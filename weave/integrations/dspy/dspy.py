@@ -39,6 +39,31 @@ patched_functions = [
         attribute_name="Predict.forward",
         make_new_value=weave.op(),
     ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Module.__init__",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Module.__call__",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Retrieve.__init__",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Retrieve.__call__",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Retrieve.forward",
+        make_new_value=weave.op(),
+    ),
 ]
 patched_functions += get_patched_lm_functions(
     base_symbol="dspy", lm_class_name="AzureOpenAI"
