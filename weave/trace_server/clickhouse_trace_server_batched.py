@@ -54,6 +54,7 @@ class CallStartCHInsertable(BaseModel):
     inputs_dump: str
     input_refs: typing.List[str]
     output_refs: typing.List[str] = []  # sadly, this is required
+    display_name: typing.List[typing.Tuple[datetime.datetime, str]] = []
 
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
@@ -68,6 +69,7 @@ class CallEndCHInsertable(BaseModel):
     output_dump: str
     input_refs: typing.List[str] = []  # sadly, this is required
     output_refs: typing.List[str]
+    display_name: typing.List[typing.Tuple[datetime.datetime, str]] = []
 
 
 class CallDeleteCHInsertable(BaseModel):
@@ -79,6 +81,7 @@ class CallDeleteCHInsertable(BaseModel):
     # required types
     input_refs: typing.List[str] = []
     output_refs: typing.List[str] = []
+    display_name: typing.List[typing.Tuple[datetime.datetime, str]] = []
 
 
 class CallRenameCHInsertable(BaseModel):
@@ -329,9 +332,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
             limit=req.limit,
             offset=req.offset,
-            order_by=None
-            if not req.sort_by
-            else [(s.field, s.direction) for s in req.sort_by],
+            order_by=(
+                None
+                if not req.sort_by
+                else [(s.field, s.direction) for s in req.sort_by]
+            ),
         )
         for ch_dict in ch_call_dicts:
             yield tsi.CallSchema.model_validate(
