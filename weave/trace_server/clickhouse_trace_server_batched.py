@@ -329,11 +329,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             parameters=parameters,
             limit=req.limit,
             offset=req.offset,
-            order_by=(
-                None
-                if not req.sort_by
-                else [(s.field, s.direction) for s in req.sort_by]
-            ),
+            order_by=None
+            if not req.sort_by
+            else [(s.field, s.direction) for s in req.sort_by],
         )
         for ch_dict in ch_call_dicts:
             yield tsi.CallSchema.model_validate(
