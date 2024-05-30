@@ -137,8 +137,6 @@ def from_pandas(df):
 
 #### Newer API below
 
-_current_inited_client = None
-
 
 def init(project_name: str) -> _weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
@@ -155,13 +153,11 @@ def init(project_name: str) -> _weave_client.WeaveClient:
     Returns:
         A Weave client.
     """
-    global _current_inited_client
     # This is the stream-table backend. Disabling it in favor of the new
     # trace-server backend.
     # return _weave_init.init_wandb(project_name).client
     # return _weave_init.init_trace_remote(project_name).client
-    _current_inited_client = _weave_init.init_weave(project_name)
-    return _current_inited_client.client
+    return _weave_init.init_weave(project_name).client
 
 
 @contextlib.contextmanager
@@ -360,10 +356,7 @@ def finish() -> None:
     Following finish, calls of weave.op() decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
 
     """
-    global _current_inited_client
-    if _current_inited_client is not None:
-        _weave_init.finish(_current_inited_client)
-        _current_inited_client = None
+    _weave_init.finish()
 
 
 __docspec__ = [init, publish, ref]
