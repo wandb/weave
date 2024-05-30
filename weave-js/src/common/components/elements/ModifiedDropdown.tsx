@@ -487,7 +487,7 @@ const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
     }
     const isOverflow =
       optionRef.current.scrollWidth > optionRef.current.clientWidth;
-    if (optionRef.current && isOverflow !== showTooltip) {
+    if (isOverflow !== showTooltip) {
       setShowTooltip(isOverflow);
     }
   }, [showTooltip, text]);
