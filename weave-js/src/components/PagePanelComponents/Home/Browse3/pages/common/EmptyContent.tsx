@@ -1,7 +1,8 @@
 import React from 'react';
 
-import {Link, TargetBlank} from '../../../../../../common/util/links';
+import {TargetBlank} from '../../../../../../common/util/links';
 import {EmptyProps} from './Empty';
+import {Link} from './Links';
 
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
