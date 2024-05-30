@@ -44,7 +44,9 @@ from weave.trace_server.trace_server_interface import (
     _TableRowFilter,
     _CallsFilter,
     _ObjectVersionFilter,
+    Query,
 )
+from weave.trace_server.interface.query import Operation
 from weave.trace.refs import (
     Ref,
     ObjectRef,
@@ -173,14 +175,20 @@ class Call:
 
 class CallsIter:
     server: TraceServerInterface
-    filter: _CallsFilter
+    filter: Optional[_CallsFilter]
+    query: Optional[Query]
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: Optional[_CallsFilter],
+        query: Optional[Query],
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
+        self.query = query
 
     def __getitem__(self, key: Union[slice, int]) -> TraceObject:
         if isinstance(key, slice):
@@ -192,13 +200,14 @@ class CallsIter:
 
     def __iter__(self) -> typing.Iterator[TraceObject]:
         page_index = 0
-        page_size = 10
+        page_size = 100
         entity, project = self.project_id.split("/")
         while True:
             response = self.server.calls_query(
                 CallsQueryReq(
                     project_id=self.project_id,
                     filter=self.filter,
+                    query=self.query,
                     offset=page_index * page_size,
                     limit=page_size,
                 )
@@ -381,11 +390,25 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
-        if filter is None:
-            filter = _CallsFilter()
+    def calls(
+        self, op_names: Optional[list[str]], filter: Optional[dict] = None
+    ) -> CallsIter:
+        query: Optional[Query] = None
+        if filter is not None:
+            query = Query.model_validate({"$expr": filter})
+        trace_server_filt: Optional[_CallsFilter] = None
+        if op_names is not None:
+            op_ref_uris = []
+            for op_name in op_names:
+                if op_name.startswith("weave:///"):
+                    op_ref_uris.append(op_name)
+                else:
+                    if ":" not in op_name:
+                        op_name = op_name + ":*"
+                    op_ref_uris.append(f"weave:///{self._project_id()}/op/{op_name}")
+            trace_server_filt = _CallsFilter(op_names=op_ref_uris)
 
-        return CallsIter(self.server, self._project_id(), filter)
+        return CallsIter(self.server, self._project_id(), trace_server_filt, query)
 
     @trace_sentry.global_trace_sentry.watch()
     def call(self, call_id: str) -> TraceObject:
