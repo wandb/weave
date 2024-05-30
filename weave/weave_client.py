@@ -449,6 +449,7 @@ class WeaveClient:
         parent: Optional[Call],
         inputs: dict,
         attributes: dict = {},
+        display_name: Optional[str] = None,
     ) -> Call:
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -496,6 +497,7 @@ class WeaveClient:
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes=attributes,
             wb_run_id=current_wb_run_id,
+            display_name=display_name,
         )
         self.server.call_start(CallStartReq(start=start))
         run_context.push_call(call)

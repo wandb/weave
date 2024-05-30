@@ -47,11 +47,14 @@ class Op:
     # double-underscore to avoid conflict with old Weave refs
     __ref: Optional[ObjectRef] = None
 
-    def __init__(self, resolve_fn: Callable) -> None:
+    def __init__(
+        self, resolve_fn: Callable, display_name: Optional[str] = None
+    ) -> None:
         self.resolve_fn = resolve_fn
         self.name = resolve_fn.__name__
         self.signature = inspect.signature(resolve_fn)
         self._on_output_handler = None
+        self.display_name = display_name
 
     def __get__(
         self, obj: Optional[object], objtype: Optional[type[object]] = None
@@ -80,7 +83,11 @@ class Op:
         client.save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
         run = client.create_call(
-            self, parent_run, inputs_with_defaults, attributes=attributes
+            self,
+            parent_run,
+            inputs_with_defaults,
+            attributes=attributes,
+            display_name=self.display_name or None,
         )
 
         has_finished = False

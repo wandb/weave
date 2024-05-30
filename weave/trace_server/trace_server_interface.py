@@ -54,6 +54,8 @@ class StartedCallSchemaForInsert(BaseModel):
 
     # Name of the calling function (op)
     op_name: str
+    # Optional display name of the call
+    display_name: typing.Optional[str] = None
 
     ## Trace ID
     trace_id: typing.Optional[str] = None  # Will be generated if not provided

@@ -1297,6 +1297,10 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     # wrong trace id (one that does not match the parent_id)!
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
+    if start_call.display_name:
+        display_name = [(start_call.started_at, start_call.display_name)]
+    else:
+        display_name = []
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -1309,6 +1313,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
         wb_user_id=start_call.wb_user_id,
+        display_name=display_name,
     )
 
 
