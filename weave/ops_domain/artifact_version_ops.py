@@ -555,7 +555,8 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     )
     print(f"\n\nlogging artifact_by_id uri: ===> \n{uri}\n\n", flush=True)
     # todo: postman query returns null project for user querying an artifact from a team they're
-    # not a member of. but through weave somehow project is not null. is that a dev issue?
+    # not a member of. but through weave somehow project is not null. is this related to cg cache?
+    # able to confirm that things work when the following block is commented out. Needs more testing.
     if artifactVersion["artifactSequence"]["project"] is not None:
         entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
         project_name = artifactVersion["artifactSequence"]["project"]["name"]
