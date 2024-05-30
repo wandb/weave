@@ -8,7 +8,7 @@ import styled from 'styled-components';
 import {MOON_800} from '../../../../../../common/css/color.styles';
 import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
-import {CallsTable} from '../CallsPage/CallsPage';
+import {CallsTable} from '../CallsPage/CallsTable';
 import {KeyValueTable} from '../common/KeyValueTable';
 import {CallLink, opNiceName} from '../common/Links';
 import {CenteredAnimatedLoader} from '../common/Loader';
@@ -154,7 +154,6 @@ export const CallDetails: FC<{
           let callsTable = (
             <CallsTable
               hideControls
-              ioColumnsOnly
               initialFilter={{
                 opVersionRefs: [opVersionRef],
                 parentId: call.callId,

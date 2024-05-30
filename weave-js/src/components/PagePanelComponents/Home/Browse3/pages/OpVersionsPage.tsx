@@ -6,6 +6,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import React, {useEffect, useMemo, useState} from 'react';
 
+import {ErrorPanel} from '../../../../ErrorPanel';
 import {Loading} from '../../../../Loading';
 import {LoadingDots} from '../../../../LoadingDots';
 import {Timestamp} from '../../../../Timestamp';
@@ -20,7 +21,7 @@ import {
   OpVersionsLink,
 } from './common/Links';
 import {SimplePageLayout} from './common/SimplePageLayout';
-import {useInitializingFilter, useURLSearchParamsDict} from './util';
+import {useControllableState, useURLSearchParamsDict} from './util';
 import {useWFHooks} from './wfReactInterface/context';
 import {opVersionKeyToRefUri} from './wfReactInterface/utilities';
 import {OpVersionSchema} from './wfReactInterface/wfDataModelHooksInterface';
@@ -37,8 +38,8 @@ export const OpVersionsPage: React.FC<{
   // is responsible for updating the filter.
   onFilterUpdate?: (filter: WFHighLevelOpVersionFilter) => void;
 }> = props => {
-  const {filter, setFilter} = useInitializingFilter(
-    props.initialFilter,
+  const [filter, setFilter] = useControllableState(
+    props.initialFilter ?? {},
     props.onFilterUpdate
   );
 
@@ -182,6 +183,9 @@ export const FilterableOpVersionsTable: React.FC<{
   if (filteredOpVersions.loading) {
     return <Loading centered />;
   }
+  if (filteredOpVersions.error) {
+    return <ErrorPanel />;
+  }
 
   // TODO: Only show the empty state if unfiltered
   const opVersions = filteredOpVersions.result ?? [];
@@ -265,29 +269,19 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
 };
 
 const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
-  const {useCalls} = useWFHooks();
+  const {useCallsStats} = useWFHooks();
 
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
 
-  // Here, we really just want to know the count - and it should be calculated
-  // by the server, not by the client. This is a performance optimization. In
-  // the meantime we will just fetch the first 100 versions and display 99+ if
-  // there are at least 100. Someone can come back and add `count` to the 3
-  // query APIs which will make this faster.
-  const calls = useCalls(
-    obj.entity,
-    obj.project,
-    {
-      opVersionRefs: [refUri],
-    },
-    100
-  );
+  const calls = useCallsStats(obj.entity, obj.project, {
+    opVersionRefs: [refUri],
+  });
   if (calls.loading) {
     return <LoadingDots />;
   }
 
-  const callCount = calls?.result?.length ?? 0;
+  const callCount = calls?.result?.count ?? 0;
 
   if (callCount === 0) {
     return null;
@@ -297,8 +291,7 @@ const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
       neverPeek
       entity={obj.entity}
       project={obj.project}
-      callCount={Math.min(callCount, 99)}
-      countIsLimited={callCount === 100}
+      callCount={callCount}
       filter={{
         opVersionRefs: [refUri],
       }}

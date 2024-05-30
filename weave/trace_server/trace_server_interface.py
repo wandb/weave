@@ -3,6 +3,8 @@ import datetime
 import typing
 from pydantic import BaseModel
 
+from .interface.query import Query
+
 
 class CallSchema(BaseModel):
     id: str
@@ -39,6 +41,8 @@ class CallSchema(BaseModel):
     # WB Metadata
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
+
+    deleted_at: typing.Optional[datetime.datetime] = None
 
 
 # Essentially a partial of StartedCallSchema. Mods:
@@ -90,6 +94,7 @@ class ObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
+    deleted_at: typing.Optional[datetime.datetime] = None
     digest: str
     version_index: int
     is_latest: int
@@ -135,6 +140,17 @@ class CallReadRes(BaseModel):
     call: CallSchema
 
 
+class CallsDeleteReq(BaseModel):
+    project_id: str
+    # wb_user_id gets generated from auth params
+    wb_user_id: typing.Optional[str] = None
+    call_ids: typing.List[str]
+
+
+class CallsDeleteRes(BaseModel):
+    pass
+
+
 class _CallsFilter(BaseModel):
     op_names: typing.Optional[typing.List[str]] = None
     input_refs: typing.Optional[typing.List[str]] = None
@@ -148,10 +164,12 @@ class _CallsFilter(BaseModel):
 
 
 class _SortBy(BaseModel):
-    # Field should be a key of `CallSchema`. For dictionary fields (`attributes`, `inputs`, `outputs`, `summary`), the field can be dot-separated.
-    field: str
+    # Field should be a key of `CallSchema`. For dictionary fields
+    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
+    # dot-separated.
+    field: str  # Consider changing this to _FieldSelect
     # Direction should be either 'asc' or 'desc'
-    direction: str
+    direction: typing.Literal["asc", "desc"]
 
 
 class CallsQueryReq(BaseModel):
@@ -161,10 +179,21 @@ class CallsQueryReq(BaseModel):
     offset: typing.Optional[int] = None
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
+    query: typing.Optional[Query] = None
 
 
 class CallsQueryRes(BaseModel):
     calls: typing.List[CallSchema]
+
+
+class CallsQueryStatsReq(BaseModel):
+    project_id: str
+    filter: typing.Optional[_CallsFilter] = None
+    query: typing.Optional[Query] = None
+
+
+class CallsQueryStatsRes(BaseModel):
+    count: int
 
 
 class OpCreateReq(BaseModel):
@@ -308,6 +337,14 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
+        ...
+
+    @abc.abstractmethod
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
+        ...
+
+    @abc.abstractmethod
+    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
         ...
 
     # Op API

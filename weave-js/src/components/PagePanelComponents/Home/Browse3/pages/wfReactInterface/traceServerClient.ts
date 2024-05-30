@@ -16,6 +16,8 @@ import {getCookie} from '@wandb/weave/common/util/cookie';
 import fetch from 'isomorphic-unfetch';
 import _ from 'lodash';
 
+import {Query} from './traceServerClientInterface/query';
+
 export type KeyedDictType = {
   [key: string]: any;
   _keys?: string[];
@@ -67,15 +69,34 @@ interface TraceCallsFilter {
   wb_user_ids?: string[];
 }
 
+export type SortBy = {field: string; direction: 'asc' | 'desc'};
+
 export type TraceCallsQueryReq = {
   project_id: string;
   filter?: TraceCallsFilter;
   limit?: number;
   offset?: number;
+  sort_by?: SortBy[];
+  query?: Query;
 };
 
 export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
+};
+
+export type TraceCallsQueryStatsReq = {
+  project_id: string;
+  filter?: TraceCallsFilter;
+  query?: Query;
+};
+
+export type TraceCallsQueryStatsRes = {
+  count: number;
+};
+
+export type TraceCallsDeleteReq = {
+  project_id: string;
+  call_ids: string[];
 };
 
 interface TraceObjectsFilter {
@@ -169,14 +190,42 @@ export class TraceServerClient {
       }>
     >
   > = {};
+  private onDeleteListeners: Array<() => void>;
 
   constructor(baseUrl: string) {
     this.readBatchCollectors = [];
     this.inFlightFetchesRequests = {};
     this.baseUrl = baseUrl;
     this.scheduleReadBatch();
+    this.onDeleteListeners = [];
   }
 
+  /**
+   * Registers a callback to be called when a delete operation occurs.
+   * This method is purely for local notification within the client
+   *    and does not interact with the REST API.
+   *
+   * @param callback A function to be called when a delete operation is triggered.
+   * @returns A function to unregister the callback.
+   */
+  public registerOnDeleteListener(callback: () => void): () => void {
+    this.onDeleteListeners.push(callback);
+    return () => {
+      this.onDeleteListeners = this.onDeleteListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+
+  callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
+    const res = this.makeRequest<TraceCallsDeleteReq, void>(
+      '/calls/delete',
+      req
+    ).then(() => {
+      this.onDeleteListeners.forEach(listener => listener());
+    });
+    return res;
+  };
   callsQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       return this.makeRequest<TraceCallsQueryReq, TraceCallsQueryRes>(
@@ -184,6 +233,14 @@ export class TraceServerClient {
         req
       );
     };
+  callsQueryStats: (
+    req: TraceCallsQueryStatsReq
+  ) => Promise<TraceCallsQueryStatsRes> = req => {
+    return this.makeRequest<TraceCallsQueryStatsReq, TraceCallsQueryStatsRes>(
+      '/calls/query_stats',
+      req
+    );
+  };
   callsSteamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       const res = this.makeRequest<TraceCallsQueryReq, string>(
@@ -208,6 +265,7 @@ export class TraceServerClient {
             }
             const calls: TraceCallSchema[] = [];
             const lines = content.split('\n');
+            let earlyTermination = false;
 
             lines.forEach((line, lineIndex) => {
               try {
@@ -226,6 +284,7 @@ export class TraceServerClient {
                   console.debug(
                     `Early stream termination, performing a new request resuming from ${newReq.offset}`
                   );
+                  earlyTermination = true;
                   this.callsSteamQuery(newReq)
                     .then(innerRes => {
                       calls.push(...innerRes.calls);
@@ -242,8 +301,9 @@ export class TraceServerClient {
                 }
               }
             });
-
-            resolve({calls});
+            if (!earlyTermination) {
+              resolve({calls});
+            }
           })
           .catch(err => {
             reject(err);
