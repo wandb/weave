@@ -342,6 +342,10 @@ class TraceServerInterface:
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
         ...
 
+    @abc.abstractmethod
+    def call_rename(self, req: CallRenameReq) -> CallRenameRes:
+        ...
+
     # Op API
     @abc.abstractmethod
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
