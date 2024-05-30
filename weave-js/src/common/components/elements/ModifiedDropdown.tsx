@@ -60,9 +60,10 @@ const simpleSearch = (options: DropdownItemProps[], query: string) => {
 
 const getOptionProps = (opt: Option, hideText: boolean) => {
   const {text, ...props} = opt;
-  props.text = hideText ? null : (
-    <OptionWithTooltip text={opt.text as string} />
-  );
+  props.text = hideText ? null : opt.text;
+  // props.text = hideText ? null : (
+  //   <OptionWithTooltip text={opt.text as string} />
+  // );
   return props;
 };
 
