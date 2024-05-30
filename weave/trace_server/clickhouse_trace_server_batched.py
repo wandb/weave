@@ -84,7 +84,7 @@ class CallDeleteCHInsertable(BaseModel):
 class CallRenameCHInsertable(BaseModel):
     project_id: str
     id: str
-    display_name: str
+    display_name: typing.List[typing.Tuple[datetime.datetime, str]]
     wb_user_id: typing.Optional[str]
 
     # required types
@@ -108,7 +108,7 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
-    display_name: typing.Optional[str] = None
+    display_name: typing.List[typing.Tuple[datetime.datetime, str]]
 
     trace_id: str
     parent_id: typing.Optional[str] = None
@@ -391,9 +391,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             project_id=req.project_id,
             id=req.call_id,
             wb_user_id=req.wb_user_id,
-            display_name=req.display_name,
+            display_name=[(datetime.datetime.now(), req.display_name)],
         )
-        print(f"\n\n\n*** {renamed_insertable.model_dump_json()} ***\n")
         self._insert_call(renamed_insertable)
 
         return tsi.CallRenameRes()
@@ -956,7 +955,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for col in columns:
             if col in ["project_id", "id"]:
                 merged_cols.append(f"{col} AS {col}")
-            elif col in ["input_refs", "output_refs"]:
+            elif col in ["input_refs", "output_refs", "display_name"]:
                 merged_cols.append(f"array_concat_agg({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
@@ -1222,6 +1221,15 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
+def _ch_call_display_name_tuple_to_str(
+    display_names: typing.Optional[typing.List[typing.Tuple[datetime.datetime, str]]]
+) -> typing.Optional[str]:
+    if display_names is None or len(display_names) == 0:
+        return None
+    display_names.sort(key=lambda x: x[0])
+    return display_names[-1][1]
+
+
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1238,6 +1246,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
+        display_name=_ch_call_display_name_tuple_to_str(ch_call.display_name),
     )
 
 
@@ -1258,6 +1267,9 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
+        display_name=_ch_call_display_name_tuple_to_str(
+            ch_call_dict.get("display_name")
+        ),
     )
 
 

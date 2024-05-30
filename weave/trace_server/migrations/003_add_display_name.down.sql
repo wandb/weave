@@ -23,5 +23,4 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 ALTER TABLE calls_merged DROP COLUMN display_name;
 
 ALTER TABLE call_parts DROP COLUMN display_name;
-ALTER TABLE call_parts MODIFY ORDER BY (project_id, id);
 

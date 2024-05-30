@@ -11,7 +11,7 @@ class CallSchema(BaseModel):
     # Name of the calling function (op)
     op_name: str
     # Optional display name of the call
-    display_name: typing.Optional[str] = None
+    display_name: typing.Optional[str]
 
     ## Trace ID
     trace_id: str
@@ -153,7 +153,7 @@ class CallsDeleteRes(BaseModel):
 
 class CallRenameReq(BaseModel):
     project_id: str
-    id: str
+    call_id: str
     # wb_user_id gets generated from auth params
     wb_user_id: typing.Optional[str] = None
     display_name: str

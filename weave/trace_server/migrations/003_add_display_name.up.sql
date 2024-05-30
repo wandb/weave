@@ -1,11 +1,8 @@
 ALTER TABLE call_parts
-    ADD COLUMN display_name Nullable(String) DEFAULT NULL;
-
-ALTER TABLE call_parts
-    MODIFY ORDER BY (project_id, id, created_at);
+    ADD COLUMN display_name Array(Tuple(DateTime64(3), String));
 
 ALTER TABLE calls_merged
-    ADD COLUMN display_name SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN display_name SimpleAggregateFunction(array_concat_agg, Array(Tuple(DateTime64(3), String)));
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
@@ -24,7 +21,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs,
-        anyLastSimpleState(display_name) as display_name
+        array_concat_aggSimpleState(display_name) as display_name
     FROM call_parts
     GROUP BY project_id,
         id;

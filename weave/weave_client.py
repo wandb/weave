@@ -173,7 +173,6 @@ class Call:
         return client.delete_call(call=self)
 
     def rename(self, new_name: str) -> "Call":
-        print(f"\nRenaming call {self.op_name}  ---->  {new_name}")
         client = graph_client_context.require_graph_client()
         client.rename_call(call=self, display_name=new_name)
         self.display_name = new_name
@@ -576,7 +575,7 @@ class WeaveClient:
         self.server.call_rename(
             CallRenameReq(
                 project_id=self._project_id(),
-                id=call.id,
+                call_id=call.id,
                 display_name=display_name,
             )
         )
