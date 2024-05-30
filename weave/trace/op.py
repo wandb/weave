@@ -176,6 +176,7 @@ class BoundOp(Op):
         self.signature = inspect.signature(op.resolve_fn)
         self.resolve_fn = op.resolve_fn
         self._on_output_handler = op._on_output_handler
+        self.display_name = op.display_name
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return Op.__call__(self, self.arg0, *args, **kwargs)
