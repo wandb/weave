@@ -159,3 +159,9 @@ def init_local() -> InitializedClient:
     server.setup_tables()
     client = weave_client.WeaveClient("none", "none", server)
     return InitializedClient(client)
+
+
+def finish(init_client: InitializedClient) -> None:
+    init_client.reset()
+    autopatch.reset_autopatch()
+    trace_sentry.global_trace_sentry.end_session()
