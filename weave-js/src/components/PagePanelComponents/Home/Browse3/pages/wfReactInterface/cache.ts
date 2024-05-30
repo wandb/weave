@@ -35,6 +35,9 @@ const makeSpecificCache = <K, V>(
     set: (key: K, value: V) => {
       cache.set(keyFn(key), value);
     },
+    del: (key: K) => {
+      cache.del(keyFn(key));
+    },
   };
 };
 
