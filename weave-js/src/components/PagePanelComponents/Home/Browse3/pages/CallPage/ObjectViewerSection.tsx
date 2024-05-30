@@ -131,11 +131,10 @@ const ObjectViewerSectionNonEmpty = ({
   );
   const getGroupIds = useCallback(() => {
     const rowIds = apiRef.current.getAllRowIds();
-    rowIds.filter(rowId => {
+    return rowIds.filter(rowId => {
       const rowNode = apiRef.current.getRowNode(rowId);
       return rowNode && rowNode.type === 'group';
     });
-    return rowIds;
   }, [apiRef]);
 
   // Re-clicking the button will reapply collapse/expand

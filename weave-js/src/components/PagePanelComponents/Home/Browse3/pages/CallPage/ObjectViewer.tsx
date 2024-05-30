@@ -4,6 +4,7 @@ import {
   GridApiPro,
   GridColDef,
   GridRowHeightParams,
+  GridRowId,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {
@@ -41,8 +42,8 @@ type ObjectViewerProps = {
   apiRef: React.MutableRefObject<GridApiPro>;
   data: Data;
   isExpanded: boolean;
-  expandedIds: Array<string | number>;
-  setExpandedIds: Dispatch<SetStateAction<Array<string | number>>>;
+  expandedIds: GridRowId[];
+  setExpandedIds: Dispatch<SetStateAction<GridRowId[]>>;
 };
 
 // Traverse the data and find all ref URIs.
