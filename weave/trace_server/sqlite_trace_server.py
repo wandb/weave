@@ -385,7 +385,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             delete_query = """
                 UPDATE calls
                 SET deleted_at = CURRENT_TIMESTAMP
-                WHERE deleted_at is NULL AND 
+                WHERE deleted_at is NULL AND
                     id IN ({})
             """.format(
                 ", ".join("?" * len(all_ids))
@@ -395,6 +395,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conn.commit()
 
         return tsi.CallsDeleteRes()
+
+    def call_rename(self, req: tsi.CallRenameReq) -> tsi.CallRenameRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute(
+                "UPDATE calls SET display_name = ? WHERE id = ?",
+                (req.display_name, req.call_id),
+            )
+            conn.commit()
+        return tsi.CallRenameRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()

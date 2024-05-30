@@ -21,6 +21,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs,
+        -- *** Add array aggregating display name field ***
         array_concat_aggSimpleState(display_name) as display_name
     FROM call_parts
     GROUP BY project_id,
