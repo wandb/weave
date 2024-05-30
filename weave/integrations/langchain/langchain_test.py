@@ -1,5 +1,5 @@
 import os
-from typing import Any, Optional
+from typing import Any, List, Optional, Tuple
 
 import pytest
 from weave.trace_server import trace_server_interface as tsi
@@ -191,3 +191,118 @@ def test_simple_rag_chain(client: WeaveClient) -> None:
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_correct_calls_for_rag_chain(res.calls)
+
+
+def assert_correct_calls_for_tool_chain(calls: list[tsi.CallSchema]) -> None:
+    # assert len(calls) == 10
+    print(len(calls))
+    flattened = flatten_calls(calls)
+
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    print(got)
+    # exp = [
+    #     ("langchain.Chain.RunnableSequence", 0),
+    #     ("langchain.Chain.RunnableParallel context question ", 1),
+    #     ("langchain.Chain.RunnableSequence", 2),
+    #     ("langchain.Retriever.Retriever", 3),
+    #     ("langchain.Chain.format_docs", 3),
+    #     ("langchain.Chain.RunnablePassthrough", 2),
+    #     ("langchain.Prompt.ChatPromptTemplate", 1),
+    #     ("langchain.Llm.ChatOpenAI", 1),
+    #     ("openai.chat.completions.create", 2),
+    #     ("langchain.Parser.StrOutputParser", 1),
+    # ]
+    # assert got == exp
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_simple_tool_run(client: WeaveClient) -> None:
+    from langchain.agents import AgentExecutor
+    from langchain.agents.format_scratchpad import format_to_openai_function_messages
+    from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
+    from langchain.pydantic_v1 import BaseModel, Field
+    from langchain.tools import StructuredTool
+    from langchain_core.messages import AIMessage, HumanMessage
+    from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+    from langchain_core.utils.function_calling import convert_to_openai_function
+    from langchain_openai import ChatOpenAI
+
+    from .langchain import WeaveTracer
+
+    class CalculatorInput(BaseModel):
+        a: int = Field(description="first number")
+        b: int = Field(description="second number")
+
+    def multiply(a: int, b: int) -> int:
+        """Multiply two numbers."""
+        return a * b
+
+    calculator = StructuredTool.from_function(
+        func=multiply,
+        name="Calculator",
+        description="multiply numbers",
+        args_schema=CalculatorInput,
+        return_direct=True,
+    )
+
+    llm = ChatOpenAI(model="gpt-3.5-turbo")
+
+    tools = [calculator]
+    functions = [convert_to_openai_function(t) for t in tools]
+
+    assistant_system_message = """You are a helpful assistant. \
+    Use tools (only if necessary) to best answer the users questions."""
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", assistant_system_message),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    llm_with_tools = llm.bind(functions=functions)
+
+    def _format_chat_history(chat_history: List[Tuple[str, str]]):
+        buffer = []
+        for human, ai in chat_history:
+            buffer.append(HumanMessage(content=human))
+            buffer.append(AIMessage(content=ai))
+        return buffer
+
+    agent = (
+        {
+            "input": lambda x: x["input"],
+            "chat_history": lambda x: _format_chat_history(x["chat_history"]),
+            "agent_scratchpad": lambda x: format_to_openai_function_messages(
+                x["intermediate_steps"]
+            ),
+        }
+        | prompt
+        | llm_with_tools
+        | OpenAIFunctionsAgentOutputParser()
+    )
+
+    class AgentInput(BaseModel):
+        input: str
+        chat_history: List[Tuple[str, str]] = Field(
+            ...,
+            extra={"widget": {"type": "chat", "input": "input", "output": "output"}},
+        )
+
+    agent_executor = AgentExecutor(agent=agent, tools=tools).with_types(
+        input_type=AgentInput
+    )
+
+    response = agent_executor.invoke(
+        {"input": "What is 3 times 4 ?", "chat_history": []},
+        config={"callbacks": [WeaveTracer()]},
+    )
+    print(response)
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert_correct_calls_for_tool_chain(res.calls)
