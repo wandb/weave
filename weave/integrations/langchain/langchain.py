@@ -1,5 +1,6 @@
 import datetime
 import json
+import re
 from uuid import UUID
 
 from weave import graph_client_context
@@ -18,6 +19,12 @@ except ImportError:
 from typing import Any, Dict, List, Optional
 
 if not import_failed:
+
+    def make_valid_run_name(name: str) -> str:
+        name = name.replace("<", " ").replace(">", " ")
+
+        valid_run_name = re.sub(r"[^a-zA-Z0-9 .-_]", " ", name)
+        return valid_run_name
 
     def _run_to_dict(run: Run, as_input: bool = False) -> dict:
         run_dict = run.json(
@@ -68,7 +75,7 @@ if not import_failed:
 
             if is_valid_root or is_valid_child:
                 # TO:DO, Figure out how to handle the run name. It errors in the UI
-                run_name = run.name.replace("<", "-").replace(">", "")
+                run_name = make_valid_run_name(run.name)
                 parent_id = run.parent_run_id
                 call = self.gc.create_call(
                     # Make sure to add the run name once the UI issue is figured out
