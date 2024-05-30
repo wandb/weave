@@ -58,6 +58,14 @@ const simpleSearch = (options: DropdownItemProps[], query: string) => {
     .value();
 };
 
+const getOptionProps = (opt: Option, hideText: boolean) => {
+  const {text, ...props} = opt;
+  props.text = hideText ? null : (
+    <OptionWithTooltip text={opt.text as string} />
+  );
+  return props;
+};
+
 export interface ModifiedDropdownExtraProps {
   debounceTime?: number;
   enableReordering?: boolean;
@@ -66,6 +74,7 @@ export interface ModifiedDropdownExtraProps {
   resultLimit?: number;
   resultLimitMessage?: string;
   style?: CSSProperties;
+  hideText?: boolean;
 
   optionTransform?(option: Option): Option;
 }
@@ -82,6 +91,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
       options: propsOptions,
       search,
       value,
+      hideText = false,
     } = props;
 
     const {
@@ -215,10 +225,7 @@ const ModifiedDropdown: FC<ModifiedDropdownProps> = React.memo(
     const displayOptions = getDisplayOptions(
       multiple
         ? computedOptions
-        : computedOptions.map(opt => ({
-            ...opt,
-            content: <OptionWithTooltip text={opt.text as string} />,
-          })),
+        : computedOptions.map(opt => getOptionProps(opt, hideText) as Option),
       resultLimit,
       searchQuery,
       value
@@ -477,7 +484,7 @@ type OptionWithTooltipProps = {
   text: string | null;
 };
 
-const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
+export const OptionWithTooltip: React.FC<OptionWithTooltipProps> = ({text}) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const optionRef = useRef<HTMLDivElement>(null);
 
