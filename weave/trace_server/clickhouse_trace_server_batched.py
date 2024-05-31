@@ -582,7 +582,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 SELECT *,
                                     row_number() OVER (PARTITION BY project_id, digest) AS rn
                                 FROM tables
-                                WHERE project_id = {{project_id:String}}
+                                WHERE project_id = {{project_id:String}} AND digest = {{digest:String}}
                             )
                         WHERE rn = 1
                         ORDER BY project_id, digest
