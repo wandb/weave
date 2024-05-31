@@ -1,3 +1,8 @@
+---
+sidebar_position: 3
+hide_table_of_contents: true
+---
+
 # Example: Model-Based Evaluation of RAG applications
 
 Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases. 
