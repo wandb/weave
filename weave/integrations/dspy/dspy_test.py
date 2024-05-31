@@ -30,35 +30,6 @@ def op_name_from_ref(ref: str) -> str:
     return ref.split("/")[-1].split(":")[0]
 
 
-def assert_calls_correct_for_quickstart(calls: list[tsi.CallSchema]) -> None:
-    assert len(calls) == 9
-    """ Next, the major thing to assert is the "shape" of the calls:
-    llama_index.query
-        llama_index.retrieve
-            llama_index.embedding
-        llama_index.synthesize
-            llama_index.chunking
-            llama_index.chunking
-            llama_index.templating
-            llama_index.llm
-                openai.chat.completions.create
-    """
-    flattened = flatten_calls(calls)
-    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
-    exp = [
-        ("llama_index.query", 0),
-        ("llama_index.retrieve", 1),
-        ("llama_index.embedding", 2),
-        ("llama_index.synthesize", 1),
-        ("llama_index.chunking", 2),
-        ("llama_index.chunking", 2),
-        ("llama_index.templating", 2),
-        ("llama_index.llm", 2),
-        ("openai.chat.completions.create", 3),
-    ]
-    assert got == exp
-
-
 @pytest.fixture
 def fake_api_key() -> Generator[None, None, None]:
     import os
@@ -74,7 +45,11 @@ def fake_api_key() -> Generator[None, None, None]:
             os.environ["OPENAI_API_KEY"] = orig_key
 
 
-def assert_calls(client: WeaveClient, expected_calls: List[Tuple[str, int]]):
+def assert_calls(
+    client: WeaveClient,
+    expected_calls: List[Tuple[str, int]],
+    partial_assertion: bool = False,
+):
     weave_server_respose = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
@@ -82,7 +57,11 @@ def assert_calls(client: WeaveClient, expected_calls: List[Tuple[str, int]]):
         (op_name_from_ref(c.op_name), d)
         for (c, d) in flatten_calls(weave_server_respose.calls)
     ]
-    assert flattened_call_response == expected_calls
+    if not partial_assertion:
+        assert flattened_call_response == expected_calls
+    else:
+        for call in expected_calls:
+            assert call in flattened_call_response
 
 
 @pytest.mark.vcr(
@@ -361,4 +340,45 @@ def test_dspy_react(client: WeaveClient, fake_api_key: None) -> None:
             ("GPT3.basic_request", 5),
             ("openai.chat.completions.create", 6),
         ],
+    )
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_dspy_react(client: WeaveClient, fake_api_key: None) -> None:
+    gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
+    dspy.configure(lm=gpt3_turbo)
+
+    class BasicQA(dspy.Signature):
+        """Answer questions with short factoid answers."""
+
+        question = dspy.InputField()
+        answer = dspy.OutputField(desc="often between 1 and 5 words")
+
+    react_module = dspy.ReAct(BasicQA)
+    react_module(question="What is the color of the sky?")
+
+    assert_calls(
+        client,
+        expected_calls=[
+            ("GPT3.__init__", 0),
+            ("BootstrapFewShot.__init__", 0),
+            ("RAG.__init__", 0),
+            ("Retrieve.__init__", 0),
+            ("ChainOfThought.__init__", 0),
+            ("BootstrapFewShot.compile", 0),
+            ("RAG.__call__", 1),
+            ("Retrieve.__call__", 2),
+            ("Retrieve.forward", 3),
+            ("ChainOfThought.__call__", 1),
+            ("ChainOfThought.forward", 2),
+            ("GPT3.__call__", 3),
+            ("GPT3.request", 4),
+            ("GPT3.basic_request", 5),
+            ("validate_context_and_answer", 1),
+        ],
+        partial_assertion=True,
     )
