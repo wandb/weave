@@ -45,7 +45,7 @@ export const CallPage: FC<{
           <Button icon="close" variant="ghost" onClick={close} />
         </div>
         <div style={{flex: 1}}>
-          <ErrorPanel title="Call not found" />
+          <ErrorPanel title="Call not found" subtitle="" subtitle2="" />
         </div>
       </div>
     );
