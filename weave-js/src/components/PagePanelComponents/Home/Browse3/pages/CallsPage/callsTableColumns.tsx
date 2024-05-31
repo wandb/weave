@@ -437,7 +437,9 @@ const useAllDynamicColumnNames = (
   // 1. Maintain an ever-growing set of unique columns. It must be reset
   // when `effectiveFilter` changes.
   const currentDynamicColumnNames = useMemo(() => {
-    const dynamicColumns = new Set<string>();
+    // Use of a map to ensure uniqueness while also
+    // ensuring order is maintained.
+    const dynamicColumnsMap: {[key: string]: boolean} = {};
     tableData.forEach(row => {
       Object.keys(row).forEach(key => {
         if (
@@ -446,11 +448,11 @@ const useAllDynamicColumnNames = (
           key.startsWith('output') ||
           key.startsWith('summary')
         ) {
-          dynamicColumns.add(key);
+          dynamicColumnsMap[key] = true;
         }
       });
     });
-    return _.sortBy([...dynamicColumns]);
+    return Object.keys(dynamicColumnsMap);
   }, [tableData]);
 
   // Wow this is a pretty crazy idea to maintain a list of all dynamic columns
@@ -468,11 +470,18 @@ const useAllDynamicColumnNames = (
         return true;
       });
 
-      return _.sortBy(
-        Array.from(
-          new Set([...lastDynamicColumnNames, ...currentDynamicColumnNames])
-        )
-      );
+      // Use of a map to ensure uniqueness while also
+      // ensuring order is maintained. New fields are
+      // added to the "end"
+      const totalDynamicColumnNames: {[key: string]: boolean} = {};
+      lastDynamicColumnNames.forEach(c => {
+        totalDynamicColumnNames[c] = true;
+      });
+      currentDynamicColumnNames.forEach(c => {
+        totalDynamicColumnNames[c] = true;
+      });
+
+      return Object.keys(totalDynamicColumnNames);
     });
   }, [currentDynamicColumnNames, shouldIgnoreColumn]);
 
