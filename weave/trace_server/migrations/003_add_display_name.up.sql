@@ -2,7 +2,7 @@ ALTER TABLE call_parts
     ADD COLUMN display_name Nullable(String) DEFAULT NULL;
 
 ALTER TABLE calls_merged
-    ADD COLUMN display_name SimpleAggregateFunction(max, Tuple(Nullable(String), DateTime));
+    ADD COLUMN display_name SimpleAggregateFunction(max, Tuple(DateTime, Nullable(String)));
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
@@ -22,7 +22,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs,
         -- *** Add argMax to use most recent display_name ***
-        maxSimpleState((display_name, call_parts.created_at)) as display_name
+        maxSimpleState((call_parts.created_at, display_name)) as display_name
     FROM call_parts
     GROUP BY project_id,
         id;
