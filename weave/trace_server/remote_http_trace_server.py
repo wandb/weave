@@ -122,11 +122,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if len(batch) == 0:
             return
 
-        # `by_alias` is required since we have Mongo-style properties in the
-        # query models that are aliased to conform to start with `$`. Without
-        # this, the model_dump will use the internal property names which are
-        # not valid for the `model_validate` step.
-        data = Batch(batch=batch).model_dump_json(by_alias=True)
+        data = Batch(batch=batch).model_dump_json()
         encoded_data = data.encode("utf-8")
         encoded_bytes = len(encoded_data)
 
