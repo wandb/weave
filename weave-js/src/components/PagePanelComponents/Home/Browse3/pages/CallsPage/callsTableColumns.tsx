@@ -381,6 +381,7 @@ function buildCallsTableColumns(
     // Should have custom timestamp filter here.
     filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
     sortable: true,
+    sortingOrder: ['desc', 'asc'],
     width: 100,
     minWidth: 100,
     maxWidth: 100,
