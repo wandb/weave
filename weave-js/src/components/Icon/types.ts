@@ -33,6 +33,7 @@ export const IconNames = {
   Collapse: 'collapse',
   Color: 'color',
   Column: 'column',
+  ColumnAlt: 'column-alt',
   ContentFullWidth: 'content-full-width',
   ContentNarrow: 'content-narrow',
   ContentWide: 'content-wide',

@@ -34,6 +34,7 @@ export {
   IconCollapse,
   IconColor,
   IconColumn,
+  IconColumnAlt,
   IconContentFullWidth,
   IconContentNarrow,
   IconContentWide,

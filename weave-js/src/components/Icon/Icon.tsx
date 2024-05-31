@@ -34,6 +34,7 @@ import {ReactComponent as ImportCodeAlt} from '../../assets/icons/icon-code-alt.
 import {ReactComponent as ImportCollapse} from '../../assets/icons/icon-collapse.svg';
 import {ReactComponent as ImportColor} from '../../assets/icons/icon-color.svg';
 import {ReactComponent as ImportColumn} from '../../assets/icons/icon-column.svg';
+import {ReactComponent as ImportColumnAlt} from '../../assets/icons/icon-column-alt.svg';
 import {ReactComponent as ImportContentFullWidth} from '../../assets/icons/icon-content-full-width.svg';
 import {ReactComponent as ImportContentNarrow} from '../../assets/icons/icon-content-narrow.svg';
 import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-content-wide.svg';
@@ -347,6 +348,9 @@ export const IconColor = (props: SVGIconProps) => (
 );
 export const IconColumn = (props: SVGIconProps) => (
   <ImportColumn {...updateIconProps(props)} />
+);
+export const IconColumnAlt = (props: SVGIconProps) => (
+    <ImportColumnAlt {...updateIconProps(props)} />
 );
 export const IconContentFullWidth = (props: SVGIconProps) => (
   <ImportContentFullWidth {...updateIconProps(props)} />
@@ -978,6 +982,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   collapse: IconCollapse,
   color: IconColor,
   column: IconColumn,
+  'column-alt': IconColumnAlt,
   'content-full-width': IconContentFullWidth,
   'content-narrow': IconContentNarrow,
   'content-wide': IconContentWide,
