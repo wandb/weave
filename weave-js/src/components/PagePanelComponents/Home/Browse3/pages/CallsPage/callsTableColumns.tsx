@@ -435,7 +435,6 @@ const useAllDynamicColumnNames = (
   shouldIgnoreColumn: (col: string) => boolean,
   resetDep: any
 ) => {
-  // TODO: Maintain user-defined order
   const [allDynamicColumnNames, setAllDynamicColumnNames] = useState<string[]>(
     []
   );
