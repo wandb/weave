@@ -48,6 +48,10 @@ class Evaluation(Object):
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
+            elif isinstance(scorer, type):
+                raise ValueError(
+                    f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
+                )
             elif callable(scorer) and not isinstance(scorer, Op):
                 scorer = weave.op()(scorer)
             elif isinstance(scorer, Op):
@@ -154,6 +158,7 @@ class Evaluation(Object):
             if isinstance(score_arg_names, BoundOp):
                 score_arg_names = score_arg_names[1:]
 
+            print("SCORE ARG NAMES", score_arg_names)
             if "model_output" not in score_arg_names:
                 raise OpCallError(
                     f"Scorer {scorer_name} must have a 'model_output' argument, to receive the output of the model function."
