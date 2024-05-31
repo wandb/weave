@@ -7,6 +7,14 @@
 export type Path = string[];
 export type PathList = Path[];
 
+export function stringToPath(str: string): Path {
+  return str.split('.');
+}
+
+export function pathToString(path: Path): string {
+  return path.join('.');
+}
+
 // Helper function to check if two paths are equal
 function pathsEqual(path1: Path, path2: Path): boolean {
   if (path1.length !== path2.length) return false;
