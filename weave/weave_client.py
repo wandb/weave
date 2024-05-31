@@ -44,7 +44,9 @@ from weave.trace_server.trace_server_interface import (
     _TableRowFilter,
     _CallsFilter,
     _ObjectVersionFilter,
+    Query,
 )
+from weave.trace_server.interface.query import Operation
 from weave.trace.refs import (
     Ref,
     ObjectRef,
@@ -173,14 +175,20 @@ class Call:
 
 class CallsIter:
     server: TraceServerInterface
-    filter: _CallsFilter
+    filter: Optional[_CallsFilter]
+    query: Optional[Query]
 
     def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+        self,
+        server: TraceServerInterface,
+        project_id: str,
+        filter: Optional[_CallsFilter],
+        query: Optional[Query],
     ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
+        self.query = query
 
     def __getitem__(self, key: Union[slice, int]) -> TraceObject:
         if isinstance(key, slice):
@@ -192,13 +200,14 @@ class CallsIter:
 
     def __iter__(self) -> typing.Iterator[TraceObject]:
         page_index = 0
-        page_size = 10
+        page_size = 100
         entity, project = self.project_id.split("/")
         while True:
             response = self.server.calls_query(
                 CallsQueryReq(
                     project_id=self.project_id,
                     filter=self.filter,
+                    query=self.query,
                     offset=page_index * page_size,
                     limit=page_size,
                 )
@@ -244,6 +253,86 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
             else:
                 result[k] = result.get(k, 0) + v
     return result
+
+
+# ChatGPT version :)
+def transform_filter(filter):
+    def determine_type(value):
+        if isinstance(value, int):
+            return "int"
+        elif isinstance(value, float):
+            return "double"
+        elif isinstance(value, str):
+            return "string"
+        elif isinstance(value, bool):
+            return "bool"
+        # Add more types as necessary
+        return "string"
+
+    def transform_value(value):
+        if isinstance(value, dict):
+            new_value = {}
+            for k, v in value.items():
+                if k.startswith("$"):
+                    new_value[k] = transform_value(v)
+                else:
+                    new_value["$getField"] = k
+                    new_value = transform_value(new_value)
+            return new_value
+        elif isinstance(value, (int, float, str, bool)):
+            return {"$literal": value}
+        else:
+            return value
+
+    def transform_operator(field, operator, value):
+        if operator in ["$gt", "$gte", "$lt", "$lte", "$eq", "$ne"]:
+            left_is_literal = isinstance(value, (int, float, str, bool))
+            if left_is_literal:
+                literal = value
+                literal_type = determine_type(literal)
+                return {
+                    operator: (
+                        {
+                            "$convert": {
+                                "input": {"$getField": field},
+                                "to": literal_type,
+                            }
+                        },
+                        transform_value(literal),
+                    )
+                }
+        elif operator == "$contains":
+            return {
+                operator: {
+                    "input": {
+                        "$convert": {"input": {"$getField": field}, "to": "string"}
+                    },
+                    "substr": transform_value(value),
+                    "case_insensitive": False,
+                }
+            }
+        elif operator == "$not":
+            inner_operator = next(iter(value))
+            inner_value = value[inner_operator]
+            transformed_inner = transform_operator(field, inner_operator, inner_value)
+            return {"$not": transformed_inner}
+        else:
+            return {operator: transform_value(value)}
+
+    def transform_field(field, value):
+        if isinstance(value, dict):
+            transformed_value = {}
+            for operator, val in value.items():
+                transformed_value.update(transform_operator(field, operator, val))
+            return transformed_value
+        else:
+            return transform_operator(field, "$eq", value)
+
+    transformed_filter = {}
+    for field, value in filter.items():
+        transformed_filter.update(transform_field(field, value))
+
+    return transformed_filter
 
 
 class WeaveClient:
@@ -381,11 +470,28 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
-        if filter is None:
-            filter = _CallsFilter()
+    def calls(
+        self, op_names: Optional[list[str]], filter: Optional[dict] = None
+    ) -> CallsIter:
+        query: Optional[Query] = None
+        if filter is not None:
+            transformed = transform_filter(filter)
+            query = Query.model_validate({"$expr": transformed})
+        trace_server_filt: Optional[_CallsFilter] = None
+        if op_names is not None:
+            if isinstance(op_names, str):
+                op_names = [op_names]
+            op_ref_uris = []
+            for op_name in op_names:
+                if op_name.startswith("weave:///"):
+                    op_ref_uris.append(op_name)
+                else:
+                    if ":" not in op_name:
+                        op_name = op_name + ":*"
+                    op_ref_uris.append(f"weave:///{self._project_id()}/op/{op_name}")
+            trace_server_filt = _CallsFilter(op_names=op_ref_uris)
 
-        return CallsIter(self.server, self._project_id(), filter)
+        return CallsIter(self.server, self._project_id(), trace_server_filt, query)
 
     @trace_sentry.global_trace_sentry.watch()
     def call(self, call_id: str) -> TraceObject:

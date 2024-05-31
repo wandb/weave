@@ -169,7 +169,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req = req_model.model_validate(req)
         r = requests.post(
             self.trace_server_url + url,
-            data=req.model_dump_json().encode("utf-8"),
+            # Made the by_alias change as recommended by Tim.
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
         )
         if r.status_code == 413 and "obj/create" in url:
