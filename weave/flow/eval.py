@@ -158,7 +158,6 @@ class Evaluation(Object):
             if isinstance(score_arg_names, BoundOp):
                 score_arg_names = score_arg_names[1:]
 
-            print("SCORE ARG NAMES", score_arg_names)
             if "model_output" not in score_arg_names:
                 raise OpCallError(
                     f"Scorer {scorer_name} must have a 'model_output' argument, to receive the output of the model function."
