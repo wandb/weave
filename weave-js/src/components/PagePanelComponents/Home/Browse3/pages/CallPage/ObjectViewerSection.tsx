@@ -1,5 +1,5 @@
 import Box from '@mui/material/Box';
-import {useGridApiRef} from '@mui/x-data-grid-pro';
+import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import styled from 'styled-components';
@@ -89,7 +89,7 @@ const ObjectViewerSectionNonEmpty = ({
   const [mode, setMode] = useState(
     isSimpleData(data) || isExpanded ? 'expanded' : 'collapsed'
   );
-  const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
+  const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
     if (mode === 'collapsed' || mode === 'expanded') {
