@@ -568,7 +568,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conds.extend(conditions)
 
         predicate = _combine_conditions(conds, "AND")
-        # Must dedupe table rows and tables.
+        # The subqueries are for deduplication of table rows and tables by digest.
         # It might be more efficient to do deduplication of table rows
         # in the outer query instead of the right side of the JOIN clause here,
         # that hasn't been tested yet.
@@ -596,8 +596,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             SELECT *,
                                 row_number() OVER (PARTITION BY project_id, digest) AS rn
                             FROM table_rows
+                            WHERE project_id = {{project_id:String}}
                         )
-                    WHERE project_id = {{project_id:String}} AND rn = 1
+                    WHERE rn = 1
                     ORDER BY project_id, digest
                 ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
@@ -853,7 +854,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        # Must dedupe files
+        # The subquery is responsible for deduplication of file chunks by digest
         query_result = self.ch_client.query(
             """
             SELECT n_chunks, val_bytes
@@ -1141,7 +1142,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if parameters is None:
             parameters = {}
-        # must dedupe object_versions
+        # The subquery is for deduplication of object versions by digest
         query_result = self._query_stream(
             f"""
             SELECT 
