@@ -1,12 +1,14 @@
-import { isWeaveObjectRef,parseRef } from '../../../../../../react';
-import { flattenObject } from '../../../Browse2/browse2Util';
-import { isRef } from '../common/util';
-import { OBJECT_ATTR_EDGE_NAME } from '../wfReactInterface/constants';
-import { TraceCallSchema } from '../wfReactInterface/traceServerClient';
-import { EXPANDED_REF_REF_KEY, EXPANDED_REF_VAL_KEY } from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import { CallSchema } from '../wfReactInterface/wfDataModelHooksInterface';
-import { ExpandedRefWithValueAsTableRef } from './callsTableColumns';
-
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {flattenObject} from '../../../Browse2/browse2Util';
+import {isRef} from '../common/util';
+import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
+import {TraceCallSchema} from '../wfReactInterface/traceServerClient';
+import {
+  EXPANDED_REF_REF_KEY,
+  EXPANDED_REF_VAL_KEY,
+} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {ExpandedRefWithValueAsTableRef} from './callsTableColumns';
 
 /**
  * This function is responsible for taking the raw calls data and flattening it
@@ -34,7 +36,7 @@ import { ExpandedRefWithValueAsTableRef } from './callsTableColumns';
  */
 export function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
-): Array<TraceCallSchema & { [key: string]: string; }> {
+): Array<TraceCallSchema & {[key: string]: string}> {
   return callsResult.map(r => {
     // First, flatten the inner trace call (this is the on-wire format)
     let flattened = flattenObject(r.traceCall ?? {});
@@ -42,7 +44,7 @@ export function prepareFlattenedCallDataForTable(
     flattened = replaceTableRefsInFlattenedData(flattened);
 
     // Next, process some of the keys.
-    const cleaned: { [key: string]: any; } = {};
+    const cleaned: {[key: string]: any} = {};
     Object.keys(flattened).forEach(key => {
       let newKey = key;
 
@@ -51,7 +53,8 @@ export function prepareFlattenedCallDataForTable(
         const keyRoot = newKey.slice(0, -EXPANDED_REF_REF_KEY.length - 1);
 
         // Case 1: the refVal is a primitive and we just need to toss away the ref key
-        const refValIsPrimitive = flattened[newKey + '.' + EXPANDED_REF_VAL_KEY] !== undefined;
+        const refValIsPrimitive =
+          flattened[newKey + '.' + EXPANDED_REF_VAL_KEY] !== undefined;
         if (refValIsPrimitive) {
           return;
 
@@ -75,7 +78,7 @@ export function prepareFlattenedCallDataForTable(
       cleaned[newKey] = flattened[key];
     });
 
-    return cleaned as TraceCallSchema & { [key: string]: string; };
+    return cleaned as TraceCallSchema & {[key: string]: string};
   });
 }
 /**
@@ -108,11 +111,12 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
         if (isWeaveObjectRef(parsedRef)) {
           if (parsedRef.weaveKind === 'table') {
             let parentRef: string | null = null;
-            let lookupPath = key.split('.');
+            const lookupPath = key.split('.');
             if (lookupPath.length > 0) {
               const attr = lookupPath.pop()!;
               while (lookupPath.length > 0) {
-                const parentKey = lookupPath.join('.') + '.' + EXPANDED_REF_REF_KEY;
+                const parentKey =
+                  lookupPath.join('.') + '.' + EXPANDED_REF_REF_KEY;
                 if (parentKey in flattened) {
                   const parentVal = flattened[parentKey];
                   if (isRef(parentVal)) {
@@ -124,7 +128,8 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
               }
               if (parentRef) {
                 const newVal: ExpandedRefWithValueAsTableRef = {
-                  [EXPANDED_REF_REF_KEY]: parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr,
+                  [EXPANDED_REF_REF_KEY]:
+                    parentRef + '/' + OBJECT_ATTR_EDGE_NAME + '/' + attr,
                   [EXPANDED_REF_VAL_KEY]: val,
                 };
                 return [key, newVal];

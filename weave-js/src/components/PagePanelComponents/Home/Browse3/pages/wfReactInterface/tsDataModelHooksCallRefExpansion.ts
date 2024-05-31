@@ -8,7 +8,7 @@
 import * as _ from 'lodash';
 import {useEffect, useMemo, useState} from 'react';
 
-import { isWeaveObjectRef,parseRef } from '../../../../../../react';
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {isRef} from '../common/util';
 import {refDataCache} from './cache';
 import * as traceServerClient from './traceServerClient';
@@ -188,8 +188,7 @@ export const isTableRef = (ref: any): boolean => {
     return parsed.weaveKind === 'table';
   }
   return false;
-}
-
+};
 
 export const isExpandableRef = (ref: any): boolean => {
   if (typeof ref !== 'string') {
@@ -210,4 +209,3 @@ export const isExpandableRef = (ref: any): boolean => {
   }
   return false;
 };
-
