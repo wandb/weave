@@ -109,6 +109,16 @@ patched_functions = [
         attribute_name="Retrieve.forward",
         make_new_value=weave.op(),
     ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy.evaluate.evaluate"),
+        attribute_name="Evaluate.__init__",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy.evaluate.evaluate"),
+        attribute_name="Evaluate.__call__",
+        make_new_value=weave.op(),
+    ),
 ]
 
 # Patch Teleprompter classes
