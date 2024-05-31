@@ -55,7 +55,7 @@ class CallStartCHInsertable(BaseModel):
     inputs_dump: str
     input_refs: typing.List[str]
     output_refs: typing.List[str] = []  # sadly, this is required
-    display_name: typing.List[typing.Tuple[datetime.datetime, str]] = []
+    display_name: typing.Optional[str] = None
 
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
@@ -70,7 +70,6 @@ class CallEndCHInsertable(BaseModel):
     output_dump: str
     input_refs: typing.List[str] = []  # sadly, this is required
     output_refs: typing.List[str]
-    display_name: typing.List[typing.Tuple[datetime.datetime, str]] = []
 
 
 class CallDeleteCHInsertable(BaseModel):
@@ -82,13 +81,12 @@ class CallDeleteCHInsertable(BaseModel):
     # required types
     input_refs: typing.List[str] = []
     output_refs: typing.List[str] = []
-    display_name: typing.List[typing.Tuple[datetime.datetime, str]] = []
 
 
 class CallRenameCHInsertable(BaseModel):
     project_id: str
     id: str
-    display_name: typing.List[typing.Tuple[datetime.datetime, str]]
+    display_name: typing.Optional[str] = None
     wb_user_id: typing.Optional[str]
 
     # required types
@@ -112,7 +110,7 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
-    display_name: typing.List[typing.Tuple[datetime.datetime, str]]
+    display_name: typing.Optional[str] = None
 
     trace_id: str
     parent_id: typing.Optional[str] = None
@@ -388,7 +386,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             project_id=req.project_id,
             id=req.call_id,
             wb_user_id=req.wb_user_id,
-            display_name=[(datetime.datetime.now(), req.display_name)],
+            display_name=req.display_name,
         )
         self._insert_call(renamed_insertable)
 
@@ -952,8 +950,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for col in columns:
             if col in ["project_id", "id"]:
                 merged_cols.append(f"{col} AS {col}")
-            elif col in ["input_refs", "output_refs", "display_name"]:
+            elif col in ["input_refs", "output_refs"]:
                 merged_cols.append(f"array_concat_agg({col}) AS {col}")
+            elif col in ["display_name"]:
+                merged_cols.append(f"max({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
@@ -1296,15 +1296,6 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
-def _ch_call_display_name_tuple_to_str(
-    display_names: typing.Optional[typing.List[typing.Tuple[datetime.datetime, str]]]
-) -> typing.Optional[str]:
-    if display_names is None or len(display_names) == 0:
-        return None
-    display_names.sort(key=lambda x: x[0])
-    return display_names[-1][1]
-
-
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1321,7 +1312,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
-        display_name=_ch_call_display_name_tuple_to_str(ch_call.display_name),
+        display_name=ch_call.display_name[0] if ch_call.display_name else None,
     )
 
 
@@ -1342,9 +1333,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
-        display_name=_ch_call_display_name_tuple_to_str(
-            ch_call_dict.get("display_name")
-        ),
+        display_name=ch_call_dict.get("display_name", [None])[0],
     )
 
 
@@ -1369,10 +1358,6 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     # wrong trace id (one that does not match the parent_id)!
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
-    if start_call.display_name:
-        display_name = [(start_call.started_at, start_call.display_name)]
-    else:
-        display_name = []
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -1385,7 +1370,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
         wb_user_id=start_call.wb_user_id,
-        display_name=display_name,
+        display_name=start_call.display_name,
     )
 
 

@@ -1,8 +1,8 @@
 ALTER TABLE call_parts
-    ADD COLUMN display_name Array(Tuple(DateTime64(3), String));
+    ADD COLUMN display_name Nullable(String) DEFAULT NULL;
 
 ALTER TABLE calls_merged
-    ADD COLUMN display_name SimpleAggregateFunction(array_concat_agg, Array(Tuple(DateTime64(3), String)));
+    ADD COLUMN display_name SimpleAggregateFunction(max, Tuple(Nullable(String), DateTime));
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
@@ -21,8 +21,8 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs,
-        -- *** Add array aggregating display name field ***
-        array_concat_aggSimpleState(display_name) as display_name
+        -- *** Add argMax to use most recent display_name ***
+        maxSimpleState((display_name, call_parts.created_at)) as display_name
     FROM call_parts
     GROUP BY project_id,
         id;
