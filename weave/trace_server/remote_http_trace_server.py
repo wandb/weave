@@ -46,7 +46,7 @@ def _is_retryable_exception(e: Exception) -> bool:
         return False
 
     # Don't retry on HTTP 4xx (except 429)
-    if isinstance(e, requests.HTTPError):
+    if isinstance(e, requests.HTTPError) and e.response is not None:
         code_class = e.response.status_code // 100
 
         # Bad request, not rate-limiting
@@ -251,6 +251,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsQueryRes:
         return self._generic_request(
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
+        )
+
+    def calls_query_stats(
+        self, req: t.Union[tsi.CallsQueryStatsReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallsQueryStatsRes:
+        return self._generic_request(
+            "/calls/query_stats", req, tsi.CallsQueryStatsReq, tsi.CallsQueryStatsRes
         )
 
     def calls_delete(

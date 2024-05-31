@@ -17,6 +17,7 @@ from .trace_server_interface_util import (
     bytes_digest,
 )
 from . import trace_server_interface as tsi
+from .interface import query as tsi_query
 
 from weave.trace import refs
 from weave.trace_server.trace_server_interface_util import (
@@ -275,6 +276,88 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
 
+        if req.query:
+            # This is the mongo-style query
+            def process_operation(operation: tsi_query.Operation) -> str:
+                cond = None
+
+                if isinstance(operation, tsi_query.AndOperation):
+                    lhs_part = process_operand(operation.and_[0])
+                    rhs_part = process_operand(operation.and_[1])
+                    cond = f"({lhs_part} AND {rhs_part})"
+                elif isinstance(operation, tsi_query.OrOperation):
+                    lhs_part = process_operand(operation.or_[0])
+                    rhs_part = process_operand(operation.or_[1])
+                    cond = f"({lhs_part} OR {rhs_part})"
+                elif isinstance(operation, tsi_query.NotOperation):
+                    operand_part = process_operand(operation.not_[0])
+                    cond = f"(NOT ({operand_part}))"
+                elif isinstance(operation, tsi_query.EqOperation):
+                    lhs_part = process_operand(operation.eq_[0])
+                    rhs_part = process_operand(operation.eq_[1])
+                    cond = f"({lhs_part} = {rhs_part})"
+                elif isinstance(operation, tsi_query.GtOperation):
+                    lhs_part = process_operand(operation.gt_[0])
+                    rhs_part = process_operand(operation.gt_[1])
+                    cond = f"({lhs_part} > {rhs_part})"
+                elif isinstance(operation, tsi_query.GteOperation):
+                    lhs_part = process_operand(operation.gte_[0])
+                    rhs_part = process_operand(operation.gte_[1])
+                    cond = f"({lhs_part} >= {rhs_part})"
+                elif isinstance(operation, tsi_query.ContainsOperation):
+                    lhs_part = process_operand(operation.contains_.input)
+                    rhs_part = process_operand(operation.contains_.substr)
+                    if operation.contains_.case_insensitive:
+                        lhs_part = f"LOWER({lhs_part})"
+                        rhs_part = f"LOWER({rhs_part})"
+                    cond = f"instr({lhs_part}, {rhs_part})"
+                else:
+                    raise ValueError(f"Unknown operation type: {operation}")
+
+                return cond
+
+            def process_operand(operand: tsi_query.Operand) -> str:
+                if isinstance(operand, tsi_query.LiteralOperation):
+                    return json.dumps(operand.literal_)
+                elif isinstance(operand, tsi_query.GetFieldOperator):
+                    field = _transform_external_calls_field_to_internal_calls_field(
+                        operand.get_field_, None
+                    )
+                    return field
+                elif isinstance(operand, tsi_query.ConvertOperation):
+                    field = process_operand(operand.convert_.input)
+                    convert_to = operand.convert_.to
+                    if convert_to == "int":
+                        sql_type = "INT"
+                    elif convert_to == "double":
+                        sql_type = "FLOAT"
+                    elif convert_to == "bool":
+                        sql_type = "BOOL"
+                    elif convert_to == "string":
+                        sql_type = "TEXT"
+                    else:
+                        raise ValueError(f"Unknown cast: {convert_to}")
+                    return f"CAST({field} AS {sql_type})"
+                elif isinstance(
+                    operand,
+                    (
+                        tsi_query.AndOperation,
+                        tsi_query.OrOperation,
+                        tsi_query.NotOperation,
+                        tsi_query.EqOperation,
+                        tsi_query.GtOperation,
+                        tsi_query.GteOperation,
+                        tsi_query.ContainsOperation,
+                    ),
+                ):
+                    return process_operation(operand)
+                else:
+                    raise ValueError(f"Unknown operand type: {operand}")
+
+            filter_cond = process_operation(req.query.expr_)
+
+            conds.append(filter_cond)
+
         query = f"SELECT * FROM calls WHERE deleted_at IS NULL AND project_id = '{req.project_id}'"
 
         conditions_part = " AND ".join(conds)
@@ -303,8 +386,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     field = "attributes_dump" + field[len("attributes") :]
                 elif field.startswith("summary"):
                     field = "summary_dump" + field[len("summary") :]
-                elif field == ("latency"):
-                    field = "ended_at - started_at"
 
                 assert direction in [
                     "ASC",
@@ -351,6 +432,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 )
                 for row in query_result
             ]
+        )
+
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+            )
+        ).calls
+        return tsi.CallsQueryStatsRes(
+            count=len(calls),
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -748,3 +841,71 @@ def get_base_object_class(val: Any) -> Optional[str]:
                             elif "_class_name" in val:
                                 return val["_class_name"]
     return None
+
+
+def _quote_json_path(path: str) -> str:
+    parts = path.split(".")
+    parts_final = []
+    for part in parts:
+        try:
+            int(part)
+            parts_final.append("[" + part + "]")
+        except ValueError:
+            parts_final.append('."' + part + '"')
+    return "$" + "".join(parts_final)
+
+
+def _transform_external_calls_field_to_internal_calls_field(
+    field: str,
+    cast: Optional[str] = None,
+) -> str:
+    json_path = None
+    if field == "inputs" or field.startswith("inputs."):
+        if field == "inputs":
+            json_path = "$"
+        else:
+            json_path = _quote_json_path(field[len("inputs.") :])
+        field = "inputs"
+    elif field == "output" or field.startswith("output."):
+        if field == "output":
+            json_path = "$"
+        else:
+            json_path = _quote_json_path(field[len("output.") :])
+        field = "output"
+    elif field == "attributes" or field.startswith("attributes."):
+        if field == "attributes":
+            json_path = "$"
+        else:
+            json_path = _quote_json_path(field[len("attributes.") :])
+        field = "attributes"
+    elif field == "summary" or field.startswith("summary."):
+        if field == "summary":
+            json_path = "$"
+        else:
+            json_path = _quote_json_path(field[len("summary.") :])
+        field = "summary"
+
+    if json_path is not None:
+        sql_type = "TEXT"
+        if cast is not None:
+            if cast == "int":
+                sql_type = "INT"
+            elif cast == "float":
+                sql_type = "FLOAT"
+            elif cast == "bool":
+                sql_type = "BOOL"
+            elif cast == "str":
+                sql_type = "TEXT"
+            else:
+                raise ValueError(f"Unknown cast: {cast}")
+        field = (
+            "CAST(json_extract("
+            + json.dumps(field)
+            + ", '"
+            + json_path
+            + "') AS "
+            + sql_type
+            + ")"
+        )
+
+    return field

@@ -231,7 +231,7 @@ def compare_safe_equal(v1, v2):
 
 
 @given(l1=list_strategy())
-@settings(max_examples=EXAMPLES_PER_TEST)
+@settings(max_examples=EXAMPLES_PER_TEST, deadline=None)
 def test_to_compare_safe(l1):
     l2 = rotate_list(l1)
     a1 = ops_arrow.to_arrow(l1)

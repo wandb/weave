@@ -154,7 +154,6 @@ export const CallDetails: FC<{
           let callsTable = (
             <CallsTable
               hideControls
-              ioColumnsOnly
               initialFilter={{
                 opVersionRefs: [opVersionRef],
                 parentId: call.callId,

@@ -3,6 +3,8 @@ import datetime
 import typing
 from pydantic import BaseModel
 
+from .interface.query import Query
+
 
 class CallSchema(BaseModel):
     id: str
@@ -166,10 +168,12 @@ class _CallsFilter(BaseModel):
 
 
 class _SortBy(BaseModel):
-    # Field should be a key of `CallSchema`. For dictionary fields (`attributes`, `inputs`, `outputs`, `summary`), the field can be dot-separated.
-    field: str
+    # Field should be a key of `CallSchema`. For dictionary fields
+    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
+    # dot-separated.
+    field: str  # Consider changing this to _FieldSelect
     # Direction should be either 'asc' or 'desc'
-    direction: str
+    direction: typing.Literal["asc", "desc"]
 
 
 class CallsQueryReq(BaseModel):
@@ -179,10 +183,21 @@ class CallsQueryReq(BaseModel):
     offset: typing.Optional[int] = None
     # Sort by multiple fields
     sort_by: typing.Optional[typing.List[_SortBy]] = None
+    query: typing.Optional[Query] = None
 
 
 class CallsQueryRes(BaseModel):
     calls: typing.List[CallSchema]
+
+
+class CallsQueryStatsReq(BaseModel):
+    project_id: str
+    filter: typing.Optional[_CallsFilter] = None
+    query: typing.Optional[Query] = None
+
+
+class CallsQueryStatsRes(BaseModel):
+    count: int
 
 
 class CallRenameReq(BaseModel):
@@ -342,6 +357,10 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
+        ...
+
+    @abc.abstractmethod
+    def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
         ...
 
     @abc.abstractmethod

@@ -9,7 +9,6 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import LinearProgress from '@mui/material/LinearProgress';
 import {LicenseInfo} from '@mui/x-license-pro';
 import {useWindowSize} from '@wandb/weave/common/hooks/useWindowSize';
 import _ from 'lodash';
@@ -19,7 +18,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useState,
 } from 'react';
 import useMousetrap from 'react-hook-mousetrap';
 import {
@@ -30,7 +28,6 @@ import {
   useParams,
 } from 'react-router-dom';
 
-import {useWeaveContext} from '../../../context';
 import {URL_BROWSE3} from '../../../urls';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
@@ -54,6 +51,8 @@ import {BoardPage} from './Browse3/pages/BoardPage';
 import {BoardsPage} from './Browse3/pages/BoardsPage';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
 import {CallsPage} from './Browse3/pages/CallsPage/CallsPage';
+import {Empty} from './Browse3/pages/common/Empty';
+import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {CenteredAnimatedLoader} from './Browse3/pages/common/Loader';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {ObjectPage} from './Browse3/pages/ObjectPage';
@@ -71,6 +70,7 @@ import {
   useWFHooks,
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
+import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {SideNav} from './Browse3/SideNav';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -173,15 +173,7 @@ const Browse3Mounted: FC<{
   navigateAwayFromProject?: () => void;
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
-  const weaveContext = useWeaveContext();
-  const [weaveLoading, setWeaveLoading] = useState(false);
-  useEffect(() => {
-    const obs = weaveContext.client.loadingObservable();
-    const sub = obs.subscribe(loading => {
-      setWeaveLoading(loading);
-    });
-    return () => sub.unsubscribe();
-  }, [weaveContext.client]);
+  const hasTSContext = useHasTraceServerClientContext();
   return (
     <Box
       sx={{
@@ -190,16 +182,6 @@ const Browse3Mounted: FC<{
         overflow: 'auto',
         flexDirection: 'column',
       }}>
-      {weaveLoading && (
-        <Box
-          sx={{
-            width: '100%',
-            position: 'absolute',
-            zIndex: 2,
-          }}>
-          <LinearProgress />
-        </Box>
-      )}
       {!props.hideHeader && (
         <AppBar
           sx={{
@@ -235,22 +217,9 @@ const Browse3Mounted: FC<{
         <Route path={baseRouter.projectUrl(':entity', ':project')} exact>
           <ProjectRedirect />
         </Route>
-        <Route
-          path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
-          <Box
-            component="main"
-            sx={{
-              flex: '1 1 auto',
-              height: '100%',
-              width: '100%',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'row',
-            }}>
-            <SideNav />
-            {/* <RouteAwareBrowse3ProjectSideNav
-              navigateAwayFromProject={props.navigateAwayFromProject}
-            /> */}
+        {hasTSContext ? (
+          <Route
+            path={browse3Paths(baseRouter.projectUrl(':entity', ':project'))}>
             <Box
               component="main"
               sx={{
@@ -259,14 +228,31 @@ const Browse3Mounted: FC<{
                 width: '100%',
                 overflow: 'hidden',
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: 'row',
               }}>
-              <ErrorBoundary>
-                <MainPeekingLayout />
-              </ErrorBoundary>
+              <SideNav />
+              {/* <RouteAwareBrowse3ProjectSideNav
+              navigateAwayFromProject={props.navigateAwayFromProject}
+            /> */}
+              <Box
+                component="main"
+                sx={{
+                  flex: '1 1 auto',
+                  height: '100%',
+                  width: '100%',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}>
+                <ErrorBoundary>
+                  <MainPeekingLayout />
+                </ErrorBoundary>
+              </Box>
             </Box>
-          </Box>
-        </Route>
+          </Route>
+        ) : (
+          <Empty {...EMPTY_NO_TRACE_SERVER} />
+        )}
 
         <Route>
           <Box component="main" sx={{flexGrow: 1, p: 3}}>
