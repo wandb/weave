@@ -2,6 +2,7 @@ import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {EmptyProps} from './Empty';
+import {Link} from './Links';
 
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
@@ -118,22 +119,16 @@ export const EMPTY_PROPS_OBJECTS: EmptyProps = {
   ),
 };
 
-export const EMPTY_PROPS_CALL: EmptyProps = {
-  icon: 'layout-tabs' as const,
-  heading: 'Call not found',
+export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
+  icon: 'weave' as const,
+  heading: 'Weave coming soon!',
   description:
-    'Use traces to track all inputs & outputs of functions within your application. Debug, monitor or drill-down into tricky examples',
+    'Weave is a lightweight toolkit for tracking and evaluating LLM applications.',
   moreInformation: (
     <>
-      Learn{' '}
-      <TargetBlank href="http://wandb.me/weave_traces">
-        tracing basics
-      </TargetBlank>{' '}
-      or see traces in action by{' '}
-      <TargetBlank href="http://wandb.me/weave_quickstart">
-        following our quickstart guide
-      </TargetBlank>
-      .
+      Learn about{' '}
+      <TargetBlank href="https://wandb.me/weave">Weave features</TargetBlank> or
+      return to <Link to="..">your project homepage</Link>.
     </>
   ),
 };
