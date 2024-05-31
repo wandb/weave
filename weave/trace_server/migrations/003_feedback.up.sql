@@ -1,4 +1,3 @@
-
 CREATE TABLE feedback (
     /*
     `id`: The unique identifier for the feedback. This is a UUID.
@@ -13,10 +12,10 @@ CREATE TABLE feedback (
     project_id String,
 
     /*
-    `wb_ref`: The ref the feedback is associated with.
-    Note: the wb prefix is to avoid conflict with React's notion of ref.
+    `weave_ref`: The ref the feedback is associated with.
+    Note: the weave prefix is to avoid conflict with React's notion of ref.
     */
-    wb_ref String,
+    weave_ref String,
 
     /*
     `wb_user_id`: The ID of the user account used to authenticate the feedback creation.
@@ -29,7 +28,7 @@ CREATE TABLE feedback (
     the user account used to authenticate the feedback creation, but can be an arbitrary string.
     This is useful for feedback that originated with end users who may not have a W&B account.
     */
-    creator String,
+    creator String NULL,
 
     /*
     `created_at`: The time that the row was inserted into the database.
@@ -42,11 +41,10 @@ CREATE TABLE feedback (
     feedback_type String,
 
     /*
-    `payload`: A dictionary of values that represent the feedback.
+    `payload_dump`: A dictionary of values that represent the feedback.
     The schema of this dictionary is determined by the feedback_type.
     */
-    payload String,
-
+    payload_dump String,
 
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (project_id, wb_ref, wb_user_id, id);
+ORDER BY (project_id, weave_ref, wb_user_id, id);
