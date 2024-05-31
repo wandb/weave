@@ -2,7 +2,6 @@
  * This implementation was created with assistance from ChatGPT, an AI developed by OpenAI.
  */
 
-
 // Define types
 export type Path = string[];
 export type PathList = Path[];
@@ -15,11 +14,22 @@ export function pathToString(path: Path): string {
   return path.join('.');
 }
 
+export function isDynamicCallColumn(path: Path): boolean {
+  return (
+    path.length > 1 &&
+    ['attributes', 'inputs', 'output', 'summary'].includes(path[0])
+  );
+}
+
 // Helper function to check if two paths are equal
 function pathsEqual(path1: Path, path2: Path): boolean {
-  if (path1.length !== path2.length) return false;
+  if (path1.length !== path2.length) {
+    return false;
+  }
   for (let i = 0; i < path1.length; i++) {
-    if (path1[i] !== path2[i]) return false;
+    if (path1[i] !== path2[i]) {
+      return false;
+    }
   }
   return true;
 }
@@ -27,7 +37,7 @@ function pathsEqual(path1: Path, path2: Path): boolean {
 // Helper function to find the longest common prefix of two paths
 function longestCommonPrefix(path1: Path, path2: Path): Path {
   const minLength = Math.min(path1.length, path2.length);
-  let commonPrefix: Path = [];
+  const commonPrefix: Path = [];
   for (let i = 0; i < minLength; i++) {
     if (path1[i] === path2[i]) {
       commonPrefix.push(path1[i]);
@@ -59,7 +69,7 @@ function longestCommonPrefix(path1: Path, path2: Path): Path {
 //        * Else, insert P immediately after the last element in L that has a prefix of C
 export function insertPath(L: PathList, P: Path): PathList {
   // Check if P is already in L
-  for (let path of L) {
+  for (const path of L) {
     if (pathsEqual(path, P)) {
       return L;
     }

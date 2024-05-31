@@ -10,7 +10,6 @@ import {
   GridColumnNode,
 } from '@mui/x-data-grid-pro';
 import {UserLink} from '@wandb/weave/components/UserLink';
-import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {monthRoundedTime} from '../../../../../../common/util/time';
@@ -33,7 +32,12 @@ import {
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {OpVersionIndexText} from './CallsTable';
 import {buildTree} from './callsTableBuildTree';
-import {insertPath, pathToString, stringToPath} from './callsTableColumnsUtil';
+import {
+  insertPath,
+  isDynamicCallColumn,
+  pathToString,
+  stringToPath,
+} from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {allOperators} from './callsTableQuery';
 
@@ -69,10 +73,6 @@ export const useCallsTableColumns = (
 
   const shouldIgnoreColumn = useCallback(
     (col: string) => {
-      // Captures the case where the column is already expanded.
-      if (columnIsRefExpanded(col)) {
-        return true;
-      }
       const columnsWithRefsList = Array.from(columnsWithRefs);
       // Captures the case where the column has just been expanded.
       for (const refCol of columnsWithRefsList) {
@@ -82,7 +82,7 @@ export const useCallsTableColumns = (
       }
       return false;
     },
-    [columnIsRefExpanded, columnsWithRefs]
+    [columnsWithRefs]
   );
 
   const allDynamicColumnNames = useAllDynamicColumnNames(
@@ -435,81 +435,26 @@ const useAllDynamicColumnNames = (
   shouldIgnoreColumn: (col: string) => boolean,
   resetDep: any
 ) => {
-  // TODO: incorporate new logic
-  // TODO: Clear out columns when collapsing
   // TODO: Maintain user-defined order
-  // 1. Maintain an ever-growing set of unique columns. It must be reset
-  // when `effectiveFilter` changes.
-  // const currentDynamicColumnNames = useMemo(() => {
-  //   // Use of a map to ensure uniqueness while also
-  //   // ensuring order is maintained.
-  //   const dynamicColumnsMap: {[key: string]: boolean} = {};
-  //   tableData.forEach(row => {
-  //     Object.keys(row).forEach(key => {
-  //       if (
-  //         key.startsWith('attributes') ||
-  //         key.startsWith('inputs') ||
-  //         key.startsWith('output') ||
-  //         key.startsWith('summary')
-  //       ) {
-  //         dynamicColumnsMap[key] = true;
-  //       }
-  //     });
-  //   });
-  //   return Object.keys(dynamicColumnsMap);
-  // }, [tableData]);
-
-  // Wow this is a pretty crazy idea to maintain a list of all dynamic columns
-  // so we don't blow away old ones
   const [allDynamicColumnNames, setAllDynamicColumnNames] = useState<string[]>(
     []
   );
 
   useEffect(() => {
     setAllDynamicColumnNames(last => {
-      let nextAsPaths = last.map(stringToPath);
+      let nextAsPaths = last
+        .filter(c => !shouldIgnoreColumn(c))
+        .map(stringToPath);
       tableData.forEach(row => {
         Object.keys(row).forEach(key => {
-          nextAsPaths = insertPath(nextAsPaths, stringToPath(key));
+          const keyAsPath = stringToPath(key);
+          if (isDynamicCallColumn(keyAsPath)) {
+            nextAsPaths = insertPath(nextAsPaths, stringToPath(key));
+          }
         });
       });
 
       return nextAsPaths.map(pathToString);
-
-      // const dynamicColumnsMap: {[key: string]: boolean} = {};
-      // tableData.forEach(row => {
-      //   Object.keys(row).forEach(key => {
-      //     if (
-      //       key.startsWith('attributes') ||
-      //       key.startsWith('inputs') ||
-      //       key.startsWith('output') ||
-      //       key.startsWith('summary')
-      //     ) {
-      //       dynamicColumnsMap[key] = true;
-      //     }
-      //   });
-      // });
-      // // return Object.keys(dynamicColumnsMap);
-
-      // const lastDynamicColumnNames = last.filter(c => {
-      //   if (shouldIgnoreColumn(c)) {
-      //     return false;
-      //   }
-      //   return true;
-      // });
-
-      // // Use of a map to ensure uniqueness while also
-      // // ensuring order is maintained. New fields are
-      // // added to the "end"
-      // const totalDynamicColumnNames: {[key: string]: boolean} = {};
-      // lastDynamicColumnNames.forEach(c => {
-      //   totalDynamicColumnNames[c] = true;
-      // });
-      // currentDynamicColumnNames.forEach(c => {
-      //   totalDynamicColumnNames[c] = true;
-      // });
-
-      // return Object.keys(totalDynamicColumnNames);
     });
   }, [shouldIgnoreColumn, tableData]);
 
