@@ -434,6 +434,7 @@ const useAllDynamicColumnNames = (
   shouldIgnoreColumn: (col: string) => boolean,
   resetDep: any
 ) => {
+  // TODO: incorporate new logic
   // 1. Maintain an ever-growing set of unique columns. It must be reset
   // when `effectiveFilter` changes.
   const currentDynamicColumnNames = useMemo(() => {
