@@ -864,8 +864,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         SELECT *,
                             row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
                         FROM files
+                        WHERE project_id = {project_id:String} AND digest = {digest:String}
                     )
-                WHERE rn = 1 AND project_id = {project_id:String} AND digest = {digest:String}
+                WHERE rn = 1
                 ORDER BY project_id, digest, chunk_index
             )
             WHERE project_id = {project_id:String} AND digest = {digest:String}""",
