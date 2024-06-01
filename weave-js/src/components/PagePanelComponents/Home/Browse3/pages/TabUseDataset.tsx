@@ -3,6 +3,7 @@ import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
 import {parseRef} from '../../../../../react';
+import {abbreviateRef} from '../../../../../util/refs';
 import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
@@ -60,8 +61,9 @@ ${pythonName} = weave.ref('${ref.artifactName}:v${versionIndex}').get()`;
       <Box mt={2}>
         Use the following code to retrieve this {label}:
         <CopyableText
-          text={`${pythonName} = weave.ref("<ref_uri>").get()`}
+          text={`${pythonName} = weave.ref("${abbreviateRef(uri)}").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
+          tooltipText="Click to copy unabridged string"
         />
         {long && (
           <>
