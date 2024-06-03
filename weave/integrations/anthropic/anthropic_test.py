@@ -117,7 +117,6 @@ async def test_async_anthropic(
         api_key=os.environ.get("ANTHROPIC_API_KEY"),
     )
 
-
     message = await anthropic_client.messages.create(
         model=model,
         max_tokens=1024,
@@ -158,13 +157,36 @@ async def test_async_anthropic_stream(
         api_key=os.environ.get("ANTHROPIC_API_KEY"),
     )
 
-
-    message = await anthropic_client.messages.create(
+    stream = await anthropic_client.messages.create(
         model=model,
         stream=True,
         max_tokens=1024,
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
-
+    all_content = ""
+    async for event in stream:
+        if event.type == "message_start":
+            message = event.message
+            input_tokens = event.message.usage.input_tokens
+        if event.type == "content_block_delta":
+            all_content += event.delta.text
+        if event.type == "message_delta":
+            output_tokens = event.usage.output_tokens
+    exp = "Hello! It's nice to meet you. How can I assist you today?"
+    assert all_content == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.id == message.id
+    assert output.model == message.model
+    assert output.stop_reason== "end_turn"
+    assert output.stop_sequence == None
+    assert output.content[0].text == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == output_tokens == 19
+    assert output.usage.input_tokens == input_tokens == 10
