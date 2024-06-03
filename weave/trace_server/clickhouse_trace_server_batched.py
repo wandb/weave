@@ -1838,7 +1838,7 @@ def _process_calls_filter_to_conditions(
         raw_fields_used.add("wb_run_id")
 
     return FilterToConditions(
-        conditions=having_conditions,
+        having_conditions=having_conditions,
         start_event_conditions=start_event_conditions,
         end_event_conditions=end_event_conditions,
         fields_used=raw_fields_used,
