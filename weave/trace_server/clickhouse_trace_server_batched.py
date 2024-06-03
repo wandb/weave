@@ -275,11 +275,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # First, apply the application filter
         if req.filter:
-            having_filter_conds, fields_used = _process_calls_filter_to_conditions(
+            filter_to_conditions = _process_calls_filter_to_conditions(
                 req.filter, param_builder
             )
-            raw_fields_used.update(fields_used)
-            having_conditions.extend(having_filter_conds)
+            raw_fields_used.update(filter_to_conditions.fields_used)
+            having_conditions.extend(filter_to_conditions.having_conditions)
 
         # Next, apply the query filter
         if req.query:
@@ -309,10 +309,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # First, apply the application filter
         if req.filter:
-            (having_filter_conds, _) = _process_calls_filter_to_conditions(
+            filter_to_conditions = _process_calls_filter_to_conditions(
                 req.filter, param_builder
             )
-            having_conditions.extend(having_filter_conds)
+            having_conditions.extend(filter_to_conditions.having_conditions)
 
         # Next, apply the query filter
         if req.query:
@@ -1730,10 +1730,15 @@ def _transform_external_field_to_internal_field(
     return field, param_builder, raw_fields_used
 
 
+class FilterToConditions(BaseModel):
+    having_conditions: list[str]
+    fields_used: set[str]
+
+
 def _process_calls_filter_to_conditions(
     filter: tsi._CallsFilter,
     param_builder: typing.Optional[ParamBuilder] = None,
-) -> tuple[list[str], set[str]]:
+) -> FilterToConditions:
     """Converts a CallsFilter to a list of conditions for a clickhouse query."""
     param_builder = param_builder or ParamBuilder()
     conditions = []
@@ -1816,7 +1821,7 @@ def _process_calls_filter_to_conditions(
         )
         raw_fields_used.add("wb_run_id")
 
-    return conditions, raw_fields_used
+    return FilterToConditions(conditions=conditions, fields_used=raw_fields_used)
 
 
 def _process_query_to_conditions(
