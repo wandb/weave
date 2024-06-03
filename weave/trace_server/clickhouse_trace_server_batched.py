@@ -403,11 +403,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             for call_id in all_descendants
         ]
-        self._flush_immediately = False
-        for insertable in insertables:
-            self._insert_call(insertable)
-        self._flush_calls()
-        self._flush_immediately = True
+
+        with self.call_batch():
+            for insertable in insertables:
+                self._insert_call(insertable)
 
         return tsi.CallsDeleteRes()
 

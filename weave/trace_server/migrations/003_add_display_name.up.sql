@@ -30,6 +30,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
         array_concat_aggSimpleState(output_refs) as output_refs,
+        anySimpleState(deleted_at) as deleted_at,
         -- *** Add argMax to use most recent display_name ***
         argMaxState(display_name, call_parts.created_at) as display_name
     FROM call_parts

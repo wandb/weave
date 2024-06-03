@@ -19,7 +19,8 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(output_dump) as output_dump,
         anySimpleState(summary_dump) as summary_dump,
         anySimpleState(exception) as exception,
-        array_concat_aggSimpleState(output_refs) as output_refs
+        array_concat_aggSimpleState(output_refs) as output_refs,
+        anySimpleState(deleted_at) as deleted_at
     FROM call_parts
     GROUP BY project_id,
         id;
