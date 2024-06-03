@@ -54,18 +54,12 @@ def test_simple_chain_invoke(client: WeaveClient) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    from .langchain import WeaveTracer
-
-    tracer = WeaveTracer()
-    config = {
-        "callbacks": [tracer],
-    }
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
-    output = llm_chain.invoke({"number": 2}, config=config)
+    _ = llm_chain.invoke({"number": 2})
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_correct_calls_for_chain_invoke(res.calls)
@@ -75,6 +69,7 @@ def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
     assert len(calls) == 8
     flattened = flatten_calls(calls)
 
+    # TODO: figure out what is the right call order for this.
     # got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
     # exp = [
@@ -96,18 +91,12 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    from .langchain import WeaveTracer
-
-    tracer = WeaveTracer()
-    config = {
-        "callbacks": [tracer],
-    }
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
-    output = llm_chain.batch([{"number": 2}, {"number": 3}], config=config)
+    _ = llm_chain.batch([{"number": 2}, {"number": 3}])
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_correct_calls_for_chain_batch(res.calls)
@@ -152,8 +141,6 @@ def test_simple_rag_chain(client: WeaveClient) -> None:
     from langchain_core.runnables import RunnablePassthrough
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-    from .langchain import WeaveTracer
-
     loader = TextLoader("integrations/langchain/test_data/paul_graham_essay.txt")
     docs = loader.load()
 
@@ -186,33 +173,32 @@ def test_simple_rag_chain(client: WeaveClient) -> None:
 
     rag_chain.invoke(
         input="What is the essay about?",
-        config={"callbacks": [WeaveTracer()]},
     )
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_correct_calls_for_rag_chain(res.calls)
 
 
-def assert_correct_calls_for_tool_chain(calls: list[tsi.CallSchema]) -> None:
+def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> None:
     # assert len(calls) == 10
     print(len(calls))
     flattened = flatten_calls(calls)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
-    print(got)
-    # exp = [
-    #     ("langchain.Chain.RunnableSequence", 0),
-    #     ("langchain.Chain.RunnableParallel context question ", 1),
-    #     ("langchain.Chain.RunnableSequence", 2),
-    #     ("langchain.Retriever.Retriever", 3),
-    #     ("langchain.Chain.format_docs", 3),
-    #     ("langchain.Chain.RunnablePassthrough", 2),
-    #     ("langchain.Prompt.ChatPromptTemplate", 1),
-    #     ("langchain.Llm.ChatOpenAI", 1),
-    #     ("openai.chat.completions.create", 2),
-    #     ("langchain.Parser.StrOutputParser", 1),
-    # ]
-    # assert got == exp
+
+    exp = [
+        ("langchain.Chain.RunnableSequence", 0),
+        ("langchain.Chain.RunnableParallel context question ", 1),
+        ("langchain.Chain.RunnableSequence", 2),
+        ("langchain.Retriever.Retriever", 3),
+        ("langchain.Chain.format_docs", 3),
+        ("langchain.Chain.RunnablePassthrough", 2),
+        ("langchain.Prompt.ChatPromptTemplate", 1),
+        ("langchain.Llm.ChatOpenAI", 1),
+        ("openai.chat.completions.create", 2),
+        ("langchain.Parser.StrOutputParser", 1),
+    ]
+    assert got == exp
 
 
 @pytest.mark.skip_clickhouse_client
@@ -231,8 +217,6 @@ def test_simple_tool_run(client: WeaveClient) -> None:
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_core.utils.function_calling import convert_to_openai_function
     from langchain_openai import ChatOpenAI
-
-    from .langchain import WeaveTracer
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")
@@ -301,8 +285,6 @@ def test_simple_tool_run(client: WeaveClient) -> None:
 
     response = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
-        config={"callbacks": [WeaveTracer()]},
     )
-    print(response)
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_tool_chain(res.calls)
+    assert_correct_calls_for_agent_with_tool(res.calls)

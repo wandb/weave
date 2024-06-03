@@ -1,9 +1,12 @@
 import datetime
 import json
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
 from uuid import UUID
 
 from weave import graph_client_context
+from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 
 import_failed = False
@@ -13,10 +16,11 @@ try:
     from langchain_core.messages import BaseMessage
     from langchain_core.tracers import Run
     from langchain_core.tracers.base import BaseTracer
+    from langchain_core.tracers.context import register_configure_hook
 except ImportError:
     import_failed = True
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 if not import_failed:
 
@@ -183,3 +187,75 @@ if not import_failed:
 
         def _on_retriever_error(self, run: Run) -> None:
             self._update_run_error(run)
+
+else:
+
+    class WeaveTracer:  # type: ignore
+        pass
+
+
+weave_tracing_callback_var: ContextVar[Optional[WeaveTracer]] = ContextVar(
+    "tracing_weave_callback", default=None
+)
+
+register_configure_hook(
+    weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN"
+)
+
+
+@contextmanager
+def weave_tracing_enabled(
+    session_name: str = "default",
+) -> Generator[None, None, None]:
+    """Get the WandbTracer in a context manager.
+
+    Args:
+        session_name (str, optional): The name of the session.
+            Defaults to "default".
+
+    Returns:
+        None
+
+    Example:
+        >>> with weave_tracing_enabled() as session:
+        ...     # Use the WeaveTracer session
+    """
+    cb = WeaveTracer()
+    weave_tracing_callback_var.set(cb)
+    yield None
+    weave_tracing_callback_var.set(None)
+
+
+class LangchainPatcher(Patcher):
+    def __init__(self) -> None:
+        pass
+
+    def attempt_patch(self) -> bool:
+        if import_failed:
+            return False
+        try:
+            import os
+
+            os.environ["WEAVE_TRACE_LANGCHAIN"] = "true"
+            register_configure_hook(
+                weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN"
+            )
+            return True
+        except Exception:
+            return False
+
+    def undo_patch(self) -> bool:
+        if not hasattr(self, "_original_handler"):
+            return False
+        try:
+            import os
+
+            del os.environ["WEAVE_TRACE_LANGCHAIN"]
+            weave_tracing_callback_var.set(None)
+
+            return True
+        except Exception:
+            return False
+
+
+langchain_patcher = LangchainPatcher()

@@ -178,24 +178,30 @@ interactions:
         0.0001, \n        \"litellm_provider\": \"openai\"\n    }, \n    \"azure/whisper-1\":
         {\n        \"mode\": \"audio_transcription\",\n        \"input_cost_per_second\":
         0, \n        \"output_cost_per_second\": 0.0001, \n        \"litellm_provider\":
-        \"azure\"\n    },\n    \"azure/gpt-4-turbo-2024-04-09\": {\n        \"max_tokens\":
+        \"azure\"\n    },\n    \"azure/gpt-4o\": {\n        \"max_tokens\": 4096,\n
+        \       \"max_input_tokens\": 128000,\n        \"max_output_tokens\": 4096,\n
+        \       \"input_cost_per_token\": 0.000005,\n        \"output_cost_per_token\":
+        0.000015,\n        \"litellm_provider\": \"azure\",\n        \"mode\": \"chat\",\n
+        \       \"supports_function_calling\": true,\n        \"supports_parallel_function_calling\":
+        true,\n        \"supports_vision\": true\n    },\n    \"azure/gpt-4-turbo-2024-04-09\":
+        {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 128000,\n
+        \       \"max_output_tokens\": 4096,\n        \"input_cost_per_token\": 0.00001,\n
+        \       \"output_cost_per_token\": 0.00003,\n        \"litellm_provider\":
+        \"azure\",\n        \"mode\": \"chat\",\n        \"supports_function_calling\":
+        true,\n        \"supports_parallel_function_calling\": true,\n        \"supports_vision\":
+        true\n    },\n    \"azure/gpt-4-0125-preview\": {\n        \"max_tokens\":
         4096,\n        \"max_input_tokens\": 128000,\n        \"max_output_tokens\":
         4096,\n        \"input_cost_per_token\": 0.00001,\n        \"output_cost_per_token\":
         0.00003,\n        \"litellm_provider\": \"azure\",\n        \"mode\": \"chat\",\n
         \       \"supports_function_calling\": true,\n        \"supports_parallel_function_calling\":
-        true,\n        \"supports_vision\": true\n    },\n    \"azure/gpt-4-0125-preview\":
-        {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 128000,\n
-        \       \"max_output_tokens\": 4096,\n        \"input_cost_per_token\": 0.00001,\n
-        \       \"output_cost_per_token\": 0.00003,\n        \"litellm_provider\":
-        \"azure\",\n        \"mode\": \"chat\",\n        \"supports_function_calling\":
-        true,\n        \"supports_parallel_function_calling\": true\n    },\n    \"azure/gpt-4-1106-preview\":
-        {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 128000,\n
-        \       \"max_output_tokens\": 4096,\n        \"input_cost_per_token\": 0.00001,\n
-        \       \"output_cost_per_token\": 0.00003,\n        \"litellm_provider\":
-        \"azure\",\n        \"mode\": \"chat\",\n        \"supports_function_calling\":
-        true,\n        \"supports_parallel_function_calling\": true\n    },\n    \"azure/gpt-4-0613\":
-        {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 8192,\n        \"max_output_tokens\":
-        4096,\n        \"input_cost_per_token\": 0.00003,\n        \"output_cost_per_token\":
+        true\n    },\n    \"azure/gpt-4-1106-preview\": {\n        \"max_tokens\":
+        4096,\n        \"max_input_tokens\": 128000,\n        \"max_output_tokens\":
+        4096,\n        \"input_cost_per_token\": 0.00001,\n        \"output_cost_per_token\":
+        0.00003,\n        \"litellm_provider\": \"azure\",\n        \"mode\": \"chat\",\n
+        \       \"supports_function_calling\": true,\n        \"supports_parallel_function_calling\":
+        true\n    },\n    \"azure/gpt-4-0613\": {\n        \"max_tokens\": 4096,\n
+        \       \"max_input_tokens\": 8192,\n        \"max_output_tokens\": 4096,\n
+        \       \"input_cost_per_token\": 0.00003,\n        \"output_cost_per_token\":
         0.00006,\n        \"litellm_provider\": \"azure\",\n        \"mode\": \"chat\",\n
         \       \"supports_function_calling\": true\n    },\n    \"azure/gpt-4-32k-0613\":
         {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 32768,\n        \"max_output_tokens\":
@@ -310,16 +316,16 @@ interactions:
         0.00000551,\n        \"litellm_provider\": \"anthropic\",\n        \"mode\":
         \"chat\"\n    },\n    \"mistral/mistral-tiny\": {\n        \"max_tokens\":
         8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
-        8191,\n        \"input_cost_per_token\": 0.00000015,\n        \"output_cost_per_token\":
-        0.00000046,\n        \"litellm_provider\": \"mistral\",\n        \"mode\":
+        8191,\n        \"input_cost_per_token\": 0.00000025,\n        \"output_cost_per_token\":
+        0.00000025,\n        \"litellm_provider\": \"mistral\",\n        \"mode\":
         \"chat\"\n    },\n    \"mistral/mistral-small\": {\n        \"max_tokens\":
         8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
-        8191,\n        \"input_cost_per_token\": 0.000002,\n        \"output_cost_per_token\":
-        0.000006,\n        \"litellm_provider\": \"mistral\",\n        \"supports_function_calling\":
+        8191,\n        \"input_cost_per_token\": 0.000001,\n        \"output_cost_per_token\":
+        0.000003,\n        \"litellm_provider\": \"mistral\",\n        \"supports_function_calling\":
         true,\n        \"mode\": \"chat\"\n    },\n    \"mistral/mistral-small-latest\":
         {\n        \"max_tokens\": 8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
-        8191,\n        \"input_cost_per_token\": 0.000002,\n        \"output_cost_per_token\":
-        0.000006,\n        \"litellm_provider\": \"mistral\",\n        \"supports_function_calling\":
+        8191,\n        \"input_cost_per_token\": 0.000001,\n        \"output_cost_per_token\":
+        0.000003,\n        \"litellm_provider\": \"mistral\",\n        \"supports_function_calling\":
         true,\n        \"mode\": \"chat\"\n    },\n    \"mistral/mistral-medium\":
         {\n        \"max_tokens\": 8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
         8191,\n        \"input_cost_per_token\": 0.0000027,\n        \"output_cost_per_token\":
@@ -334,26 +340,41 @@ interactions:
         0.0000081,\n        \"litellm_provider\": \"mistral\",\n        \"mode\":
         \"chat\"\n    },\n    \"mistral/mistral-large-latest\": {\n        \"max_tokens\":
         8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
-        8191,\n        \"input_cost_per_token\": 0.000008,\n        \"output_cost_per_token\":
-        0.000024,\n        \"litellm_provider\": \"mistral\",\n        \"mode\": \"chat\",\n
+        8191,\n        \"input_cost_per_token\": 0.000004,\n        \"output_cost_per_token\":
+        0.000012,\n        \"litellm_provider\": \"mistral\",\n        \"mode\": \"chat\",\n
         \       \"supports_function_calling\": true\n    },\n    \"mistral/mistral-large-2402\":
         {\n        \"max_tokens\": 8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
-        8191,\n        \"input_cost_per_token\": 0.000008,\n        \"output_cost_per_token\":
-        0.000024,\n        \"litellm_provider\": \"mistral\",\n        \"mode\": \"chat\",\n
-        \       \"supports_function_calling\": true\n    },\n    \"mistral/open-mixtral-8x7b\":
+        8191,\n        \"input_cost_per_token\": 0.000004,\n        \"output_cost_per_token\":
+        0.000012,\n        \"litellm_provider\": \"mistral\",\n        \"mode\": \"chat\",\n
+        \       \"supports_function_calling\": true\n    },\n    \"mistral/open-mistral-7b\":
         {\n        \"max_tokens\": 8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
+        8191,\n        \"input_cost_per_token\": 0.00000025,\n        \"output_cost_per_token\":
+        0.00000025,\n        \"litellm_provider\": \"mistral\",\n        \"mode\":
+        \"chat\"\n    },\n    \"mistral/open-mixtral-8x7b\": {\n        \"max_tokens\":
+        8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
+        8191,\n        \"input_cost_per_token\": 0.0000007,\n        \"output_cost_per_token\":
+        0.0000007,\n        \"litellm_provider\": \"mistral\",\n        \"mode\":
+        \"chat\",\n        \"supports_function_calling\": true\n    },\n    \"mistral/open-mixtral-8x22b\":
+        {\n        \"max_tokens\": 8191,\n        \"max_input_tokens\": 64000,\n        \"max_output_tokens\":
         8191,\n        \"input_cost_per_token\": 0.000002,\n        \"output_cost_per_token\":
         0.000006,\n        \"litellm_provider\": \"mistral\",\n        \"mode\": \"chat\",\n
-        \       \"supports_function_calling\": true\n    },\n    \"mistral/mistral-embed\":
-        {\n        \"max_tokens\": 8192,\n        \"max_input_tokens\": 8192,\n        \"input_cost_per_token\":
-        0.000000111,\n        \"litellm_provider\": \"mistral\",\n        \"mode\":
-        \"embedding\"\n    },\n    \"deepseek-chat\": {\n        \"max_tokens\": 4096,\n
-        \       \"max_input_tokens\": 32000,\n        \"max_output_tokens\": 4096,\n
-        \       \"input_cost_per_token\": 0.00000014,\n        \"output_cost_per_token\":
-        0.00000028,\n        \"litellm_provider\": \"deepseek\",\n        \"mode\":
-        \"chat\"\n    },\n    \"deepseek-coder\": {\n        \"max_tokens\": 4096,\n
-        \       \"max_input_tokens\": 16000,\n        \"max_output_tokens\": 4096,\n
-        \       \"input_cost_per_token\": 0.00000014,\n        \"output_cost_per_token\":
+        \       \"supports_function_calling\": true\n    },\n    \"mistral/codestral-latest\":
+        {\n        \"max_tokens\": 8191,\n        \"max_input_tokens\": 32000,\n        \"max_output_tokens\":
+        8191,\n        \"input_cost_per_token\": 0.000001,\n        \"output_cost_per_token\":
+        0.000003,\n        \"litellm_provider\": \"mistral\",\n        \"mode\": \"chat\"\n
+        \   },\n    \"mistral/codestral-2405\": {\n        \"max_tokens\": 8191,\n
+        \       \"max_input_tokens\": 32000,\n        \"max_output_tokens\": 8191,\n
+        \       \"input_cost_per_token\": 0.000001,\n        \"output_cost_per_token\":
+        0.000003,\n        \"litellm_provider\": \"mistral\",\n        \"mode\": \"chat\"\n
+        \   },\n    \"mistral/mistral-embed\": {\n        \"max_tokens\": 8192,\n
+        \       \"max_input_tokens\": 8192,\n        \"input_cost_per_token\": 0.0000001,\n
+        \       \"litellm_provider\": \"mistral\",\n        \"mode\": \"embedding\"\n
+        \   },\n    \"deepseek-chat\": {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\":
+        32000,\n        \"max_output_tokens\": 4096,\n        \"input_cost_per_token\":
+        0.00000014,\n        \"output_cost_per_token\": 0.00000028,\n        \"litellm_provider\":
+        \"deepseek\",\n        \"mode\": \"chat\"\n    },\n    \"deepseek-coder\":
+        {\n        \"max_tokens\": 4096,\n        \"max_input_tokens\": 16000,\n        \"max_output_tokens\":
+        4096,\n        \"input_cost_per_token\": 0.00000014,\n        \"output_cost_per_token\":
         0.00000028,\n        \"litellm_provider\": \"deepseek\",\n        \"mode\":
         \"chat\"\n    },\n    \"groq/llama2-70b-4096\": {\n        \"max_tokens\":
         4096,\n        \"max_input_tokens\": 4096,\n        \"max_output_tokens\":
@@ -509,6 +530,14 @@ interactions:
         0.000000625, \n        \"output_cost_per_token\": 0.000001875,\n        \"litellm_provider\":
         \"vertex_ai-language-models\",\n        \"mode\": \"chat\",\n        \"supports_function_calling\":
         true,\n        \"supports_tool_choice\": true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
+        \   },\n    \"gemini-1.5-flash-001\": {\n        \"max_tokens\": 8192,\n        \"max_input_tokens\":
+        1000000,\n        \"max_output_tokens\": 8192,\n        \"max_images_per_prompt\":
+        3000,\n        \"max_videos_per_prompt\": 10,\n        \"max_video_length\":
+        1,\n        \"max_audio_length_hours\": 8.4,\n        \"max_audio_per_prompt\":
+        1,\n        \"max_pdf_size_mb\": 30,\n        \"input_cost_per_token\": 0,
+        \n        \"output_cost_per_token\": 0,\n        \"litellm_provider\": \"vertex_ai-language-models\",\n
+        \       \"mode\": \"chat\",\n        \"supports_function_calling\": true,\n
+        \       \"supports_vision\": true,\n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini-1.5-flash-preview-0514\": {\n        \"max_tokens\":
         8192,\n        \"max_input_tokens\": 1000000,\n        \"max_output_tokens\":
         8192,\n        \"max_images_per_prompt\": 3000,\n        \"max_videos_per_prompt\":
@@ -518,6 +547,11 @@ interactions:
         0,\n        \"litellm_provider\": \"vertex_ai-language-models\",\n        \"mode\":
         \"chat\",\n        \"supports_function_calling\": true,\n        \"supports_vision\":
         true,\n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
+        \   },\n    \"gemini-1.5-pro-001\": { \n        \"max_tokens\": 8192,\n        \"max_input_tokens\":
+        1000000,\n        \"max_output_tokens\": 8192,\n        \"input_cost_per_token\":
+        0.000000625, \n        \"output_cost_per_token\": 0.000001875,\n        \"litellm_provider\":
+        \"vertex_ai-language-models\",\n        \"mode\": \"chat\",\n        \"supports_function_calling\":
+        true,\n        \"supports_tool_choice\": true, \n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini-1.5-pro-preview-0514\": { \n        \"max_tokens\": 8192,\n
         \       \"max_input_tokens\": 1000000,\n        \"max_output_tokens\": 8192,\n
         \       \"input_cost_per_token\": 0.000000625, \n        \"output_cost_per_token\":
@@ -1651,7 +1685,7 @@ interactions:
       Content-Encoding:
       - gzip
       Content-Length:
-      - '6945'
+      - '7034'
       Content-Security-Policy:
       - default-src 'none'; style-src 'unsafe-inline'; sandbox
       Content-Type:
@@ -1659,13 +1693,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 30 May 2024 07:42:19 GMT
+      - Mon, 03 Jun 2024 12:32:16 GMT
       ETag:
-      - W/"f650ae129d44327ca1058e9226351d6135568bcc98844a6b486118ac17ceb0fa"
+      - W/"4c3303d50bbc8e38e32c7064894cf5126351d40ed7b10e08fbe9b08167d3d6da"
       Expires:
-      - Thu, 30 May 2024 07:47:19 GMT
+      - Mon, 03 Jun 2024 12:37:16 GMT
       Source-Age:
-      - '242'
+      - '164'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -1675,19 +1709,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '3'
+      - '2'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 3c898670fcfcf87c45f7b94b7b0dce56923bcf07
+      - 730ff09d2e0e9746d4c0b79115ce1b875d129506
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - 8D0F:327FA0:18353:2B26D:6657F6C9
+      - 7ED5:396F32:106446:15CB31:665A53AE
       X-Served-By:
-      - cache-maa10238-MAA
+      - cache-maa10231-MAA
       X-Timer:
-      - S1717054939.489248,VS0,VE0
+      - S1717417937.817282,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
@@ -1729,17 +1763,17 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA1SQsW7CMBRF93yF9WaCkhKEyNYFdWFoK9ShqpDjPILB9rPsl6oI8e+VQwp08XBv
-        zvVxzpkQoFuoBai9ZGW9yZebjX5fr08fVbsu7OqlOR57eXheGf32+g2TRFBzQMV/1FSR9QZZk7vW
-        KqBkTKvlolwU82pZFUNhqUWTsM5zPpvOc+5DQ3lRPs1Hck9aYYRafGZCCHEezuToWvyBWgw7Q2Ix
-        Rtkh1LePhIBAJiUgY9SRpWOY3EtFjtEN2jMY48ttz1DnAzXpbtcbc8t32um43waUkVxiI5O/4pdM
-        iK/Bu/+nAj6Q9bxlOqJLg+XsOgf3P/VQjh0TS/MQV9moB/EUGe12p12HwQc9vCFJZpfsFwAA//8D
-        AHCb9I/CAQAA
+        H4sIAAAAAAAAA1SQy27CMBBF9/kKa9YEkQYUkV03LFDbbV+qkGOGxK3tMfZEbYX498ohPLrx4t6c
+        6+McMiFAb6EWoDrJynqTL5+L5er75WnRrF/XD/t9+2a7+b53q3t+rGCSCGo+UfGZmiqy3iBrcqda
+        BZSMabWoimpeVMuyGgpLWzQJaz3n5XSRcx8aymfF3WIkO9IKI9TiPRNCiMNwJke3xR+oxWxyTizG
+        KFuE+vKREBDIpARkjDqydAyTa6nIMbpBu4QxPl72DLU+UJPudr0xl3ynnY7dJqCM5BIbmfwJP2ZC
+        fAze/T8V8IGs5w3TF7o0WJSnObj+qZty7JhYmpt4no16EH8jo93stGsx+KCHNyTJ7Jj9AQAA//8D
+        AOHBcfvCAQAA
     headers:
       CF-Cache-Status:
       - DYNAMIC
       CF-RAY:
-      - 88bd16428f8d7f76-MAA
+      - 88dfb47ecde93c0c-BLR
       Connection:
       - keep-alive
       Content-Encoding:
@@ -1747,14 +1781,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 30 May 2024 07:42:21 GMT
+      - Mon, 03 Jun 2024 12:32:18 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=cGDGUSN9ZBDpQ_y4WxbKyQV69H.ulH8suvxsS.TfRsI-1717054941-1.0.1.1-Yvn7NyiFsD1EcqoVjmmhyEbv0nguyJYBB018gfh3UQZpyLH92eDJ_6TkRbqAYi5gPvnNRHbiGfDBM_gzG8XeLg;
-        path=/; expires=Thu, 30-May-24 08:12:21 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=te5ej74J1CO2RnLuDhppqqvqOHJmouAlkOa2aEa.wFw-1717417938-1.0.1.1-niYB_yexiD02Juxb77N7cECwRoYNHHArcG3rGhzKxs_KjoiTNK4.s9ollAP8XbehgXG4sPdIqdzBREnM7qkDBg;
+        path=/; expires=Mon, 03-Jun-24 13:02:18 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=yc_xXO4yiDNiKOvF5ysDWn5HXyoNlLwVf7zRsJAWs8Q-1717054941105-0.0.1.1-604800000;
+      - _cfuvid=46Wrq3_jRqO_HG_eKfuwEMksXTsRystxm_z3IotfBmo-1717417938291-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -1763,7 +1797,7 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '232'
+      - '181'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
@@ -1781,7 +1815,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_b0cc64faed4f84b0dd094935764e4d00
+      - req_ef89409246c3db35ff80dadafb649cfa
     status:
       code: 200
       message: OK

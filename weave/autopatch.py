@@ -24,10 +24,12 @@ def autopatch_openai() -> None:
 def autopatch() -> None:
     autopatch_openai()
 
-    from .integrations.mistral.mistral import mistral_patcher
+    from .integrations.langchain.langchain import langchain_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
+    from .integrations.mistral.mistral import mistral_patcher
 
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
+    langchain_patcher.attempt_patch()
