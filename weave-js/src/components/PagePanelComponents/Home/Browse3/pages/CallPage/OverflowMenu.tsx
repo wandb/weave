@@ -30,6 +30,7 @@ export const OverflowMenu: FC<{
         onClick: () => setRenameCall(true),
         disabled: selectedCalls.length === 0,
       },
+    ], [
       {
         key: 'delete',
         text: 'Delete',
@@ -67,7 +68,7 @@ export const OverflowMenu: FC<{
             style={{marginLeft: '4px'}}
           />
         }
-        offset="-68px, -10px"
+        offset="-78px, -16px"
       />
     </>
   );
@@ -235,6 +236,7 @@ const RenameCallModal: FC<{
             value={newName}
             onChange={value => setNewName(value)}
             disabled={renameLoading}
+            autoFocus={true}
           />
         </DialogContent>
         <DialogActions $align="left">
