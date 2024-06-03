@@ -1,4 +1,3 @@
-import os
 import pytest
 from typing import Any, Generator, List, Optional, Tuple
 
@@ -66,7 +65,6 @@ def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
     assert_calls(
         client,
         expected_calls=[
-            ("GPT3.__init__", 0),
             ("GPT3.__call__", 0),
             ("GPT3.request", 1),
             ("GPT3.basic_request", 2),
@@ -86,8 +84,6 @@ def test_dspy_signature(client: WeaveClient, fake_api_key: None) -> None:
     assert_calls(
         client,
         expected_calls=[
-            ("GPT3.__init__", 0),
-            ("Predict.__init__", 0),
             ("Predict.__call__", 0),
             ("Predict.forward", 1),
             ("GPT3.__call__", 2),
@@ -110,8 +106,6 @@ def test_dspy_inline_signature(client: WeaveClient, fake_api_key: None) -> None:
     assert_calls(
         client,
         expected_calls=[
-            ("GPT3.__init__", 0),
-            ("ChainOfThought.__init__", 0),
             ("ChainOfThought.__call__", 0),
             ("ChainOfThought.forward", 1),
             ("GPT3.__call__", 2),
@@ -143,8 +137,6 @@ def test_dspy_cot(client: WeaveClient, fake_api_key: None) -> None:
     assert_calls(
         client,
         expected_calls=[
-            ("GPT3.__init__", 0),
-            ("Predict.__init__", 0),
             ("Predict.__call__", 0),
             ("Predict.forward", 1),
             ("GPT3.__call__", 2),
@@ -176,8 +168,6 @@ def test_dspy_cot_with_hint(client: WeaveClient, fake_api_key: None) -> None:
     assert_calls(
         client,
         expected_calls=[
-            ("GPT3.__init__", 0),
-            ("ChainOfThoughtWithHint.__init__", 0),
             ("ChainOfThoughtWithHint.__call__", 0),
             ("ChainOfThoughtWithHint.forward", 1),
             ("GPT3.__call__", 2),
@@ -224,9 +214,6 @@ def test_dspy_multi_chain_comparison(client: WeaveClient, fake_api_key: None) ->
     assert_calls(
         client,
         expected_calls=[
-            ("GPT3.__init__", 0),
-            ("MultiChainComparison.__init__", 0),
-            ("Predict.__init__", 0),
             ("MultiChainComparison.__call__", 0),
             ("Predict.__call__", 1),
             ("Predict.forward", 2),
@@ -262,11 +249,6 @@ def test_dspy_pot(client: WeaveClient, fake_api_key: None) -> None:
     assert_calls(
         client,
         expected_calls=[
-            ("GPT3.__init__", 0),
-            ("ProgramOfThought.__init__", 0),
-            ("ChainOfThought.__init__", 0),
-            ("ChainOfThought.__init__", 0),
-            ("ChainOfThought.__init__", 0),
             ("ProgramOfThought.__call__", 0),
             ("ChainOfThought.__call__", 1),
             ("ChainOfThought.forward", 2),
@@ -302,13 +284,6 @@ def test_dspy_react(client: WeaveClient, fake_api_key: None) -> None:
     assert_calls(
         client,
         expected_calls=[
-            ("GPT3.__init__", 0),
-            ("ReAct.__init__", 0),
-            ("Predict.__init__", 0),
-            ("Predict.__init__", 0),
-            ("Predict.__init__", 0),
-            ("Predict.__init__", 0),
-            ("Predict.__init__", 0),
             ("ReAct.__call__", 0),
             ("Predict.__call__", 1),
             ("Predict.forward", 2),
