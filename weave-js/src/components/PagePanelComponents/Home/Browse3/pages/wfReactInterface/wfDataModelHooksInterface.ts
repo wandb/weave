@@ -36,6 +36,7 @@ export type CallKey = {
 };
 export type CallSchema = CallKey & {
   spanName: string;
+  displayName: string | null;
   opVersionRef: string | null;
   traceId: string;
   parentId: string | null;
@@ -172,7 +173,11 @@ export type WFDataModelHooksInterface = {
     projectID: string,
     callIDs: string[]
   ) => Promise<void>;
-
+  useCallRenameFunc: () => (
+    projectID: string,
+    callID: string,
+    newName: string
+  ) => Promise<void>;
   useOpVersion: (key: OpVersionKey | null) => Loadable<OpVersionSchema | null>;
   useOpVersions: (
     entity: string,

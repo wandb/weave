@@ -100,6 +100,12 @@ export type TraceCallsDeleteReq = {
   call_ids: string[];
 };
 
+export type TraceCallRenameReq = {
+  project_id: string;
+  call_id: string;
+  display_name: string;
+};
+
 interface TraceObjectsFilter {
   base_object_classes?: string[];
   object_ids?: string[];
@@ -192,6 +198,7 @@ export class TraceServerClient {
     >
   > = {};
   private onDeleteListeners: Array<() => void>;
+  private onRenameListeners: Array<() => void>;
 
   constructor(baseUrl: string) {
     this.readBatchCollectors = [];
@@ -199,6 +206,7 @@ export class TraceServerClient {
     this.baseUrl = baseUrl;
     this.scheduleReadBatch();
     this.onDeleteListeners = [];
+    this.onRenameListeners = [];
   }
 
   /**
@@ -217,6 +225,14 @@ export class TraceServerClient {
       );
     };
   }
+  public registerOnRenameListener(callback: () => void): () => void {
+    this.onRenameListeners.push(callback);
+    return () => {
+      this.onRenameListeners = this.onRenameListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
 
   callsDelete: (req: TraceCallsDeleteReq) => Promise<void> = req => {
     const res = this.makeRequest<TraceCallsDeleteReq, void>(
@@ -224,6 +240,15 @@ export class TraceServerClient {
       req
     ).then(() => {
       this.onDeleteListeners.forEach(listener => listener());
+    });
+    return res;
+  };
+  callRename: (req: TraceCallRenameReq) => Promise<void> = req => {
+    const res = this.makeRequest<TraceCallRenameReq, void>(
+      '/call/rename',
+      req
+    ).then(() => {
+      this.onRenameListeners.forEach(listener => listener());
     });
     return res;
   };

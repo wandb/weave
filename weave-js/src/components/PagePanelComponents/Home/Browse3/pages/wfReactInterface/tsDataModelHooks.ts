@@ -274,7 +274,13 @@ const useCallsNoExpansion = (
   // register doFetch as a callback after deletion
   useEffect(() => {
     if (opts?.refetchOnDelete) {
-      return getTsClient().registerOnDeleteListener(doFetch);
+      const client = getTsClient();
+      const unregister = client.registerOnDeleteListener(doFetch);
+      const unregisterRename = client.registerOnRenameListener(doFetch);
+      return () => {
+        unregister();
+        unregisterRename();
+      };
     }
     return () => {};
   }, [opts?.refetchOnDelete, getTsClient, doFetch]);
@@ -416,6 +422,31 @@ const useCallsDeleteFunc = () => {
   );
 
   return callsDelete;
+};
+
+const useCallRenameFunc = () => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const callRename = useCallback(
+    (projectID: string, callID: string, newName: string): Promise<void> => {
+      return getTsClient()
+        .callRename({
+          project_id: projectID,
+          call_id: callID,
+          display_name: newName,
+        })
+        .then(() => {
+          callCache.del({
+            entity: projectID.split('/')[0],
+            project: projectID.split('/')[1],
+            callId: callID,
+          });
+        });
+    },
+    [getTsClient]
+  );
+
+  return callRename;
 };
 
 const useOpVersion = (
@@ -1198,6 +1229,7 @@ const traceCallToUICallSchema = (
       traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
         ? refUriToOpVersionKey(traceCall.op_name).opId
         : traceCall.op_name,
+    displayName: traceCall.display_name ?? null,
     opVersionRef:
       traceCall.op_name.startsWith(WANDB_ARTIFACT_REF_PREFIX) ||
       traceCall.op_name.startsWith(WEAVE_REF_PREFIX)
@@ -1224,6 +1256,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCalls,
   useCallsStats,
   useCallsDeleteFunc,
+  useCallRenameFunc,
   useOpVersion,
   useOpVersions,
   useObjectVersion,

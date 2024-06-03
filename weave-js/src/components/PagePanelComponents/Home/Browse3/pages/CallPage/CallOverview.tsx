@@ -35,7 +35,7 @@ OverflowBin.displayName = 'S.OverflowBin';
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const opName = opNiceName(call.spanName);
+  const opName = call.displayName ?? opNiceName(call.spanName);
 
   const statusCode = call.rawSpan.status_code;
 

@@ -6,7 +6,8 @@ import {
 } from '@material-ui/core';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
-import {IconDelete} from '@wandb/weave/components/Icon';
+import {TextField} from '@wandb/weave/components/Form/TextField';
+import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
@@ -18,9 +19,17 @@ export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
 }> = ({selectedCalls}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renameCall, setRenameCall] = useState(false);
 
   const menuOptions = [
     [
+      {
+        key: 'rename',
+        text: 'Rename',
+        icon: <IconPencilEdit style={{marginRight: '4px'}} />,
+        onClick: () => setRenameCall(true),
+        disabled: selectedCalls.length === 0,
+      },
       {
         key: 'delete',
         text: 'Delete',
@@ -38,6 +47,13 @@ export const OverflowMenu: FC<{
           calls={selectedCalls}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
+        />
+      )}
+      {renameCall && (
+        <RenameCallModal
+          calls={selectedCalls}
+          renameCall={renameCall}
+          setRenameCall={setRenameCall}
         />
       )}
       <PopupDropdown
@@ -163,5 +179,79 @@ const ConfirmDeleteModal: FC<{
         </Button>
       </DialogActions>
     </Dialog>
+  );
+};
+
+const RenameCallModal: FC<{
+  calls: CallSchema[];
+  renameCall: boolean;
+  setRenameCall: (renameCall: boolean) => void;
+}> = ({calls, renameCall, setRenameCall}) => {
+  const {useCallRenameFunc} = useWFHooks();
+  const callRename = useCallRenameFunc();
+  const closePeek = useClosePeek();
+
+  let error = null;
+  if (calls.length === 0) {
+    error = 'No calls selected';
+  } else if (calls.length > 1) {
+    error = 'Cannot rename multiple calls';
+  }
+
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  const onRename = () => {
+    setRenameLoading(true);
+    // Assuming renameCall is an API call or method that handles the renaming logic
+    callRename(
+      `${calls[0].entity}/${calls[0].project}`,
+      calls[0].callId,
+      newName
+    )
+      .then(() => {
+        setRenameLoading(false);
+        setRenameCall(false);
+        closePeek();
+      })
+      .catch(e => {
+        console.error('Error renaming call:', e);
+        setRenameLoading(false);
+      });
+  };
+
+  return (
+    <>
+      <Dialog
+        open={renameCall}
+        onClose={() => setRenameCall(false)}
+        maxWidth="xs"
+        fullWidth>
+        <DialogTitle>Rename call</DialogTitle>
+        {error != null && <p style={{color: 'red'}}>{error}</p>}
+        <DialogContent>
+          <TextField
+            placeholder="name"
+            value={newName}
+            onChange={value => setNewName(value)}
+            disabled={renameLoading}
+          />
+        </DialogContent>
+        <DialogActions $align="left">
+          <Button
+            variant="primary"
+            disabled={renameLoading || newName.trim() === '' || error != null}
+            onClick={onRename}>
+            Rename
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={renameLoading}
+            onClick={() => setRenameCall(false)}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
