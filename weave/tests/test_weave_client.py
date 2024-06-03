@@ -320,19 +320,43 @@ def test_rename_calls(client):
     assert len(result) == 1
     assert result[0].display_name == "updated_name"
 
+    # wrong name(s)
     result = list(
         client.calls(weave_client._CallsFilter(display_names=["updated_name123", "x"]))
     )
     assert len(result) == 0
-
-    # Reset name for further testing
-    call0.rename("x")
 
     # Rename using the call object's method
     call0.rename("new_name")
     result = list(client.calls())
     assert len(result) == 1
     assert result[0].display_name == "new_name"
+
+
+def test_op_display_name(client):
+    @weave.op()
+    def my_op(x):
+        return x**2
+
+    my_op(4)
+
+    result = list(client.calls())
+    assert len(result) == 1
+    assert not result[0].display_name
+
+    my_op.display_name = "op name"
+    my_op(8)
+    result = list(client.calls(weave_client._CallsFilter(display_names=["op name"])))
+    assert len(result) == 1
+
+    my_op.display_name = "op name 2"
+    my_op(2)
+
+    result = list(client.calls())
+    assert len(result) == 3
+
+    result = list(client.calls(weave_client._CallsFilter(display_names=["op name 2"])))
+    assert len(result) == 1
 
 
 def test_dataset_calls(client):
