@@ -270,6 +270,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         having_conditions = []
+        start_event_conditions = []
+        end_event_conditions = []
         param_builder = ParamBuilder()
         raw_fields_used = set()
 
@@ -280,6 +282,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             raw_fields_used.update(filter_to_conditions.fields_used)
             having_conditions.extend(filter_to_conditions.having_conditions)
+            start_event_conditions.extend(filter_to_conditions.start_event_conditions)
+            end_event_conditions.extend(filter_to_conditions.end_event_conditions)
 
         # Next, apply the query filter
         if req.query:
@@ -293,6 +297,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stats = self._calls_query_stats_raw(
             req.project_id,
             columns=list(raw_fields_used),
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
             having_conditions=having_conditions,
             parameters=param_builder.get_params(),
         )
@@ -305,6 +311,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         having_conditions = []
+        start_event_conditions = []
+        end_event_conditions = []
         param_builder = ParamBuilder()
 
         # First, apply the application filter
@@ -313,6 +321,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 req.filter, param_builder
             )
             having_conditions.extend(filter_to_conditions.having_conditions)
+            start_event_conditions.extend(filter_to_conditions.start_event_conditions)
+            end_event_conditions.extend(filter_to_conditions.end_event_conditions)
 
         # Next, apply the query filter
         if req.query:
@@ -324,6 +334,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Perform the query against the database
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
             having_conditions=having_conditions,
             parameters=param_builder.get_params(),
             limit=req.limit,
@@ -1732,6 +1744,8 @@ def _transform_external_field_to_internal_field(
 
 class FilterToConditions(BaseModel):
     having_conditions: list[str]
+    start_event_conditions: list[str]
+    end_event_conditions: list[str]
     fields_used: set[str]
 
 
@@ -1741,7 +1755,9 @@ def _process_calls_filter_to_conditions(
 ) -> FilterToConditions:
     """Converts a CallsFilter to a list of conditions for a clickhouse query."""
     param_builder = param_builder or ParamBuilder()
-    having_conditions = []
+    having_conditions: list[str] = []
+    start_event_conditions: list[str] = []
+    end_event_conditions: list[str] = []
     raw_fields_used = set()
 
     if filter.op_names:
@@ -1761,69 +1777,75 @@ def _process_calls_filter_to_conditions(
 
         if non_wildcarded_names:
             or_conditions.append(
-                f"op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
+                f"calls_merged.op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
             )
             raw_fields_used.add("op_name")
 
         for name in wildcarded_names:
             like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
             or_conditions.append(
-                f"op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
+                f"calls_merged.op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
             )
             raw_fields_used.add("op_name")
 
         if or_conditions:
-            having_conditions.append(_combine_conditions(or_conditions, "OR"))
+            start_event_conditions.append(_combine_conditions(or_conditions, "OR"))
 
     if filter.input_refs:
-        having_conditions.append(
-            f"hasAny(input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+        start_event_conditions.append(
+            f"hasAny(calls_merged.input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
         raw_fields_used.add("input_refs")
 
     if filter.output_refs:
-        having_conditions.append(
-            f"hasAny(output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+        end_event_conditions.append(
+            f"hasAny(calls_merged.output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
         raw_fields_used.add("output_refs")
 
     if filter.parent_ids:
-        having_conditions.append(
-            f"parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+        start_event_conditions.append(
+            f"calls_merged.parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
         raw_fields_used.add("parent_id")
 
     if filter.trace_ids:
-        having_conditions.append(
-            f"trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
+        start_event_conditions.append(
+            f"calls_merged.trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
         raw_fields_used.add("trace_id")
 
     if filter.call_ids:
-        having_conditions.append(
-            f"id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+        start_event_conditions.append(
+            f"calls_merged.id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
         raw_fields_used.add("id")
 
     if filter.trace_roots_only:
-        having_conditions.append("parent_id IS NULL")
+        start_event_conditions.append("calls_merged.parent_id IS NULL")
         raw_fields_used.add("parent_id")
 
     if filter.wb_user_ids:
-        having_conditions.append(
-            f"wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+        start_event_conditions.append(
+            f"calls_merged.wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
         )
         raw_fields_used.add("wb_user_id")
 
     if filter.wb_run_ids:
-        having_conditions.append(
-            f"wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+        start_event_conditions.append(
+            f"calls_merged.wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
         )
         raw_fields_used.add("wb_run_id")
 
-    return FilterToConditions(conditions=having_conditions, fields_used=raw_fields_used)
+    return FilterToConditions(
+        conditions=having_conditions,
+        start_event_conditions=start_event_conditions,
+        end_event_conditions=end_event_conditions,
+        fields_used=raw_fields_used,
+    )
 
 
+# TODO: Implement predicate pushdown just like `_process_calls_filter_to_conditions`
 def _process_query_to_conditions(
     query: tsi.Query,
     all_columns: typing.Sequence[str],
