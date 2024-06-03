@@ -100,8 +100,25 @@ async def test_async_anthropic(
         messages=[{"role": "user", "content": "Hello, Claude"}],
     )
 
+    all_content = message.content[0]
+    exp = "Hello! It's nice to meet you. How can I assist you today?"
+    assert all_content.text == exp
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.id == message.id
+    assert output.model == message.model
+    assert output.stop_reason== "end_turn"
+    assert output.stop_sequence == None
+    assert output.content[0].text == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"] == 19
+    assert output.usage.input_tokens == model_usage["input_tokens"] == 10
 
 @pytest.mark.vcr(
     filter_headers=["authorization"],
