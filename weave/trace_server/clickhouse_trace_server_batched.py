@@ -953,7 +953,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             elif col in ["input_refs", "output_refs"]:
                 merged_cols.append(f"array_concat_agg({col}) AS {col}")
             elif col in ["display_name"]:
-                merged_cols.append(f"max({col}) AS {col}")
+                merged_cols.append(f"argMaxMerge({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
@@ -1312,7 +1312,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
-        display_name=ch_call.display_name[1] if ch_call.display_name else None,
+        display_name=ch_call.display_name,
     )
 
 
@@ -1333,7 +1333,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
-        display_name=ch_call_dict.get("display_name", [None, None])[1],
+        display_name=ch_call_dict.get("display_name"),
     )
 
 
