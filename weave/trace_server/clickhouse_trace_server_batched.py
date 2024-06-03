@@ -30,6 +30,7 @@ import json
 import typing
 import hashlib
 import dataclasses
+import logging
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult, StreamContext
@@ -53,6 +54,8 @@ from . import trace_server_interface as tsi
 from .interface import query as tsi_query
 
 from . import refs_internal
+
+logger = logging.getLogger(__name__)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -1270,7 +1273,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return result
 
     def _run_migrations(self) -> None:
-        print("Running migrations")
+        logger.info("Running migrations")
         migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
         migrator.apply_migrations(self._database)
 
@@ -1281,7 +1284,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.Iterator[QueryResult]:
         """Streams the results of a query from the database."""
-        print("Running query: " + query + " with parameters: " + str(parameters))
+        logger.info(
+            {
+                "event": "clickhouse_stream_query",
+                "query": query,
+                "parameters": parameters,
+            }
+        )
         parameters = _process_parameters(parameters)
         with self.ch_client.query_rows_stream(
             query, parameters=parameters, column_formats=column_formats, use_none=True
@@ -1296,12 +1305,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
-        print("Running query: " + query + " with parameters: " + str(parameters))
         parameters = _process_parameters(parameters)
         res = self.ch_client.query(
             query, parameters=parameters, column_formats=column_formats, use_none=True
         )
-        print("Summary: " + json.dumps(res.summary, indent=2))
+        logger.info(
+            {
+                "event": "clickhouse_query",
+                "query": query,
+                "parameters": parameters,
+                "summary": res.summary,
+            }
+        )
         return res
 
     def _insert(
