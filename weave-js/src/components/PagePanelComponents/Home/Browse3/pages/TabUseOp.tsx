@@ -2,6 +2,7 @@ import {Box} from '@mui/material';
 import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
+import {abbreviateRef} from '../../../../../util/refs';
 import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
@@ -32,8 +33,9 @@ export const TabUseOp = ({name, uri}: TabUseOpProps) => {
       <Box mt={2}>
         Use the following code to retrieve this operation version:
         <CopyableText
-          text={`${pythonName} = weave.ref(<ref_url>).get()`}
+          text={`${pythonName} = weave.ref("${abbreviateRef(uri)}").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
+          tooltipText="Click to copy unabridged string"
         />
       </Box>
     </Box>

@@ -46,7 +46,7 @@ def _is_retryable_exception(e: Exception) -> bool:
         return False
 
     # Don't retry on HTTP 4xx (except 429)
-    if isinstance(e, requests.HTTPError):
+    if isinstance(e, requests.HTTPError) and e.response is not None:
         code_class = e.response.status_code // 100
 
         # Bad request, not rate-limiting
@@ -169,7 +169,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req = req_model.model_validate(req)
         r = requests.post(
             self.trace_server_url + url,
-            data=req.model_dump_json().encode("utf-8"),
+            # `by_alias` is required since we have Mongo-style properties in the
+            # query models that are aliased to conform to start with `$`. Without
+            # this, the model_dump will use the internal property names which are
+            # not valid for the `model_validate` step.
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
         )
         if r.status_code == 413 and "obj/create" in url:
@@ -251,6 +255,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsQueryRes:
         return self._generic_request(
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
+        )
+
+    def calls_query_stats(
+        self, req: t.Union[tsi.CallsQueryStatsReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallsQueryStatsRes:
+        return self._generic_request(
+            "/calls/query_stats", req, tsi.CallsQueryStatsReq, tsi.CallsQueryStatsRes
         )
 
     def calls_delete(
