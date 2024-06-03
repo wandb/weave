@@ -40,7 +40,6 @@ def anthropic_accumulator(
     # Merge in the usage info if available
     if hasattr(value, "message") and value.message.usage is not None:
         acc.usage.input_tokens += value.message.usage.input_tokens
-        acc.usage.output_tokens += value.message.usage.output_tokens
 
     # Accumulate the content if it's a ContentBlockDeltaEvent
     if isinstance(value, ContentBlockDeltaEvent) and hasattr(value.delta, "text"):
@@ -55,26 +54,29 @@ def anthropic_accumulator(
             acc.stop_reason = value.delta.stop_reason
         if hasattr(value.delta, "stop_sequence") and value.delta.stop_sequence:
             acc.stop_sequence = value.delta.stop_sequence
+        if hasattr(value, "usage") and value.usage.output_tokens:
+            acc.usage.output_tokens = value.usage.output_tokens
 
     return acc
-
 
 # TODO: Add accumulator for beta.messages for tool usage
 
 
-def anthropic_stream_wrapper(fn: typing.Callable) -> typing.Callable:
-    op = weave.op()(fn)
-    acc_op = add_accumulator(op, anthropic_accumulator)  # type: ignore
-    return acc_op
+
+# Unlike other integrations, streaming is based on input flag
+def should_use_accumulator(inputs: typing.Dict) -> bool:
+    return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def anthropic_create_wrapper(fn: typing.Callable) -> typing.Callable:
-    def wrapper(*args, **kwargs):
-        if kwargs.get(
-            "stream", False
-        ):  # we check if the stream parameter is set to True
-            return anthropic_stream_wrapper(fn)(*args, **kwargs)
-        return weave.op()(fn)(*args, **kwargs)
+def create_wrapper(name:str):
+    def wrapper(fn: typing.Callable) -> typing.Callable:
+        "We need to do this so we can check if `stream` is used"
+        op = weave.op()(fn)
+        op.name = name # type: ignore
+        return add_accumulator(
+            op, 
+            anthropic_accumulator, 
+            should_accumulate=should_use_accumulator)
 
     return wrapper
 
@@ -85,12 +87,12 @@ anthropic_patcher = MultiPatcher(
         SymbolPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "Messages.create",
-            anthropic_create_wrapper,
+            create_wrapper(name="Messages.create"),
         ),
         SymbolPatcher(
             lambda: importlib.import_module("anthropic.resources.messages"),
             "AsyncMessages.create",
-            anthropic_create_wrapper,
+            create_wrapper(name="AsyncMessages.create"),
         ),
     ]
 )
