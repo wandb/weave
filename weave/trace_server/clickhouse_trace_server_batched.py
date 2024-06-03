@@ -1284,17 +1284,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.Iterator[QueryResult]:
         """Streams the results of a query from the database."""
-        logger.info(
-            {
-                "event": "clickhouse_stream_query",
-                "query": query,
-                "parameters": parameters,
-            }
-        )
+        summary = None
         parameters = _process_parameters(parameters)
         with self.ch_client.query_rows_stream(
             query, parameters=parameters, column_formats=column_formats, use_none=True
         ) as stream:
+            if isinstance(stream.source, QueryResult):
+                summary = stream.source.summary
+            logger.info(
+                {
+                    "event": "clickhouse_stream_query",
+                    "query": query,
+                    "parameters": parameters,
+                    "summary": summary,
+                }
+            )
             for row in stream:
                 yield row
 
