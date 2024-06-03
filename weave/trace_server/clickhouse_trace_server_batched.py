@@ -1741,7 +1741,7 @@ def _process_calls_filter_to_conditions(
 ) -> FilterToConditions:
     """Converts a CallsFilter to a list of conditions for a clickhouse query."""
     param_builder = param_builder or ParamBuilder()
-    conditions = []
+    having_conditions = []
     raw_fields_used = set()
 
     if filter.op_names:
@@ -1773,55 +1773,55 @@ def _process_calls_filter_to_conditions(
             raw_fields_used.add("op_name")
 
         if or_conditions:
-            conditions.append(_combine_conditions(or_conditions, "OR"))
+            having_conditions.append(_combine_conditions(or_conditions, "OR"))
 
     if filter.input_refs:
-        conditions.append(
+        having_conditions.append(
             f"hasAny(input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
         raw_fields_used.add("input_refs")
 
     if filter.output_refs:
-        conditions.append(
+        having_conditions.append(
             f"hasAny(output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
         raw_fields_used.add("output_refs")
 
     if filter.parent_ids:
-        conditions.append(
+        having_conditions.append(
             f"parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
         raw_fields_used.add("parent_id")
 
     if filter.trace_ids:
-        conditions.append(
+        having_conditions.append(
             f"trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
         )
         raw_fields_used.add("trace_id")
 
     if filter.call_ids:
-        conditions.append(
+        having_conditions.append(
             f"id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
         raw_fields_used.add("id")
 
     if filter.trace_roots_only:
-        conditions.append("parent_id IS NULL")
+        having_conditions.append("parent_id IS NULL")
         raw_fields_used.add("parent_id")
 
     if filter.wb_user_ids:
-        conditions.append(
+        having_conditions.append(
             f"wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
         )
         raw_fields_used.add("wb_user_id")
 
     if filter.wb_run_ids:
-        conditions.append(
+        having_conditions.append(
             f"wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
         )
         raw_fields_used.add("wb_run_id")
 
-    return FilterToConditions(conditions=conditions, fields_used=raw_fields_used)
+    return FilterToConditions(conditions=having_conditions, fields_used=raw_fields_used)
 
 
 def _process_query_to_conditions(
