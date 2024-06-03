@@ -1291,16 +1291,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ) as stream:
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
+            logger.info(
+                {
+                    "event": "clickhouse_stream_query",
+                    "query": query,
+                    "parameters": parameters,
+                    "summary": summary,
+                }
+            )
             for row in stream:
                 yield row
-        logger.info(
-            {
-                "event": "clickhouse_stream_query",
-                "query": query,
-                "parameters": parameters,
-                "summary": summary,
-            }
-        )
 
     def _query(
         self,
