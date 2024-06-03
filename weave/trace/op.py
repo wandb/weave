@@ -87,7 +87,7 @@ class Op:
             parent_run,
             inputs_with_defaults,
             attributes=attributes,
-            display_name=self.display_name or None,
+            display_name=self.display_name,
         )
 
         has_finished = False
