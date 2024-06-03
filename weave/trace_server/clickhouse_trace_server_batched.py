@@ -960,6 +960,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
+        start_event_conditions: typing.Optional[typing.List[str]] = None,
+        end_event_conditions: typing.Optional[typing.List[str]] = None,
         having_conditions: typing.Optional[typing.List[str]] = None,
         order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
         offset: typing.Optional[int] = None,
@@ -996,6 +998,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             having_conditions = ["1 = 1"]
 
         having_conditions_part = _combine_conditions(having_conditions, "AND")
+
+        where_conditions_part = _make_calls_where_condition_from_event_conditions(
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
+        )
 
         order_by_part = "ORDER BY started_at ASC"
         if order_by is not None:
@@ -1053,6 +1060,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             SELECT {select_columns_part}
             FROM calls_merged
             WHERE project_id = {{project_id: String}}
+                AND {where_conditions_part}
             GROUP BY project_id, id
             HAVING deleted_at IS NULL AND
                 {having_conditions_part}
@@ -1072,6 +1080,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
+        start_event_conditions: typing.Optional[typing.List[str]] = None,
+        end_event_conditions: typing.Optional[typing.List[str]] = None,
         having_conditions: typing.Optional[typing.List[str]] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.Dict:
@@ -1086,6 +1096,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             having_conditions = ["1 = 1"]
 
         having_conditions_part = _combine_conditions(having_conditions, "AND")
+
+        where_conditions_part = _make_calls_where_condition_from_event_conditions(
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
+        )
 
         if columns == None:
             columns = ["id"]
@@ -1112,6 +1127,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 SELECT {select_columns_part}
                 FROM calls_merged
                 WHERE project_id = {{project_id: String}}
+                    AND {where_conditions_part}
                 GROUP BY project_id, id
                 HAVING {having_conditions_part}
             )
@@ -1898,3 +1914,31 @@ def _process_query_to_conditions(
     conditions.append(filter_cond)
 
     return conditions, raw_fields_used
+
+
+def _make_calls_where_condition_from_event_conditions(
+    start_event_conditions: typing.Optional[typing.List[str]] = None,
+    end_event_conditions: typing.Optional[typing.List[str]] = None,
+) -> str:
+    event_conds = []
+    if start_event_conditions is not None and len(start_event_conditions) > 0:
+        conds = _combine_conditions(
+            ["isNotNull(started_at)", *start_event_conditions], "AND"
+        )
+        event_conds.append(
+            f"(calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
+        )
+
+    if end_event_conditions is not None and len(end_event_conditions) > 0:
+        conds = _combine_conditions(
+            ["isNotNull(ended_at)", *start_event_conditions], "AND"
+        )
+        event_conds.append(
+            f"(calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
+        )
+
+    where_conditions_part = "(1 = 1)"
+    if event_conds:
+        where_conditions_part = _combine_conditions(event_conds, "OR")
+
+    return where_conditions_part
