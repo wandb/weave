@@ -4,9 +4,12 @@ import {
   GridApiPro,
   GridColDef,
   GridRowHeightParams,
+  GridRowId,
 } from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {
+  Dispatch,
+  SetStateAction,
   useCallback,
   useContext,
   useEffect,
@@ -39,6 +42,8 @@ type ObjectViewerProps = {
   apiRef: React.MutableRefObject<GridApiPro>;
   data: Data;
   isExpanded: boolean;
+  expandedIds: GridRowId[];
+  setExpandedIds: Dispatch<SetStateAction<GridRowId[]>>;
 };
 
 // Traverse the data and find all ref URIs.
@@ -72,7 +77,13 @@ const refIsExpandable = (ref: string): boolean => {
 };
 
 // This is a general purpose object viewer that can be used to view any object.
-export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
+export const ObjectViewer = ({
+  apiRef,
+  data,
+  isExpanded,
+  expandedIds,
+  setExpandedIds,
+}: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
   // `resolvedData` holds ref-resolved data.
@@ -278,9 +289,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
   // the expansion. Importantly, when the column is clicked, we do some
   // bookkeeping to add the expanded ref to the `expandedRefs` state. This
   // triggers a set of state updates to populate the expanded data.
-  const [expandedIds, setExpandedIds] = useState<Array<string | number>>(
-    isExpanded ? rows.filter(r => !r.isExpandableRef).map(r => r.id) : []
-  );
+
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
       headerName: 'Path',
@@ -305,7 +314,7 @@ export const ObjectViewer = ({apiRef, data, isExpanded}: ObjectViewerProps) => {
         );
       },
     }),
-    [addExpandedRef]
+    [addExpandedRef, setExpandedIds]
   );
 
   // Next we define a function that updates the row expansion state. This
