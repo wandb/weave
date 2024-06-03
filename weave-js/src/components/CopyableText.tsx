@@ -12,6 +12,7 @@ type CopyableTextProps = {
 
   // The text to copy to the clipboard. If not provided, `text` will be used.
   copyText?: string;
+  tooltipText?: string;
   toastText?: string;
   icon?: IconName;
   disabled?: boolean;
@@ -49,6 +50,7 @@ Text.displayName = 'S.Text';
 export const CopyableText = ({
   text,
   copyText,
+  tooltipText = 'Click to copy to clipboard',
   toastText = 'Copied to clipboard',
   icon,
   disabled,
@@ -80,5 +82,5 @@ export const CopyableText = ({
       <Text>{text}</Text>
     </Wrapper>
   );
-  return <Tooltip content="Click to copy to clipboard" trigger={trigger} />;
+  return <Tooltip content={tooltipText} trigger={trigger} />;
 };

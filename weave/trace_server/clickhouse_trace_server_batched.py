@@ -1,5 +1,27 @@
 # Clickhouse Trace Server
 
+# A note on query structure:
+# There are four major kinds of things that we query:
+# - calls,
+# - object_versions,
+# - tables
+# - files
+#
+# calls are identified by ID.
+#
+# object_versions, tables, and files are identified by digest. For these kinds of
+# things, we dedupe at merge time using Clickhouse's ReplacingMergeTree, but we also
+# need to dedupe at query time.
+#
+# Previously, we did query time deduping in *_deduped VIEWs. But it turns out
+# clickhouse doesn't push down the project_id predicate into those views, so we were
+# always scanning whole tables.
+#
+# Now, we've just written the what were views before into this file directly as
+# subqueries, and put the project_id predicate in the innermost subquery, which fixes
+# the problem.
+
+
 from collections import defaultdict
 import threading
 from contextlib import contextmanager
@@ -330,9 +352,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # This order-by clause creation should probably be moved into this function
             # and passed down as a processed object. It will follow the same patterns as
             # the filters and queries.
-            order_by=None
-            if not req.sort_by
-            else [(s.field, s.direction) for s in req.sort_by],
+            order_by=(
+                None
+                if not req.sort_by
+                else [(s.field, s.direction) for s in req.sort_by]
+            ),
         )
 
         # Yield the marshaled response
@@ -578,15 +602,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conds.extend(conditions)
 
         predicate = _combine_conditions(conds, "AND")
+        # The subqueries are for deduplication of table rows and tables by digest.
+        # It might be more efficient to do deduplication of table rows
+        # in the outer query instead of the right side of the JOIN clause here,
+        # that hasn't been tested yet.
         query = f"""
                 SELECT tr.digest, tr.val_dump
                 FROM (
                     SELECT project_id, row_digest
-                    FROM tables_deduped
+                    FROM (
+                        SELECT *
+                        FROM (
+                                SELECT *,
+                                    row_number() OVER (PARTITION BY project_id, digest) AS rn
+                                FROM tables
+                                WHERE project_id = {{project_id:String}} AND digest = {{digest:String}}
+                            )
+                        WHERE rn = 1
+                        ORDER BY project_id, digest
+                    )
                     ARRAY JOIN row_digests AS row_digest
                     WHERE digest = {{digest:String}}
                 ) AS t
-                JOIN table_rows_deduped tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
+                JOIN (
+                    SELECT project_id, digest, val_dump
+                    FROM (
+                            SELECT *,
+                                row_number() OVER (PARTITION BY project_id, digest) AS rn
+                            FROM table_rows
+                            WHERE project_id = {{project_id:String}}
+                        )
+                    WHERE rn = 1
+                    ORDER BY project_id, digest
+                ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
             """
         if parameters is None:
@@ -840,8 +888,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        # The subquery is responsible for deduplication of file chunks by digest
         query_result = self.ch_client.query(
-            "SELECT n_chunks, val_bytes FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
+            """
+            SELECT n_chunks, val_bytes
+            FROM (
+                SELECT *
+                FROM (
+                        SELECT *,
+                            row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
+                        FROM files
+                        WHERE project_id = {project_id:String} AND digest = {digest:String}
+                    )
+                WHERE rn = 1
+                ORDER BY project_id, digest, chunk_index
+            )
+            WHERE project_id = {project_id:String} AND digest = {digest:String}""",
             parameters={"project_id": req.project_id, "digest": req.digest},
             column_formats={"val_bytes": "bytes"},
         )
@@ -1117,6 +1179,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if parameters is None:
             parameters = {}
+        # The subquery is for deduplication of object versions by digest
         query_result = self._query_stream(
             f"""
             SELECT 
@@ -1133,7 +1196,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 version_index,
                 version_count,
                 is_latest
-            FROM object_versions_deduped
+            FROM (
+                SELECT project_id,
+                    object_id,
+                    created_at,
+                    kind,
+                    base_object_class,
+                    refs,
+                    val_dump,
+                    digest,
+                    if (kind = 'op', 1, 0) AS is_op,
+                    row_number() OVER (
+                        PARTITION BY project_id,
+                        kind,
+                        object_id
+                        ORDER BY created_at ASC
+                    ) AS _version_index_plus_1,
+                    _version_index_plus_1 - 1 AS version_index,
+                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
+                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
+                FROM (
+                    SELECT *,
+                        row_number() OVER (
+                            PARTITION BY project_id,
+                            kind,
+                            object_id,
+                            digest
+                            ORDER BY created_at ASC
+                        ) AS rn
+                    FROM object_versions
+                    WHERE project_id = {{project_id: String}}
+                )
+                WHERE rn = 1
+            )
             WHERE project_id = {{project_id: String}} AND
                 {conditions_part}
             {limit_part}
@@ -1742,6 +1837,7 @@ def _process_calls_query_to_conditions(
     param_builder = param_builder or ParamBuilder()
     conditions = []
     raw_fields_used = set()
+
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
         cond = None

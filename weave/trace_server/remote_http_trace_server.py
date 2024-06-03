@@ -169,7 +169,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req = req_model.model_validate(req)
         r = requests.post(
             self.trace_server_url + url,
-            data=req.model_dump_json().encode("utf-8"),
+            # `by_alias` is required since we have Mongo-style properties in the
+            # query models that are aliased to conform to start with `$`. Without
+            # this, the model_dump will use the internal property names which are
+            # not valid for the `model_validate` step.
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
         )
         if r.status_code == 413 and "obj/create" in url:
