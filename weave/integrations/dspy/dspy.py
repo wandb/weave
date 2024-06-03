@@ -95,11 +95,6 @@ patched_functions = [
     ),
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
-        attribute_name="KNNFewShot.compile",
-        make_new_value=weave.op(),
-    ),
-    SymbolPatcher(
-        get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="MIPRO.compile",
         make_new_value=weave.op(),
     ),
@@ -111,11 +106,6 @@ patched_functions = [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
         attribute_name="SignatureOptimizer.compile",
-        make_new_value=weave.op(),
-    ),
-    SymbolPatcher(
-        get_base_symbol=lambda: importlib.import_module("dspy.teleprompt"),
-        attribute_name="BayesianSignatureOptimizer.compile",
         make_new_value=weave.op(),
     ),
     SymbolPatcher(
