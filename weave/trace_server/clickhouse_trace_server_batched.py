@@ -363,13 +363,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
         # Note: i think this project condition is redundant
-        proj_cond = "project_id = {project_id: String}"
+        proj_cond = "calls_merged.project_id = {project_id: String}"
         proj_params = {"project_id": req.project_id}
 
         # get all parents
         parents = self._select_calls_query(
             req.project_id,
-            start_event_conditions=[proj_cond, "id IN {ids: Array(String)}"],
+            start_event_conditions=[
+                proj_cond,
+                "calls_merged.id IN {ids: Array(String)}",
+            ],
             parameters=proj_params | {"ids": req.call_ids},
         )
 
@@ -378,7 +381,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.project_id,
             start_event_conditions=[
                 proj_cond,
-                "trace_id IN {trace_ids: Array(String)}",
+                "calls_merged.trace_id IN {trace_ids: Array(String)}",
             ],
             parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
         )
@@ -937,7 +940,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Generate and run the query to get the call from the database
         ch_calls = self._select_calls_query(
             req.project_id,
-            start_event_conditions=["id = {id: String}"],
+            start_event_conditions=["calls_merged.id = {id: String}"],
             limit=1,
             parameters={"id": req.id},
         )
@@ -1974,6 +1977,6 @@ def _make_calls_where_condition_from_event_conditions(
 
     where_conditions_part = "(1 = 1)"
     if event_conds:
-        where_conditions_part = _combine_conditions(event_conds, "OR")
+        where_conditions_part = _combine_conditions(event_conds, "AND")
 
     return where_conditions_part
