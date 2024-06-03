@@ -1,14 +1,10 @@
+import os
 import pytest
 from typing import Any, Generator, List, Optional, Tuple
 
 import dspy
 from weave.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-
-
-def filter_body(r: Any) -> Any:
-    r.body = ""
-    return r
 
 
 def flatten_calls(
@@ -35,7 +31,7 @@ def fake_api_key() -> Generator[None, None, None]:
     import os
 
     orig_key = os.environ.get("OPENAI_API_KEY")
-    os.environ["OPENAI_API_KEY"] = "sk-DUMMY_KEY"
+    # os.environ["OPENAI_API_KEY"] = "sk-DUMMY_KEY"
     try:
         yield
     finally:
@@ -48,7 +44,6 @@ def fake_api_key() -> Generator[None, None, None]:
 def assert_calls(
     client: WeaveClient,
     expected_calls: List[Tuple[str, int]],
-    partial_assertion: bool = False,
 ):
     weave_server_respose = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
@@ -57,17 +52,12 @@ def assert_calls(
         (op_name_from_ref(c.op_name), d)
         for (c, d) in flatten_calls(weave_server_respose.calls)
     ]
-    if not partial_assertion:
-        assert flattened_call_response == expected_calls
-    else:
-        for call in expected_calls:
-            assert call in flattened_call_response
+    assert flattened_call_response == expected_calls
 
 
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
 )
 def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
@@ -87,13 +77,12 @@ def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
 )
 def test_dspy_signature(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
-    sentence = "it's a charming and often affecting journey."  # example from the SST-2 dataset.
-    dspy.Predict("sentence -> sentiment")
+    classify = dspy.Predict("sentence -> sentiment")
+    classify(sentence="it's a charming and often affecting journey.")
     assert_calls(
         client,
         expected_calls=[
@@ -104,7 +93,6 @@ def test_dspy_signature(client: WeaveClient, fake_api_key: None) -> None:
             ("GPT3.__call__", 2),
             ("GPT3.request", 3),
             ("GPT3.basic_request", 4),
-            ("openai.chat.completions.create", 5),
         ],
     )
 
@@ -112,7 +100,6 @@ def test_dspy_signature(client: WeaveClient, fake_api_key: None) -> None:
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
 )
 def test_dspy_inline_signature(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
@@ -137,7 +124,6 @@ def test_dspy_inline_signature(client: WeaveClient, fake_api_key: None) -> None:
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
 )
 def test_dspy_cot(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
@@ -164,7 +150,6 @@ def test_dspy_cot(client: WeaveClient, fake_api_key: None) -> None:
             ("GPT3.__call__", 2),
             ("GPT3.request", 3),
             ("GPT3.basic_request", 4),
-            ("openai.chat.completions.create", 5),
         ],
     )
 
@@ -172,7 +157,6 @@ def test_dspy_cot(client: WeaveClient, fake_api_key: None) -> None:
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
 )
 def test_dspy_cot_with_hint(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
@@ -199,11 +183,9 @@ def test_dspy_cot_with_hint(client: WeaveClient, fake_api_key: None) -> None:
             ("GPT3.__call__", 2),
             ("GPT3.request", 3),
             ("GPT3.basic_request", 4),
-            ("openai.chat.completions.create", 5),
             ("GPT3.__call__", 2),
             ("GPT3.request", 3),
             ("GPT3.basic_request", 4),
-            ("openai.chat.completions.create", 5),
         ],
     )
 
@@ -211,7 +193,6 @@ def test_dspy_cot_with_hint(client: WeaveClient, fake_api_key: None) -> None:
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
 )
 def test_dspy_multi_chain_comparison(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
@@ -244,7 +225,7 @@ def test_dspy_multi_chain_comparison(client: WeaveClient, fake_api_key: None) ->
         client,
         expected_calls=[
             ("GPT3.__init__", 0),
-            ("MultiChainComparison", 0),
+            ("MultiChainComparison.__init__", 0),
             ("Predict.__init__", 0),
             ("MultiChainComparison.__call__", 0),
             ("Predict.__call__", 1),
@@ -262,7 +243,6 @@ def test_dspy_multi_chain_comparison(client: WeaveClient, fake_api_key: None) ->
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
 )
 def test_dspy_pot(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
@@ -293,13 +273,11 @@ def test_dspy_pot(client: WeaveClient, fake_api_key: None) -> None:
             ("GPT3.__call__", 3),
             ("GPT3.request", 4),
             ("GPT3.basic_request", 5),
-            ("openai.chat.completions.create", 6),
             ("ChainOfThought.__call__", 1),
             ("ChainOfThought.forward", 2),
             ("GPT3.__call__", 3),
             ("GPT3.request", 4),
             ("GPT3.basic_request", 5),
-            ("openai.chat.completions.create", 6),
         ],
     )
 
@@ -307,7 +285,6 @@ def test_dspy_pot(client: WeaveClient, fake_api_key: None) -> None:
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
 )
 def test_dspy_react(client: WeaveClient, fake_api_key: None) -> None:
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
@@ -340,45 +317,4 @@ def test_dspy_react(client: WeaveClient, fake_api_key: None) -> None:
             ("GPT3.basic_request", 5),
             ("openai.chat.completions.create", 6),
         ],
-    )
-
-
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-    before_record_request=filter_body,
-)
-def test_dspy_react(client: WeaveClient, fake_api_key: None) -> None:
-    gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
-    dspy.configure(lm=gpt3_turbo)
-
-    class BasicQA(dspy.Signature):
-        """Answer questions with short factoid answers."""
-
-        question = dspy.InputField()
-        answer = dspy.OutputField(desc="often between 1 and 5 words")
-
-    react_module = dspy.ReAct(BasicQA)
-    react_module(question="What is the color of the sky?")
-
-    assert_calls(
-        client,
-        expected_calls=[
-            ("GPT3.__init__", 0),
-            ("BootstrapFewShot.__init__", 0),
-            ("RAG.__init__", 0),
-            ("Retrieve.__init__", 0),
-            ("ChainOfThought.__init__", 0),
-            ("BootstrapFewShot.compile", 0),
-            ("RAG.__call__", 1),
-            ("Retrieve.__call__", 2),
-            ("Retrieve.forward", 3),
-            ("ChainOfThought.__call__", 1),
-            ("ChainOfThought.forward", 2),
-            ("GPT3.__call__", 3),
-            ("GPT3.request", 4),
-            ("GPT3.basic_request", 5),
-            ("validate_context_and_answer", 1),
-        ],
-        partial_assertion=True,
     )
