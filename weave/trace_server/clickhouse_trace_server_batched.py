@@ -163,6 +163,8 @@ all_call_insert_columns = list(
 )
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
+all_call_json_columns = ("inputs", "output", "attributes", "summary")
+
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 required_call_columns = list(set(all_call_select_columns) - set([]))
@@ -304,8 +306,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Next, apply the query filter
         if req.query:
-            query_conds, fields_used = _process_calls_query_to_conditions(
-                req.query, param_builder
+            query_conds, fields_used = _process_query_to_conditions(
+                req.query, all_call_select_columns, all_call_json_columns, param_builder
             )
             raw_fields_used.update(fields_used)
             conditions.extend(query_conds)
@@ -337,8 +339,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Next, apply the query filter
         if req.query:
-            query_conds, _ = _process_calls_query_to_conditions(
-                req.query, param_builder
+            query_conds, _ = _process_query_to_conditions(
+                req.query, all_call_select_columns, all_call_json_columns, param_builder
             )
             conditions.extend(query_conds)
 
@@ -1062,8 +1064,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         inner_field,
                         param_builder,
                         _,
-                    ) = _transform_external_calls_field_to_internal_calls_field(
-                        field, cast
+                    ) = _transform_external_field_to_internal_field(
+                        field, all_call_select_columns, all_call_json_columns, cast
                     )
                     parameters.update(param_builder.get_params())
 
@@ -1181,7 +1183,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # The subquery is for deduplication of object versions by digest
         query_result = self._query_stream(
             f"""
-            SELECT 
+            SELECT
                 project_id,
                 object_id,
                 created_at,
@@ -1686,8 +1688,10 @@ def _is_dynamic_field(field: str) -> bool:
     )
 
 
-def _transform_external_calls_field_to_internal_calls_field(
+def _transform_external_field_to_internal_field(
     field: str,
+    all_columns: typing.Sequence[str],
+    json_columns: typing.Sequence[str],
     cast: typing.Optional[str] = None,
     param_builder: typing.Optional[ParamBuilder] = None,
 ) -> tuple[str, ParamBuilder, set[str]]:
@@ -1695,7 +1699,7 @@ def _transform_external_calls_field_to_internal_calls_field(
     param_builder = param_builder or ParamBuilder()
     raw_fields_used = set()
     json_path = None
-    for prefix in ["inputs", "output", "attributes", "summary"]:
+    for prefix in json_columns:
         if field == prefix or field.startswith(prefix + "."):
             if field == prefix:
                 json_path = "$"
@@ -1705,7 +1709,7 @@ def _transform_external_calls_field_to_internal_calls_field(
             break
 
     # validate field
-    if field not in all_call_select_columns:
+    if field not in all_columns:
         raise ValueError(f"Unknown field: {field}")
 
     raw_fields_used.add(field)
@@ -1835,8 +1839,11 @@ def _process_calls_filter_to_conditions(
     return conditions, raw_fields_used
 
 
-def _process_calls_query_to_conditions(
-    query: tsi.Query, param_builder: typing.Optional[ParamBuilder] = None
+def _process_query_to_conditions(
+    query: tsi.Query,
+    all_columns: typing.Sequence[str],
+    json_columns: typing.Sequence[str],
+    param_builder: typing.Optional[ParamBuilder] = None,
 ) -> tuple[list[str], set[str]]:
     """Converts a Query to a list of conditions for a clickhouse query."""
     param_builder = param_builder or ParamBuilder()
@@ -1895,12 +1902,8 @@ def _process_calls_query_to_conditions(
                 _python_value_to_ch_type(operand.literal_),
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            (
-                field,
-                _,
-                fields_used,
-            ) = _transform_external_calls_field_to_internal_calls_field(
-                operand.get_field_, None, param_builder
+            (field, _, fields_used,) = _transform_external_field_to_internal_field(
+                operand.get_field_, all_columns, json_columns, None, param_builder
             )
             raw_fields_used.update(fields_used)
             return field
