@@ -140,16 +140,7 @@ patched_functions += dspy_get_patched_lm_functions(
     base_symbol="dspy", lm_class_name="OpenAI"
 )
 patched_functions += dspy_get_patched_lm_functions(
-    base_symbol="dspy", lm_class_name="Databricks"
-)
-patched_functions += dspy_get_patched_lm_functions(
     base_symbol="dspy", lm_class_name="Cohere"
-)
-patched_functions += dspy_get_patched_lm_functions(
-    base_symbol="dspy", lm_class_name="ColBERTv2"
-)
-patched_functions += dspy_get_patched_lm_functions(
-    base_symbol="dspy", lm_class_name="Pyserini"
 )
 patched_functions += dspy_get_patched_lm_functions(
     base_symbol="dspy", lm_class_name="Clarifai"
@@ -175,5 +166,27 @@ patched_functions += dspy_get_patched_lm_functions(
 patched_functions += dspy_get_patched_lm_functions(
     base_symbol="dspy", lm_class_name="Bedrock"
 )
+patched_functions += [
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Databricks.basic_request",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Databricks.__call__",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="ColBERTv2.__call__",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Pyserini.__call__",
+        make_new_value=weave.op(),
+    ),
+]
 
 dspy_patcher = MultiPatcher(patched_functions)
