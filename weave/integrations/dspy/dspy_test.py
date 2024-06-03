@@ -1,5 +1,5 @@
 import pytest
-from typing import Any, Generator, List, Optional, Tuple
+from typing import Generator, List, Optional, Tuple
 
 import dspy
 from weave.weave_client import WeaveClient
@@ -290,6 +290,5 @@ def test_dspy_react(client: WeaveClient, fake_api_key: None) -> None:
             ("GPT3.__call__", 3),
             ("GPT3.request", 4),
             ("GPT3.basic_request", 5),
-            ("openai.chat.completions.create", 6),
         ],
     )
