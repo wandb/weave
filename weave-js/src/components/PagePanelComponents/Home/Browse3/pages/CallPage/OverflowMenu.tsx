@@ -30,7 +30,8 @@ export const OverflowMenu: FC<{
         onClick: () => setRenameCall(true),
         disabled: selectedCalls.length === 0,
       },
-    ], [
+    ],
+    [
       {
         key: 'delete',
         text: 'Delete',
