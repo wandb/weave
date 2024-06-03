@@ -269,7 +269,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        conditions = []
+        having_conditions = []
         param_builder = ParamBuilder()
         raw_fields_used = set()
 
@@ -279,7 +279,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 req.filter, param_builder
             )
             raw_fields_used.update(fields_used)
-            conditions.extend(filter_conds)
+            having_conditions.extend(filter_conds)
 
         # Next, apply the query filter
         if req.query:
@@ -287,13 +287,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 req.query, all_call_select_columns, all_call_json_columns, param_builder
             )
             raw_fields_used.update(fields_used)
-            conditions.extend(query_conds)
+            having_conditions.extend(query_conds)
 
         # Perform the query against the database
         stats = self._calls_query_stats_raw(
             req.project_id,
             columns=list(raw_fields_used),
-            having_conditions=conditions,
+            having_conditions=having_conditions,
             parameters=param_builder.get_params(),
         )
 
@@ -304,7 +304,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        conditions = []
+        having_conditions = []
         param_builder = ParamBuilder()
 
         # First, apply the application filter
@@ -312,19 +312,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             (filter_conds, _) = _process_calls_filter_to_conditions(
                 req.filter, param_builder
             )
-            conditions.extend(filter_conds)
+            having_conditions.extend(filter_conds)
 
         # Next, apply the query filter
         if req.query:
             query_conds, _ = _process_query_to_conditions(
                 req.query, all_call_select_columns, all_call_json_columns, param_builder
             )
-            conditions.extend(query_conds)
+            having_conditions.extend(query_conds)
 
         # Perform the query against the database
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
-            having_conditions=conditions,
+            having_conditions=having_conditions,
             parameters=param_builder.get_params(),
             limit=req.limit,
             offset=req.offset,
@@ -356,14 +356,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # get all parents
         parents = self._select_calls_query(
             req.project_id,
-            conditions=[proj_cond, "id IN {ids: Array(String)}"],
+            having_conditions=[proj_cond, "id IN {ids: Array(String)}"],
             parameters=proj_params | {"ids": req.call_ids},
         )
 
         # get all calls with trace_ids matching parents
         all_calls = self._select_calls_query(
             req.project_id,
-            conditions=[proj_cond, "trace_id IN {trace_ids: Array(String)}"],
+            having_conditions=[proj_cond, "trace_id IN {trace_ids: Array(String)}"],
             parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
         )
 
@@ -921,7 +921,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Generate and run the query to get the call from the database
         ch_calls = self._select_calls_query(
             req.project_id,
-            conditions=["id = {id: String}"],
+            having_conditions=["id = {id: String}"],
             limit=1,
             parameters={"id": req.id},
         )
@@ -936,7 +936,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
-        conditions: typing.Optional[typing.List[str]] = None,
+        having_conditions: typing.Optional[typing.List[str]] = None,
         order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
@@ -945,7 +945,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         dicts = self._select_calls_query_raw(
             project_id,
             columns=columns,
-            having_conditions=conditions,
+            having_conditions=having_conditions,
             order_by=order_by,
             offset=offset,
             limit=limit,
