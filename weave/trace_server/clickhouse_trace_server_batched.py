@@ -1961,7 +1961,7 @@ def _make_calls_where_condition_from_event_conditions(
             ["isNotNull(started_at)", *start_event_conditions], "AND"
         )
         event_conds.append(
-            f"(calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
+            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
         )
 
     if end_event_conditions is not None and len(end_event_conditions) > 0:
@@ -1969,7 +1969,7 @@ def _make_calls_where_condition_from_event_conditions(
             ["isNotNull(ended_at)", *end_event_conditions], "AND"
         )
         event_conds.append(
-            f"(calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
+            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
         )
 
     where_conditions_part = "(1 = 1)"
