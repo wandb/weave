@@ -3,6 +3,7 @@ import React from 'react';
 
 import {isValidVarName} from '../../../../../core/util/var';
 import {parseRef} from '../../../../../react';
+import {abbreviateRef} from '../../../../../util/refs';
 import {Alert} from '../../../../Alert';
 import {CopyableText} from '../../../../CopyableText';
 import {DocLink} from './common/Links';
@@ -38,8 +39,9 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
       <Box mt={2}>
         Use the following code to retrieve this {label}:
         <CopyableText
-          text={`${pythonName} = weave.ref("<ref_uri>").get()`}
+          text={`${pythonName} = weave.ref("${abbreviateRef(uri)}").get()`}
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
+          tooltipText="Click to copy unabridged string"
         />
       </Box>
       {isParentObject && (
@@ -48,16 +50,20 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
             To <DocLink path="guides/tools/serve" text="serve this model" />{' '}
             locally with a Swagger UI:
             <CopyableText
-              text="weave serve <ref_uri>"
-              copyText={`weave serve ${uri}`}
+              text={`weave serve "${abbreviateRef(uri)}"`}
+              copyText={`weave serve "${uri}"`}
+              tooltipText="Click to copy unabridged string"
             />
           </Box>
           <Box mt={2}>
             To <DocLink path="guides/tools/deploy" text="deploy this model" />{' '}
             to the cloud run:
             <CopyableText
-              text={`weave deploy gcp --project "${projectName}" <ref_uri>`}
-              copyText={`weave deploy gcp --project "${projectName}" ${uri}`}
+              text={`weave deploy gcp --project "${projectName}" "${abbreviateRef(
+                uri
+              )}"`}
+              copyText={`weave deploy gcp --project "${projectName}" "${uri}"`}
+              tooltipText="Click to copy unabridged string"
             />
           </Box>
         </>
