@@ -146,6 +146,12 @@ all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
 required_call_columns = list(set(all_call_select_columns) - set([]))
 
 
+# DB special call column selection types, all others use `any`
+call_select_raw_columns = ["id", "project_id"]
+call_select_arrays_columns = ["input_refs", "output_refs"]  # array_concat_agg
+call_select_argmax_columns = ["display_name"]  # argMaxMerge
+
+
 class ObjCHInsertable(BaseModel):
     project_id: str
     kind: str
@@ -948,11 +954,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ), f"Invalid columns: {columns}"
         merged_cols = []
         for col in columns:
-            if col in ["project_id", "id"]:
+            if col in call_select_raw_columns:
                 merged_cols.append(f"{col} AS {col}")
-            elif col in ["input_refs", "output_refs"]:
+            elif col in call_select_arrays_columns:
                 merged_cols.append(f"array_concat_agg({col}) AS {col}")
-            elif col in ["display_name"]:
+            elif col in call_select_argmax_columns:
                 merged_cols.append(f"argMaxMerge({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
