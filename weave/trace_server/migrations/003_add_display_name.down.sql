@@ -1,3 +1,8 @@
+/*
+    Remove display_name column from call_parts
+    Remove display_name argMax aggregation from calls_merged
+    Remove display_name argMaxState aggregation from calls_merged_view
+*/
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
         id,

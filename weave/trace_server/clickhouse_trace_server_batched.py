@@ -132,7 +132,7 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
-    display_name: typing.Tuple[datetime.datetime, typing.Optional[str]] = None
+    display_name: typing.Optional[str] = None
 
     trace_id: str
     parent_id: typing.Optional[str] = None

@@ -1,3 +1,12 @@
+/*
+    Add display_name column to call_parts
+    Add display_name argMax aggregation to calls_merged
+    Add display_name argMaxState aggregation to calls_merged_view
+
+    NOTE:
+    * `argMaxState` is NOT simple and must be queried with `argMaxMerge` *
+*/
+
 ALTER TABLE call_parts
     ADD COLUMN display_name Nullable(String) DEFAULT NULL;
 
