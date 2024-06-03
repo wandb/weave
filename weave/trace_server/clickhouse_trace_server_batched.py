@@ -293,7 +293,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stats = self._calls_query_stats_raw(
             req.project_id,
             columns=list(raw_fields_used),
-            conditions=conditions,
+            having_conditions=conditions,
             parameters=param_builder.get_params(),
         )
 
@@ -324,7 +324,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Perform the query against the database
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
-            conditions=conditions,
+            having_conditions=conditions,
             parameters=param_builder.get_params(),
             limit=req.limit,
             offset=req.offset,
@@ -945,7 +945,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         dicts = self._select_calls_query_raw(
             project_id,
             columns=columns,
-            conditions=conditions,
+            having_conditions=conditions,
             order_by=order_by,
             offset=offset,
             limit=limit,
@@ -960,7 +960,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
-        conditions: typing.Optional[typing.List[str]] = None,
+        having_conditions: typing.Optional[typing.List[str]] = None,
         order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
@@ -992,10 +992,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
-        if not conditions:
-            conditions = ["1 = 1"]
+        if not having_conditions:
+            having_conditions = ["1 = 1"]
 
-        conditions_part = _combine_conditions(conditions, "AND")
+        having_conditions_part = _combine_conditions(having_conditions, "AND")
 
         order_by_part = "ORDER BY started_at ASC"
         if order_by is not None:
@@ -1055,7 +1055,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             WHERE project_id = {{project_id: String}}
             GROUP BY project_id, id
             HAVING deleted_at IS NULL AND
-                {conditions_part}
+                {having_conditions_part}
             {order_by_part}
             {limit_part}
             {offset_part}
@@ -1072,7 +1072,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
-        conditions: typing.Optional[typing.List[str]] = None,
+        having_conditions: typing.Optional[typing.List[str]] = None,
         parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> typing.Dict:
         """Generates and executes a query to get stats for a calls query."""
@@ -1082,10 +1082,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         parameters["project_id"] = project_id
 
-        if not conditions:
-            conditions = ["1 = 1"]
+        if not having_conditions:
+            having_conditions = ["1 = 1"]
 
-        conditions_part = _combine_conditions(conditions, "AND")
+        having_conditions_part = _combine_conditions(having_conditions, "AND")
 
         if columns == None:
             columns = ["id"]
@@ -1113,7 +1113,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 FROM calls_merged
                 WHERE project_id = {{project_id: String}}
                 GROUP BY project_id, id
-                HAVING {conditions_part}
+                HAVING {having_conditions_part}
             )
         """
 
