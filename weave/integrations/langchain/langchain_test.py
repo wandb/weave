@@ -180,8 +180,8 @@ def test_simple_rag_chain(client: WeaveClient) -> None:
 
 
 def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> None:
-    # assert len(calls) == 10
-    print(len(calls))
+    assert len(calls) == 10
+
     flattened = flatten_calls(calls)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
