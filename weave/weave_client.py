@@ -476,6 +476,7 @@ class WeaveClient:
             parent_id = None
         call = Call(
             op_name=op_str,
+            display_name=display_name,
             project_id=self._project_id(),
             trace_id=trace_id,
             parent_id=parent_id,
@@ -491,13 +492,13 @@ class WeaveClient:
             project_id=self._project_id(),
             id=call_id,
             op_name=op_str,
+            display_name=display_name,
             trace_id=trace_id,
             started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes=attributes,
             wb_run_id=current_wb_run_id,
-            display_name=display_name,
         )
         self.server.call_start(CallStartReq(start=start))
         run_context.push_call(call)

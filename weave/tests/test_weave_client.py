@@ -335,22 +335,22 @@ def test_rename_calls(client):
 
 def test_op_display_name(client):
     @weave.op()
-    def my_op(x):
-        return x**2
+    def my_op():
+        return "fake"
 
-    my_op(4)
+    my_op()
 
     result = list(client.calls())
     assert len(result) == 1
     assert not result[0].display_name
 
     my_op.display_name = "op name"
-    my_op(8)
+    my_op()
     result = list(client.calls(weave_client._CallsFilter(display_names=["op name"])))
     assert len(result) == 1
 
     my_op.display_name = "op name 2"
-    my_op(2)
+    my_op()
 
     result = list(client.calls())
     assert len(result) == 3

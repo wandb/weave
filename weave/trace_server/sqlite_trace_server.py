@@ -152,19 +152,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     trace_id,
                     parent_id,
                     op_name,
+                    display_name,
                     started_at,
                     attributes,
                     inputs,
                     input_refs,
                     wb_user_id,
                     wb_run_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
                     req.start.trace_id,
                     req.start.parent_id,
                     req.start.op_name,
+                    req.start.display_name,
                     req.start.started_at.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
@@ -275,6 +277,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if filter.wb_run_ids:
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
+            if filter.display_names:
+                in_expr = ", ".join((f"'{x}'" for x in filter.display_names))
+                conds += [f"display_name IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -428,7 +433,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     summary=json.loads(row[13]) if row[13] else None,
                     wb_user_id=row[14],
                     wb_run_id=row[15],
-                    display_name=row[16],
+                    display_name=row[17],
                 )
                 for row in query_result
             ]
