@@ -1826,6 +1826,16 @@ def _process_calls_filter_to_conditions(
         )
         raw_fields_used.add("wb_run_id")
 
+    if filter.display_names:
+        or_conditions: typing.List[str] = []
+        for name in filter.display_names:
+            like_name = "%" + name + "%"
+            or_conditions.append(
+                f"display_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
+            )
+            raw_fields_used.add("display_name")
+        conditions.append(_combine_conditions(or_conditions, "OR"))
+
     return conditions, raw_fields_used
 
 

@@ -304,6 +304,37 @@ def test_calls_delete_cascade(client):
     assert len(result) == 0
 
 
+def test_rename_calls(client):
+    call0 = client.create_call("x", None, {"a": 5, "b": 10})
+
+    # Rename using the client method
+    client.rename_call(call0, "updated_name")
+    # same op_name
+    result = list(client.calls(weave_client._CallsFilter(op_name="x")))
+    assert len(result) == 1
+
+    # test filtering by display_name
+    result = list(
+        client.calls(weave_client._CallsFilter(display_names=["updated_name"]))
+    )
+    assert len(result) == 1
+    assert result[0].display_name == "updated_name"
+
+    result = list(
+        client.calls(weave_client._CallsFilter(display_names=["updated_name123", "x"]))
+    )
+    assert len(result) == 0
+
+    # Reset name for further testing
+    call0.rename("x")
+
+    # Rename using the call object's method
+    call0.rename("new_name")
+    result = list(client.calls())
+    assert len(result) == 1
+    assert result[0].display_name == "new_name"
+
+
 def test_dataset_calls(client):
     ref = client.save(
         weave.Dataset(rows=[{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),

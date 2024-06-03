@@ -157,6 +157,7 @@ class CallsDeleteRes(BaseModel):
 
 class _CallsFilter(BaseModel):
     op_names: typing.Optional[typing.List[str]] = None
+    display_names: typing.Optional[typing.List[str]] = None
     input_refs: typing.Optional[typing.List[str]] = None
     output_refs: typing.Optional[typing.List[str]] = None
     parent_ids: typing.Optional[typing.List[str]] = None
