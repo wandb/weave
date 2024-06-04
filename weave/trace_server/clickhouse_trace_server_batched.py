@@ -1368,12 +1368,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if isinstance(stream.source, QueryResult):
                 summary = stream.source.summary
             logger.info(
-                {
-                    "event": "clickhouse_stream_query",
+                "clickhouse_stream_query",
+                extra={
                     "query": query,
                     "parameters": parameters,
                     "summary": summary,
-                }
+                },
             )
             for row in stream:
                 yield row
@@ -1390,12 +1390,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             query, parameters=parameters, column_formats=column_formats, use_none=True
         )
         logger.info(
-            {
-                "event": "clickhouse_query",
+            "clickhouse_query",
+            extra={
                 "query": query,
                 "parameters": parameters,
                 "summary": res.summary,
-            }
+            },
         )
         return res
 
