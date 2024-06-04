@@ -107,6 +107,10 @@ def init_weave(
     )
 
     global _current_inited_client
+    if _current_inited_client is not None:
+        raise errors.WeaveConfigurationError(
+            "weave.init called twice without calling weave.finish"
+        )
     _current_inited_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
