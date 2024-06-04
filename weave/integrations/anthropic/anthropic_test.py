@@ -24,7 +24,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic(
@@ -63,7 +63,7 @@ def test_anthropic(
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_stream(
@@ -110,7 +110,7 @@ def test_anthropic_stream(
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
@@ -152,7 +152,7 @@ async def test_async_anthropic(
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
@@ -202,7 +202,7 @@ async def test_async_anthropic_stream(
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_tools_calling(
