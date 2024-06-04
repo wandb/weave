@@ -21,7 +21,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
         return weave.ref(call_output).get()
     return call_output
 
-
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
@@ -59,7 +59,7 @@ def test_anthropic(
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
     assert output.usage.input_tokens == model_usage["input_tokens"] == 10
 
-
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
@@ -105,7 +105,7 @@ def test_anthropic_stream(
     assert output.usage.output_tokens == output_tokens == 13
     assert output.usage.input_tokens == input_tokens == 10
 
-
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
@@ -146,7 +146,7 @@ async def test_async_anthropic(
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
     assert output.usage.input_tokens == model_usage["input_tokens"] == 10
 
-
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
@@ -195,7 +195,7 @@ async def test_async_anthropic_stream(
     assert output.usage.output_tokens == output_tokens == 19
     assert output.usage.input_tokens == input_tokens == 10
 
-
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
