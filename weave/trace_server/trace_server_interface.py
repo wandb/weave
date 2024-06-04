@@ -360,17 +360,19 @@ class TraceServerInterface:
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         ...
 
-    # @abc.abstractmethod
-    # def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-    #     ...
+    @abc.abstractmethod
+    def calls_delete(
+        self, req: CallsDeleteReq | CallsDeleteReqForInsert
+    ) -> CallsDeleteRes:
+        ...
 
     @abc.abstractmethod
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
         ...
 
-    # @abc.abstractmethod
-    # def call_rename(self, req: CallRenameReq) -> CallRenameRes:
-    #     ...
+    @abc.abstractmethod
+    def call_rename(self, req: CallRenameReq | CallRenameReqForInsert) -> CallRenameRes:
+        ...
 
     # Op API
     @abc.abstractmethod
