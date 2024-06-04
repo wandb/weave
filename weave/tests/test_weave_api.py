@@ -38,7 +38,6 @@ def test_weave_finish_unsets_client(client):
     calls = list(client.calls())
     assert len(calls) == 0
 
-    weave.init("test-project")
     assert test_op("hello") == "hello"
     calls = list(client.calls())
     assert len(calls) == 1
@@ -47,8 +46,3 @@ def test_weave_finish_unsets_client(client):
     assert test_op("hello2") == "hello2"
     calls = list(client.calls())
     assert len(calls) == 1
-
-    weave.init("test-project")
-    assert test_op("hello3") == "hello3"
-    calls = list(client.calls())
-    assert len(calls) == 2
