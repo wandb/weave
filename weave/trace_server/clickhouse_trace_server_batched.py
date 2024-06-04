@@ -368,7 +368,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _ch_call_dict_to_call_schema_dict(ch_dict)
             )
 
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    def calls_delete(self, req: tsi.CallsDeleteReqForInsert) -> tsi.CallsDeleteRes:
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
@@ -413,7 +413,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.CallsDeleteRes()
 
-    def call_rename(self, req: tsi.CallRenameReq) -> tsi.CallRenameRes:
+    def call_rename(self, req: tsi.CallRenameReqForInsert) -> tsi.CallRenameRes:
         renamed_insertable = CallRenameCHInsertable(
             project_id=req.project_id,
             id=req.call_id,

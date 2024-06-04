@@ -146,9 +146,11 @@ class CallReadRes(BaseModel):
 
 class CallsDeleteReq(BaseModel):
     project_id: str
-    # wb_user_id gets generated from auth params
-    wb_user_id: typing.Optional[str] = None
     call_ids: typing.List[str]
+
+
+class CallsDeleteReqForInsert(CallsDeleteReq):
+    wb_user_id: str
 
 
 class CallsDeleteRes(BaseModel):
@@ -204,9 +206,11 @@ class CallsQueryStatsRes(BaseModel):
 class CallRenameReq(BaseModel):
     project_id: str
     call_id: str
-    # wb_user_id gets generated from auth params
-    wb_user_id: typing.Optional[str] = None
     display_name: str
+
+
+class CallRenameReqForInsert(CallRenameReq):
+    wb_user_id: str
 
 
 class CallRenameRes(BaseModel):
@@ -356,17 +360,17 @@ class TraceServerInterface:
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         ...
 
-    @abc.abstractmethod
-    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
-        ...
+    # @abc.abstractmethod
+    # def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
+    #     ...
 
     @abc.abstractmethod
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
         ...
 
-    @abc.abstractmethod
-    def call_rename(self, req: CallRenameReq) -> CallRenameRes:
-        ...
+    # @abc.abstractmethod
+    # def call_rename(self, req: CallRenameReq) -> CallRenameRes:
+    #     ...
 
     # Op API
     @abc.abstractmethod
