@@ -120,7 +120,7 @@ async def test_async_anthropic(
 
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
-        api_key=os.environ.get("ANTHROPIC_API_KEY"),
+        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
 
     message = await anthropic_client.messages.create(
@@ -162,7 +162,7 @@ async def test_async_anthropic_stream(
 
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
-        api_key=os.environ.get("ANTHROPIC_API_KEY"),
+        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
 
     stream = await anthropic_client.messages.create(
