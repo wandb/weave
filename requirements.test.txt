@@ -32,5 +32,4 @@ vcrpy==6.0.1
 mistralai>=0.1.8
 litellm>=1.36.1
 llama-index>=0.10.35
-# TODO: Update following requirement after DSPy releases the next version after 2.4.9
-git+https://github.com/stanfordnlp/dspy.git
+dspy-ai==2.5.0rc3

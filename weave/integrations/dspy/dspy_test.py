@@ -60,7 +60,7 @@ def assert_calls(
 )
 def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
-    
+
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
     gpt3_turbo("hello! this is a raw prompt to GPT-3.5")
@@ -81,7 +81,7 @@ def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
 )
 def test_dspy_signature(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
-    
+
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
     classify = dspy.Predict("sentence -> sentiment")
@@ -105,7 +105,7 @@ def test_dspy_signature(client: WeaveClient, fake_api_key: None) -> None:
 )
 def test_dspy_inline_signature(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
-    
+
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
     document = """The 21-year-old made seven appearances for the Hammers and netted his only goal for them in a Europa League qualification round match against Andorran side FC Lustrains last season. Lee had two loan spells in League One last term, with Blackpool and then Colchester United. He scored twice for the U's but was unable to save them from relegation. The length of Lee's contract with the promoted Tykes has not been revealed. Find all the latest football transfers on our dedicated page."""
@@ -130,7 +130,7 @@ def test_dspy_inline_signature(client: WeaveClient, fake_api_key: None) -> None:
 )
 def test_dspy_cot(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
-    
+
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
 
@@ -164,7 +164,7 @@ def test_dspy_cot(client: WeaveClient, fake_api_key: None) -> None:
 )
 def test_dspy_cot_with_hint(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
-    
+
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
 
@@ -201,7 +201,7 @@ def test_dspy_cot_with_hint(client: WeaveClient, fake_api_key: None) -> None:
 )
 def test_dspy_multi_chain_comparison(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
-    
+
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
 
@@ -251,7 +251,7 @@ def test_dspy_multi_chain_comparison(client: WeaveClient, fake_api_key: None) ->
 )
 def test_dspy_pot(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
-    
+
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
 
@@ -291,7 +291,7 @@ def test_dspy_pot(client: WeaveClient, fake_api_key: None) -> None:
 )
 def test_dspy_react(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
-    
+
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
 

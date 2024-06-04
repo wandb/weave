@@ -163,9 +163,6 @@ patched_functions += dspy_get_patched_lm_functions(
 patched_functions += dspy_get_patched_lm_functions(
     base_symbol="dspy", lm_class_name="OllamaLocal"
 )
-patched_functions += dspy_get_patched_lm_functions(
-    base_symbol="dspy", lm_class_name="Bedrock"
-)
 patched_functions += [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
@@ -185,6 +182,11 @@ patched_functions += [
     SymbolPatcher(
         get_base_symbol=lambda: importlib.import_module("dspy"),
         attribute_name="Pyserini.__call__",
+        make_new_value=weave.op(),
+    ),
+    SymbolPatcher(
+        get_base_symbol=lambda: importlib.import_module("dspy"),
+        attribute_name="Bedrock.call_model",
         make_new_value=weave.op(),
     ),
 ]

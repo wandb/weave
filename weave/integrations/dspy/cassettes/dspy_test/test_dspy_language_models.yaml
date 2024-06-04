@@ -681,8 +681,8 @@ interactions:
         10,\n        \"max_video_length\": 1,\n        \"max_audio_length_hours\":
         8.4,\n        \"max_audio_per_prompt\": 1,\n        \"max_pdf_size_mb\": 30,\n
         \       \"input_cost_per_token\": 0, \n        \"output_cost_per_token\":
-        0,\n        \"litellm_provider\": \"vertex_ai-language-models\",\n        \"mode\":
-        \"chat\",\n        \"supports_function_calling\": true,\n        \"supports_vision\":
+        0,\n        \"litellm_provider\": \"gemini\",\n        \"mode\": \"chat\",\n
+        \       \"supports_function_calling\": true,\n        \"supports_vision\":
         true,\n        \"source\": \"https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#foundation_models\"\n
         \   },\n    \"gemini/gemini-pro\": {\n        \"max_tokens\": 8192,\n        \"max_input_tokens\":
         32760,\n        \"max_output_tokens\": 8192,\n        \"input_cost_per_token\":
@@ -1685,7 +1685,7 @@ interactions:
       Content-Encoding:
       - gzip
       Content-Length:
-      - '7034'
+      - '7031'
       Content-Security-Policy:
       - default-src 'none'; style-src 'unsafe-inline'; sandbox
       Content-Type:
@@ -1693,13 +1693,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Tue, 04 Jun 2024 12:27:13 GMT
+      - Tue, 04 Jun 2024 15:39:59 GMT
       ETag:
-      - W/"4c3303d50bbc8e38e32c7064894cf5126351d40ed7b10e08fbe9b08167d3d6da"
+      - W/"435128242def81a66312cad8369081ffa0af44c0647b0ea283fb6507b67ac8c0"
       Expires:
-      - Tue, 04 Jun 2024 12:32:13 GMT
+      - Tue, 04 Jun 2024 15:44:59 GMT
       Source-Age:
-      - '110'
+      - '179'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -1709,19 +1709,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '1'
+      - '2'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 7ed4f85ab373d147b0f16f96d31a602c85750d44
+      - d2c1d65b709ccc7edf00c53ea051e5d4e89f0fae
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - E9C7:3146A:C90818:E53B30:665A537E
+      - 1013:190820:925055:9DDFA2:665F30AD
       X-Served-By:
-      - cache-lax-kwhp1940072-LAX
+      - cache-lax-kwhp1940112-LAX
       X-Timer:
-      - S1717504034.937507,VS0,VE1
+      - S1717515599.144075,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
