@@ -21,6 +21,7 @@ def _get_call_output(call: tsi.CallSchema) -> Any:
         return weave.ref(call_output).get()
     return call_output
 
+
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
@@ -58,6 +59,7 @@ def test_anthropic(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
     assert output.usage.input_tokens == model_usage["input_tokens"] == 10
+
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
@@ -105,6 +107,7 @@ def test_anthropic_stream(
     assert output.usage.output_tokens == output_tokens == 13
     assert output.usage.input_tokens == input_tokens == 10
 
+
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
     filter_headers=["authorization"],
@@ -145,6 +148,7 @@ async def test_async_anthropic(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
     assert output.usage.input_tokens == model_usage["input_tokens"] == 10
+
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
@@ -194,6 +198,7 @@ async def test_async_anthropic_stream(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == output_tokens == 19
     assert output.usage.input_tokens == input_tokens == 10
+
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
@@ -253,5 +258,3 @@ def test_tools_calling(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 56
     assert output.usage.input_tokens == model_usage["input_tokens"] == 354
-
-

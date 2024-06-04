@@ -69,13 +69,15 @@ def should_use_accumulator(inputs: typing.Dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
-def create_wrapper(name: str):
+def create_wrapper(name: str) -> typing.Callable[[typing.Callable], typing.Callable]:
     def wrapper(fn: typing.Callable) -> typing.Callable:
         "We need to do this so we can check if `stream` is used"
         op = weave.op()(fn)
         op.name = name  # type: ignore
         return add_accumulator(
-            op, anthropic_accumulator, should_accumulate=should_use_accumulator
+            op,  # type: ignore
+            anthropic_accumulator,
+            should_accumulate=should_use_accumulator,
         )
 
     return wrapper
