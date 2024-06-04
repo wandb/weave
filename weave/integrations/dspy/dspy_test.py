@@ -43,7 +43,7 @@ def fake_api_key() -> Generator[None, None, None]:
 def assert_calls(
     client: WeaveClient,
     expected_calls: List[Tuple[str, int]],
-):
+) -> None:
     weave_server_respose = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     )
