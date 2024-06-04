@@ -1020,10 +1020,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
-        if not having_conditions:
-            having_conditions = ["1 = 1"]
-
-        having_conditions_part = _combine_conditions(having_conditions, "AND")
+        having_conditions_part = None
+        if having_conditions:
+            having_conditions_part = _combine_conditions(having_conditions, "AND")
 
         where_conditions_part = _make_calls_where_condition_from_event_conditions(
             start_event_conditions=start_event_conditions,
@@ -1082,18 +1081,46 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit_part = "LIMIT {limit: Int64}"
             parameters["limit"] = limit
 
-        query_str = f"""
-            SELECT {select_columns_part}
-            FROM calls_merged
-            WHERE project_id = {{project_id: String}}
-                AND {where_conditions_part}
-            GROUP BY project_id, id
-            HAVING deleted_at IS NULL AND
-                {having_conditions_part}
-            {order_by_part}
-            {limit_part}
-            {offset_part}
-        """
+        if having_conditions_part:
+            query_str = f"""
+                SELECT {select_columns_part}
+                FROM calls_merged
+                WHERE project_id = {{project_id: String}}
+                    AND {where_conditions_part}
+                GROUP BY project_id, id
+                HAVING {having_conditions_part}
+                {order_by_part}
+                {limit_part}
+                {offset_part}
+            """
+        else:
+            # FAST PATH!!
+            #
+            # Here we have an opportunity to optimize the query by using a subquery to
+            # filter out the rows before the group by. This is because the group by
+            # is expensive and we can avoid it if we can filter out rows before it.
+            # This is a common pattern in SQL optimization.
+            where_conditions_part = f"""(
+                calls_merged.id IN (
+                    SELECT id from calls_merged WHERE (
+                        project_id = {{project_id: String}}
+                        AND 
+                        {where_conditions_part}
+                    )
+                    {order_by_part}
+                    {limit_part}
+                    {offset_part}
+                )
+            )"""
+            query_str = f"""
+                SELECT {select_columns_part}
+                FROM calls_merged
+                WHERE project_id = {{project_id: String}}
+                    AND {where_conditions_part}
+                GROUP BY project_id, id
+                {order_by_part}
+            """
+
         raw_res = self._query_stream(
             query_str,
             parameters,
@@ -1155,8 +1182,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 WHERE project_id = {{project_id: String}}
                     AND {where_conditions_part}
                 GROUP BY project_id, id
-                HAVING deleted_at IS NULL AND
-                    {having_conditions_part}
+                HAVING {having_conditions_part}
             )
         """
 
@@ -2005,8 +2031,14 @@ def _make_calls_where_condition_from_event_conditions(
             f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
         )
 
-    where_conditions_part = "(1 = 1)"
-    if event_conds:
-        where_conditions_part = _combine_conditions(event_conds, "AND")
+    # Exclude deleted calls
+    conds = _combine_conditions(
+        ["project_id = {project_id: String}", "isNotNull(deleted_at)"], "AND"
+    )
+    event_conds.append(
+        f"calls_merged.id NOT IN (SELECT id FROM calls_merged WHERE {conds})"
+    )
+
+    where_conditions_part = _combine_conditions(event_conds, "AND")
 
     return where_conditions_part
