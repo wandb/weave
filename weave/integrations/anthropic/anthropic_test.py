@@ -194,3 +194,64 @@ async def test_async_anthropic_stream(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == output_tokens == 19
     assert output.usage.input_tokens == input_tokens == 10
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_tools_calling(
+    client: weave.weave_client.WeaveClient,
+) -> None:
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(
+        api_key=api_key,
+    )
+    message = anthropic_client.messages.create(
+        model=model,
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "What's the weather like in San Francisco?",
+            }
+        ],
+        tools=[
+            {
+                "name": "get_weather",
+                "description": "Get the current weather in a given location",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        }
+                    },
+                    "required": ["location"],
+                },
+            },
+        ],
+    )
+    exp = "San Francisco, CA"
+    all_content = message.content[0]
+    assert all_content.input["location"] == exp
+    assert all_content.type == "tool_use"
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert len(res.calls) == 1
+    call = res.calls[0]
+    assert call.exception is None and call.ended_at is not None
+    output = _get_call_output(call)
+    assert output.id == message.id
+    assert output.model == message.model
+    assert output.stop_reason == "tool_use"
+    assert output.stop_sequence == None
+    assert output.content[0].input["location"] == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"] == 56
+    assert output.usage.input_tokens == model_usage["input_tokens"] == 354
+
+
