@@ -1104,7 +1104,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 calls_merged.id IN (
                     SELECT id from calls_merged WHERE (
                         project_id = {{project_id: String}}
-                        AND 
+                            AND 
                         {where_conditions_part}
                     )
                     {order_by_part}
@@ -2031,13 +2031,13 @@ def _make_calls_where_condition_from_event_conditions(
             f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
         )
 
+
     # Exclude deleted calls
-    conds = _combine_conditions(
-        ["project_id = {project_id: String}", "isNotNull(deleted_at)"], "AND"
-    )
+    conds = _combine_conditions(["project_id = {project_id: String}", "isNotNull(deleted_at)"], "AND")
     event_conds.append(
         f"calls_merged.id NOT IN (SELECT id FROM calls_merged WHERE {conds})"
     )
+
 
     where_conditions_part = _combine_conditions(event_conds, "AND")
 
