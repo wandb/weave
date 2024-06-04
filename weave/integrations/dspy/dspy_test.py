@@ -54,6 +54,7 @@ def assert_calls(
     assert flattened_call_response == expected_calls
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -72,6 +73,7 @@ def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
     )
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -93,6 +95,7 @@ def test_dspy_signature(client: WeaveClient, fake_api_key: None) -> None:
     )
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -115,6 +118,7 @@ def test_dspy_inline_signature(client: WeaveClient, fake_api_key: None) -> None:
     )
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -146,6 +150,7 @@ def test_dspy_cot(client: WeaveClient, fake_api_key: None) -> None:
     )
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -180,6 +185,7 @@ def test_dspy_cot_with_hint(client: WeaveClient, fake_api_key: None) -> None:
     )
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -227,6 +233,7 @@ def test_dspy_multi_chain_comparison(client: WeaveClient, fake_api_key: None) ->
     )
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
@@ -264,6 +271,7 @@ def test_dspy_pot(client: WeaveClient, fake_api_key: None) -> None:
     )
 
 
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
