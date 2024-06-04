@@ -4,9 +4,10 @@ import {
   DialogContent as MaterialDialogContent,
   DialogTitle as MaterialDialogTitle,
 } from '@material-ui/core';
+import EditableField from '@wandb/weave/common/components/EditableField';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
-import {IconDelete} from '@wandb/weave/components/Icon';
+import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
 import React, {FC, useState} from 'react';
 import styled from 'styled-components';
 
@@ -16,10 +17,20 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const OverflowMenu: FC<{
   selectedCalls: CallSchema[];
-}> = ({selectedCalls}) => {
+  setIsRenaming: (isEditing: boolean) => void;
+}> = ({selectedCalls, setIsRenaming}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
+    [
+      {
+        key: 'rename',
+        text: 'Rename',
+        icon: <IconPencilEdit style={{marginRight: '4px'}} />,
+        onClick: () => setIsRenaming(true),
+        disabled: selectedCalls.length === 0,
+      },
+    ],
     [
       {
         key: 'delete',
@@ -165,3 +176,30 @@ const ConfirmDeleteModal: FC<{
     </Dialog>
   );
 };
+
+
+export const EditableCallName: FC<{
+  opName: string;
+  entity: string;
+  project: string;
+  callId: string;
+  onSave?: () => void;
+}> = ({opName, entity, project, callId, onSave}) => {
+
+  const {useCallRenameFunc} = useWFHooks();
+  const callRename = useCallRenameFunc();
+  const [curOpName, setCurOpName] = useState(opName);
+
+  return <EditableField
+    value={curOpName}
+    save={newName => {
+      callRename(`${entity}/${project}`, callId, newName);
+      setCurOpName(newName);
+      onSave?.();
+    }}
+    placeholder=""
+    updateValue={true}
+    autoSelect={true}
+  />
+};
+

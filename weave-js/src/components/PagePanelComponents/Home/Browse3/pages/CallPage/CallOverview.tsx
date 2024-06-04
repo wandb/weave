@@ -55,6 +55,9 @@ export const CallOverview: React.FC<{
           <EditableField
             value={curOpName}
             save={newName => {
+              if (newName === curOpName) {
+                return;
+              }
               callRename(
                 `${call.entity}/${call.project}`,
                 call.callId,
@@ -69,7 +72,7 @@ export const CallOverview: React.FC<{
         <CallId callId={call.callId} />
         <StatusChip value={statusCode} iconOnly />
         <OverflowBin>
-          <OverflowMenu selectedCalls={[call]} />
+          <OverflowMenu selectedCalls={[call]} setIsRenaming={() => {}} />
         </OverflowBin>
       </Overview>
       {call.rawSpan.exception && (

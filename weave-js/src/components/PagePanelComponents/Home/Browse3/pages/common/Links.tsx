@@ -14,6 +14,7 @@ import {
   usePeekLocation,
   useWeaveflowRouteContext,
 } from '../../context';
+import { EditableCallName } from '../CallPage/OverflowMenu';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
@@ -241,6 +242,8 @@ export const CallLink: React.FC<{
   fullWidth?: boolean;
   preservePath?: boolean;
   tracetree?: boolean;
+  readonly?: boolean;
+  onSave?: () => void;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
@@ -271,7 +274,15 @@ export const CallLink: React.FC<{
     <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
       <LinkTruncater fullWidth={props.fullWidth}>
         <Link $variant={props.variant} to={to}>
-          {opName}
+          {props.readonly ? opName : (
+            <EditableCallName 
+              opName={opName} 
+              entity={props.entityName} 
+              project={props.projectName} 
+              callId={props.callId} 
+              onSave={props.onSave}
+            />
+          )}
         </Link>
       </LinkTruncater>
       <CallId callId={props.callId} />

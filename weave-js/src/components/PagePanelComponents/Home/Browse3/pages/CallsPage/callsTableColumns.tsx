@@ -20,6 +20,7 @@ import {CellValue} from '../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
+import { OverflowMenu } from '../CallPage/OverflowMenu';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {isRef} from '../common/util';
@@ -30,6 +31,7 @@ import {
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
+import { CallSchema } from '../wfReactInterface/wfDataModelHooksInterface';
 import {OpVersionIndexText} from './CallsTable';
 import {buildTree} from './callsTableBuildTree';
 import {
@@ -108,6 +110,7 @@ export const useCallsTableColumns = (
       effectiveFilter.opVersionRefs[0].includes('predict_and_score:'),
     [effectiveFilter.opVersionRefs]
   );
+  const [renamingCall, setRenamingCall] = useState<string | null>(null);
 
   const columns = useMemo(
     () =>
@@ -123,7 +126,9 @@ export const useCallsTableColumns = (
         columnsWithRefs,
         onExpand,
         columnIsRefExpanded,
-        userDefinedColumnWidths
+        userDefinedColumnWidths,
+        renamingCall,
+        setRenamingCall
       ),
     [
       entity,
@@ -138,6 +143,8 @@ export const useCallsTableColumns = (
       onExpand,
       columnIsRefExpanded,
       userDefinedColumnWidths,
+      renamingCall, 
+      setRenamingCall
     ]
   );
 
@@ -160,7 +167,9 @@ function buildCallsTableColumns(
   columnsWithRefs: Set<string>,
   onExpand: (col: string) => void,
   columnIsRefExpanded: (col: string) => boolean,
-  userDefinedColumnWidths: Record<string, number>
+  userDefinedColumnWidths: Record<string, number>,
+  renamingCall: string | null,
+  setRenamingCall: (callId: string | null) => void,
 ): {
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
@@ -180,7 +189,8 @@ function buildCallsTableColumns(
         if (!isRef(op_name)) {
           return op_name;
         }
-        return (
+        return (<>
+          <>
           <CallLink
             entityName={entity}
             projectName={project}
@@ -188,8 +198,23 @@ function buildCallsTableColumns(
             callId={rowParams.row.id}
             fullWidth={true}
             preservePath={preservePath}
+            readonly={renamingCall !== rowParams.row.id}
+            onSave={() => setRenamingCall(null)}
           />
-        );
+          <div style={{display: 'flex'}}>
+            <OverflowMenu 
+              selectedCalls={[{
+                callId: rowParams.row.id,
+                displayName: rowParams.row.display_name ?? null,
+                spanName: opVersionRefOpName(op_name),
+                entity: entity,
+                project: project,
+              } as CallSchema]}
+              setIsRenaming={() => setRenamingCall(rowParams.row.id)}
+            />
+          </div>
+          </>
+        </>);
       },
     },
     ...(isSingleOp && !isSingleOpVersion
