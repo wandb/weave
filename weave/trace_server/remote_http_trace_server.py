@@ -5,6 +5,7 @@ import typing as t
 from pydantic import BaseModel, ValidationError
 import requests
 import tenacity
+import logging
 
 from weave.trace_server import environment as wf_env
 
@@ -12,6 +13,8 @@ from weave.trace_server import environment as wf_env
 from weave.wandb_interface import project_creator
 from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
+
+logger = logging.getLogger(__name__)
 
 
 class StartBatchItem(BaseModel):
@@ -65,16 +68,24 @@ def _is_retryable_exception(e: Exception) -> bool:
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
-    print(
-        f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
-        file=sys.stderr,
+    logger.info(
+        {
+            "event": "retry_attempt",
+            "fn": retry_state.fn,
+            "attempt_number": retry_state.attempt_number,
+            "exception": str(retry_state.outcome.exception()),
+        }
     )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
-    print(
-        f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
-        file=sys.stderr,
+    logger.info(
+        {
+            "event": "retry_failed",
+            "fn": retry_state.fn,
+            "attempt_number": retry_state.attempt_number,
+            "exception": str(retry_state.outcome.exception()),
+        }
     )
     return retry_state.outcome.result()
 
@@ -169,7 +180,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req = req_model.model_validate(req)
         r = requests.post(
             self.trace_server_url + url,
-            data=req.model_dump_json().encode("utf-8"),
+            # `by_alias` is required since we have Mongo-style properties in the
+            # query models that are aliased to conform to start with `$`. Without
+            # this, the model_dump will use the internal property names which are
+            # not valid for the `model_validate` step.
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
         )
         if r.status_code == 413 and "obj/create" in url:
