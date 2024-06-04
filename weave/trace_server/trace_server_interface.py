@@ -144,12 +144,12 @@ class CallReadRes(BaseModel):
     call: CallSchema
 
 
-class CallsDeleteReq(BaseModel):
+class CallsDeleteReqExternal(BaseModel):
     project_id: str
     call_ids: typing.List[str]
 
 
-class CallsDeleteReqForInsert(CallsDeleteReq):
+class CallsDeleteReq(CallsDeleteReqExternal):
     wb_user_id: str
 
 
@@ -203,13 +203,13 @@ class CallsQueryStatsRes(BaseModel):
     count: int
 
 
-class CallRenameReq(BaseModel):
+class CallRenameReqExternal(BaseModel):
     project_id: str
     call_id: str
     display_name: str
 
 
-class CallRenameReqForInsert(CallRenameReq):
+class CallRenameReq(CallRenameReqExternal):
     wb_user_id: str
 
 
@@ -361,9 +361,7 @@ class TraceServerInterface:
         ...
 
     @abc.abstractmethod
-    def calls_delete(
-        self, req: CallsDeleteReq | CallsDeleteReqForInsert
-    ) -> CallsDeleteRes:
+    def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
         ...
 
     @abc.abstractmethod
@@ -371,7 +369,7 @@ class TraceServerInterface:
         ...
 
     @abc.abstractmethod
-    def call_rename(self, req: CallRenameReq | CallRenameReqForInsert) -> CallRenameRes:
+    def call_rename(self, req: CallRenameReq) -> CallRenameRes:
         ...
 
     # Op API

@@ -173,6 +173,10 @@ class Call:
         return client.delete_call(call=self)
 
     def rename(self, new_name: str) -> "Call":
+        if new_name == self.display_name:
+            return self
+        elif new_name == "":
+            raise ValueError("New name cannot be empty")
         client = graph_client_context.require_graph_client()
         client.rename_call(call=self, display_name=new_name)
         self.display_name = new_name

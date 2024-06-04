@@ -413,7 +413,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.CallsDeleteRes()
 
-    def call_rename(self, req: tsi.CallRenameReqForInsert) -> tsi.CallRenameRes:
+    def call_rename(self, req: tsi.CallRenameReq) -> tsi.CallRenameRes:
         renamed_insertable = CallRenameCHInsertable(
             project_id=req.project_id,
             id=req.call_id,
