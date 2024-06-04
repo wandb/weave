@@ -69,23 +69,23 @@ def _is_retryable_exception(e: Exception) -> bool:
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
     logger.info(
-        {
-            "event": "retry_attempt",
+        "retry_attempt",
+        extra={
             "fn": retry_state.fn,
             "attempt_number": retry_state.attempt_number,
             "exception": str(retry_state.outcome.exception()),
-        }
+        },
     )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
     logger.info(
-        {
-            "event": "retry_failed",
+        "retry_failed",
+        extra={
             "fn": retry_state.fn,
             "attempt_number": retry_state.attempt_number,
             "exception": str(retry_state.outcome.exception()),
-        }
+        },
     )
     return retry_state.outcome.result()
 
