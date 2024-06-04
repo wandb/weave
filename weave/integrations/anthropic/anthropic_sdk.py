@@ -6,6 +6,15 @@ import weave
 from weave.trace.op_extensions.accumulator import add_accumulator
 from weave.trace.patcher import SymbolPatcher, MultiPatcher
 
+from anthropic.types import (
+    Message,
+    Usage,
+    ContentBlockDeltaEvent,
+    InputJsonDelta,
+    MessageDeltaEvent,
+    TextBlock,
+)
+
 if typing.TYPE_CHECKING:
     from anthropic.types import Message, MessageStreamEvent
 
@@ -14,14 +23,6 @@ def anthropic_accumulator(
     acc: typing.Optional["Message"],
     value: "MessageStreamEvent",
 ) -> "Message":
-    from anthropic.types import (
-        Message,
-        Usage,
-        ContentBlockDeltaEvent,
-        MessageDeltaEvent,
-        TextBlock,
-    )
-
     if acc is None:
         if hasattr(value, "message"):
             acc = Message(
