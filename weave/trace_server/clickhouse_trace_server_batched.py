@@ -1155,8 +1155,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 WHERE project_id = {{project_id: String}}
                     AND {where_conditions_part}
                 GROUP BY project_id, id
-                HAVING deleted_at IS NULL AND
-                    {having_conditions_part}
+                HAVING {having_conditions_part}
             )
         """
 
