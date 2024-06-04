@@ -350,4 +350,13 @@ def serve(
     raise ValueError("Should not reach here")
 
 
+def finish() -> None:
+    """Stops logging to weave.
+
+    Following finish, calls of weave.op() decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
+
+    """
+    _weave_init.finish()
+
+
 __docspec__ = [init, publish, ref]
