@@ -1155,7 +1155,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 WHERE project_id = {{project_id: String}}
                     AND {where_conditions_part}
                 GROUP BY project_id, id
-                HAVING {having_conditions_part}
+                HAVING deleted_at IS NULL AND
+                    {having_conditions_part}
             )
         """
 
@@ -1980,7 +1981,12 @@ def _make_calls_where_condition_from_event_conditions(
     event_conds = []
     if start_event_conditions is not None and len(start_event_conditions) > 0:
         conds = _combine_conditions(
-            ["isNotNull(started_at)", *start_event_conditions], "AND"
+            [
+                "project_id = {{project_id: String}}",
+                "isNotNull(started_at)",
+                *start_event_conditions,
+            ],
+            "AND",
         )
         event_conds.append(
             f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
@@ -1988,7 +1994,12 @@ def _make_calls_where_condition_from_event_conditions(
 
     if end_event_conditions is not None and len(end_event_conditions) > 0:
         conds = _combine_conditions(
-            ["isNotNull(ended_at)", *end_event_conditions], "AND"
+            [
+                "project_id = {{project_id: String}}",
+                "isNotNull(ended_at)",
+                *end_event_conditions,
+            ],
+            "AND",
         )
         event_conds.append(
             f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
