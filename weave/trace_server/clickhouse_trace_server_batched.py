@@ -56,6 +56,7 @@ from .interface import query as tsi_query
 from . import refs_internal
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
