@@ -30,7 +30,7 @@ def fake_api_key() -> Generator[None, None, None]:
     import os
 
     orig_key = os.environ.get("OPENAI_API_KEY")
-    # os.environ["OPENAI_API_KEY"] = "sk-DUMMY_KEY"
+    os.environ["OPENAI_API_KEY"] = "sk-DUMMY_KEY"
     try:
         yield
     finally:
