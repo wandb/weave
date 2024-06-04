@@ -111,7 +111,6 @@ message = client.messages.create(
         },
     ],
     model=model,
-    stream=False,
 )
 
 print(message)
