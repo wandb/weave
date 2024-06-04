@@ -27,7 +27,6 @@ export type TraceCallSchema = {
   project_id: string;
   id: string;
   op_name: string;
-  display_name?: string;
   trace_id: string;
   parent_id?: string;
   started_at: string;

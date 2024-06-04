@@ -170,10 +170,11 @@ all_call_json_columns = ("inputs", "output", "attributes", "summary")
 required_call_columns = list(set(all_call_select_columns) - set([]))
 
 
-# DB special call column selection types, all others use `any`
-call_select_raw_columns = ["id", "project_id"]
+# Columns in the calls_merged table with special aggregation functions:
+call_select_raw_columns = ["id", "project_id"]  # no aggregation
 call_select_arrays_columns = ["input_refs", "output_refs"]  # array_concat_agg
 call_select_argmax_columns = ["display_name"]  # argMaxMerge
+# all others use `any`
 
 
 class ObjCHInsertable(BaseModel):
