@@ -23,8 +23,8 @@ from weave.trace.object_record import (
 from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
-    CallRenameReqForInsert,
-    CallsDeleteReqForInsert,
+    CallRenameReq,
+    CallsDeleteReq,
     ObjSchema,
     RefsReadBatchReq,
     TraceServerInterface,
@@ -45,7 +45,7 @@ from weave.trace_server.trace_server_interface import (
     _TableRowFilter,
     _CallsFilter,
     _ObjectVersionFilter,
-    TraceServerInterfacePostAuth,
+    TraceServerInterface,
 )
 from weave.trace.refs import (
     Ref,
@@ -277,7 +277,7 @@ class WeaveClient:
         self,
         entity: str,
         project: str,
-        server: TraceServerInterfacePostAuth,
+        server: TraceServerInterface,
         ensure_project_exists: bool = True,
     ):
         self.entity = entity
@@ -572,21 +572,19 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:
         self.server.calls_delete(
-            CallsDeleteReqForInsert(
+            CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
-                wb_user_id=self.entity,
             )
         )
 
     @trace_sentry.global_trace_sentry.watch()
     def rename_call(self, call: Call, display_name: str) -> None:
         self.server.call_rename(
-            CallRenameReqForInsert(
+            CallRenameReq(
                 project_id=self._project_id(),
                 call_id=call.id,
                 display_name=display_name,
-                wb_user_id=self.entity,
             )
         )
 
