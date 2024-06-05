@@ -46,7 +46,7 @@ def assert_correct_calls_for_chain_invoke(calls: list[tsi.CallSchema]) -> None:
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
+    filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
@@ -70,15 +70,19 @@ def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
     flattened = flatten_calls(calls)
 
     # TODO: figure out what is the right call order for this.
-    # got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
-    # exp = [
-    #     ("langchain.Chain.RunnableSequence", 0),
-    #     ("langchain.Prompt.PromptTemplate", 1),
-    #     ("langchain.Llm.ChatOpenAI", 1),
-    #     ("openai.chat.completions.create", 2),
-    # ]
-    # assert got == exp
+    exp = [
+        ("langchain.Chain.RunnableSequence", 0),
+        ("langchain.Prompt.PromptTemplate", 1),
+        ("langchain.Llm.ChatOpenAI", 1),
+        ("openai.chat.completions.create", 2),
+        ("langchain.Chain.RunnableSequence", 0),
+        ("langchain.Prompt.PromptTemplate", 1),
+        ("langchain.Llm.ChatOpenAI", 1),
+        ("openai.chat.completions.create", 2),
+    ]
+    assert got == exp
 
 
 @pytest.mark.skip_clickhouse_client
