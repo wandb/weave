@@ -384,7 +384,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _ch_call_dict_to_call_schema_dict(ch_dict)
             )
 
-    def calls_delete(self, req: tsi.CallsDeleteReqForInsert) -> tsi.CallsDeleteRes:
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"

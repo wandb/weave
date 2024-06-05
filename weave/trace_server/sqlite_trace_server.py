@@ -451,7 +451,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             count=len(calls),
         )
 
-    def calls_delete(self, req: tsi.CallsDeleteReqForInsert) -> tsi.CallsDeleteRes:
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         # update row with a deleted_at field set to now
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
