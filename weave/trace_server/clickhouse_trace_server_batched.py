@@ -33,17 +33,21 @@ import dataclasses
 import logging
 from zoneinfo import ZoneInfo
 
+import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult, StreamContext
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
-from .errors import RequestTooLarge
+from .errors import InvalidRequest, RequestTooLarge
+from .emoji_util import detone_emojis
+from .feedback import TABLE_FEEDBACK, validate_feedback_create_req
 from .orm import Table, Column, ParamBuilder, Row
+
 
 from .trace_server_interface_util import (
     extract_refs_from_values,
@@ -66,21 +70,6 @@ MAX_FLUSH_AGE = 15
 FILE_CHUNK_SIZE = 100000
 
 MAX_DELETE_CALLS_COUNT = 100
-
-
-TABLE_FEEDBACK = Table(
-    "feedback",
-    [
-        Column("id", "string"),
-        Column("project_id", "string"),
-        Column("weave_ref", "string"),
-        Column("wb_user_id", "string"),
-        Column("creator", "string", nullable=True),
-        Column("created_at", "datetime"),
-        Column("feedback_type", "string"),
-        Column("payload", "json", db_name="payload_dump"),
-    ],
-)
 
 
 class NotFoundError(Exception):
@@ -204,7 +193,7 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
-class ClickHouseTraceServer(tsi.TraceServerInterface):
+class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
     def __init__(
         self,
         *,
@@ -924,13 +913,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def feedback_create(
         self, req: tsi.FeedbackCreateReqForInsert
     ) -> tsi.FeedbackCreateRes:
+        validate_feedback_create_req(req)
+
+        # Augment emoji with alias.
+        res_payload = {}
+        if req.feedback_type == "wandb.reaction.1":
+            em = req.payload["emoji"]
+            if emoji.emoji_count(em) != 1:
+                raise InvalidRequest(
+                    "Value of emoji key in payload must be exactly one emoji"
+                )
+            req.payload["alias"] = emoji.demojize(em)
+            detoned = detone_emojis(em)
+            req.payload["detoned"] = detoned
+            req.payload["detoned_alias"] = emoji.demojize(detoned)
+            res_payload = req.payload
+
         feedback_id = generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
-        # TODO: What should max payload size be?
         payload = _dict_value_to_dump(req.payload)
-        if len(payload) > 1024:
-            raise ValueError("Feedback payload too large")
+        MAX_PAYLOAD = 1024
+        if len(payload) > MAX_PAYLOAD:
+            raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
             "project_id": req.project_id,
@@ -943,7 +948,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
         TABLE_FEEDBACK.insert(row).execute(self.ch_client)
         return tsi.FeedbackCreateRes(
-            id=feedback_id, created_at=created_at, wb_user_id=req.wb_user_id
+            id=feedback_id,
+            created_at=created_at,
+            wb_user_id=req.wb_user_id,
+            payload=res_payload,
         )
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
@@ -964,8 +972,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = TABLE_FEEDBACK.purge()
         query = query.project_id(req.project_id)
         query = query.where(req.query)
-        result = query.execute(self.ch_client)
-        return tsi.FeedbackPurgeRes(result=result)
+        query.execute(self.ch_client)
+        return tsi.FeedbackPurgeRes()
 
     # Private Methods
     @property
@@ -1215,7 +1223,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 calls_merged.id IN (
                     SELECT id from calls_merged WHERE (
                         project_id = {{project_id: String}}
-                            AND 
+                            AND
                         {where_conditions_part}
                     )
                     {order_by_side}

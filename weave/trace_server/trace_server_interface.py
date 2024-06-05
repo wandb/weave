@@ -362,7 +362,7 @@ class Feedback(FeedbackCreateReqForInsert):
 class FeedbackQueryReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     fields: typing.Optional[list[str]] = Field(
-        default=None, examples=[["id", "feedback_type", "payload.note"]]
+        default=None, examples=[["id", "feedback_type", "payload.note", "count(*)"]]
     )
     query: typing.Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
@@ -461,4 +461,22 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
+        raise NotImplementedError()
+
+
+class TraceServerInterfacePostAuth(TraceServerInterface):
+    @abc.abstractmethod
+    def feedback_create(self, req: FeedbackCreateReqForInsert) -> FeedbackCreateRes:
         raise NotImplementedError()

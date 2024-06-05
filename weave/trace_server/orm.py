@@ -1,9 +1,11 @@
 """
-A lightweight ORM layer for ClickHouse. Allows building up SQL queries in a safe way.
+A lightweight ORM layer for ClickHouse/SQLite.
+Abstracts away some of their differences and allows building up SQL queries in a safe way.
 """
 
 import datetime
 import json
+import sqlite3
 import typing
 from typing_extensions import TypeAlias
 
@@ -13,6 +15,9 @@ from clickhouse_connect.driver.summary import QuerySummary
 from . import trace_server_interface as tsi
 from .errors import RequestTooLarge
 from .interface import query as tsi_query
+
+
+DatabaseType = typing.Literal["clickhouse", "sqlite"]
 
 
 param_builder_count = 0
@@ -37,16 +42,39 @@ class ParamBuilder:
     the query.
     """
 
-    def __init__(self, prefix: typing.Optional[str] = None):
+    def __init__(
+        self,
+        prefix: typing.Optional[str] = None,
+        database_type: DatabaseType = "clickhouse",
+    ):
         global param_builder_count
         param_builder_count += 1
         self._params: typing.Dict[str, typing.Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
+        self._database_type = database_type
 
     def add_param(self, param_value: typing.Any) -> str:
         param_name = self._prefix + str(len(self._params))
         self._params[param_name] = param_value
         return param_name
+
+    def add(
+        self,
+        param_value: typing.Any,
+        param_name: typing.Optional[str] = None,
+        param_type: typing.Optional[str] = None,
+    ) -> str:
+        """Returns the placeholder for the target database type.
+
+        e.g. SQLite -> :limit
+        e.g. ClickHouse -> {limit:UInt64}
+        """
+        param_name = param_name or self._prefix + str(len(self._params))
+        self._params[param_name] = param_value
+        if self._database_type == "clickhouse":
+            ptype = param_type or _python_value_to_ch_type(param_value)
+            return f"{{{param_name}:{ptype}}}"
+        return ":" + param_name
 
     def get_params(self) -> typing.Dict[str, typing.Any]:
         return {**self._params}
@@ -93,8 +121,17 @@ class Column:
     def dbname(self) -> str:
         return self.db_name or self.name
 
+    def create_sql(self) -> str:
+        sql_type = "TEXT"
+        sql = f"{self.dbname()} {sql_type}"
+        return sql
+
 
 Columns = list[Column]
+
+# Note, in practice could be a TracingClickhouseConnectClient which
+# technically isn't a subclass of CHClient but more of a proxy object.
+Client: TypeAlias = typing.Union[CHClient, sqlite3.Cursor]
 
 
 class Table:
@@ -104,6 +141,15 @@ class Table:
     def __init__(self, name: str, cols: typing.Optional[Columns] = None):
         self.name = name
         self.cols = cols or []
+
+    def create_sql(self) -> str:
+        sql = f"CREATE TABLE IF NOT EXISTS {self.name} (\n"
+        sql += ",\n".join("    " + col.create_sql() for col in self.cols)
+        sql += "\n)"
+        return sql
+
+    def drop_sql(self) -> str:
+        return f"DROP TABLE IF EXISTS {self.name}"
 
     def select(self) -> "Select":
         return Select(self)
@@ -117,9 +163,13 @@ class Table:
     def purge(self) -> "Select":
         return Select(self, action="DELETE")
 
-    def truncate(self, client: CHClient) -> None:
-        statement = f"TRUNCATE TABLE {self.name}"
-        res = client.query(statement)
+    def truncate(self, client: Client) -> None:
+        if isinstance(client, sqlite3.Cursor):
+            statement = f"DELETE FROM {self.name}"
+            client.execute(statement)
+        else:
+            statement = f"TRUNCATE TABLE {self.name}"
+            client.query(statement)
 
 
 Action = typing.Literal["SELECT", "DELETE"]
@@ -133,7 +183,6 @@ class Select:
     db_names: dict[str, str]
 
     action: Action
-    param_builder: ParamBuilder
 
     _project_id: typing.Optional[str]
     _fields: typing.Optional[list[str]]
@@ -149,8 +198,6 @@ class Select:
         self.json_columns = [c.name for c in table.cols if c.type == "json"]
         self.col_types = {c.name: c.type for c in table.cols}
         self.db_names = {c.name: c.db_name for c in table.cols if c.db_name}
-
-        self.param_builder = ParamBuilder()
 
         self._project_id = None
         self._fields = []
@@ -195,7 +242,14 @@ class Select:
         self._offset = offset
         return self
 
-    def prepare(self) -> typing.Tuple[str, typing.Dict[str, typing.Any], list[str]]:
+    def prepare(
+        self,
+        database_type: DatabaseType,
+        param_builder: typing.Optional[ParamBuilder] = None,
+    ) -> typing.Tuple[str, typing.Dict[str, typing.Any], list[str]]:
+        param_builder = param_builder or ParamBuilder(None, database_type)
+        assert database_type == param_builder._database_type
+
         sql = ""
         if self.action == "SELECT":
             fieldnames = self._fields or self.all_columns
@@ -204,7 +258,7 @@ class Select:
                     f,
                     self.all_columns,
                     self.json_columns,
-                    param_builder=self.param_builder,
+                    param_builder=param_builder,
                 )[0]
                 for f in fieldnames
             ]
@@ -216,11 +270,15 @@ class Select:
 
         sql += f"FROM {self.table.name}"
 
-        name_project_id = self.param_builder.add_param(self._project_id)
-        conditions = [f"project_id = {{{name_project_id}:String}}"]
+        conditions = []
+        if self._project_id:
+            param_project_id = param_builder.add(
+                self._project_id, "project_id", "String"
+            )
+            conditions = [f"project_id = {param_project_id}"]
         if self._query:
             query_conds, fields_used = _process_query_to_conditions(
-                self._query, self.all_columns, self.json_columns, self.param_builder
+                self._query, self.all_columns, self.json_columns, param_builder
             )
             conditions.extend(query_conds)
 
@@ -255,7 +313,7 @@ class Select:
                         self.all_columns,
                         self.json_columns,
                         cast,
-                        param_builder=self.param_builder,
+                        param_builder=param_builder,
                     )
                     order_parts.append(f"{inner_field} {direct}")
             order_by_part = ", ".join(order_parts)
@@ -263,22 +321,29 @@ class Select:
                 sql += f"\nORDER BY {order_by_part}"
 
         if self._limit is not None:
-            name_limit = self.param_builder.add_param(self._limit)
-            sql += f"\nLIMIT {{{name_limit}:UInt64}}"
+            param_limit = param_builder.add(self._limit, "limit", "UInt64")
+            sql += f"\nLIMIT {param_limit}"
         if self._offset is not None:
-            name_offset = self.param_builder.add_param(self._offset)
-            sql += f"\nOFFSET {{{name_offset}:UInt64}}"
+            param_offset = param_builder.add(self._offset, "offset", "UInt64")
+            sql += f"\nOFFSET {param_offset}"
 
-        parameters = self.param_builder.get_params()
+        parameters = param_builder.get_params()
         return sql, parameters, fieldnames
 
-    def execute(self, client: CHClient) -> list[Row]:
+    def execute(self, client: Client) -> list[Row]:
         """Run the select."""
-        sql, parameters, fieldnames = self.prepare()
-        res = client.query(sql, parameters=parameters)
+        sql, parameters, fieldnames = self.prepare(
+            "sqlite" if isinstance(client, sqlite3.Cursor) else "clickhouse"
+        )
+        if isinstance(client, sqlite3.Cursor):
+            cursor = client.execute(sql, parameters)
+            rows = cursor.fetchall()
+        else:
+            res = client.query(sql, parameters=parameters)
+            rows = res.result_rows
         col_types = {c.name: c.type for c in self.table.cols}
         dicts = []
-        for row in res.result_rows:
+        for row in rows:
             d = {}
             for i, field in enumerate(fieldnames):
                 if field.endswith("_dump"):
@@ -306,9 +371,8 @@ class Insert:
         """Queue a row for insertion."""
         self.rows.append(row)
 
-    def execute(self, client: CHClient) -> None:
+    def execute(self, client: Client) -> None:
         """Insert the queued rows."""
-        # TODO: Bring over batch insert capability.
         for row in self.rows:
             column_names = []
             for key in row.keys():
@@ -318,14 +382,23 @@ class Insert:
 
     def _insert(
         self,
-        ch_client: CHClient,
+        client: Client,
         table: str,
         data: typing.Sequence[typing.Sequence[typing.Any]],
         column_names: list[str],
         settings: typing.Optional[dict[str, typing.Any]] = None,
     ) -> QuerySummary:
+        if isinstance(client, sqlite3.Cursor):
+            sql = f"INSERT INTO {table} (\n    "
+            sql += ", ".join(column_names)
+            sql += "\n) VALUES (\n    "
+            sql += ", ".join("?" for _ in column_names)
+            sql += "\n)"
+            client.executemany(sql, data)
+            return QuerySummary()
+        # TODO: Bring over batch insert capability.
         try:
-            return ch_client.insert(
+            return client.insert(
                 table, data=data, column_names=column_names, settings=settings
             )
         except ValueError as e:
@@ -367,11 +440,6 @@ def _python_value_to_ch_type(value: typing.Any) -> str:
         raise ValueError(f"Unknown value type: {value}")
 
 
-def _param_slot(param_name: str, param_type: str) -> str:
-    """Helper function to create a parameter slot for a clickhouse query."""
-    return f"{{{param_name}:{param_type}}}"
-
-
 def _quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
@@ -402,25 +470,21 @@ def _transform_external_field_to_internal_field(
     raw_fields_used = set()
     json_path = None
     for prefix in json_columns:
-        if field == prefix or field.startswith(prefix + "."):
-            if field == prefix:
-                json_path = "$"
-            else:
-                json_path = _quote_json_path(field[len(prefix + ".") :])
+        if field == prefix:
             field = prefix + "_dump"
-            break
+        elif field.startswith(prefix + "."):
+            json_path = _quote_json_path(field[len(prefix + ".") :])
+            field = prefix + "_dump"
 
     # validate field
-    if field not in all_columns:
+    if field not in all_columns and field.lower() != "count(*)":
         raise ValueError(f"Unknown field: {field}")
 
     raw_fields_used.add(field)
     if json_path is not None:
-        json_path_param_name = param_builder.add_param(json_path)
+        json_path_param = param_builder.add(json_path, None, "String")
         if cast == "exists":
-            field = (
-                "(JSON_EXISTS(" + field + ", {" + json_path_param_name + ":String}))"
-            )
+            field = "(JSON_EXISTS(" + field + ", " + json_path_param + "))"
         else:
             method = "toString"
             if cast is not None:
@@ -434,14 +498,11 @@ def _transform_external_field_to_internal_field(
                     method = "toString"
                 else:
                     raise ValueError(f"Unknown cast: {cast}")
-            field = (
-                method
-                + "(JSON_VALUE("
-                + field
-                + ", {"
-                + json_path_param_name
-                + ":String}))"
-            )
+            is_sqlite = param_builder._database_type == "sqlite"
+            json_func = "json_extract(" if is_sqlite else "JSON_VALUE("
+            field = json_func + field + ", " + json_path_param + ")"
+            if not is_sqlite:
+                field = method + "(" + field + ")"
 
     return field, param_builder, raw_fields_used
 
@@ -453,7 +514,7 @@ def _process_query_to_conditions(
     param_builder: typing.Optional[ParamBuilder] = None,
 ) -> tuple[list[str], set[str]]:
     """Converts a Query to a list of conditions for a clickhouse query."""
-    param_builder = param_builder or ParamBuilder()
+    pb = param_builder or ParamBuilder()
     conditions = []
     raw_fields_used = set()
 
@@ -504,13 +565,12 @@ def _process_query_to_conditions(
 
     def process_operand(operand: tsi_query.Operand) -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
-            return _param_slot(
-                param_builder.add_param(operand.literal_),  # type: ignore
-                _python_value_to_ch_type(operand.literal_),
+            return pb.add(
+                operand.literal_, None, _python_value_to_ch_type(operand.literal_)
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             (field, _, fields_used,) = _transform_external_field_to_internal_field(
-                operand.get_field_, all_columns, json_columns, None, param_builder
+                operand.get_field_, all_columns, json_columns, None, pb
             )
             raw_fields_used.update(fields_used)
             return field
