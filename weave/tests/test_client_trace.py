@@ -1556,24 +1556,24 @@ def test_sort_through_refs(client):
     values = [3, 9, 15, 21, 12, 6, 18]
     random.shuffle(values)
 
-    res = test_op(values[0], {"a": {"b": {"c": {"d": values[0]}}}})
+    test_op(values[0], {"a": {"b": {"c": {"d": values[0]}}}})
 
     # Ref at A
-    res = test_op(values[1], {"a": test_obj({"b": {"c": {"d": values[1]}}})})
+    test_op(values[1], {"a": test_obj({"b": {"c": {"d": values[1]}}})})
     # Ref at B
-    res = test_op(values[2], {"a": {"b": test_obj({"c": {"d": values[2]}})}})
+    test_op(values[2], {"a": {"b": test_obj({"c": {"d": values[2]}})}})
     # Ref at C
-    res = test_op(values[3], {"a": {"b": {"c": test_obj({"d": values[3]})}}})
+    test_op(values[3], {"a": {"b": {"c": test_obj({"d": values[3]})}}})
 
     # Ref at A and B
-    res = test_op(values[4], {"a": test_obj({"b": test_obj({"c": {"d": values[4]}})})})
+    test_op(values[4], {"a": test_obj({"b": test_obj({"c": {"d": values[4]}})})})
     # Ref at A and C
-    res = test_op(values[5], {"a": test_obj({"b": {"c": test_obj({"d": values[5]})}})})
+    test_op(values[5], {"a": test_obj({"b": {"c": test_obj({"d": values[5]})}})})
     # Ref at B and C
-    res = test_op(values[6], {"a": {"b": test_obj({"c": test_obj({"d": values[6]})})}})
+    test_op(values[6], {"a": {"b": test_obj({"c": test_obj({"d": values[6]})})}})
 
     # Ref at A, B and C
-    res = test_op(
+    test_op(
         values[7], {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})}
     )
 

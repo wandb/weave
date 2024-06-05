@@ -83,21 +83,50 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._id_converter.convert_ext_to_int_project_id(
             req.project_id
         )
-        return self._universal_int_to_ext_ref_converter(
+        res = self._universal_int_to_ext_ref_converter(
             self._internal_trace_server.call_read(
                 self._universal_ext_to_int_ref_converter(req)
             )
         )
 
+        res.call.project_id = self._id_converter.convert_int_to_ext_project_id(
+            res.call.project_id
+        )
+        if res.call.wb_run_id:
+            res.call.wb_run_id = self._id_converter.convert_int_to_ext_run_id(
+                res.call.run_id
+            )
+        if res.call.wb_user_id:
+            res.call.wb_user_id = self._id_converter.convert_int_to_ext_user_id(
+                res.call.user_id
+            )
+
+        return res
+
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         req.project_id = self._id_converter.convert_ext_to_int_project_id(
             req.project_id
         )
-        return self._universal_int_to_ext_ref_converter(
+        res = self._universal_int_to_ext_ref_converter(
             self._internal_trace_server.calls_query(
                 self._universal_ext_to_int_ref_converter(req)
             )
         )
+
+        for item in res.calls:
+            item.project_id = self._id_converter.convert_int_to_ext_project_id(
+                item.project_id
+            )
+            if item.wb_run_id:
+                item.wb_run_id = self._id_converter.convert_int_to_ext_run_id(
+                    item.run_id
+                )
+            if item.wb_user_id:
+                item.wb_user_id = self._id_converter.convert_int_to_ext_user_id(
+                    item.user_id
+                )
+
+        return res
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         req.project_id = self._id_converter.convert_ext_to_int_project_id(
