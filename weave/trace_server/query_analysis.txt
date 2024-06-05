@@ -1,0 +1,97 @@
+
+WITH 
+    SIMPLE_FILTERED_IDS_QUERY AS (
+        SELECT
+            project_id,
+            id
+        FROM
+            calls_merged 
+        GROUP BY
+            project_id, id
+        HAVING
+            project_id = {project_id: String }
+            --     AND
+            -- {SIMPLE_WHERE_CONDITIONS}
+    ),
+    -- The goal of the next CTE is is to create a synthetic filter that can be used
+    -- to filter and sort the data. In the application layer, we should extract the 
+    -- total set of fields that are needed to filter and sort the data, and then
+    -- create a synthetic table that has those fields as columns.
+    SORTED_PAGINATED_IDS_QUERY AS (
+        WITH 
+            ITERATIVELY_HYDRATED_QUERY AS (
+                SELECT
+                    project_id,
+                    id,
+                    -- These fields might be dynamic fields, feedback fields, or known fields
+                    any(started_at) as started_at
+                    -- query.field.x, 
+                    -- query.field.y,
+                    -- query.field.z,
+                    -- sort.field.x,
+                    -- sort.field.y,
+                    -- sort.field.z,
+                    -- ...
+                -- This could have many iteratively deep layers here, 
+                -- but always terminates at the bottom with the following:
+                FROM
+                    calls_merged 
+                WHERE
+                    project_id = {project_id: String }
+                        AND
+                    id IN (SELECT id FROM SIMPLE_FILTERED_IDS_QUERY)
+                GROUP BY
+                    project_id, id
+            )
+        SELECT
+            id,
+            project_id
+        FROM
+            ITERATIVELY_HYDRATED_QUERY
+        -- WHERE
+        --     {WHERE_CONDITIONS}
+        ORDER BY
+            started_at DESC
+            -- {ORDER_BY_CLAUSE}
+        LIMIT
+            100
+            -- {LIMIT_CLAUSE}
+        OFFSET
+            10
+            -- {OFFSET_CLAUSE}
+    ),
+    PRE_ORDERED_RESULTS AS (
+        SELECT
+            project_id,
+            id,
+            -- any(inputs_dump)
+            -- COLS
+        FROM
+            calls_merged
+        WHERE
+            project_id = {project_id: String }
+                AND
+            id IN (SELECT id FROM SORTED_PAGINATED_IDS_QUERY)
+        GROUP BY
+            project_id, id
+        -- can we use the ordering calculated in the previous step?
+    ),
+    -- UGG is this the only way to sort this??
+    FINAL_RESULTS AS ( 
+        SELECT
+            final.*
+        FROM
+            (
+                SELECT
+                    id,
+                    project_id,
+                    rowNumberInAllBlocks() as rowNumber
+                FROM
+                    SORTED_PAGINATED_IDS_QUERY
+            ) as sorted
+        JOIN
+            PRE_ORDERED_RESULTS as final USING (project_id, id)
+        ORDER BY
+            sorted.rowNumber
+    )
+SELECT * FROM FINAL_RESULTS
