@@ -114,7 +114,7 @@ export default class EditableField extends React.Component<
   stopEditing = () => {
     this.setState({editing: false, origValue: this.state.currentValue});
     this.save.flush();
-    this.props.onFinish?.(this.state.currentValue)
+    this.props.onFinish?.(this.state.currentValue);
   };
 
   cancelEditing = () => {
@@ -125,7 +125,7 @@ export default class EditableField extends React.Component<
 
   onKeyDown = (e: any) => {
     if (this.props.inDataGrid) {
-      e.stopPropagation()
+      e.stopPropagation();
     }
     if (e.keyCode === 27) {
       this.cancelEditing();
