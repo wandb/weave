@@ -5,6 +5,7 @@ import typing as t
 from pydantic import BaseModel, ValidationError
 import requests
 import tenacity
+import logging
 
 from weave.trace_server import environment as wf_env
 
@@ -12,6 +13,8 @@ from weave.trace_server import environment as wf_env
 from weave.wandb_interface import project_creator
 from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
+
+logger = logging.getLogger(__name__)
 
 
 class StartBatchItem(BaseModel):
@@ -65,16 +68,24 @@ def _is_retryable_exception(e: Exception) -> bool:
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
-    print(
-        f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
-        file=sys.stderr,
+    logger.info(
+        "retry_attempt",
+        extra={
+            "fn": retry_state.fn,
+            "attempt_number": retry_state.attempt_number,
+            "exception": str(retry_state.outcome.exception()),
+        },
     )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
-    print(
-        f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
-        file=sys.stderr,
+    logger.info(
+        "retry_failed",
+        extra={
+            "fn": retry_state.fn,
+            "attempt_number": retry_state.attempt_number,
+            "exception": str(retry_state.outcome.exception()),
+        },
     )
     return retry_state.outcome.result()
 
