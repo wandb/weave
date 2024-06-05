@@ -1537,3 +1537,118 @@ def test_single_primitive_output(client):
     assert inner_res.calls[1].output == True
     assert inner_res.calls[2].output == None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
+
+
+def test_sort_through_refs(client):
+    @weave.op()
+    def test_op(label, val):
+        return val
+
+    class TestObj(weave.Object):
+        val: typing.Any
+
+    def test_obj(val):
+        return weave.publish(TestObj(val=val))
+
+    import random
+
+    # make sure we have a variety of values and requires correct casting
+    values = [i * 3 for i in range(8)]  # [0, 3, 6, 9, 12, 15, 18, 21]
+    random.shuffle(values)
+
+    res = test_op(values[0], {"a": {"b": {"c": {"d": values[0]}}}})
+
+    # Ref at A
+    res = test_op(values[1], {"a": test_obj({"b": {"c": {"d": values[1]}}})})
+    # Ref at B
+    res = test_op(values[2], {"a": {"b": test_obj({"c": {"d": values[2]}})}})
+    # Ref at C
+    res = test_op(values[3], {"a": {"b": {"c": test_obj({"d": values[3]})}}})
+
+    # Ref at A and B
+    res = test_op(values[4], {"a": test_obj({"b": test_obj({"c": {"d": values[4]}})})})
+    # Ref at A and C
+    res = test_op(values[5], {"a": test_obj({"b": {"c": test_obj({"d": values[5]})}})})
+    # Ref at B and C
+    res = test_op(values[6], {"a": {"b": test_obj({"c": test_obj({"d": values[6]})})}})
+
+    # Ref at A, B and C
+    res = test_op(
+        values[7], {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})}
+    )
+
+    for first, last, sort_by in [
+        (0, 21, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi._SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
+        (0, 21, [tsi._SortBy(field="output.a.b.c.d", direction="asc")]),
+        (21, 0, [tsi._SortBy(field="output.a.b.c.d", direction="desc")]),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=sort_by,
+            )
+        )
+
+        assert inner_res.calls[0].inputs["label"] == first
+        assert inner_res.calls[1].inputs["label"] == first
+
+    for first, last, count, query in [
+        (
+            6,
+            21,
+            6,
+            {
+                "$gt": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.val.a.b.c.d"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": 5},
+                ]
+            },
+        ),
+        (
+            0,
+            3,
+            2,
+            {
+                "$not": [
+                    {
+                        "$gt": [
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "output.a.b.c.d"},
+                                    "to": "int",
+                                }
+                            },
+                            {"$literal": 5},
+                        ]
+                    }
+                ]
+            },
+        ),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    sort_by=[tsi._SortBy(field="inputs.val.a.b.c.d", direction="asc")],
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        assert len(inner_res.calls) == count
+        inner_res = get_client_trace_server(client).calls_query_stats(
+            tsi.CallsQueryStatsReq.model_validate(
+                dict(
+                    project_id=get_client_project_id(client),
+                    query={"$expr": query},
+                )
+            )
+        )
+
+        assert inner_res.count == count
