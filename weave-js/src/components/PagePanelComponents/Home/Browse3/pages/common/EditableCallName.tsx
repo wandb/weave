@@ -35,11 +35,12 @@ export const EditableCallName: React.FC<{
   return (
     <EditableField
       value={curOpName}
-      save={saveName}
+      onFinish={saveName}
       placeholder={curOpName}
       updateValue={true}
       autoSelect={true}
       externalEditingControl={externalEditingControl}
+      inDataGrid={true}
     />
   );
 };

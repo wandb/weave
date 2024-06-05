@@ -30,7 +30,9 @@ export interface EditableFieldProps {
   showEditIcon?: boolean;
   renderLinks?: boolean;
   externalEditingControl?: boolean;
+  inDataGrid?: boolean;
   save?(value: string): void;
+  onFinish?(value: string): void;
   overrideClick?(): void;
 }
 
@@ -112,6 +114,7 @@ export default class EditableField extends React.Component<
   stopEditing = () => {
     this.setState({editing: false, origValue: this.state.currentValue});
     this.save.flush();
+    this.props.onFinish?.(this.state.currentValue)
   };
 
   cancelEditing = () => {
@@ -121,6 +124,9 @@ export default class EditableField extends React.Component<
   };
 
   onKeyDown = (e: any) => {
+    if (this.props.inDataGrid) {
+      e.stopPropagation()
+    }
     if (e.keyCode === 27) {
       this.cancelEditing();
       return;
