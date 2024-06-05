@@ -1552,8 +1552,8 @@ def test_sort_through_refs(client):
 
     import random
 
-    # make sure we have a variety of values and requires correct casting
-    values = [i * 3 for i in range(8)]  # [0, 3, 6, 9, 12, 15, 18, 21]
+    # Purposely shuffled and contains values that would not sort correctly as strings
+    values = [3, 9, 15, 21, 18, 12, 6, 0]
     random.shuffle(values)
 
     res = test_op(values[0], {"a": {"b": {"c": {"d": values[0]}}}})
