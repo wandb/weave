@@ -204,7 +204,7 @@ def patch() -> None:
 
 def unpatch() -> None:
     # if _get_global_monitor() is not None:
-    info("Unpatching OpenAI completions")
+    # info("Unpatching OpenAI completions")
     openai.resources.chat.completions.Completions.create = old_create
     openai.resources.chat.completions.AsyncCompletions.create = old_async_create
 

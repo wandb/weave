@@ -1,5 +1,27 @@
 # Clickhouse Trace Server
 
+# A note on query structure:
+# There are four major kinds of things that we query:
+# - calls,
+# - object_versions,
+# - tables
+# - files
+#
+# calls are identified by ID.
+#
+# object_versions, tables, and files are identified by digest. For these kinds of
+# things, we dedupe at merge time using Clickhouse's ReplacingMergeTree, but we also
+# need to dedupe at query time.
+#
+# Previously, we did query time deduping in *_deduped VIEWs. But it turns out
+# clickhouse doesn't push down the project_id predicate into those views, so we were
+# always scanning whole tables.
+#
+# Now, we've just written the what were views before into this file directly as
+# subqueries, and put the project_id predicate in the innermost subquery, which fixes
+# the problem.
+
+
 from collections import defaultdict
 import threading
 from contextlib import contextmanager
@@ -8,6 +30,7 @@ import json
 import typing
 import hashlib
 import dataclasses
+import logging
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult, StreamContext
@@ -28,8 +51,12 @@ from .trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from . import trace_server_interface as tsi
+from .interface import query as tsi_query
 
 from . import refs_internal
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -123,6 +150,8 @@ all_call_insert_columns = list(
 )
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
+all_call_json_columns = ("inputs", "output", "attributes", "summary")
+
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 required_call_columns = list(set(all_call_select_columns) - set([]))
@@ -240,83 +269,92 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
+    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        """Returns a stats object for the given query. This is useful for counts or other
+        aggregate statistics that are not directly queryable from the calls themselves.
+        """
+        having_conditions = []
+        start_event_conditions = []
+        end_event_conditions = []
+        param_builder = ParamBuilder()
+        raw_fields_used = set()
+
+        # First, apply the application filter
+        if req.filter:
+            filter_to_conditions = _process_calls_filter_to_conditions(
+                req.filter, param_builder
+            )
+            raw_fields_used.update(filter_to_conditions.fields_used)
+            having_conditions.extend(filter_to_conditions.having_conditions)
+            start_event_conditions.extend(filter_to_conditions.start_event_conditions)
+            end_event_conditions.extend(filter_to_conditions.end_event_conditions)
+
+        # Next, apply the query filter
+        if req.query:
+            having_query_conds, fields_used = _process_query_to_conditions(
+                req.query, all_call_select_columns, all_call_json_columns, param_builder
+            )
+            raw_fields_used.update(fields_used)
+            having_conditions.extend(having_query_conds)
+
+        # Perform the query against the database
+        stats = self._calls_query_stats_raw(
+            req.project_id,
+            columns=list(raw_fields_used),
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
+            having_conditions=having_conditions,
+            parameters=param_builder.get_params(),
+        )
+
+        # Return the marshaled response
+        return tsi.CallsQueryStatsRes(count=stats["count"])
+
     def calls_query_stream(
         self, req: tsi.CallsQueryReq
     ) -> typing.Iterator[tsi.CallSchema]:
-        conditions = []
-        parameters: typing.Dict[str, typing.Union[typing.List[str], str]] = {}
+        """Returns a stream of calls that match the given query."""
+        having_conditions = []
+        start_event_conditions = []
+        end_event_conditions = []
+        param_builder = ParamBuilder()
+
+        # First, apply the application filter
         if req.filter:
-            if req.filter.op_names:
-                # We will build up (0 or 1) + N conditions for the op_version_refs
-                # If there are any non-wildcarded names, then we at least have an IN condition
-                # If there are any wildcarded names, then we have a LIKE condition for each
+            filter_to_conditions = _process_calls_filter_to_conditions(
+                req.filter, param_builder
+            )
+            having_conditions.extend(filter_to_conditions.having_conditions)
+            start_event_conditions.extend(filter_to_conditions.start_event_conditions)
+            end_event_conditions.extend(filter_to_conditions.end_event_conditions)
 
-                or_conditions: typing.List[str] = []
+        # Next, apply the query filter
+        if req.query:
+            having_query_conds, _ = _process_query_to_conditions(
+                req.query, all_call_select_columns, all_call_json_columns, param_builder
+            )
+            having_conditions.extend(having_query_conds)
 
-                non_wildcarded_names: typing.List[str] = []
-                wildcarded_names: typing.List[str] = []
-                for name in req.filter.op_names:
-                    if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                        wildcarded_names.append(name)
-                    else:
-                        non_wildcarded_names.append(name)
-
-                if non_wildcarded_names:
-                    or_conditions.append(
-                        "op_name IN {non_wildcarded_names: Array(String)}"
-                    )
-                    parameters["non_wildcarded_names"] = non_wildcarded_names
-
-                for name_ndx, name in enumerate(wildcarded_names):
-                    param_name = "wildcarded_name_" + str(name_ndx)
-                    or_conditions.append("op_name LIKE {" + param_name + ": String}")
-                    like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-                    parameters[param_name] = like_name
-
-                if or_conditions:
-                    conditions.append(_combine_conditions(or_conditions, "OR"))
-
-            if req.filter.input_refs:
-                parameters["input_refs"] = req.filter.input_refs
-                conditions.append("hasAny(input_refs, {input_refs: Array(String)})")
-
-            if req.filter.output_refs:
-                parameters["output_refs"] = req.filter.output_refs
-                conditions.append("hasAny(output_refs, {output_refs: Array(String)})")
-
-            if req.filter.parent_ids:
-                conditions.append("parent_id IN {parent_ids: Array(String)}")
-                parameters["parent_ids"] = req.filter.parent_ids
-
-            if req.filter.trace_ids:
-                conditions.append("trace_id IN {trace_ids: Array(String)}")
-                parameters["trace_ids"] = req.filter.trace_ids
-
-            if req.filter.call_ids:
-                conditions.append("id IN {call_ids: Array(String)}")
-                parameters["call_ids"] = req.filter.call_ids
-
-            if req.filter.trace_roots_only:
-                conditions.append("parent_id IS NULL")
-
-            if req.filter.wb_user_ids:
-                conditions.append("wb_user_id IN {wb_user_ids: Array(String)}")
-                parameters["wb_user_ids"] = req.filter.wb_user_ids
-
-            if req.filter.wb_run_ids:
-                conditions.append("wb_run_id IN {wb_run_ids: Array(String)}")
-                parameters["wb_run_ids"] = req.filter.wb_run_ids
-
+        # Perform the query against the database
         ch_call_dicts = self._select_calls_query_raw(
             req.project_id,
-            conditions=conditions,
-            parameters=parameters,
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
+            having_conditions=having_conditions,
+            parameters=param_builder.get_params(),
             limit=req.limit,
             offset=req.offset,
-            order_by=None
-            if not req.sort_by
-            else [(s.field, s.direction) for s in req.sort_by],
+            # This order-by clause creation should probably be moved into this function
+            # and passed down as a processed object. It will follow the same patterns as
+            # the filters and queries.
+            order_by=(
+                None
+                if not req.sort_by
+                else [(s.field, s.direction) for s in req.sort_by]
+            ),
         )
+
+        # Yield the marshaled response
         for ch_dict in ch_call_dicts:
             yield tsi.CallSchema.model_validate(
                 _ch_call_dict_to_call_schema_dict(ch_dict)
@@ -328,20 +366,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        proj_cond = "project_id = {project_id: String}"
+        # Note: i think this project condition is redundant
+        proj_cond = "calls_merged.project_id = {project_id: String}"
         proj_params = {"project_id": req.project_id}
 
         # get all parents
         parents = self._select_calls_query(
             req.project_id,
-            conditions=[proj_cond, "id IN {ids: Array(String)}"],
+            start_event_conditions=[
+                proj_cond,
+                "calls_merged.id IN {ids: Array(String)}",
+            ],
             parameters=proj_params | {"ids": req.call_ids},
         )
 
         # get all calls with trace_ids matching parents
         all_calls = self._select_calls_query(
             req.project_id,
-            conditions=[proj_cond, "trace_id IN {trace_ids: Array(String)}"],
+            start_event_conditions=[
+                proj_cond,
+                "calls_merged.trace_id IN {trace_ids: Array(String)}",
+            ],
             parameters=proj_params | {"trace_ids": [p.trace_id for p in parents]},
         )
 
@@ -548,15 +593,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             conds.extend(conditions)
 
         predicate = _combine_conditions(conds, "AND")
+        # The subqueries are for deduplication of table rows and tables by digest.
+        # It might be more efficient to do deduplication of table rows
+        # in the outer query instead of the right side of the JOIN clause here,
+        # that hasn't been tested yet.
         query = f"""
                 SELECT tr.digest, tr.val_dump
                 FROM (
                     SELECT project_id, row_digest
-                    FROM tables_deduped
+                    FROM (
+                        SELECT *
+                        FROM (
+                                SELECT *,
+                                    row_number() OVER (PARTITION BY project_id, digest) AS rn
+                                FROM tables
+                                WHERE project_id = {{project_id:String}} AND digest = {{digest:String}}
+                            )
+                        WHERE rn = 1
+                        ORDER BY project_id, digest
+                    )
                     ARRAY JOIN row_digests AS row_digest
                     WHERE digest = {{digest:String}}
                 ) AS t
-                JOIN table_rows_deduped tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
+                JOIN (
+                    SELECT project_id, digest, val_dump
+                    FROM (
+                            SELECT *,
+                                row_number() OVER (PARTITION BY project_id, digest) AS rn
+                            FROM table_rows
+                            WHERE project_id = {{project_id:String}}
+                        )
+                    WHERE rn = 1
+                    ORDER BY project_id, digest
+                ) tr ON t.project_id = tr.project_id AND t.row_digest = tr.digest
                 WHERE {predicate}
             """
         if parameters is None:
@@ -810,8 +879,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        # The subquery is responsible for deduplication of file chunks by digest
         query_result = self.ch_client.query(
-            "SELECT n_chunks, val_bytes FROM files_deduped WHERE project_id = {project_id:String} AND digest = {digest:String}",
+            """
+            SELECT n_chunks, val_bytes
+            FROM (
+                SELECT *
+                FROM (
+                        SELECT *,
+                            row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
+                        FROM files
+                        WHERE project_id = {project_id:String} AND digest = {digest:String}
+                    )
+                WHERE rn = 1
+                ORDER BY project_id, digest, chunk_index
+            )
+            WHERE project_id = {project_id:String} AND digest = {digest:String}""",
             parameters={"project_id": req.project_id, "digest": req.digest},
             column_formats={"val_bytes": "bytes"},
         )
@@ -861,7 +944,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Generate and run the query to get the call from the database
         ch_calls = self._select_calls_query(
             req.project_id,
-            conditions=["id = {id: String}"],
+            start_event_conditions=["calls_merged.id = {id: String}"],
             limit=1,
             parameters={"id": req.id},
         )
@@ -876,7 +959,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
-        conditions: typing.Optional[typing.List[str]] = None,
+        start_event_conditions: typing.Optional[typing.List[str]] = None,
+        end_event_conditions: typing.Optional[typing.List[str]] = None,
+        having_conditions: typing.Optional[typing.List[str]] = None,
         order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
@@ -885,7 +970,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         dicts = self._select_calls_query_raw(
             project_id,
             columns=columns,
-            conditions=conditions,
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
+            having_conditions=having_conditions,
             order_by=order_by,
             offset=offset,
             limit=limit,
@@ -900,7 +987,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         project_id: str,
         columns: typing.Optional[typing.List[str]] = None,
-        conditions: typing.Optional[typing.List[str]] = None,
+        start_event_conditions: typing.Optional[typing.List[str]] = None,
+        end_event_conditions: typing.Optional[typing.List[str]] = None,
+        having_conditions: typing.Optional[typing.List[str]] = None,
         order_by: typing.Optional[typing.List[typing.Tuple[str, str]]] = None,
         offset: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
@@ -932,47 +1021,91 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
 
-        if not conditions:
-            conditions = ["1 = 1"]
+        having_conditions_part = None
+        if having_conditions:
+            having_conditions_part = _combine_conditions(having_conditions, "AND")
 
-        conditions_part = _combine_conditions(conditions, "AND")
+        where_conditions_part = _make_calls_where_condition_from_event_conditions(
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
+        )
 
         order_by_part = "ORDER BY started_at ASC"
+        order_by_events = set(["START"])
         if order_by is not None:
+            order_by_events = set([])
             order_parts = []
             for field, direction in order_by:
-                json_path: typing.Optional[str] = None
-                if field.startswith("inputs"):
-                    field = "inputs_dump" + field[len("inputs") :]
-                    if field.startswith("inputs_dump."):
-                        field = "inputs_dump"
-                        json_path = field[len("inputs_dump.") :]
-                elif field.startswith("output"):
-                    field = "output_dump" + field[len("output") :]
-                    if field.startswith("output_dump."):
-                        field = "output_dump"
-                        json_path = field[len("output_dump.") :]
-                elif field.startswith("attributes"):
-                    field = "attributes_dump" + field[len("attributes") :]
-                elif field.startswith("summary"):
-                    field = "summary_dump" + field[len("summary") :]
-                elif field == ("latency"):
-                    field = "ended_at - started_at"
-
-                assert (
-                    field in all_call_select_columns
-                ), f"Invalid order_by field: {field}"
                 assert direction in [
                     "ASC",
                     "DESC",
                     "asc",
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
-                if json_path:
-                    key = f"order_field_{field}"
-                    field = f"JSON_VALUE({field}, '$.{{{key}: String}}')"
-                    parameters[key] = json_path
-                order_parts.append(f"{field} {direction}")
+
+                # For each order by field, if it is a dynamic field, we generate
+                # 3 order by terms: one for existence, one for float casting, and one for string casting.
+                # The effect of this is that we will have stable sorting for nullable, mixed-type fields.
+                if _is_dynamic_field(field):
+                    # Prioritize existence, then cast to float, then str
+                    options = [
+                        ("exists", "desc"),
+                        ("float", direction),
+                        ("str", direction),
+                    ]
+                else:
+                    options = [(field, direction)]
+
+                start_fields = (
+                    "project_id",
+                    "id",
+                    "trace_id",
+                    "parent_id",
+                    "op_name",
+                    "started_at",
+                    "attributes",
+                    "inputs",
+                    "input_refs",
+                    "wb_user_id",
+                    "wb_run_id",
+                )
+                end_fields = (
+                    "ended_at",
+                    "exception",
+                    "summary",
+                    "output",
+                    "output_refs",
+                )
+
+                if (
+                    field in start_fields
+                    or field.startswith("inputs.")
+                    or field.startswith("attributes.")
+                ):
+                    order_by_events.add("START")
+                elif (
+                    field in end_fields
+                    or field.startswith("output.")
+                    or field.startswith("summary.")
+                ):
+                    order_by_events.add("END")
+                else:
+                    raise ValueError(f"Invalid order_by field: {field}")
+
+                # For each option, build the order by term
+                for cast, direct in options:
+                    # Future refactor: this entire section should be moved into its own helper
+                    # method and hoisted out of this function
+                    (
+                        inner_field,
+                        param_builder,
+                        _,
+                    ) = _transform_external_field_to_internal_field(
+                        field, all_call_select_columns, all_call_json_columns, cast
+                    )
+                    parameters.update(param_builder.get_params())
+
+                    order_parts.append(f"{inner_field} {direct}")
 
             order_by_part = ", ".join(order_parts)
             order_by_part = f"ORDER BY {order_by_part}"
@@ -987,23 +1120,130 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit_part = "LIMIT {limit: Int64}"
             parameters["limit"] = limit
 
-        raw_res = self._query(
-            f"""
-            SELECT {select_columns_part}
-            FROM calls_merged
-            WHERE project_id = {{project_id: String}}
-            GROUP BY project_id, id
-            HAVING deleted_at IS NULL AND
-                {conditions_part}
-            {order_by_part}
-            {limit_part}
-            {offset_part}
-        """,
+        if having_conditions_part or len(order_by_events) != 1:
+            if having_conditions_part is None:
+                having_conditions_part == "1 = 1"
+            query_str = f"""
+                SELECT {select_columns_part}
+                FROM calls_merged
+                WHERE project_id = {{project_id: String}}
+                    AND {where_conditions_part}
+                GROUP BY project_id, id
+                HAVING {having_conditions_part}
+                {order_by_part}
+                {limit_part}
+                {offset_part}
+            """
+        else:
+            # FAST PATH!!
+            #
+            # Here we have an opportunity to optimize the query by using a subquery to
+            # filter out the rows before the group by. This is because the group by
+            # is expensive and we can avoid it if we can filter out rows before it.
+            # This is a common pattern in SQL optimization.
+            if "START" in order_by_events:
+                order_by_side = "AND isNotNull(started_at)"
+            elif "END" in order_by_events:
+                order_by_side = "AND isNotNull(ended_at)"
+            else:
+                raise ValueError("Invalid order_by_events")
+
+            where_conditions_part = f"""(
+                calls_merged.id IN (
+                    SELECT id from calls_merged WHERE (
+                        project_id = {{project_id: String}}
+                            AND 
+                        {where_conditions_part}
+                    )
+                    {order_by_side}
+                    {order_by_part}
+                    {limit_part}
+                    {offset_part}
+                )
+            )"""
+            query_str = f"""
+                SELECT {select_columns_part}
+                FROM calls_merged
+                WHERE project_id = {{project_id: String}}
+                    AND {where_conditions_part}
+                GROUP BY project_id, id
+                {order_by_part}
+            """
+
+        raw_res = self._query_stream(
+            query_str,
             parameters,
         )
 
         for row in raw_res:
             yield dict(zip(columns, row))
+
+    def _calls_query_stats_raw(
+        self,
+        project_id: str,
+        columns: typing.Optional[typing.List[str]] = None,
+        start_event_conditions: typing.Optional[typing.List[str]] = None,
+        end_event_conditions: typing.Optional[typing.List[str]] = None,
+        having_conditions: typing.Optional[typing.List[str]] = None,
+        parameters: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> typing.Dict:
+        """Generates and executes a query to get stats for a calls query."""
+        if not parameters:
+            parameters = {}
+        parameters = typing.cast(typing.Dict[str, typing.Any], parameters)
+
+        parameters["project_id"] = project_id
+
+        if not having_conditions:
+            having_conditions = ["1 = 1"]
+
+        having_conditions_part = _combine_conditions(having_conditions, "AND")
+
+        where_conditions_part = _make_calls_where_condition_from_event_conditions(
+            start_event_conditions=start_event_conditions,
+            end_event_conditions=end_event_conditions,
+        )
+
+        if columns == None:
+            columns = ["id"]
+        columns = typing.cast(typing.List[str], columns)
+        if len(columns) == 0:
+            columns = ["id"]
+        # Stop injection
+        assert (
+            set(columns) - set(all_call_select_columns) == set()
+        ), f"Invalid columns: {columns}"
+        merged_cols = []
+        for col in columns:
+            if col in ["project_id", "id"]:
+                merged_cols.append(f"{col} AS {col}")
+            elif col in ["input_refs", "output_refs"]:
+                merged_cols.append(f"array_concat_agg({col}) AS {col}")
+            else:
+                merged_cols.append(f"any({col}) AS {col}")
+        select_columns_part = ", ".join(merged_cols)
+
+        query_str = f"""
+            SELECT COUNT(*)
+            FROM (
+                SELECT {select_columns_part}
+                FROM calls_merged
+                WHERE project_id = {{project_id: String}}
+                    AND {where_conditions_part}
+                GROUP BY project_id, id
+                HAVING {having_conditions_part}
+            )
+        """
+
+        raw_res = self._query(
+            query_str,
+            parameters,
+        )
+        rows = raw_res.result_rows
+        count = 0
+        if rows and len(rows) == 1 and len(rows[0]) == 1:
+            count = rows[0][0]
+        return dict(count=count)
 
     def _select_objs_query(
         self,
@@ -1023,9 +1263,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if parameters is None:
             parameters = {}
-        query_result = self._query(
+        # The subquery is for deduplication of object versions by digest
+        query_result = self._query_stream(
             f"""
-            SELECT 
+            SELECT
                 project_id,
                 object_id,
                 created_at,
@@ -1039,7 +1280,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 version_index,
                 version_count,
                 is_latest
-            FROM object_versions_deduped
+            FROM (
+                SELECT project_id,
+                    object_id,
+                    created_at,
+                    kind,
+                    base_object_class,
+                    refs,
+                    val_dump,
+                    digest,
+                    if (kind = 'op', 1, 0) AS is_op,
+                    row_number() OVER (
+                        PARTITION BY project_id,
+                        kind,
+                        object_id
+                        ORDER BY created_at ASC
+                    ) AS _version_index_plus_1,
+                    _version_index_plus_1 - 1 AS version_index,
+                    count(*) OVER (PARTITION BY project_id, kind, object_id) as version_count,
+                    if(_version_index_plus_1 = version_count, 1, 0) AS is_latest
+                FROM (
+                    SELECT *,
+                        row_number() OVER (
+                            PARTITION BY project_id,
+                            kind,
+                            object_id,
+                            digest
+                            ORDER BY created_at ASC
+                        ) AS rn
+                    FROM object_versions
+                    WHERE project_id = {{project_id: String}}
+                )
+                WHERE rn = 1
+            )
             WHERE project_id = {{project_id: String}} AND
                 {conditions_part}
             {limit_part}
@@ -1076,23 +1349,55 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return result
 
     def _run_migrations(self) -> None:
-        print("Running migrations")
+        logger.info("Running migrations")
         migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
         migrator.apply_migrations(self._database)
+
+    def _query_stream(
+        self,
+        query: str,
+        parameters: typing.Dict[str, typing.Any],
+        column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> typing.Iterator[QueryResult]:
+        """Streams the results of a query from the database."""
+        summary = None
+        parameters = _process_parameters(parameters)
+        with self.ch_client.query_rows_stream(
+            query, parameters=parameters, column_formats=column_formats, use_none=True
+        ) as stream:
+            if isinstance(stream.source, QueryResult):
+                summary = stream.source.summary
+            logger.info(
+                "clickhouse_stream_query",
+                extra={
+                    "query": query,
+                    "parameters": parameters,
+                    "summary": summary,
+                },
+            )
+            for row in stream:
+                yield row
 
     def _query(
         self,
         query: str,
         parameters: typing.Dict[str, typing.Any],
         column_formats: typing.Optional[typing.Dict[str, typing.Any]] = None,
-    ) -> typing.Iterator[QueryResult]:
-        print("Running query: " + query + " with parameters: " + str(parameters))
+    ) -> QueryResult:
+        """Directly queries the database and returns the result."""
         parameters = _process_parameters(parameters)
-        with self.ch_client.query_rows_stream(
+        res = self.ch_client.query(
             query, parameters=parameters, column_formats=column_formats, use_none=True
-        ) as stream:
-            for row in stream:
-                yield row
+        )
+        logger.info(
+            "clickhouse_query",
+            extra={
+                "query": query,
+                "parameters": parameters,
+                "summary": res.summary,
+            },
+        )
+        return res
 
     def _insert(
         self,
@@ -1390,3 +1695,399 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
+
+
+param_builder_count = 0
+
+
+class ParamBuilder:
+    """ParamBuilder helps with the construction of parameterized clickhouse queries.
+    It is used in a number of functions/routines that build queries to ensure that
+    the queries are parameterized and safe from injection attacks. Specifically, a caller
+    would use it as follows:
+
+    ```
+    pb = ParamBuilder()
+    param_name = pb.add_param("some_value")
+    query = f"SELECT * FROM some_table WHERE some_column = {{{param_name}:String}}"
+    parameters = pb.get_params()
+    # Execute the query with the parameters
+    ```
+
+    With queries that have many construction phases, it is recommended to use the
+    same ParamBuilder instance to ensure that the parameter names are unique across
+    the query.
+    """
+
+    def __init__(self, prefix: typing.Optional[str] = None):
+        global param_builder_count
+        param_builder_count += 1
+        self._params: typing.Dict[str, typing.Any] = {}
+        self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
+
+    def add_param(self, param_value: typing.Any) -> str:
+        param_name = self._prefix + str(len(self._params))
+        self._params[param_name] = param_value
+        return param_name
+
+    def get_params(self) -> typing.Dict[str, typing.Any]:
+        return {**self._params}
+
+
+def _python_value_to_ch_type(value: typing.Any) -> str:
+    """Helper function to convert python types to clickhouse types."""
+    if isinstance(value, str):
+        return "String"
+    elif isinstance(value, int):
+        return "UInt64"
+    elif isinstance(value, float):
+        return "Float64"
+    elif isinstance(value, bool):
+        return "UInt8"
+    elif value is None:
+        return "Nullable(String)"
+    else:
+        raise ValueError(f"Unknown value type: {value}")
+
+
+def _param_slot(param_name: str, param_type: str) -> str:
+    """Helper function to create a parameter slot for a clickhouse query."""
+    return f"{{{param_name}:{param_type}}}"
+
+
+def _quote_json_path(path: str) -> str:
+    """Helper function to quote a json path for use in a clickhouse query. Moreover,
+    this converts index operations from dot notation (conforms to Mongo) to bracket
+    notation (required by clickhouse)
+
+    See comments on `GetFieldOperator` for current limitations
+    """
+    parts = path.split(".")
+    parts_final = []
+    for part in parts:
+        try:
+            int(part)
+            parts_final.append("[" + part + "]")
+        except ValueError:
+            parts_final.append('."' + part + '"')
+    return "$" + "".join(parts_final)
+
+
+def _is_dynamic_field(field: str) -> bool:
+    """Dynamic fields are fields that are arbitrary values produced by the user."""
+    return (
+        field in ("inputs", "output", "attributes", "summary")
+        or field.startswith("inputs.")
+        or field.startswith("output.")
+        or field.startswith("attributes.")
+        or field.startswith("summary.")
+    )
+
+
+def _transform_external_field_to_internal_field(
+    field: str,
+    all_columns: typing.Sequence[str],
+    json_columns: typing.Sequence[str],
+    cast: typing.Optional[str] = None,
+    param_builder: typing.Optional[ParamBuilder] = None,
+) -> tuple[str, ParamBuilder, set[str]]:
+    """Transforms a request for a dot-notation field to a clickhouse field."""
+    param_builder = param_builder or ParamBuilder()
+    raw_fields_used = set()
+    json_path = None
+    for prefix in json_columns:
+        if field == prefix or field.startswith(prefix + "."):
+            if field == prefix:
+                json_path = "$"
+            else:
+                json_path = _quote_json_path(field[len(prefix + ".") :])
+            field = prefix + "_dump"
+            break
+
+    # validate field
+    if field not in all_columns:
+        raise ValueError(f"Unknown field: {field}")
+
+    raw_fields_used.add(field)
+    if json_path is not None:
+        json_path_param_name = param_builder.add_param(json_path)
+        if cast == "exists":
+            field = (
+                "(JSON_EXISTS(" + field + ", {" + json_path_param_name + ":String}))"
+            )
+        else:
+            method = "toString"
+            if cast is not None:
+                if cast == "int":
+                    method = "toInt64OrNull"
+                elif cast == "float":
+                    method = "toFloat64OrNull"
+                elif cast == "bool":
+                    method = "toUInt8OrNull"
+                elif cast == "str":
+                    method = "toString"
+                else:
+                    raise ValueError(f"Unknown cast: {cast}")
+            field = (
+                method
+                + "(JSON_VALUE("
+                + field
+                + ", {"
+                + json_path_param_name
+                + ":String}))"
+            )
+
+    return field, param_builder, raw_fields_used
+
+
+class FilterToConditions(BaseModel):
+    having_conditions: list[str]
+    start_event_conditions: list[str]
+    end_event_conditions: list[str]
+    fields_used: set[str]
+
+
+def _process_calls_filter_to_conditions(
+    filter: tsi._CallsFilter,
+    param_builder: typing.Optional[ParamBuilder] = None,
+) -> FilterToConditions:
+    """Converts a CallsFilter to a list of conditions for a clickhouse query."""
+    param_builder = param_builder or ParamBuilder()
+    having_conditions: list[str] = []
+    start_event_conditions: list[str] = []
+    end_event_conditions: list[str] = []
+    raw_fields_used = set()
+
+    if filter.op_names:
+        # We will build up (0 or 1) + N conditions for the op_version_refs
+        # If there are any non-wildcarded names, then we at least have an IN condition
+        # If there are any wildcarded names, then we have a LIKE condition for each
+
+        or_conditions: typing.List[str] = []
+
+        non_wildcarded_names: typing.List[str] = []
+        wildcarded_names: typing.List[str] = []
+        for name in filter.op_names:
+            if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                wildcarded_names.append(name)
+            else:
+                non_wildcarded_names.append(name)
+
+        if non_wildcarded_names:
+            or_conditions.append(
+                f"calls_merged.op_name IN {_param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
+            )
+            raw_fields_used.add("op_name")
+
+        for name in wildcarded_names:
+            like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+            or_conditions.append(
+                f"calls_merged.op_name LIKE {_param_slot(param_builder.add_param(like_name), 'String')}"
+            )
+            raw_fields_used.add("op_name")
+
+        if or_conditions:
+            start_event_conditions.append(_combine_conditions(or_conditions, "OR"))
+
+    if filter.input_refs:
+        start_event_conditions.append(
+            f"hasAny(calls_merged.input_refs, {_param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+        )
+        raw_fields_used.add("input_refs")
+
+    if filter.output_refs:
+        end_event_conditions.append(
+            f"hasAny(calls_merged.output_refs, {_param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+        )
+        raw_fields_used.add("output_refs")
+
+    if filter.parent_ids:
+        start_event_conditions.append(
+            f"calls_merged.parent_id IN {_param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+        )
+        raw_fields_used.add("parent_id")
+
+    if filter.trace_ids:
+        start_event_conditions.append(
+            f"calls_merged.trace_id IN {_param_slot(param_builder.add_param(filter.trace_ids), 'Array(String)')}"
+        )
+        raw_fields_used.add("trace_id")
+
+    if filter.call_ids:
+        start_event_conditions.append(
+            f"calls_merged.id IN {_param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+        )
+        raw_fields_used.add("id")
+
+    if filter.trace_roots_only:
+        start_event_conditions.append("calls_merged.parent_id IS NULL")
+        raw_fields_used.add("parent_id")
+
+    if filter.wb_user_ids:
+        start_event_conditions.append(
+            f"calls_merged.wb_user_id IN {_param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')})"
+        )
+        raw_fields_used.add("wb_user_id")
+
+    if filter.wb_run_ids:
+        start_event_conditions.append(
+            f"calls_merged.wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
+        )
+        raw_fields_used.add("wb_run_id")
+
+    return FilterToConditions(
+        having_conditions=having_conditions,
+        start_event_conditions=start_event_conditions,
+        end_event_conditions=end_event_conditions,
+        fields_used=raw_fields_used,
+    )
+
+
+# TODO: Implement predicate pushdown just like `_process_calls_filter_to_conditions`
+def _process_query_to_conditions(
+    query: tsi.Query,
+    all_columns: typing.Sequence[str],
+    json_columns: typing.Sequence[str],
+    param_builder: typing.Optional[ParamBuilder] = None,
+) -> tuple[list[str], set[str]]:
+    """Converts a Query to a list of conditions for a clickhouse query."""
+    param_builder = param_builder or ParamBuilder()
+    conditions = []
+    raw_fields_used = set()
+
+    # This is the mongo-style query
+    def process_operation(operation: tsi_query.Operation) -> str:
+        cond = None
+
+        if isinstance(operation, tsi_query.AndOperation):
+            if len(operation.and_) == 0:
+                raise ValueError("Empty AND operation")
+            elif len(operation.and_) == 1:
+                return process_operand(operation.and_[0])
+            parts = [process_operand(op) for op in operation.and_]
+            cond = f"({' AND '.join(parts)})"
+        elif isinstance(operation, tsi_query.OrOperation):
+            if len(operation.or_) == 0:
+                raise ValueError("Empty OR operation")
+            elif len(operation.or_) == 1:
+                return process_operand(operation.or_[0])
+            parts = [process_operand(op) for op in operation.or_]
+            cond = f"({' OR '.join(parts)})"
+        elif isinstance(operation, tsi_query.NotOperation):
+            operand_part = process_operand(operation.not_[0])
+            cond = f"(NOT ({operand_part}))"
+        elif isinstance(operation, tsi_query.EqOperation):
+            lhs_part = process_operand(operation.eq_[0])
+            rhs_part = process_operand(operation.eq_[1])
+            cond = f"({lhs_part} = {rhs_part})"
+        elif isinstance(operation, tsi_query.GtOperation):
+            lhs_part = process_operand(operation.gt_[0])
+            rhs_part = process_operand(operation.gt_[1])
+            cond = f"({lhs_part} > {rhs_part})"
+        elif isinstance(operation, tsi_query.GteOperation):
+            lhs_part = process_operand(operation.gte_[0])
+            rhs_part = process_operand(operation.gte_[1])
+            cond = f"({lhs_part} >= {rhs_part})"
+        elif isinstance(operation, tsi_query.ContainsOperation):
+            lhs_part = process_operand(operation.contains_.input)
+            rhs_part = process_operand(operation.contains_.substr)
+            position_operation = "position"
+            if operation.contains_.case_insensitive:
+                position_operation = "positionCaseInsensitive"
+            cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+        else:
+            raise ValueError(f"Unknown operation type: {operation}")
+
+        return cond
+
+    def process_operand(operand: tsi_query.Operand) -> str:
+        if isinstance(operand, tsi_query.LiteralOperation):
+            return _param_slot(
+                param_builder.add_param(operand.literal_),  # type: ignore
+                _python_value_to_ch_type(operand.literal_),
+            )
+        elif isinstance(operand, tsi_query.GetFieldOperator):
+            (field, _, fields_used,) = _transform_external_field_to_internal_field(
+                operand.get_field_, all_columns, json_columns, None, param_builder
+            )
+            raw_fields_used.update(fields_used)
+            return field
+        elif isinstance(operand, tsi_query.ConvertOperation):
+            field = process_operand(operand.convert_.input)
+            convert_to = operand.convert_.to
+            if convert_to == "int":
+                method = "toInt64OrNull"
+            elif convert_to == "double":
+                method = "toFloat64OrNull"
+            elif convert_to == "bool":
+                method = "toUInt8OrNull"
+            elif convert_to == "string":
+                method = "toString"
+            else:
+                raise ValueError(f"Unknown cast: {convert_to}")
+            return f"{method}({field})"
+        elif isinstance(
+            operand,
+            (
+                tsi_query.AndOperation,
+                tsi_query.OrOperation,
+                tsi_query.NotOperation,
+                tsi_query.EqOperation,
+                tsi_query.GtOperation,
+                tsi_query.GteOperation,
+                tsi_query.ContainsOperation,
+            ),
+        ):
+            return process_operation(operand)
+        else:
+            raise ValueError(f"Unknown operand type: {operand}")
+
+    filter_cond = process_operation(query.expr_)
+
+    conditions.append(filter_cond)
+
+    return conditions, raw_fields_used
+
+
+def _make_calls_where_condition_from_event_conditions(
+    start_event_conditions: typing.Optional[typing.List[str]] = None,
+    end_event_conditions: typing.Optional[typing.List[str]] = None,
+) -> str:
+    event_conds = []
+    if start_event_conditions is not None and len(start_event_conditions) > 0:
+        conds = _combine_conditions(
+            [
+                "project_id = {project_id: String}",
+                "isNotNull(started_at)",
+                *start_event_conditions,
+            ],
+            "AND",
+        )
+        event_conds.append(
+            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
+        )
+
+    if end_event_conditions is not None and len(end_event_conditions) > 0:
+        conds = _combine_conditions(
+            [
+                "project_id = {project_id: String}",
+                "isNotNull(ended_at)",
+                *end_event_conditions,
+            ],
+            "AND",
+        )
+        event_conds.append(
+            f"calls_merged.id IN (SELECT id FROM calls_merged WHERE {conds})"
+        )
+
+    # Exclude deleted calls
+    conds = _combine_conditions(
+        ["project_id = {project_id: String}", "isNotNull(deleted_at)"], "AND"
+    )
+    event_conds.append(
+        f"calls_merged.id NOT IN (SELECT id FROM calls_merged WHERE {conds})"
+    )
+
+    where_conditions_part = _combine_conditions(event_conds, "AND")
+
+    return where_conditions_part

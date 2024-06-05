@@ -59,6 +59,14 @@ export const StyledDataGrid = styled(
     outline: 'none',
   },
 
+  '& .MuiTablePagination-displayedRows': {
+    margin: 0,
+  },
+
+  '& .MuiTablePagination-actions': {
+    marginRight: '16px',
+  },
+
   [`& .${gridClasses.row}`]: {
     '&.Mui-hovered': {
       backgroundColor: backgroundColorHovered,
