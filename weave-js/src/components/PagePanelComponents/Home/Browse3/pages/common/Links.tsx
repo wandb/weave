@@ -4,7 +4,7 @@ import {
   TEAL_500,
   TEAL_600,
 } from '@wandb/weave/common/css/color.styles';
-import React from 'react';
+import React, {useState} from 'react';
 import {Link as LinkComp, useHistory} from 'react-router-dom';
 import styled, {css} from 'styled-components';
 
@@ -14,11 +14,12 @@ import {
   usePeekLocation,
   useWeaveflowRouteContext,
 } from '../../context';
-import { EditableCallName } from '../CallPage/OverflowMenu';
+import {OverflowMenu} from '../CallPage/OverflowMenu';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
 import {CallId} from './CallId';
+import {EditableCallName} from './EditableCallName';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -242,12 +243,13 @@ export const CallLink: React.FC<{
   fullWidth?: boolean;
   preservePath?: boolean;
   tracetree?: boolean;
-  readonly?: boolean;
-  onSave?: () => void;
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   const opName = opNiceName(props.opName);
+
+  // Manages clicking "rename" in the overflow menu, forces call name editing view
+  const [renamingCall, setRenamingCall] = useState<boolean | null>(null);
 
   // Custom logic to calculate path and tracetree here is not good. Shows
   // a leak of abstraction. We should not be reaching into the peek location and
@@ -274,18 +276,28 @@ export const CallLink: React.FC<{
     <LinkWrapper onClick={onClick} fullWidth={props.fullWidth}>
       <LinkTruncater fullWidth={props.fullWidth}>
         <Link $variant={props.variant} to={to}>
-          {props.readonly ? opName : (
-            <EditableCallName 
-              opName={opName} 
-              entity={props.entityName} 
-              project={props.projectName} 
-              callId={props.callId} 
-              onSave={props.onSave}
+          {!renamingCall ? (
+            opName
+          ) : (
+            <EditableCallName
+              opName={opName}
+              entity={props.entityName}
+              project={props.projectName}
+              callId={props.callId}
+              onSave={() => setRenamingCall(null)}
+              externalEditingControl={renamingCall}
             />
           )}
         </Link>
       </LinkTruncater>
       <CallId callId={props.callId} />
+      <OverflowMenu
+        entity={props.entityName}
+        project={props.projectName}
+        callIds={[props.callId]}
+        callNames={[opName]}
+        setIsRenaming={() => setRenamingCall(true)}
+      />
     </LinkWrapper>
   );
 };

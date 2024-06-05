@@ -29,6 +29,7 @@ export interface EditableFieldProps {
   className?: string;
   showEditIcon?: boolean;
   renderLinks?: boolean;
+  externalEditingControl?: boolean;
   save?(value: string): void;
   overrideClick?(): void;
 }
@@ -55,7 +56,11 @@ export default class EditableField extends React.Component<
     if (!props.updateValue) {
       return null;
     } else {
-      if (state.editing) {
+      if (
+        state.editing ||
+        (props.externalEditingControl !== undefined &&
+          props.externalEditingControl)
+      ) {
         return {
           origValue: props.value,
         };
@@ -152,7 +157,11 @@ export default class EditableField extends React.Component<
     }
 
     let fieldComponent: JSX.Element;
-    if (this.state.editing) {
+    const editing =
+      this.props.externalEditingControl !== undefined
+        ? this.props.externalEditingControl
+        : this.state.editing;
+    if (editing) {
       if (this.props.multiline) {
         fieldComponent = (
           <Form>

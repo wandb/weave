@@ -159,7 +159,7 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
   const [callRes, setCallRes] =
     useState<traceServerClient.TraceCallReadRes | null>(null);
   const deepKey = useDeepMemo(key);
-  useEffect(() => {
+  const doFetch = useCallback(() => {
     if (deepKey) {
       setCallRes(null);
       loadingRef.current = true;
@@ -174,6 +174,14 @@ const useCall = (key: CallKey | null): Loadable<CallSchema | null> => {
         });
     }
   }, [deepKey, getTsClient]);
+
+  useEffect(() => {
+    doFetch();
+  }, [doFetch]);
+
+  useEffect(() => {
+    return getTsClient().registerOnRenameListener(doFetch);
+  }, [getTsClient, doFetch]);
 
   return useMemo(() => {
     if (key == null) {

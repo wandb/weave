@@ -4,7 +4,6 @@ import {
   DialogContent as MaterialDialogContent,
   DialogTitle as MaterialDialogTitle,
 } from '@material-ui/core';
-import EditableField from '@wandb/weave/common/components/EditableField';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
 import {IconDelete, IconPencilEdit} from '@wandb/weave/components/Icon';
@@ -13,12 +12,14 @@ import styled from 'styled-components';
 
 import {useClosePeek} from '../../context';
 import {useWFHooks} from '../wfReactInterface/context';
-import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const OverflowMenu: FC<{
-  selectedCalls: CallSchema[];
+  entity: string;
+  project: string;
+  callIds: string[];
+  callNames: string[];
   setIsRenaming: (isEditing: boolean) => void;
-}> = ({selectedCalls, setIsRenaming}) => {
+}> = ({entity, project, callIds, callNames, setIsRenaming}) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const menuOptions = [
@@ -28,7 +29,7 @@ export const OverflowMenu: FC<{
         text: 'Rename',
         icon: <IconPencilEdit style={{marginRight: '4px'}} />,
         onClick: () => setIsRenaming(true),
-        disabled: selectedCalls.length === 0,
+        disabled: callIds.length === 0,
       },
     ],
     [
@@ -37,7 +38,7 @@ export const OverflowMenu: FC<{
         text: 'Delete',
         icon: <IconDelete style={{marginRight: '4px'}} />,
         onClick: () => setConfirmDelete(true),
-        disabled: selectedCalls.length === 0,
+        disabled: callIds.length === 0,
       },
     ],
   ];
@@ -46,7 +47,10 @@ export const OverflowMenu: FC<{
     <>
       {confirmDelete && (
         <ConfirmDeleteModal
-          calls={selectedCalls}
+          entity={entity}
+          project={project}
+          callIds={callIds}
+          callNames={callNames}
           confirmDelete={confirmDelete}
           setConfirmDelete={setConfirmDelete}
         />
@@ -103,10 +107,20 @@ DialogActions.displayName = 'S.DialogActions';
 const MAX_DELETED_CALLS_TO_SHOW = 10;
 
 const ConfirmDeleteModal: FC<{
-  calls: CallSchema[];
+  entity: string;
+  project: string;
+  callIds: string[];
+  callNames: string[];
   confirmDelete: boolean;
   setConfirmDelete: (confirmDelete: boolean) => void;
-}> = ({calls, confirmDelete, setConfirmDelete}) => {
+}> = ({
+  entity,
+  project,
+  callIds,
+  callNames,
+  confirmDelete,
+  setConfirmDelete,
+}) => {
   const {useCallsDeleteFunc} = useWFHooks();
   const callsDelete = useCallsDeleteFunc();
   const closePeek = useClosePeek();
@@ -114,20 +128,13 @@ const ConfirmDeleteModal: FC<{
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   let error = null;
-  if (calls.length === 0) {
+  if (callIds.length === 0) {
     error = 'No calls selected';
-  } else if (new Set(calls.map(c => c.entity)).size > 1) {
-    error = 'Cannot delete calls from multiple entities';
-  } else if (new Set(calls.map(c => c.project)).size > 1) {
-    error = 'Cannot delete calls from multiple projects';
   }
 
   const onDelete = () => {
     setDeleteLoading(true);
-    callsDelete(
-      `${calls[0].entity}/${calls[0].project}`,
-      calls.map(c => c.callId)
-    ).then(() => {
+    callsDelete(`${entity}/${project}`, callIds).then(() => {
       setDeleteLoading(false);
       setConfirmDelete(false);
       closePeek();
@@ -140,22 +147,24 @@ const ConfirmDeleteModal: FC<{
       onClose={() => setConfirmDelete(false)}
       maxWidth="xs"
       fullWidth>
-      <DialogTitle>Delete {calls.length > 1 ? 'calls' : 'call'}</DialogTitle>
+      <DialogTitle>Delete {callIds.length > 1 ? 'calls' : 'call'}</DialogTitle>
       <DialogContent>
         {error != null ? (
           <p style={{color: 'red'}}>{error}</p>
         ) : (
           <p>
             Are you sure you want to delete
-            {calls.length > 1 ? ' these calls' : ' this call'}?
+            {callIds.length > 1 ? ' these calls' : ' this call'}?
           </p>
         )}
-        {calls.slice(0, MAX_DELETED_CALLS_TO_SHOW).map(call => (
-          <CallName key={call.callId}>{call.spanName}</CallName>
-        ))}
-        {calls.length > MAX_DELETED_CALLS_TO_SHOW && (
+        {callNames
+          .slice(0, MAX_DELETED_CALLS_TO_SHOW)
+          .map((callName, index) => (
+            <CallName key={callIds[index]}>{callName}</CallName>
+          ))}
+        {callNames.length > MAX_DELETED_CALLS_TO_SHOW && (
           <p style={{marginTop: '8px'}}>
-            and {calls.length - MAX_DELETED_CALLS_TO_SHOW} more...
+            and {callNames.length - MAX_DELETED_CALLS_TO_SHOW} more...
           </p>
         )}
       </DialogContent>
@@ -164,7 +173,7 @@ const ConfirmDeleteModal: FC<{
           variant="destructive"
           disabled={error != null || deleteLoading}
           onClick={onDelete}>
-          {calls.length > 1 ? 'Delete calls' : 'Delete call'}
+          {callIds.length > 1 ? 'Delete calls' : 'Delete call'}
         </Button>
         <Button
           variant="ghost"
@@ -176,30 +185,3 @@ const ConfirmDeleteModal: FC<{
     </Dialog>
   );
 };
-
-
-export const EditableCallName: FC<{
-  opName: string;
-  entity: string;
-  project: string;
-  callId: string;
-  onSave?: () => void;
-}> = ({opName, entity, project, callId, onSave}) => {
-
-  const {useCallRenameFunc} = useWFHooks();
-  const callRename = useCallRenameFunc();
-  const [curOpName, setCurOpName] = useState(opName);
-
-  return <EditableField
-    value={curOpName}
-    save={newName => {
-      callRename(`${entity}/${project}`, callId, newName);
-      setCurOpName(newName);
-      onSave?.();
-    }}
-    placeholder=""
-    updateValue={true}
-    autoSelect={true}
-  />
-};
-
