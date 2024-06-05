@@ -144,12 +144,12 @@ class CallReadRes(BaseModel):
     call: CallSchema
 
 
-class CallsDeleteReqExternal(BaseModel):
+class CallsDeleteReq(BaseModel):
     project_id: str
     call_ids: typing.List[str]
 
 
-class CallsDeleteReq(CallsDeleteReqExternal):
+class CallsDeleteReqForInsert(CallsDeleteReq):
     wb_user_id: str
 
 
@@ -203,13 +203,13 @@ class CallsQueryStatsRes(BaseModel):
     count: int
 
 
-class CallRenameReqExternal(BaseModel):
+class CallRenameReq(BaseModel):
     project_id: str
     call_id: str
     display_name: str
 
 
-class CallRenameReq(CallRenameReqExternal):
+class CallRenameReqForInsert(CallRenameReq):
     wb_user_id: str
 
 
@@ -416,4 +416,16 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
+        raise NotImplementedError()
+
+
+class TraceServerInterfacePostAuth(TraceServerInterface):
+    """Interface with additional auth information added by middlewear."""
+
+    @abc.abstractmethod
+    def call_rename(self, req: CallRenameReqForInsert) -> CallRenameRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def calls_delete(self, req: CallsDeleteReqForInsert) -> CallsDeleteRes:
         raise NotImplementedError()

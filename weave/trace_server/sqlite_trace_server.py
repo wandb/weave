@@ -54,7 +54,7 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     return conn_cursor
 
 
-class SqliteTraceServer(tsi.TraceServerInterface):
+class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
     def __init__(self, db_path: str):
         self.lock = threading.Lock()
         self.db_path = db_path
