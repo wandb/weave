@@ -10,6 +10,7 @@ import datetime
 from requests import HTTPError
 
 from weave.exception import exception_to_json_str
+from weave.feedback import RefFeedback, Feedbacks
 from weave.table import Table
 from weave import trace_sentry, urls
 from weave import run_context
@@ -39,6 +40,9 @@ from weave.trace_server.trace_server_interface import (
     CallSchema,
     ObjQueryReq,
     ObjQueryRes,
+    Feedback,
+    FeedbackQueryReq,
+    Query,
     TableCreateReq,
     TableSchemaForInsert,
     TableQueryReq,
@@ -147,6 +151,21 @@ class Call:
     attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
+
+    _feedback: Optional[RefFeedback] = None
+
+    @property
+    def feedback(self) -> RefFeedback:
+        if not self.id:
+            raise ValueError("Can't get feedback for call without ID")
+        if self._feedback is None:
+            project_parts = self.project_id.split("/")
+            if len(project_parts) != 2:
+                raise ValueError(f"Invalid project_id: {self.project_id}")
+            entity, project = project_parts
+            weave_ref = CallRef(entity, project, self.id)
+            self._feedback = RefFeedback(weave_ref.uri())
+        return self._feedback
 
     @property
     def ui_url(self) -> str:
@@ -625,6 +644,59 @@ class WeaveClient:
     def remove_call_display_name(self, call: Call) -> None:
         self.set_call_display_name(call, None)
 
+    def feedback(
+        self,
+        query: Optional[Union[Query, str]] = None,
+        reaction: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> Feedbacks:
+        expr: dict[str, Any] = {
+            "$eq": [
+                {"$literal": "1"},
+                {"$literal": "1"},
+            ],
+        }
+        if isinstance(query, str):
+            expr = {
+                "$eq": [
+                    {"$getField": "id"},
+                    {"$literal": query},
+                ],
+            }
+        elif isinstance(query, Query):
+            expr = query.expr_.dict()
+
+        if reaction:
+            expr = {
+                "$and": [
+                    expr,
+                    {
+                        "$eq": [
+                            {"$getField": "feedback_type"},
+                            {"$literal": "wandb.reaction.1"},
+                        ],
+                    },
+                    {
+                        "$eq": [
+                            {"$getField": "payload.emoji"},
+                            {"$literal": reaction},
+                        ],
+                    },
+                ]
+            }
+        rewritten_query = Query(**{"$expr": expr})
+
+        response = self.server.feedback_query(
+            FeedbackQueryReq(
+                project_id=self._project_id(),
+                query=rewritten_query,
+                offset=offset,
+                limit=limit,
+            )
+        )
+        return Feedbacks(Feedback(**r) for r in response.result)
+
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
             return
@@ -662,12 +734,6 @@ class WeaveClient:
         raise NotImplementedError()
 
     def ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
-        raise NotImplementedError()
-
-    def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
-        raise NotImplementedError()
-
-    def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError()
 
     def op_runs(self, op_def: Op) -> Sequence[Call]:
