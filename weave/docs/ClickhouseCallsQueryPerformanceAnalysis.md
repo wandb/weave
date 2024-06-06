@@ -2,10 +2,9 @@
 
 In this document, I will outline my learnings from investigating the Weave Calls Query performance. I will also cover some foundational topics relating to ClickHouse as it pertains to this discussion.
 
-TODO: Revise statements, assumptions, and conclusions in this document based on the incorrect assumption of "granule fragmentation". A deeper read indicates that this is not the case - rather that an entire part is completely ordered. 
-
 
 - [1. Clickhouse Calls Query Performance Analysis](#1-clickhouse-calls-query-performance-analysis)
+- [TLDR:](#tldr)
 - [2. Goal(s)](#2-goals)
   - [2.1. Motivating Example](#21-motivating-example)
 - [3. Clickhouse Fundamentals](#3-clickhouse-fundamentals)
@@ -13,7 +12,6 @@ TODO: Revise statements, assumptions, and conclusions in this document based on 
   - [3.2. AggregatingMergeTree](#32-aggregatingmergetree)
 - [4. High level Insights](#4-high-level-insights)
   - [4.1. Research \& Questions](#41-research--questions)
-  - [4.2. Granule Simulation](#42-granule-simulation)
 - [5. New Capability: Dynamic Queries](#5-new-capability-dynamic-queries)
   - [5.1. Current Database Schema](#51-current-database-schema)
     - [5.1.1. Application Perspective](#511-application-perspective)
@@ -27,6 +25,12 @@ TODO: Revise statements, assumptions, and conclusions in this document based on 
   - [6.3. Async Inserts](#63-async-inserts)
   - [6.4. Indexing Strategies and Id Structure](#64-indexing-strategies-and-id-structure)
 
+# TLDR:
+* We need to build a more advanced Calls Query builder that optimizes queries such that data read into memory is minimized.
+  * This needs to support filtering/sorting through references.
+  * This needs to support filtering/sorting through joined in feedback.
+  * This needs to support column sub-selection
+* There are a number of techniques such as Clickhouse Projections, additional indexes, alternative ID formats, and Async Inserts that can help improve performance
 
 # 2. Goal(s)
 I set out to focus on solving 2 problems:
@@ -129,7 +133,6 @@ An initial hand-tuning of the query gives:
 * Granules: 242/4400
 
 ```sql
-EXPLAIN indexes = 1
 SELECT
     any(deleted_at) AS deleted_at,
     any(parent_id) AS parent_id,
@@ -255,7 +258,7 @@ Here is a simplified summary of the data flow:
   2. If `async_insert` is enabled, then Clickhouse server will group together batches within a window to combine into a bigger batch
   3. Batches are written as "parts"
   4. Parts are pre-processed into "Granules" with indexes based on the table definition
-  5. Periodically, Clickhouse will merge parts. Frankly, I could not find what exactly happens in a merge, or exactly when this happens, but i assume it is a "zip" sort of behavior that zips together the already-sorted-granules of each part.
+  5. Periodically, Clickhouse will merge parts.
 * Read Side:
     1. Client performs SELECT commands against the DB
     2. Clickhouse determines which granules (across all parts) are needed to load into memory. This is achieved by considering the WHERE condition in the query, then finding all granules that could possibly contain data relevant to the query. In my opinion it is useful to think of this operation as "filtering" out unneeded granules. By default, all granules are needed, but if the WHERE condition contains a predicate that operates on an indexed field, then the granule's "mark" can be used to determine if it might contain relevant data (or rather, certainly does not contain result rows).
@@ -305,12 +308,8 @@ The key mental model elements here are:
 3. Well, while it is expected that most rows in `calls_merged` are [fully Optimized](https://clickhouse.com/docs/en/sql-reference/statements/optimize), it is also true that rows exist across parts which share the same index key, but are not merged. 
 4. Therefore, it is required to apply group & aggregation operations matching the view against the `calls_merged` table when querying. This is all outlined in the docs above.
 
-The takeaway here is that: all queries for Calls require a group-by, and by definition, will require full-pass over data. 
+One takeaway here is that: all queries for Calls require a group-by operation. In principle, this is nothing wrong with this, but useful to be aware of when constructing queries. Moving filters inside of the WHERE clause when applicable is most ideal.
 
-
-
-Rough Notes:
-* The aggregating merge tree is really nasty since we can't garuntee that parts will be merged - ever? seems to be true accoring to my research
 
 
 # 4. High level Insights
@@ -319,7 +318,7 @@ Rough Notes:
       1. BatchSize: The bigger the batch size, the more de-fragmented the granules will be.
            * **Action:** Implement [Async Inserts](https://clickhouse.com/docs/en/optimize/asynchronous-inserts)! This will maximize our part size.
       2. Data: Index Column Format (UUID vs Naturally Ordered)
-           * **Action:** Revisit our call id structure. I have a strong feeling that prefixing the UUID with a numeric timestamp will have huge impacts in terms of the granule fragmentation. We need to research this a bit more and possible consider other prefixes.
+         1. Our IDs are essentially random strings - some research is needed to determine if there is a better format here. For example, it is possible that some sort of timestamp prefix would be better (but perhaps just indexing the timestamp would suffice?)
       3. Schema: Indexing Strategy & Projections
            * **Action:** I think we can add additional indexes on the calls_merged table, at least for (trace_id, user_id, run_id, parent_id, and timestamp) - trace and project should be timestamp prefixed. This needs more research to get correct and might warrant a few projects. [Indexing is an important subject in Clickhouse](https://clickhouse.com/docs/en/optimize/sparse-primary-indexes) and requires deep reading. Choosing the right indexing strategy is paramount to fast queries. [Projections can help](https://clickhouse.com/docs/en/sql-reference/statements/alter/projection) where there are disjoint indexing use cases.
       4. Query: Pushing filtering clauses operating on indexed fields as far down as possible. Critically predicate pushdown only matters if the ID reduction actually reduces the rows read!
@@ -509,13 +508,6 @@ So here, we are doing a lookup 3 IDs vs 15. Notice that the time is about an ord
     * Step 6: apply sorting
     * Step 7: apply offset/limit
 
-
-
-
-## 4.2. Granule Simulation
-TODO: Notebook
-
-
 # 5. New Capability: Dynamic Queries
 
 ## 5.1. Current Database Schema
@@ -667,8 +659,6 @@ FROM
 # 6. Technical Recommendations
 
 ## 6.1. CallsQueryPlanner & Dynamic Queries
-
-
 
 Rough Notes:
 * Column Selection
@@ -978,8 +968,20 @@ SELECT * FROM FINAL_RESULTS
 ```
 
 ### 6.1.1. General Principles
+TODO: Describe the general pattern for how this will work
+
 ### 6.1.2. Dynamic Queries
+TODO: Describe how to integrate the above dynamic queries
+
 ### 6.1.3. Joins
+TODO: Describe how to integrate joining in feedback
+
 ## 6.2. Column Sub-Selection
+TODO: Describe how to implement and the benefits of top-level column sub selection.
+
 ## 6.3. Async Inserts
+TODO: Describe the benefits of async inserts and how to implement
+
 ## 6.4. Indexing Strategies and Id Structure
+TODO: Revisit and better understand ID Structures / Projections
+TODO: Revise statements, assumptions, and conclusions in this document based on the incorrect assumption of "granule fragmentation". A deeper read indicates that this is not the case - rather that an entire part is completely ordered. 
