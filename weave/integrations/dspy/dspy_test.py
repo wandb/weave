@@ -56,31 +56,17 @@ def assert_calls(
     assert flattened_call_response == expected_calls
 
 
-@pytest.fixture
-def only_patch_dspy() -> Generator[None, None, None]:
-    autopatch.reset_autopatch()
-    dspy_patcher.attempt_patch()
-    autopatch.autopatch_openai()
-
-    try:
-        yield
-    finally:
-        autopatch.autopatch()
-
-
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_dspy_language_models(
-    client: WeaveClient, fake_api_key: None, only_patch_dspy: None
-) -> None:
+def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
     import dspy
 
     gpt3_turbo = dspy.OpenAI(model="gpt-3.5-turbo-1106", max_tokens=300)
     dspy.configure(lm=gpt3_turbo)
-    gpt3_turbo("hello! this is a raw prompt to GPT-3.5")
+    gpt3_turbo("Hello! this is a raw prompt to GPT-3.5")
     assert_calls(
         client,
         expected_calls=[
