@@ -1,14 +1,32 @@
-# Clickhouse Calls Query Performance Analysis
+# 1. Clickhouse Calls Query Performance Analysis
 In this document, I will outline my learnings from investigating the Weave Calls Query performance. I will also cover some foundational topics relating to ClickHouse as it pertains to this discussion.
-# Goal(s)
+- [1. Clickhouse Calls Query Performance Analysis](#1-clickhouse-calls-query-performance-analysis)
+- [2. Goal(s)](#2-goals)
+- [3. Current Database Schema](#3-current-database-schema)
+  - [3.1. Application Perspective](#31-application-perspective)
+- [4. Aggregating Merge Tree \& Insertions](#4-aggregating-merge-tree--insertions)
+- [5. Motivating Example](#5-motivating-example)
+- [6. Thougts round two](#6-thougts-round-two)
+- [7. Questions answered](#7-questions-answered)
+- [8. Other Notes:](#8-other-notes)
+- [9. Outline](#9-outline)
+- [10. Recommendations:](#10-recommendations)
+- [11. High level Insights:](#11-high-level-insights)
+  - [11.1. Granule Simulation](#111-granule-simulation)
+- [12. AggregatingMergeTree](#12-aggregatingmergetree)
+- [13. Dynamic Queries](#13-dynamic-queries)
+- [14. CallsQueryPlanner \& Dynamic Queries](#14-callsqueryplanner--dynamic-queries)
+
+
+# 2. Goal(s)
 I set out to focus on solving 2 problems:
 1. Even after converting to streaming, moving pagination, sorting & filters to the backend, and implementing predicate pushdown, a number of simple queries are still taking longer than expected. We should characterize why this is happening and take steps to improve it. With new features like Call Deletion, Call Display Names, and Feedback, these queries are only going to get more complicated and slower.
 2. One of the last "features" missing to complete the core API is filtering / sorting "through" references. We will discuss what this means later, but the query mechanics and implementation to achieve this calls the entire call schema & query layer into question. 
 Given that these problems are so closely related, it is appropriate to consider them together.
 
-# Current Database Schema
+# 3. Current Database Schema
 Before we analyze the system, or consider how to add new features, let's establish some common ground by describing the current DB Schema
-## Application Perspective
+## 3.1. Application Perspective
 First, let's consider the application perspective. From this perspective, there are the following "tables"
 
 ```mermaid
@@ -22,9 +40,9 @@ graph TD
 **Ops** are the "operations" or "methods", which when "called", produce a **Call**. **Calls** can "reference" **Objects** if they are used as *inputs* or *output* (read: "parameters" or "return value"). **Objects** can recursively "reference" other **Objects**. Finally, **Calls** will (soon) support having multiple **Feedbacks** associated with them.
 
 
-# Aggregating Merge Tree & Insertions
+# 4. Aggregating Merge Tree & Insertions
 
-# Motivating Example
+# 5. Motivating Example
 This is our current query for the homepage, which for Chris' project (limit=100) has the following characteristics:
 * Elapsed: 0.309s
 * Read: 210,695 rows (105.40 MB)
@@ -211,10 +229,10 @@ Here, we see that the granules haven't changed (242), but the rows have (that is
 The rest of this document is a writeup of my learnings from 2 days of research, playing with clickhouse, and prototyping queries. Essentially my goal is to have a definitive understanding of how we can build complex queries that are efficient and support our upcoming features (rather than just patching in changes on top of a shaky foundation.)
 
 
-# Thougts round two
+# 6. Thougts round two
 
 
-# Questions answered
+# 7. Questions answered
 
 * Must Read: https://clickhouse.com/docs/en/optimize/sparse-primary-indexes
 * Must Read: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#mergetree-data-storage
@@ -396,10 +414,10 @@ So here, we are doing a lookup 3 IDs vs 15. Notice that the time is about an ord
     * Step 6: apply sorting
     * Step 7: apply offset/limit
 
-# Other Notes:
+# 8. Other Notes:
 * CVP's project id: `UHJvamVjdEludGVybmFsSWQ6MzkwNzUzNzU=`
 
-# Outline
+# 9. Outline
 1. Clickhouse Fundamentals: 
    1. Parts / Granules / Indexes
    2. AggregatingMergeTree
@@ -414,9 +432,9 @@ So here, we are doing a lookup 3 IDs vs 15. Notice that the time is about an ord
    3. Async Inserts
    4. Indexing Strategies and Id Structure
 
-# Recommendations:
+# 10. Recommendations:
 
-# High level Insights:
+# 11. High level Insights:
 1. Query latency is largely a function of: # of applicable granules X column "width" read. Therefore, query optimization is a game of:
    1. Reducing the number of granules which apply to the query (and importantly, de-fragging the granules). This in itself is a function of:
       1. BatchSize: The bigger the batch size, the more de-fragmented the granules will be.
@@ -434,14 +452,14 @@ So here, we are doing a lookup 3 IDs vs 15. Notice that the time is about an ord
 2. Strong Hypothesis: Out current strategy results in nearly the entire project data getting loaded for most queries. Even though we have started to implement predicate pushdown, our indexing strategy results in nearly every part for the project getting loaded, and we don't do any sort of column sub-selection. This is what is likely leading to our near constant query time for any given project
 3. The AggregatingMergeTree's "group by" is not always that costly. In cases where the query doing the groupby does not select "heavy" fields, then it seems to be negligible. 
 
-## Granule Simulation
+## 11.1. Granule Simulation
 TODO: Notebook
 
-# AggregatingMergeTree
+# 12. AggregatingMergeTree
 Rough Notes:
 * The aggregating merge tree is really nasty since we can't garuntee that parts will be merged - ever? seems to be true accoring to my research
 
-# Dynamic Queries
+# 13. Dynamic Queries
 Link [to notebook](./../../clickhouse_explore.ipynb). Fill in More details!
 
 ```python
@@ -570,7 +588,7 @@ FROM
     LEFT JOIN objects as objquery_9 ON substring(subquery_9.payload_dump, 15) = objquery_9.id
 ```
 
-# CallsQueryPlanner & Dynamic Queries
+# 14. CallsQueryPlanner & Dynamic Queries
 Rough Notes:
 * Column Selection
 * Pushing/popping requires heuristic analysis
