@@ -4,35 +4,35 @@ In this document, I will outline my learnings from investigating the Weave Calls
 
 
 - [1. Clickhouse Calls Query Performance Analysis](#1-clickhouse-calls-query-performance-analysis)
-- [TLDR:](#tldr)
-- [2. Goal(s)](#2-goals)
-  - [2.1. Motivating Example](#21-motivating-example)
-- [3. Clickhouse Fundamentals](#3-clickhouse-fundamentals)
-  - [3.1. Parts / Granules / Indexes](#31-parts--granules--indexes)
-  - [3.2. AggregatingMergeTree](#32-aggregatingmergetree)
-- [4. High level Insights](#4-high-level-insights)
-  - [4.1. Research \& Questions](#41-research--questions)
-- [5. New Capability: Dynamic Queries](#5-new-capability-dynamic-queries)
-  - [5.1. Current Database Schema](#51-current-database-schema)
-    - [5.1.1. Application Perspective](#511-application-perspective)
-  - [5.2. Notebook Exploration](#52-notebook-exploration)
-- [6. Technical Recommendations](#6-technical-recommendations)
-  - [6.1. CallsQueryPlanner \& Dynamic Queries](#61-callsqueryplanner--dynamic-queries)
-    - [6.1.1. General Principles](#611-general-principles)
-    - [6.1.2. Dynamic Queries](#612-dynamic-queries)
-    - [6.1.3. Joins](#613-joins)
-  - [6.2. Column Sub-Selection](#62-column-sub-selection)
-  - [6.3. Async Inserts](#63-async-inserts)
-  - [6.4. Indexing Strategies and Id Structure](#64-indexing-strategies-and-id-structure)
+- [2. TLDR](#2-tldr)
+- [3. Goal(s)](#3-goals)
+  - [3.1. Motivating Example](#31-motivating-example)
+- [4. Clickhouse Fundamentals](#4-clickhouse-fundamentals)
+  - [4.1. Parts / Granules / Indexes](#41-parts--granules--indexes)
+  - [4.2. AggregatingMergeTree](#42-aggregatingmergetree)
+- [5. High level Insights](#5-high-level-insights)
+  - [5.1. Research \& Questions](#51-research--questions)
+- [6. New Capability: Dynamic Queries](#6-new-capability-dynamic-queries)
+  - [6.1. Current Database Schema](#61-current-database-schema)
+    - [6.1.1. Application Perspective](#611-application-perspective)
+  - [6.2. Notebook Exploration](#62-notebook-exploration)
+- [7. Technical Recommendations](#7-technical-recommendations)
+  - [7.1. CallsQueryPlanner \& Dynamic Queries](#71-callsqueryplanner--dynamic-queries)
+    - [7.1.1. General Principles](#711-general-principles)
+    - [7.1.2. Dynamic Queries](#712-dynamic-queries)
+    - [7.1.3. Joins](#713-joins)
+  - [7.2. Column Sub-Selection](#72-column-sub-selection)
+  - [7.3. Async Inserts](#73-async-inserts)
+  - [7.4. Indexing Strategies and Id Structure](#74-indexing-strategies-and-id-structure)
 
-# TLDR:
+# 2. TLDR
 * We need to build a more advanced Calls Query builder that optimizes queries such that data read into memory is minimized.
   * This needs to support filtering/sorting through references.
   * This needs to support filtering/sorting through joined in feedback.
   * This needs to support column sub-selection
 * There are a number of techniques such as Clickhouse Projections, additional indexes, alternative ID formats, and Async Inserts that can help improve performance
 
-# 2. Goal(s)
+# 3. Goal(s)
 I set out to focus on solving 2 problems:
 
 1. Even after converting to streaming, moving pagination, sorting & filters to the backend, and implementing predicate pushdown, **a number of simple queries are still taking longer than expected.** We should characterize why this is happening and take steps to improve it. With new features like Call Deletion, Call Display Names, and Feedback, these **queries are only going to get more complicated and slower.**
@@ -41,7 +41,7 @@ Given that these problems are so closely related, it is appropriate to consider 
 
 
 
-## 2.1. Motivating Example
+## 3.1. Motivating Example
 This is our current query for the homepage, which for Chris' project (limit=100) has the following characteristics (we discuss the concepts of "parts" and "granules" in later sections):
 * Elapsed: 0.309s
 * Read: 210,695 rows (105.40 MB)
@@ -232,13 +232,13 @@ Here, we see that the granules haven't changed (242), but the rows have (that is
 
 The rest of this document is a writeup of my learnings from 2 days of research, playing with clickhouse, and prototyping queries. Essentially my goal is to have a definitive understanding of how we can build complex queries that are efficient and support our upcoming features (rather than just patching in changes on top of our current implementation)
 
-# 3. Clickhouse Fundamentals
+# 4. Clickhouse Fundamentals
 Please carve out an hour or two to read the following resources, they are very useful in understanding Clickhouse!
 * Must Read: https://clickhouse.com/docs/en/optimize/sparse-primary-indexes
 * Must Read: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#mergetree-data-storage
 * Must Read: https://clickhouse.com/docs/en/optimize/asynchronous-inserts
   
-## 3.1. Parts / Granules / Indexes
+## 4.1. Parts / Granules / Indexes
 The following images should be familiar since you read the above documents (:
 
 **Parts / Granules / Indexes**
@@ -272,7 +272,7 @@ Ok, so let's review some of the key points here:
 4. At query time, the relevant granules are determined, columns read into memory, then operations applied. **The best way to improve performance is reduce the number of granules needed for a query and the size of the requested columns.**
     * The trick here is to optimize write, index, and query components in order to achieve the above.
 
-## 3.2. AggregatingMergeTree
+## 4.2. AggregatingMergeTree
 
 * Must Read: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/aggregatingmergetree
 * Must Read/Watch: https://clickhouse.com/docs/en/guides/developer/cascading-materialized-views#source-table-for-the-materialized-views
@@ -312,7 +312,7 @@ One takeaway here is that: all queries for Calls require a group-by operation. I
 
 
 
-# 4. High level Insights
+# 5. High level Insights
 1. Query latency is largely a function of: # of applicable granules X column "width" read. Therefore, query optimization is a game of:
    1. Reducing the number of granules which apply to the query (and importantly, de-fragging the granules). This in itself is a function of:
       1. BatchSize: The bigger the batch size, the more de-fragmented the granules will be.
@@ -330,7 +330,7 @@ One takeaway here is that: all queries for Calls require a group-by operation. I
 2. Strong Hypothesis: Out current strategy results in nearly the entire project data getting loaded for most queries. Even though we have started to implement predicate pushdown, our indexing strategy results in nearly every part for the project getting loaded, and we don't do any sort of column sub-selection. This is what is likely leading to our near constant query time for any given project
 3. The AggregatingMergeTree's "group by" is not always that costly. In cases where the query doing the groupby does not select "heavy" fields, then it seems to be negligible. 
 
-## 4.1. Research & Questions
+## 5.1. Research & Questions
 * Q: Does clickhouse store ranges for indexed columns or a set? Probably a range
     * A: Start/Stop Marks
 * Q: Target granule size
@@ -508,11 +508,11 @@ So here, we are doing a lookup 3 IDs vs 15. Notice that the time is about an ord
     * Step 6: apply sorting
     * Step 7: apply offset/limit
 
-# 5. New Capability: Dynamic Queries
+# 6. New Capability: Dynamic Queries
 
-## 5.1. Current Database Schema
+## 6.1. Current Database Schema
 Before we analyze the system, or consider how to add new features, let's establish some common ground by describing the current DB Schema
-### 5.1.1. Application Perspective
+### 6.1.1. Application Perspective
 First, let's consider the application perspective. From this perspective, there are the following "tables"
 
 ```mermaid
@@ -526,7 +526,7 @@ graph TD
 **Ops** are the "operations" or "methods", which when "called", produce a **Call**. **Calls** can "reference" **Objects** if they are used as *inputs* or *output* (read: "parameters" or "return value"). **Objects** can recursively "reference" other **Objects**. Finally, **Calls** will (soon) support having multiple **Feedbacks** associated with them.
 
 
-## 5.2. Notebook Exploration
+## 6.2. Notebook Exploration
 Link [to notebook](./../../clickhouse_explore.ipynb). Fill in More details!
 
 ```python
@@ -656,9 +656,9 @@ FROM
 ```
 
 
-# 6. Technical Recommendations
+# 7. Technical Recommendations
 
-## 6.1. CallsQueryPlanner & Dynamic Queries
+## 7.1. CallsQueryPlanner & Dynamic Queries
 
 Rough Notes:
 * Column Selection
@@ -967,21 +967,21 @@ WITH
 SELECT * FROM FINAL_RESULTS
 ```
 
-### 6.1.1. General Principles
+### 7.1.1. General Principles
 TODO: Describe the general pattern for how this will work
 
-### 6.1.2. Dynamic Queries
+### 7.1.2. Dynamic Queries
 TODO: Describe how to integrate the above dynamic queries
 
-### 6.1.3. Joins
+### 7.1.3. Joins
 TODO: Describe how to integrate joining in feedback
 
-## 6.2. Column Sub-Selection
+## 7.2. Column Sub-Selection
 TODO: Describe how to implement and the benefits of top-level column sub selection.
 
-## 6.3. Async Inserts
+## 7.3. Async Inserts
 TODO: Describe the benefits of async inserts and how to implement
 
-## 6.4. Indexing Strategies and Id Structure
+## 7.4. Indexing Strategies and Id Structure
 TODO: Revisit and better understand ID Structures / Projections
 TODO: Revise statements, assumptions, and conclusions in this document based on the incorrect assumption of "granule fragmentation". A deeper read indicates that this is not the case - rather that an entire part is completely ordered. 
