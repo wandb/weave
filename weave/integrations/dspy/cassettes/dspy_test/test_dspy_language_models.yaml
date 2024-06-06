@@ -9,7 +9,7 @@ interactions:
       Connection:
       - keep-alive
       User-Agent:
-      - python-requests/2.31.0
+      - python-requests/2.32.3
     method: GET
     uri: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
   response:
@@ -1693,13 +1693,13 @@ interactions:
       Cross-Origin-Resource-Policy:
       - cross-origin
       Date:
-      - Thu, 06 Jun 2024 11:58:42 GMT
+      - Thu, 06 Jun 2024 12:57:45 GMT
       ETag:
       - W/"435128242def81a66312cad8369081ffa0af44c0647b0ea283fb6507b67ac8c0"
       Expires:
-      - Thu, 06 Jun 2024 12:03:42 GMT
+      - Thu, 06 Jun 2024 13:02:45 GMT
       Source-Age:
-      - '281'
+      - '201'
       Strict-Transport-Security:
       - max-age=31536000
       Vary:
@@ -1709,19 +1709,19 @@ interactions:
       X-Cache:
       - HIT
       X-Cache-Hits:
-      - '1'
+      - '7'
       X-Content-Type-Options:
       - nosniff
       X-Fastly-Request-ID:
-      - 853b95ba4b907df67ab8c96817adb83b5f3a6892
+      - f9e603ab0ad643459b423bd316f38be302d83c73
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - 1013:190820:925055:9DDFA2:665F30AD
+      - AB0A:14AEA0:94691:AC5FB:665F3120
       X-Served-By:
-      - cache-lax-kwhp1940059-LAX
+      - cache-qpg1224-QPG
       X-Timer:
-      - S1717675122.295543,VS0,VE1
+      - S1717678665.024753,VS0,VE0
       X-XSS-Protection:
       - 1; mode=block
     status:
