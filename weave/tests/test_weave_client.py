@@ -344,14 +344,19 @@ def test_op_display_name(client):
     assert len(result) == 1
     assert not result[0].display_name
 
-    my_op.display_name = "op name"
-    my_op()
+    @weave.op(display_name="op name")
+    def my_op_1():
+        return "fake"
+
+    my_op_1()
     result = list(client.calls(weave_client._CallsFilter(display_names=["op name"])))
     assert len(result) == 1
 
-    my_op.display_name = "op name 2"
-    my_op()
+    @weave.op(display_name="op name 2")
+    def my_op_2():
+        return "fake"
 
+    my_op_2()
     result = list(client.calls())
     assert len(result) == 3
 
