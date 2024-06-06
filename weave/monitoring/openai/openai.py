@@ -3,9 +3,8 @@ __all__ = ["patch", "unpatch"]
 import functools
 from contextlib import contextmanager
 from functools import partialmethod
-from typing import Callable, Type, Union, AsyncIterator, TypeVar, Generic
+from typing import Callable, Type, Union, AsyncIterator
 import typing
-from types import TracebackType
 
 import openai
 from openai import AsyncStream, Stream
@@ -44,35 +43,6 @@ def to_python(obj: Any) -> Any:
 class partialmethod_with_self(partialmethod):
     def __get__(self, obj: Any, cls: Optional[Type[Any]] = None) -> Callable:
         return self._make_unbound_method().__get__(obj, cls)  # type: ignore
-
-
-_T = TypeVar("_T")
-
-
-class OpenAIStreamProxy(Generic[_T]):
-    _iterator: Iterator[_T]
-    _original_stream = Stream
-
-    def __init__(self, iterator: Iterator[_T], original_stream: Stream) -> None:
-        self._iterator = iterator
-        self._original_stream = original_stream
-
-    def __next__(self) -> _T:
-        return self._iterator.__next__()
-
-    def __iter__(self) -> Iterator[_T]:
-        return self._iterator
-
-    def __enter__(self) -> "OpenAIStreamProxy":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        self._original_stream.close()
 
 
 class WeaveAsyncStream(AsyncStream):
