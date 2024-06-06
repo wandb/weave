@@ -24,7 +24,191 @@ graph TD
 
 # Aggregating Merge Tree & Insertions
 
+# Motivating Example
+This is our current query for the homepage, which for Chris' project (limit=100) has the following characteristics:
+* Elapsed: 0.309s
+* Read: 210,695 rows (105.40 MB)
+* Parts: 14/16
+* Granules: 242/4401
+```sql
+SELECT
+    any(deleted_at) AS deleted_at,
+    any(parent_id) AS parent_id,
+    any(exception) AS exception,
+    any(op_name) AS op_name,
+    any(summary_dump) AS summary_dump,
+    project_id AS project_id,
+    id AS id,
+    any(attributes_dump) AS attributes_dump,
+    array_concat_agg(output_refs) AS output_refs,
+    any(started_at) AS started_at,
+    array_concat_agg(input_refs) AS input_refs,
+    any(wb_user_id) AS wb_user_id,
+    any(inputs_dump) AS inputs_dump,
+    any(wb_run_id) AS wb_run_id,
+    any(output_dump) AS output_dump,
+    any(trace_id) AS trace_id,
+    any(ended_at) AS ended_at
+FROM
+    calls_merged
+WHERE
+    project_id = {project_id: String }
+    AND (
+        calls_merged.id IN (
+            SELECT
+                id
+            from
+                calls_merged
+            WHERE
+                (
+                    project_id = {project_id: String }
+                    AND (
+                        (
+                            calls_merged.id IN (
+                                SELECT
+                                    id
+                                FROM
+                                    calls_merged
+                                WHERE
+                                    (
+                                        (project_id = {project_id: String })
+                                        AND (isNotNull(started_at))
+                                        AND (calls_merged.parent_id IS NULL)
+                                    )
+                            )
+                        )
+                        AND (
+                            calls_merged.id NOT IN (
+                                SELECT
+                                    id
+                                FROM
+                                    calls_merged
+                                WHERE
+                                    (
+                                        (project_id = {project_id: String })
+                                        AND (isNotNull(deleted_at))
+                                    )
+                            )
+                        )
+                    )
+                )
+                AND isNotNull(started_at)
+            ORDER BY
+                started_at desc
+            LIMIT
+                {limit: Int64} OFFSET {offset: Int64}
+        )
+    )
+GROUP BY
+    project_id,
+    id
+ORDER BY
+    started_at desc
+```
 
+Note: this is ~version 4 of our query style and is admittedly overly complex - the latest column pushdown is definitely overkill. The question becomes: "what is the best query here, and in general, everywhere?". An initial hand-tuning of the query gives:
+* Elapsed: 0.334s
+* Read: 96,979 rows (99.66 MB)
+* Parts: 14/15
+* Granules: 242/4400
+
+```sql
+EXPLAIN indexes = 1
+SELECT
+    any(deleted_at) AS deleted_at,
+    any(parent_id) AS parent_id,
+    any(exception) AS exception,
+    any(op_name) AS op_name,
+    any(summary_dump) AS summary_dump,
+    project_id AS project_id,
+    id AS id,
+    any(attributes_dump) AS attributes_dump,
+    array_concat_agg(output_refs) AS output_refs,
+    any(started_at) AS started_at,
+    array_concat_agg(input_refs) AS input_refs,
+    any(wb_user_id) AS wb_user_id,
+    any(inputs_dump) AS inputs_dump,
+    any(wb_run_id) AS wb_run_id,
+    any(output_dump) AS output_dump,
+    any(trace_id) AS trace_id,
+    any(ended_at) AS ended_at
+FROM
+    calls_merged
+WHERE
+    project_id = {project_id: String }
+    AND (
+        calls_merged.id IN (
+            SELECT
+                id
+            FROM
+                calls_merged
+            WHERE
+                project_id = {project_id: String }
+            GROUP BY
+                project_id, id
+            HAVING
+                isNull(any(deleted_at))
+                    AND
+                isNull(any(parent_id))
+            ORDER BY
+                any(started_at) desc
+            LIMIT
+                {limit: Int64} OFFSET {offset: Int64}
+        )
+    )
+GROUP BY
+    project_id,
+    id
+ORDER BY
+    started_at desc
+```
+
+While this is less complicated, it does not actually improve the performance. The inner query has: Elapsed: 0.032s and Read: 59,434 rows (7.10 MB). Ok, so, let's manually paste in the list:
+* Elapsed: 0.254s
+* Read: 37,546 rows (92.57 MB)
+* Parts: 14/16
+* Granules: 242/4401
+```sql
+SELECT
+    any(deleted_at) AS deleted_at,
+    any(parent_id) AS parent_id,
+    any(exception) AS exception,
+    any(op_name) AS op_name,
+    any(summary_dump) AS summary_dump,
+    project_id AS project_id,
+    id AS id,
+    any(attributes_dump) AS attributes_dump,
+    array_concat_agg(output_refs) AS output_refs,
+    any(started_at) AS started_at,
+    array_concat_agg(input_refs) AS input_refs,
+    any(wb_user_id) AS wb_user_id,
+    any(inputs_dump) AS inputs_dump,
+    any(wb_run_id) AS wb_run_id,
+    any(output_dump) AS output_dump,
+    any(trace_id) AS trace_id,
+    any(ended_at) AS ended_at
+FROM
+    calls_merged
+WHERE
+    project_id = {project_id: String }
+    AND (
+        calls_merged.id IN [
+            '72e2ef4c-7ddd-4509-813d-5657970df071',
+            --- snip 98 other ids --
+            'dc271f97-2875-4859-bdb8-9decdcfbedbd'
+        ]
+    )
+GROUP BY
+    project_id,
+    id
+ORDER BY
+    started_at desc
+```
+
+Here, we see that the granules haven't changed (242), but the rows have (that is because the rows report sums across sub queries). This is still ridiculous! We are reading 242 granules (37k rows @ 92MB) to report 100 rows of data! Now, if we remove the "heavy" columns, we get much better performance: Elapsed: 0.030s, Read: 37,593 rows (4.12 MB). However, the user needs this data! Darn users!
+
+
+The rest of this document is a writeup of my learnings from 2 days of research, playing with clickhouse, and prototyping queries. Essentially my goal is to have a definitive understanding of how we can build complex queries that are efficient and support our upcoming features (rather than just patching in changes on top of a shaky foundation.)
 
 
 # Thougts round two
