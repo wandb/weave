@@ -77,7 +77,9 @@ def match_score1(expected: str, model_output: dict) -> dict:
 ```
 
 ### Optional: Define a custom `Scorer` class
-In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#defining-a-scorer-class) for more information. 
+In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. 
+
+See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#defining-a-scorer-class) for more information. 
 
 ### Define a Model to evaluate
 

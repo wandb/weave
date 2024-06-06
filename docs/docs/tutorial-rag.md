@@ -248,7 +248,12 @@ class CorrectnessLLMJudge(Scorer):
                 "stderr": sample_error,
             }
         }
+```
 
+To use this as a scorer, you would initialize it and pass it to `scorers` argument in your `Evaluation like this:
+
+```python
+evaluation = weave.Evaluation(dataset=questions, scorers=[CorrectnessLLMJudge()])
 ```
 
 # Pulling it all together
