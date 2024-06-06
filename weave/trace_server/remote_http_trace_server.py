@@ -5,6 +5,7 @@ import typing as t
 from pydantic import BaseModel, ValidationError
 import requests
 import tenacity
+import logging
 
 from weave.trace_server import environment as wf_env
 
@@ -12,6 +13,8 @@ from weave.trace_server import environment as wf_env
 from weave.wandb_interface import project_creator
 from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
+
+logger = logging.getLogger(__name__)
 
 
 class StartBatchItem(BaseModel):
@@ -65,16 +68,24 @@ def _is_retryable_exception(e: Exception) -> bool:
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
-    print(
-        f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
-        file=sys.stderr,
+    logger.info(
+        "retry_attempt",
+        extra={
+            "fn": retry_state.fn,
+            "attempt_number": retry_state.attempt_number,
+            "exception": str(retry_state.outcome.exception()),
+        },
     )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
-    print(
-        f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
-        file=sys.stderr,
+    logger.info(
+        "retry_failed",
+        extra={
+            "fn": retry_state.fn,
+            "attempt_number": retry_state.attempt_number,
+            "exception": str(retry_state.outcome.exception()),
+        },
     )
     return retry_state.outcome.result()
 
@@ -169,7 +180,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req = req_model.model_validate(req)
         r = requests.post(
             self.trace_server_url + url,
-            data=req.model_dump_json().encode("utf-8"),
+            # `by_alias` is required since we have Mongo-style properties in the
+            # query models that are aliased to conform to start with `$`. Without
+            # this, the model_dump will use the internal property names which are
+            # not valid for the `model_validate` step.
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
             auth=self._auth,
         )
         if r.status_code == 413 and "obj/create" in url:
@@ -368,3 +383,24 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.writelines(r.iter_content())
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
+
+    def feedback_create(
+        self, req: t.Union[tsi.FeedbackCreateReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackCreateRes:
+        return self._generic_request(
+            "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
+        )
+
+    def feedback_query(
+        self, req: t.Union[tsi.FeedbackQueryReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackQueryRes:
+        return self._generic_request(
+            "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
+        )
+
+    def feedback_purge(
+        self, req: t.Union[tsi.FeedbackPurgeReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackPurgeRes:
+        return self._generic_request(
+            "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
+        )
