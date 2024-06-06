@@ -2,6 +2,9 @@
 
 In this document, I will outline my learnings from investigating the Weave Calls Query performance. I will also cover some foundational topics relating to ClickHouse as it pertains to this discussion.
 
+TODO: Revise statements, assumptions, and conclusions in this document based on the incorrect assumption of "granule fragmentation". A deeper read indicates that this is not the case - rather that an entire part is completely ordered. 
+
+
 - [1. Clickhouse Calls Query Performance Analysis](#1-clickhouse-calls-query-performance-analysis)
 - [2. Goal(s)](#2-goals)
   - [2.1. Motivating Example](#21-motivating-example)
@@ -27,14 +30,15 @@ In this document, I will outline my learnings from investigating the Weave Calls
 
 # 2. Goal(s)
 I set out to focus on solving 2 problems:
-1. Even after converting to streaming, moving pagination, sorting & filters to the backend, and implementing predicate pushdown, a number of simple queries are still taking longer than expected. We should characterize why this is happening and take steps to improve it. With new features like Call Deletion, Call Display Names, and Feedback, these queries are only going to get more complicated and slower.
-2. One of the last "features" missing to complete the core API is filtering / sorting "through" references. We will discuss what this means later, but the query mechanics and implementation to achieve this calls the entire call schema & query layer into question. 
+
+1. Even after converting to streaming, moving pagination, sorting & filters to the backend, and implementing predicate pushdown, **a number of simple queries are still taking longer than expected.** We should characterize why this is happening and take steps to improve it. With new features like Call Deletion, Call Display Names, and Feedback, these **queries are only going to get more complicated and slower.**
+2. One of the last "features" missing to complete the core API **is filtering / sorting "through" references.** We will discuss what this means later, but the query mechanics and implementation to achieve this calls the entire call schema & query layer into question. 
 Given that these problems are so closely related, it is appropriate to consider them together.
 
 
 
 ## 2.1. Motivating Example
-This is our current query for the homepage, which for Chris' project (limit=100) has the following characteristics:
+This is our current query for the homepage, which for Chris' project (limit=100) has the following characteristics (we discuss the concepts of "parts" and "granules" in later sections):
 * Elapsed: 0.309s
 * Read: 210,695 rows (105.40 MB)
 * Parts: 14/16
@@ -116,7 +120,9 @@ ORDER BY
     started_at desc
 ```
 
-Note: this is ~version 4 of our query style and is admittedly overly complex - the latest column pushdown is definitely overkill. The question becomes: "what is the best query here, and in general, everywhere?". An initial hand-tuning of the query gives:
+Note: this is ~version 4 of our query style and is admittedly under-optimized - the latest column pushdown is definitely not quite correct. **The question becomes: "what is the best query here, and in general, everywhere?"**. 
+
+An initial hand-tuning of the query gives:
 * Elapsed: 0.334s
 * Read: 96,979 rows (99.66 MB)
 * Parts: 14/15
@@ -173,7 +179,10 @@ ORDER BY
     started_at desc
 ```
 
-While this is less complicated, it does not actually improve the performance. The inner query has: Elapsed: 0.032s and Read: 59,434 rows (7.10 MB). Ok, so, let's manually paste in the list:
+While this is less complicated, it does not actually improve the performance. 
+
+The inner id-select query has: Elapsed: 0.032s and Read: 59,434 rows (7.10 MB), but let's remove it for simplicity and justs manually paste in the list. After dowing that we get:
+
 * Elapsed: 0.254s
 * Read: 37,546 rows (92.57 MB)
 * Parts: 14/16
@@ -218,15 +227,88 @@ ORDER BY
 Here, we see that the granules haven't changed (242), but the rows have (that is because the rows report sums across sub queries). This is still ridiculous! We are reading 242 granules (37k rows @ 92MB) to report 100 rows of data! Now, if we remove the "heavy" columns, we get much better performance: Elapsed: 0.030s, Read: 37,593 rows (4.12 MB). However, the user needs this data! Darn users!
 
 
-The rest of this document is a writeup of my learnings from 2 days of research, playing with clickhouse, and prototyping queries. Essentially my goal is to have a definitive understanding of how we can build complex queries that are efficient and support our upcoming features (rather than just patching in changes on top of a shaky foundation.)
+The rest of this document is a writeup of my learnings from 2 days of research, playing with clickhouse, and prototyping queries. Essentially my goal is to have a definitive understanding of how we can build complex queries that are efficient and support our upcoming features (rather than just patching in changes on top of our current implementation)
 
 # 3. Clickhouse Fundamentals
+Please carve out an hour or two to read the following resources, they are very useful in understanding Clickhouse!
 * Must Read: https://clickhouse.com/docs/en/optimize/sparse-primary-indexes
 * Must Read: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#mergetree-data-storage
+* Must Read: https://clickhouse.com/docs/en/optimize/asynchronous-inserts
   
 ## 3.1. Parts / Granules / Indexes
+The following images should be familiar since you read the above documents (:
+
+**Parts / Granules / Indexes**
+![Parts/Granules/Indexes](https://clickhouse.com/docs/assets/images/sparse-primary-indexes-03a-4d999529304bd55849b8621823b64105.png)
+
+**Synchronous Inserts**
+![SyncInserts](https://clickhouse.com/docs/assets/images/async-01-62b6e26b6500c1d31abe528440c09ee1.png)
+
+**Async Inserts**
+![AsyncInserts](https://clickhouse.com/docs/assets/images/async-02-fa8696a515ccdc848c1bf6b24472be21.png)
+
+Clickhouse is optimized for massive data writes.
+
+Here is a simplified summary of the data flow:
+* Write Side:
+  1. Clients performs INSERT commands to insert batches of data into Clickhouse.
+  2. If `async_insert` is enabled, then Clickhouse server will group together batches within a window to combine into a bigger batch
+  3. Batches are written as "parts"
+  4. Parts are pre-processed into "Granules" with indexes based on the table definition
+  5. Periodically, Clickhouse will merge parts. Frankly, I could not find what exactly happens in a merge, or exactly when this happens, but i assume it is a "zip" sort of behavior that zips together the already-sorted-granules of each part.
+* Read Side:
+    1. Client performs SELECT commands against the DB
+    2. Clickhouse determines which granules (across all parts) are needed to load into memory. This is achieved by considering the WHERE condition in the query, then finding all granules that could possibly contain data relevant to the query. In my opinion it is useful to think of this operation as "filtering" out unneeded granules. By default, all granules are needed, but if the WHERE condition contains a predicate that operates on an indexed field, then the granule's "mark" can be used to determine if it might contain relevant data (or rather, certainly does not contain result rows).
+    3. Once the granules are selected, all columns which the query depends on are read from disk into memory
+    4. Finally, any joining, grouping, filtering, sorting, and other operations are applied in memory and returned to the user.
+
+Ok, so let's review some of the key points here:
+1. Data is stored on disk in a columnar layout.
+2. Clickhouse organizes data into unit groups called "granules", and groups of granules into so-called "parts".
+3. Within a granule, data is ordered based on the columns specified in the ORDER BY clause. These columns also serve as the "sparse index" keys associated with each granule. These are called "marks".
+4. At query time, the relevant granules are determined, columns read into memory, then operations applied. **The best way to improve performance is reduce the number of granules needed for a query and the size of the requested columns.**
+    * The trick here is to optimize write, index, and query components in order to achieve the above.
 
 ## 3.2. AggregatingMergeTree
+
+* Must Read: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/aggregatingmergetree
+* Must Read/Watch: https://clickhouse.com/docs/en/guides/developer/cascading-materialized-views#source-table-for-the-materialized-views
+
+Ok, before we move on, it is probably useful to talk about `AggregatingMergeTree`. Clickhouse has a number of table engines in the "merge" family. I think "merge" here refers to the fact that data is written nearly immediately and parts can be "merged" according to rules.
+
+Anyhow everything we have discussed up until this point is true for clickhouse "merge" family. In our current implementation, we leverage 3 engine types:
+* `MergeTree` -> the standard one
+* `AggregatingMergeTree` -> used by our calls table!
+* `ReplacingMergeTree`. Note: i did not deeply research these tables. I am a bit skeptical that they are needed as implemented, but that is saved for another deep dive.
+
+Our Calls Table storage is setup as follows:
+
+* `call_parts` (MergeTree) -> This table contains "parts" or "updates" to a call. There are 4 types of parts:
+  * "Start Events"
+  * "End Events"
+  * "Delete Events"
+  * "Rename Events"
+* `calls_merged` (AggregatingMergeTree) -> This table is populated from a materialized view `calls_merged_view`, which in itself is a grouped query against the `call_parts` table.
+
+We make all inserts against the `call_parts` table and all queries against the `calls_merged` table. 
+
+The key mental model elements here are:
+1. When data is inserted into the `call_parts` table, it is also materialized into the `calls_merged` table via the materialized view.
+2. The way that aggregations work is they need to satisfy:
+    ```
+    Given row set S and aggregation function F,
+    Let S = S_0 U S_1, where S_0 is any random subset of S.
+    Then the following must hold:
+    F(S) = F(F(S_0) U F(S_1))
+    ```
+    The implication here is that you must be able to apply aggregations iteratively over any subset of the data. Why does this matter?
+3. Well, while it is expected that most rows in `calls_merged` are [fully Optimized](https://clickhouse.com/docs/en/sql-reference/statements/optimize), it is also true that rows exist across parts which share the same index key, but are not merged. 
+4. Therefore, it is required to apply group & aggregation operations matching the view against the `calls_merged` table when querying. This is all outlined in the docs above.
+
+The takeaway here is that: all queries for Calls require a group-by, and by definition, will require full-pass over data. 
+
+
+
 Rough Notes:
 * The aggregating merge tree is really nasty since we can't garuntee that parts will be merged - ever? seems to be true accoring to my research
 
