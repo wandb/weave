@@ -4,8 +4,6 @@ from typing import Generator, List, Optional, Tuple
 
 from weave.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-from weave import autopatch
-from .dspy import dspy_patcher
 
 
 def flatten_calls(
