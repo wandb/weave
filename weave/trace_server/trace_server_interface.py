@@ -4,7 +4,7 @@ import typing
 from pydantic import BaseModel, Field
 
 
-from .interface.query import Query
+from .interface.query import Query, LiteralOperation, GetFieldOperator
 
 
 class CallSchema(BaseModel):
@@ -362,7 +362,7 @@ class Feedback(FeedbackCreateReqForInsert):
 class FeedbackQueryReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     fields: typing.Optional[list[str]] = Field(
-        default=None, examples=[["id", "feedback_type", "payload.note", "count(*)"]]
+        default=None, examples=[["id", "feedback_type", "payload.note"]]
     )
     query: typing.Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
@@ -380,8 +380,7 @@ class FeedbackQueryRes(BaseModel):
 
 class FeedbackPurgeReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
-    # TODO: Should we make this required?
-    query: typing.Optional[Query] = None
+    query: Query
 
 
 class FeedbackPurgeRes(BaseModel):

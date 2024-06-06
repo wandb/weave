@@ -24,7 +24,11 @@ from .interface import query as tsi_query
 from weave.trace import refs
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.feedback import TABLE_FEEDBACK, validate_feedback_create_req
+from weave.trace_server.feedback import (
+    TABLE_FEEDBACK,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
+)
 from weave.trace_server.trace_server_interface_util import (
     generate_id,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -775,6 +779,7 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
         #       should we select matching ids, and then DELETE FROM WHERE id IN (...)?
         #       This would allow us to return the number of rows deleted, and complain
         #       if too many things would be deleted.
+        validate_feedback_purge_req(req)
         conn, cursor = get_conn_cursor(self.db_path)
         query = TABLE_FEEDBACK.purge()
         query = query.project_id(req.project_id)

@@ -45,7 +45,11 @@ from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
 from .errors import InvalidRequest, RequestTooLarge
 from .emoji_util import detone_emojis
-from .feedback import TABLE_FEEDBACK, validate_feedback_create_req
+from .feedback import (
+    TABLE_FEEDBACK,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
+)
 from .orm import Table, Column, ParamBuilder, Row
 
 
@@ -969,6 +973,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
         #       should we select matching ids, and then DELETE FROM WHERE id IN (...)?
         #       This would allow us to return the number of rows deleted, and complain
         #       if too many things would be deleted.
+        validate_feedback_purge_req(req)
         query = TABLE_FEEDBACK.purge()
         query = query.project_id(req.project_id)
         query = query.where(req.query)
