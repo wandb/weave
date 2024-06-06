@@ -54,7 +54,9 @@ def reset_autopatch() -> None:
     from .integrations.mistral.mistral import mistral_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
+    from .integrations.diffusers.diffusers import diffusers_patcher
 
     mistral_patcher.undo_patch()
     litellm_patcher.undo_patch()
     llamaindex_patcher.undo_patch()
+    diffusers_patcher.undo_patch()
