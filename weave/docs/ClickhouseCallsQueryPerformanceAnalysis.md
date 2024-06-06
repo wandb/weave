@@ -1,21 +1,28 @@
 # 1. Clickhouse Calls Query Performance Analysis
+
 In this document, I will outline my learnings from investigating the Weave Calls Query performance. I will also cover some foundational topics relating to ClickHouse as it pertains to this discussion.
+
 - [1. Clickhouse Calls Query Performance Analysis](#1-clickhouse-calls-query-performance-analysis)
 - [2. Goal(s)](#2-goals)
-- [3. Current Database Schema](#3-current-database-schema)
-  - [3.1. Application Perspective](#31-application-perspective)
-- [4. Aggregating Merge Tree \& Insertions](#4-aggregating-merge-tree--insertions)
-- [5. Motivating Example](#5-motivating-example)
-- [6. Thougts round two](#6-thougts-round-two)
-- [7. Questions answered](#7-questions-answered)
-- [8. Other Notes:](#8-other-notes)
-- [9. Outline](#9-outline)
-- [10. Recommendations:](#10-recommendations)
-- [11. High level Insights:](#11-high-level-insights)
-  - [11.1. Granule Simulation](#111-granule-simulation)
-- [12. AggregatingMergeTree](#12-aggregatingmergetree)
-- [13. Dynamic Queries](#13-dynamic-queries)
-- [14. CallsQueryPlanner \& Dynamic Queries](#14-callsqueryplanner--dynamic-queries)
+  - [2.1. Motivating Example](#21-motivating-example)
+- [3. Clickhouse Fundamentals](#3-clickhouse-fundamentals)
+  - [3.1. Parts / Granules / Indexes](#31-parts--granules--indexes)
+  - [3.2. AggregatingMergeTree](#32-aggregatingmergetree)
+- [4. High level Insights](#4-high-level-insights)
+  - [4.1. Research \& Questions](#41-research--questions)
+  - [4.2. Granule Simulation](#42-granule-simulation)
+- [5. New Capability: Dynamic Queries](#5-new-capability-dynamic-queries)
+  - [5.1. Current Database Schema](#51-current-database-schema)
+    - [5.1.1. Application Perspective](#511-application-perspective)
+  - [5.2. Notebook Exploration](#52-notebook-exploration)
+- [6. Technical Recommendations](#6-technical-recommendations)
+  - [6.1. CallsQueryPlanner \& Dynamic Queries](#61-callsqueryplanner--dynamic-queries)
+    - [6.1.1. General Principles](#611-general-principles)
+    - [6.1.2. Dynamic Queries](#612-dynamic-queries)
+    - [6.1.3. Joins](#613-joins)
+  - [6.2. Column Sub-Selection](#62-column-sub-selection)
+  - [6.3. Async Inserts](#63-async-inserts)
+  - [6.4. Indexing Strategies and Id Structure](#64-indexing-strategies-and-id-structure)
 
 
 # 2. Goal(s)
@@ -24,30 +31,15 @@ I set out to focus on solving 2 problems:
 2. One of the last "features" missing to complete the core API is filtering / sorting "through" references. We will discuss what this means later, but the query mechanics and implementation to achieve this calls the entire call schema & query layer into question. 
 Given that these problems are so closely related, it is appropriate to consider them together.
 
-# 3. Current Database Schema
-Before we analyze the system, or consider how to add new features, let's establish some common ground by describing the current DB Schema
-## 3.1. Application Perspective
-First, let's consider the application perspective. From this perspective, there are the following "tables"
-
-```mermaid
-graph TD
-    Ops --> Calls
-    Calls --> Feedbacks
-    Calls --> Objects
-    Objects --> Objects
-```
-
-**Ops** are the "operations" or "methods", which when "called", produce a **Call**. **Calls** can "reference" **Objects** if they are used as *inputs* or *output* (read: "parameters" or "return value"). **Objects** can recursively "reference" other **Objects**. Finally, **Calls** will (soon) support having multiple **Feedbacks** associated with them.
 
 
-# 4. Aggregating Merge Tree & Insertions
-
-# 5. Motivating Example
+## 2.1. Motivating Example
 This is our current query for the homepage, which for Chris' project (limit=100) has the following characteristics:
 * Elapsed: 0.309s
 * Read: 210,695 rows (105.40 MB)
 * Parts: 14/16
 * Granules: 242/4401
+
 ```sql
 SELECT
     any(deleted_at) AS deleted_at,
@@ -228,15 +220,36 @@ Here, we see that the granules haven't changed (242), but the rows have (that is
 
 The rest of this document is a writeup of my learnings from 2 days of research, playing with clickhouse, and prototyping queries. Essentially my goal is to have a definitive understanding of how we can build complex queries that are efficient and support our upcoming features (rather than just patching in changes on top of a shaky foundation.)
 
-
-# 6. Thougts round two
-
-
-# 7. Questions answered
-
+# 3. Clickhouse Fundamentals
 * Must Read: https://clickhouse.com/docs/en/optimize/sparse-primary-indexes
 * Must Read: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#mergetree-data-storage
+  
+## 3.1. Parts / Granules / Indexes
 
+## 3.2. AggregatingMergeTree
+Rough Notes:
+* The aggregating merge tree is really nasty since we can't garuntee that parts will be merged - ever? seems to be true accoring to my research
+
+
+# 4. High level Insights
+1. Query latency is largely a function of: # of applicable granules X column "width" read. Therefore, query optimization is a game of:
+   1. Reducing the number of granules which apply to the query (and importantly, de-fragging the granules). This in itself is a function of:
+      1. BatchSize: The bigger the batch size, the more de-fragmented the granules will be.
+           * **Action:** Implement [Async Inserts](https://clickhouse.com/docs/en/optimize/asynchronous-inserts)! This will maximize our part size.
+      2. Data: Index Column Format (UUID vs Naturally Ordered)
+           * **Action:** Revisit our call id structure. I have a strong feeling that prefixing the UUID with a numeric timestamp will have huge impacts in terms of the granule fragmentation. We need to research this a bit more and possible consider other prefixes.
+      3. Schema: Indexing Strategy & Projections
+           * **Action:** I think we can add additional indexes on the calls_merged table, at least for (trace_id, user_id, run_id, parent_id, and timestamp) - trace and project should be timestamp prefixed. This needs more research to get correct and might warrant a few projects. [Indexing is an important subject in Clickhouse](https://clickhouse.com/docs/en/optimize/sparse-primary-indexes) and requires deep reading. Choosing the right indexing strategy is paramount to fast queries. [Projections can help](https://clickhouse.com/docs/en/sql-reference/statements/alter/projection) where there are disjoint indexing use cases.
+      4. Query: Pushing filtering clauses operating on indexed fields as far down as possible. Critically predicate pushdown only matters if the ID reduction actually reduces the rows read!
+          * **Action:** Implement a `CallsQueryPlanner` that is able to build optimized queries (see below for a larger discussion here)
+   2. Reducing the number / width of the fields read for each query/subquery. This in itself is a function of:
+      1. Data: Some fields are static width (ie. date) vs "dynamic" such as inputs.
+      2. Query: Pulling "heavier" fieldsets up for example, a selection or a filter operating on inputs should be after all the lightweight filters.
+            * **Action:** Implement a `CallsQueryPlanner` that is able to build optimized queries (see below for a larger discussion here)
+2. Strong Hypothesis: Out current strategy results in nearly the entire project data getting loaded for most queries. Even though we have started to implement predicate pushdown, our indexing strategy results in nearly every part for the project getting loaded, and we don't do any sort of column sub-selection. This is what is likely leading to our near constant query time for any given project
+3. The AggregatingMergeTree's "group by" is not always that costly. In cases where the query doing the groupby does not select "heavy" fields, then it seems to be negligible. 
+
+## 4.1. Research & Questions
 * Q: Does clickhouse store ranges for indexed columns or a set? Probably a range
     * A: Start/Stop Marks
 * Q: Target granule size
@@ -414,52 +427,32 @@ So here, we are doing a lookup 3 IDs vs 15. Notice that the time is about an ord
     * Step 6: apply sorting
     * Step 7: apply offset/limit
 
-# 8. Other Notes:
-* CVP's project id: `UHJvamVjdEludGVybmFsSWQ6MzkwNzUzNzU=`
 
-# 9. Outline
-1. Clickhouse Fundamentals: 
-   1. Parts / Granules / Indexes
-   2. AggregatingMergeTree
-2. High level Insights
-3. New Capability: Dynamic (Filter and Sort) Queries
-4. Technical Recommendations
-   1. CallsQueryPlanner
-      1. General Principles
-      2. Dynamic Queries
-      3. Joins
-   2. Column Sub-Selection
-   3. Async Inserts
-   4. Indexing Strategies and Id Structure
 
-# 10. Recommendations:
 
-# 11. High level Insights:
-1. Query latency is largely a function of: # of applicable granules X column "width" read. Therefore, query optimization is a game of:
-   1. Reducing the number of granules which apply to the query (and importantly, de-fragging the granules). This in itself is a function of:
-      1. BatchSize: The bigger the batch size, the more de-fragmented the granules will be.
-           * **Action:** Implement [Async Inserts](https://clickhouse.com/docs/en/optimize/asynchronous-inserts)! This will maximize our part size.
-      2. Data: Index Column Format (UUID vs Naturally Ordered)
-           * **Action:** Revisit our call id structure. I have a strong feeling that prefixing the UUID with a numeric timestamp will have huge impacts in terms of the granule fragmentation. We need to research this a bit more and possible consider other prefixes.
-      3. Schema: Indexing Strategy & Projections
-           * **Action:** I think we can add additional indexes on the calls_merged table, at least for (trace_id, user_id, run_id, parent_id, and timestamp) - trace and project should be timestamp prefixed. This needs more research to get correct and might warrant a few projects. [Indexing is an important subject in Clickhouse](https://clickhouse.com/docs/en/optimize/sparse-primary-indexes) and requires deep reading. Choosing the right indexing strategy is paramount to fast queries. [Projections can help](https://clickhouse.com/docs/en/sql-reference/statements/alter/projection) where there are disjoint indexing use cases.
-      4. Query: Pushing filtering clauses operating on indexed fields as far down as possible. Critically predicate pushdown only matters if the ID reduction actually reduces the rows read!
-          * **Action:** Implement a `CallsQueryPlanner` that is able to build optimized queries (see below for a larger discussion here)
-   2. Reducing the number / width of the fields read for each query/subquery. This in itself is a function of:
-      1. Data: Some fields are static width (ie. date) vs "dynamic" such as inputs.
-      2. Query: Pulling "heavier" fieldsets up for example, a selection or a filter operating on inputs should be after all the lightweight filters.
-            * **Action:** Implement a `CallsQueryPlanner` that is able to build optimized queries (see below for a larger discussion here)
-2. Strong Hypothesis: Out current strategy results in nearly the entire project data getting loaded for most queries. Even though we have started to implement predicate pushdown, our indexing strategy results in nearly every part for the project getting loaded, and we don't do any sort of column sub-selection. This is what is likely leading to our near constant query time for any given project
-3. The AggregatingMergeTree's "group by" is not always that costly. In cases where the query doing the groupby does not select "heavy" fields, then it seems to be negligible. 
-
-## 11.1. Granule Simulation
+## 4.2. Granule Simulation
 TODO: Notebook
 
-# 12. AggregatingMergeTree
-Rough Notes:
-* The aggregating merge tree is really nasty since we can't garuntee that parts will be merged - ever? seems to be true accoring to my research
 
-# 13. Dynamic Queries
+# 5. New Capability: Dynamic Queries
+
+## 5.1. Current Database Schema
+Before we analyze the system, or consider how to add new features, let's establish some common ground by describing the current DB Schema
+### 5.1.1. Application Perspective
+First, let's consider the application perspective. From this perspective, there are the following "tables"
+
+```mermaid
+graph TD
+    Ops --> Calls
+    Calls --> Feedbacks
+    Calls --> Objects
+    Objects --> Objects
+```
+
+**Ops** are the "operations" or "methods", which when "called", produce a **Call**. **Calls** can "reference" **Objects** if they are used as *inputs* or *output* (read: "parameters" or "return value"). **Objects** can recursively "reference" other **Objects**. Finally, **Calls** will (soon) support having multiple **Feedbacks** associated with them.
+
+
+## 5.2. Notebook Exploration
 Link [to notebook](./../../clickhouse_explore.ipynb). Fill in More details!
 
 ```python
@@ -588,7 +581,13 @@ FROM
     LEFT JOIN objects as objquery_9 ON substring(subquery_9.payload_dump, 15) = objquery_9.id
 ```
 
-# 14. CallsQueryPlanner & Dynamic Queries
+
+# 6. Technical Recommendations
+
+## 6.1. CallsQueryPlanner & Dynamic Queries
+
+
+
 Rough Notes:
 * Column Selection
 * Pushing/popping requires heuristic analysis
@@ -895,3 +894,10 @@ WITH
     )
 SELECT * FROM FINAL_RESULTS
 ```
+
+### 6.1.1. General Principles
+### 6.1.2. Dynamic Queries
+### 6.1.3. Joins
+## 6.2. Column Sub-Selection
+## 6.3. Async Inserts
+## 6.4. Indexing Strategies and Id Structure
