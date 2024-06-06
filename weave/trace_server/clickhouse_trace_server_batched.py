@@ -112,7 +112,7 @@ class CallDeleteCHInsertable(BaseModel):
     project_id: str
     id: str
     deleted_at: datetime.datetime
-    wb_user_id: typing.Optional[str]
+    wb_user_id: str
 
     # required types
     input_refs: typing.List[str] = []
@@ -122,8 +122,8 @@ class CallDeleteCHInsertable(BaseModel):
 class CallRenameCHInsertable(BaseModel):
     project_id: str
     id: str
-    display_name: typing.Optional[str] = None
-    wb_user_id: typing.Optional[str]
+    display_name: str
+    wb_user_id: str
 
     # required types
     input_refs: typing.List[str] = []
