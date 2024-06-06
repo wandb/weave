@@ -236,7 +236,11 @@ class LangchainPatcher(Patcher):
         try:
             import os
 
-            os.environ["WEAVE_TRACE_LANGCHAIN"] = "true"
+            self.original_trace_state = os.environ.get("WEAVE_TRACE_LANGCHAIN")
+            if self.original_trace_state is None:
+                os.environ["WEAVE_TRACE_LANGCHAIN"] = "true"
+            else:
+                os.environ["WEAVE_TRACE_LANGCHAIN"] = self.original_trace_state
             register_configure_hook(
                 weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN"
             )
@@ -250,7 +254,7 @@ class LangchainPatcher(Patcher):
         try:
             import os
 
-            del os.environ["WEAVE_TRACE_LANGCHAIN"]
+            os.environ["WEAVE_TRACE_LANGCHAIN"] = self.original_trace_state
             weave_tracing_callback_var.set(None)
 
             return True
