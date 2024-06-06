@@ -198,10 +198,6 @@ weave_tracing_callback_var: ContextVar[Optional[WeaveTracer]] = ContextVar(
     "tracing_weave_callback", default=None
 )
 
-register_configure_hook(
-    weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN"
-)
-
 
 @contextmanager
 def weave_tracing_enabled(
@@ -249,7 +245,7 @@ class LangchainPatcher(Patcher):
             return False
 
     def undo_patch(self) -> bool:
-        if not hasattr(self, "_original_handler"):
+        if not hasattr(self, "original_trace_state"):
             return False
         try:
             import os
