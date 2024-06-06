@@ -271,7 +271,7 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self.ensure_project_exists = ensure_project_exists
-        
+
         if ensure_project_exists:
             self.server.ensure_project_exists(entity, project)
 
