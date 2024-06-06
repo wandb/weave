@@ -188,7 +188,7 @@ class ChatCompletions:
         with log_run(create_op, named_args) as finish_run:
 
             base_stream = self._base_create(*args, **kwargs)
-            stream = WeaveAsyncStream(
+            stream = WeaveStream(
                 base_stream=base_stream,
                 messages=messages,
                 finish_run=finish_run,
