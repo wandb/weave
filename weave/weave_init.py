@@ -75,6 +75,17 @@ Args:
 def init_weave(
     project_name: str, ensure_project_exists: bool = True
 ) -> InitializedClient:
+    global _current_inited_client
+    if _current_inited_client is not None:
+        if (
+            _current_inited_client.client.project == project_name
+            and _current_inited_client.client.ensure_project_exists
+            == ensure_project_exists
+        ):
+            return _current_inited_client
+        else:
+            _current_inited_client.reset()
+
     from . import wandb_api
 
     # Must init to read ensure we've read auth from the environment, in
@@ -106,11 +117,6 @@ def init_weave(
         entity_name, project_name, remote_server, ensure_project_exists
     )
 
-    global _current_inited_client
-    if _current_inited_client is not None:
-        raise errors.WeaveConfigurationError(
-            "weave.init called twice without calling weave.finish"
-        )
     _current_inited_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
