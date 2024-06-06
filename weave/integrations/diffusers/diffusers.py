@@ -3,7 +3,7 @@ import importlib
 import weave
 from weave.trace.patcher import SymbolPatcher, MultiPatcher
 
-from diffusers import StableDiffusionPipeline
+from diffusers import DiffusionPipeline
 
 
 diffusers_patcher = MultiPatcher(
