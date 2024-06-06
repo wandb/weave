@@ -71,6 +71,6 @@ def test_dspy_language_models(client: WeaveClient, fake_api_key: None) -> None:
             ("GPT3.__call__", 0),
             ("GPT3.request", 1),
             ("GPT3.basic_request", 2),
-            ("openai.chat.completions.create", 3)
+            ("openai.chat.completions.create", 3),
         ],
     )
