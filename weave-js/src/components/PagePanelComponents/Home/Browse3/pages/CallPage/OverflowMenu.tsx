@@ -127,18 +127,21 @@ const ConfirmDeleteModal: FC<{
 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  let error = null;
-  if (callIds.length === 0) {
-    error = 'No calls selected';
-  }
+  const [error, setError] = useState(
+    callIds.length === 0 ? 'No call(s) selected' : null
+  );
 
   const onDelete = () => {
     setDeleteLoading(true);
-    callsDelete(`${entity}/${project}`, callIds).then(() => {
-      setDeleteLoading(false);
-      setConfirmDelete(false);
-      closePeek();
-    });
+    callsDelete(`${entity}/${project}`, callIds)
+      .catch(() => {
+        setError(`Failed to delete call(s) ${callNames.join(', ')}`);
+      })
+      .then(() => {
+        setDeleteLoading(false);
+        setConfirmDelete(false);
+        closePeek();
+      });
   };
 
   return (
