@@ -3,8 +3,9 @@ __all__ = ["patch", "unpatch"]
 import functools
 from contextlib import contextmanager
 from functools import partialmethod
-from typing import Callable, Type, Union, AsyncIterator
+from typing import Callable, Type, Union, AsyncIterator, TypeVar, Generic
 import typing
+from types import TracebackType
 
 import openai
 from openai import AsyncStream, Stream
@@ -45,6 +46,35 @@ class partialmethod_with_self(partialmethod):
         return self._make_unbound_method().__get__(obj, cls)  # type: ignore
 
 
+_T = TypeVar("_T")
+
+
+class OpenAIStreamProxy(Generic[_T]):
+    _iterator: Iterator[_T]
+    _original_stream = Stream
+
+    def __init__(self, iterator: Iterator[_T], original_stream: Stream) -> None:
+        self._iterator = iterator
+        self._original_stream = original_stream
+
+    def __next__(self) -> _T:
+        return self._iterator.__next__()
+
+    def __iter__(self) -> Iterator[_T]:
+        return self._iterator
+
+    def __enter__(self) -> "OpenAIStreamProxy":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self._original_stream.close()
+
+
 class WeaveAsyncStream(AsyncStream):
     def __init__(
         self,
@@ -77,6 +107,41 @@ class WeaveAsyncStream(AsyncStream):
         list(wrapped_stream)
 
         result = wrapped_stream.final_response()
+        result_with_usage = ChatCompletion(
+            **result.model_dump(exclude_unset=True),
+            usage=token_usage(self._messages, result.choices),
+        )
+        self._finish_run(result_with_usage.model_dump(exclude_unset=True))
+
+
+class WeaveStream(Stream):
+    def __init__(
+        self,
+        *,
+        base_stream: Stream,
+        messages: List[ChatCompletionMessageParam],
+        finish_run: Callable,
+    ) -> None:
+        from weave.flow.chat_util import OpenAIStream
+
+        self._messages = messages
+        self._chunks: List[ChatCompletionChunk] = []
+        self._finish_run = finish_run
+        super().__init__(
+            cast_to=ChatCompletionChunk,
+            client=base_stream._client,
+            response=base_stream.response,
+        )
+        self._openai_stream = OpenAIStream(self._iterator)
+
+    def __next__(self) -> ChatCompletionChunk:
+        return self._openai_stream.__next__()
+
+    def __iter__(self) -> Iterator[ChatCompletionChunk]:
+        for chunk in self._openai_stream:
+            yield chunk
+
+        result = self._openai_stream.final_response()
         result_with_usage = ChatCompletion(
             **result.model_dump(exclude_unset=True),
             usage=token_usage(self._messages, result.choices),
@@ -152,21 +217,14 @@ class ChatCompletions:
 
         with log_run(create_op, named_args) as finish_run:
 
-            def _stream_create_gen():  # type: ignore
-                stream = self._base_create(*args, **kwargs)
-                from weave.flow.chat_util import OpenAIStream
+            base_stream = self._base_create(*args, **kwargs)
+            stream = WeaveAsyncStream(
+                base_stream=base_stream,
+                messages=messages,
+                finish_run=finish_run,
+            )
 
-                wrapped_stream = OpenAIStream(stream)
-                for chunk in wrapped_stream:
-                    yield chunk
-                result = wrapped_stream.final_response()
-                result_with_usage = ChatCompletion(
-                    **result.model_dump(exclude_unset=True),
-                    usage=token_usage(messages, result.choices),
-                )
-                finish_run(result_with_usage.model_dump(exclude_unset=True))
-
-        return _stream_create_gen()  # type: ignore
+        return stream
 
 
 def patch() -> None:
