@@ -3,9 +3,8 @@ __all__ = ["patch", "unpatch"]
 import functools
 from contextlib import contextmanager
 from functools import partialmethod
-from typing import Callable, Type, Union, AsyncIterator, TypeVar, Generic
+from typing import Callable, Type, Union, AsyncIterator
 import typing
-from types import TracebackType
 
 import openai
 from openai import AsyncStream, Stream
@@ -153,9 +152,8 @@ class ChatCompletions:
 
         with log_run(create_op, named_args) as finish_run:
 
-            stream = self._base_create(*args, **kwargs)
-
             def _stream_create_gen():  # type: ignore
+                stream = self._base_create(*args, **kwargs)
                 from weave.flow.chat_util import OpenAIStream
 
                 wrapped_stream = OpenAIStream(stream)
@@ -168,36 +166,7 @@ class ChatCompletions:
                 )
                 finish_run(result_with_usage.model_dump(exclude_unset=True))
 
-        return _OpenAIStreamProxy(_stream_create_gen(), stream)  # type: ignore
-
-
-_T = TypeVar("_T")
-
-
-class _OpenAIStreamProxy(Generic[_T]):
-    _iterator: Iterator[_T]
-    _original_stream = Stream
-
-    def __init__(self, iterator: Iterator[_T], original_stream: Stream) -> None:
-        self._iterator = iterator
-        self._original_stream = original_stream
-
-    def __next__(self) -> _T:
-        return self._iterator.__next__()
-
-    def __iter__(self) -> Iterator[_T]:
-        return self._iterator
-
-    def __enter__(self) -> "_OpenAIStreamProxy":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        self._original_stream.close()
+        return _stream_create_gen()  # type: ignore
 
 
 def patch() -> None:

@@ -106,35 +106,6 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
     assert_correct_calls_for_chain_batch(res.calls)
 
 
-def assert_correct_calls_for_chain_stream(calls: list[tsi.CallSchema]) -> None:
-    assert len(calls) == 4
-
-    flattened = flatten_calls(calls)
-    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
-    exp = [
-        ("langchain.Chain.RunnableSequence", 0),
-        ("langchain.Prompt.PromptTemplate", 1),
-        ("langchain.Llm.ChatOpenAI", 1),
-        ("openai.chat.completions.create", 2),
-    ]
-    assert got == exp
-
-
-def test_simple_chain_stream(client: WeaveClient) -> None:
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
-
-    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_KEY")
-    llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
-    prompt = PromptTemplate.from_template("1 + {number} = ")
-
-    llm_chain = prompt | llm
-    res = list(llm_chain.stream({"number": 234}))
-
-    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
-    assert_correct_calls_for_chain_stream(res.calls)
-
-
 def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
     assert len(calls) == 10
     flattened = flatten_calls(calls)
@@ -234,12 +205,12 @@ def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> Non
     assert got == exp
 
 
-# @pytest.mark.skip_clickhouse_client
-# @pytest.mark.vcr(
-#     filter_headers=["authorization"],
-#     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
-#     before_record_request=filter_body,
-# )
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
 def test_simple_tool_run(client: WeaveClient) -> None:
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages

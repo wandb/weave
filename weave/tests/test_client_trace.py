@@ -1,6 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from contextvars import copy_context
 import dataclasses
 from collections import namedtuple
 import datetime
@@ -1539,80 +1537,3 @@ def test_single_primitive_output(client):
     assert inner_res.calls[1].output == True
     assert inner_res.calls[2].output == None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
-
-
-def test_langsmith_style_batching(client):
-    import time
-
-    @weave.op()
-    def op_a(a: int) -> int:
-        time.sleep(0.3)
-        return a
-
-    @weave.op()
-    def op_b(b: int) -> int:
-        time.sleep(0.2)
-        return op_a(b)
-
-    @weave.op()
-    def op_c(c: int) -> int:
-        time.sleep(0.1)
-        return op_b(c)
-
-    # This pattern simulates how Langchain does batches
-    def run_with_forked_contexts(max_workers, fn, args):
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            contexts = [copy_context() for _ in range(max_workers)]
-
-            def _wrapped_fn(*args):
-                return contexts.pop().run(fn, *args)
-
-            executor.map(_wrapped_fn, args)
-
-    op_c(0)
-    run_with_forked_contexts(3, op_c, [1, 2, 3])
-    op_c(4)
-
-    inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client._project_id(),
-        )
-    )
-
-    assert len(inner_res.calls) == 15
-
-    # Now, we want to assert that the calls are in the right topological order - while
-    # it is possible that their timestamps are not in order
-    # First some helpers:
-    roots = [c for c in inner_res.calls if c.parent_id is None]
-
-    def assert_input_of_call(call, input_val):
-        assert call.inputs == input_val
-
-    def get_children_of_call(call):
-        return [c for c in inner_res.calls if c.parent_id == call.id]
-
-    def assert_valid_trace(root_call, val):
-        assert_input_of_call(root_call, {"c": val})
-        children = get_children_of_call(root_call)
-        assert len(children) == 1
-        assert_input_of_call(children[0], {"b": val})
-        children = get_children_of_call(children[0])
-        assert len(children) == 1
-        assert_input_of_call(children[0], {"a": val})
-
-    def assert_valid_batched_trace(root_call):
-        val = int(root_call.inputs["c"])
-        assert_valid_trace(root_call, val)
-
-    # First, ensure that there are 5 roots
-    assert len(roots) == 5
-
-    # Now we can validate the shape of the calls within their traces.
-    # The first and last roots are not batched and therefore deterministic
-    # The middle 3 roots are batched and therefore non-deterministic
-    assert_valid_trace(roots[0], 0)
-    assert_valid_batched_trace(roots[1])
-    assert_valid_batched_trace(roots[2])
-    assert_valid_batched_trace(roots[3])
-    assert_valid_trace(roots[4], 4)
