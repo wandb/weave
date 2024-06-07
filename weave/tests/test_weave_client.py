@@ -1,4 +1,5 @@
 import dataclasses
+import functools
 import re
 import signal
 import requests
@@ -31,6 +32,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     FileContentReadReq,
 )
+import weave.trace_server.trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace
 
@@ -242,6 +244,20 @@ def test_calls_query(client):
 
 
 def test_calls_delete(client):
+    # patch post auth methods with wb_user_id
+    original_calls_delete = client.server.calls_delete
+
+    def patched_delete(req):
+        post_auth_req = tsi.CallsDeleteReqForInsert(
+            project_id=req.project_id,
+            call_ids=req.call_ids,
+            wb_user_id="test-user-id",
+        )
+        return original_calls_delete(post_auth_req)
+
+    # Patch calls_delete with our fake middlewear
+    client.server.calls_delete = patched_delete
+
     call0 = client.create_call("x", None, {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", call0, {"a": 5, "b": 11})
     _call0_child2 = client.create_call("x", call0_child1, {"a": 5, "b": 12})
@@ -272,6 +288,20 @@ def test_calls_delete(client):
 
 
 def test_calls_delete_cascade(client):
+    # patch post auth methods with wb_user_id
+    original_calls_delete = client.server.calls_delete
+
+    def patched_delete(req):
+        post_auth_req = tsi.CallsDeleteReqForInsert(
+            project_id=req.project_id,
+            call_ids=req.call_ids,
+            wb_user_id="test-user-id",
+        )
+        return original_calls_delete(post_auth_req)
+
+    # Patch calls_delete with our fake middlewear
+    client.server.calls_delete = patched_delete
+
     # run an evaluation, then delete the evaluation and its children
     @weave.op()
     async def model_predict(input) -> str:
@@ -305,6 +335,21 @@ def test_calls_delete_cascade(client):
 
 
 def test_call_display_name(client):
+    # patch post auth methods with wb_user_id
+    original_call_update = client.server.call_update
+
+    def patched_update(req):
+        post_auth_req = tsi.CallUpdateReqForInsert(
+            project_id=req.project_id,
+            call_id=req.call_id,
+            display_name=req.display_name,
+            wb_user_id="test-user-id",
+        )
+        return original_call_update(post_auth_req)
+
+    # Patch call_update with our fake middlewear
+    client.server.call_update = patched_update
+
     call0 = client.create_call("x", None, {"a": 5, "b": 10})
 
     # Rename using the client method
