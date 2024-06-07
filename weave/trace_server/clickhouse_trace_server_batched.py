@@ -1622,7 +1622,7 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
-def _empty_str_to_none(val: str) -> typing.Optional[str]:
+def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
     return val if val != "" else None
 
 
