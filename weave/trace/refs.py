@@ -2,7 +2,6 @@ import dataclasses
 from typing import Any, Union
 
 from weave.graph_client_context import get_graph_client
-from weave.weave_init import init_weave
 
 from ..trace_server import refs_internal
 
@@ -63,9 +62,6 @@ class ObjectRef(RefWithExtra):
         return u
 
     def get(self) -> Any:
-        # Move import here so that it only happens when the function is called.
-        # This import is invalid in the trace server and represents a dependency
-        # that should be removed.
         gc = get_graph_client()
         if gc is not None:
             return gc.get(self)
@@ -74,13 +70,14 @@ class ObjectRef(RefWithExtra):
         # yet initialized the client, we can initialize a client to
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
-        if gc is None:
-            init_client = init_weave(f"{self.entity}/{self.project}", ensure_project_exists=False)
-            try:
-                res = init_client.client.get(self)
-            finally:
-                init_client.reset()
-            return res
+        from weave.weave_init import init_weave
+
+        init_client = init_weave(f"{self.entity}/{self.project}", ensure_project_exists=False)
+        try:
+            res = init_client.client.get(self)
+        finally:
+            init_client.reset()
+        return res
 
     def is_descended_from(self, potential_ancestor: "ObjectRef") -> bool:
         if self.entity != potential_ancestor.entity:
