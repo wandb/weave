@@ -443,7 +443,7 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
                     summary=json.loads(row[13]) if row[13] else None,
                     wb_user_id=row[14],
                     wb_run_id=row[15],
-                    display_name=row[17],
+                    display_name=row[17] if row[17] != "" else None,
                 )
                 for row in query_result
             ]
