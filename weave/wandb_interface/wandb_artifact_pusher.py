@@ -33,7 +33,7 @@ def artifact_commithash_by_digest(
     }
     """
     )
-    res = wandb_client_api.wandb_public_api().client.execute(
+    res = wandb_client_api.wandb_public_api().client.execute( # type: ignore
         query,
         # variable_values={"id": hex_to_b64_id(server_id)},
         variable_values={
