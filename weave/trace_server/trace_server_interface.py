@@ -14,7 +14,7 @@ class CallSchema(BaseModel):
     # Name of the calling function (op)
     op_name: str
     # Optional display name of the call
-    display_name: typing.Optional[str]
+    display_name: typing.Optional[str] = None
 
     ## Trace ID
     trace_id: str
@@ -204,17 +204,20 @@ class CallsQueryStatsRes(BaseModel):
     count: int
 
 
-class CallRenameReq(BaseModel):
+class CallUpdateReq(BaseModel):
+    # required for all updates
     project_id: str
     call_id: str
-    display_name: str
+
+    # optional update fields
+    display_name: typing.Optional[str] = None
 
 
-class CallRenameReqForInsert(CallRenameReq):
+class CallUpdateReqForInsert(CallUpdateReq):
     wb_user_id: str
 
 
-class CallRenameRes(BaseModel):
+class CallUpdateRes(BaseModel):
     pass
 
 
@@ -438,7 +441,7 @@ class TraceServerInterface:
         ...
 
     @abc.abstractmethod
-    def call_rename(self, req: CallRenameReq) -> CallRenameRes:
+    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
         ...
 
     # Op API
@@ -506,7 +509,7 @@ class TraceServerInterfacePostAuth(TraceServerInterface):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def call_rename(self, req: CallRenameReqForInsert) -> CallRenameRes:
+    def call_update(self, req: CallUpdateReqForInsert) -> CallUpdateRes:
         raise NotImplementedError()
 
     @abc.abstractmethod

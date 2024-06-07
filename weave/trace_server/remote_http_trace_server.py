@@ -282,11 +282,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
         )
 
-    def call_rename(
-        self, req: t.Union[tsi.CallRenameReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallRenameRes:
+    def call_update(
+        self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallUpdateRes:
         return self._generic_request(
-            "/call/rename", req, tsi.CallRenameReq, tsi.CallRenameRes
+            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
         )
 
     # Op API

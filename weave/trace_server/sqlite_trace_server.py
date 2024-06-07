@@ -290,9 +290,6 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
             if filter.wb_run_ids:
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
-            if filter.display_names:
-                in_expr = ", ".join((f"'{x}'" for x in filter.display_names))
-                conds += [f"display_name IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -507,7 +504,10 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
 
         return tsi.CallsDeleteRes()
 
-    def call_rename(self, req: tsi.CallRenameReq) -> tsi.CallRenameRes:
+    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+        if req.display_name is None:
+            raise ValueError("One of [display_name] is required for call update")
+
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute(
@@ -515,7 +515,7 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
                 (req.display_name, req.call_id),
             )
             conn.commit()
-        return tsi.CallRenameRes()
+        return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()

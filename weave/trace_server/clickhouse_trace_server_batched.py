@@ -119,11 +119,13 @@ class CallDeleteCHInsertable(BaseModel):
     output_refs: typing.List[str] = []
 
 
-class CallRenameCHInsertable(BaseModel):
+class CallUpdateCHInsertable(BaseModel):
     project_id: str
     id: str
-    display_name: str
     wb_user_id: str
+
+    # update types
+    display_name: typing.Optional[str] = None
 
     # required types
     input_refs: typing.List[str] = []
@@ -134,7 +136,7 @@ CallCHInsertable = typing.Union[
     CallStartCHInsertable,
     CallEndCHInsertable,
     CallDeleteCHInsertable,
-    CallRenameCHInsertable,
+    CallUpdateCHInsertable,
 ]
 
 
@@ -173,7 +175,7 @@ all_call_insert_columns = list(
     CallStartCHInsertable.model_fields.keys()
     | CallEndCHInsertable.model_fields.keys()
     | CallDeleteCHInsertable.model_fields.keys()
-    | CallRenameCHInsertable.model_fields.keys()
+    | CallUpdateCHInsertable.model_fields.keys()
 )
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
@@ -446,8 +448,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
 
         return tsi.CallsDeleteRes()
 
-    def call_rename(self, req: tsi.CallRenameReqForInsert) -> tsi.CallRenameRes:
-        renamed_insertable = CallRenameCHInsertable(
+    def _ensure_valid_update_field(self, req: tsi.CallUpdateReqForInsert) -> None:
+        valid_update_fields = ["display_name"]
+        for field in valid_update_fields:
+            if getattr(req, field, None) is not None:
+                return
+
+        raise ValueError(
+            f"One of [{', '.join(valid_update_fields)}] is required for call update"
+        )
+
+    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+        self._ensure_valid_update_field(req)
+        renamed_insertable = CallUpdateCHInsertable(
             project_id=req.project_id,
             id=req.call_id,
             wb_user_id=req.wb_user_id,
@@ -455,7 +468,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
         )
         self._insert_call(renamed_insertable)
 
-        return tsi.CallRenameRes()
+        return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -1609,6 +1622,10 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
+def _empty_str_to_none(val: str) -> typing.Optional[str]:
+    return val if val != "" else None
+
+
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1625,7 +1642,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
-        display_name=ch_call.display_name,
+        display_name=_empty_str_to_none(ch_call.display_name),
     )
 
 
@@ -1646,7 +1663,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
-        display_name=ch_call_dict.get("display_name"),
+        display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
     )
 
 
@@ -2014,12 +2031,6 @@ def _process_calls_filter_to_conditions(
             f"calls_merged.wb_run_id IN {_param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')})"
         )
         raw_fields_used.add("wb_run_id")
-
-    if filter.display_names:
-        start_event_conditions.append(
-            f"calls_merged.display_name IN {_param_slot(param_builder.add_param(filter.display_names), 'Array(String)')}"
-        )
-        raw_fields_used.add("display_name")
 
     return FilterToConditions(
         having_conditions=having_conditions,
