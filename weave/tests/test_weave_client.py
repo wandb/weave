@@ -1,5 +1,4 @@
 import dataclasses
-import functools
 import re
 import signal
 import requests
