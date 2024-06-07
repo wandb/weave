@@ -1,6 +1,5 @@
 import io
 import json
-import sys
 import typing as t
 from pydantic import BaseModel, ValidationError
 import requests

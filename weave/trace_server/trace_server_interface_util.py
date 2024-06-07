@@ -1,10 +1,8 @@
 import base64
 import hashlib
-import json
 import typing
 import uuid
 
-from . import trace_server_interface as tsi
 from . import refs_internal
 
 TRACE_REF_SCHEME = "weave"

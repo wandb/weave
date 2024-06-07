@@ -1,4 +1,3 @@
-import pytest
 from weave.trace.refs import ObjectRef
 
 

@@ -33,7 +33,7 @@ import dataclasses
 import logging
 
 from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.query import QueryResult, StreamContext
+from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect

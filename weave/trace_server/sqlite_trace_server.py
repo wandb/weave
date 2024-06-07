@@ -1,10 +1,9 @@
 # Sqlite Trace Server
 
-from typing import cast, Optional, Any, Union
+from typing import cast, Optional, Any
 import threading
 
 import contextvars
-import contextlib
 import datetime
 import json
 import hashlib
