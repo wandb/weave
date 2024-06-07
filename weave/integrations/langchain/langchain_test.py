@@ -2,8 +2,23 @@ import os
 from typing import Any, List, Optional, Tuple
 
 import pytest
+from weave.autopatch import autopatch, autopatch_openai, reset_autopatch
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
+
+from .langchain import langchain_patcher
+
+
+@pytest.fixture
+def only_patch_langchain():
+    reset_autopatch()
+    langchain_patcher.attempt_patch()
+    autopatch_openai()
+
+    try:
+        yield  # This is where the test using this fixture will run
+    finally:
+        autopatch()  # Ensures future tests have the patch applied
 
 
 def filter_body(r: Any) -> Any:
@@ -50,7 +65,7 @@ def assert_correct_calls_for_chain_invoke(calls: list[tsi.CallSchema]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_chain_invoke(client: WeaveClient) -> None:
+def test_simple_chain_invoke(client: WeaveClient, only_patch_langchain) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
@@ -71,7 +86,7 @@ def test_simple_chain_invoke(client: WeaveClient) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_chain_stream(client: WeaveClient) -> None:
+def test_simple_chain_stream(client: WeaveClient, only_patch_langchain) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
@@ -113,7 +128,7 @@ def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_chain_batch(client: WeaveClient) -> None:
+def test_simple_chain_batch(client: WeaveClient, only_patch_langchain) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
@@ -155,7 +170,7 @@ def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_rag_chain(client: WeaveClient) -> None:
+def test_simple_rag_chain(client: WeaveClient, only_patch_langchain) -> None:
     from typing import List
 
     from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -233,7 +248,7 @@ def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> Non
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_agent_run_with_tools(client: WeaveClient) -> None:
+def test_agent_run_with_tools(client: WeaveClient, only_patch_langchain) -> None:
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
     from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
