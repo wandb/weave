@@ -1543,29 +1543,30 @@ def test_single_primitive_output(client):
 
 def test_langsmith_style_batching(client):
     import time
-    
+
     @weave.op()
     def op_a(a: int) -> int:
         time.sleep(0.3)
         return a
-    
+
     @weave.op()
     def op_b(b: int) -> int:
         time.sleep(0.2)
         return op_a(b)
-    
+
     @weave.op()
     def op_c(c: int) -> int:
         time.sleep(0.1)
         return op_b(c)
-    
+
     # This pattern simulates how Langchain does batches
     def run_with_forked_contexts(max_workers, fn, args):
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             contexts = [copy_context() for _ in range(max_workers)]
+
             def _wrapped_fn(*args):
                 return contexts.pop().run(fn, *args)
-            
+
             executor.map(_wrapped_fn, args)
 
     op_c(0)
@@ -1584,7 +1585,7 @@ def test_langsmith_style_batching(client):
     # it is possible that their timestamps are not in order
     # First some helpers:
     roots = [c for c in inner_res.calls if c.parent_id is None]
-    
+
     def assert_input_of_call(call, input_val):
         assert call.inputs == input_val
 
@@ -1592,16 +1593,16 @@ def test_langsmith_style_batching(client):
         return [c for c in inner_res.calls if c.parent_id == call.id]
 
     def assert_valid_trace(root_call, val):
-        assert_input_of_call(root_call, {'c': val})
+        assert_input_of_call(root_call, {"c": val})
         children = get_children_of_call(root_call)
         assert len(children) == 1
-        assert_input_of_call(children[0], {'b': val})
+        assert_input_of_call(children[0], {"b": val})
         children = get_children_of_call(children[0])
         assert len(children) == 1
-        assert_input_of_call(children[0], {'a': val})
+        assert_input_of_call(children[0], {"a": val})
 
     def assert_valid_batched_trace(root_call):
-        val = int(root_call.inputs['c'])
+        val = int(root_call.inputs["c"])
         assert_valid_trace(root_call, val)
 
     # First, ensure that there are 5 roots
@@ -1615,6 +1616,3 @@ def test_langsmith_style_batching(client):
     assert_valid_batched_trace(roots[2])
     assert_valid_batched_trace(roots[3])
     assert_valid_trace(roots[4], 4)
-
-
-

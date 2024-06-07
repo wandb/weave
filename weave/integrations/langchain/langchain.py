@@ -21,7 +21,9 @@ try:
 except ImportError:
     import_failed = True
 
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Union
+
+RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
 if not import_failed:
 
@@ -61,7 +63,7 @@ if not import_failed:
 
     class WeaveTracer(BaseTracer):
         def __init__(self, **kwargs: Any) -> None:
-            self._call_map: Dict[UUID, Call] = {}
+            self._call_map: Dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
             self.gc = graph_client_context.require_graph_client()
             super().__init__()
@@ -73,73 +75,80 @@ if not import_failed:
         def _persist_run_single(self, run: Run) -> None:
             """Persist a run."""
             run_dict = _run_to_dict(run, as_input=True)
+            # TODO: Figure out how to handle the run name. It errors in the UI
+            run_name = make_valid_run_name(run.name)
 
-            # Create a call object.
-            is_valid_root = run.parent_run_id is None
-            lc_parent_run = self._call_map.get(run.parent_run_id)
-            is_valid_child = lc_parent_run is not None
+            lc_run_id = str(run.id)
+            lc_parent_run_id = (
+                str(run.parent_run_id) if run.parent_run_id is not None else None
+            )
+            wv_parent_run = (
+                self._call_map.get(lc_parent_run_id) if lc_parent_run_id else None
+            )
+            parent_run: Union[Optional[Call], bool] = None
+            if wv_parent_run is not None:
+                parent_run = wv_parent_run
+            else:
+                # We need to check for a very very specific condition here.
+                wv_current_run = run_context.get_current_run()
+                if wv_current_run is not None:
+                    wv_current_run_lc_name = (wv_current_run.attributes or {}).get(
+                        "lc_name"
+                    )
+                    wv_current_run_lc_trace_id = (wv_current_run.attributes or {}).get(
+                        "lc_trace_id"
+                    )
+                    wv_current_run_lc_parent_run_id = (
+                        wv_current_run.attributes or {}
+                    ).get("parent_run_id")
+                    wv_current_run_wv_parent_id = wv_current_run.parent_id
+                    lc_name = run.name
+                    lc_trace_id = run.trace_id
 
-            if is_valid_root or is_valid_child:
-                # TO:DO, Figure out how to handle the run name. It errors in the UI
-                run_name = make_valid_run_name(run.name)
-                parent_id = run.parent_run_id
-                # This is not good enough because it won't work when nested inside of another op!
-                # Let's see -> we want to say: look, i know who my parent is, or i believe i am a root.
-                # always respect who my parent is. And if i am a root, then my parent is the parent (or null) of the first execution.
-                # We should let the context operate just on ids,  not the whole call.
-                #
-                # If run.parent_run_id is null then we are a langchain root. 
-                #    If this is the case, then we should get the current weave call from context.
-                #        if there is no call, then we are truly in a root situation
-                #           pass None
-                #        if there the call is a langchain call (it is in the map), then we are in a langchain root batch situation, assert ourselves as as root
-                #           pass False
-                #        If there the call is not a langchain call (it is not in the map), then that is the true parent.
-                #           pass None
-                # Else (parent id is not null)
-                #    If this is the case, then we get the call from the map
-                #        pass the parent call (ideally this would be by id.)
-                parent_run = self._call_map.get(parent_id)
-                parent_run = parent_run if parent_run else False
+                    if (
+                        wv_current_run_lc_name == lc_name == RUNNABLE_SEQUENCE_NAME
+                        and wv_current_run_lc_trace_id != lc_trace_id
+                        and wv_current_run_lc_parent_run_id == None
+                        and lc_parent_run_id == None
+                    ):
+                        # Here we are - the dreaded moment of being in the wrong place at the wrong time!
+                        # We want to set our parent to the parent of this other guy.
+                        if wv_current_run_wv_parent_id is None:
+                            parent_run = False
+                        else:
+                            parent_run = self.gc.call(wv_current_run_wv_parent_id)
 
-                # There are 2 special cases for parent_runs
-                # parent_run = None
-                # if lc_parent_run is not None:
-                #     parent_run = lc_parent_run
-                # else:
-                #     weave_parent_run = run_context.get_current_run()
-                #     if weave_parent_run is not None:
-                #         for known_call in self._call_map.values():
-                #             if known_call.id == parent_run.id:
-                #                 # This is a lc-created run and if it truly was our parent we would know!
-                #                 parent_run = False
-                #                 break
-                            
+            call = self.gc.create_call(
+                # Make sure to add the run name once the UI issue is figured out
+                f"langchain.{run.run_type.capitalize()}.{run_name}",
+                parent_run,
+                run_dict["inputs"],
+                attributes={
+                    "lc_id": lc_run_id,
+                    "lc_trace_id": str(run.trace_id),
+                    "parent_run_id": lc_parent_run_id,
+                    "lc_name": run.name,
+                },
+            )
 
-
-                call = self.gc.create_call(
-                    # Make sure to add the run name once the UI issue is figured out
-                    f"langchain.{run.run_type.capitalize()}.{run_name}",
-                    parent_run,
-                    run_dict,
-                )
-
-                # Add the call to the call map.
-                self._call_map[run.id] = call
+            # Add the call to the call map.
+            self._call_map[lc_run_id] = call
 
         def _finish_run(self, run: Run) -> None:
             """Finish a run."""
             # If the event is in the call map, finish the call.
-            if run.id in self._call_map:
+            run_id = str(run.id)
+            if run_id in self._call_map:
                 # Finish the call.
-                run_id = run.id
+                run_id = run_id
                 parent_id = run.parent_run_id
                 call = self._call_map.pop(run_id)
                 run_dict = _run_to_dict(run, as_input=False)
                 self.gc.finish_call(call, run_dict)
 
         def _update_run_error(self, run: Run) -> None:
-            call = self._call_map.pop(run.id)
+            run_id = str(run.id)
+            call = self._call_map.pop(run_id)
             if call:
                 self.gc.finish_call(
                     call, _run_to_dict(run), exception=Exception(run.error)
@@ -286,7 +295,10 @@ class LangchainPatcher(Patcher):
         try:
             import os
 
-            os.environ["WEAVE_TRACE_LANGCHAIN"] = self.original_trace_state
+            if self.original_trace_state is None:
+                del os.environ["WEAVE_TRACE_LANGCHAIN"]
+            else:
+                os.environ["WEAVE_TRACE_LANGCHAIN"] = self.original_trace_state
             weave_tracing_callback_var.set(None)
 
             return True

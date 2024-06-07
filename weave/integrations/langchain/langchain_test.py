@@ -69,18 +69,18 @@ def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
     assert len(calls) == 8
     flattened = flatten_calls(calls)
 
-    # TODO: figure out what is the right call order for this.
-    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
+    ids = [c.id for (c, _) in flattened]
 
     exp = [
-        ("langchain.Chain.RunnableSequence", 0),
-        ("langchain.Prompt.PromptTemplate", 1),
-        ("langchain.Llm.ChatOpenAI", 1),
-        ("openai.chat.completions.create", 2),
-        ("langchain.Chain.RunnableSequence", 0),
-        ("langchain.Prompt.PromptTemplate", 1),
-        ("langchain.Llm.ChatOpenAI", 1),
-        ("openai.chat.completions.create", 2),
+        ("langchain.Chain.RunnableSequence", 0, None),
+        ("langchain.Prompt.PromptTemplate", 1, ids[0]),
+        ("langchain.Llm.ChatOpenAI", 1, ids[0]),
+        ("openai.chat.completions.create", 2, ids[2]),
+        ("langchain.Chain.RunnableSequence", 0, None),
+        ("langchain.Prompt.PromptTemplate", 1, ids[4]),
+        ("langchain.Llm.ChatOpenAI", 1, ids[4]),
+        ("openai.chat.completions.create", 2, ids[6]),
     ]
     assert got == exp
 
@@ -95,7 +95,7 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_KEY")
     llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
@@ -124,9 +124,7 @@ def test_simple_chain_stream(client: WeaveClient) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
-    api_key = os.environ.get(
-        "OPENAI_API_KEY", "DUMMY_KEY"
-    )
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_KEY")
     llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
@@ -287,7 +285,7 @@ def test_simple_tool_run(client: WeaveClient) -> None:
 
     llm_with_tools = llm.bind(functions=functions)
 
-    def _format_chat_history(chat_history: List[Tuple[str, str]]):
+    def _format_chat_history(chat_history: List[Tuple[str, str]]) -> List:
         buffer = []
         for human, ai in chat_history:
             buffer.append(HumanMessage(content=human))

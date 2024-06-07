@@ -142,6 +142,7 @@ class Call:
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
+    attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -227,6 +228,7 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
         summary=server_call.summary,
+        attributes=server_call.attributes,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -437,7 +439,12 @@ class WeaveClient:
     def create_call(
         self,
         op: Union[str, Op],
-        parent: Optional[Call] | bool, # bad! temporary way to differentiate None from False
+        # parent can be: (is there a better way to differentiate these?)
+        # - None: infer parent from stack
+        # - False: explicitly no parent, top-level call
+        # - True: invalid, use None instead
+        # - Call: explicit parent
+        parent: Union[Optional[Call], bool],
         inputs: dict,
         attributes: dict = {},
     ) -> Call:
@@ -460,7 +467,9 @@ class WeaveClient:
         elif parent is False:
             parent = None
         elif parent is True:
-            raise ValueError("parent=True is not supported. Use parent=None to indicate no parent.")
+            raise ValueError(
+                "parent=True is not supported. Use parent=None to indicate no parent."
+            )
 
         if parent:
             trace_id = parent.trace_id
@@ -475,6 +484,7 @@ class WeaveClient:
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
+            attributes=attributes,
         )
         if parent is not None:
             parent._children.append(call)
