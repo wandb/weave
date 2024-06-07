@@ -1682,6 +1682,7 @@ def test_call_stack_order_out_of_order_pop(client):
     call_1 = client.create_call("op", None, {})
     call_2 = client.create_call("op", None, {})
     call_3 = client.create_call("op", None, {})
+    # Purposely swap 4 & 5
     call_5 = client.create_call("op", call_1, {})  # <- Explicit Parent (call_1)
     call_4 = client.create_call("op", call_2, {})  # <- Explicit Parent (call_2)
     call_6 = client.create_call("op", call_5, {})  # <- Explicit Parent (call_5)
