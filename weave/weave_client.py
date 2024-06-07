@@ -437,7 +437,7 @@ class WeaveClient:
     def create_call(
         self,
         op: Union[str, Op],
-        parent: Optional[Call],
+        parent: Optional[Call] | bool, # bad! temporary way to differentiate None from False
         inputs: dict,
         attributes: dict = {},
     ) -> Call:
@@ -457,6 +457,10 @@ class WeaveClient:
 
         if parent is None:
             parent = run_context.get_current_run()
+        elif parent is False:
+            parent = None
+        elif parent is True:
+            raise ValueError("parent=True is not supported. Use parent=None to indicate no parent.")
 
         if parent:
             trace_id = parent.trace_id

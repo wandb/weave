@@ -6,6 +6,7 @@ from contextvars import ContextVar
 from uuid import UUID
 
 from weave import graph_client_context
+from weave import run_context
 from weave.trace.patcher import Patcher
 from weave.weave_client import Call
 
@@ -75,16 +76,51 @@ if not import_failed:
 
             # Create a call object.
             is_valid_root = run.parent_run_id is None
-            is_valid_child = run.parent_run_id in self._call_map
+            lc_parent_run = self._call_map.get(run.parent_run_id)
+            is_valid_child = lc_parent_run is not None
 
             if is_valid_root or is_valid_child:
                 # TO:DO, Figure out how to handle the run name. It errors in the UI
                 run_name = make_valid_run_name(run.name)
                 parent_id = run.parent_run_id
+                # This is not good enough because it won't work when nested inside of another op!
+                # Let's see -> we want to say: look, i know who my parent is, or i believe i am a root.
+                # always respect who my parent is. And if i am a root, then my parent is the parent (or null) of the first execution.
+                # We should let the context operate just on ids,  not the whole call.
+                #
+                # If run.parent_run_id is null then we are a langchain root. 
+                #    If this is the case, then we should get the current weave call from context.
+                #        if there is no call, then we are truly in a root situation
+                #           pass None
+                #        if there the call is a langchain call (it is in the map), then we are in a langchain root batch situation, assert ourselves as as root
+                #           pass False
+                #        If there the call is not a langchain call (it is not in the map), then that is the true parent.
+                #           pass None
+                # Else (parent id is not null)
+                #    If this is the case, then we get the call from the map
+                #        pass the parent call (ideally this would be by id.)
+                parent_run = self._call_map.get(parent_id)
+                parent_run = parent_run if parent_run else False
+
+                # There are 2 special cases for parent_runs
+                # parent_run = None
+                # if lc_parent_run is not None:
+                #     parent_run = lc_parent_run
+                # else:
+                #     weave_parent_run = run_context.get_current_run()
+                #     if weave_parent_run is not None:
+                #         for known_call in self._call_map.values():
+                #             if known_call.id == parent_run.id:
+                #                 # This is a lc-created run and if it truly was our parent we would know!
+                #                 parent_run = False
+                #                 break
+                            
+
+
                 call = self.gc.create_call(
                     # Make sure to add the run name once the UI issue is figured out
                     f"langchain.{run.run_type.capitalize()}.{run_name}",
-                    self._call_map.get(parent_id),
+                    parent_run,
                     run_dict,
                 )
 
