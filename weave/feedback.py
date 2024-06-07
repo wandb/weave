@@ -25,20 +25,12 @@ class Feedbacks:
         return self.items[index]
 
     def __iter__(self) -> Iterator[tsi.Feedback]:
-        self.current = 0
-        return self
-
-    def __next__(self) -> tsi.Feedback:
-        if self.current < len(self.items):
-            item = self.items[self.current]
-            self.current += 1
-            return item
-        raise StopIteration
+        return iter(self.items)
 
     def __len__(self) -> int:
         return len(self.items)
 
-    def as_table(self, include_ref: bool = True) -> Table:
+    def as_rich_table(self, include_ref: bool = True) -> Table:
         table = Table(show_header=True, header_style="bold cyan")
         if include_ref:
             table.add_column("Ref", overflow="fold")
@@ -90,7 +82,7 @@ class Feedbacks:
         elif len(self) == 1:
             p.text(pydantic_util.model_to_str(self.items[0]))
         else:
-            table = self.as_table()
+            table = self.as_rich_table()
             p.text(pydantic_util.table_to_str(table))
 
 
@@ -121,16 +113,8 @@ class RefFeedback:
 
     def __iter__(self) -> Iterator[tsi.Feedback]:
         self._maybe_fetch()
-        self.current = 0
-        return self
-
-    def __next__(self) -> tsi.Feedback:
         assert self.items is not None
-        if self.current < len(self.items):
-            item = self.items[self.current]
-            self.current += 1
-            return item
-        raise StopIteration
+        return iter(self.items)
 
     def __len__(self) -> int:
         self._maybe_fetch()
@@ -253,5 +237,5 @@ class RefFeedback:
         else:
             self._maybe_fetch()
             assert self.items is not None
-            table = Feedbacks(self.items).as_table(include_ref=False)
+            table = Feedbacks(self.items).as_rich_table(include_ref=False)
             p.text(pydantic_util.table_to_str(table))
