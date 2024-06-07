@@ -111,8 +111,9 @@ class CallEndCHInsertable(BaseModel):
 class CallDeleteCHInsertable(BaseModel):
     project_id: str
     id: str
-    deleted_at: datetime.datetime
     wb_user_id: str
+
+    deleted_at: datetime.datetime
 
     # required types
     input_refs: typing.List[str] = []
