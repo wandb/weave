@@ -19,6 +19,7 @@ Faker==19.6.2  # used for synthetic data generation
 pytest-dotenv
 supervisor>=4.2.5
 clickhouse_connect==0.7.0
+emoji>=2.12.1
 uvicorn>=0.27.0
 fastapi>=0.110.0
 tqdm>=4.66.3  # CVE 2024-34062
