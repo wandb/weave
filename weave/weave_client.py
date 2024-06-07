@@ -24,7 +24,6 @@ from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
     CallUpdateReq,
-    CallUpdateReqForInsert,
     CallsDeleteReq,
     ObjSchema,
     RefsReadBatchReq,
@@ -46,7 +45,6 @@ from weave.trace_server.trace_server_interface import (
     _TableRowFilter,
     _CallsFilter,
     _ObjectVersionFilter,
-    TraceServerInterface,
 )
 from weave.trace.refs import (
     Ref,
@@ -588,7 +586,7 @@ class WeaveClient:
     def set_call_display_name(
         self, call: Call, display_name: Optional[str] = None
     ) -> None:
-        # Unset the display name when None
+        # Removing call display name, use "" for db representation
         if display_name is None:
             display_name = ""
         self.server.call_update(
