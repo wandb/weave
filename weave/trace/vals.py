@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
 from weave import box
-from weave.graph_client_context import require_graph_client
+from weave.graph_client_context import get_graph_client
 from weave.table import Table
 from weave.trace.errors import InternalError
 from weave.trace.object_record import ObjectRecord
@@ -113,14 +113,12 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
         except AttributeError:
             return None
 
-    gc = require_graph_client()
-    res = attribute_access_result(self, attribute, name, server=gc.server)
+    server = gc.server if (gc := get_graph_client()) else None
+    res = attribute_access_result(self, attribute, name, server=server)
     return res
 
 
 def attribute_access_result(self: object, val_attr_val: Any, attr_name: str, *, server: Optional[TraceServerInterface]) -> Any:
-    # Require server to be explicitly to be super clear!
-
     # Not ideal, what about properties?
     if callable(val_attr_val):
         return val_attr_val
