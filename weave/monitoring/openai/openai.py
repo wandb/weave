@@ -63,16 +63,24 @@ class WeaveAsyncStream(AsyncStream):
         )
 
     async def __anext__(self) -> ChatCompletionChunk:
-        item = await self._iterator.__anext__()
+        try:
+            item = await self._iterator.__anext__()
+        except StopAsyncIteration:
+            self._on_finish()
+            raise
         self._chunks.append(item)
         return item
 
     async def __aiter__(self) -> AsyncIterator[ChatCompletionChunk]:
-        from weave.flow.chat_util import OpenAIStream
-
         async for item in self._iterator:
             self._chunks.append(item)
             yield item
+
+        self._on_finish()
+
+    def _on_finish(self) -> None:
+        from weave.flow.chat_util import OpenAIStream
+
         wrapped_stream = OpenAIStream(iter(self._chunks))
         list(wrapped_stream)
 
@@ -105,12 +113,18 @@ class WeaveStream(Stream):
         self._openai_stream = OpenAIStream(self._iterator)
 
     def __next__(self) -> ChatCompletionChunk:
-        return self._openai_stream.__next__()
+        try:
+            return self._openai_stream.__next__()
+        except StopIteration:
+            self._on_finish()
+            raise
 
     def __iter__(self) -> Iterator[ChatCompletionChunk]:
         for chunk in self._openai_stream:
             yield chunk
+        self._on_finish()
 
+    def _on_finish(self) -> None:
         result = self._openai_stream.final_response()
         result_with_usage = ChatCompletion(
             **result.model_dump(exclude_unset=True),
