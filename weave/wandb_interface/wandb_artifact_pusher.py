@@ -42,7 +42,7 @@ def artifact_commithash_by_digest(
             "artName": artifact_name,
             "digest": digest,
         },
-    )
+    )  # type: ignore
     project = res.get("project")
     if project is None:
         return None

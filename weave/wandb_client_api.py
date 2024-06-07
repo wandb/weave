@@ -1,20 +1,18 @@
 # This is deprecated in favor of the new wandb_api.py module.
 # TODO: remove uses of this and delete.
 
-from wandb.apis import public
-from wandb.apis.public.api import gql
-from wandb.sdk.internal.internal_api import _thread_local_api_settings
 import logging
 import typing
 
-from wandb.errors import CommError as WandbCommError
-
-from . import errors
-
 import graphql
 from graphql import GraphQLSchema
-
 from requests import exceptions
+from wandb.apis import public
+from wandb.apis.public.api import gql
+from wandb.errors import CommError as WandbCommError
+from wandb.sdk.internal.internal_api import _thread_local_api_settings
+
+from . import errors
 
 
 def wandb_public_api() -> public.Api:
@@ -44,7 +42,7 @@ def query_with_retry(
             return wandb_public_api().client.execute(
                 gql(query_str),
                 variable_values=variables,
-            )
+            )  # type: ignore
         except exceptions.Timeout as e:
             if attempt_no == num_timeout_retries:
                 raise

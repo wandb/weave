@@ -56,7 +56,9 @@ Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
 MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["append"]]
 
 
-def make_mutation(path: list[str], operation: MutationOperation, args: tuple[Any, ...]) -> Mutation:
+def make_mutation(
+    path: list[str], operation: MutationOperation, args: tuple[Any, ...]
+) -> Mutation:
     if operation == "setitem":
         if len(args) != 2 or not isinstance(args[0], str):
             raise ValueError("setitem mutation requires 2 args")
@@ -84,7 +86,9 @@ class Tracable:
     root: "Tracable"
     server: TraceServerInterface
 
-    def add_mutation(self, path: list[str], operation: MutationOperation, *args: Any) -> None:
+    def add_mutation(
+        self, path: list[str], operation: MutationOperation, *args: Any
+    ) -> None:
         if self.mutations is None:
             self.mutations = []
         self.mutations.append(make_mutation(path, operation, args))
@@ -118,7 +122,13 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     return res
 
 
-def attribute_access_result(self: object, val_attr_val: Any, attr_name: str, *, server: Optional[TraceServerInterface]) -> Any:
+def attribute_access_result(
+    self: object,
+    val_attr_val: Any,
+    attr_name: str,
+    *,
+    server: Optional[TraceServerInterface],
+) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
         return val_attr_val
@@ -183,7 +193,9 @@ class TraceObject(Tracable):
         else:
             if not isinstance(self.ref, ObjectRef):
                 raise ValueError("Can only set attributes on object refs")
-            object.__getattribute__(self, "root").add_mutation(self.ref.extra, "setattr", __name, __value)
+            object.__getattribute__(self, "root").add_mutation(
+                self.ref.extra, "setattr", __name, __value
+            )
             return object.__setattr__(self._val, __name, __value)
 
     def __dir__(self) -> list[str]:
@@ -329,7 +341,9 @@ class TraceDict(Tracable, dict):
 
     def get(self, key: str, default: Any = None) -> Any:
         new_ref = self.ref.with_key(key)
-        return make_trace_obj(super().get(key, default), new_ref, self.server, self.root)
+        return make_trace_obj(
+            super().get(key, default), new_ref, self.server, self.root
+        )
 
     def __setitem__(self, key: str, value: Any) -> None:
         if not isinstance(self.ref, ObjectRef):
@@ -396,7 +410,9 @@ def make_trace_obj(
         if not isinstance(val_ref, TableRef):
             val_table_ref = getattr(val, "table_ref", None)
             if not isinstance(val_table_ref, TableRef):
-                raise InternalError("Expected Table.ref or Table.table_ref to be TableRef")
+                raise InternalError(
+                    "Expected Table.ref or Table.table_ref to be TableRef"
+                )
             val_ref = val_table_ref
         val = TraceTable(val_ref, new_ref, server, _TableRowFilter(), root)
     if isinstance(val, TableRef):
@@ -444,7 +460,9 @@ def make_trace_obj(
         #    case. We are accepting the incorrect assignment here for the sake
         #    of expediency, but should be fixed.
         if parent is None:
-            raise MissingSelfInstanceError(f"{val.name} Op requires a bound self instance. Must be called from an instance method.")
+            raise MissingSelfInstanceError(
+                f"{val.name} Op requires a bound self instance. Must be called from an instance method."
+            )
         val = val.__get__(parent, type(parent))
     box_val = box.box(val)
     if isinstance(box_val, pydantic_v1.BaseModel):
