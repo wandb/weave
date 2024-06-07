@@ -84,6 +84,41 @@ class WeaveAsyncStream(AsyncStream):
         self._finish_run(result_with_usage.model_dump(exclude_unset=True))
 
 
+class WeaveStream(Stream):
+    def __init__(
+        self,
+        *,
+        base_stream: Stream,
+        messages: List[ChatCompletionMessageParam],
+        finish_run: Callable,
+    ) -> None:
+        from weave.flow.chat_util import OpenAIStream
+
+        self._messages = messages
+        self._chunks: List[ChatCompletionChunk] = []
+        self._finish_run = finish_run
+        super().__init__(
+            cast_to=ChatCompletionChunk,
+            client=base_stream._client,
+            response=base_stream.response,
+        )
+        self._openai_stream = OpenAIStream(self._iterator)
+
+    def __next__(self) -> ChatCompletionChunk:
+        return self._openai_stream.__next__()
+
+    def __iter__(self) -> Iterator[ChatCompletionChunk]:
+        for chunk in self._openai_stream:
+            yield chunk
+
+        result = self._openai_stream.final_response()
+        result_with_usage = ChatCompletion(
+            **result.model_dump(exclude_unset=True),
+            usage=token_usage(self._messages, result.choices),
+        )
+        self._finish_run(result_with_usage.model_dump(exclude_unset=True))
+
+
 class AsyncChatCompletions:
     def __init__(self, base_create: Callable) -> None:
         self._base_create = base_create
@@ -152,21 +187,14 @@ class ChatCompletions:
 
         with log_run(create_op, named_args) as finish_run:
 
-            def _stream_create_gen():  # type: ignore
-                stream = self._base_create(*args, **kwargs)
-                from weave.flow.chat_util import OpenAIStream
+            base_stream = self._base_create(*args, **kwargs)
+            stream = WeaveStream(
+                base_stream=base_stream,
+                messages=messages,
+                finish_run=finish_run,
+            )
 
-                wrapped_stream = OpenAIStream(stream)
-                for chunk in wrapped_stream:
-                    yield chunk
-                result = wrapped_stream.final_response()
-                result_with_usage = ChatCompletion(
-                    **result.model_dump(exclude_unset=True),
-                    usage=token_usage(messages, result.choices),
-                )
-                finish_run(result_with_usage.model_dump(exclude_unset=True))
-
-        return _stream_create_gen()  # type: ignore
+        return stream
 
 
 def patch() -> None:
