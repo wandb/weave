@@ -247,7 +247,7 @@ def test_calls_delete(client):
     # patch post auth methods with wb_user_id
     original_calls_delete = client.server.calls_delete
 
-    def patched_delete(req):
+    def patched_delete(req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         post_auth_req = tsi.CallsDeleteReqForInsert(
             project_id=req.project_id,
             call_ids=req.call_ids,
@@ -291,7 +291,7 @@ def test_calls_delete_cascade(client):
     # patch post auth methods with wb_user_id
     original_calls_delete = client.server.calls_delete
 
-    def patched_delete(req):
+    def patched_delete(req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         post_auth_req = tsi.CallsDeleteReqForInsert(
             project_id=req.project_id,
             call_ids=req.call_ids,
@@ -338,7 +338,7 @@ def test_call_display_name(client):
     # patch post auth methods with wb_user_id
     original_call_update = client.server.call_update
 
-    def patched_update(req):
+    def patched_update(req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         post_auth_req = tsi.CallUpdateReqForInsert(
             project_id=req.project_id,
             call_id=req.call_id,
@@ -419,7 +419,7 @@ def test_op_display_name(client):
     my_op_2()
     result = list(client.calls())
     assert len(result) == 3
-    assert result[2].display_name == "op name"
+    assert result[2].display_name == "op name 2"
 
 
 def test_dataset_calls(client):
