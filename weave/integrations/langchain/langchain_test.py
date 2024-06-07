@@ -65,6 +65,28 @@ def test_simple_chain_invoke(client: WeaveClient) -> None:
     assert_correct_calls_for_chain_invoke(res.calls)
 
 
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_simple_chain_stream(client: WeaveClient) -> None:
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+
+    llm_chain = prompt | llm
+    for _ in llm_chain.stream({"number": 2}):
+        pass
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert_correct_calls_for_chain_invoke(res.calls)
+
+
 def assert_correct_calls_for_chain_batch(calls: list[tsi.CallSchema]) -> None:
     assert len(calls) == 8
     flattened = flatten_calls(calls)
@@ -211,7 +233,7 @@ def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> Non
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_tool_run(client: WeaveClient) -> None:
+def test_agent_run_with_tools(client: WeaveClient) -> None:
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
     from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
@@ -287,7 +309,7 @@ def test_simple_tool_run(client: WeaveClient) -> None:
         input_type=AgentInput
     )
 
-    response = agent_executor.invoke(
+    _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
     )
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
