@@ -369,7 +369,7 @@ def test_call_display_name(client):
     call0 = result[0]
     client.remove_call_display_name(call0)
     call0 = client.call(call0.id)
-    assert not call0.display_name
+    assert call0.display_name == None
 
     # add it back
     call0.set_display_name("new new name")
@@ -379,7 +379,7 @@ def test_call_display_name(client):
     # delete display_name by setting to None
     call0.remove_display_name()
     call0 = client.call(call0.id)
-    assert not call0.display_name
+    assert call0.display_name == None
 
     # add it back
     call0.set_display_name("new new name")
@@ -389,7 +389,7 @@ def test_call_display_name(client):
     # delete by passing None to set
     call0.set_display_name(None)
     call0 = client.call(call0.id)
-    assert not call0.display_name
+    assert call0.display_name == None
 
 
 def test_op_display_name(client):
