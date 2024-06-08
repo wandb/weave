@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Tuple
 import pytest
 from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
+import weave
 
 
 def filter_body(r: Any) -> Any:
@@ -104,6 +105,49 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     assert_correct_calls_for_chain_batch(res.calls)
+
+
+def assert_correct_calls_for_chain_batch_from_op(calls: list[tsi.CallSchema]) -> None:
+    assert len(calls) == 9
+    flattened = flatten_calls(calls)
+
+    got = [(op_name_from_ref(c.op_name), d, c.parent_id) for (c, d) in flattened]
+    ids = [c.id for (c, _) in flattened]
+
+    exp = [
+        ("run_batch", 0, None),
+        ("langchain.Chain.RunnableSequence", 1, ids[0]),
+        ("langchain.Prompt.PromptTemplate", 2, ids[1]),
+        ("langchain.Llm.ChatOpenAI", 2, ids[1]),
+        ("openai.chat.completions.create", 3, ids[3]),
+        ("langchain.Chain.RunnableSequence", 1, ids[0]),
+        ("langchain.Prompt.PromptTemplate", 2, ids[5]),
+        ("langchain.Llm.ChatOpenAI", 2, ids[5]),
+        ("openai.chat.completions.create", 3, ids[7]),
+    ]
+    assert got == exp
+
+
+# TODO: VCR Stuff
+def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
+    # This test is the same as test_simple_chain_batch, but ensures things work when nested in an op
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_KEY")
+    llm = ChatOpenAI(openai_api_key=api_key, temperature=0.0)
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+
+    llm_chain = prompt | llm
+
+    @weave.op()
+    def run_batch(batch) -> None:
+        _ = llm_chain.batch(batch)
+
+    run_batch([{"number": 2}, {"number": 3}])
+
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
+    assert_correct_calls_for_chain_batch_from_op(res.calls)
 
 
 def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:

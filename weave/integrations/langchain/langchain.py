@@ -78,45 +78,85 @@ if not import_failed:
             # TODO: Figure out how to handle the run name. It errors in the UI
             run_name = make_valid_run_name(run.name)
 
-            lc_run_id = str(run.id)
+            """
+            Now we must determine the parent_run to associate this call with. 
+            
+            In most 
+            cases, it is very straight forward - we just look up the parent_run_id in the
+            call map and associate it with the parent call.
+
+            However, there is a very specific case with `RunnableSequence`. The way that
+            `RunnableSequence::batch` is implemented, Langchain will fire off two runs
+            in sequence. For example, in the event that we have a model like:
+            ```
+            (prompt | llm).batch([1, 2])
+            ```
+            Langchain's sequence of call starts is:
+            ```
+            start RunnableSequence1 -> no parent
+            start RunnableSequence2 -> no parent
+            (2 parallel threads) to resolve prompt batch
+            Thread 1:
+                start Prompt1 -> RunnableSequence1
+                end   Prompt1
+            Thread 2:
+                start Prompt2 -> RunnableSequence2
+                end   Prompt1
+            (2 parallel threads)  to resolve llm batch
+            Thread 1:
+                start LLM1 -> RunnableSequence1
+                (OpenAI calls run in here)
+                end   LLM1
+            Thread 2:
+                start LLM2 -> RunnableSequence2
+                (OpenAI calls run in here)
+                end   LLM2
+            end RunnableSequence1
+            end RunnableSequence2
+            ```
+
+            In these cases, RunnableSequence2 is started, but our stack context will have 
+            `RunnableSequence1` popped onto the stack. To solve for this, we need to send
+            `False` as the `parent_id`, telling the system: "trust me, this is a root".
+            """
+            parent_run: Union[Optional[Call], bool] = None
             lc_parent_run_id = (
                 str(run.parent_run_id) if run.parent_run_id is not None else None
             )
             wv_parent_run = (
                 self._call_map.get(lc_parent_run_id) if lc_parent_run_id else None
             )
-            parent_run: Union[Optional[Call], bool] = None
             if wv_parent_run is not None:
                 parent_run = wv_parent_run
             else:
-                # We need to check for a very very specific condition here.
+                # Here is our check for the specific condition
                 wv_current_run = run_context.get_current_run()
-                if wv_current_run is not None:
-                    wv_current_run_lc_name = (wv_current_run.attributes or {}).get(
-                        "lc_name"
-                    )
-                    wv_current_run_lc_trace_id = (wv_current_run.attributes or {}).get(
-                        "lc_trace_id"
-                    )
-                    wv_current_run_lc_parent_run_id = (
-                        wv_current_run.attributes or {}
-                    ).get("parent_run_id")
-                    wv_current_run_wv_parent_id = wv_current_run.parent_id
-                    lc_name = run.name
-                    lc_trace_id = run.trace_id
 
+                # First, there needs to be something on the stack.
+                if wv_current_run is not None:
+                    attrs = wv_current_run.attributes or {}
+                    # Now, the major condition:
                     if (
-                        wv_current_run_lc_name == lc_name == RUNNABLE_SEQUENCE_NAME
-                        and wv_current_run_lc_trace_id != lc_trace_id
-                        and wv_current_run_lc_parent_run_id == None
-                        and lc_parent_run_id == None
+                        # 1. Both runs must be of type `RunnableSequence`
+                        attrs.get("lc_name") == run.name == RUNNABLE_SEQUENCE_NAME
+                        # 2. Both us and the sibling run must have empty parents (i think
+                        # this condition will always be true, else we would have a parent
+                        # run already, but trying to be safe here)
+                        and attrs.get("parent_run_id") == lc_parent_run_id == None
                     ):
-                        # Here we are - the dreaded moment of being in the wrong place at the wrong time!
-                        # We want to set our parent to the parent of this other guy.
-                        if wv_current_run_wv_parent_id is None:
+                        # Now, we know that Langchain has confused us. And we want to set the
+                        # parent to the current Weave Run's parent. So, if that parent is
+                        # None, then we use `False` here to force a root. Else we lookup
+                        # the parent from the client. You might be thinking... id the parent
+                        # run_id is none, when would this NOT be none? The answer: when Langchain
+                        # is called inside of another op (like Evaluations!)
+                        if wv_current_run.parent_id is None:
                             parent_run = False
                         else:
-                            parent_run = self.gc.call(wv_current_run_wv_parent_id)
+                            # Note: this is implemented as a network call - it would be much nice
+                            # to refactor `create_call` such that it could accept a parent_id instead
+                            # of an entire Parent object.
+                            parent_run = self.gc.call(wv_current_run.parent_id)
 
             call = self.gc.create_call(
                 # Make sure to add the run name once the UI issue is figured out
@@ -124,15 +164,14 @@ if not import_failed:
                 parent_run,
                 run_dict["inputs"],
                 attributes={
-                    "lc_id": lc_run_id,
-                    "lc_trace_id": str(run.trace_id),
+                    "lc_id": str(run.id),
                     "parent_run_id": lc_parent_run_id,
                     "lc_name": run.name,
                 },
             )
 
             # Add the call to the call map.
-            self._call_map[lc_run_id] = call
+            self._call_map[str(run.id)] = call
 
         def _finish_run(self, run: Run) -> None:
             """Finish a run."""
@@ -140,15 +179,13 @@ if not import_failed:
             run_id = str(run.id)
             if run_id in self._call_map:
                 # Finish the call.
-                run_id = run_id
                 parent_id = run.parent_run_id
                 call = self._call_map.pop(run_id)
                 run_dict = _run_to_dict(run, as_input=False)
                 self.gc.finish_call(call, run_dict)
 
         def _update_run_error(self, run: Run) -> None:
-            run_id = str(run.id)
-            call = self._call_map.pop(run_id)
+            call = self._call_map.pop(str(run.id))
             if call:
                 self.gc.finish_call(
                     call, _run_to_dict(run), exception=Exception(run.error)
