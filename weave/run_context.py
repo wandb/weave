@@ -38,7 +38,7 @@ def push_call(run: "Call") -> None:
 def pop_call(call_id: typing.Optional[str]) -> None:
     new_stack = copy.copy(_run_stack.get())
     if len(new_stack) == 0:
-        logger.warning(
+        logger.debug(
             f"weave pop_call error: Found empty callstack when popping call_id: {call_id}."
         )
         # raise ValueError("Call stack is empty")
@@ -50,10 +50,15 @@ def pop_call(call_id: typing.Optional[str]) -> None:
             call = new_stack[target_index]
             if call.id == call_id:
                 # Actually do the slice
+                # Note (Tim): I think this logic is not quite correct. This will
+                # effectively pop off all calls up to and including the target
+                # call. I think this is actually an error case. Throwing an
+                # error here would disallow out-of-sequence call finishing, but
+                # i think that might be a good thing.
                 new_stack = new_stack[:target_index]
                 break
         else:
-            logger.warning(
+            logger.debug(
                 f"weave pop_call error: Call with id {call_id} not found in stack."
             )
             # raise ValueError(f"Call with id {call_id} not found in stack")

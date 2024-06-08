@@ -119,13 +119,15 @@ if not import_failed:
             `RunnableSequence1` popped onto the stack. To solve for this, we need to send
             `False` as the `parent_id`, telling the system: "trust me, this is a root".
             """
-            parent_run: Union[Optional[Call], bool] = None
+            parent_run: Optional[Call] = None
             lc_parent_run_id = (
                 str(run.parent_run_id) if run.parent_run_id is not None else None
             )
             wv_parent_run = (
                 self._call_map.get(lc_parent_run_id) if lc_parent_run_id else None
             )
+
+            create_call_fn = self.gc.create_call
             if wv_parent_run is not None:
                 parent_run = wv_parent_run
             else:
@@ -151,14 +153,14 @@ if not import_failed:
                         # run_id is none, when would this NOT be none? The answer: when Langchain
                         # is called inside of another op (like Evaluations!)
                         if wv_current_run.parent_id is None:
-                            parent_run = False
+                            create_call_fn = self.gc.create_call_outside_execution
                         else:
                             # Note: this is implemented as a network call - it would be much nice
                             # to refactor `create_call` such that it could accept a parent_id instead
                             # of an entire Parent object.
                             parent_run = self.gc.call(wv_current_run.parent_id)
 
-            call = self.gc.create_call(
+            call = create_call_fn(
                 # Make sure to add the run name once the UI issue is figured out
                 f"langchain.{run.run_type.capitalize()}.{run_name}",
                 parent_run,
