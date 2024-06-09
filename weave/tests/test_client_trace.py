@@ -1570,7 +1570,7 @@ def map_with_copying_thread_executor(fn, vals):
     "mapper",
     [
         map_simple,
-        # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
+        map_with_thread_executor,  # <-- Currently this is failing! Fix me (:
         map_with_copying_thread_executor,
     ],
 )
