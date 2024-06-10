@@ -553,7 +553,7 @@ export const parseRef = (ref: string): ObjectRef => {
 
   // Decode the URI pathname to handle URL-encoded characters, required
   // in some browsers (safari)
-  const decodedUri = decodeURI(url.pathname);
+  const decodedUri = decodeURIComponent(url.pathname);
   const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
 
   if (splitUri.length !== splitLimit) {
