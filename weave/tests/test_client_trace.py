@@ -70,6 +70,7 @@ def test_simple_op(client):
         exception=None,
         output=6,
         summary={},
+        attributes={},
     )
 
 
