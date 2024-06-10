@@ -1548,7 +1548,7 @@ def map_simple(fn, vals):
 
 max_workers = 3
 
-# This is a standard way to execute a map operation with a thread executor.
+# This is a standard way to execute a map operation with thread executor.
 def map_with_thread_executor(fn, vals):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(fn, vals)
