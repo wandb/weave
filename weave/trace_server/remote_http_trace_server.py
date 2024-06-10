@@ -390,24 +390,3 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.writelines(r.iter_content())
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
-
-    def feedback_create(
-        self, req: t.Union[tsi.FeedbackCreateReq, t.Dict[str, t.Any]]
-    ) -> tsi.FeedbackCreateRes:
-        return self._generic_request(
-            "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
-        )
-
-    def feedback_query(
-        self, req: t.Union[tsi.FeedbackQueryReq, t.Dict[str, t.Any]]
-    ) -> tsi.FeedbackQueryRes:
-        return self._generic_request(
-            "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
-        )
-
-    def feedback_purge(
-        self, req: t.Union[tsi.FeedbackPurgeReq, t.Dict[str, t.Any]]
-    ) -> tsi.FeedbackPurgeRes:
-        return self._generic_request(
-            "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
-        )
