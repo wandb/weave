@@ -142,6 +142,7 @@ class Call:
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
+    attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -227,6 +228,7 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
         summary=server_call.summary,
+        attributes=server_call.attributes,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -442,6 +444,28 @@ class WeaveClient:
         inputs: dict,
         attributes: dict = {},
     ) -> Call:
+        if parent is None:
+            parent = run_context.get_current_run()
+        call = self.create_call_outside_execution(op, parent, inputs, attributes)
+        run_context.push_call(call)
+        return call
+
+    @trace_sentry.global_trace_sentry.watch()
+    def create_call_outside_execution(
+        self,
+        op: Union[str, Op],
+        parent: Optional[Call],
+        inputs: dict,
+        attributes: dict = {},
+    ) -> Call:
+        """
+        Create a call without inferring the parent from the current run context,
+        or pushing the call onto the run context stack. This is useful in situations
+        where the information regarding the call is delivered outside of the normal
+        execution flow. For example, in a callback function. In such cases we still
+        want to log the call, but don't want this logging to interfere with the
+        normal stack context.
+        """
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -456,9 +480,6 @@ class WeaveClient:
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
-        if parent is None:
-            parent = run_context.get_current_run()
-
         if parent:
             trace_id = parent.trace_id
             parent_id = parent.id
@@ -472,6 +493,7 @@ class WeaveClient:
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
+            attributes=attributes,
         )
         if parent is not None:
             parent._children.append(call)
@@ -490,7 +512,6 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
-        run_context.push_call(call)
         return call
 
     @trace_sentry.global_trace_sentry.watch()
