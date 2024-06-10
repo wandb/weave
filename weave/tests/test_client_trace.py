@@ -1565,7 +1565,7 @@ def call_structure(calls):
 
 def test_call_stack_order_implicit_depth_first(client):
     # This version of the call sequence matches the happy path
-    # without any out-of-order calls.
+    # without any out-of-order calls
     call_1 = client.create_call("op", None, {})
     call_2 = client.create_call("op", None, {})
     call_3 = client.create_call("op", None, {})
