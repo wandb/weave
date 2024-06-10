@@ -1,16 +1,15 @@
 import pytest
-import weave
-from .. import artifact_local
-from .. import ref_util
-from .. import storage
-from .. import ops_arrow as arrow
-from weave.flow.obj import Object
 
+import weave
+from weave.flow.obj import Object
 from weave.trace_server.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
 )
+
+from .. import artifact_local, ref_util, storage
+from .. import ops_arrow as arrow
 
 
 def test_laref_artifact_version_1():
@@ -128,18 +127,13 @@ def assert_local_ref(object, path_parts, extra_parts):
         artifact=obj_ref.name,
         alias=obj_ref.version,
         file_path_parts=path_parts,
-        ref_extra_tuples=[
-            ref_util.RefExtraTuple(*extra_parts[i : i + 2])
-            for i in range(0, len(extra_parts), 2)
-        ],
+        ref_extra_tuples=[ref_util.RefExtraTuple(*extra_parts[i : i + 2]) for i in range(0, len(extra_parts), 2)],
     )
     assert parsed_obj_ref == target_obj_ref
 
 
 def test_ref_parser():
-    assert ref_util.parse_ref_str(
-        "local-artifact:///art_name:version"
-    ) == ref_util.ParsedRef(
+    assert ref_util.parse_ref_str("local-artifact:///art_name:version") == ref_util.ParsedRef(
         scheme="local-artifact",
         entity=None,
         project=None,
@@ -148,9 +142,7 @@ def test_ref_parser():
         file_path_parts=[],
         ref_extra_tuples=[],
     )
-    assert ref_util.parse_ref_str(
-        "local-artifact:///art_name:version/possibly/deep/path"
-    ) == ref_util.ParsedRef(
+    assert ref_util.parse_ref_str("local-artifact:///art_name:version/possibly/deep/path") == ref_util.ParsedRef(
         scheme="local-artifact",
         entity=None,
         project=None,
@@ -159,9 +151,7 @@ def test_ref_parser():
         file_path_parts=["possibly", "deep", "path"],
         ref_extra_tuples=[],
     )
-    assert ref_util.parse_ref_str(
-        "local-artifact:///art_name:version/possibly/deep/path#very/deep/ref/extra"
-    ) == ref_util.ParsedRef(
+    assert ref_util.parse_ref_str("local-artifact:///art_name:version/possibly/deep/path#very/deep/ref/extra") == ref_util.ParsedRef(
         scheme="local-artifact",
         entity=None,
         project=None,
@@ -173,9 +163,7 @@ def test_ref_parser():
             ref_util.RefExtraTuple("ref", "extra"),
         ],
     )
-    assert ref_util.parse_ref_str(
-        "wandb-artifact:///entity/project/art_name:version"
-    ) == ref_util.ParsedRef(
+    assert ref_util.parse_ref_str("wandb-artifact:///entity/project/art_name:version") == ref_util.ParsedRef(
         scheme="wandb-artifact",
         entity="entity",
         project="project",
@@ -184,9 +172,7 @@ def test_ref_parser():
         file_path_parts=[],
         ref_extra_tuples=[],
     )
-    assert ref_util.parse_ref_str(
-        "wandb-artifact:///entity/project/art_name:version/possibly/deep/path"
-    ) == ref_util.ParsedRef(
+    assert ref_util.parse_ref_str("wandb-artifact:///entity/project/art_name:version/possibly/deep/path") == ref_util.ParsedRef(
         scheme="wandb-artifact",
         entity="entity",
         project="project",
@@ -195,9 +181,7 @@ def test_ref_parser():
         file_path_parts=["possibly", "deep", "path"],
         ref_extra_tuples=[],
     )
-    assert ref_util.parse_ref_str(
-        "wandb-artifact:///entity/project/art_name:version/possibly/deep/path#very/deep/ref/extra"
-    ) == ref_util.ParsedRef(
+    assert ref_util.parse_ref_str("wandb-artifact:///entity/project/art_name:version/possibly/deep/path#very/deep/ref/extra") == ref_util.ParsedRef(
         scheme="wandb-artifact",
         entity="entity",
         project="project",
@@ -290,10 +274,7 @@ def test_ref_extra_table(ref_tracking):
 
     assert saved_obj.to_pylist_notags() == arrow_raw.to_pylist_notags()
     assert_local_ref(saved_obj, ["obj"], [])
-    assert (
-        storage.get(saved_obj._ref.uri).to_pylist_notags()
-        == arrow_raw.to_pylist_notags()
-    )
+    assert storage.get(saved_obj._ref.uri).to_pylist_notags() == arrow_raw.to_pylist_notags()
 
     val = saved_obj[0]
     assert val == {"a": 1}
@@ -370,9 +351,7 @@ def test_refs_across_artifacts(ref_tracking):
 
     val = saved_outer_obj["outer"]["a"]
     assert val == 1
-    assert_local_ref(
-        val, ["obj"], [DICT_KEY_EDGE_NAME, "outer", DICT_KEY_EDGE_NAME, "a"]
-    )
+    assert_local_ref(val, ["obj"], [DICT_KEY_EDGE_NAME, "outer", DICT_KEY_EDGE_NAME, "a"])
     assert storage.get(val._ref.uri) == 1
 
     # Jumping artifact boundaries uses new artifact refs
@@ -420,3 +399,16 @@ def test_ref_objects_across_artifacts_cross(ref_tracking, get_custom_object_clas
     val = saved_obj_b.inner_b
     # Notice that we have reset the ref structure here to the new artifact
     assert_local_ref(val, ["obj"], [])
+
+
+def test_dataset_table_deref_without_weave_init(request):
+    # Log a sample dataset and finish
+    weave.init("test-project")
+    ds = weave.Dataset(name="potato", rows=[{"a": 1}])
+    ref = weave.publish(ds)
+    ref_uri = ref.uri()
+    weave.finish()
+
+    # You should be able to get the rows without having to re-init
+    ds2 = weave.ref(ref_uri).get()
+    assert ds2.rows[0] is not None
