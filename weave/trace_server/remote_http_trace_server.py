@@ -103,8 +103,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth: t.Optional[t.Tuple[str, str]] = None
 
     def ensure_project_exists(self, entity: str, project: str) -> None:
-        # TODO: This should happen in the wandb backend, not here, and its slow
-        # (hundres of ms)
+        # TODO: This should happen in the wandb backend, not here, and it's slow
+        # (hundreds of ms)
         project_creator.ensure_project_exists(entity, project)
 
     @classmethod
