@@ -502,7 +502,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             if isinstance(uri, WeaveWBArtifactByIDURI):
                 path = f"{uri.path_root}/{uri.artifact_id}/{uri.name}:{uri.version}"
             else:
-                path = f"{uri.entity_name}/{uri.project_name}/{uri.name}:{uri.version}"
+                raise errors.WeaveInternalError("cannot get saved artifact via id uri")
             self._read_artifact = get_wandb_read_artifact(path)
         return self._read_artifact
 
@@ -519,13 +519,11 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         assert uri.startswith("wandb-artifact:///") or uri.startswith(
             "wandb-artifact-by-id:///"
         )
-        try:
+        if uri.startswith("wandb-artifact:///"):
             uri_parts = WeaveWBArtifactURI.parse(uri)
             uri_path = f"{uri_parts.entity_name}/{uri_parts.project_name}/{uri_parts.name}:{uri_parts.version}"
-        except errors.WeaveInternalError:
-            uri_by_id_parts = WeaveWBArtifactByIDURI.parse(uri)
-            uri_path = f"{uri_by_id_parts.path_root}/{uri_by_id_parts.artifact_id}/{uri_by_id_parts.name}:{uri_by_id_parts.version}"
-        # todo: how to handle this? this queries the public api
+        elif uri.startswith("wandb-artifact-by-id:///"):
+            raise errors.WeaveInternalError("cannot add reference via id")
         ref_artifact = get_wandb_read_artifact(uri_path)
 
         # A reference needs to point to a specific existing file in the other artifact.
@@ -1183,8 +1181,9 @@ class WeaveWBArtifactByIDURI(uris.WeaveURI):
             path = f"{self.path_root}/{self.artifact_id}/{self.name}"
             if self.version:
                 path += f":{self.version}"
-            # todo: Since we were able to retrieve an artifact ID, can we assume that
-            # the artifact has been saved already
+            # Since this class is only used while querying for artifact files,
+            # we can assume the version exists and directly return the resolved
+            # artifact instead of querying the public api for it
             resolved_artifact_uri = WeaveWBArtifactByIDURI(
                 self.name.split(":", 1)[0],
                 self.version,

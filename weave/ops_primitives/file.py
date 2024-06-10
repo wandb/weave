@@ -55,10 +55,6 @@ def _file_dict_from_manifest(
     if "ref" in base_dict:
         base_dict["url"] = base_dict["ref"]
     else:
-        print(art.uri_obj, flush=True)
-        print(art.uri_obj.__class__, flush=True)
-        uri_obj_with_path = art.uri_obj.with_path(file.path)
-        print(uri_obj_with_path.__class__, flush=True)
         res = wandb_file_manager._local_path_and_download_url(
             art.uri_obj.with_path(file.path),
             manifest,

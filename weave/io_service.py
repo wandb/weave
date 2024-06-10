@@ -32,6 +32,7 @@ from . import wandb_file_manager
 from . import server_error_handling
 from . import async_queue
 from . import context_state
+from . import uris
 from typing import Any, Callable, Dict, TypeVar, Iterator
 
 
@@ -400,24 +401,21 @@ class Server:
         self, artifact_uri: str
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
         print("inside io_service, ensure manifest()")
-        try:
-            uri: typing.Union[
-                "artifact_wandb.WeaveWBArtifactURI",
-                "artifact_wandb.WeaveWBArtifactByIDURI",
-            ] = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        except errors.WeaveInternalError:
-            uri = artifact_wandb.WeaveWBArtifactByIDURI.parse(artifact_uri)
-            print(f"except error uri ===> {uri}")
+        uri = uris.WeaveURI.parse(artifact_uri)
+        if not isinstance(
+            uri,
+            (artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI),
+        ):
+            raise errors.WeaveInternalError("invalid scheme ", uri)
         return await self.wandb_file_manager.manifest(uri)
 
     async def handle_ensure_file(self, artifact_uri: str) -> typing.Optional[str]:
-        try:
-            uri: typing.Union[
-                "artifact_wandb.WeaveWBArtifactURI",
-                "artifact_wandb.WeaveWBArtifactByIDURI",
-            ] = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        except errors.WeaveInternalError:
-            uri = artifact_wandb.WeaveWBArtifactByIDURI.parse(artifact_uri)
+        uri = uris.WeaveURI.parse(artifact_uri)
+        if not isinstance(
+            uri,
+            (artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI),
+        ):
+            raise errors.WeaveInternalError("invalid scheme ", uri)
         return await self.wandb_file_manager.ensure_file(uri)
 
     async def handle_ensure_file_downloaded(
@@ -426,13 +424,12 @@ class Server:
         return await self.wandb_file_manager.ensure_file_downloaded(download_url)
 
     async def handle_direct_url(self, artifact_uri: str) -> typing.Optional[str]:
-        try:
-            uri: typing.Union[
-                "artifact_wandb.WeaveWBArtifactURI",
-                "artifact_wandb.WeaveWBArtifactByIDURI",
-            ] = artifact_wandb.WeaveWBArtifactURI.parse(artifact_uri)
-        except errors.WeaveInternalError:
-            uri = artifact_wandb.WeaveWBArtifactByIDURI.parse(artifact_uri)
+        uri = uris.WeaveURI.parse(artifact_uri)
+        if not isinstance(
+            uri,
+            (artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI),
+        ):
+            raise errors.WeaveInternalError("invalid scheme ", uri)
         return await self.wandb_file_manager.direct_url(uri)
 
     async def handle_sleep(self, seconds: float) -> float:

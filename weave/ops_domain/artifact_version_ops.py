@@ -545,6 +545,14 @@ def history_metrics(
 
 # TODO: Move all this to helper functions off the artifactVersion object
 def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
+    # With the introduction of org-level registries, artifacts from teams can be published
+    # to a collection in an org-registry, such that they're readable by all users in the organization.
+    # However, since not all org users belong to the same team, viewing the published artifact's files
+    # cannot depend on its source artifact's entity.
+    # In the case where the viewing user doesn't
+    # have access to an artifact's project/entity, such that the artifact has been linked to a
+    # collection in an org-registry, we use WeaveWBArtifactByIDURI which allows us to query the
+    # artifact's manifest and hence, files, using just its ID.
     print(f"\n\nlogging version query result: ===> \n{artifactVersion}\n\n", flush=True)
     artifact_id = artifactVersion["id"]
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
@@ -554,9 +562,6 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
         home_sequence_name, commit_hash, artifact_id
     )
     print(f"\n\nlogging artifact_by_id uri: ===> \n{uri}\n\n", flush=True)
-    # todo: postman query returns null project for user querying an artifact from a team they're
-    # not a member of. but through weave somehow project is not null. is this related to cg cache?
-    # able to confirm that things work when the following block is commented out. Needs more testing.
     if artifactVersion["artifactSequence"]["project"] is not None:
         entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
         project_name = artifactVersion["artifactSequence"]["project"]["name"]
