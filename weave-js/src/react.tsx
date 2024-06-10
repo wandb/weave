@@ -551,7 +551,10 @@ export const parseRef = (ref: string): ObjectRef => {
     throw new Error(`Unknown protocol: ${url.protocol}`);
   }
 
-  const splitUri = url.pathname.replace(/^\/+/, '').split('/', splitLimit);
+  // Decode the URI pathname to handle URL-encoded characters, required
+  // in some browsers (safari)
+  const decodedUri = decodeURI(url.pathname);
+  const splitUri = decodedUri.replace(/^\/+/, '').split('/', splitLimit);
 
   if (splitUri.length !== splitLimit) {
     throw new Error(`Invalid Artifact URI: ${url}`);
@@ -582,7 +585,7 @@ export const parseRef = (ref: string): ObjectRef => {
   }
 
   if (isWeaveRef) {
-    const trimmed = trimStartChar(decodeURI(url.pathname), '/');
+    const trimmed = trimStartChar(url.pathname, '/');
     const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
     if (tableMatch !== null) {
       const [entity, project, digest] = tableMatch.slice(1);
