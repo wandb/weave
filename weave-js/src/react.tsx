@@ -582,7 +582,7 @@ export const parseRef = (ref: string): ObjectRef => {
   }
 
   if (isWeaveRef) {
-    const trimmed = trimStartChar(url.pathname, '/').replace(/%20/g, ' ');
+    const trimmed = trimStartChar(decodeURI(url.pathname), '/');
     const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
     if (tableMatch !== null) {
       const [entity, project, digest] = tableMatch.slice(1);
