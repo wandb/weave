@@ -370,7 +370,7 @@ def teardown():
 
 
 class MockSyncResponse:
-    """This emulates a synchronous SSE response"""
+    """This emulates a synchronous SSE response."""
 
     def __init__(self, chunks: List):
         self._chunks = iter(chunks)
