@@ -499,8 +499,8 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def _saved_artifact(self):
         if self._read_artifact is None:
             uri = self._read_artifact_uri
-            if isinstance(uri, WeaveWBArtifactByIDURI):
-                path = f"{uri.path_root}/{uri.artifact_id}/{uri.name}:{uri.version}"
+            if isinstance(uri, WeaveWBArtifactURI):
+                path = f"{uri.entity_name}/{uri.project_name}/{uri.name}:{uri.version}"
             else:
                 raise errors.WeaveInternalError("cannot get saved artifact via id uri")
             self._read_artifact = get_wandb_read_artifact(path)

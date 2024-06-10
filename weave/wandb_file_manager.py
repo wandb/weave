@@ -64,6 +64,9 @@ def _local_path_and_download_url(
     md5_hex = hashutil.b64_to_hex_id(hashutil.B64MD5(manifest_entry["digest"]))
     base_url = base_url or weave_env.wandb_base_url()
     file_path = _file_path(art_uri, md5_hex)
+    # For artifactsV1 (legacy artifacts), the artifact's files cannot be fetched without the entity name, but
+    # we substitute a '_' here anyway since artifact_uri.entity_name can be None accessed via an organization's
+    # registry collection.
     if manifest.storage_layout == artifact_wandb.WandbArtifactManifest.StorageLayout.V1:
         return file_path, "{}/artifacts/{}/{}/{}".format(
             base_url, art_uri.entity_name or "_", md5_hex, urllib.parse.quote(file_name)
@@ -71,6 +74,9 @@ def _local_path_and_download_url(
     else:
         # TODO: storage_region
         storage_region = "default"
+        # For artifactsV2 (which is all artifacts now), the file download handler ignores the entity
+        # parameter while parsing the url, and fetches the files directly via the artifact id
+        # Refer to: https://github.com/wandb/core/blob/7cfee1cd07ddc49fe7ba70ce3d213d2a11bd4456/services/gorilla/api/handler/artifacts.go#L179
         return file_path, "{}/artifactsV2/{}/{}/{}/{}/{}".format(
             base_url,
             storage_region,
