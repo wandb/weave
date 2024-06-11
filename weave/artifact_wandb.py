@@ -500,7 +500,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         if self._read_artifact is None:
             uri = self._read_artifact_uri
             if isinstance(uri, WeaveWBArtifactURI):
-                path = f"{uri.entity_name}/{uri.project_name}/{uri.name}:{uri.version}"
+                path = uri.uri_path
             else:
                 raise errors.WeaveInternalError("cannot get saved artifact via id uri")
             self._read_artifact = get_wandb_read_artifact(path)
@@ -521,7 +521,7 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         )
         if uri.startswith("wandb-artifact:///"):
             uri_parts = WeaveWBArtifactURI.parse(uri)
-            uri_path = f"{uri_parts.entity_name}/{uri_parts.project_name}/{uri_parts.name}:{uri_parts.version}"
+            uri_path = uri_parts.uri_path
         elif uri.startswith("wandb-artifact-by-id:///"):
             raise errors.WeaveInternalError("cannot add reference via id")
         ref_artifact = get_wandb_read_artifact(uri_path)
@@ -987,6 +987,10 @@ class WeaveWBArtifactURI(uris.WeaveURI):
             path,
             self.extra,
         )
+
+    @property
+    def uri_path(self) -> str:
+        return f"{self.entity_name}/{self.project_name}/{self.name}:{self.version}"
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
