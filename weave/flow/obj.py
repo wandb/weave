@@ -32,6 +32,18 @@ class Object(BaseModel):
             self.local_attr_cache[name] = value
         super().__setattr__(name, value)
 
+    # TODO: This will call the default factories twice, but it lets
+    # the user not have to write their own __init__.  You must do this
+    # because __setattr__ is not called when instantiating a default_factory
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        object_internal_names = ["name", "description", "local_attr_cache"]
+        for name, field in self.model_fields.items():
+            print(f"{name=}, {field=}")
+            if field.default_factory and name not in object_internal_names:
+                self.__setattr__(name, field.default_factory())
+
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.
     @model_validator(mode="wrap")

@@ -1,7 +1,10 @@
-import pytest
-import weave
 import typing
+
 import numpy as np
+import pytest
+from pydantic import Field
+
+import weave
 
 from .. import ref_base
 
@@ -241,9 +244,7 @@ def test_saveloop_idempotent_with_refs(user_by_api_key_in_env):
 
 
 def test_subobj_ref_passing(client):
-    dataset = client.save(
-        weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
-    )
+    dataset = client.save(weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset")
 
     @weave.op()
     def get_item(row):
@@ -284,10 +285,30 @@ def test_agent_has_tools(client):
 
 
 def test_construct_eval_with_dataset_get(client):
-    dataset = client.save(
-        weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
-    )
+    dataset = client.save(weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset")
     ref = weave.obj_ref(dataset)
     assert ref is not None
     dataset2 = weave.ref(ref.uri()).get()
     weave.Evaluation(dataset=dataset2)
+
+
+def test_dont_create_new_objects_on_every_getattribute():
+    class Example(weave.Model):
+        samples: list[dict] = Field(default_factory=list)
+
+        @weave.op
+        def add_sample(self, sample: dict):
+            assert self.samples is self.samples
+            self.samples.append(sample)
+            assert self.samples is self.samples
+
+    example = Example()
+
+    # These repeated assertions are to check that we never create a new object,
+    # only mutate an existing object.  We must fetch the same object back to support
+    # operations like list.append
+    assert example.samples is example.samples
+    example.add_sample({"a": 1})
+    assert example.samples is example.samples
+    example.add_sample({"b": 2})
+    assert example.samples is example.samples
