@@ -433,6 +433,14 @@ function buildCallsTableColumns(
         // Displaying nothing seems preferable to being misleading.
         return null;
       }
+      return traceCallLatencyS(cellParams.row);
+    },
+    renderCell: cellParams => {
+      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+        // Call is still in progress, latency will be 0.
+        // Displaying nothing seems preferable to being misleading.
+        return null;
+      }
       return monthRoundedTime(traceCallLatencyS(cellParams.row));
     },
   });
