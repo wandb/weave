@@ -5,13 +5,13 @@ from unittest.mock import Mock
 import openai
 import pytest
 import pytest_asyncio
+import weave
 from openai import AsyncStream, Stream
 from openai.types.chat.chat_completion import ChatCompletion, Choice
-from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceDelta
+from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from openai.types.completion_usage import CompletionUsage
-
-import weave
 from weave.monitoring import init_monitor
 from weave.monitoring.openai import util
 from weave.monitoring.openai.models import *
@@ -370,7 +370,7 @@ def teardown():
 
 
 class MockSyncResponse:
-    """This emulates an SSE response"""
+    """This emulates a synchronous SSE response"""
 
     def __init__(self, chunks: List):
         self._chunks = iter(chunks)

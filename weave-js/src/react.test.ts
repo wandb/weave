@@ -58,6 +58,34 @@ describe('parseRef', () => {
         weaveKind: 'object',
       });
     });
+    it('parses a ref with spaces in name and projectName', () => {
+      const parsed = parseRef(
+        'weave:///entity/project with spaces/object/artifact name with spaces:artifactversion'
+      );
+      expect(parsed).toEqual({
+        artifactName: 'artifact name with spaces',
+        artifactRefExtra: '',
+        artifactVersion: 'artifactversion',
+        entityName: 'entity',
+        projectName: 'project with spaces',
+        scheme: 'weave',
+        weaveKind: 'object',
+      });
+    });
+    it('parses a ref with escaped spaces in name and projectName', () => {
+      const parsed = parseRef(
+        'weave:///entity/project%20with%20spaces/object/artifact%20name%20with%20spaces:artifactversion'
+      );
+      expect(parsed).toEqual({
+        artifactName: 'artifact name with spaces',
+        artifactRefExtra: '',
+        artifactVersion: 'artifactversion',
+        entityName: 'entity',
+        projectName: 'project with spaces',
+        scheme: 'weave',
+        weaveKind: 'object',
+      });
+    });
   });
   it('parses a weave table ref', () => {
     const parsed = parseRef(
