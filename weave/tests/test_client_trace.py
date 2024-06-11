@@ -8,6 +8,7 @@ import datetime
 import os
 import typing
 import pytest
+from collections import defaultdict
 
 from pydantic import BaseModel, ValidationError
 import wandb
