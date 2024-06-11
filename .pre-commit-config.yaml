@@ -10,6 +10,69 @@ repos:
     rev: 22.3.0
     hooks:
       - id: black
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        additional_dependencies: [flake8-bugbear, flake8-docstrings]
+        args: [
+            "--ignore=D100,D101,D102,D103,D104,D105,D106,D107,D200,D202,D205,D209,D300,D400,D401,D403,D412,E203,E262,E266,E302,E401,E402,E501,E711,E712,E713,E721,E722,E731,E741,F401,F403,F405,F811,F821,F841,W291,W293,W391,W503,W605,B001,B006,B007,B008,B009,B010,B014,B015,B018,B020,B023,B028",
+            # "D101,D102,D103,D105,D107,D400,D401,E401,E402,E501,W605",
+            # D100 Missing docstring in public module
+            # D101 Missing docstring in public class
+            # D102 Missing docstring in public method
+            # D103 Missing docstring in public function
+            # D104 Missing docstring in public package
+            # D105 Missing docstring in magic method
+            # D106 Missing docstring in public nested class
+            # D107 Missing docstring in __init__
+            # D200 One-line docstring should fit on one line with quotes
+            # D202 No blank lines allowed after function docstring
+            # D205 1 blank line required between summary line and description
+            # D209 Multi-line docstring closing quotes should be on a separate line
+            # D300 Use """triple double quotes"""
+            # D401 First line should be in imperative mood
+            # D403 First word of the first line should be properly capitalized
+            # D412 No blank lines allowed between a section header and its content
+            # E203 whitespace before ':'
+            # E262 inline comment should start with '# '
+            # E266 too many leading '#' for block comment
+            # E302 expected 2 blank lines, found 1
+            # E401 multiple imports on one line
+            # E402 module level import not at top of file
+            # E501 line too long
+            # E711 comparison to None should be 'if cond is None:'
+            # E712 comparison to True should be 'if cond is True:' or 'if cond:'
+            # E713 test for membership should be 'not in'
+            # E721 do not compare types
+            # E722 do not use bare 'except'
+            # E731 do not assign a lambda expression, use a def
+            # E741 ambiguous variable name 'l'
+            # D400 First line should end with a perio
+            # F401 imported but unused
+            # F403 'from .api import *' used; unable to detect undefined names
+            # F405 'errors' may be undefined, or defined from star imports: .api, .errors
+            # F811 redefinition of unused
+            # F821 undefined name '_trace'
+            # F841 local variable is assigned to but never used
+            # W291 trailing whitespace
+            # W293 blank line contains whitespace
+            # W391 blank line at end of file
+            # W503 line break before binary operator
+            # W605 invalid escape sequence
+            # B001 Do not use bare `except:`
+            # B006 Do not use mutable data structures for argument defaults
+            # B007 Loop control variable 'i' not used within the loop body
+            # B008 Do not perform function calls in argument defaults.
+            # B009 Do not call getattr with a constant attribute value, it is not any safer than normal property acces
+            # B010 Do not call setattr with a constant attribute value, it is not any safer than normal property access.
+            # B014 Redundant exception types
+            # B015 Result of comparison is not used
+            # B018 Found useless Dict expression. Consider either assigning it to a variable or removing it.
+            # B020 Found for loop that reassigns the iterable it is iterating with each iterable value.
+            # B023 Function definition does not bind loop variable
+            # B028 No explicit stacklevel argument found.
+          ]
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: "v1.0.0"
     hooks:
