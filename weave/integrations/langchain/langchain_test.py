@@ -226,7 +226,6 @@ def assert_correct_calls_for_rag_chain(calls: list[tsi.CallSchema]) -> None:
 def test_simple_rag_chain(client: WeaveClient, only_patch_langchain: Callable) -> None:
     from typing import List
 
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain_community.document_loaders import TextLoader
     from langchain_community.vectorstores import Chroma
     from langchain_core.documents import Document
@@ -234,6 +233,8 @@ def test_simple_rag_chain(client: WeaveClient, only_patch_langchain: Callable) -
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.runnables import RunnablePassthrough
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
 
     loader = TextLoader("integrations/langchain/test_data/paul_graham_essay.txt")
     docs = loader.load()
@@ -304,15 +305,18 @@ def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> Non
 def test_agent_run_with_tools(
     client: WeaveClient, only_patch_langchain: Callable
 ) -> None:
-    from langchain.agents import AgentExecutor
-    from langchain.agents.format_scratchpad import format_to_openai_function_messages
-    from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from langchain.pydantic_v1 import BaseModel, Field
-    from langchain.tools import StructuredTool
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_core.utils.function_calling import convert_to_openai_tool
     from langchain_openai import ChatOpenAI
+
+    from langchain.agents import AgentExecutor
+    from langchain.agents.format_scratchpad import \
+        format_to_openai_function_messages
+    from langchain.agents.output_parsers import \
+        OpenAIFunctionsAgentOutputParser
+    from langchain.pydantic_v1 import BaseModel, Field
+    from langchain.tools import StructuredTool
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")
