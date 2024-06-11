@@ -1,6 +1,7 @@
 from typing import Union, Any
 import dataclasses
 from ..trace_server import refs_internal
+from weave import urls
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -58,6 +59,12 @@ class ObjectRef(RefWithExtra):
             u += "/" + "/".join(self.extra)
         return u
 
+    @property
+    def ui_url(self) -> str:
+        return urls.object_version_path(
+            self.entity, self.project, self.name, self.digest
+        )
+
     def get(self) -> Any:
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
@@ -107,6 +114,10 @@ class OpRef(ObjectRef):
         if self.extra:
             u += "/" + "/".join(self.extra)
         return u
+
+    @property
+    def ui_url(self) -> str:
+        return urls.op_version_path(self.entity, self.project, self.name, self.digest)
 
 
 @dataclasses.dataclass

@@ -38,12 +38,15 @@ from weave.trace_server.trace_server_interface import (
     CallSchema,
     ObjQueryReq,
     ObjQueryRes,
+    OpQueryReq,
     TableCreateReq,
     TableSchemaForInsert,
+    RefsReadBatchReq,
     TableQueryReq,
     _TableRowFilter,
     _CallsFilter,
     _ObjectVersionFilter,
+    _OpVersionFilter,
     Query,
 )
 from weave.trace_server.interface.query import Operation
@@ -140,9 +143,12 @@ class Call:
     project_id: str
     parent_id: Optional[str]
     inputs: dict
+    started_at: datetime.datetime
+    ended_at: Optional[datetime.datetime] = None
     id: Optional[str] = None
     output: Any = None
     exception: Optional[str] = None
+    attributes: Optional[dict] = None
     summary: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
@@ -163,14 +169,17 @@ class Call:
         if not self.id:
             raise ValueError("Can't get children of call without ID")
         return CallsIter(
-            client.server,
-            self.project_id,
-            _CallsFilter(parent_ids=[self.id]),
+            client.server, self.project_id, _CallsFilter(parent_ids=[self.id]), None
         )
 
     def delete(self) -> bool:
         client = graph_client_context.require_graph_client()
         return client.delete_call(call=self)
+
+    def __repr__(self):
+        from weave.trace.print import print_thing
+
+        return print_thing(self)
 
 
 class CallsIter:
@@ -200,7 +209,7 @@ class CallsIter:
 
     def __iter__(self) -> typing.Iterator[TraceObject]:
         page_index = 0
-        page_size = 100
+        page_size = 1000
         entity, project = self.project_id.split("/")
         while True:
             response = self.server.calls_query(
@@ -235,11 +244,18 @@ def make_client_call(
         id=server_call.id,
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
+        exception=server_call.exception,
+        attributes=server_call.attributes,
         summary=server_call.summary,
+        started_at=server_call.started_at,
+        ended_at=server_call.ended_at,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
-    return TraceObject(call, CallRef(entity, project, call.id), server, None)
+    # TODO: changed this so __repr__ works. We should just attach ref to call
+    # directly instead of using TraceObject?
+    return call
+    # return TraceObject(call, CallRef(entity, project, call.id), server, None)
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
@@ -408,6 +424,22 @@ class WeaveClient:
             raise ValueError(f"Expected ObjectRef, got {ref}")
         return self.get(ref)
 
+    def get_batch(self, refs: Sequence[str]) -> Sequence[Any]:
+        # Create a dictionary to store unique refs and their results
+        unique_refs = list(set(refs))
+        read_res = self.server.refs_read_batch(
+            RefsReadBatchReq(refs=[uri for uri in unique_refs])
+        )
+
+        # Create a mapping from ref to result
+        ref_to_result = {
+            unique_refs[i]: from_json(val, self._project_id(), self.server)
+            for i, val in enumerate(read_res.vals)
+        }
+
+        # Return results in the original order of refs
+        return [ref_to_result[ref] for ref in refs]
+
     @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef) -> Any:
         project_id = f"{ref.entity}/{ref.project}"
@@ -528,6 +560,24 @@ class WeaveClient:
                 filter=filter,
             )
         )
+        # TODO: This should return ObjInfo instead of ObjSchema
+        return response.objs
+
+    @trace_sentry.global_trace_sentry.watch()
+    def ops(self, filter: Optional[_ObjectVersionFilter] = None) -> list[ObjSchema]:
+        if not filter:
+            filter = _ObjectVersionFilter()
+        else:
+            filter = filter.model_copy()
+        filter = typing.cast(_ObjectVersionFilter, filter)
+        filter.is_op = True
+
+        response = self.server.objs_query(
+            ObjQueryReq(
+                project_id=self._project_id(),
+                filter=filter,
+            )
+        )
         return response.objs
 
     def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
@@ -577,6 +627,7 @@ class WeaveClient:
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
         )
         if parent is not None:
             parent._children.append(call)
@@ -588,7 +639,7 @@ class WeaveClient:
             id=call_id,
             op_name=op_str,
             trace_id=trace_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            started_at=call.started_at,
             parent_id=parent_id,
             inputs=to_json(inputs_with_refs, self._project_id(), self.server),
             attributes=attributes,
