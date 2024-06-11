@@ -37,7 +37,6 @@ def unpatch_openai() -> None:
 def autopatch() -> None:
     autopatch_openai()
 
-    from .integrations.langchain.langchain import langchain_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
     from .integrations.mistral.mistral import mistral_patcher
@@ -46,14 +45,12 @@ def autopatch() -> None:
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
     llamaindex_patcher.attempt_patch()
-    langchain_patcher.attempt_patch()
     crewai_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
     unpatch_openai()
 
-    from .integrations.langchain.langchain import langchain_patcher
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
     from .integrations.mistral.mistral import mistral_patcher
@@ -62,5 +59,4 @@ def reset_autopatch() -> None:
     mistral_patcher.undo_patch()
     litellm_patcher.undo_patch()
     llamaindex_patcher.undo_patch()
-    langchain_patcher.undo_patch()
     crewai_patcher.undo_patch()
