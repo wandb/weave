@@ -1770,7 +1770,6 @@ def test_call_stack_order_mixed(client):
     }
 
 
-
 def test_single_primitive_output(client):
     @weave.op()
     def single_int_output(a: int) -> int:
@@ -1816,7 +1815,6 @@ def test_single_primitive_output(client):
     assert inner_res.calls[1].output == True
     assert inner_res.calls[2].output == None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
-
 
 
 def map_simple(fn, vals):
@@ -1960,4 +1958,3 @@ def test_mapped_execution(client, mapper):
     for child in children:
         assert_valid_batched_trace(child)
     assert_valid_trace(roots[root_ndx], last_val)
-
