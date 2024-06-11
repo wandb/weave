@@ -326,7 +326,11 @@ function buildCallsTableColumns(
       valueGetter: cellParams => {
         const val = (cellParams.row as any)[key];
         if (Array.isArray(val) || typeof val === 'object') {
-          return JSON.stringify(val);
+          try {
+            return JSON.stringify(val);
+          } catch {
+            return val;
+          }
         }
         return val;
       },
