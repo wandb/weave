@@ -1,7 +1,7 @@
 import abc
 import datetime
 import typing
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .interface.query import Query
 
@@ -103,9 +103,12 @@ class ObjSchema(BaseModel):
     val: typing.Any
 
 
+RE_VALID_OBJECT_ID = r"^[A-Za-z0-9._-]+$"
+
+
 class ObjSchemaForInsert(BaseModel):
     project_id: str
-    object_id: str
+    object_id: str = Field(min_length=1, max_length=128, pattern=RE_VALID_OBJECT_ID)
     val: typing.Any
 
 
