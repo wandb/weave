@@ -41,7 +41,7 @@ def query_with_retry(
         raise ValueError("num_timeout_retries must be >= 0")
     for attempt_no in range(num_timeout_retries + 1):
         try:
-            return wandb_public_api().client.execute(
+            return wandb_public_api().client.execute(  # type: ignore
                 gql(query_str),
                 variable_values=variables,
             )

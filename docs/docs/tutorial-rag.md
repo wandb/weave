@@ -1,3 +1,8 @@
+---
+sidebar_position: 3
+hide_table_of_contents: true
+---
+
 # Example: Model-Based Evaluation of RAG applications
 
 Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases. 
@@ -165,6 +170,92 @@ evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_scor
 asyncio.run(evaluation.evaluate(model)) # note: you'll need to define a model to evaluate
 ```
 
+### Optional: Defining a `Scorer` class
+In some applications we want to create custom evaluation classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. In order to do that Weave defines a list of ready-to-use `Scorer` classes and also makes it easy to create a custom `Scorer` - in the following we'll see how to create a custom `class CorrectnessLLMJudge(Scorer)`. 
+
+On a high-level the steps to create custom Scorer are quite simple: 
+1. Define a custom class that inherits from `weave.flow.scorer.Scorer`
+2. Overwrite the `score` function and add a `@weave.op()` if you want to track each call of the function
+    - this function has to define a `model_output` argument where the prediction of the model will be passed to. We define it as type `Optional[dict]` in case the mode might return "None".
+    - the rest of the arguments can either be a general `Any` or `dict` or can select specific columns from the dataset that is used to evaluate the model using the `weave.Evaluate` class - they have to have the exact same names as the column names or keys of a single row after being passed to `preprocess_model_input` if that is used.
+3. *Optional:* Overwrite the `summarize` function to customize the calculation of the aggregate score. By default Weave uses the `weave.flow.scorer.auto_summarize` function if you don't define a custom function.
+    - this function has to have a `@weave.op()` decorator.
+
+
+```python
+from weave.flow.scorer import Scorer
+from weave import WeaveList
+
+class CorrectnessLLMJudge(Scorer):
+    prompt: str
+    model_name: str
+    device: str
+
+    @weave.op()
+    async def score(self, model_output: Optional[dict], query: str, answer: str) -> Any:
+        """Score the correctness of the predictions by comparing the pred, query, target.
+           Args:
+            - model_output: the dict that will be provided by the model that is evaluated
+            - query: the question asked - as defined in the dataset
+            - answer: the target answer - as defined in the dataset
+           Returns:
+            - single dict {metric name: single evaluation value}"""
+
+        # get_model is defined as general model getter based on provided params (OpenAI,HF...)
+        eval_model = get_model(
+            model_name = self.model_name,
+            prompt = self.prompt
+            device = self.device,
+        )
+        # async evaluation to speed up evaluation - this doesn't have to be async
+        grade = await eval_model.async_predict(
+            {
+                "query": query,
+                "answer": answer,
+                "result": model_output.get("result"),
+            }
+        )
+        # output parsing - could be done more reobustly with pydantic
+        evaluation = "incorrect" not in grade["text"].strip().lower()
+
+        # the column name displayed in Weave
+        return {"correct": evaluation}
+
+    @weave.op()
+    def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        """Aggregate all the scores that are calculated for each row by the scoring function.
+           Args:
+            - score_rows: a WeaveList object, nested dict of metrics and scores
+           Returns:
+            - nested dict with the same structure as the input"""
+        
+        # if nothing is provided the weave.flow.scorer.auto_summarize function is used
+        # return auto_summarize(score_rows)
+
+        valid_data = [x.get("correct") for x in score_rows if x.get("correct") is not None]
+        count_true = list(valid_data).count(True)
+        int_data = [int(x) for x in valid_data]
+
+        sample_mean = np.mean(int_data) if int_data else 0
+        sample_variance = np.var(int_data) if int_data else 0
+        sample_error = np.sqrt(sample_variance / len(int_data)) if int_data else 0
+
+        # the extra "correct" layer is not necessary but adds structure in the UI
+        return {
+            "correct": {
+                "true_count": count_true,
+                "true_fraction": sample_mean,
+                "stderr": sample_error,
+            }
+        }
+```
+
+To use this as a scorer, you would initialize it and pass it to `scorers` argument in your `Evaluation like this:
+
+```python
+evaluation = weave.Evaluation(dataset=questions, scorers=[CorrectnessLLMJudge()])
+```
+
 # Pulling it all together
 
 To get the same result for your RAG apps:
@@ -173,6 +264,8 @@ To get the same result for your RAG apps:
 - Collect examples to evaluate
 - Create scoring functions that score one example
 - Use `Evaluation` class to run evaluations on your examples
+
+**NOTE:** Sometimes the async execution of Evaluations will trigger a rate limit on the models of OpenAI, Anthropic, etc. To prevent that you can set an environment variable to limit the amount of parallel workers e.g. `WEAVE_PARALLELISM=3`.
 
 Here, we show the code in it's entirety.
 

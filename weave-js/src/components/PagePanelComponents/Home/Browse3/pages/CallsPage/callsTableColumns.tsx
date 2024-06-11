@@ -10,7 +10,6 @@ import {
   GridColumnNode,
 } from '@mui/x-data-grid-pro';
 import {UserLink} from '@wandb/weave/components/UserLink';
-import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {monthRoundedTime} from '../../../../../../common/util/time';
@@ -33,6 +32,12 @@ import {
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {OpVersionIndexText} from './CallsTable';
 import {buildTree} from './callsTableBuildTree';
+import {
+  insertPath,
+  isDynamicCallColumn,
+  pathToString,
+  stringToPath,
+} from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {allOperators} from './callsTableQuery';
 
@@ -68,10 +73,6 @@ export const useCallsTableColumns = (
 
   const shouldIgnoreColumn = useCallback(
     (col: string) => {
-      // Captures the case where the column is already expanded.
-      if (columnIsRefExpanded(col)) {
-        return true;
-      }
       const columnsWithRefsList = Array.from(columnsWithRefs);
       // Captures the case where the column has just been expanded.
       for (const refCol of columnsWithRefsList) {
@@ -81,7 +82,7 @@ export const useCallsTableColumns = (
       }
       return false;
     },
-    [columnIsRefExpanded, columnsWithRefs]
+    [columnsWithRefs]
   );
 
   const allDynamicColumnNames = useAllDynamicColumnNames(
@@ -174,6 +175,13 @@ function buildCallsTableColumns(
       filterable: false,
       width: 250,
       hideable: false,
+      valueGetter: rowParams => {
+        const op_name = rowParams.row.op_name;
+        if (!isRef(op_name)) {
+          return op_name;
+        }
+        return opVersionRefOpName(op_name);
+      },
       renderCell: rowParams => {
         const op_name = rowParams.row.op_name;
         if (!isRef(op_name)) {
@@ -233,6 +241,9 @@ function buildCallsTableColumns(
       // type: 'singleSelect',
       // valueOptions: ['SUCCESS', 'ERROR', 'PENDING'],
       width: 59,
+      valueGetter: cellParams => {
+        return traceCallStatusCode(cellParams.row);
+      },
       renderCell: cellParams => {
         return (
           <div style={{margin: 'auto'}}>
@@ -312,6 +323,17 @@ function buildCallsTableColumns(
           </div>
         );
       },
+      valueGetter: cellParams => {
+        const val = (cellParams.row as any)[key];
+        if (Array.isArray(val) || typeof val === 'object') {
+          try {
+            return JSON.stringify(val);
+          } catch {
+            return val;
+          }
+        }
+        return val;
+      },
       renderCell: cellParams => {
         const val = (cellParams.row as any)[key];
         if (val === undefined) {
@@ -381,6 +403,7 @@ function buildCallsTableColumns(
     // Should have custom timestamp filter here.
     filterOperators: allOperators.filter(o => o.value.startsWith('(date)')),
     sortable: true,
+    sortingOrder: ['desc', 'asc'],
     width: 100,
     minWidth: 100,
     maxWidth: 100,
@@ -404,6 +427,14 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: cellParams => {
+      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+        // Call is still in progress, latency will be 0.
+        // Displaying nothing seems preferable to being misleading.
+        return null;
+      }
+      return traceCallLatencyS(cellParams.row);
+    },
     renderCell: cellParams => {
       if (traceCallStatusCode(cellParams.row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
@@ -434,47 +465,27 @@ const useAllDynamicColumnNames = (
   shouldIgnoreColumn: (col: string) => boolean,
   resetDep: any
 ) => {
-  // 1. Maintain an ever-growing set of unique columns. It must be reset
-  // when `effectiveFilter` changes.
-  const currentDynamicColumnNames = useMemo(() => {
-    const dynamicColumns = new Set<string>();
-    tableData.forEach(row => {
-      Object.keys(row).forEach(key => {
-        if (
-          key.startsWith('attributes') ||
-          key.startsWith('inputs') ||
-          key.startsWith('output') ||
-          key.startsWith('summary')
-        ) {
-          dynamicColumns.add(key);
-        }
-      });
-    });
-    return _.sortBy([...dynamicColumns]);
-  }, [tableData]);
-
-  // Wow this is a pretty crazy idea to maintain a list of all dynamic columns
-  // so we don't blow away old ones
-  const [allDynamicColumnNames, setAllDynamicColumnNames] = useState(
-    currentDynamicColumnNames
+  const [allDynamicColumnNames, setAllDynamicColumnNames] = useState<string[]>(
+    []
   );
 
   useEffect(() => {
     setAllDynamicColumnNames(last => {
-      const lastDynamicColumnNames = last.filter(c => {
-        if (shouldIgnoreColumn(c)) {
-          return false;
-        }
-        return true;
+      let nextAsPaths = last
+        .filter(c => !shouldIgnoreColumn(c))
+        .map(stringToPath);
+      tableData.forEach(row => {
+        Object.keys(row).forEach(key => {
+          const keyAsPath = stringToPath(key);
+          if (isDynamicCallColumn(keyAsPath)) {
+            nextAsPaths = insertPath(nextAsPaths, stringToPath(key));
+          }
+        });
       });
 
-      return _.sortBy(
-        Array.from(
-          new Set([...lastDynamicColumnNames, ...currentDynamicColumnNames])
-        )
-      );
+      return nextAsPaths.map(pathToString);
     });
-  }, [currentDynamicColumnNames, shouldIgnoreColumn]);
+  }, [shouldIgnoreColumn, tableData]);
 
   useEffect(() => {
     // Here, we reset the dynamic column names when the filter changes.

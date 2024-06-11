@@ -439,7 +439,10 @@ export const CallsTable: FC<{
         // However, in this case it is also useful.
         disableColumnPinning={false}
         // ColumnReorder is definitely useful
-        disableColumnReorder={false}
+        // TODO (Tim): This needs to be managed externally (making column
+        // ordering a controlled property) This is a "regression" from the calls
+        // table refactor
+        disableColumnReorder={true}
         // ColumnResize is definitely useful
         disableColumnResize={false}
         // ColumnSelector is definitely useful

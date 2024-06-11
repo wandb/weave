@@ -48,6 +48,10 @@ class Evaluation(Object):
         for scorer in self.scorers or []:
             if isinstance(scorer, Scorer):
                 pass
+            elif isinstance(scorer, type):
+                raise ValueError(
+                    f"Scorer {scorer.__name__} must be an instance, not a class. Did you forget to instantiate?"
+                )
             elif callable(scorer) and not isinstance(scorer, Op):
                 scorer = weave.op()(scorer)
             elif isinstance(scorer, Op):
