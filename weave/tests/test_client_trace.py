@@ -8,6 +8,7 @@ import datetime
 import os
 import typing
 import pytest
+from collections import defaultdict
 
 from pydantic import BaseModel, ValidationError
 import wandb
@@ -1685,3 +1686,327 @@ def test_mapped_execution(client, mapper):
     for child in children:
         assert_valid_batched_trace(child)
     assert_valid_trace(roots[root_ndx], last_val)
+
+
+def call_structure(calls):
+    parent_to_children_map = defaultdict(list)
+    roots = []
+    for call in calls:
+        parent_to_children_map[call.parent_id].append(call.id)
+        if call.parent_id is None:
+            roots.append(call.id)
+
+    found_structure = {}
+
+    def build_structure(parent_id):
+        if parent_id is None:
+            return {}
+        children = parent_to_children_map[parent_id]
+        return {child: build_structure(child) for child in children}
+
+    for root in roots:
+        found_structure[root] = build_structure(root)
+
+    return found_structure
+
+
+def test_call_stack_order_implicit_depth_first(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+
+    # This version of the call sequence matches the happy path
+    # without any out-of-order calls
+    call_1 = client.create_call("op", None, {})
+    call_2 = client.create_call("op", None, {})
+    call_3 = client.create_call("op", None, {})
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", None, {})
+    client.finish_call(call_4)
+    client.finish_call(call_2)
+    call_5 = client.create_call("op", None, {})
+    call_6 = client.create_call("op", None, {})
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", None, {})
+    client.finish_call(call_7)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_explicit_depth_first(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This version of the call sequence matches the happy path
+    # without any out-of-order calls, but with explicit parentage
+    # specified.
+    call_1 = client.create_call("op", None, {})
+    call_2 = client.create_call("op", call_1, {})
+    call_3 = client.create_call("op", call_2, {})
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", call_2, {})
+    client.finish_call(call_4)
+    client.finish_call(call_2)
+    call_5 = client.create_call("op", call_1, {})
+    call_6 = client.create_call("op", call_5, {})
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", call_5, {})
+    client.finish_call(call_7)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_langchain_batch(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This sequence is pretty much exactly what langchain does when handling
+    # a batch of calls. Specifically (prompt | llm).batch([1,2])
+    call_1 = client.create_call("op", None, {})  # <- Implicit Parent, no stack = root
+    call_2 = client.create_call("op", call_1, {})  # <- RunnableSequence1
+    call_5 = client.create_call("op", call_1, {})  # <- RunnableSequence2
+    call_3 = client.create_call("op", call_2, {})  # <- Prompt1
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", call_2, {})  # <- LLM1
+    call_4gpt = client.create_call("op", None, {})  # <- Openai
+    client.finish_call(call_4gpt)
+    client.finish_call(call_4)
+    call_6 = client.create_call("op", call_5, {})  # <- Prompt2
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", call_5, {})  # <- LLM2
+    call_7gpt = client.create_call("op", None, {})  # <- Openai
+    client.finish_call(call_7gpt)
+    client.finish_call(call_7)
+    client.finish_call(call_2)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {call_4gpt.id: {}}},
+            call_5.id: {call_6.id: {}, call_7.id: {call_7gpt.id: {}}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+POP_REORDERS_STACK = False
+
+
+def test_call_stack_order_out_of_order_pop(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering is a specifically challenging case where we return to
+    # a parent that that was not the top of stack
+    call_1 = client.create_call("op", None, {})
+    call_2 = client.create_call("op", None, {})
+    call_3 = client.create_call("op", None, {})
+    # Purposely swap 4 & 5
+    call_5 = client.create_call("op", call_1, {})  # <- Explicit Parent (call_1)
+    call_4 = client.create_call("op", call_2, {})  # <- Explicit Parent (call_2)
+    call_6 = client.create_call("op", call_5, {})  # <- Explicit Parent (call_5)
+    client.finish_call(call_6)  # <- Finish call_6
+    # (should change stack to call_6.parent which is call_5)
+    call_7 = client.create_call("op", None, {})  # <- Implicit Parent (call_5)
+    # (current stack implementation will think this is 4)
+
+    # Finish them in completely reverse order, because why not?
+    client.finish_call(call_1)
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+    client.finish_call(call_5)
+    client.finish_call(call_7)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    if POP_REORDERS_STACK:
+        # In my (Tim) opinion, this is the correct ordering.
+        # However, the current implementation results in the
+        # "else" branch here. The key difference is when we
+        # finish call_6. Since call_6 was started immediately after
+        # call_4, we currently will believe the top of the stack is
+        # call_4. However, call_6's parent is call_5, so in my
+        # opinion, we should pop the stack back to call_5. We
+        # can debate this more and change the test/implementation
+        # as needed.
+        exp = {
+            call_1.id: {
+                call_2.id: {call_3.id: {}, call_4.id: {}},
+                call_5.id: {call_6.id: {}, call_7.id: {}},
+            },
+            terminal_root_call.id: {},
+        }
+    else:
+        exp = {
+            call_1.id: {
+                call_2.id: {call_3.id: {}, call_4.id: {call_7.id: {}}},
+                call_5.id: {
+                    call_6.id: {},
+                },
+            },
+            terminal_root_call.id: {},
+        }
+
+    assert call_structure(inner_res.calls) == exp
+
+
+def test_call_stack_order_height_ordering(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering calls ops in the order of their height in the tree
+    call_1 = client.create_call("op", None, {})
+    call_2 = client.create_call("op", call_1, {})
+    call_5 = client.create_call("op", call_1, {})
+    call_3 = client.create_call("op", call_2, {})
+    call_6 = client.create_call("op", call_5, {})
+    call_4 = client.create_call("op", call_2, {})
+    call_7 = client.create_call("op", call_5, {})
+
+    # Finish them in completely reverse order
+    client.finish_call(call_1)
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+    client.finish_call(call_5)
+    client.finish_call(call_7)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_mixed(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering is as mixed up as I could make it
+    call_1 = client.create_call("op", None, {})
+    call_5 = client.create_call("op", call_1, {})
+    call_7 = client.create_call("op", call_5, {})
+    client.finish_call(call_7)
+    call_6 = client.create_call("op", call_5, {})
+    client.finish_call(call_5)
+    call_2 = client.create_call("op", call_1, {})
+    client.finish_call(call_1)
+    call_4 = client.create_call("op", call_2, {})
+    call_3 = client.create_call("op", call_2, {})
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_5.id: {call_7.id: {}, call_6.id: {}},
+            call_2.id: {call_4.id: {}, call_3.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
