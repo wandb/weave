@@ -1492,53 +1492,6 @@ def _patched_default_initializer(trace_client: weave_client.WeaveClient):
         weave_init.init_weave_get_server = orig
 
 
-def test_single_primitive_output(client):
-    @weave.op()
-    def single_int_output(a: int) -> int:
-        return a
-
-    @weave.op()
-    def single_bool_output(a: int) -> bool:
-        return a == 1
-
-    @weave.op()
-    def single_none_output(a: int) -> None:
-        return None
-
-    @weave.op()
-    def dict_output(a: int, b: bool, c: None) -> dict:
-        return {"a": a, "b": b, "c": c}
-
-    a = single_int_output(1)
-    b = single_bool_output(1)
-    c = single_none_output(1)
-    d = dict_output(a, b, c)
-
-    assert isinstance(a, int)
-    assert a == 1
-    assert isinstance(b, bool)
-    assert b == True
-    assert isinstance(c, type(None))
-    assert c == None
-    assert isinstance(d, dict)
-    assert isinstance(d["a"], int)
-    assert isinstance(d["b"], bool)
-    assert isinstance(d["c"], type(None))
-    assert d == {"a": 1, "b": True, "c": None}
-
-    inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client._project_id(),
-        )
-    )
-
-    assert len(inner_res.calls) == 4
-    assert inner_res.calls[0].output == 1
-    assert inner_res.calls[1].output == True
-    assert inner_res.calls[2].output == None
-    assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
-
-
 def call_structure(calls):
     parent_to_children_map = {}
     roots = []
@@ -1810,3 +1763,52 @@ def test_call_stack_order_mixed(client):
         },
         terminal_root_call.id: {},
     }
+
+
+
+def test_single_primitive_output(client):
+    @weave.op()
+    def single_int_output(a: int) -> int:
+        return a
+
+    @weave.op()
+    def single_bool_output(a: int) -> bool:
+        return a == 1
+
+    @weave.op()
+    def single_none_output(a: int) -> None:
+        return None
+
+    @weave.op()
+    def dict_output(a: int, b: bool, c: None) -> dict:
+        return {"a": a, "b": b, "c": c}
+
+    a = single_int_output(1)
+    b = single_bool_output(1)
+    c = single_none_output(1)
+    d = dict_output(a, b, c)
+
+    assert isinstance(a, int)
+    assert a == 1
+    assert isinstance(b, bool)
+    assert b == True
+    assert isinstance(c, type(None))
+    assert c == None
+    assert isinstance(d, dict)
+    assert isinstance(d["a"], int)
+    assert isinstance(d["b"], bool)
+    assert isinstance(d["c"], type(None))
+    assert d == {"a": 1, "b": True, "c": None}
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == 4
+    assert inner_res.calls[0].output == 1
+    assert inner_res.calls[1].output == True
+    assert inner_res.calls[2].output == None
+    assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
+
