@@ -109,7 +109,9 @@ class Tracable:
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     attribute = object.__getattribute__(self, name)
-    if name not in object.__getattribute__(self, "model_fields"):
+    model_fields = object.__getattribute__(self, "model_fields")
+
+    if name not in model_fields:
         return attribute
     if name == "ref":
         try:
@@ -119,6 +121,10 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
 
     server = gc.server if (gc := get_graph_client()) else None
     res = attribute_access_result(self, attribute, name, server=server)
+
+    # This is is important to update the value of the attribute so
+    # we can get the same id back each time.
+    self.__dict__[name] = res
     return res
 
 
