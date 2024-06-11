@@ -180,7 +180,6 @@ class FilesystemArtifact(artifact_base.Artifact):
         typing.Union["FilesystemArtifactFile", "FilesystemArtifactDir"]
     ]:
         res = self._path_info(path)
-        print(f"\n\nafter _path_info() res = {res}\n\n", flush=True)
         if isinstance(res, FilesystemArtifactRef):
             if res.path is None:
                 raise errors.WeaveInternalError(f"Cannot get path info for {path}")

@@ -553,7 +553,6 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     # have access to an artifact's project/entity, such that the artifact has been linked to a
     # collection in an org-registry, we use WeaveWBArtifactByIDURI which allows us to query the
     # artifact's manifest and hence, files, using just its ID.
-    print(f"\n\nlogging version query result: ===> \n{artifactVersion}\n\n", flush=True)
     artifact_id = artifactVersion["id"]
     type_name = artifactVersion["artifactSequence"]["defaultArtifactType"]["name"]
     home_sequence_name = artifactVersion["artifactSequence"]["name"]
@@ -561,20 +560,12 @@ def _artifact_version_to_wb_artifact(artifactVersion: wdt.ArtifactVersion):
     uri = artifact_wandb.WeaveWBArtifactByIDURI(
         home_sequence_name, commit_hash, artifact_id
     )
-    print(f"\n\nlogging artifact_by_id uri: URI.PATH ===> \n{uri.path}\n\n", flush=True)
-    print(f"\n\nlogging artifact_by_id uri: ===> \n{uri}\n\n", flush=True)
     if artifactVersion["artifactSequence"]["project"] is not None:
         entity_name = artifactVersion["artifactSequence"]["project"]["entity"]["name"]
         project_name = artifactVersion["artifactSequence"]["project"]["name"]
         uri = artifact_wandb.WeaveWBArtifactURI(
             home_sequence_name, commit_hash, entity_name, project_name
         )
-        print(
-            f"\n\nlogging version project_name: ===> \n{project_name}\nentity_name ===> {entity_name}\n\n",
-            flush=True,
-        )
-        print(f"\n\nlogging artifact uri: URI.PATH ===> \n{uri.path}\n\n", flush=True)
-
     return artifact_wandb.WandbArtifact(
         name=home_sequence_name,
         type=type_name,

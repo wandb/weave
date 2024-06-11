@@ -128,22 +128,15 @@ class WandbFileManagerAsync:
             async with self.fs.open_read(manifest_path) as f:
                 return artifact_wandb.WandbArtifactManifest(json.loads(await f.read()))
         except FileNotFoundError:
-            print(f"could not find manifest at path ===> {manifest_path}")
             pass
         # Download
-        print(f"download manifest via id ===> {art_uri.__class__}", flush=True)
         manifest_url = None
         if isinstance(art_uri, artifact_wandb.WeaveWBArtifactByIDURI):
-            print(
-                f"downloading manifest via artifact id ===> {art_uri.artifact_id}",
-                flush=True,
-            )
             artifact_id = art_uri.artifact_id
             manifest_url = await self.wandb_api.artifact_manifest_url_from_id(
                 art_id=artifact_id,
             )
         else:
-            print("download manifest via id is None, downloading via name", flush=True)
             manifest_url = await self.wandb_api.artifact_manifest_url(
                 art_uri.entity_name,
                 art_uri.project_name,
@@ -168,10 +161,8 @@ class WandbFileManagerAsync:
             assert art_uri.version is not None
             manifest_path = self.manifest_path(art_uri)
             manifest = self._manifests.get(manifest_path)
-            print("inside async manifest")
             if not isinstance(manifest, cache.LruTimeWindowCache.NotFound):
                 return manifest
-            print(f"query manifest {art_uri.__class__}", flush=True)
             manifest = await self._manifest(art_uri, manifest_path)
             self._manifests.set(manifest_path, manifest)
             return manifest
@@ -332,7 +323,6 @@ class WandbFileManager:
         except FileNotFoundError:
             pass
         # Download
-        print(f"download manifest via id ===> {art_uri.__class__}", flush=True)
         manifest_url = None
         if isinstance(art_uri, artifact_wandb.WeaveWBArtifactByIDURI):
             artifact_id = art_uri.artifact_id
@@ -340,7 +330,6 @@ class WandbFileManager:
                 art_id=artifact_id,
             )
         else:
-            print("download manifest via id is None, downloading via name", flush=True)
             manifest_url = self.wandb_api.artifact_manifest_url(
                 art_uri.entity_name,
                 art_uri.project_name,
@@ -361,7 +350,6 @@ class WandbFileManager:
             artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI
         ],
     ) -> typing.Optional[artifact_wandb.WandbArtifactManifest]:
-        print("inside sync manifest", flush=True)
         with tracer.trace("wandb_file_manager.manifest") as span:
             assert art_uri.version is not None
             manifest_path = self.manifest_path(art_uri)
