@@ -2,6 +2,10 @@
 
 Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
 
+<a target="_blank" href="http://wandb.me/weave_colab">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 ---
 
 You can use Weave to:
