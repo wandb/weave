@@ -3,7 +3,6 @@ from collections.abc import Callable
 from typing import Any, Generator, List, Optional, Tuple
 
 import pytest
-
 import weave
 from weave.autopatch import autopatch, autopatch_openai, reset_autopatch
 from weave.trace_server import trace_server_interface as tsi
@@ -282,16 +281,16 @@ def assert_correct_calls_for_agent_with_tool(calls: list[tsi.CallSchema]) -> Non
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
     exp = [
-        ("langchain.Chain.RunnableSequence", 0),
-        ("langchain.Chain.RunnableParallel context question ", 1),
-        ("langchain.Chain.RunnableSequence", 2),
-        ("langchain.Retriever.Retriever", 3),
-        ("langchain.Chain.format_docs", 3),
-        ("langchain.Chain.RunnablePassthrough", 2),
-        ("langchain.Prompt.ChatPromptTemplate", 1),
-        ("langchain.Llm.ChatOpenAI", 1),
-        ("openai.chat.completions.create", 2),
-        ("langchain.Parser.StrOutputParser", 1),
+        ("langchain.Chain.AgentExecutor", 0),
+        ("langchain.Chain.RunnableSequence", 1),
+        ("langchain.Chain.RunnableParallel input chat_history agent_scratchpad ", 2),
+        ("langchain.Chain.RunnableLambda", 3),
+        ("langchain.Chain.RunnableLambda", 3),
+        ("langchain.Chain.RunnableLambda", 3),
+        ("langchain.Prompt.ChatPromptTemplate", 2),
+        ("langchain.Llm.ChatOpenAI", 2),
+        ("openai.chat.completions.create", 3),
+        ("langchain.Parser.OpenAIFunctionsAgentOutputParser", 2),
     ]
     assert got == exp
 
@@ -312,7 +311,7 @@ def test_agent_run_with_tools(
     from langchain.tools import StructuredTool
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-    from langchain_core.utils.function_calling import convert_to_openai_function
+    from langchain_core.utils.function_calling import convert_to_openai_tool
     from langchain_openai import ChatOpenAI
 
     class CalculatorInput(BaseModel):
@@ -334,7 +333,7 @@ def test_agent_run_with_tools(
     llm = ChatOpenAI(model="gpt-3.5-turbo")
 
     tools = [calculator]
-    functions = [convert_to_openai_function(t) for t in tools]
+    functions = [convert_to_openai_tool(t) for t in tools]
 
     assistant_system_message = """You are a helpful assistant. \
     Use tools (only if necessary) to best answer the users questions."""
@@ -347,7 +346,7 @@ def test_agent_run_with_tools(
         ]
     )
 
-    llm_with_tools = llm.bind(functions=functions)
+    llm_with_tools = llm.bind(tools=functions)
 
     def _format_chat_history(chat_history: List[Tuple[str, str]]) -> List:
         buffer = []
