@@ -1,4 +1,7 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from contextvars import copy_context
 import dataclasses
 from collections import namedtuple
 import datetime
@@ -1539,3 +1542,146 @@ def test_single_primitive_output(client):
     assert inner_res.calls[1].output == True
     assert inner_res.calls[2].output == None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
+
+
+def map_simple(fn, vals):
+    return [fn(v) for v in vals]
+
+
+max_workers = 3
+
+# This is a standard way to execute a map operation with thread executor.
+def map_with_thread_executor(fn, vals):
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(fn, vals)
+
+
+# This is how Langchain executes batches (with a manual context copy)
+def map_with_copying_thread_executor(fn, vals):
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        contexts = [copy_context() for _ in range(len(vals))]
+
+        def _wrapped_fn(*args):
+            return contexts.pop().run(fn, *args)
+
+        executor.map(_wrapped_fn, vals)
+
+
+# TODO: Make an async version of this
+@pytest.mark.parametrize(
+    "mapper",
+    [
+        map_simple,
+        # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
+        map_with_copying_thread_executor,
+    ],
+)
+def test_mapped_execution(client, mapper):
+    import time
+
+    events = []
+
+    @weave.op()
+    def op_a(a: int) -> int:
+        events.append("A(S):" + str(a))
+        time.sleep(0.3)
+        events.append("A(E):" + str(a))
+        return a
+
+    @weave.op()
+    def op_b(b: int) -> int:
+        events.append("B(S):" + str(b))
+        time.sleep(0.2)
+        res = op_a(b)
+        events.append("B(E):" + str(b))
+        return res
+
+    @weave.op()
+    def op_c(c: int) -> int:
+        events.append("C(S):" + str(c))
+        time.sleep(0.1)
+        res = op_b(c)
+        events.append("C(E):" + str(c))
+        return res
+
+    @weave.op()
+    def op_mapper(vals):
+        return mapper(op_c, vals)
+
+    map_vals = list(range(12))
+    first_val = map_vals[0]
+    last_val = map_vals[-1]
+    middle_vals = map_vals[1:-1]
+    split = len(middle_vals) // 2
+    middle_vals_outer = middle_vals[:split]
+    middle_vals_inner = middle_vals[split:]
+    op_c(first_val)
+    mapper(op_c, middle_vals_outer)
+    op_mapper(middle_vals_inner)
+    op_c(last_val)
+
+    # Make sure that the events are in the right (or wrong!) order
+    sequential_expected_order = []
+    for i in map_vals:
+        for event in ["S", "E"]:
+            order = ["A", "B", "C"]
+            if event == "S":
+                order = order[::-1]
+            for op in order:
+                sequential_expected_order.append(f"{op}({event}):{i}")
+    if mapper == map_simple:
+        assert events == sequential_expected_order
+    else:
+        assert events != sequential_expected_order
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == (len(map_vals) * 3) + 1
+
+    # Now, we want to assert that the calls are in the right topological order - while
+    # it is possible that their timestamps are not in order
+    # First some helpers:
+    roots = [c for c in inner_res.calls if c.parent_id is None]
+
+    def assert_input_of_call(call, input_val):
+        assert call.inputs == input_val
+
+    def get_children_of_call(call):
+        return [c for c in inner_res.calls if c.parent_id == call.id]
+
+    def assert_valid_trace(root_call, val):
+        assert_input_of_call(root_call, {"c": val})
+        children = get_children_of_call(root_call)
+        assert len(children) == 1
+        assert_input_of_call(children[0], {"b": val})
+        children = get_children_of_call(children[0])
+        assert len(children) == 1
+        assert_input_of_call(children[0], {"a": val})
+
+    def assert_valid_batched_trace(root_call):
+        val = int(root_call.inputs["c"])
+        assert_valid_trace(root_call, val)
+
+    # First, ensure that there are 5 roots
+    assert len(roots) == 3 + len(middle_vals_outer)
+
+    # Now we can validate the shape of the calls within their traces.
+    # The first and last roots are not batched and therefore deterministic
+    # The middle 3 roots are batched and therefore non-deterministic
+    root_ndx = 0
+    assert_valid_trace(roots[root_ndx], first_val)
+    root_ndx += 1
+    for outer in middle_vals_outer:
+        assert_valid_trace(roots[root_ndx], outer)
+        root_ndx += 1
+
+    children = get_children_of_call(roots[root_ndx])
+    root_ndx += 1
+    assert len(children) == len(middle_vals_inner)
+    for child in children:
+        assert_valid_batched_trace(child)
+    assert_valid_trace(roots[root_ndx], last_val)
