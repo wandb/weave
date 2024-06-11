@@ -472,11 +472,9 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
             self._unresolved_read_artifact_or_client_uri,
             (WeaveWBLoggedArtifactURI, WeaveWBArtifactURI, WeaveWBArtifactByIDURI),
         ):
-            print(self._unresolved_read_artifact_or_client_uri.__class__, flush=True)
             self._resolved_read_artifact_uri = (
                 self._unresolved_read_artifact_or_client_uri.resolved_artifact_uri
             )
-            print(self._resolved_read_artifact_uri.__class__, flush=True)
         return self._resolved_read_artifact_uri
 
     @property
@@ -499,10 +497,11 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
     def _saved_artifact(self):
         if self._read_artifact is None:
             uri = self._read_artifact_uri
-            if isinstance(uri, WeaveWBArtifactURI):
-                path = uri.uri_path
-            else:
-                raise errors.WeaveInternalError("cannot get saved artifact via id uri")
+            if isinstance(uri, WeaveWBArtifactByIDURI):
+                raise errors.WeaveInternalError(
+                    "The `_saved_artifact` property does not support `wandb-artifact-by-id` URI scheme. This is an internal programming error"
+                )
+            path = uri.uri_path
             self._read_artifact = get_wandb_read_artifact(path)
         return self._read_artifact
 
@@ -516,14 +515,13 @@ class WandbArtifact(artifact_fs.FilesystemArtifact):
         # The URI for a get node might look like: wandb-artifact:///<entity>/<project>/test8:latest/obj
         # but the SDK add_reference call requires something like:
         # wandb-artifact://41727469666163743a353432353830303535/obj.object.json
-        assert uri.startswith("wandb-artifact:///") or uri.startswith(
-            "wandb-artifact-by-id:///"
-        )
-        if uri.startswith("wandb-artifact:///"):
-            uri_parts = WeaveWBArtifactURI.parse(uri)
-            uri_path = uri_parts.uri_path
-        elif uri.startswith("wandb-artifact-by-id:///"):
-            raise errors.WeaveInternalError("cannot add reference via id")
+        if uri.startswith("wandb-artifact-by-id:///"):
+            raise errors.WeaveInternalError(
+                "`add_artifact_reference` does not support `wandb-artifact-by-id` URI scheme. This is an internal programming error"
+            )
+        assert uri.startswith("wandb-artifact:///")
+        uri_parts = WeaveWBArtifactURI.parse(uri)
+        uri_path = uri_parts.uri_path
         ref_artifact = get_wandb_read_artifact(uri_path)
 
         # A reference needs to point to a specific existing file in the other artifact.
@@ -1099,6 +1097,7 @@ class WeaveWBArtifactByIDURI(uris.WeaveURI):
     SCHEME = "wandb-artifact-by-id"
     path_root = "__wb_artifacts_by_id__"
     entity_name = None
+    project_name = None
     artifact_id: str
     netloc: typing.Optional[str] = None
     path: typing.Optional[str] = None
