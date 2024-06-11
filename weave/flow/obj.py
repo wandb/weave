@@ -1,24 +1,21 @@
-from typing import Optional, Any
-from pydantic import (
-    ConfigDict,
-    model_validator,
-    ValidatorFunctionWrapHandler,
-    ValidationInfo,
-    BaseModel,
-)
+from typing import Any, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, ValidatorFunctionWrapHandler, model_validator
 
 # import pydantic
-
 from weave import box
-from weave.trace.op import Op, ObjectRef
-from weave.trace.vals import pydantic_getattribute
+from weave.trace.op import ObjectRef, Op
+from weave.trace.vals import ObjectRecord, TraceList, TraceObject, pydantic_getattribute
 from weave.weave_client import get_ref
-from weave.trace.vals import ObjectRecord, TraceObject
 
 
 class Object(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+
+    # This really should be PrivateAttr, but I'm not sure why it doesn't work atm.
+    # There is probably something messing with underscore redirect
+    local_attr_cache: dict = Field(default_factory=dict)
 
     # Allow Op attributes
     model_config = ConfigDict(
@@ -29,6 +26,11 @@ class Object(BaseModel):
     )
 
     __str__ = BaseModel.__repr__
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in self.model_fields:
+            self.local_attr_cache[name] = value
+        super().__setattr__(name, value)
 
     # This is a "wrap" validator meaning we can run our own logic before
     # and after the standard pydantic validation.

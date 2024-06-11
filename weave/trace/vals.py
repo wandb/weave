@@ -117,6 +117,10 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
         except AttributeError:
             return None
 
+    cache = object.__getattribute__(self, "local_attr_cache")
+    if name in cache:
+        return cache[name]
+
     server = gc.server if (gc := get_graph_client()) else None
     res = attribute_access_result(self, attribute, name, server=server)
     return res
