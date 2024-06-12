@@ -289,6 +289,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
+        self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
             self.server.ensure_project_exists(entity, project)
@@ -460,32 +461,22 @@ class WeaveClient:
         inputs: dict,
         display_name: Optional[str] = None,
         attributes: Optional[dict] = None,
+        *,
+        _use_stack: bool = True,
     ) -> Call:
-        if parent is None:
-            parent = run_context.get_current_run()
-        call = self.create_call_outside_execution(
-            op, parent, inputs, display_name, attributes
-        )
-        run_context.push_call(call)
-        return call
+        """Create, log, and push a call onto the runtime stack.
 
-    @trace_sentry.global_trace_sentry.watch()
-    def create_call_outside_execution(
-        self,
-        op: Union[str, Op],
-        parent: Optional[Call],
-        inputs: dict,
-        display_name: Optional[str] = None,
-        attributes: Optional[dict] = None,
-    ) -> Call:
+        Args:
+            op (Union[str, Op]): The operation to log.
+            parent (Optional[Call]): The parent call. If parent is not provided, the current run is used as the parent.
+            inputs (dict): The inputs to the operation.
+            display_name (Optional[str], optional): The display name for the call. Defaults to None.
+            attributes (Optional[dict], optional): The attributes for the call. Defaults to None.
+            _use_stack (bool, optional): Whether to push the call onto the runtime stack. Defaults to True.
         """
-        Create a call without inferring the parent from the current run context,
-        or pushing the call onto the run context stack. This is useful in situations
-        where the information regarding the call is delivered outside of the normal
-        execution flow. For example, in a callback function. In such cases we still
-        want to log the call, but don't want this logging to interfere with the
-        normal stack context.
-        """
+        if parent is None and _use_stack:
+            parent = run_context.get_current_run()
+
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -534,6 +525,10 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
+
+        if _use_stack:
+            run_context.push_call(call)
+
         return call
 
     @trace_sentry.global_trace_sentry.watch()
