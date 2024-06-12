@@ -810,6 +810,7 @@ def test_op_query(client):
     res = client.objects()
     assert len(res) == 1
 
+#todo
 
 @pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_noextra(client):
