@@ -53,6 +53,7 @@ from .feedback import (
 from .orm import Table, Column, ParamBuilder, Row
 
 from .trace_server_interface_util import (
+    assert_non_null_wb_user_id,
     extract_refs_from_values,
     generate_id,
     str_digest,
@@ -223,7 +224,7 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
-class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
+class ClickHouseTraceServer(tsi.TraceServerInterface):
     def __init__(
         self,
         *,
@@ -396,7 +397,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
                 _ch_call_dict_to_call_schema_dict(ch_dict)
             )
 
-    def calls_delete(self, req: tsi.CallsDeleteReqForInsert) -> tsi.CallsDeleteRes:
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
@@ -448,7 +450,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
 
         return tsi.CallsDeleteRes()
 
-    def _ensure_valid_update_field(self, req: tsi.CallUpdateReqForInsert) -> None:
+    def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
         for field in valid_update_fields:
             if getattr(req, field, None) is not None:
@@ -458,7 +460,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
             f"One of [{', '.join(valid_update_fields)}] is required for call update"
         )
 
-    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
         renamed_insertable = CallUpdateCHInsertable(
             project_id=req.project_id,
@@ -961,9 +964,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
             raise ValueError("Missing chunks")
         return tsi.FileContentReadRes(content=b"".join(chunks))
 
-    def feedback_create(
-        self, req: tsi.FeedbackCreateReqForInsert
-    ) -> tsi.FeedbackCreateRes:
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req)
 
         # Augment emoji with alias.

@@ -28,7 +28,7 @@ FEEDBACK_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
 }
 
 
-def validate_feedback_create_req(req: tsi.FeedbackCreateReqForInsert) -> None:
+def validate_feedback_create_req(req: tsi.FeedbackCreateReq) -> None:
     payload_schema = FEEDBACK_PAYLOAD_SCHEMAS.get(req.feedback_type)
     if payload_schema:
         try:

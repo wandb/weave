@@ -10,7 +10,7 @@ def test_feedback_apis(client):
     project_id = client._project_id()
 
     # Emoji from Jamie
-    req = tsi.FeedbackCreateReqForInsert(
+    req = tsi.FeedbackCreateReq(
         project_id=project_id,
         wb_user_id="VXNlcjo0NTI1NDQ=",
         weave_ref="weave:///entity/project/object/name:digest",
@@ -23,7 +23,7 @@ def test_feedback_apis(client):
     id_emoji_1 = res.id
 
     # Another emoji from Jamie
-    req = tsi.FeedbackCreateReqForInsert(
+    req = tsi.FeedbackCreateReq(
         project_id=project_id,
         wb_user_id="VXNlcjo0NTI1NDQ=",
         weave_ref="weave:///entity/project/object/name:digest",
@@ -36,7 +36,7 @@ def test_feedback_apis(client):
     id_emoji_2 = res.id
 
     # Emoji from Shawn
-    req = tsi.FeedbackCreateReqForInsert(
+    req = tsi.FeedbackCreateReq(
         project_id=project_id,
         wb_user_id="VXNlcjoxOQ==",
         weave_ref="weave:///entity/project/object/name:digest",
@@ -49,7 +49,7 @@ def test_feedback_apis(client):
     id_emoji_3 = res.id
 
     # Note from Jamie
-    req = tsi.FeedbackCreateReqForInsert(
+    req = tsi.FeedbackCreateReq(
         project_id=project_id,
         wb_user_id="VXNlcjo0NTI1NDQ=",
         weave_ref="weave:///entity/project/object/name:digest",
@@ -61,7 +61,7 @@ def test_feedback_apis(client):
     id_note = res.id
 
     # Custom from Jamie
-    req = tsi.FeedbackCreateReqForInsert(
+    req = tsi.FeedbackCreateReq(
         project_id=project_id,
         wb_user_id="VXNlcjo0NTI1NDQ=",
         weave_ref="weave:///entity/project/object/name:digest",
@@ -73,7 +73,7 @@ def test_feedback_apis(client):
     id_custom_1 = res.id
 
     # Custom on another object
-    req = tsi.FeedbackCreateReqForInsert(
+    req = tsi.FeedbackCreateReq(
         project_id=project_id,
         wb_user_id="VXNlcjo0NTI1NDQ=",
         weave_ref="weave:///entity/project/object/name2:digest",
@@ -205,7 +205,7 @@ def test_feedback_create_too_large(client):
     project_id = client._project_id()
 
     value = "a" * 10000
-    req = tsi.FeedbackCreateReqForInsert(
+    req = tsi.FeedbackCreateReq(
         project_id=project_id,
         wb_user_id="VXNlcjo0NTI1NDQ=",
         weave_ref="weave:///entity/project/object/name:digest",
