@@ -148,9 +148,8 @@ class CallsDeleteReq(BaseModel):
     project_id: str
     call_ids: typing.List[str]
 
-
-class CallsDeleteReqForInsert(CallsDeleteReq):
-    wb_user_id: str
+    # wb_user_id is automatically populated by the server
+    wb_user_id: typing.Optional[str] = None
 
 
 class CallsDeleteRes(BaseModel):
@@ -210,9 +209,8 @@ class CallUpdateReq(BaseModel):
     # optional update fields
     display_name: typing.Optional[str] = None
 
-
-class CallUpdateReqForInsert(CallUpdateReq):
-    wb_user_id: str
+    # wb_user_id is automatically populated by the server
+    wb_user_id: typing.Optional[str] = None
 
 
 class CallUpdateRes(BaseModel):
@@ -343,9 +341,8 @@ class FeedbackCreateReq(BaseModel):
         ]
     )
 
-
-class FeedbackCreateReqForInsert(FeedbackCreateReq):
-    wb_user_id: str
+    # wb_user_id is automatically populated by the server
+    wb_user_id: typing.Optional[str] = None
 
 
 # The response provides the additional fields needed to convert a request
@@ -357,7 +354,7 @@ class FeedbackCreateRes(BaseModel):
     payload: typing.Dict[str, typing.Any]  # If not empty, replace payload
 
 
-class Feedback(FeedbackCreateReqForInsert):
+class Feedback(FeedbackCreateReq):
     id: str
     created_at: datetime.datetime
 
@@ -498,18 +495,4 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
-        raise NotImplementedError()
-
-
-class TraceServerInterfacePostAuth(TraceServerInterface):
-    @abc.abstractmethod
-    def call_update(self, req: CallUpdateReqForInsert) -> CallUpdateRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def calls_delete(self, req: CallsDeleteReqForInsert) -> CallsDeleteRes:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def feedback_create(self, req: FeedbackCreateReqForInsert) -> FeedbackCreateRes:
         raise NotImplementedError()
