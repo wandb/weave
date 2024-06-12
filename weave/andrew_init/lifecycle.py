@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from typing import Optional
 
+from weave import trace_sentry
 from weave.trace_server.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server.trace_server_interface import TraceServerInterface
 
@@ -23,7 +24,8 @@ def init(entity: str, project: str, server: Optional[TraceServerInterface] = Non
 def finish():
     ...
     # zero out global state
-    utils.sentry_reset_scope()
+    # utils.sentry_reset_scope()
+    trace_sentry.global_trace_sentry.end_session()
 
     # TODO: move gc context to this new global to re-enable
     # autopatch.reset_autopatch()

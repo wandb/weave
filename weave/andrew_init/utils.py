@@ -43,7 +43,7 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
 
 # All of this stuff should be used in tsi from_env?
 # TODO: this func is not ideally factored
-def init_wandb_api_return_api_key() -> str:
+def init_wandb_api_return_api_key(entity: str, project: str) -> str:
     # from .. import wandb_api
 
     wandb_api.init()
@@ -58,9 +58,9 @@ def init_wandb_api_return_api_key() -> str:
         wandb_context = wandb_api.get_wandb_api_context()
 
     # TODO: this should be refactored
-    entity_name, project_name = get_entity_project_from_project_name(project_name)
+    entity, project = get_entity_project_from_project_name(project)
     wandb_run_id = safe_current_wb_run_id()
-    check_wandb_run_matches(wandb_run_id, entity_name, project_name)
+    check_wandb_run_matches(wandb_run_id, entity, project)
 
     api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:
@@ -72,7 +72,7 @@ def init_wandb_api_return_api_key() -> str:
 
     username = get_username()
     print(f"Logged in as Weights & Biases user: {username}.")
-    print(f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}")
+    print(f"View Weave data at {urls.project_weave_root_url(entity, project)}")
 
     return api_key
     # remote_server = init_weave_get_server(api_key)

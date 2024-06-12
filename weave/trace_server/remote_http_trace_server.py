@@ -99,11 +99,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(self._flush_calls)
 
-        # TODO: Refactor this class to be a bit cleaner...
-        from ..andrew_init.utils import init_wandb_api_return_api_key
-
-        api_key = init_wandb_api_return_api_key()
-        self.auth = ("api", api_key)
+        # TODO: user needs a way to set auth in regular init flow
 
         # put other init checks here
         # assert min_weave_version
@@ -115,7 +111,22 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
-        return cls(wf_env.wf_trace_server_url(), should_batch)
+        # TODO: Refactor this class to be a bit cleaner...
+        from ..andrew_init.utils import init_wandb_api_return_api_key
+        # from ..init_message import _parse_version
+
+        obj = cls(wf_env.wf_trace_server_url(), should_batch)
+
+        if not (entity := wf_env.wandb_entity()):
+            raise ValueError("entity must be set in the environment")
+
+        if not (project := wf_env.wandb_project()):
+            raise ValueError("project must be set in the environment")
+
+        api_key = init_wandb_api_return_api_key(entity, project)
+        obj.auth = ("api", api_key)
+
+        return obj
 
     @property
     def auth(self) -> t.Optional[t.Tuple[str, str]]:
