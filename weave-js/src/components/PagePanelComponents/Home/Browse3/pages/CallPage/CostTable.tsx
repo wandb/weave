@@ -54,7 +54,7 @@ const columns: GridColDef[] = [
   },
 ];
 
-export const CostTable = ({usage}: {usage: {string: UsageData}}) => {
+export const CostTable = ({usage}: {usage: {[key: string]: UsageData}}) => {
   const usageData = Object.entries(usage ?? {}).map(([k, v]) => {
     return {
       id: k,

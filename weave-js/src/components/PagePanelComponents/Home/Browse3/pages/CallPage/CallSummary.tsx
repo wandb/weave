@@ -7,7 +7,8 @@ import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CostTable, UsageData} from './CostTable';
+import {CostTable} from './CostTable';
+import {UsageData} from './TraceUsageStats';
 
 export const CallSummary: React.FC<{
   call: CallSchema;
@@ -21,6 +22,7 @@ export const CallSummary: React.FC<{
   const summary = _.fromPairs(
     Object.entries(span.summary ?? {}).filter(
       ([k, a]) =>
+        // Display all summary fields, but remove usage stats because we have a separate table
         !k.startsWith('_') && k !== 'latency_s' && a != null && k !== 'usage'
     )
   );
@@ -69,7 +71,7 @@ export const CallSummary: React.FC<{
             }}>
             Usage
           </p>
-          <CostTable usage={span.summary.usage as {string: UsageData}} />
+          <CostTable usage={span.summary.usage as {[key: string]: UsageData}} />
         </div>
       )}
     </div>
