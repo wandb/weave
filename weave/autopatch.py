@@ -40,7 +40,7 @@ def autopatch() -> None:
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
     from .integrations.mistral.mistral import mistral_patcher
-    from .integrations.crewai.crewai import crewai_patcher
+    from .integrations.crewai.crewai_sdk import crewai_patcher
 
     mistral_patcher.attempt_patch()
     litellm_patcher.attempt_patch()
@@ -54,7 +54,7 @@ def reset_autopatch() -> None:
     from .integrations.litellm.litellm import litellm_patcher
     from .integrations.llamaindex.llamaindex import llamaindex_patcher
     from .integrations.mistral.mistral import mistral_patcher
-    from .integrations.crewai.crewai import crewai_patcher
+    from .integrations.crewai.crewai_sdk import crewai_patcher
 
     mistral_patcher.undo_patch()
     litellm_patcher.undo_patch()

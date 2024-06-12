@@ -23,4 +23,4 @@ patched_methods = [
     ),
 ]
 
-crewai_patcher = MultiPatcher(patched_methods)
+crewai_patcher = MultiPatcher(patched_methods)  # type: ignore[arg-type]

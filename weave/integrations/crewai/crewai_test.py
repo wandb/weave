@@ -7,10 +7,11 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.weave_client import WeaveClient
 import weave
 
-from .crewai import crewai_patcher
+from .crewai_sdk import crewai_patcher
+
 
 @pytest.fixture
-def only_patch_crewai():
+def only_patch_crewai() -> typing.Generator:
     reset_autopatch()
     crewai_patcher.attempt_patch()
     autopatch_openai()
@@ -22,16 +23,15 @@ def only_patch_crewai():
 
 
 class ResearchAgents:
-    def __init__(self, search_tool):
+    def __init__(self, search_tool: typing.Any):
         self.search_tool = search_tool
 
-
-    def get_researcher_agent(self):
-        from crewai import Agent
+    def get_researcher_agent(self) -> typing.Any:
+        from crewai import Agent  # type: ignore
 
         researcher = Agent(
-            role='Senior Researcher',
-            goal='Uncover groundbreaking technologies in {topic}',
+            role="Senior Researcher",
+            goal="Uncover groundbreaking technologies in {topic}",
             verbose=True,
             memory=True,
             backstory=(
@@ -40,17 +40,17 @@ class ResearchAgents:
                 "the world."
             ),
             tools=[self.search_tool],
-            allow_delegation=True
+            allow_delegation=True,
         )
 
         return researcher
-    
-    def get_writer_agent(self):
-        from crewai import Agent
+
+    def get_writer_agent(self) -> typing.Any:
+        from crewai import Agent  # type: ignore
 
         writer = Agent(
-            role='Writer',
-            goal='Narrate compelling tech stories about {topic}',
+            role="Writer",
+            goal="Narrate compelling tech stories about {topic}",
             verbose=True,
             memory=True,
             backstory=(
@@ -59,17 +59,17 @@ class ResearchAgents:
                 "discoveries to light in an accessible manner."
             ),
             tools=[self.search_tool],
-            allow_delegation=False
+            allow_delegation=False,
         )
 
         return writer
-    
+
 
 class ResearchTasks:
-    def __init__(self, search_tool):
+    def __init__(self, search_tool: typing.Any):
         self.search_tool = search_tool
-    
-    def get_write_task(self, writer):
+
+    def get_write_task(self, writer: typing.Any) -> typing.Any:
         from crewai import Task
 
         # Writing task with language model configuration
@@ -79,19 +79,19 @@ class ResearchTasks:
                 "Focus on the latest trends and how it's impacting the industry."
                 "This article should be easy to understand, engaging, and positive."
             ),
-            expected_output='A 4 paragraph article on {topic} advancements formatted as markdown.',
+            expected_output="A 4 paragraph article on {topic} advancements formatted as markdown.",
             tools=[self.search_tool],
             agent=writer,
             async_execution=False,
-            output_file='new-blog-post.md'  # Example of output customization
-        ) 
+            output_file="new-blog-post.md",  # Example of output customization
+        )
 
         return write_task
 
 
-def get_crew():
+def get_crew() -> typing.Any:
     from crewai import Crew, Process
-    from crewai_tools import SerperDevTool
+    from crewai_tools import SerperDevTool  # type: ignore
 
     search_tool = SerperDevTool()
 
@@ -112,7 +112,7 @@ def get_crew():
         memory=True,
         cache=True,
         max_rpm=10,
-        share_crew=True
+        share_crew=True,
     )
 
     return crew
@@ -129,12 +129,12 @@ def filter_body(r: typing.Any) -> typing.Any:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_crew(client: WeaveClient, only_patch_crewai) -> None:
+def test_simple_crew(client: WeaveClient, only_patch_crewai: typing.Generator) -> None:
     openai_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     serper_key = os.environ.get("SERPER_API_KEY", "sk-DUMMY_KEY")
 
     crew = get_crew()
-    _ = crew.kickoff(inputs={'topic': 'AI in astrophysics'})
+    _ = crew.kickoff(inputs={"topic": "AI in astrophysics"})
 
     res = client.server.calls_query(tsi.CallsQueryReq(project_id=client._project_id()))
     calls = res.calls
