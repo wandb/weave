@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import emoji
 
 from .trace_server_interface_util import (
+    assert_non_null_wb_user_id,
     extract_refs_from_values,
     str_digest,
     bytes_digest,
@@ -65,7 +66,7 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     return conn_cursor
 
 
-class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
+class SqliteTraceServer(tsi.TraceServerInterface):
     def __init__(self, db_path: str):
         self.lock = threading.Lock()
         self.db_path = db_path
@@ -462,6 +463,7 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        assert_non_null_wb_user_id(req)
         # update row with a deleted_at field set to now
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
@@ -504,7 +506,8 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
 
         return tsi.CallsDeleteRes()
 
-    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        assert_non_null_wb_user_id(req)
         if req.display_name is None:
             raise ValueError("One of [display_name] is required for call update")
 
@@ -707,9 +710,8 @@ class SqliteTraceServer(tsi.TraceServerInterfacePostAuth):
 
         return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_obj_refs])
 
-    def feedback_create(
-        self, req: tsi.FeedbackCreateReqForInsert
-    ) -> tsi.FeedbackCreateRes:
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req)
 
         # Augment emoji with alias.
