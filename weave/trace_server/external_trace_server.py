@@ -155,7 +155,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             req.project_id
         )
         if req.wb_user_id:
-            req.wb_user_id = self._id_converter.convert_ext_to_int_user_id(req.user_id)
+            req.wb_user_id = self._id_converter.convert_ext_to_int_user_id(
+                req.wb_user_id
+            )
         return self._universal_int_to_ext_ref_converter(
             self._internal_trace_server.call_update(
                 self._universal_ext_to_int_ref_converter(req)

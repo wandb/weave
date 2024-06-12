@@ -42,6 +42,7 @@ def get_client_trace_server(
 def get_client_project_id(client: weave_client.WeaveClient) -> str:
     return client._project_id()
 
+
 def client_is_sqlite(client: weave_client.WeaveClient) -> bool:
     return isinstance(get_client_trace_server(client), SqliteTraceServer)
 
@@ -1299,8 +1300,8 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    digest_for_sqlite = 'aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc'
-    digest_for_ext_ch = '4tE9AJg5bXktQggg1khnRXnV3IcDgmWd9b9Hdd3udZs'
+    digest_for_sqlite = "aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc"
+    digest_for_ext_ch = "4tE9AJg5bXktQggg1khnRXnV3IcDgmWd9b9Hdd3udZs"
 
     # This feels pretty bad (that the digest is different between sqlite and ext-ch)
     if client_is_sqlite(client):
