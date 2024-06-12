@@ -277,9 +277,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if filter.wb_run_ids:
                 in_expr = ", ".join((f"'{x}'" for x in filter.wb_run_ids))
                 conds += [f"wb_run_id IN ({in_expr})"]
-            if filter.display_names:
-                in_expr = ", ".join((f"'{x}'" for x in filter.display_names))
-                conds += [f"display_name IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -483,7 +480,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             delete_query = """
                 UPDATE calls
                 SET deleted_at = CURRENT_TIMESTAMP
-                WHERE deleted_at is NULL AND
+                WHERE deleted_at is NULL AND 
                     id IN ({})
             """.format(
                 ", ".join("?" * len(all_ids))

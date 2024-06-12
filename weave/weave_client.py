@@ -485,7 +485,6 @@ class WeaveClient:
             parent_id = None
         call = Call(
             op_name=op_str,
-            display_name=display_name,
             project_id=self._project_id(),
             trace_id=trace_id,
             parent_id=parent_id,

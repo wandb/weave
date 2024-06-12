@@ -47,9 +47,7 @@ class Op:
     # double-underscore to avoid conflict with old Weave refs
     __ref: Optional[ObjectRef] = None
 
-    def __init__(
-        self, resolve_fn: Callable, display_name: Optional[str] = None
-    ) -> None:
+    def __init__(self, resolve_fn: Callable) -> None:
         self.resolve_fn = resolve_fn
         self.name = resolve_fn.__name__
         self.signature = inspect.signature(resolve_fn)
