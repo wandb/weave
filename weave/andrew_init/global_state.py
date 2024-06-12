@@ -5,23 +5,23 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from ..andrew_client import Client
 
-global_client: Optional["Client"] = None
-global_client_lock = threading.Lock()
+client: Optional["Client"] = None
+client_lock = threading.Lock()
 # There is also a run context?  idk what this is
 
 
-def get_global_client() -> "Client":
-    return global_client
+def get_client() -> "Client":
+    return client
 
 
-def set_global_client(client: "Client") -> None:
-    global global_client
-    if client is not None and global_client is None:
-        with global_client_lock:
-            if global_client is None:
-                global_client = client
+def set_client(c: "Client") -> None:
+    global client
+    if c is not None and client is None:
+        with client_lock:
+            if client is None:
+                client = c
 
-    elif client is None and global_client is not None:
-        with global_client_lock:
-            if global_client is not None:
-                global_client = None
+    elif c is None and client is not None:
+        with client_lock:
+            if client is not None:
+                client = None

@@ -12,7 +12,7 @@ def init(entity: str, project: str, server: Optional[TraceServerInterface] = Non
     # server = RemoteHTTPTraceServer.from_env()
     client = Client(entity, project, server)
 
-    global_state.set_global_client(client)
+    global_state.set_client(client)
     # TODO: move gc context to this new global to re-enable
     # autopatch.autopatch()
     utils.sentry_configure_scope(entity, project)
@@ -27,7 +27,7 @@ def finish():
 
     # TODO: move gc context to this new global to re-enable
     # autopatch.reset_autopatch()
-    global_state.set_global_client(None)
+    global_state.set_client(None)
 
     # flush any messages stuck in the queue
     ...

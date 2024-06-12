@@ -157,7 +157,14 @@ def init(project_name: str) -> _weave_client.WeaveClient:
     # trace-server backend.
     # return _weave_init.init_wandb(project_name).client
     # return _weave_init.init_trace_remote(project_name).client
-    return _weave_init.init_weave(project_name).client
+    # return _weave_init.init_weave(project_name).client
+
+    from .andrew_init.lifecycle import init
+    from .trace_server.remote_http_trace_server import RemoteHTTPTraceServer
+
+    server = RemoteHTTPTraceServer.from_env()
+    return init(project_name, project_name, server=server)
+
 
 
 @contextlib.contextmanager
