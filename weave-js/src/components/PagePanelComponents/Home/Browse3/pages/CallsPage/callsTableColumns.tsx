@@ -96,6 +96,11 @@ export const useCallsTableColumns = (
     effectiveFilter
   );
 
+  // Filters summary.usage. because we add a derived column for tokens and cost
+  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
+    c => !c.startsWith('summary.usage.')
+  );
+
   // Determine what sort of view we are looking at based on the filter
   const isSingleOpVersion = useMemo(
     () => effectiveFilter.opVersionRefs?.length === 1,
@@ -122,7 +127,7 @@ export const useCallsTableColumns = (
         preservePath,
         isSingleOp,
         isSingleOpVersion,
-        allDynamicColumnNames,
+        filteredDynamicColumnNames,
         expandedRefCols,
         onCollapse,
         columnsWithRefs,
@@ -136,7 +141,7 @@ export const useCallsTableColumns = (
       preservePath,
       isSingleOp,
       isSingleOpVersion,
-      allDynamicColumnNames,
+      filteredDynamicColumnNames,
       expandedRefCols,
       onCollapse,
       columnsWithRefs,
@@ -308,11 +313,6 @@ function buildCallsTableColumns(
   }) as GridColumnGroupingModel;
 
   for (const key of allDynamicColumnNames) {
-    // We don't want to show usage stats in the table, because we have a separate derived column for that.
-    if (key.startsWith('summary.usage')) {
-      continue;
-    }
-
     const col: GridColDef<TraceCallSchema> = {
       flex: 1,
       minWidth: 150,
