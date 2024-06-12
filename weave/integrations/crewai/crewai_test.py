@@ -16,7 +16,7 @@ def only_patch_crewai():
     autopatch_openai()
 
     try:
-        yield  # This is where the test using this fixture will run
+        yield   # This is where the test using this fixture will run
     finally:
         autopatch()  # Ensures future tests have the patch applied
 
