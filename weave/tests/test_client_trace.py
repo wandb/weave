@@ -42,6 +42,9 @@ def get_client_trace_server(
 def get_client_project_id(client: weave_client.WeaveClient) -> str:
     return client._project_id()
 
+def client_is_sqlite(client: weave_client.WeaveClient) -> bool:
+    return isinstance(get_client_trace_server(client), SqliteTraceServer)
+
 
 ## End hacky interface compatibility helpers
 
@@ -710,7 +713,7 @@ def test_trace_call_sort(client):
 
 
 def test_trace_call_filter(client):
-    is_sql_lite = isinstance(client.server, SqliteTraceServer)
+    is_sql_lite = client_is_sqlite(client)
 
     @weave.op()
     def basic_op(in_val: dict, delay) -> dict:
@@ -1296,7 +1299,15 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    digest_for_sqlite = 'aF7lCSKo9BTXJaPxYHEBsH51dOKtwzxS6Hqvw4RmAdc'
+    digest_for_ext_ch = '4tE9AJg5bXktQggg1khnRXnV3IcDgmWd9b9Hdd3udZs'
+
+    # This feels pretty bad (that the digest is different between sqlite and ext-ch)
+    if client_is_sqlite(client):
+        digest = digest_for_sqlite
+    else:
+        digest = digest_for_ext_ch
+    exp_ref = f"weave:///shawn/test-project/object/Dataset:{digest}/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
