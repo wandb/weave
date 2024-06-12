@@ -501,6 +501,8 @@ class TraceServerInterface:
 # These symbols are used in the WB Trace Server and it is not safe
 # to remove them, else it will break the server. Once the server
 # is updated to use the new symbols, these can be removed.
+#
+# Remove once https://github.com/wandb/core/pull/22040 lands
 CallsDeleteReqForInsert = CallsDeleteReq
 CallUpdateReqForInsert = CallUpdateReq
 FeedbackCreateReqForInsert = FeedbackCreateReq
