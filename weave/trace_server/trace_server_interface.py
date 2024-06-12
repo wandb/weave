@@ -5,6 +5,10 @@ from pydantic import BaseModel, Field
 
 from .interface.query import Query
 
+WB_USER_ID_DESCRIPTION = (
+    "Do not set directly. Server will automatically populate this field."
+)
+
 
 class CallSchema(BaseModel):
     id: str
@@ -73,9 +77,7 @@ class StartedCallSchemaForInsert(BaseModel):
     inputs: typing.Dict[str, typing.Any]
 
     # WB Metadata
-    wb_user_id: typing.Optional[str] = Field(
-        None, description="will be automatically set by the server - leave as None."
-    )
+    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: typing.Optional[str] = None
 
 
@@ -151,9 +153,7 @@ class CallsDeleteReq(BaseModel):
     call_ids: typing.List[str]
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = Field(
-        None, description="will be automatically set by the server - leave as None."
-    )
+    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallsDeleteRes(BaseModel):
@@ -214,9 +214,7 @@ class CallUpdateReq(BaseModel):
     display_name: typing.Optional[str] = None
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = Field(
-        None, description="will be automatically set by the server - leave as None."
-    )
+    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallUpdateRes(BaseModel):
@@ -348,9 +346,7 @@ class FeedbackCreateReq(BaseModel):
     )
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = Field(
-        None, description="will be automatically set by the server - leave as None."
-    )
+    wb_user_id: typing.Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 # The response provides the additional fields needed to convert a request
