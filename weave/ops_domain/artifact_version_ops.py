@@ -441,6 +441,12 @@ def _get_history_metrics(
         return {}
 
     run_name = created_by["name"]
+    # With org-level registries allowing access to team-level artifacts,
+    # there are cases where users can have access to the artifact,
+    # but not its source run or project/team. This access check on the frontend
+    # will prevent us from making queries that we know will crash for such users.
+    if created_by["project"] is None:
+        return {}
     project_name = created_by["project"]["name"]
     entity_name = created_by["project"]["entity"]["name"]
     history_step = artifactVersion["historyStep"]
@@ -506,6 +512,7 @@ def _get_history_metrics(
 def refine_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
 ) -> types.Type:
+    print("\n\n logging ===> ", flush=True)
     return wb_util.process_run_dict_type(_get_history_metrics(artifactVersion))
 
 
