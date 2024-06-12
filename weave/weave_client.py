@@ -474,9 +474,6 @@ class WeaveClient:
             attributes (Optional[dict], optional): The attributes for the call. Defaults to None.
             _use_stack (bool, optional): Whether to push the call onto the runtime stack. Defaults to True.
         """
-        if parent is None and _use_stack:
-            parent = run_context.get_current_run()
-
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -490,6 +487,9 @@ class WeaveClient:
         self.save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
+
+        if parent is None and _use_stack:
+            parent = run_context.get_current_run()
 
         if parent:
             trace_id = parent.trace_id
