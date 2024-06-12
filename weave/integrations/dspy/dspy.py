@@ -184,11 +184,6 @@ patched_functions += [
         attribute_name="Pyserini.__call__",
         make_new_value=weave.op(),
     ),
-    SymbolPatcher(
-        get_base_symbol=lambda: importlib.import_module("dspy"),
-        attribute_name="Bedrock.call_model",
-        make_new_value=weave.op(),
-    ),
 ]
 
 dspy_patcher = MultiPatcher(patched_functions)
