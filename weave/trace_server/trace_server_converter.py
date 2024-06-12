@@ -11,7 +11,7 @@ def universal_ext_to_int_ref_converter(
     """Takes any object and recursively replaces all external references with
     internal references. The external references are expected to be in the
     format of `weave:///entity/project/...` and the internal references are
-    expected to be in the format of `weave-internal:///project_id/...`.
+    expected to be in the format of `weave-trace-internal:///project_id/...`.
 
     Args:
         obj: The object to convert.
@@ -55,7 +55,7 @@ def universal_int_to_ext_ref_converter(
 ) -> typing.Any:
     """Takes any object and recursively replaces all internal references with
     external references. The internal references are expected to be in the
-    format of `weave-internal:///project_id/...` and the external references are
+    format of `weave-trace-internal:///project_id/...` and the external references are
     expected to be in the format of `weave:///entity/project/...`.
 
     Args:
