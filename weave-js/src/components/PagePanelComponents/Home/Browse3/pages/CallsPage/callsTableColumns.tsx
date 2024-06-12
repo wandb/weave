@@ -459,7 +459,7 @@ function buildCallsTableColumns(
       return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
     },
   });
-  
+
   cols.push({
     field: 'derived.latency',
     headerName: 'Latency',
