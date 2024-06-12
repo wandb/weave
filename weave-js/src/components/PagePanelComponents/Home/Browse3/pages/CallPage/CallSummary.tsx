@@ -59,20 +59,24 @@ export const CallSummary: React.FC<{
           ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
         }}
       />
-      <Divider />
       {span.summary.usage && (
-        <div>
-          {/* This styling is similar to what is is SimpleKeyValueTable */}
-          <p
-            style={{
-              fontWeight: 600,
-              marginRight: 10,
-              paddingRight: 10,
-            }}>
-            Usage
-          </p>
-          <CostTable usage={span.summary.usage as {[key: string]: UsageData}} />
-        </div>
+        <>
+          <Divider />
+          <div>
+            {/* This styling is similar to what is is SimpleKeyValueTable */}
+            <p
+              style={{
+                fontWeight: 600,
+                marginRight: 10,
+                paddingRight: 10,
+              }}>
+              Usage
+            </p>
+            <CostTable
+              usage={span.summary.usage as {[key: string]: UsageData}}
+            />
+          </div>
+        </>
       )}
     </div>
   );

@@ -32,6 +32,42 @@ const isUsageDataKey = (key: string): key is UsageDataKeys => {
   return usageDataKeys.includes(key as UsageDataKeys);
 };
 
+export const TraceUsageStats = ({
+  usage,
+  latency_s,
+}: {
+  usage: {[key: string]: UsageData};
+  latency_s: number;
+}) => {
+  const {cost, tokens, costToolTip, tokenToolTip} =
+    getTokensAndCostFromUsage(usage);
+
+  const latency =
+    (latency_s < 0.01 ? '<0.01' : formatNumber(latency_s, 'Number')) + 's';
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <TraceStat icon="recent-clock" label={latency} />
+      {usage && (
+        <>
+          {/* Tokens */}
+          <TraceStat
+            icon="database-artifacts"
+            label={tokens}
+            tooltip={tokenToolTip}
+          />
+          {/* Cost */}
+          <TraceStat label={cost} tooltip={costToolTip} />
+        </>
+      )}
+    </Box>
+  );
+};
+
 export const getUsageFromCellParams = (params: {[key: string]: any}) => {
   const usage: {[key: string]: UsageData} = {};
   for (const key in params) {
@@ -162,42 +198,6 @@ export const getTokensAndCostFromUsage = (usage: {
     </Box>
   );
   return {cost, tokens, costToolTip, tokenToolTip};
-};
-
-export const TraceUsageStats = ({
-  usage,
-  latency_s,
-}: {
-  usage: {[key: string]: UsageData};
-  latency_s: number;
-}) => {
-  const {cost, tokens, costToolTip, tokenToolTip} =
-    getTokensAndCostFromUsage(usage);
-
-  const latency =
-    (latency_s < 0.01 ? '<0.01' : formatNumber(latency_s, 'Number')) + 's';
-
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-      }}>
-      <TraceStat icon="recent-clock" label={latency} />
-      {usage && (
-        <>
-          {/* Tokens */}
-          <TraceStat
-            icon="database-artifacts"
-            label={tokens}
-            tooltip={tokenToolTip}
-          />
-          {/* Cost */}
-          <TraceStat label={cost} tooltip={costToolTip} />
-        </>
-      )}
-    </Box>
-  );
 };
 
 const TraceStat = ({

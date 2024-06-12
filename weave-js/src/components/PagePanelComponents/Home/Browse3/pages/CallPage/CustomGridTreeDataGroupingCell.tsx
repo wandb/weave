@@ -185,12 +185,6 @@ export const CustomGridTreeDataGroupingCell: FC<
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                ...(call?.rawSpan?.summary || rowNode.type === 'group'
-                  ? {}
-                  : {
-                      height: '100%',
-                      alignItems: 'center',
-                    }),
               }}>
               <Box
                 sx={{
