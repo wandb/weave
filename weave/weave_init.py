@@ -1,6 +1,7 @@
 import typing
 
 from . import autopatch, context_state, errors, init_message, trace_sentry, weave_client
+from .client import new_weave_init
 from .trace_server import remote_http_trace_server, sqlite_trace_server
 
 _current_inited_client = None
@@ -95,13 +96,13 @@ def init_weave(project_name: str) -> InitializedClient:
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
     # server = ClickHouseTraceServer(host="localhost")
-    client = weave_client.WeaveClient(entity_name, project_name, remote_server)
+    client = new_weave_init.Client(entity_name, project_name, remote_server)
 
     _current_inited_client = InitializedClient(client)
     # entity_name, project_name = get_entity_project_from_project_name(project_name)
     # from .trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 
-    # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
+    # client = new_weave_init.Client(ClickHouseTraceServer(host="localhost"))
 
     # init_client = InitializedClient(client)  # type: ignore
 
@@ -138,15 +139,15 @@ def init_weave_get_server(
     api_key: typing.Optional[str] = None,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
     res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(True)
-    if api_key is not None:
-        res.set_auth(("api", api_key))
+    # if api_key is not None:
+    #     res.set_auth(("api", api_key))
     return res
 
 
 def init_local() -> InitializedClient:
     server = sqlite_trace_server.SqliteTraceServer("weave.db")
     server.setup_tables()
-    client = weave_client.WeaveClient("none", "none", server)
+    client = new_weave_init.Client("none", "none", server)
     return InitializedClient(client)
 
 

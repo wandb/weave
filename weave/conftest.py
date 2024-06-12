@@ -1,39 +1,30 @@
+import logging
 import os
-import random
-import numpy as np
-
 import pathlib
-import typing
-import pytest
+import random
 import shutil
 import tempfile
+import typing
 
-import weave
-
-from . import context_state
-from .tests import fixture_fakewandb
-from . import serialize
-from . import client as client_legacy
-from .language_features.tagging.tag_store import isolated_tagging_context
-from . import logs
-from . import io_service
-from . import logs
-from . import environment
-import logging
-from . import autopatch
-
-
+import numpy as np
+import pytest
 from flask.testing import FlaskClient
 
-from .tests.wandb_system_tests_conftest import *
-from .tests.trace_server_clickhouse_conftest import *
-
+import weave
+from weave import weave_init
 from weave.trace_server import (
+    remote_http_trace_server,
     sqlite_trace_server,
     trace_server_interface,
-    remote_http_trace_server,
 )
-from weave import weave_init
+
+from . import autopatch, context_state, environment, io_service, logs, serialize
+from . import client as client_legacy
+from .client import new_weave_init
+from .language_features.tagging.tag_store import isolated_tagging_context
+from .tests import fixture_fakewandb
+from .tests.trace_server_clickhouse_conftest import *
+from .tests.wandb_system_tests_conftest import *
 
 logs.configure_logger()
 
@@ -45,7 +36,6 @@ context_state._eager_mode.set(False)
 # A lot of tests rely on weave.ops.* being in scope. Importing this here
 # makes that work...
 from weave import ops
-
 
 ### Disable datadog engine tracing
 
@@ -59,14 +49,11 @@ def make_fake_tracer():
     return FakeTracer()
 
 
-from . import engine_trace
-
-
 ### End disable datadog engine tracing
-
 ### disable internet access
-
 import socket
+
+from . import engine_trace
 
 
 def guard(*args, **kwargs):
@@ -117,9 +104,7 @@ def pre_post_each_test(test_artifact_dir, caplog):
     caplog.handler.setFormatter(logging.Formatter(logs.default_log_format))
     # Tests rely on full cache mode right now.
     os.environ["WEAVE_CACHE_MODE"] = "full"
-    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(
-        pathlib.Path(__file__).parent.parent / "wb_schema.gql"
-    )
+    os.environ["WEAVE_GQL_SCHEMA_PATH"] = str(pathlib.Path(__file__).parent.parent / "wb_schema.gql")
     try:
         shutil.rmtree(test_artifact_dir)
     except (FileNotFoundError, OSError):
@@ -317,30 +302,24 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     weave_server_flag = request.config.getoption("--weave-server")
     tsi: trace_server_interface.TraceServerInterface
     if weave_server_flag == "sqlite":
-        sql_lite_server = sqlite_trace_server.SqliteTraceServer(
-            "file::memory:?cache=shared"
-        )
+        sql_lite_server = sqlite_trace_server.SqliteTraceServer("file::memory:?cache=shared")
         sql_lite_server.drop_tables()
         sql_lite_server.setup_tables()
         tsi = sql_lite_server
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(use_async_insert=False)
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
         tsi = ch_server
     elif weave_server_flag.startswith("http"):
-        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
-            weave_server_flag
-        )
+        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(weave_server_flag)
         tsi = remote_server
     elif weave_server_flag == ("prod"):
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = weave_client.WeaveClient("shawn", "test-project", tsi)
+        client = new_weave_init.Client("shawn", "test-project", tsi)
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:

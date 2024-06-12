@@ -29,3 +29,8 @@ def wf_clickhouse_database() -> str:
 def wf_trace_server_url() -> str:
     """The url of the web server exposing the trace interface endpoints"""
     return os.environ.get("WF_TRACE_SERVER_URL", "https://trace.wandb.ai")
+
+
+# todo: move to a better place
+def wandb_api_key() -> str:
+    return os.getenv("WANDB_API_KEY", "")
