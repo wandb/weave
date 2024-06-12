@@ -31,17 +31,26 @@ import typing
 import hashlib
 import dataclasses
 import logging
+from zoneinfo import ZoneInfo
 
+import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult, StreamContext
 from clickhouse_connect.driver.summary import QuerySummary
 
 import clickhouse_connect
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import environment as wf_env
 from . import clickhouse_trace_server_migrator as wf_migrator
-from .errors import RequestTooLarge
+from .errors import InvalidRequest, RequestTooLarge
+from .emoji_util import detone_emojis
+from .feedback import (
+    TABLE_FEEDBACK,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
+)
+from .orm import Table, Column, ParamBuilder, Row
 
 from .trace_server_interface_util import (
     extract_refs_from_values,
@@ -952,6 +961,78 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
             raise ValueError("Missing chunks")
         return tsi.FileContentReadRes(content=b"".join(chunks))
 
+    def feedback_create(
+        self, req: tsi.FeedbackCreateReqForInsert
+    ) -> tsi.FeedbackCreateRes:
+        validate_feedback_create_req(req)
+
+        # Augment emoji with alias.
+        res_payload = {}
+        if req.feedback_type == "wandb.reaction.1":
+            em = req.payload["emoji"]
+            if emoji.emoji_count(em) != 1:
+                raise InvalidRequest(
+                    "Value of emoji key in payload must be exactly one emoji"
+                )
+            req.payload["alias"] = emoji.demojize(em)
+            detoned = detone_emojis(em)
+            req.payload["detoned"] = detoned
+            req.payload["detoned_alias"] = emoji.demojize(detoned)
+            res_payload = req.payload
+
+        feedback_id = generate_id()
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+        # TODO: Any validation on weave_ref?
+        payload = _dict_value_to_dump(req.payload)
+        MAX_PAYLOAD = 1024
+        if len(payload) > MAX_PAYLOAD:
+            raise InvalidRequest("Feedback payload too large")
+        row: Row = {
+            "id": feedback_id,
+            "project_id": req.project_id,
+            "weave_ref": req.weave_ref,
+            "wb_user_id": req.wb_user_id,
+            "creator": req.creator,
+            "feedback_type": req.feedback_type,
+            "payload": payload,
+            "created_at": created_at,
+        }
+        prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
+        self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+        return tsi.FeedbackCreateRes(
+            id=feedback_id,
+            created_at=created_at,
+            wb_user_id=req.wb_user_id,
+            payload=res_payload,
+        )
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        query = TABLE_FEEDBACK.select()
+        query = query.project_id(req.project_id)
+        query = query.fields(req.fields)
+        query = query.where(req.query)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="clickhouse")
+        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        result = TABLE_FEEDBACK.tuples_to_rows(
+            query_result.result_rows, prepared.fields
+        )
+        return tsi.FeedbackQueryRes(result=result)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        # TODO: Instead of passing conditions to DELETE FROM,
+        #       should we select matching ids, and then DELETE FROM WHERE id IN (...)?
+        #       This would allow us to return the number of rows deleted, and complain
+        #       if too many things would be deleted.
+        validate_feedback_purge_req(req)
+        query = TABLE_FEEDBACK.purge()
+        query = query.project_id(req.project_id)
+        query = query.where(req.query)
+        prepared = query.prepare(database_type="clickhouse")
+        self.ch_client.query(prepared.sql, prepared.parameters)
+        return tsi.FeedbackPurgeRes()
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
@@ -1202,7 +1283,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
                 calls_merged.id IN (
                     SELECT id from calls_merged WHERE (
                         project_id = {{project_id: String}}
-                            AND 
+                            AND
                         {where_conditions_part}
                     )
                     {order_by_side}
@@ -1721,7 +1802,9 @@ def _digest_is_version_like(digest: str) -> typing.Tuple[bool, int]:
 def _combine_conditions(conditions: typing.List[str], operator: str) -> str:
     if operator not in ("AND", "OR"):
         raise ValueError(f"Invalid operator: {operator}")
-    combined = f" {operator} ".join([f"({c})" for c in conditions])
+    if len(conditions) == 1:
+        return conditions[0]
+    combined = f" {operator} ".join(f"({c})" for c in conditions)
     return f"({combined})"
 
 
@@ -1752,43 +1835,6 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
-
-
-param_builder_count = 0
-
-
-class ParamBuilder:
-    """ParamBuilder helps with the construction of parameterized clickhouse queries.
-    It is used in a number of functions/routines that build queries to ensure that
-    the queries are parameterized and safe from injection attacks. Specifically, a caller
-    would use it as follows:
-
-    ```
-    pb = ParamBuilder()
-    param_name = pb.add_param("some_value")
-    query = f"SELECT * FROM some_table WHERE some_column = {{{param_name}:String}}"
-    parameters = pb.get_params()
-    # Execute the query with the parameters
-    ```
-
-    With queries that have many construction phases, it is recommended to use the
-    same ParamBuilder instance to ensure that the parameter names are unique across
-    the query.
-    """
-
-    def __init__(self, prefix: typing.Optional[str] = None):
-        global param_builder_count
-        param_builder_count += 1
-        self._params: typing.Dict[str, typing.Any] = {}
-        self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
-
-    def add_param(self, param_value: typing.Any) -> str:
-        param_name = self._prefix + str(len(self._params))
-        self._params[param_name] = param_value
-        return param_name
-
-    def get_params(self) -> typing.Dict[str, typing.Any]:
-        return {**self._params}
 
 
 def _python_value_to_ch_type(value: typing.Any) -> str:
