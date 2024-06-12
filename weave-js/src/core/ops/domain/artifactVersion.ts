@@ -1,3 +1,4 @@
+import {opArtifactProject, opIsNone} from '@wandb/weave/core';
 import * as _ from 'lodash';
 
 import * as Urls from '../../_external/util/urls';
@@ -29,8 +30,6 @@ import {
   wandbJsonWithArtifacts,
 } from './run';
 import {connectionToNodes} from './util';
-import {useNodeValue} from "@wandb/weave/react";
-import {opArtifactMembershipArtifactVersion, opArtifactProject, opFlatten, opIsNone} from "@wandb/weave/core";
 
 const makeArtifactVersionOp = makeStandardOp;
 
@@ -707,13 +706,12 @@ export const opArtifactVersionRunHistoryRow = makeBasicOp({
     // will prevent us from making queries that we know will crash for such users.
     const noProjectAccessNode = opIsNone({
       val: opArtifactProject({
-           artifact: opArtifactVersionArtifactSequence({
-              artifactVersion:  forwardOp.op.inputs.artifactVersion,
-          }),
-        })
-      });
+        artifact: opArtifactVersionArtifactSequence({
+          artifactVersion: forwardOp.op.inputs.artifactVersion,
+        }),
+      }),
+    });
     const [noProjectAccess] = await eng.executeNodes([noProjectAccessNode]);
-    console.log(noProjectAccess)
     if (noProjectAccess) {
       return Promise.resolve({});
     }

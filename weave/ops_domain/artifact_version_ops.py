@@ -512,7 +512,6 @@ def _get_history_metrics(
 def refine_history_metrics(
     artifactVersion: wdt.ArtifactVersion,
 ) -> types.Type:
-    print("\n\n logging ===> ", flush=True)
     return wb_util.process_run_dict_type(_get_history_metrics(artifactVersion))
 
 
