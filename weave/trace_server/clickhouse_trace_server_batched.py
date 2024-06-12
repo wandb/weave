@@ -214,7 +214,7 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 required_obj_select_columns = list(set(all_obj_select_columns) - set([]))
 
 
-class ClickHouseTraceServer(tsi.TraceServerInterface):
+class ClickHouseTraceServer(tsi.TraceServerInterfacePostAuth):
     def __init__(
         self,
         *,
