@@ -10,6 +10,8 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './CostTable';
 import {UsageData} from './TraceUsageStats';
 
+const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = ['_latency_s', 'usage'];
+
 export const CallSummary: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
@@ -22,8 +24,10 @@ export const CallSummary: React.FC<{
   const summary = _.fromPairs(
     Object.entries(span.summary ?? {}).filter(
       ([k, a]) =>
-        // Display all summary fields, but remove usage stats because we have a separate table
-        !k.startsWith('_') && k !== 'latency_s' && a != null && k !== 'usage'
+        // Display all summary fields, but remove usage and latencys stats because we have a separate representations
+        !k.startsWith('_') &&
+        a != null &&
+        !SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER.includes(k)
     )
   );
 

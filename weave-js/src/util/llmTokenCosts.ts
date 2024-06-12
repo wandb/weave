@@ -1,125 +1,102 @@
-export const modelTuple = [
-  'default',
-  'gpt-4o',
-  'gpt-4o-2024-05-13',
-  'gpt-4-turbo',
-  'gpt-4-turbo-2024-04-09',
-  'gpt-4',
-  'gpt-4-32k',
-  'gpt-4-0125-preview',
-  'gpt-4-1106-preview',
-  'gpt-4-vision-preview',
-  'gpt-3.5-turbo-1106',
-  'gpt-3.5-turbo-0613',
-  'gpt-3.5-turbo-16k-0613',
-  'gpt-3.5-turbo-0301',
-  'gpt-3.5-turbo-0125',
-  'gpt-3.5-turbo-instruct',
-  'davinci-002',
-  'babbage-002',
-  'claude-3-opus-20240229',
-  'claude-3-sonnet-20240229',
-  'claude-3-haiku-20240307',
-];
-
-export type MODEL = (typeof modelTuple)[number];
-export const isValidLLMModel = (model: string): model is MODEL => {
-  return model in modelTuple;
+export type Model = keyof typeof LLM_TOKEN_COSTS;
+export const isValidLLMModel = (model: string): model is Model => {
+  return model in Object.keys(LLM_TOKEN_COSTS);
 };
 
-export const LLM_TOKEN_COSTS: Record<MODEL, {input: number; output: number}> = {
-  // Default pricing if model has no specific pricing
-  default: {
-    input: 0.005,
-    output: 0.015,
-  },
+export const LLM_TOKEN_COSTS: Record<string, {input: number; output: number}> =
+  {
+    // Default pricing if model has no specific pricing
+    default: {
+      input: 0.005,
+      output: 0.015,
+    },
 
-  // OPENAI pricing for 1k LLM tokens taken on June 4, 2024
-  // https://openai.com/api/pricing/
-  'gpt-4o': {
-    input: 0.005,
-    output: 0.015,
-  },
-  'gpt-4o-2024-05-13': {
-    input: 0.005,
-    output: 0.015,
-  },
-  'gpt-4-turbo': {
-    input: 0.01,
-    output: 0.03,
-  },
-  'gpt-4-turbo-2024-04-09': {
-    input: 0.01,
-    output: 0.03,
-  },
-  'gpt-4': {
-    input: 0.03,
-    output: 0.06,
-  },
-  'gpt-4-32k': {
-    input: 0.06,
-    output: 0.12,
-  },
-  'gpt-4-0125-preview': {
-    input: 0.01,
-    output: 0.03,
-  },
-  'gpt-4-1106-preview': {
-    input: 0.01,
-    output: 0.03,
-  },
-  'gpt-4-vision-preview': {
-    input: 0.01,
-    output: 0.03,
-  },
-  'gpt-3.5-turbo-1106': {
-    input: 0.001,
-    output: 0.002,
-  },
-  'gpt-3.5-turbo-0613': {
-    input: 0.0015,
-    output: 0.002,
-  },
-  'gpt-3.5-turbo-16k-0613': {
-    input: 0.003,
-    output: 0.004,
-  },
-  'gpt-3.5-turbo-0301': {
-    input: 0.0015,
-    output: 0.002,
-  },
-  'gpt-3.5-turbo-0125': {
-    input: 0.0005,
-    output: 0.0015,
-  },
-  'gpt-3.5-turbo-instruct': {
-    input: 0.0015,
-    output: 0.002,
-  },
-  'davinci-002': {
-    input: 0.002,
-    output: 0.002,
-  },
-  'babbage-002': {
-    input: 0.0004,
-    output: 0.0004,
-  },
+    // OPENAI pricing for 1k LLM tokens taken on June 4, 2024
+    // https://openai.com/api/pricing/
+    'gpt-4o': {
+      input: 0.005,
+      output: 0.015,
+    },
+    'gpt-4o-2024-05-13': {
+      input: 0.005,
+      output: 0.015,
+    },
+    'gpt-4-turbo': {
+      input: 0.01,
+      output: 0.03,
+    },
+    'gpt-4-turbo-2024-04-09': {
+      input: 0.01,
+      output: 0.03,
+    },
+    'gpt-4': {
+      input: 0.03,
+      output: 0.06,
+    },
+    'gpt-4-32k': {
+      input: 0.06,
+      output: 0.12,
+    },
+    'gpt-4-0125-preview': {
+      input: 0.01,
+      output: 0.03,
+    },
+    'gpt-4-1106-preview': {
+      input: 0.01,
+      output: 0.03,
+    },
+    'gpt-4-vision-preview': {
+      input: 0.01,
+      output: 0.03,
+    },
+    'gpt-3.5-turbo-1106': {
+      input: 0.001,
+      output: 0.002,
+    },
+    'gpt-3.5-turbo-0613': {
+      input: 0.0015,
+      output: 0.002,
+    },
+    'gpt-3.5-turbo-16k-0613': {
+      input: 0.003,
+      output: 0.004,
+    },
+    'gpt-3.5-turbo-0301': {
+      input: 0.0015,
+      output: 0.002,
+    },
+    'gpt-3.5-turbo-0125': {
+      input: 0.0005,
+      output: 0.0015,
+    },
+    'gpt-3.5-turbo-instruct': {
+      input: 0.0015,
+      output: 0.002,
+    },
+    'davinci-002': {
+      input: 0.002,
+      output: 0.002,
+    },
+    'babbage-002': {
+      input: 0.0004,
+      output: 0.0004,
+    },
 
-  // Anthropic pricing for 1k LLM tokens taken on June 4, 2024
-  // https://docs.anthropic.com/en/docs/models-overview
-  'claude-3-opus-20240229': {
-    input: 0.015,
-    output: 0.075,
-  },
-  'claude-3-sonnet-20240229': {
-    input: 0.003,
-    output: 0.015,
-  },
-  'claude-3-haiku-20240307': {
-    input: 0.00025,
-    output: 0.00125,
-  },
-};
+    // Anthropic pricing for 1k LLM tokens taken on June 4, 2024
+    // https://docs.anthropic.com/en/docs/models-overview
+    'claude-3-opus-20240229': {
+      input: 0.015,
+      output: 0.075,
+    },
+    'claude-3-sonnet-20240229': {
+      input: 0.003,
+      output: 0.015,
+    },
+    'claude-3-haiku-20240307': {
+      input: 0.00025,
+      output: 0.00125,
+    },
+  };
 
 export const getLLMTokenCost = (
   model: string,

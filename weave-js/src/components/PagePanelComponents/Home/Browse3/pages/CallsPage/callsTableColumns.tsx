@@ -298,6 +298,11 @@ function buildCallsTableColumns(
   }) as GridColumnGroupingModel;
 
   for (const key of allDynamicColumnNames) {
+    // We don't want to show usage stats in the table, because we have a separate derived column for that.
+    if (key.startsWith('summary.usage')) {
+      continue;
+    }
+
     const col: GridColDef<TraceCallSchema> = {
       flex: 1,
       minWidth: 150,
@@ -485,11 +490,7 @@ const useAllDynamicColumnNames = (
       tableData.forEach(row => {
         Object.keys(row).forEach(key => {
           const keyAsPath = stringToPath(key);
-          // Removes summary.usage columns, as they have their own dedicated column.
-          if (
-            isDynamicCallColumn(keyAsPath) &&
-            !key.startsWith('summary.usage')
-          ) {
+          if (isDynamicCallColumn(keyAsPath)) {
             nextAsPaths = insertPath(nextAsPaths, stringToPath(key));
           }
         });
