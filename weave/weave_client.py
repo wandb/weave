@@ -467,12 +467,15 @@ class WeaveClient:
         """Create, log, and push a call onto the runtime stack.
 
         Args:
-            op (Union[str, Op]): The operation to log.
-            parent (Optional[Call]): The parent call. If parent is not provided, the current run is used as the parent.
-            inputs (dict): The inputs to the operation.
-            display_name (Optional[str], optional): The display name for the call. Defaults to None.
-            attributes (Optional[dict], optional): The attributes for the call. Defaults to None.
-            _use_stack (bool, optional): Whether to push the call onto the runtime stack. Defaults to True.
+            op: The operation producing the call, or the name of an anonymous operation. 
+            parent: The parent call. If parent is not provided, the current run is used as the parent.
+            inputs: The inputs to the operation.
+            display_name: The display name for the call. Defaults to None.
+            attributes: The attributes for the call. Defaults to None.
+            _use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+
+        Returns:
+            The created Call object.
         """
         if isinstance(op, str):
             if op not in self._anonymous_ops:
