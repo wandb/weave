@@ -82,8 +82,8 @@ class Op:
         attributes = call_attributes.get()
         run = client.create_call(
             self,
-            parent_run,
             inputs_with_defaults,
+            parent_run,
             attributes=attributes,
             display_name=self.display_name,
         )
