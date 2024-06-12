@@ -144,6 +144,7 @@ class Call:
     exception: Optional[str] = None
     summary: Optional[dict] = None
     display_name: Optional[str] = None
+    attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
 
@@ -244,6 +245,7 @@ def make_client_call(
         output=output,
         summary=server_call.summary,
         display_name=server_call.display_name,
+        attributes=server_call.attributes,
     )
     if call.id is None:
         raise ValueError("Call ID is None")
@@ -455,11 +457,26 @@ class WeaveClient:
     def create_call(
         self,
         op: Union[str, Op],
-        parent: Optional[Call],
         inputs: dict,
-        attributes: dict = {},
+        parent: Optional[Call] = None,
+        attributes: Optional[dict] = None,
         display_name: Optional[str] = None,
+        *,
+        use_stack: bool = True,
     ) -> Call:
+        """Create, log, and push a call onto the runtime stack.
+
+        Args:
+            op: The operation producing the call, or the name of an anonymous operation.
+            inputs: The inputs to the operation.
+            parent: The parent call. If parent is not provided, the current run is used as the parent.
+            display_name: The display name for the call. Defaults to None.
+            attributes: The attributes for the call. Defaults to None.
+            use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+
+        Returns:
+            The created Call object.
+        """
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -474,7 +491,7 @@ class WeaveClient:
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
-        if parent is None:
+        if parent is None and use_stack:
             parent = run_context.get_current_run()
 
         if parent:
@@ -483,6 +500,10 @@ class WeaveClient:
         else:
             trace_id = generate_id()
             parent_id = None
+
+        if attributes is None:
+            attributes = {}
+
         call = Call(
             op_name=op_str,
             project_id=self._project_id(),
@@ -491,6 +512,7 @@ class WeaveClient:
             id=call_id,
             inputs=inputs_with_refs,
             display_name=display_name,
+            attributes=attributes,
         )
         if parent is not None:
             parent._children.append(call)
@@ -510,7 +532,10 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
-        run_context.push_call(call)
+
+        if use_stack:
+            run_context.push_call(call)
+
         return call
 
     @trace_sentry.global_trace_sentry.watch()
