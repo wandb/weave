@@ -67,7 +67,7 @@ class RAG(dspy.Module):
         prediction = self.generate_answer(context=context, question=question)
         return dspy.Prediction(context=context, answer=prediction.answer)
 
-@weabe.op()
+@weave.op()
 def validate_context_and_answer(example, pred, trace=None):
     answer_EM = dspy.evaluate.answer_exact_match(example, pred)
     answer_PM = dspy.evaluate.answer_passage_match(example, pred)
@@ -88,3 +88,16 @@ compiled_rag = teleprompter.compile(RAG(), trainset=trainset)
 | [![dspy_without_weave_op.png](imgs/dspy_without_weave_op.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fcalls%2F8f643d8d-5b97-4494-b98f-ffc28bd8bf46) | [![dspy_with_weave_op.png](imgs/dspy_with_weave_op.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fcalls%2F76dfb9bc-12e6-421b-b9dd-f10916494a27%3Fpath%3Dvalidate_context_and_answer*0%26tracetree%3D1) |
 |---|---|
 | Not tracing the metric function | Tracing the metric function using `@weave.op()` |
+
+
+## Create a `Model` for easier experimentation
+
+Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
+
+In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/core-types/evaluations)s.
+
+In the example below, you can experiment with `WeaveModel`. Every time you change one of these, you'll get a new _version_ of `WeaveModel`.
+
+| [![dspy_weave_model_v1.png](imgs/dspy_weave_model_v1.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FKq8TSGXULeiFmLaXJsJkueJd7RQqEX9R7XpGpg7xC2Q%3F%26) | [![dspy_weave_model_v2.png](imgs/dspy_weave_model_v2.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FsxYxUemiZYVOPCUU2ziMJhk3rvw2QEz7iNqEfXLBqfI%3F%26) |
+|---|---|
+| Version 1 of the `WeaveModel` | Version 2 of the `WeaveModel` |
