@@ -35,8 +35,8 @@ def universal_ext_to_int_ref_converter(
         entity, project, tail = parts
         project_key = f"{entity}/{project}"
         if project_key not in ext_to_int_project_cache:
-            ext_to_int_project_cache[project_key] = (
-                convert_ext_to_int_project_id(project_key)
+            ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(
+                project_key
             )
         internal_project_id = ext_to_int_project_cache[project_key]
         return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
@@ -80,8 +80,8 @@ def universal_int_to_ext_ref_converter(
             raise ValueError(f"Invalid URI: {ref_str}")
         project_id, tail = parts
         if project_id not in int_to_ext_project_cache:
-            int_to_ext_project_cache[project_id] = (
-                convert_int_to_ext_project_id(project_id)
+            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
+                project_id
             )
         external_project_id = int_to_ext_project_cache[project_id]
         return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
