@@ -9,9 +9,9 @@ hide_table_of_contents: true
 
 ## Tracing
 
-It’s important to store traces of langugae model applications in a central database, both during development and in production. These traces can be useful for debugging, and as a dataset that will help you improve your application.
+It’s important to store traces of language model applications in a central location, both during development and in production. These traces can be useful for debugging, and as a dataset that will help you improve your application.
 
-Weave will automatically capture traces for [DSPy](https://dspy-docs.vercel.app/). You can use the library as usual, start by calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")`:
+Weave will automatically capture traces for [DSPy](https://dspy-docs.vercel.app/). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
 
 ```python
 import os
@@ -35,7 +35,7 @@ classify(sentence="it's a charming and often affecting journey.")
 
 Wrapping a function with `@weave.op` starts capturing inputs, outputs and app logic so you can debug how data flows through your app. You can deeply nest ops and build a tree of functions that you want to track. This also starts automatically versioning code as you experiment to capture ad-hoc details that haven't been committed to git.
 
-Simply create a function decorated with [`@weave.op`](/guides/tracking/ops) that calls into [openai python library](https://platform.openai.com/docs/api-reference?lang=python).
+Simply create a function decorated with [`@weave.op`](/guides/tracking/ops).
 
 In the example below, we have the function `validate_context_and_answer` which is the metric function wrapped with `@weave.op`. This helps us see how intermediate steps, like the optimization step for a DSPy application, are affecting the results.
 
