@@ -8,3 +8,9 @@ class RequestTooLarge(Error):
     """Raised when a request is too large."""
 
     pass
+
+
+class InvalidRequest(Error):
+    """Raised when a request is invalid."""
+
+    pass

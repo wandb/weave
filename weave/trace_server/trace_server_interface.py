@@ -1,7 +1,7 @@
 import abc
 import datetime
 import typing
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .interface.query import Query
 
@@ -12,6 +12,8 @@ class CallSchema(BaseModel):
 
     # Name of the calling function (op)
     op_name: str
+    # Optional display name of the call
+    display_name: typing.Optional[str] = None
 
     ## Trace ID
     trace_id: str
@@ -54,6 +56,8 @@ class StartedCallSchemaForInsert(BaseModel):
 
     # Name of the calling function (op)
     op_name: str
+    # Optional display name of the call
+    display_name: typing.Optional[str] = None
 
     ## Trace ID
     trace_id: typing.Optional[str] = None  # Will be generated if not provided
@@ -142,9 +146,11 @@ class CallReadRes(BaseModel):
 
 class CallsDeleteReq(BaseModel):
     project_id: str
-    # wb_user_id gets generated from auth params
-    wb_user_id: typing.Optional[str] = None
     call_ids: typing.List[str]
+
+
+class CallsDeleteReqForInsert(CallsDeleteReq):
+    wb_user_id: str
 
 
 class CallsDeleteRes(BaseModel):
@@ -194,6 +200,23 @@ class CallsQueryStatsReq(BaseModel):
 
 class CallsQueryStatsRes(BaseModel):
     count: int
+
+
+class CallUpdateReq(BaseModel):
+    # required for all updates
+    project_id: str
+    call_id: str
+
+    # optional update fields
+    display_name: typing.Optional[str] = None
+
+
+class CallUpdateReqForInsert(CallUpdateReq):
+    wb_user_id: str
+
+
+class CallUpdateRes(BaseModel):
+    pass
 
 
 class OpCreateReq(BaseModel):
@@ -299,6 +322,74 @@ class RefsReadBatchRes(BaseModel):
     vals: typing.List[typing.Any]
 
 
+class FeedbackPayloadReactionReq(BaseModel):
+    emoji: str
+
+
+class FeedbackPayloadNoteReq(BaseModel):
+    note: str = Field(min_length=1, max_length=1024)
+
+
+class FeedbackCreateReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
+    creator: typing.Optional[str] = Field(default=None, examples=["Jane Smith"])
+    feedback_type: str = Field(examples=["custom"])
+    payload: typing.Dict[str, typing.Any] = Field(
+        examples=[
+            {
+                "key": "value",
+            }
+        ]
+    )
+
+
+class FeedbackCreateReqForInsert(FeedbackCreateReq):
+    wb_user_id: str
+
+
+# The response provides the additional fields needed to convert a request
+# into a complete Feedback.
+class FeedbackCreateRes(BaseModel):
+    id: str
+    created_at: datetime.datetime
+    wb_user_id: str
+    payload: typing.Dict[str, typing.Any]  # If not empty, replace payload
+
+
+class Feedback(FeedbackCreateReqForInsert):
+    id: str
+    created_at: datetime.datetime
+
+
+class FeedbackQueryReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    fields: typing.Optional[list[str]] = Field(
+        default=None, examples=[["id", "feedback_type", "payload.note"]]
+    )
+    query: typing.Optional[Query] = None
+    # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
+    # TODO: Might be nice to have shortcut for single field and implied ASC direction
+    # TODO: I think _SortBy shouldn't have leading underscore
+    sort_by: typing.Optional[typing.List[_SortBy]] = None
+    limit: typing.Optional[int] = Field(default=None, examples=[10])
+    offset: typing.Optional[int] = Field(default=None, examples=[0])
+
+
+class FeedbackQueryRes(BaseModel):
+    # Note: this is not a list of Feedback because user can request any fields.
+    result: list[dict[str, typing.Any]]
+
+
+class FeedbackPurgeReq(BaseModel):
+    project_id: str = Field(examples=["entity/project"])
+    query: Query
+
+
+class FeedbackPurgeRes(BaseModel):
+    pass
+
+
 class FileCreateReq(BaseModel):
     project_id: str
     name: str
@@ -347,6 +438,10 @@ class TraceServerInterface:
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
         ...
 
+    @abc.abstractmethod
+    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
+        ...
+
     # Op API
     @abc.abstractmethod
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
@@ -391,4 +486,30 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
+        raise NotImplementedError()
+
+
+class TraceServerInterfacePostAuth(TraceServerInterface):
+    @abc.abstractmethod
+    def call_update(self, req: CallUpdateReqForInsert) -> CallUpdateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def calls_delete(self, req: CallsDeleteReqForInsert) -> CallsDeleteRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def feedback_create(self, req: FeedbackCreateReqForInsert) -> FeedbackCreateRes:
         raise NotImplementedError()

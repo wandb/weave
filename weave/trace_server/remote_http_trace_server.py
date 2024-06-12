@@ -103,8 +103,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth: t.Optional[t.Tuple[str, str]] = None
 
     def ensure_project_exists(self, entity: str, project: str) -> None:
-        # TODO: This should happen in the wandb backend, not here, and its slow
-        # (hundres of ms)
+        # TODO: This should happen in the wandb backend, not here, and it's slow
+        # (hundreds of ms)
         project_creator.ensure_project_exists(entity, project)
 
     @classmethod
@@ -282,6 +282,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
         )
 
+    def call_update(
+        self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallUpdateRes:
+        return self._generic_request(
+            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
+        )
+
     # Op API
 
     def op_create(
@@ -383,3 +390,24 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.writelines(r.iter_content())
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
+
+    def feedback_create(
+        self, req: t.Union[tsi.FeedbackCreateReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackCreateRes:
+        return self._generic_request(
+            "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
+        )
+
+    def feedback_query(
+        self, req: t.Union[tsi.FeedbackQueryReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackQueryRes:
+        return self._generic_request(
+            "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
+        )
+
+    def feedback_purge(
+        self, req: t.Union[tsi.FeedbackPurgeReq, t.Dict[str, t.Any]]
+    ) -> tsi.FeedbackPurgeRes:
+        return self._generic_request(
+            "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
+        )
