@@ -7,6 +7,10 @@ hide_table_of_contents: true
 
 # Introduction
 
+<a target="_blank" href="http://wandb.me/weave_colab">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 Weave is a lightweight toolkit for tracking and evaluating LLM applications, built by Weights & Biases.
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing AI applications, without introducing cognitive overhead.

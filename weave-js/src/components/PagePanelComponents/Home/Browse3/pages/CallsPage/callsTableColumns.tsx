@@ -175,6 +175,13 @@ function buildCallsTableColumns(
       filterable: false,
       width: 250,
       hideable: false,
+      valueGetter: rowParams => {
+        const op_name = rowParams.row.op_name;
+        if (!isRef(op_name)) {
+          return op_name;
+        }
+        return opVersionRefOpName(op_name);
+      },
       renderCell: rowParams => {
         const op_name = rowParams.row.op_name;
         if (!isRef(op_name)) {
@@ -234,6 +241,9 @@ function buildCallsTableColumns(
       // type: 'singleSelect',
       // valueOptions: ['SUCCESS', 'ERROR', 'PENDING'],
       width: 59,
+      valueGetter: cellParams => {
+        return traceCallStatusCode(cellParams.row);
+      },
       renderCell: cellParams => {
         return (
           <div style={{margin: 'auto'}}>
@@ -312,6 +322,17 @@ function buildCallsTableColumns(
             {key.split('.').slice(-1)[0]}
           </div>
         );
+      },
+      valueGetter: cellParams => {
+        const val = (cellParams.row as any)[key];
+        if (Array.isArray(val) || typeof val === 'object') {
+          try {
+            return JSON.stringify(val);
+          } catch {
+            return val;
+          }
+        }
+        return val;
       },
       renderCell: cellParams => {
         const val = (cellParams.row as any)[key];
@@ -406,6 +427,14 @@ function buildCallsTableColumns(
     // Should probably have a custom filter here.
     filterable: false,
     sortable: false,
+    valueGetter: cellParams => {
+      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+        // Call is still in progress, latency will be 0.
+        // Displaying nothing seems preferable to being misleading.
+        return null;
+      }
+      return traceCallLatencyS(cellParams.row);
+    },
     renderCell: cellParams => {
       if (traceCallStatusCode(cellParams.row) === 'UNSET') {
         // Call is still in progress, latency will be 0.
