@@ -67,7 +67,7 @@ class RAG(dspy.Module):
         prediction = self.generate_answer(context=context, question=question)
         return dspy.Prediction(context=context, answer=prediction.answer)
 
-
+@weabe.op()
 def validate_context_and_answer(example, pred, trace=None):
     answer_EM = dspy.evaluate.answer_exact_match(example, pred)
     answer_PM = dspy.evaluate.answer_passage_match(example, pred)
