@@ -81,6 +81,7 @@ class CallStartCHInsertable(BaseModel):
     inputs_dump: str
     input_refs: typing.List[str]
     output_refs: typing.List[str] = []  # sadly, this is required
+    display_name: typing.Optional[str] = None
 
     wb_user_id: typing.Optional[str] = None
     wb_run_id: typing.Optional[str] = None
@@ -100,16 +101,33 @@ class CallEndCHInsertable(BaseModel):
 class CallDeleteCHInsertable(BaseModel):
     project_id: str
     id: str
-    deleted_at: datetime.datetime
-    wb_user_id: typing.Optional[str]
+    wb_user_id: str
 
-    # boo
+    deleted_at: datetime.datetime
+
+    # required types
+    input_refs: typing.List[str] = []
+    output_refs: typing.List[str] = []
+
+
+class CallUpdateCHInsertable(BaseModel):
+    project_id: str
+    id: str
+    wb_user_id: str
+
+    # update types
+    display_name: typing.Optional[str] = None
+
+    # required types
     input_refs: typing.List[str] = []
     output_refs: typing.List[str] = []
 
 
 CallCHInsertable = typing.Union[
-    CallStartCHInsertable, CallEndCHInsertable, CallDeleteCHInsertable
+    CallStartCHInsertable,
+    CallEndCHInsertable,
+    CallDeleteCHInsertable,
+    CallUpdateCHInsertable,
 ]
 
 
@@ -121,6 +139,7 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
+    display_name: typing.Optional[str] = None
 
     trace_id: str
     parent_id: typing.Optional[str] = None
@@ -147,6 +166,7 @@ all_call_insert_columns = list(
     CallStartCHInsertable.model_fields.keys()
     | CallEndCHInsertable.model_fields.keys()
     | CallDeleteCHInsertable.model_fields.keys()
+    | CallUpdateCHInsertable.model_fields.keys()
 )
 
 all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
@@ -155,6 +175,13 @@ all_call_json_columns = ("inputs", "output", "attributes", "summary")
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 required_call_columns = list(set(all_call_select_columns) - set([]))
+
+
+# Columns in the calls_merged table with special aggregation functions:
+call_select_raw_columns = ["id", "project_id"]  # no aggregation
+call_select_arrays_columns = ["input_refs", "output_refs"]  # array_concat_agg
+call_select_argmax_columns = ["display_name"]  # argMaxMerge
+# all others use `any`
 
 
 class ObjCHInsertable(BaseModel):
@@ -360,7 +387,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 _ch_call_dict_to_call_schema_dict(ch_dict)
             )
 
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    def calls_delete(self, req: tsi.CallsDeleteReqForInsert) -> tsi.CallsDeleteRes:
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
@@ -405,13 +432,34 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             for call_id in all_descendants
         ]
-        self._flush_immediately = False
-        for insertable in insertables:
-            self._insert_call(insertable)
-        self._flush_calls()
-        self._flush_immediately = True
+
+        with self.call_batch():
+            for insertable in insertables:
+                self._insert_call(insertable)
 
         return tsi.CallsDeleteRes()
+
+    def _ensure_valid_update_field(self, req: tsi.CallUpdateReqForInsert) -> None:
+        valid_update_fields = ["display_name"]
+        for field in valid_update_fields:
+            if getattr(req, field, None) is not None:
+                return
+
+        raise ValueError(
+            f"One of [{', '.join(valid_update_fields)}] is required for call update"
+        )
+
+    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+        self._ensure_valid_update_field(req)
+        renamed_insertable = CallUpdateCHInsertable(
+            project_id=req.project_id,
+            id=req.call_id,
+            wb_user_id=req.wb_user_id,
+            display_name=req.display_name,
+        )
+        self._insert_call(renamed_insertable)
+
+        return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -1013,10 +1061,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ), f"Invalid columns: {columns}"
         merged_cols = []
         for col in columns:
-            if col in ["project_id", "id"]:
+            if col in call_select_raw_columns:
                 merged_cols.append(f"{col} AS {col}")
-            elif col in ["input_refs", "output_refs"]:
+            elif col in call_select_arrays_columns:
                 merged_cols.append(f"array_concat_agg({col}) AS {col}")
+            elif col in call_select_argmax_columns:
+                merged_cols.append(f"argMaxMerge({col}) AS {col}")
             else:
                 merged_cols.append(f"any({col}) AS {col}")
         select_columns_part = ", ".join(merged_cols)
@@ -1497,6 +1547,10 @@ def _raw_call_dict_to_ch_call(
     return SelectableCHCallSchema.model_validate(call)
 
 
+def _empty_str_to_none(val: typing.Optional[str]) -> typing.Optional[str]:
+    return val if val != "" else None
+
+
 def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
     return tsi.CallSchema(
         project_id=ch_call.project_id,
@@ -1513,6 +1567,7 @@ def _ch_call_to_call_schema(ch_call: SelectableCHCallSchema) -> tsi.CallSchema:
         exception=ch_call.exception,
         wb_run_id=ch_call.wb_run_id,
         wb_user_id=ch_call.wb_user_id,
+        display_name=_empty_str_to_none(ch_call.display_name),
     )
 
 
@@ -1533,6 +1588,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: typing.Dict) -> typing.Dict:
         exception=ch_call_dict.get("exception"),
         wb_run_id=ch_call_dict.get("wb_run_id"),
         wb_user_id=ch_call_dict.get("wb_user_id"),
+        display_name=_empty_str_to_none(ch_call_dict.get("display_name")),
     )
 
 
@@ -1569,6 +1625,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
         wb_user_id=start_call.wb_user_id,
+        display_name=start_call.display_name,
     )
 
 

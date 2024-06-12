@@ -5,6 +5,10 @@ hide_table_of_contents: true
 
 # Quickstart
 
+<a target="_blank" href="http://wandb.me/weave_colab">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 ## Installation
 
 Weave requires Python 3.9+.
