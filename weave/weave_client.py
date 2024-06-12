@@ -23,7 +23,7 @@ from weave.trace.object_record import (
 from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
 from weave import graph_client_context
 from weave.trace_server.trace_server_interface import (
-    CallRenameReq,
+    CallUpdateReq,
     CallsDeleteReq,
     ObjSchema,
     RefsReadBatchReq,
@@ -172,11 +172,19 @@ class Call:
         client = graph_client_context.require_graph_client()
         return client.delete_call(call=self)
 
-    def rename(self, new_name: str) -> "Call":
+    def set_display_name(self, name: Optional[str]) -> None:
+        if name == "":
+            raise ValueError(
+                "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."
+            )
+        if name == self.display_name:
+            return
         client = graph_client_context.require_graph_client()
-        client.rename_call(call=self, display_name=new_name)
-        self.display_name = new_name
-        return self
+        client.set_call_display_name(call=self, display_name=name)
+        self.display_name = name
+
+    def remove_display_name(self) -> None:
+        self.set_display_name(None)
 
 
 class CallsIter:
@@ -279,6 +287,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
+        self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
             self.server.ensure_project_exists(entity, project)
@@ -482,6 +491,7 @@ class WeaveClient:
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
+            display_name=display_name,
         )
         if parent is not None:
             parent._children.append(call)
@@ -574,14 +584,22 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def rename_call(self, call: Call, display_name: str) -> None:
-        self.server.call_rename(
-            CallRenameReq(
+    def set_call_display_name(
+        self, call: Call, display_name: Optional[str] = None
+    ) -> None:
+        # Removing call display name, use "" for db representation
+        if display_name is None:
+            display_name = ""
+        self.server.call_update(
+            CallUpdateReq(
                 project_id=self._project_id(),
                 call_id=call.id,
                 display_name=display_name,
             )
         )
+
+    def remove_call_display_name(self, call: Call) -> None:
+        self.set_call_display_name(call, None)
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:

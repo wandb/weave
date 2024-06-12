@@ -266,7 +266,7 @@ const useCallsNoExpansion = (
       console.error(e);
       setCallRes({calls: []});
     };
-    getTsClient().callsSteamQuery(req).then(onSuccess).catch(onError);
+    getTsClient().callsStreamQuery(req).then(onSuccess).catch(onError);
   }, [
     entity,
     project,

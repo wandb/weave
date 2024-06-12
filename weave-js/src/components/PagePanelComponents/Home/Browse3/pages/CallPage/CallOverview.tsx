@@ -1,8 +1,8 @@
 import React, {useState} from 'react';
 import styled from 'styled-components';
 
-import {CallId} from '../common/CallId';
 import {EditableCallName} from '../common/EditableCallName';
+import {CopyableId} from '../common/Id';
 import {opNiceName} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -56,7 +56,7 @@ export const CallOverview: React.FC<{
             externalEditingControl={isRenamingCall}
           />
         </CallName>
-        <CallId callId={call.callId} />
+        <CopyableId id={call.callId} type="Call" />
         <StatusChip value={statusCode} iconOnly />
         <OverflowBin>
           <OverflowMenu

@@ -267,7 +267,7 @@ export class TraceServerClient {
       req
     );
   };
-  callsSteamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
+  callsStreamQuery: (req: TraceCallsQueryReq) => Promise<TraceCallsQueryRes> =
     req => {
       const res = this.makeRequest<TraceCallsQueryReq, string>(
         '/calls/stream_query',
@@ -311,7 +311,7 @@ export class TraceServerClient {
                     `Early stream termination, performing a new request resuming from ${newReq.offset}`
                   );
                   earlyTermination = true;
-                  this.callsSteamQuery(newReq)
+                  this.callsStreamQuery(newReq)
                     .then(innerRes => {
                       calls.push(...innerRes.calls);
                       resolve({calls});

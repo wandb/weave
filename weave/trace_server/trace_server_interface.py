@@ -13,7 +13,7 @@ class CallSchema(BaseModel):
     # Name of the calling function (op)
     op_name: str
     # Optional display name of the call
-    display_name: typing.Optional[str]
+    display_name: typing.Optional[str] = None
 
     ## Trace ID
     trace_id: str
@@ -146,9 +146,11 @@ class CallReadRes(BaseModel):
 
 class CallsDeleteReq(BaseModel):
     project_id: str
-    # wb_user_id gets generated from auth params
-    wb_user_id: typing.Optional[str] = None
     call_ids: typing.List[str]
+
+
+class CallsDeleteReqForInsert(CallsDeleteReq):
+    wb_user_id: str
 
 
 class CallsDeleteRes(BaseModel):
@@ -201,15 +203,20 @@ class CallsQueryStatsRes(BaseModel):
     count: int
 
 
-class CallRenameReq(BaseModel):
+class CallUpdateReq(BaseModel):
+    # required for all updates
     project_id: str
     call_id: str
-    # wb_user_id gets generated from auth params
-    wb_user_id: typing.Optional[str] = None
-    display_name: str
+
+    # optional update fields
+    display_name: typing.Optional[str] = None
 
 
-class CallRenameRes(BaseModel):
+class CallUpdateReqForInsert(CallUpdateReq):
+    wb_user_id: str
+
+
+class CallUpdateRes(BaseModel):
     pass
 
 
@@ -365,7 +372,7 @@ class TraceServerInterface:
         ...
 
     @abc.abstractmethod
-    def call_rename(self, req: CallRenameReq) -> CallRenameRes:
+    def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
         ...
 
     # Op API
@@ -412,4 +419,14 @@ class TraceServerInterface:
 
     @abc.abstractmethod
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
+        raise NotImplementedError()
+
+
+class TraceServerInterfacePostAuth(TraceServerInterface):
+    @abc.abstractmethod
+    def call_update(self, req: CallUpdateReqForInsert) -> CallUpdateRes:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def calls_delete(self, req: CallsDeleteReqForInsert) -> CallsDeleteRes:
         raise NotImplementedError()

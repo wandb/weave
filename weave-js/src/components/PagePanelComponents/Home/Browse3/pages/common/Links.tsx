@@ -18,8 +18,8 @@ import {OverflowMenu} from '../CallPage/OverflowMenu';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
-import {CallId} from './CallId';
 import {EditableCallName} from './EditableCallName';
+import {Id} from './Id';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -290,7 +290,7 @@ export const CallLink: React.FC<{
           )}
         </Link>
       </LinkTruncater>
-      <CallId callId={props.callId} />
+      <Id id={props.callId} type="Call" />
       <OverflowMenu
         entity={props.entityName}
         project={props.projectName}

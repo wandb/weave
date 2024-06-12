@@ -433,7 +433,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     summary=json.loads(row[13]) if row[13] else None,
                     wb_user_id=row[14],
                     wb_run_id=row[15],
-                    display_name=row[17],
+                    display_name=row[17] if row[17] != "" else None,
                 )
                 for row in query_result
             ]
@@ -494,7 +494,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.CallsDeleteRes()
 
-    def call_rename(self, req: tsi.CallRenameReq) -> tsi.CallRenameRes:
+    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+        if req.display_name is None:
+            raise ValueError("One of [display_name] is required for call update")
+
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute(
@@ -502,7 +505,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 (req.display_name, req.call_id),
             )
             conn.commit()
-        return tsi.CallRenameRes()
+        return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()

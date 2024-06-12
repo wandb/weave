@@ -5,6 +5,7 @@ import typing as t
 from pydantic import BaseModel, ValidationError
 import requests
 import tenacity
+import logging
 
 from weave.trace_server import environment as wf_env
 
@@ -12,6 +13,8 @@ from weave.trace_server import environment as wf_env
 from weave.wandb_interface import project_creator
 from .async_batch_processor import AsyncBatchProcessor
 from . import trace_server_interface as tsi
+
+logger = logging.getLogger(__name__)
 
 
 class StartBatchItem(BaseModel):
@@ -65,16 +68,24 @@ def _is_retryable_exception(e: Exception) -> bool:
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
-    print(
-        f"Retrying {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
-        file=sys.stderr,
+    logger.info(
+        "retry_attempt",
+        extra={
+            "fn": retry_state.fn,
+            "attempt_number": retry_state.attempt_number,
+            "exception": str(retry_state.outcome.exception()),
+        },
     )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> t.Any:
-    print(
-        f"Failed {retry_state.fn}: attempt {retry_state.attempt_number} ended with: ({retry_state.outcome.exception().__class__.__name__}) {retry_state.outcome.exception()}",
-        file=sys.stderr,
+    logger.info(
+        "retry_failed",
+        extra={
+            "fn": retry_state.fn,
+            "attempt_number": retry_state.attempt_number,
+            "exception": str(retry_state.outcome.exception()),
+        },
     )
     return retry_state.outcome.result()
 
@@ -92,8 +103,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth: t.Optional[t.Tuple[str, str]] = None
 
     def ensure_project_exists(self, entity: str, project: str) -> None:
-        # TODO: This should happen in the wandb backend, not here, and its slow
-        # (hundres of ms)
+        # TODO: This should happen in the wandb backend, not here, and it's slow
+        # (hundreds of ms)
         project_creator.ensure_project_exists(entity, project)
 
     @classmethod
@@ -271,11 +282,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
         )
 
-    def call_rename(
-        self, req: t.Union[tsi.CallRenameReq, t.Dict[str, t.Any]]
-    ) -> tsi.CallRenameRes:
+    def call_update(
+        self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallUpdateRes:
         return self._generic_request(
-            "/call/rename", req, tsi.CallRenameReq, tsi.CallRenameRes
+            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
         )
 
     # Op API
