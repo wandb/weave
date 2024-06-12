@@ -496,3 +496,11 @@ class TraceServerInterface:
     @abc.abstractmethod
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
         raise NotImplementedError()
+
+
+# These symbols are used in the WB Trace Server and it is not safe
+# to remove them, else it will break the server. Once the server
+# is updated to use the new symbols, these can be removed.
+CallsDeleteReqForInsert = CallsDeleteReq
+CallUpdateReqForInsert = CallUpdateReq
+FeedbackCreateReqForInsert = FeedbackCreateReq
