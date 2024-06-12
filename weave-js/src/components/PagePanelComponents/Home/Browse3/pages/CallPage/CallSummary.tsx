@@ -1,4 +1,4 @@
-import { Divider } from '@mui/material';
+import {Divider} from '@mui/material';
 import _ from 'lodash';
 import React from 'react';
 
