@@ -1,11 +1,13 @@
 import _ from 'lodash';
 import React from 'react';
+import {Divider} from 'semantic-ui-react';
 
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {parseRefMaybe, SmallRef} from '../../../Browse2/SmallRef';
 import {SimpleKeyValueTable} from '../common/SimplePageLayout';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CostTable, UsageData} from './CostTable';
 
 export const CallSummary: React.FC<{
   call: CallSchema;
@@ -18,7 +20,8 @@ export const CallSummary: React.FC<{
   );
   const summary = _.fromPairs(
     Object.entries(span.summary ?? {}).filter(
-      ([k, a]) => !k.startsWith('_') && k !== 'latency_s' && a != null
+      ([k, a]) =>
+        !k.startsWith('_') && k !== 'latency_s' && a != null && k !== 'usage'
     )
   );
 
@@ -54,6 +57,21 @@ export const CallSummary: React.FC<{
           ...(Object.keys(summary).length > 0 ? {Summary: summary} : {}),
         }}
       />
+      <Divider />
+      {span.summary.usage && (
+        <div>
+          {/* This styling is similar to what is is SimpleKeyValueTable */}
+          <p
+            style={{
+              fontWeight: 600,
+              marginRight: 10,
+              paddingRight: 10,
+            }}>
+            Usage
+          </p>
+          <CostTable usage={span.summary.usage as {string: UsageData}} />
+        </div>
+      )}
     </div>
   );
 };
