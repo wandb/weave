@@ -6,7 +6,8 @@ from weave.trace_server.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server.trace_server_interface import TraceServerInterface
 
 from ..andrew_client.client import Client
-from ..andrew_init import global_state, utils
+from ..andrew_init import utils
+from ..andrew_state import global_state
 
 
 def init(entity: str, project: str, server: Optional[TraceServerInterface] = None) -> Client:
