@@ -96,11 +96,6 @@ export const useCallsTableColumns = (
     effectiveFilter
   );
 
-  // Filters summary.usage. because we add a derived column for tokens and cost
-  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
-    c => !c.startsWith('summary.usage.')
-  );
-
   // Determine what sort of view we are looking at based on the filter
   const isSingleOpVersion = useMemo(
     () => effectiveFilter.opVersionRefs?.length === 1,
@@ -127,7 +122,7 @@ export const useCallsTableColumns = (
         preservePath,
         isSingleOp,
         isSingleOpVersion,
-        filteredDynamicColumnNames,
+        allDynamicColumnNames,
         expandedRefCols,
         onCollapse,
         columnsWithRefs,
@@ -141,7 +136,7 @@ export const useCallsTableColumns = (
       preservePath,
       isSingleOp,
       isSingleOpVersion,
-      filteredDynamicColumnNames,
+      allDynamicColumnNames,
       expandedRefCols,
       onCollapse,
       columnsWithRefs,
@@ -175,6 +170,11 @@ function buildCallsTableColumns(
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
 } {
+  // Filters summary.usage. because we add a derived column for tokens and cost
+  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
+    c => !c.startsWith('summary.usage.')
+  );
+
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
       field: 'op_name',
@@ -264,7 +264,7 @@ function buildCallsTableColumns(
     },
   ];
 
-  const tree = buildTree([...allDynamicColumnNames]);
+  const tree = buildTree([...filteredDynamicColumnNames]);
   let groupingModel: GridColumnGroupingModel = tree.children.filter(
     c => 'groupId' in c
   ) as GridColumnGroup[];
@@ -312,7 +312,7 @@ function buildCallsTableColumns(
     return node;
   }) as GridColumnGroupingModel;
 
-  for (const key of allDynamicColumnNames) {
+  for (const key of filteredDynamicColumnNames) {
     const col: GridColDef<TraceCallSchema> = {
       flex: 1,
       minWidth: 150,
