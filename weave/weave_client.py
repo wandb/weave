@@ -462,7 +462,7 @@ class WeaveClient:
         attributes: Optional[dict] = None,
         display_name: Optional[str] = None,
         *,
-        _use_stack: bool = True,
+        use_stack: bool = True,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
 
@@ -472,7 +472,7 @@ class WeaveClient:
             inputs: The inputs to the operation.
             display_name: The display name for the call. Defaults to None.
             attributes: The attributes for the call. Defaults to None.
-            _use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+            use_stack: Whether to push the call onto the runtime stack. Defaults to True.
 
         Returns:
             The created Call object.
@@ -491,7 +491,7 @@ class WeaveClient:
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
-        if parent is None and _use_stack:
+        if parent is None and use_stack:
             parent = run_context.get_current_run()
 
         if parent:
@@ -533,7 +533,7 @@ class WeaveClient:
         )
         self.server.call_start(CallStartReq(start=start))
 
-        if _use_stack:
+        if use_stack:
             run_context.push_call(call)
 
         return call
