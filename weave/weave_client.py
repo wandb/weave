@@ -459,8 +459,8 @@ class WeaveClient:
         op: Union[str, Op],
         parent: Optional[Call],
         inputs: dict,
-        display_name: Optional[str] = None,
         attributes: Optional[dict] = None,
+        display_name: Optional[str] = None,
         *,
         _use_stack: bool = True,
     ) -> Call:
@@ -497,6 +497,10 @@ class WeaveClient:
         else:
             trace_id = generate_id()
             parent_id = None
+
+        if attributes is None:
+            attributes = {}
+
         call = Call(
             op_name=op_str,
             project_id=self._project_id(),
