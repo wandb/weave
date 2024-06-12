@@ -27,6 +27,9 @@ You have fine-tuned a model from the Hugging Face HUB a now you want to interact
         pipe = pipeline("text-generation", model=model_name, temperature=temperature)
         return pipe(messages)
     ```
+    
+    this is very inefficient as the model is instantiated every time the function is called.
+
 2. Explicitly using the `AutoModel` and `generate` methods:
     ```python
     import weave
@@ -43,7 +46,29 @@ You have fine-tuned a model from the Hugging Face HUB a now you want to interact
         return outputs[0][input_ids.shape[-1]:] # we remove the input from the generation
     ```
 
-3. If you want to organize the model and parameters in a single `Model` class where you organize the loading of the checkpoints, the prompt formatting and the generation of the output, you can do so:
+3. Explicitly using the `AutoModel` and `generate` methods:
+    ```python
+    import weave
+    from transformers import AutoModel, AutoTokenizer
+
+    model = AutoModel.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    @weave.op
+    def apply_chat_template(messages: str, tokenizer):
+         formatted_prompt = tokenizer.apply_chat_template(messages, return_tensors="text")
+         return formatted_prompt
+
+    @weave.op
+    def generate(prompt: str, temperature: float = 0.7) -> str:
+        messages = [{"role": "user", "content": prompt}]
+        formatted_prompt = apply_chat_template(messages, tokenizer)
+        input_ids = tokenizer(formatted_prompt, return_tensors="pt").to(model.device)
+        output = model.generate(input_ids, temperature=temperature, do_sample=True)
+        return outputs[0][input_ids.shape[-1]:] # we remove the input from the generation
+    ```
+
+4. If you want to organize the model and parameters in a single `Model` class where you organize the loading of the checkpoints, the prompt formatting and the generation of the output, you can do so:
 
     ```python
     import weave
