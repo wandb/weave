@@ -38,6 +38,50 @@ def async_call(
 
 
 class Evaluation(Object):
+    """
+        Sets up an evaluation which includes a set of scorers and a dataset. 
+
+        Calling evaluation.evaluate(model) will pass in rows from a dataset into a model matching
+            the names of the columns of the dataset to the argument names in model.predict.
+
+        Then it will call all of the scorers and save the results in weave.
+
+        If you want to preprocess the rows from the dataset you can pass in a function
+        to preprocess_model_input.
+
+        Examples:
+
+        ```
+        # Collect your examples
+        examples = [
+            {"question": "What is the capital of France?", "expected": "Paris"},
+            {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+            {"question": "What is the square root of 64?", "expected": "8"},
+        ]
+
+        # Define any custom scoring function
+        @weave.op()
+        def match_score1(expected: str, model_output: dict) -> dict:
+            # Here is where you'd define the logic to score the model output
+            return {'match': expected == model_output['generated_text']}
+
+        @weave.op()
+        def function_to_evaluate(question: str):
+            # here's where you would add your LLM call and return the output
+            return  {'generated_text': 'Paris'}
+
+        # Score your examples using scoring functions
+        evaluation = Evaluation(
+            dataset=examples, scorers=[match_score1]
+        )
+
+        # Start tracking the evaluation
+        weave.init('intro-example')
+        # Run the evaluation
+        asyncio.run(evaluation.evaluate(function_to_evaluate))
+        ```
+    """
+
     dataset: Union[Dataset, list]
     scorers: Optional[list[Union[Callable, Op, Scorer]]] = None
     preprocess_model_input: Optional[Callable] = None
