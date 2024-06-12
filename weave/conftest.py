@@ -32,6 +32,7 @@ from weave.trace_server import (
     sqlite_trace_server,
     trace_server_interface,
     remote_http_trace_server,
+    unit_test_external_trace_server,
 )
 from weave import weave_init
 
@@ -324,12 +325,18 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         sql_lite_server.setup_tables()
         tsi = sql_lite_server
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
+        ch_server = unit_test_external_trace_server.make_local_clickhouse_trace_server()
+        assert isinstance(
+            ch_server._internal_trace_server,
+            clickhouse_trace_server_batched.ClickHouseTraceServer,
         )
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
-        ch_server._run_migrations()
+        ch_server._internal_trace_server.ch_client.command(
+            "DROP DATABASE IF EXISTS db_management"
+        )
+        ch_server._internal_trace_server.ch_client.command(
+            "DROP DATABASE IF EXISTS default"
+        )
+        ch_server._internal_trace_server._run_migrations()
         tsi = ch_server
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(

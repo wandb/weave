@@ -808,7 +808,6 @@ def test_op_query(client):
     assert len(res) == 1
 
 
-@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_noextra(client):
     ref = client.save_object([1, 2, 3], "my-list")
     ref2 = client.save_object({"a": [3, 4, 5]}, "my-obj")
@@ -818,7 +817,6 @@ def test_refs_read_batch_noextra(client):
     assert res.vals[1] == {"a": [3, 4, 5]}
 
 
-@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_with_extra(client):
     saved = client.save([{"a": 5}, {"a": 6}], "my-list")
     ref1 = saved[0]["a"].ref
@@ -829,7 +827,6 @@ def test_refs_read_batch_with_extra(client):
     assert res.vals[1] == {"a": 6}
 
 
-@pytest.mark.skip_clickhouse_client  # TODO: Make client work with external ref URLS
 def test_refs_read_batch_dataset_rows(client):
     saved = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
     ref1 = saved.rows[0]["a"].ref
