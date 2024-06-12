@@ -73,7 +73,9 @@ class StartedCallSchemaForInsert(BaseModel):
     inputs: typing.Dict[str, typing.Any]
 
     # WB Metadata
-    wb_user_id: typing.Optional[str] = None
+    wb_user_id: typing.Optional[str] = Field(
+        None, description="will be automatically set by the server - leave as None."
+    )
     wb_run_id: typing.Optional[str] = None
 
 
@@ -149,7 +151,9 @@ class CallsDeleteReq(BaseModel):
     call_ids: typing.List[str]
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = None
+    wb_user_id: typing.Optional[str] = Field(
+        None, description="will be automatically set by the server - leave as None."
+    )
 
 
 class CallsDeleteRes(BaseModel):
@@ -210,7 +214,9 @@ class CallUpdateReq(BaseModel):
     display_name: typing.Optional[str] = None
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = None
+    wb_user_id: typing.Optional[str] = Field(
+        None, description="will be automatically set by the server - leave as None."
+    )
 
 
 class CallUpdateRes(BaseModel):
@@ -342,7 +348,9 @@ class FeedbackCreateReq(BaseModel):
     )
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: typing.Optional[str] = None
+    wb_user_id: typing.Optional[str] = Field(
+        None, description="will be automatically set by the server - leave as None."
+    )
 
 
 # The response provides the additional fields needed to convert a request
