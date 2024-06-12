@@ -8,8 +8,8 @@ class Model(Object):
     For example it might call an LLM with a prompt to make a prediction or generate
     text.
 
-    When you change the attributes or the code that defines your model, these changes 
-    will be logged and the version will be updated. This ensures that you can compare 
+    When you change the attributes or the code that defines your model, these changes
+    will be logged and the version will be updated. This ensures that you can compare
     the predictions across different versions of your model. Use this to iterate on
     prompts or to try the latest LLM and compare predictions across different settings
 
@@ -24,8 +24,9 @@ class Model(Object):
                 # Model logic goes here
                 prediction = self.attribute1 + ' ' + input_data
                 return {'pred': prediction}
-    ``` 
+    ```
     """
+
     # TODO: should be infer: Callable
 
     def get_infer_method(self) -> Callable:
