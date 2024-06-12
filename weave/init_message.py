@@ -25,21 +25,17 @@ def _parse_version(version: str) -> "packaging.version.Version":
 
 def _print_version_check() -> None:
     import wandb
+
     import weave
 
     if _parse_version(REQUIRED_WANDB_VERSION) > _parse_version(wandb.__version__):
-        message = (
-            "wandb version >= 0.16.4 is required.  To upgrade, please run:\n"
-            " $ pip install wandb --upgrade"
-        )
+        message = "wandb version >= 0.16.4 is required.  To upgrade, please run:\n" " $ pip install wandb --upgrade"
         print(message)
     else:
         wandb_messages = wandb.sdk.internal.update.check_available(wandb.__version__)
         if wandb_messages:
             # Don't print the upgrade message, only the delete or yank message
-            use_message = wandb_messages.get("delete_message") or wandb_messages.get(
-                "yank_message"
-            )  #  or wandb_messages.get("upgrade_message")
+            use_message = wandb_messages.get("delete_message") or wandb_messages.get("yank_message")  #  or wandb_messages.get("upgrade_message")
             if use_message:
                 print(use_message)
 
@@ -49,18 +45,12 @@ def _print_version_check() -> None:
     wandb._wandb_module = orig_module
 
     if weave_messages:
-        use_message = (
-            weave_messages.get("delete_message")
-            or weave_messages.get("yank_message")
-            or weave_messages.get("upgrade_message")
-        )
+        use_message = weave_messages.get("delete_message") or weave_messages.get("yank_message") or weave_messages.get("upgrade_message")
         if use_message:
             print(use_message)
 
 
-def assert_min_weave_version(
-    min_required_version: str, trace_server_host: str = "https://trace.wandb.ai"
-) -> None:
+def assert_min_weave_version(min_required_version: str, trace_server_host: str = "https://trace.wandb.ai") -> None:
     import weave
 
     if _parse_version(min_required_version) > _parse_version(weave.__version__):
@@ -77,7 +67,6 @@ def print_init_message(
     username: typing.Optional[str],
     entity_name: str,
     project_name: str,
-    read_only: bool,
 ) -> None:
     try:
         _print_version_check()
@@ -87,10 +76,5 @@ def print_init_message(
     message = ""
     if username is not None:
         message += f"Logged in as Weights & Biases user: {username}.\n"
-    message += (
-        f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
-    )
-    # Cosmetically, if we are in `read_only` mode, we are not logging data, so
-    # we should not print the message about logging data.
-    if not read_only:
-        print(message)
+    message += f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
+    print(message)

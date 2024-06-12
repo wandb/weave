@@ -1,59 +1,56 @@
-from collections import namedtuple
-from typing import Any, Sequence, Union, Optional, TypedDict, Dict
 import dataclasses
+import datetime
 import typing
 import uuid
+from collections import namedtuple
+from typing import Any, Dict, Optional, Sequence, TypedDict, Union
+
 import pydantic
-import datetime
-
-
 from requests import HTTPError
 
+from weave import graph_client_context, run_context, trace_sentry, urls
 from weave.exception import exception_to_json_str
 from weave.table import Table
-from weave import trace_sentry, urls
-from weave import run_context
-from weave.trace.op import Op
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
-    pydantic_object_record,
     pydantic_asdict_one_level,
+    pydantic_object_record,
 )
-from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
-from weave import graph_client_context
+from weave.trace.op import Op
+from weave.trace.refs import (
+    CallRef,
+    ObjectRef,
+    OpRef,
+    Ref,
+    TableRef,
+    parse_uri,
+)
+from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
+from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
-    CallsDeleteReq,
-    ObjSchema,
-    RefsReadBatchReq,
-    TraceServerInterface,
-    ObjCreateReq,
-    ObjSchemaForInsert,
-    ObjReadReq,
-    StartedCallSchemaForInsert,
-    CallStartReq,
-    CallsQueryReq,
     CallEndReq,
-    EndedCallSchemaForInsert,
     CallSchema,
+    CallsDeleteReq,
+    CallsQueryReq,
+    CallStartReq,
+    EndedCallSchemaForInsert,
+    ObjCreateReq,
     ObjQueryReq,
     ObjQueryRes,
+    ObjReadReq,
+    ObjSchema,
+    ObjSchemaForInsert,
+    RefsReadBatchReq,
+    StartedCallSchemaForInsert,
     TableCreateReq,
-    TableSchemaForInsert,
     TableQueryReq,
-    _TableRowFilter,
+    TableSchemaForInsert,
+    TraceServerInterface,
     _CallsFilter,
     _ObjectVersionFilter,
+    _TableRowFilter,
 )
-from weave.trace.refs import (
-    Ref,
-    ObjectRef,
-    TableRef,
-    CallRef,
-    parse_uri,
-    OpRef,
-)
-from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 
 if typing.TYPE_CHECKING:
     from . import ref_base
@@ -175,9 +172,7 @@ class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
 
-    def __init__(
-        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
-    ) -> None:
+    def __init__(self, server: TraceServerInterface, project_id: str, filter: _CallsFilter) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
@@ -214,9 +209,7 @@ class CallsIter:
             page_index += 1
 
 
-def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> TraceObject:
+def make_client_call(entity: str, project: str, server_call: CallSchema, server: TraceServerInterface) -> TraceObject:
     output = server_call.output
     call = Call(
         op_name=server_call.op_name,
@@ -256,7 +249,6 @@ class WeaveClient:
         entity: The entity name.
         project: The project name.
         server: The server to use for communication.
-        ensure_project_exists: Whether to ensure the project exists on the server.
     """
 
     def __init__(
@@ -264,16 +256,12 @@ class WeaveClient:
         entity: str,
         project: str,
         server: TraceServerInterface,
-        ensure_project_exists: bool = True,
     ):
         self.entity = entity
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
-        self.ensure_project_exists = ensure_project_exists
-
-        if ensure_project_exists:
-            self.server.ensure_project_exists(entity, project)
+        self.server.ensure_project_exists(entity, project)
 
     def ref_is_own(self, ref: Ref) -> bool:
         return isinstance(ref, Ref)
@@ -353,9 +341,7 @@ class WeaveClient:
         # let the server resolve it.
         if ref.extra:
             try:
-                ref_read_res = self.server.refs_read_batch(
-                    RefsReadBatchReq(refs=[ref.uri()])
-                )
+                ref_read_res = self.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri()]))
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
                     raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -370,16 +356,8 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def save_table(self, table: Table) -> TableRef:
-        response = self.server.table_create(
-            TableCreateReq(
-                table=TableSchemaForInsert(
-                    project_id=self._project_id(), rows=table.rows
-                )
-            )
-        )
-        return TableRef(
-            entity=self.entity, project=self.project, digest=response.digest
-        )
+        response = self.server.table_create(TableCreateReq(table=TableSchemaForInsert(project_id=self._project_id(), rows=table.rows)))
+        return TableRef(entity=self.entity, project=self.project, digest=response.digest)
 
     @trace_sentry.global_trace_sentry.watch()
     def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
@@ -494,9 +472,7 @@ class WeaveClient:
         return call
 
     @trace_sentry.global_trace_sentry.watch()
-    def finish_call(
-        self, call: Call, output: Any = None, exception: Optional[BaseException] = None
-    ) -> None:
+    def finish_call(self, call: Call, output: Any = None, exception: Optional[BaseException] = None) -> None:
         self.save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
@@ -629,9 +605,7 @@ def safe_current_wb_run_id() -> Optional[str]:
         return None
 
 
-def check_wandb_run_matches(
-    wandb_run_id: Optional[str], weave_entity: str, weave_project: str
-) -> None:
+def check_wandb_run_matches(wandb_run_id: Optional[str], weave_entity: str, weave_project: str) -> None:
     if wandb_run_id:
         # ex: "entity/project/run_id"
         wandb_entity, wandb_project, _ = wandb_run_id.split("/")
