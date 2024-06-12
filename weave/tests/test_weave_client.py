@@ -250,7 +250,7 @@ def test_calls_delete(client):
     original_calls_delete = client.server.calls_delete
 
     def patched_delete(req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        post_auth_req = tsi.CallsDeleteReqForInsert(
+        post_auth_req = tsi.CallsDeleteReq(
             project_id=req.project_id,
             call_ids=req.call_ids,
             wb_user_id="test-user-id",
@@ -294,7 +294,7 @@ def test_calls_delete_cascade(client):
     original_calls_delete = client.server.calls_delete
 
     def patched_delete(req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        post_auth_req = tsi.CallsDeleteReqForInsert(
+        post_auth_req = tsi.CallsDeleteReq(
             project_id=req.project_id,
             call_ids=req.call_ids,
             wb_user_id="test-user-id",
