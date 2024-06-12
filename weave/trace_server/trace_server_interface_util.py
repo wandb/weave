@@ -90,4 +90,4 @@ def assert_non_null_wb_user_id(obj: typing.Any) -> None:
 
 def assert_null_wb_user_id(obj: typing.Any) -> None:
     if not hasattr(obj, "wb_user_id") or obj.wb_user_id is not None:
-        raise ValueError("wb_user_id must be be None")
+        raise ValueError("wb_user_id must be None")
