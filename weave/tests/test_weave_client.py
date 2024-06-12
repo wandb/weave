@@ -197,7 +197,7 @@ def test_pydantic(client):
 
 
 def test_call_create(client):
-    call = client.create_call("x", None, {"a": 5, "b": 10})
+    call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.call(call.id)
     expected = weave_client.Call(
@@ -217,9 +217,9 @@ def test_call_create(client):
 
 
 def test_calls_query(client):
-    call0 = client.create_call("x", None, {"a": 5, "b": 10})
-    call1 = client.create_call("x", None, {"a": 6, "b": 11})
-    call2 = client.create_call("y", None, {"a": 5, "b": 10})
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call1 = client.create_call("x", {"a": 6, "b": 11})
+    call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
@@ -260,10 +260,10 @@ def test_calls_delete(client):
     # Patch calls_delete with our fake middlewear
     client.server.calls_delete = patched_delete
 
-    call0 = client.create_call("x", None, {"a": 5, "b": 10})
-    call0_child1 = client.create_call("x", call0, {"a": 5, "b": 11})
-    _call0_child2 = client.create_call("x", call0_child1, {"a": 5, "b": 12})
-    call1 = client.create_call("y", None, {"a": 6, "b": 11})
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
+    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
+    call1 = client.create_call("y", {"a": 6, "b": 11})
 
     assert len(list(client.calls())) == 4
 
@@ -352,7 +352,7 @@ def test_call_display_name(client):
     # Patch call_update with our fake middlewear
     client.server.call_update = patched_update
 
-    call0 = client.create_call("x", None, {"a": 5, "b": 10})
+    call0 = client.create_call("x", {"a": 5, "b": 10})
 
     # Rename using the client method
     client.set_call_display_name(call0, "updated_name")
@@ -430,7 +430,7 @@ def test_dataset_calls(client):
         "my-dataset",
     )
     for row in ref.rows:
-        call = client.create_call("x", None, {"a": row["doc"]})
+        call = client.create_call("x", {"a": row["doc"]})
         client.finish_call(call, None)
 
     calls = list(client.calls({"op_name": "x"}))
