@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from weave.trace_server.trace_server_interface import TraceServerInterface
@@ -51,7 +51,7 @@ class Objects(Protocol):
 
 
 @runtime_checkable
-class WeaveApi(Calls, Objects): ...
+class WeaveApi(Calls, Objects, Protocol): ...
 
 
 @dataclass
@@ -95,14 +95,12 @@ class EverythingApi(metaclass=PromoteEmbeddedInterfaceMethodsMeta):
 
 @dataclass
 class Client:
+    """Now client is just a convenient way work with the Weave API."""
+
     entity: str
     project: str
-    api: WeaveApi
+    api: WeaveApi = field(repr=False)
 
-    # TODO: add convenience methods here
+    # TODO: add user-facing convenience methods here; for lower level, reach into api directly
     def get(self, ref): ...
     def save(self, val, name, branch): ...
-
-
-def init_client():
-    api = EverythingApi()
