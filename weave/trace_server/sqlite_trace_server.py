@@ -87,7 +87,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 summary TEXT,
                 wb_user_id TEXT,
                 wb_run_id TEXT,
-                deleted_at TEXT
+                deleted_at TEXT,
+                display_name TEXT
             )
         """
         )
@@ -151,19 +152,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     trace_id,
                     parent_id,
                     op_name,
+                    display_name,
                     started_at,
                     attributes,
                     inputs,
                     input_refs,
                     wb_user_id,
                     wb_run_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
                     req.start.trace_id,
                     req.start.parent_id,
                     req.start.op_name,
+                    req.start.display_name,
                     req.start.started_at.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
@@ -427,6 +430,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     summary=json.loads(row[13]) if row[13] else None,
                     wb_user_id=row[14],
                     wb_run_id=row[15],
+                    display_name=row[17] if row[17] != "" else None,
                 )
                 for row in query_result
             ]
@@ -486,6 +490,19 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conn.commit()
 
         return tsi.CallsDeleteRes()
+
+    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+        if req.display_name is None:
+            raise ValueError("One of [display_name] is required for call update")
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute(
+                "UPDATE calls SET display_name = ? WHERE id = ?",
+                (req.display_name, req.call_id),
+            )
+            conn.commit()
+        return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()

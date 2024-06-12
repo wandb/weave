@@ -1,10 +1,14 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from contextvars import copy_context
 import dataclasses
 from collections import namedtuple
 import datetime
 import os
 import typing
 import pytest
+from collections import defaultdict
 
 from pydantic import BaseModel, ValidationError
 import wandb
@@ -141,6 +145,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
+        "display_name": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -179,6 +184,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "deleted_at": None,
+        "display_name": None,
     }
 
 
@@ -1537,6 +1543,473 @@ def test_single_primitive_output(client):
     assert inner_res.calls[1].output == True
     assert inner_res.calls[2].output == None
     assert inner_res.calls[3].output == {"a": 1, "b": True, "c": None}
+
+
+def map_simple(fn, vals):
+    return [fn(v) for v in vals]
+
+
+max_workers = 3
+
+# This is a standard way to execute a map operation with thread executor.
+def map_with_thread_executor(fn, vals):
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(fn, vals)
+
+
+# This is how Langchain executes batches (with a manual context copy)
+def map_with_copying_thread_executor(fn, vals):
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        contexts = [copy_context() for _ in range(len(vals))]
+
+        def _wrapped_fn(*args):
+            return contexts.pop().run(fn, *args)
+
+        executor.map(_wrapped_fn, vals)
+
+
+# TODO: Make an async version of this
+@pytest.mark.parametrize(
+    "mapper",
+    [
+        map_simple,
+        # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
+        map_with_copying_thread_executor,
+    ],
+)
+def test_mapped_execution(client, mapper):
+    import time
+
+    events = []
+
+    @weave.op()
+    def op_a(a: int) -> int:
+        events.append("A(S):" + str(a))
+        time.sleep(0.3)
+        events.append("A(E):" + str(a))
+        return a
+
+    @weave.op()
+    def op_b(b: int) -> int:
+        events.append("B(S):" + str(b))
+        time.sleep(0.2)
+        res = op_a(b)
+        events.append("B(E):" + str(b))
+        return res
+
+    @weave.op()
+    def op_c(c: int) -> int:
+        events.append("C(S):" + str(c))
+        time.sleep(0.1)
+        res = op_b(c)
+        events.append("C(E):" + str(c))
+        return res
+
+    @weave.op()
+    def op_mapper(vals):
+        return mapper(op_c, vals)
+
+    map_vals = list(range(12))
+    first_val = map_vals[0]
+    last_val = map_vals[-1]
+    middle_vals = map_vals[1:-1]
+    split = len(middle_vals) // 2
+    middle_vals_outer = middle_vals[:split]
+    middle_vals_inner = middle_vals[split:]
+    op_c(first_val)
+    mapper(op_c, middle_vals_outer)
+    op_mapper(middle_vals_inner)
+    op_c(last_val)
+
+    # Make sure that the events are in the right (or wrong!) order
+    sequential_expected_order = []
+    for i in map_vals:
+        for event in ["S", "E"]:
+            order = ["A", "B", "C"]
+            if event == "S":
+                order = order[::-1]
+            for op in order:
+                sequential_expected_order.append(f"{op}({event}):{i}")
+    if mapper == map_simple:
+        assert events == sequential_expected_order
+    else:
+        assert events != sequential_expected_order
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(inner_res.calls) == (len(map_vals) * 3) + 1
+
+    # Now, we want to assert that the calls are in the right topological order - while
+    # it is possible that their timestamps are not in order
+    # First some helpers:
+    roots = [c for c in inner_res.calls if c.parent_id is None]
+
+    def assert_input_of_call(call, input_val):
+        assert call.inputs == input_val
+
+    def get_children_of_call(call):
+        return [c for c in inner_res.calls if c.parent_id == call.id]
+
+    def assert_valid_trace(root_call, val):
+        assert_input_of_call(root_call, {"c": val})
+        children = get_children_of_call(root_call)
+        assert len(children) == 1
+        assert_input_of_call(children[0], {"b": val})
+        children = get_children_of_call(children[0])
+        assert len(children) == 1
+        assert_input_of_call(children[0], {"a": val})
+
+    def assert_valid_batched_trace(root_call):
+        val = int(root_call.inputs["c"])
+        assert_valid_trace(root_call, val)
+
+    # First, ensure that there are 5 roots
+    assert len(roots) == 3 + len(middle_vals_outer)
+
+    # Now we can validate the shape of the calls within their traces.
+    # The first and last roots are not batched and therefore deterministic
+    # The middle 3 roots are batched and therefore non-deterministic
+    root_ndx = 0
+    assert_valid_trace(roots[root_ndx], first_val)
+    root_ndx += 1
+    for outer in middle_vals_outer:
+        assert_valid_trace(roots[root_ndx], outer)
+        root_ndx += 1
+
+    children = get_children_of_call(roots[root_ndx])
+    root_ndx += 1
+    assert len(children) == len(middle_vals_inner)
+    for child in children:
+        assert_valid_batched_trace(child)
+    assert_valid_trace(roots[root_ndx], last_val)
+
+
+def call_structure(calls):
+    parent_to_children_map = defaultdict(list)
+    roots = []
+    for call in calls:
+        parent_to_children_map[call.parent_id].append(call.id)
+        if call.parent_id is None:
+            roots.append(call.id)
+
+    found_structure = {}
+
+    def build_structure(parent_id):
+        if parent_id is None:
+            return {}
+        children = parent_to_children_map[parent_id]
+        return {child: build_structure(child) for child in children}
+
+    for root in roots:
+        found_structure[root] = build_structure(root)
+
+    return found_structure
+
+
+def test_call_stack_order_implicit_depth_first(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+
+    # This version of the call sequence matches the happy path
+    # without any out-of-order calls
+    call_1 = client.create_call("op", None, {})
+    call_2 = client.create_call("op", None, {})
+    call_3 = client.create_call("op", None, {})
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", None, {})
+    client.finish_call(call_4)
+    client.finish_call(call_2)
+    call_5 = client.create_call("op", None, {})
+    call_6 = client.create_call("op", None, {})
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", None, {})
+    client.finish_call(call_7)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_explicit_depth_first(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This version of the call sequence matches the happy path
+    # without any out-of-order calls, but with explicit parentage
+    # specified.
+    call_1 = client.create_call("op", None, {})
+    call_2 = client.create_call("op", call_1, {})
+    call_3 = client.create_call("op", call_2, {})
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", call_2, {})
+    client.finish_call(call_4)
+    client.finish_call(call_2)
+    call_5 = client.create_call("op", call_1, {})
+    call_6 = client.create_call("op", call_5, {})
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", call_5, {})
+    client.finish_call(call_7)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_langchain_batch(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This sequence is pretty much exactly what langchain does when handling
+    # a batch of calls. Specifically (prompt | llm).batch([1,2])
+    call_1 = client.create_call("op", None, {})  # <- Implicit Parent, no stack = root
+    call_2 = client.create_call("op", call_1, {})  # <- RunnableSequence1
+    call_5 = client.create_call("op", call_1, {})  # <- RunnableSequence2
+    call_3 = client.create_call("op", call_2, {})  # <- Prompt1
+    client.finish_call(call_3)
+    call_4 = client.create_call("op", call_2, {})  # <- LLM1
+    call_4gpt = client.create_call("op", None, {})  # <- Openai
+    client.finish_call(call_4gpt)
+    client.finish_call(call_4)
+    call_6 = client.create_call("op", call_5, {})  # <- Prompt2
+    client.finish_call(call_6)
+    call_7 = client.create_call("op", call_5, {})  # <- LLM2
+    call_7gpt = client.create_call("op", None, {})  # <- Openai
+    client.finish_call(call_7gpt)
+    client.finish_call(call_7)
+    client.finish_call(call_2)
+    client.finish_call(call_5)
+    client.finish_call(call_1)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {call_4gpt.id: {}}},
+            call_5.id: {call_6.id: {}, call_7.id: {call_7gpt.id: {}}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+POP_REORDERS_STACK = False
+
+
+def test_call_stack_order_out_of_order_pop(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering is a specifically challenging case where we return to
+    # a parent that that was not the top of stack
+    call_1 = client.create_call("op", None, {})
+    call_2 = client.create_call("op", None, {})
+    call_3 = client.create_call("op", None, {})
+    # Purposely swap 4 & 5
+    call_5 = client.create_call("op", call_1, {})  # <- Explicit Parent (call_1)
+    call_4 = client.create_call("op", call_2, {})  # <- Explicit Parent (call_2)
+    call_6 = client.create_call("op", call_5, {})  # <- Explicit Parent (call_5)
+    client.finish_call(call_6)  # <- Finish call_6
+    # (should change stack to call_6.parent which is call_5)
+    call_7 = client.create_call("op", None, {})  # <- Implicit Parent (call_5)
+    # (current stack implementation will think this is 4)
+
+    # Finish them in completely reverse order, because why not?
+    client.finish_call(call_1)
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+    client.finish_call(call_5)
+    client.finish_call(call_7)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    if POP_REORDERS_STACK:
+        # In my (Tim) opinion, this is the correct ordering.
+        # However, the current implementation results in the
+        # "else" branch here. The key difference is when we
+        # finish call_6. Since call_6 was started immediately after
+        # call_4, we currently will believe the top of the stack is
+        # call_4. However, call_6's parent is call_5, so in my
+        # opinion, we should pop the stack back to call_5. We
+        # can debate this more and change the test/implementation
+        # as needed.
+        exp = {
+            call_1.id: {
+                call_2.id: {call_3.id: {}, call_4.id: {}},
+                call_5.id: {call_6.id: {}, call_7.id: {}},
+            },
+            terminal_root_call.id: {},
+        }
+    else:
+        exp = {
+            call_1.id: {
+                call_2.id: {call_3.id: {}, call_4.id: {call_7.id: {}}},
+                call_5.id: {
+                    call_6.id: {},
+                },
+            },
+            terminal_root_call.id: {},
+        }
+
+    assert call_structure(inner_res.calls) == exp
+
+
+def test_call_stack_order_height_ordering(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering calls ops in the order of their height in the tree
+    call_1 = client.create_call("op", None, {})
+    call_2 = client.create_call("op", call_1, {})
+    call_5 = client.create_call("op", call_1, {})
+    call_3 = client.create_call("op", call_2, {})
+    call_6 = client.create_call("op", call_5, {})
+    call_4 = client.create_call("op", call_2, {})
+    call_7 = client.create_call("op", call_5, {})
+
+    # Finish them in completely reverse order
+    client.finish_call(call_1)
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+    client.finish_call(call_5)
+    client.finish_call(call_7)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_2.id: {call_3.id: {}, call_4.id: {}},
+            call_5.id: {call_6.id: {}, call_7.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
+
+
+def test_call_stack_order_mixed(client):
+    # Note: There is a debate going on about if the client should
+    # be responsible for enforcing the call stack order (vs having)
+    # another object that is responsible for this. This test is
+    # written with the assumption that the client is responsible
+    # for enforcing the call stack order. However, it is plausible
+    # that we change this. If so, then this test will need to both
+    # `create_call` and `push_call` effectively. Same with finish_call
+    #
+    #
+    # This ordering is as mixed up as I could make it
+    call_1 = client.create_call("op", None, {})
+    call_5 = client.create_call("op", call_1, {})
+    call_7 = client.create_call("op", call_5, {})
+    client.finish_call(call_7)
+    call_6 = client.create_call("op", call_5, {})
+    client.finish_call(call_5)
+    call_2 = client.create_call("op", call_1, {})
+    client.finish_call(call_1)
+    call_4 = client.create_call("op", call_2, {})
+    call_3 = client.create_call("op", call_2, {})
+    client.finish_call(call_2)
+    client.finish_call(call_3)
+    client.finish_call(call_4)
+
+    terminal_root_call = client.create_call("op", None, {})
+    client.finish_call(terminal_root_call)
+
+    inner_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert call_structure(inner_res.calls) == {
+        call_1.id: {
+            call_5.id: {call_7.id: {}, call_6.id: {}},
+            call_2.id: {call_4.id: {}, call_3.id: {}},
+        },
+        terminal_root_call.id: {},
+    }
 
 
 def test_sort_through_refs(client):

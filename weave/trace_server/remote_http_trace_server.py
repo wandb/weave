@@ -103,8 +103,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth: t.Optional[t.Tuple[str, str]] = None
 
     def ensure_project_exists(self, entity: str, project: str) -> None:
-        # TODO: This should happen in the wandb backend, not here, and its slow
-        # (hundres of ms)
+        # TODO: This should happen in the wandb backend, not here, and it's slow
+        # (hundreds of ms)
         project_creator.ensure_project_exists(entity, project)
 
     @classmethod
@@ -280,6 +280,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsDeleteRes:
         return self._generic_request(
             "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
+        )
+
+    def call_update(
+        self, req: t.Union[tsi.CallUpdateReq, t.Dict[str, t.Any]]
+    ) -> tsi.CallUpdateRes:
+        return self._generic_request(
+            "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
         )
 
     # Op API
