@@ -10,7 +10,7 @@ import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CostTable} from './CostTable';
 import {UsageData} from './TraceUsageStats';
 
-const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = ['_latency_s', 'usage'];
+const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = ['latency_s', 'usage'];
 
 export const CallSummary: React.FC<{
   call: CallSchema;
