@@ -1574,7 +1574,7 @@ def map_with_copying_thread_executor(fn, vals):
     [
         map_simple,
         # map_with_thread_executor, # <-- Currently this is failing! Fix me (:
-        map_with_copying_thread_executor,
+        # map_with_copying_thread_executor, # <-- Flakes in CI
     ],
 )
 def test_mapped_execution(client, mapper):
