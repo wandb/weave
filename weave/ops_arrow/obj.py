@@ -1,8 +1,7 @@
-from ..decorator_arrow_op import arrow_op
-from .. import weave_types as types
-from ..ops_primitives import obj as primitives_obj
-
-from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave import weave_types as types
+from weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave.decorator_arrow_op import arrow_op
+from weave.ops_primitives import obj as primitives_obj
 
 
 @arrow_op(

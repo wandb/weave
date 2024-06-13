@@ -3,16 +3,12 @@ import typing
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from ..arrow.arrow import offsets_starting_at_zero
-
-from ..api import op
-from ..decorator_arrow_op import arrow_op
-from .. import weave_types as types
-
-from ..arrow.list_ import ArrowWeaveList, ArrowWeaveListType
-from ..arrow.arrow import ArrowWeaveListType
-from . import util
-
+from weave import weave_types as types
+from weave.api import op
+from weave.arrow.arrow import ArrowWeaveListType, offsets_starting_at_zero
+from weave.arrow.list_ import ArrowWeaveList, ArrowWeaveListType
+from weave.decorator_arrow_op import arrow_op
+from weave.ops_arrow import util
 
 ARROW_WEAVE_LIST_STRING_TYPE = ArrowWeaveListType(types.String())
 ARROW_WEAVE_LIST_BOOLEAN_TYPE = ArrowWeaveListType(types.Boolean())

@@ -1,13 +1,13 @@
 import typing
+
 import pyarrow as pa
 from pyarrow import compute as pc
 
-from .. import weave_types as types
-from ..decorator_arrow_op import arrow_op
-from ..language_features.tagging import tagged_value_type
-
-from ..arrow.arrow import ArrowWeaveListType, arrow_as_array
-from ..arrow.list_ import ArrowWeaveList
+from weave import weave_types as types
+from weave.arrow.arrow import ArrowWeaveListType, arrow_as_array
+from weave.arrow.list_ import ArrowWeaveList
+from weave.decorator_arrow_op import arrow_op
+from weave.language_features.tagging import tagged_value_type
 
 
 def _arrowweavelistlist_listindex_output_type(input_types):
@@ -70,7 +70,7 @@ def listindex(self, index):
 
 def _list_op_output_object_type(input_types):
     self_type = input_types["self"]
-    from .. import op_def
+    from weave import op_def
 
     def _remove_tags(t):
         if isinstance(t, tagged_value_type.TaggedValueType):
@@ -304,7 +304,7 @@ def list_not_equal(self, other):
 
 
 def _vectorized_dropna_object_type(
-    outer_object_type: typing.Union[types.List, ArrowWeaveListType, types.UnionType]
+    outer_object_type: typing.Union[types.List, ArrowWeaveListType, types.UnionType],
 ) -> types.Type:
     outer_is_optional = types.is_optional(outer_object_type)
     if outer_is_optional:

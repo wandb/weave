@@ -1,15 +1,17 @@
 import typing
+
 import pyarrow as pa
 from pyarrow import compute as pc
-from .. import weave_types as types
-from .. import graph
+
+from weave import graph
+from weave import weave_types as types
 
 
 # Reimplementation of Weave0 `toSafeCall` which
 # converts media to their digest
 def _to_compare_safe_call(node: graph.OutputNode) -> graph.OutputNode:
-    from ..ops_primitives.dict import dict_
-    from ..ops_domain.wbmedia import ArtifactAssetType
+    from weave.ops_domain.wbmedia import ArtifactAssetType
+    from weave.ops_primitives.dict import dict_
 
     node_type = types.non_none(node.type)
     if ArtifactAssetType.assign_type(node_type):

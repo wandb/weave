@@ -1,22 +1,26 @@
 import typing
+
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from ..ops_primitives import list_ as primitive_list
-from .. import weave_types as types
-from ..language_features.tagging import tagged_value_type
-from ..api import op
-from .. import graph
-from .. import engine_trace
-
-from ..arrow import convert
-from ..arrow.arrow import (
+from weave import engine_trace, graph
+from weave import weave_types as types
+from weave.api import op
+from weave.arrow import convert
+from weave.arrow.arrow import (
     ArrowWeaveListType,
     safe_coalesce,
 )
-from ..arrow.arrow_tags import pushdown_list_tags
-from ..arrow.list_ import ArrowWeaveList, make_vec_dict, make_vec_taggedvalue, awl_zip
+from weave.arrow.arrow_tags import pushdown_list_tags
+from weave.arrow.list_ import (
+    ArrowWeaveList,
+    awl_zip,
+    make_vec_dict,
+    make_vec_taggedvalue,
+)
+from weave.language_features.tagging import tagged_value_type
+from weave.ops_primitives import list_ as primitive_list
 
 tracer = engine_trace.tracer()  # type: ignore
 

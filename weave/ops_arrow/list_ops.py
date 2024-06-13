@@ -1,39 +1,40 @@
 import random
-import pyarrow as pa
-import pyarrow.compute as pc
-import numpy as np
 import typing
 from builtins import map as builtin_map
-
-from ..api import op, type_of
-from ..decorator_arrow_op import arrow_op
-from .. import weave_types as types
-from ..language_features.tagging import (
-    tagged_value_type,
-    tagged_value_type_helpers,
-)
 from collections import defaultdict
-from .. import op_args
-from ..ops_primitives import list_ as primitive_list
-from .. import op_def
 
-from ..arrow.arrow import ArrowWeaveListType, arrow_as_array, offsets_starting_at_zero
-from ..arrow.list_ import (
+import numpy as np
+import pyarrow as pa
+import pyarrow.compute as pc
+
+from weave import op_args, op_def
+from weave import weave_types as types
+from weave.api import op, type_of
+from weave.arrow import arrow_tags, convert
+from weave.arrow.arrow import (
+    ArrowWeaveListType,
+    arrow_as_array,
+    offsets_starting_at_zero,
+)
+from weave.arrow.concat import concatenate_all
+from weave.arrow.constructors import (
+    vectorized_container_constructor_preprocessor,
+    vectorized_input_types,
+)
+from weave.arrow.convert import to_compare_safe
+from weave.arrow.list_ import (
     ArrowWeaveList,
     PathType,
     is_list_arrowweavelist,
     is_taggedvalue_arrowweavelist,
 )
-from ..arrow import arrow_tags
-from .vectorize import _apply_fn_node_with_tag_pushdown
-from ..arrow import convert
-from ..arrow.convert import to_compare_safe
-from ..arrow.concat import concatenate_all
-from ..arrow.constructors import (
-    vectorized_container_constructor_preprocessor,
-    vectorized_input_types,
+from weave.decorator_arrow_op import arrow_op
+from weave.language_features.tagging import (
+    tagged_value_type,
+    tagged_value_type_helpers,
 )
-
+from weave.ops_arrow.vectorize import _apply_fn_node_with_tag_pushdown
+from weave.ops_primitives import list_ as primitive_list
 
 FLATTEN_DELIMITER = "➡️"
 
@@ -47,7 +48,7 @@ def unflatten_structs_in_flattened_table(table: pa.Table) -> pa.Table:
     """
 
     def recursively_build_nested_struct_array(
-        columns: dict[str, pa.Array]
+        columns: dict[str, pa.Array],
     ) -> pa.StructArray:
         result: NestedTableColumns = defaultdict(lambda: {})
         for colname in columns:
@@ -267,9 +268,7 @@ def _sort_values_list_array_to_table(
 ) -> pa.Table:
     flattened = sort_values._arrow_data_asarray_no_tags().flatten()
 
-    columns = (
-        []
-    )  # this is intended to be a pylist and will be small since it is number of sort fields
+    columns = []  # this is intended to be a pylist and will be small since it is number of sort fields
     col_len = len(sort_values._arrow_data)
     dir_len = len(col_dirs)
     col_names = [str(i) for i in range(dir_len)]
@@ -960,7 +959,7 @@ def flatten(arr):
 
 
 def _drop_tags_output_type(input_type):
-    from ..op_def import map_type
+    from weave.op_def import map_type
 
     return map_type(
         input_type["arr"],
