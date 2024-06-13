@@ -9,9 +9,12 @@ import datetime
 import json
 import hashlib
 import sqlite3
+from zoneinfo import ZoneInfo
 
+import emoji
 
 from .trace_server_interface_util import (
+    assert_non_null_wb_user_id,
     extract_refs_from_values,
     str_digest,
     bytes_digest,
@@ -20,7 +23,15 @@ from . import trace_server_interface as tsi
 from .interface import query as tsi_query
 
 from weave.trace import refs
+from weave.trace_server.emoji_util import detone_emojis
+from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.feedback import (
+    TABLE_FEEDBACK,
+    validate_feedback_create_req,
+    validate_feedback_purge_req,
+)
 from weave.trace_server.trace_server_interface_util import (
+    generate_id,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from weave.trace_server.refs_internal import (
@@ -29,6 +40,7 @@ from weave.trace_server.refs_internal import (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
 )
+from weave.trace_server.orm import Row
 
 MAX_FLUSH_COUNT = 10000
 MAX_FLUSH_AGE = 15
@@ -61,6 +73,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def drop_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(TABLE_FEEDBACK.drop_sql())
         cursor.execute("DROP TABLE IF EXISTS calls")
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
@@ -133,6 +146,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 val BLOB)
             """
         )
+        cursor.execute(TABLE_FEEDBACK.create_sql())
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -449,6 +463,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        assert_non_null_wb_user_id(req)
         # update row with a deleted_at field set to now
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
@@ -456,12 +471,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 WITH RECURSIVE Descendants AS (
                     SELECT id
                     FROM calls
-                    WHERE project_id = ? AND 
-                        deleted_at IS NULL AND 
+                    WHERE project_id = ? AND
+                        deleted_at IS NULL AND
                         parent_id IN (SELECT id FROM calls WHERE id IN ({}))
-                    
+
                     UNION ALL
-                    
+
                     SELECT c.id
                     FROM calls c
                     JOIN Descendants d ON c.parent_id = d.id
@@ -480,7 +495,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             delete_query = """
                 UPDATE calls
                 SET deleted_at = CURRENT_TIMESTAMP
-                WHERE deleted_at is NULL AND 
+                WHERE deleted_at is NULL AND
                     id IN ({})
             """.format(
                 ", ".join("?" * len(all_ids))
@@ -491,7 +506,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.CallsDeleteRes()
 
-    def call_update(self, req: tsi.CallUpdateReqForInsert) -> tsi.CallUpdateRes:
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        assert_non_null_wb_user_id(req)
         if req.display_name is None:
             raise ValueError("One of [display_name] is required for call update")
 
@@ -693,6 +709,82 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             return val
 
         return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_obj_refs])
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        assert_non_null_wb_user_id(req)
+        validate_feedback_create_req(req)
+
+        # Augment emoji with alias.
+        res_payload = {}
+        if req.feedback_type == "wandb.reaction.1":
+            em = req.payload["emoji"]
+            if emoji.emoji_count(em) != 1:
+                raise InvalidRequest(
+                    "Value of emoji key in payload must be exactly one emoji"
+                )
+            req.payload["alias"] = emoji.demojize(em)
+            detoned = detone_emojis(em)
+            req.payload["detoned"] = detoned
+            req.payload["detoned_alias"] = emoji.demojize(detoned)
+            res_payload = req.payload
+
+        feedback_id = generate_id()
+        created_at = datetime.datetime.now(ZoneInfo("UTC"))
+        # TODO: Any validation on weave_ref?
+        payload = json.dumps(req.payload)
+        MAX_PAYLOAD = 1024
+        if len(payload) > MAX_PAYLOAD:
+            raise InvalidRequest("Feedback payload too large")
+        row: Row = {
+            "id": feedback_id,
+            "project_id": req.project_id,
+            "weave_ref": req.weave_ref,
+            "wb_user_id": req.wb_user_id,
+            "creator": req.creator,
+            "feedback_type": req.feedback_type,
+            "payload": payload,
+            "created_at": created_at,
+        }
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="sqlite")
+            cursor.executemany(prepared.sql, prepared.data)
+            conn.commit()
+        return tsi.FeedbackCreateRes(
+            id=feedback_id,
+            created_at=created_at,
+            wb_user_id=req.wb_user_id,
+            payload=res_payload,
+        )
+
+    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        query = TABLE_FEEDBACK.select()
+        query = query.project_id(req.project_id)
+        query = query.fields(req.fields)
+        query = query.where(req.query)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="sqlite")
+        r = cursor.execute(prepared.sql, prepared.parameters)
+        result = TABLE_FEEDBACK.tuples_to_rows(r.fetchall(), prepared.fields)
+        return tsi.FeedbackQueryRes(result=result)
+
+    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        # TODO: Instead of passing conditions to DELETE FROM,
+        #       should we select matching ids, and then DELETE FROM WHERE id IN (...)?
+        #       This would allow us to return the number of rows deleted, and complain
+        #       if too many things would be deleted.
+        validate_feedback_purge_req(req)
+        conn, cursor = get_conn_cursor(self.db_path)
+        query = TABLE_FEEDBACK.purge()
+        query = query.project_id(req.project_id)
+        query = query.where(req.query)
+        prepared = query.prepare(database_type="sqlite")
+        with self.lock:
+            cursor.execute(prepared.sql, prepared.parameters)
+            conn.commit()
+        return tsi.FeedbackPurgeRes()
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)

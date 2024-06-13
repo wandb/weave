@@ -9,6 +9,7 @@ import {
   GridColumnGroupingModel,
   GridColumnNode,
 } from '@mui/x-data-grid-pro';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
@@ -20,6 +21,10 @@ import {CellValue} from '../../../Browse2/CellValue';
 import {CollapseHeader} from '../../../Browse2/CollapseGroupHeader';
 import {ExpandHeader} from '../../../Browse2/ExpandHeader';
 import {NotApplicable} from '../../../Browse2/NotApplicable';
+import {
+  getTokensAndCostFromUsage,
+  getUsageFromCellParams,
+} from '../CallPage/TraceUsageStats';
 import {CallLink} from '../common/Links';
 import {StatusChip} from '../common/StatusChip';
 import {isRef} from '../common/util';
@@ -165,6 +170,11 @@ function buildCallsTableColumns(
   cols: Array<GridColDef<TraceCallSchema>>;
   colGroupingModel: GridColumnGroupingModel;
 } {
+  // Filters summary.usage. because we add a derived column for tokens and cost
+  const filteredDynamicColumnNames = allDynamicColumnNames.filter(
+    c => !c.startsWith('summary.usage.')
+  );
+
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {
       field: 'op_name',
@@ -254,7 +264,7 @@ function buildCallsTableColumns(
     },
   ];
 
-  const tree = buildTree([...allDynamicColumnNames]);
+  const tree = buildTree([...filteredDynamicColumnNames]);
   let groupingModel: GridColumnGroupingModel = tree.children.filter(
     c => 'groupId' in c
   ) as GridColumnGroup[];
@@ -302,7 +312,7 @@ function buildCallsTableColumns(
     return node;
   }) as GridColumnGroupingModel;
 
-  for (const key of allDynamicColumnNames) {
+  for (const key of filteredDynamicColumnNames) {
     const col: GridColDef<TraceCallSchema> = {
       flex: 1,
       minWidth: 150,
@@ -417,6 +427,38 @@ function buildCallsTableColumns(
     },
   };
   cols.push(startedAtCol);
+
+  cols.push({
+    field: 'derived.tokens',
+    headerName: 'Tokens',
+    width: 100,
+    minWidth: 100,
+    maxWidth: 100,
+    // Should probably have a custom filter here.
+    filterable: false,
+    sortable: false,
+    renderCell: cellParams => {
+      const usage = getUsageFromCellParams(cellParams.row);
+      const {tokens, tokenToolTip} = getTokensAndCostFromUsage(usage);
+      return <Tooltip trigger={<div>{tokens}</div>} content={tokenToolTip} />;
+    },
+  });
+
+  cols.push({
+    field: 'derived.cost',
+    headerName: 'Cost',
+    width: 100,
+    minWidth: 100,
+    maxWidth: 100,
+    // Should probably have a custom filter here.
+    filterable: false,
+    sortable: false,
+    renderCell: cellParams => {
+      const usage = getUsageFromCellParams(cellParams.row);
+      const {cost, costToolTip} = getTokensAndCostFromUsage(usage);
+      return <Tooltip trigger={<div>{cost}</div>} content={costToolTip} />;
+    },
+  });
 
   cols.push({
     field: 'derived.latency',

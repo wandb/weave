@@ -259,7 +259,7 @@ def log_run(
     client = graph_client_context.require_graph_client()
     parent_run = run_context.get_current_run()
     # TODO: client should not need refs passed in.
-    run = client.create_call(call_name, parent_run, inputs)
+    run = client.create_call(call_name, inputs, parent_run)
 
     def finish_run(output: Any) -> None:
         # TODO: client should not need refs passed in.
