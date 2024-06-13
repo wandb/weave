@@ -266,7 +266,7 @@ def output_of(obj: typing.Any) -> typing.Optional[_weave_client.Call]:
     if ref is None:
         return ref
 
-    return client.ref_output_of(ref)
+    return client._ref_output_of(ref)
 
 
 def as_op(fn: typing.Callable) -> Op:

@@ -1,26 +1,20 @@
-import typing
-from typing import Iterable, Sequence, Optional
-import weakref
+import functools
 import hashlib
 import json
-import functools
+import typing
+import weakref
+from typing import Iterable, Optional, Sequence
 
-from . import uris
-from . import box
-from . import errors
-from . import graph_client_context
+from . import box, context_state, errors, graph_client_context, object_context, uris
 from . import weave_types as types
-from . import object_context
-from . import context_state
 from .language_features.tagging import tag_store
 
 # We store Refs here if we can't attach them directly to the object
 REFS: weakref.WeakValueDictionary[int, "Ref"] = weakref.WeakValueDictionary()
 
 if typing.TYPE_CHECKING:
+    from . import run, weave_client
     from . import weave_types as types
-    from . import run
-    from . import weave_client
 
 
 def _map_to_ref_strs(obj: typing.Any) -> typing.Any:
@@ -82,9 +76,7 @@ class Ref:
                 with context_state.ref_tracking(True):
                     obj = outer_obj._lookup_path(self.extra)  # type: ignore
             except AttributeError:
-                raise errors.WeaveInternalError(
-                    f"Ref has extra {self.extra} but object of type {type(outer_obj)} does not support _lookup_path"
-                )
+                raise errors.WeaveInternalError(f"Ref has extra {self.extra} but object of type {type(outer_obj)} does not support _lookup_path")
 
         # Don't put a ref if the object is tagged, it leads to failures in a couple
         # of the test_arrow.py tests. I don't have the exact rationale, but it's something
@@ -149,9 +141,7 @@ class Ref:
     def without_extra(self, new_type: typing.Optional[types.Type]) -> "Ref":
         raise NotImplementedError
 
-    def with_extra(
-        self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]
-    ) -> "Ref":
+    def with_extra(self, new_type: typing.Optional[types.Type], obj: typing.Any, extra: list[str]) -> "Ref":
         raise NotImplementedError
 
     def __str__(self) -> str:
@@ -159,11 +149,11 @@ class Ref:
 
     def input_to(self) -> Sequence["weave_client.Call"]:
         client = graph_client_context.require_graph_client()
-        return client.ref_input_to(self)
+        return client._ref_input_to(self)
 
     def value_input_to(self) -> Sequence["weave_client.Call"]:
         client = graph_client_context.require_graph_client()
-        return client.ref_value_input_to(self)
+        return client._ref_value_input_to(self)
 
 
 def get_ref(obj: typing.Any) -> typing.Optional[Ref]:

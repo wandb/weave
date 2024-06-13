@@ -632,13 +632,13 @@ class WeaveClient:
         elif isinstance(obj, Op):
             self._save_op(obj)
 
-    def ref_input_to(self, ref: "ref_base.Ref") -> Sequence[Call]:
+    def _ref_input_to(self, ref: "ref_base.Ref") -> Sequence[Call]:
         raise NotImplementedError()
 
-    def ref_value_input_to(self, ref: "ref_base.Ref") -> list[Call]:
+    def _ref_value_input_to(self, ref: "ref_base.Ref") -> list[Call]:
         raise NotImplementedError()
 
-    def ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
+    def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
         raise NotImplementedError()
 
     def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
