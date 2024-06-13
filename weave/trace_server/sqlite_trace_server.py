@@ -450,6 +450,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> t.Iterator[tsi.CallSchema]:
+        return iter(self.calls_query(req).calls)
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         calls = self.calls_query(
             tsi.CallsQueryReq(
