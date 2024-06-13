@@ -1,13 +1,14 @@
 from typing import List, Optional
 
-from .. import monitor
 from openai.types.chat import (
     ChatCompletion,
     ChatCompletionMessage,
     ChatCompletionMessageParam,
 )
 from pydantic import BaseModel, Field
-from ... import weave_types as types
+
+from weave import weave_types as types
+from weave.monitoring import monitor
 
 
 class ModelTokensConfig(BaseModel):

@@ -6,20 +6,21 @@ import contextvars
 import dataclasses
 import datetime
 import inspect
+import logging
 import sys
 import typing
 import uuid
-import logging
 
-
-from ..wandb_interface.wandb_stream_table import StreamTable
-from .. import errors
-from .. import graph
-from .. import stream_data_interfaces
-from .. import graph_client_context
-from .. import run_context
-from .. import run_streamtable_span
-from ..trace import context as trace_context
+from weave import (
+    errors,
+    graph,
+    graph_client_context,
+    run_context,
+    run_streamtable_span,
+    stream_data_interfaces,
+)
+from weave.trace import context as trace_context
+from weave.wandb_interface.wandb_stream_table import StreamTable
 
 logger = logging.getLogger(__name__)
 

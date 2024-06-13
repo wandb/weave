@@ -1,10 +1,10 @@
 __all__ = ["patch", "unpatch"]
 
 import functools
+import typing
 from contextlib import contextmanager
 from functools import partialmethod
-from typing import Callable, Type, Union, AsyncIterator
-import typing
+from typing import AsyncIterator, Callable, Type, Union
 
 import openai
 from openai import AsyncStream, Stream
@@ -12,11 +12,10 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from packaging import version
 
 from weave import graph_client_context, run_context
+from weave.monitoring.monitor import _get_global_monitor
+from weave.monitoring.openai.models import *
+from weave.monitoring.openai.util import *
 from weave.trace.op import Op
-
-from ..monitor import _get_global_monitor
-from .models import *
-from .util import *
 
 old_create = openai.resources.chat.completions.Completions.create
 old_async_create = openai.resources.chat.completions.AsyncCompletions.create
@@ -200,7 +199,6 @@ class ChatCompletions:
             raise ValueError("messages must be a list")
 
         with log_run(create_op, named_args) as finish_run:
-
             base_stream = self._base_create(*args, **kwargs)
             stream = WeaveStream(
                 base_stream=base_stream,
