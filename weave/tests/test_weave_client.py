@@ -366,7 +366,7 @@ def test_call_display_name(client):
 
     # delete the display name
     call0 = result[0]
-    client.remove_call_display_name(call0)
+    client._remove_call_display_name(call0)
     call0 = client.call(call0.id)
     assert call0.display_name == None
 
@@ -874,7 +874,7 @@ def test_isinstance_checks(client):
 
     b = PydanticObjB(a=PydanticObjA(x={"y": [1, "j", True, None]}))
 
-    client.save_nested_objects(b)
+    client._save_nested_objects(b)
 
     assert isinstance(b, PydanticObjB)
     a = b.a

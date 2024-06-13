@@ -295,7 +295,7 @@ class WeaveClient:
     # is nicer for clients I think?
     @trace_sentry.global_trace_sentry.watch()
     def save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        self.save_nested_objects(val, name=name)
+        self._save_nested_objects(val, name=name)
         return self._save_object(val, name, branch)
 
     def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
@@ -468,7 +468,7 @@ class WeaveClient:
         else:
             op_str = op
 
-        self.save_nested_objects(inputs)
+        self._save_nested_objects(inputs)
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
@@ -521,7 +521,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _finish_call(self, call: Call, output: Any = None, exception: Optional[BaseException] = None) -> None:
-        self.save_nested_objects(output)
+        self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
         call.output = output
@@ -599,22 +599,22 @@ class WeaveClient:
             )
         )
 
-    def remove_call_display_name(self, call: Call) -> None:
+    def _remove_call_display_name(self, call: Call) -> None:
         self._set_call_display_name(call, None)
 
-    def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
+    def _save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
             return
         if isinstance(obj, pydantic.BaseModel):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
-                self.save_nested_objects(v)
+                self._save_nested_objects(v)
             ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
         elif dataclasses.is_dataclass(obj):
             obj_rec = dataclass_object_record(obj)
             for v in obj_rec.__dict__.values():
-                self.save_nested_objects(v)
+                self._save_nested_objects(v)
             ref = self._save_object(obj_rec, name or get_obj_name(obj_rec))
             obj.__dict__["ref"] = ref
         elif isinstance(obj, Table):
@@ -622,13 +622,13 @@ class WeaveClient:
             obj.ref = table_ref
         elif isinstance_namedtuple(obj):
             for v in obj._asdict().values():
-                self.save_nested_objects(v)
+                self._save_nested_objects(v)
         elif isinstance(obj, (list, tuple)):
             for v in obj:
-                self.save_nested_objects(v)
+                self._save_nested_objects(v)
         elif isinstance(obj, dict):
             for v in obj.values():
-                self.save_nested_objects(v)
+                self._save_nested_objects(v)
         elif isinstance(obj, Op):
             self._save_op(obj)
 
@@ -647,10 +647,10 @@ class WeaveClient:
     def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError()
 
-    def op_runs(self, op_def: Op) -> Sequence[Call]:
+    def _op_runs(self, op_def: Op) -> Sequence[Call]:
         raise NotImplementedError()
 
-    def ref_uri(self, name: str, version: str, path: str) -> str:
+    def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
     def __repr__(self) -> str:

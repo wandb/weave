@@ -247,7 +247,7 @@ def ref(location: str) -> _weave_client.ObjectRef:
             version = "latest"
         else:
             name, version = location.split(":")
-        location = str(client.ref_uri(name, version, "obj"))
+        location = str(client._ref_uri(name, version, "obj"))
 
     uri = _weave_client.parse_uri(location)
     if not isinstance(uri, _weave_client.ObjectRef):
