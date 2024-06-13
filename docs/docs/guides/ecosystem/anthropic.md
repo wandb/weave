@@ -14,12 +14,13 @@ It’s important to store traces of LLM applications in a central database, both
 Weave will automatically capture traces for [anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python). You can use the library as usual, start by calling `weave.init()`:
 
 ```python
-    import weave
-    weave.init("anthropic_project")
-    
+    import weave    
     # use the anthropic library as usual
     import os
     from anthropic import Anthropic
+
+    # highlight-next-line
+    weave.init("anthropic_project")
 
     client = Anthropic(
         api_key=os.environ.get("ANTHROPIC_API_KEY"),
@@ -55,6 +56,16 @@ Weave will now track and log all LLM calls made through Anthropic. You can view 
 Weave ops make results *reproducible* by automatically versioning code as you experiment, and they capture their inputs and outputs. Simply create a function decorated with [`@weave.op()`](https://wandb.github.io/weave/guides/tracking/ops) that calls into [`Anthropic.messages.create`](https://docs.anthropic.com/en/api/messages-examples) and Weave will track the inputs and outputs for you. Let's see how we can do this in nested example:
 
 ```python
+import weave
+import os
+from anthropic import Anthropic
+
+# highlight-next-line
+weave.init("anthropic_project")
+client = Anthropic(
+    api_key=os.environ.get("ANTHROPIC_API_KEY"),
+)
+
 # highlight-next-line
 @weave.op()
 def call_anthropic(user_input:str, model:str) -> str:
