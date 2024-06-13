@@ -32,6 +32,8 @@ from weave.trace_server import (
     sqlite_trace_server,
     trace_server_interface,
     remote_http_trace_server,
+    external_to_internal_trace_server_adapter,
+    clickhouse_trace_server_batched,
 )
 from weave import weave_init
 
@@ -311,6 +313,26 @@ def strict_op_saving():
 #     )
 
 
+class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
+    def convert_ext_to_int_project_id(self, project_id: str) -> str:
+        return "___".join(project_id.split("/"))
+
+    def convert_int_to_ext_project_id(self, project_id: str) -> str:
+        return "/".join(project_id.split("___"))
+
+    # def convert_ext_to_int_run_id(self, run_id: str) -> str:
+    #     return run_id
+
+    # def convert_int_to_ext_run_id(self, run_id: str) -> str:
+    #     return run_id
+
+    # def convert_ext_to_int_user_id(self, user_id: str) -> str:
+    #     return user_id
+
+    # def convert_int_to_ext_user_id(self, user_id: str) -> str:
+    #     return user_id
+
+
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     inited_client = None
@@ -322,7 +344,9 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         )
         sql_lite_server.drop_tables()
         sql_lite_server.setup_tables()
-        tsi = sql_lite_server
+        tsi = external_to_internal_trace_server_adapter.ExternalTraceServer(
+            sql_lite_server, DummyIdConverter()
+        )
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
             use_async_insert=False
@@ -330,7 +354,9 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
-        tsi = ch_server
+        tsi = external_to_internal_trace_server_adapter.ExternalTraceServer(
+            ch_server, DummyIdConverter()
+        )
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             weave_server_flag

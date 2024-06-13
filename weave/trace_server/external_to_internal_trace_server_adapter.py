@@ -4,6 +4,7 @@ import abc
 # import json
 # import sys
 from typing import Callable, Iterator, TypeVar
+import typing
 
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
@@ -59,7 +60,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         self._internal_trace_server = internal_trace_server
         self._id_converter = id_converter
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> typing.Any:
         return getattr(self._internal_trace_server, name)
 
     def _apply(self, method: Callable[[A], B], req: A) -> B:
