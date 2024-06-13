@@ -30,7 +30,7 @@ from .tests.trace_server_clickhouse_conftest import *
 
 from weave.trace_server import (
     sqlite_trace_server,
-    trace_server_interface,
+    trace_server_interface as tsi,
     remote_http_trace_server,
     external_to_internal_trace_server_adapter,
     clickhouse_trace_server_batched,
@@ -333,19 +333,48 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
     #     return user_id
 
 
+class TestOnlyUserInjectingExternalTraceServer(
+    external_to_internal_trace_server_adapter.ExternalTraceServer
+):
+    def __init__(
+        self,
+        internal_trace_server: tsi.TraceServerInterface,
+        id_converter: external_to_internal_trace_server_adapter.IdConverter,
+        user_id: str,
+    ):
+        super().__init__(internal_trace_server, id_converter)
+        self._user_id = user_id
+
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        req.start.wb_user_id = self._user_id
+        return super().call_start(req)
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        req.wb_user_id = self._user_id
+        return super().calls_delete(req)
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        req.wb_user_id = self._user_id
+        return super().call_update(req)
+
+    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        req.wb_user_id = self._user_id
+        return super().feedback_create(req)
+
+
 @pytest.fixture()
 def client(request) -> Generator[weave_client.WeaveClient, None, None]:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
-    tsi: trace_server_interface.TraceServerInterface
+    server: tsi.TraceServerInterface
     if weave_server_flag == "sqlite":
         sql_lite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
         )
         sql_lite_server.drop_tables()
         sql_lite_server.setup_tables()
-        tsi = external_to_internal_trace_server_adapter.ExternalTraceServer(
-            sql_lite_server, DummyIdConverter()
+        server = TestOnlyUserInjectingExternalTraceServer(
+            sql_lite_server, DummyIdConverter(), "wb-test-user"
         )
     elif weave_server_flag == "clickhouse":
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
@@ -354,19 +383,19 @@ def client(request) -> Generator[weave_client.WeaveClient, None, None]:
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
         ch_server._run_migrations()
-        tsi = external_to_internal_trace_server_adapter.ExternalTraceServer(
-            ch_server, DummyIdConverter()
+        server = TestOnlyUserInjectingExternalTraceServer(
+            ch_server, DummyIdConverter(), "wb-test-user"
         )
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             weave_server_flag
         )
-        tsi = remote_server
+        server = remote_server
     elif weave_server_flag == ("prod"):
         inited_client = weave_init.init_weave("dev_testing")
 
     if inited_client is None:
-        client = weave_client.WeaveClient("shawn", "test-project", tsi)
+        client = weave_client.WeaveClient("shawn", "test-project", server)
         inited_client = weave_init.InitializedClient(client)
         autopatch.autopatch()
     try:
