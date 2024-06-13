@@ -14,29 +14,29 @@ It’s important to store traces of LLM applications in a central database, both
 Weave will automatically capture traces for [anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python). You can use the library as usual, start by calling `weave.init()`:
 
 ```python
-    import weave    
-    # use the anthropic library as usual
-    import os
-    from anthropic import Anthropic
+import weave    
+# use the anthropic library as usual
+import os
+from anthropic import Anthropic
 
-    # highlight-next-line
-    weave.init("anthropic_project")
+# highlight-next-line
+weave.init("anthropic_project")
 
-    client = Anthropic(
-        api_key=os.environ.get("ANTHROPIC_API_KEY"),
-    )
+client = Anthropic(
+    api_key=os.environ.get("ANTHROPIC_API_KEY"),
+)
 
-    message = client.messages.create(
-        max_tokens=1024,
-        messages=[
-            {
-                "role": "user",
-                "content": "Tell me a joke about a dog",
-            }
-        ],
-        model="claude-3-opus-20240229",
-    )
-    print(message.content)
+message = client.messages.create(
+    max_tokens=1024,
+    messages=[
+        {
+            "role": "user",
+            "content": "Tell me a joke about a dog",
+        }
+    ],
+    model="claude-3-opus-20240229",
+)
+print(message.content)
 ```
 
 
@@ -91,6 +91,51 @@ print(generate_joke("cars"))
 ```
 
 [![anthropic_ops.png](imgs/anthropic_ops.png)](https://wandb.github.io/weave/guides/tracking/ops)
+
+## Create a `Model` for easier experimentation
+
+Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
+
+In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/core-types/evaluations)s.
+
+In the example below, you can experiment with `model` and `temperature`. Every time you change one of these, you'll get a new _version_ of `JokerModel`. 
+
+```python
+import weave    
+# use the anthropic library as usual
+import os
+from anthropic import Anthropic
+weave.init('joker-anthropic')
+
+class JokerModel(weave.Model): # Change to `weave.Model`
+  model: str
+  temperature: float
+  
+  @weave.op()
+  def predict(self, topic): # Change to `predict`
+    client = Anthropic()
+    message = client.messages.create(
+    max_tokens=1024,
+    messages=[
+        {
+            "role": "user",
+            "content": f"Tell me a joke about {topic}",
+        }
+        ],
+        model=self.model,
+        temperature=self.temperature
+    )
+    return message.content[0].text
+
+
+joker = JokerModel(
+    model="claude-3-haiku-20240307",
+    temperature = 0.1)
+result = joker.predict("Chickens and Robots")
+print(result)
+```
+
+[![anthropic_model.png](imgs/anthropic_model.png)](https://wandb.ai/capecape/anthropic_project/weave/calls)
 
 ## Tools (function calling)
 
