@@ -405,7 +405,7 @@ def test_op_display_name(client):
     assert len(result) == 1
     assert not result[0].display_name
 
-    @weave.op(display_name="op name")
+    @weave.op(trace_name="op name")
     def my_op_1():
         return "fake"
 
@@ -414,7 +414,7 @@ def test_op_display_name(client):
     assert len(result) == 2
     assert result[1].display_name == "op name"
 
-    @weave.op(display_name="op name 2")
+    @weave.op(trace_name="op name 2")
     def my_op_2():
         return "fake"
 
