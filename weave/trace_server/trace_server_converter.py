@@ -7,6 +7,7 @@ from . import refs_internal as ri
 A = typing.TypeVar("A")
 B = typing.TypeVar("B")
 
+
 def universal_ext_to_int_ref_converter(
     obj: A, convert_ext_to_int_project_id: typing.Callable[[str], str]
 ) -> A:
@@ -49,6 +50,7 @@ def universal_ext_to_int_ref_converter(
         return obj
 
     return _map_values(obj, mapper)
+
 
 C = typing.TypeVar("C")
 D = typing.TypeVar("D")
@@ -103,9 +105,7 @@ E = typing.TypeVar("E")
 F = typing.TypeVar("F")
 
 
-def _map_values(
-    obj: E, func: typing.Callable[[F], F]
-) -> E:
+def _map_values(obj: E, func: typing.Callable[[F], F]) -> E:
     if isinstance(obj, BaseModel):
         # `by_alias` is required since we have Mongo-style properties in the
         # query models that are aliased to conform to start with `$`. Without

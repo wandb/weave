@@ -201,7 +201,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 response=r,
             )
         r.raise_for_status()
-    
+
     def _generic_request(
         self,
         url: str,
@@ -213,7 +213,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req = req_model.model_validate(req)
         r = self._generic_request_executor(url, req)
         return res_model.model_validate(r.json())
-    
+
     def _generic_stream_request(
         self,
         url: str,
@@ -291,12 +291,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/calls/query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
         )
-    
+
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> t.Iterator[tsi.CallSchema]:
         return self._generic_steam_request(
-            '/calls/stream_query', req, tsi.CallsQueryReq, tsi.CallsQueryRes
+            "/calls/stream_query", req, tsi.CallsQueryReq, tsi.CallsQueryRes
         )
-        
 
     def calls_query_stats(
         self, req: t.Union[tsi.CallsQueryStatsReq, t.Dict[str, t.Any]]
