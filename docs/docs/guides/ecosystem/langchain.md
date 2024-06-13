@@ -61,8 +61,10 @@ import weave
 # highlight-next-line
 weave.init("langchain_demo")
 
+# highlight-next-line
 weave_tracer = WeaveTracer()
 
+# highlight-next-line
 config = {"callbacks": [weave_tracer]}
 
 llm = ChatOpenAI()
@@ -70,6 +72,7 @@ prompt = PromptTemplate.from_template("1 + {number} = ")
 
 llm_chain = prompt | llm
 
+# highlight-next-line
 output = llm_chain.invoke({"number": 2}, config=config)
 
 print(output)
@@ -94,6 +97,7 @@ prompt = PromptTemplate.from_template("1 + {number} = ")
 
 llm_chain = prompt | llm
 
+# highlight-next-line
 with weave_tracing_enabled():
     output = llm_chain.invoke({"number": 2})
 
@@ -128,8 +132,6 @@ Organizing and evaluating LLMs in applications for various use cases is challeng
 The following example demonstrates wrapping a Langchain chain in a `WeaveModel`:
 
 ```python
-
-
 import json
 import asyncio
 
@@ -138,15 +140,16 @@ import weave
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 
-
 # Initialize Weave with your project name
 # highlight-next-line
 weave.init("langchain_demo")
 
+# highlight-next-line
 class ExtractFruitsModel(weave.Model):
     model_name: str
     prompt_template: str
 
+# highlight-next-line
     @weave.op()
     async def predict(self, sentence: str) -> dict:
         llm = ChatOpenAI(model=self.model_name, temperature=0.0)
@@ -160,8 +163,6 @@ class ExtractFruitsModel(weave.Model):
             raise ValueError("No response from model")
         parsed = json.loads(result)
         return parsed
-
-
 
 model = ExtractFruitsModel(
     model_name="gpt-3.5-turbo-1106",
@@ -206,9 +207,6 @@ examples = [
     {"id": "1", "sentence": sentences[1], "target": labels[1]},
     {"id": "2", "sentence": sentences[2], "target": labels[2]},
 ]
-
-
-
 
 @weave.op()
 def fruit_name_score(target: dict, model_output: dict) -> dict:
