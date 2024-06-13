@@ -89,7 +89,6 @@ compiled_rag = teleprompter.compile(RAG(), trainset=trainset)
 |---|---|
 | Not tracing the metric function | Tracing the metric function using `@weave.op()` |
 
-
 ## Create a `Model` for easier experimentation
 
 Organizing experimentation is difficult when there are many moving pieces. By using the [`Model`](/guides/core-types/models) class, you can capture and organize the experimental details of your app like your system prompt or the model you're using. This helps organize and compare different iterations of your app. 
@@ -97,6 +96,38 @@ Organizing experimentation is difficult when there are many moving pieces. By us
 In addition to versioning code and capturing inputs/outputs, [`Model`](/guides/core-types/models)s capture structured parameters that control your application’s behavior, making it easy to find what parameters worked best. You can also use Weave Models with `serve`, and [`Evaluation`](/guides/core-types/evaluations)s.
 
 In the example below, you can experiment with `WeaveModel`. Every time you change one of these, you'll get a new _version_ of `WeaveModel`.
+
+```python
+import dspy
+import weave
+
+weave.init(project_name="dspy_rag")
+
+gpt3_turbo = dspy.OpenAI(model='gpt-3.5-turbo-1106', max_tokens=300)
+dspy.configure(lm=gpt3_turbo)
+
+
+class CheckCitationFaithfulness(dspy.Signature):
+    """Verify that the text is based on the provided context."""
+
+    context = dspy.InputField(desc="facts here are assumed to be true")
+    text = dspy.InputField()
+    faithfulness = dspy.OutputField(desc="True/False indicating if text is faithful to context")
+
+
+class WeaveModel(weave.Model):
+    signature: type
+
+    @weave.op()
+    def predict(self, context: str, text: str) -> bool:
+        return dspy.ChainOfThought(self.signature)(context=context, text=text)
+
+context = "The 21-year-old made seven appearances for the Hammers and netted his only goal for them in a Europa League qualification round match against Andorran side FC Lustrains last season. Lee had two loan spells in League One last term, with Blackpool and then Colchester United. He scored twice for the U's but was unable to save them from relegation. The length of Lee's contract with the promoted Tykes has not been revealed. Find all the latest football transfers on our dedicated page."
+text = "Lee scored 3 goals for Colchester United."
+
+model = WeaveModel(signature=CheckCitationFaithfulness)
+print(model.predict(context, text))
+```
 
 | [![dspy_weave_model_v1.png](imgs/dspy/dspy_weave_model_v1.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FKq8TSGXULeiFmLaXJsJkueJd7RQqEX9R7XpGpg7xC2Q%3F%26) | [![dspy_weave_model_v2.png](imgs/dspy/dspy_weave_model_v2.png)](https://wandb.ai/geekyrakshit/dspy_rag/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%2C%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fgeekyrakshit%2Fdspy_rag%2Fop%2FWeaveModel.predict%3A*%22%5D%7D&peekPath=%2Fgeekyrakshit%2Fdspy_rag%2Fobjects%2FWeaveModel%2Fversions%2FsxYxUemiZYVOPCUU2ziMJhk3rvw2QEz7iNqEfXLBqfI%3F%26) |
 |---|---|
