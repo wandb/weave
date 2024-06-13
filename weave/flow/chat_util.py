@@ -1,9 +1,6 @@
 from typing import Iterator, Optional
 
-from openai.types.chat import (
-    ChatCompletionChunk,
-)
-from openai.types.chat import ChatCompletion
+from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 
 class OpenAIStream:
@@ -66,7 +63,16 @@ class OpenAIStream:
 
             # function call
             if chunk_choice.delta.function_call:
-                raise NotImplementedError("Function calls not supported")
+                function_call_delta = chunk_choice.delta.function_call
+                if (
+                    function_call_delta.name is not None
+                    and function_call_delta.arguments is not None
+                ):
+                    function_call = {
+                        "name": function_call_delta.name,
+                        "arguments": function_call_delta.arguments,
+                    }
+                    choice["message"]["function_call"] = function_call
 
             # tool calls
             if chunk_choice.delta.tool_calls:
