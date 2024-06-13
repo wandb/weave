@@ -10,7 +10,7 @@ To iterate on an application, we need a way to evaluate if it's improving. To do
 ### Build a `Model`
 
 `Model`s store and version information about your system, such as prompts, temperatures, and more.
-Weave automatically captures when they are used and update the version when there are changes.
+Weave automatically captures when they are used and updates the version when there are changes.
 
 `Model`s are declared by subclassing `Model` and implementing a `predict` function definition, which takes one example and returns the response.
 
@@ -91,9 +91,9 @@ examples = [
 
 `Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions or `weave.flow.scorer.Scorer` classes.
 
-Here, we'll use a default scoring class `MultiTaskBinaryClassificationF1` and we'll also define our own `fruit_name_score` scoring function.
+Here, we'll use the default scoring class `MultiTaskBinaryClassificationF1` and we'll also define our own `fruit_name_score` scoring function.
 
-Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. The `fruit` key needs to be outputed by the model's predict function and must also be existing as a column in the dataset (or outputed by the `preprocess_model_input` function if defined).
+Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. The `fruit` key needs to be outputted by the model's predict function and must also exist as a column in the dataset (or outputted by the `preprocess_model_input` function if defined).
 
 ```python
 import weave

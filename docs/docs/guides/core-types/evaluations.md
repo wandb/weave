@@ -43,9 +43,9 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 
 ## Create an Evaluation
 
-To systematically improve your application, it's helpful to test your changes against a consistent dataset of potential inputs so that you catch regressions and can inspect your apps behaviour under different conditions. Using the `Evaluation` class, you can be sure you're comparing apples-to-apples by keeping track of all of the details that you're experimenting and evaluating with.
+To systematically improve your application, it's helpful to test your changes against a consistent dataset of potential inputs so that you catch regressions and can inspect your apps behavior under different conditions. Using the `Evaluation` class, you can be sure you're comparing apples-to-apples by keeping track of all of the details that you're experimenting and evaluating with.
 
-Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual ouputs and scores.
+Weave will take each example, pass it through your application and score the output using multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
 
 ### Define an evaluation dataset
 
@@ -55,7 +55,7 @@ First, define a [Dataset](/guides/core-types/datasets) or list of dictionaries w
 
 Then, create a list of scoring functions. These are used to score each example. Each function should have a `model_output` and optionally, other inputs from your examples, and return a dictionary with the scores.
 
-Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the neccessary keys by using a dictionary key based on the argument name.
+Scoring functions need to have a `model_output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
 
 This will take `expected` from the dictionary for scoring.
 
@@ -83,7 +83,7 @@ See the tutorial on defining a `Scorer` class in the next chapter on [Model-Base
 
 ### Define a Model to evaluate
 
-To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in weave.
+To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have attributes that you want to experiment with and capture in Weave.
 
 ```python
 from weave import Model, Evaluation
@@ -105,7 +105,7 @@ evaluation = Evaluation(
 weave.init('intro-example') # begin tracking results with weave
 asyncio.run(evaluation.evaluate(model))
 ```
-This will run `predict` on each example and score the output with each scoring functions.
+This will run `predict` on each example and score the output with each scoring function.
 
 ### Define a function to evaluate
 

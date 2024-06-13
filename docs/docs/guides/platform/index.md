@@ -3,7 +3,7 @@
 Weave is available on [W&B SaaS Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/saas_cloud) which is a multi-tenant, fully-managed platform deployed in W&B's Google Cloud Platform (GCP) account in a North America region.
 
 :::info
-It's coming soon on [W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud). Reach out to your W&B team if that would be of interest in your organization.
+It's coming soon on [W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud). Reach out to your W&B team if that would be of interest to your organization.
 :::
 
 ## Identity & Access Management

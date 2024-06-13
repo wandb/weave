@@ -57,7 +57,7 @@ model.predict('world')
 
 After calling this, you will see that you now have two versions of this Model in the UI, each with different tracked calls.
 
-## Serve models
+## Serving models
 
 To serve a model, you can easily spin up a FastAPI server by calling:
 
@@ -67,7 +67,7 @@ weave serve <your model ref>
 
 For additional instructions, see [serve](/guides/tools/serve).
 
-## Track production calls
+## Tracking production calls
 
 To separate production calls, you can add an additional attribute to the predictions for easy filtering in the UI or API.
 
