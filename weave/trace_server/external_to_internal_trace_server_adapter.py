@@ -1,8 +1,5 @@
 import abc
 
-# import io
-# import json
-# import sys
 from typing import Callable, Iterator, TypeVar
 import typing
 
@@ -10,11 +7,6 @@ from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
 )
-
-# from pydantic import BaseModel
-
-# from . import refs_internal as ri
-
 
 from . import trace_server_interface as tsi
 
