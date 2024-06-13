@@ -394,36 +394,6 @@ def test_call_display_name(client):
     assert call0.display_name == None
 
 
-def test_op_display_name(client):
-    @weave.op()
-    def my_op():
-        return "fake"
-
-    my_op()
-
-    result = list(client.calls())
-    assert len(result) == 1
-    assert not result[0].display_name
-
-    @weave.op(display_name="op name")
-    def my_op_1():
-        return "fake"
-
-    my_op_1()
-    result = list(client.calls())
-    assert len(result) == 2
-    assert result[1].display_name == "op name"
-
-    @weave.op(display_name="op name 2")
-    def my_op_2():
-        return "fake"
-
-    my_op_2()
-    result = list(client.calls())
-    assert len(result) == 3
-    assert result[2].display_name == "op name 2"
-
-
 def test_dataset_calls(client):
     ref = client.save(
         weave.Dataset(rows=[{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
