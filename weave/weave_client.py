@@ -1,59 +1,49 @@
-from collections import namedtuple
-from typing import Any, Sequence, Union, Optional, TypedDict, Dict
 import dataclasses
+import datetime
 import typing
 import uuid
+from collections import namedtuple
+from typing import Any, Dict, Optional, Sequence, TypedDict, Union
+
 import pydantic
-import datetime
-
-
 from requests import HTTPError
-
+from weave import graph_client_context, run_context, trace_sentry, urls
 from weave.exception import exception_to_json_str
 from weave.table import Table
-from weave import trace_sentry, urls
-from weave import run_context
-from weave.trace.op import Op
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
-    pydantic_object_record,
     pydantic_asdict_one_level,
+    pydantic_object_record,
 )
-from weave.trace.serialize import to_json, from_json, isinstance_namedtuple
-from weave import graph_client_context
+from weave.trace.op import Op
+from weave.trace.refs import CallRef, ObjectRef, OpRef, Ref, TableRef, parse_uri
+from weave.trace.serialize import from_json, isinstance_namedtuple, to_json
+from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 from weave.trace_server.trace_server_interface import (
-    CallsDeleteReq,
-    ObjSchema,
-    RefsReadBatchReq,
-    TraceServerInterface,
-    ObjCreateReq,
-    ObjSchemaForInsert,
-    ObjReadReq,
-    StartedCallSchemaForInsert,
-    CallStartReq,
-    CallsQueryReq,
     CallEndReq,
-    EndedCallSchemaForInsert,
     CallSchema,
+    CallsDeleteReq,
+    CallsQueryReq,
+    CallStartReq,
+    CallUpdateReq,
+    EndedCallSchemaForInsert,
+    ObjCreateReq,
     ObjQueryReq,
     ObjQueryRes,
+    ObjReadReq,
+    ObjSchema,
+    ObjSchemaForInsert,
+    RefsReadBatchReq,
+    StartedCallSchemaForInsert,
     TableCreateReq,
-    TableSchemaForInsert,
     TableQueryReq,
-    _TableRowFilter,
+    TableSchemaForInsert,
+    TraceServerInterface,
     _CallsFilter,
     _ObjectVersionFilter,
+    _TableRowFilter,
 )
-from weave.trace.refs import (
-    Ref,
-    ObjectRef,
-    TableRef,
-    CallRef,
-    parse_uri,
-    OpRef,
-)
-from weave.trace.vals import TraceObject, TraceTable, make_trace_obj
 
 if typing.TYPE_CHECKING:
     from . import ref_base
@@ -142,6 +132,7 @@ class Call:
     output: Any = None
     exception: Optional[str] = None
     summary: Optional[dict] = None
+    display_name: Optional[str] = None
     attributes: Optional[dict] = None
     # These are the live children during logging
     _children: list["Call"] = dataclasses.field(default_factory=list)
@@ -170,6 +161,20 @@ class Call:
     def delete(self) -> bool:
         client = graph_client_context.require_graph_client()
         return client.delete_call(call=self)
+
+    def set_display_name(self, name: Optional[str]) -> None:
+        if name == "":
+            raise ValueError(
+                "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."
+            )
+        if name == self.display_name:
+            return
+        client = graph_client_context.require_graph_client()
+        client.set_call_display_name(call=self, display_name=name)
+        self.display_name = name
+
+    def remove_display_name(self) -> None:
+        self.set_display_name(None)
 
 
 class CallsIter:
@@ -228,6 +233,7 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=output,
         summary=server_call.summary,
+        display_name=server_call.display_name,
         attributes=server_call.attributes,
     )
     if call.id is None:
@@ -440,31 +446,25 @@ class WeaveClient:
     def create_call(
         self,
         op: Union[str, Op],
-        parent: Optional[Call],
         inputs: dict,
-        attributes: dict = {},
+        parent: Optional[Call] = None,
+        attributes: Optional[dict] = None,
+        display_name: Optional[str] = None,
+        *,
+        use_stack: bool = True,
     ) -> Call:
-        if parent is None:
-            parent = run_context.get_current_run()
-        call = self.create_call_outside_execution(op, parent, inputs, attributes)
-        run_context.push_call(call)
-        return call
+        """Create, log, and push a call onto the runtime stack.
 
-    @trace_sentry.global_trace_sentry.watch()
-    def create_call_outside_execution(
-        self,
-        op: Union[str, Op],
-        parent: Optional[Call],
-        inputs: dict,
-        attributes: dict = {},
-    ) -> Call:
-        """
-        Create a call without inferring the parent from the current run context,
-        or pushing the call onto the run context stack. This is useful in situations
-        where the information regarding the call is delivered outside of the normal
-        execution flow. For example, in a callback function. In such cases we still
-        want to log the call, but don't want this logging to interfere with the
-        normal stack context.
+        Args:
+            op: The operation producing the call, or the name of an anonymous operation.
+            inputs: The inputs to the operation.
+            parent: The parent call. If parent is not provided, the current run is used as the parent.
+            display_name: The display name for the call. Defaults to None.
+            attributes: The attributes for the call. Defaults to None.
+            use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+
+        Returns:
+            The created Call object.
         """
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -480,12 +480,19 @@ class WeaveClient:
         inputs_with_refs = map_to_refs(inputs)
         call_id = generate_id()
 
+        if parent is None and use_stack:
+            parent = run_context.get_current_run()
+
         if parent:
             trace_id = parent.trace_id
             parent_id = parent.id
         else:
             trace_id = generate_id()
             parent_id = None
+
+        if attributes is None:
+            attributes = {}
+
         call = Call(
             op_name=op_str,
             project_id=self._project_id(),
@@ -493,6 +500,7 @@ class WeaveClient:
             parent_id=parent_id,
             id=call_id,
             inputs=inputs_with_refs,
+            display_name=display_name,
             attributes=attributes,
         )
         if parent is not None:
@@ -504,6 +512,7 @@ class WeaveClient:
             project_id=self._project_id(),
             id=call_id,
             op_name=op_str,
+            display_name=display_name,
             trace_id=trace_id,
             started_at=datetime.datetime.now(tz=datetime.timezone.utc),
             parent_id=parent_id,
@@ -512,6 +521,10 @@ class WeaveClient:
             wb_run_id=current_wb_run_id,
         )
         self.server.call_start(CallStartReq(start=start))
+
+        if use_stack:
+            run_context.push_call(call)
+
         return call
 
     @trace_sentry.global_trace_sentry.watch()
@@ -582,6 +595,24 @@ class WeaveClient:
                 call_ids=[call.id],
             )
         )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def set_call_display_name(
+        self, call: Call, display_name: Optional[str] = None
+    ) -> None:
+        # Removing call display name, use "" for db representation
+        if display_name is None:
+            display_name = ""
+        self.server.call_update(
+            CallUpdateReq(
+                project_id=self._project_id(),
+                call_id=call.id,
+                display_name=display_name,
+            )
+        )
+
+    def remove_call_display_name(self, call: Call) -> None:
+        self.set_call_display_name(call, None)
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:
