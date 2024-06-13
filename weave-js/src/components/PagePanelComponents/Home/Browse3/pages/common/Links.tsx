@@ -17,7 +17,7 @@ import {
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {WFHighLevelObjectVersionFilter} from '../ObjectVersionsPage';
 import {WFHighLevelOpVersionFilter} from '../OpVersionsPage';
-import {CallId} from './CallId';
+import {Id} from './Id';
 
 type LinkVariant = 'primary' | 'secondary';
 
@@ -274,7 +274,7 @@ export const CallLink: React.FC<{
           {opName}
         </Link>
       </LinkTruncater>
-      <CallId callId={props.callId} />
+      <Id id={props.callId} type="Call" />
     </LinkWrapper>
   );
 };

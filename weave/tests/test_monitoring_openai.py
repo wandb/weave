@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import openai
 import pytest
 import pytest_asyncio
-from openai import AsyncStream
+from openai import AsyncStream, Stream
 from openai.types.chat.chat_completion import ChatCompletion, Choice
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceDelta
 from openai.types.chat.chat_completion_chunk import Choice as ChunkChoice
@@ -369,10 +369,52 @@ def teardown():
     unpatch()
 
 
+class MockSyncResponse:
+    """This emulates a synchronous SSE response"""
+
+    def __init__(self, chunks: List):
+        self._chunks = iter(chunks)
+
+    def iter_lines(self):
+        i = 0
+        for chunk in self._chunks:
+            i += 1
+            yield f"data: {chunk.model_dump_json()}\n"
+            yield "\n"
+        yield "data: [DONE]\n"
+        yield "\n"
+
+    def iter_bytes(self):
+        for line in self.iter_lines():
+            yield line.encode("utf-8")
+
+
+class MockStream(Stream):
+    def __init__(self, chunks: List):
+        self._chunks = iter(chunks)
+
+        def process_response_data(*, data: object, **kwargs):
+            return ChatCompletionChunk.model_validate(data)
+
+        def make_sse_decoder():
+            from openai._streaming import SSEDecoder
+
+            return SSEDecoder()
+
+        super().__init__(
+            cast_to=ChatCompletionChunk,
+            client=Mock(
+                _process_response_data=process_response_data,
+                _make_sse_decoder=make_sse_decoder,
+            ),
+            response=MockSyncResponse(chunks),
+        )
+
+
 @pytest.fixture
 def mocked_streaming_create(streaming_chat_completion_messages):
     # Mock the base create method
-    return Mock(return_value=iter(streaming_chat_completion_messages))
+    return Mock(return_value=MockStream(streaming_chat_completion_messages))
 
 
 @pytest_asyncio.fixture

@@ -95,8 +95,8 @@ if not import_failed:
                     # Create a call object.
                     call = gc.create_call(
                         "llama_index." + event_type.name.lower(),
-                        self._call_map.get(parent_id),
                         process_payload(payload),
+                        self._call_map.get(parent_id),
                     )
 
                     # Add the call to the call map.

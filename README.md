@@ -1,5 +1,11 @@
 # **Weave by Weights & Biases**
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](http://wandb.me/weave_colab)
+[![Stable Version](https://img.shields.io/pypi/v/weave?color=green)](https://pypi.org/project/weave)
+[![Download Stats](https://img.shields.io/pypi/dm/weave)](https://pypistats.org/packages/weave)
+[![Github Checks](https://img.shields.io/github/check-runs/wandb/weave/master
+)](https://github.com/wandb/weave)
+
 Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
 
 ---
@@ -13,7 +19,7 @@ You can use Weave to:
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing Generative AI software, without introducing cognitive overhead.
 
 <div align="center">
-  <img src="./docs/static/weave-ui-example.jpg" width="400">
+  <img src="https://raw.githubusercontent.com/wandb/weave/master/docs/static/weave-ui-example.jpg" width="100%">
 </div>
 
 ## Documentation
