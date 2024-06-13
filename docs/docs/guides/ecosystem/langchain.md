@@ -120,3 +120,117 @@ The manual logging methods (`WeaveTracer` and `weave_tracing_enabled`) are simil
 By integrating Weave with LangChain, you can ensure comprehensive logging and monitoring of your LLM applications, facilitating easier debugging and performance optimization.
 
 For more detailed information, refer to the [LangChain documentation](https://python.langchain.com/v0.2/docs/how_to/debugging/#tracing).
+
+## Models and Evaluations
+
+Organizing and evaluating LLMs in applications for various use cases is challenging with multiple components, such as prompts, model configurations, and inference parameters. Using the [`weave.Model`](/guides/core-types/models), you can capture and organize experimental details like system prompts or the models you use, making it easier to compare different iterations.
+
+The following example demonstrates wrapping a Langchain chain in a `WeaveModel`:
+
+```python
+
+
+import json
+import asyncio
+
+import weave
+
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+
+# Initialize Weave with your project name
+# highlight-next-line
+weave.init("langchain_demo")
+
+class ExtractFruitsModel(weave.Model):
+    model_name: str
+    prompt_template: str
+
+    @weave.op()
+    async def predict(self, sentence: str) -> dict:
+        llm = ChatOpenAI(model=self.model_name, temperature=0.0)
+        prompt = PromptTemplate.from_template(self.prompt_template)
+
+        llm_chain = prompt | llm
+        response = llm_chain.invoke({"sentence": sentence})
+        result = response.content
+
+        if result is None:
+            raise ValueError("No response from model")
+        parsed = json.loads(result)
+        return parsed
+
+
+
+model = ExtractFruitsModel(
+    model_name="gpt-3.5-turbo-1106",
+    prompt_template='Extract fields ("fruit": <str>, "color": <str>, "flavor": <str>) from the following text, as json: {sentence}',
+)
+sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
+
+prediction = asyncio.run(model.predict(sentence))
+
+# if you're in a Jupyter Notebook, run:
+# prediction = await model.predict(sentence)
+
+print(prediction)
+```
+This code creates a model that can be visualized in the Weave UI:
+
+[![langchain_model.png](imgs/langchain_model.png)](https://wandb.ai/parambharat/langchain_demo/weave/object-versions?filter=%7B%22baseObjectClass%22%3A%22Model%22%7D&peekPath=%2Fparambharat%2Flangchain_demo%2Fobjects%2FExtractFruitsModel%2Fversions%2FBeoL6WuCH8wgjy6HfmuBMyKzArETg1oAFpYaXZSq1hw%3F%26)
+
+
+You can also use Weave Models with `serve`, and [`Evaluations`](/guides/core-types/evaluations).
+
+### Evaluations
+Evaluations help you measure the performance of your models. By using the [`weave.Evaluation`](/guides/core-types/evaluations) class, you can capture how well your model performs on specific tasks or datasets, making it easier to compare different models and iterations of your application. The following example demonstrates how to evaluate the model we created:
+
+
+```python
+
+from weave.flow.scorer import MultiTaskBinaryClassificationF1
+
+sentences = [
+    "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
+    "Pounits are a bright green color and are more savory than sweet.",
+    "Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them.",
+]
+labels = [
+    {"fruit": "neoskizzles", "color": "purple", "flavor": "candy"},
+    {"fruit": "pounits", "color": "bright green", "flavor": "savory"},
+    {"fruit": "glowls", "color": "pale orange", "flavor": "sour and bitter"},
+]
+examples = [
+    {"id": "0", "sentence": sentences[0], "target": labels[0]},
+    {"id": "1", "sentence": sentences[1], "target": labels[1]},
+    {"id": "2", "sentence": sentences[2], "target": labels[2]},
+]
+
+
+
+
+@weave.op()
+def fruit_name_score(target: dict, model_output: dict) -> dict:
+    return {"correct": target["fruit"] == model_output["fruit"]}
+
+
+evaluation = weave.Evaluation(
+    dataset=examples,
+    scorers=[
+        MultiTaskBinaryClassificationF1(class_names=["fruit", "color", "flavor"]),
+        fruit_name_score,
+    ],
+)
+scores = asyncio.run(evaluation.evaluate(model)))
+# if you're in a Jupyter Notebook, run:
+# scores = await evaluation.evaluate(model)
+
+print(scores)
+```
+
+This code generates an evaluation trace that can be visualized in the Weave UI:
+
+[![langchain_evaluation.png](imgs/langchain_eval.png)](https://wandb.ai/parambharat/langchain_demo/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fparambharat%2Flangchain_demo%2Fcalls%2F44c3f26c-d9d3-423e-b434-651ea5174be3)
+
+By integrating Weave with Langchain, you can ensure comprehensive logging and monitoring of your LLM applications, facilitating easier debugging and performance optimization.
