@@ -1,37 +1,36 @@
+import asyncio
 import dataclasses
+import json
 import re
 import signal
-import requests
-import pytest
-import pydantic
-from pydantic import BaseModel
-import json
-import weave
-import asyncio
-from weave import op_def, Evaluation
 
-from weave import weave_client
+import pydantic
+import pytest
+import requests
+from pydantic import BaseModel
+
+import weave
+import weave.trace_server.trace_server_interface as tsi
+from weave import Evaluation, op_def, weave_client
+from weave.trace import refs
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 from weave.trace.refs import (
+    DICT_KEY_EDGE_NAME,
+    LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
-    LIST_INDEX_EDGE_NAME,
-    DICT_KEY_EDGE_NAME,
 )
-from weave.trace.serializer import register_serializer, get_serializer_for_obj
-
-from weave.trace import refs
+from weave.trace.serializer import get_serializer_for_obj, register_serializer
 from weave.trace.tests.testutil import ObjectRefStrMatcher
-from weave.trace.isinstance import weave_isinstance
 from weave.trace_server.trace_server_interface import (
-    TableCreateReq,
-    TableSchemaForInsert,
-    TableQueryReq,
-    RefsReadBatchReq,
-    FileCreateReq,
     FileContentReadReq,
+    FileCreateReq,
+    RefsReadBatchReq,
+    TableCreateReq,
+    TableQueryReq,
+    TableSchemaForInsert,
 )
-import weave.trace_server.trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace
 
@@ -59,9 +58,7 @@ def test_table_create(client):
             )
         )
     )
-    result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", digest=res.digest)
-    )
+    result = client.server.table_query(TableQueryReq(project_id="test/test-project", digest=res.digest))
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2
     assert result.rows[2].val["val"] == 3
@@ -197,8 +194,8 @@ def test_pydantic(client):
 
 
 def test_call_create(client):
-    call = client.create_call("x", {"a": 5, "b": 10})
-    client.finish_call(call, "hello")
+    call = client._create_call("x", {"a": 5, "b": 10})
+    client._finish_call(call, "hello")
     result = client.call(call.id)
     expected = weave_client.Call(
         op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
@@ -217,9 +214,9 @@ def test_call_create(client):
 
 
 def test_calls_query(client):
-    call0 = client.create_call("x", {"a": 5, "b": 10})
-    call1 = client.create_call("x", {"a": 6, "b": 11})
-    call2 = client.create_call("y", {"a": 5, "b": 10})
+    call0 = client._create_call("x", {"a": 5, "b": 10})
+    call1 = client._create_call("x", {"a": 6, "b": 11})
+    call2 = client._create_call("y", {"a": 5, "b": 10})
     result = list(client.calls(weave_client._CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave_client.Call(
@@ -240,9 +237,9 @@ def test_calls_query(client):
         id=call1.id,
         attributes={},
     )
-    client.finish_call(call2, None)
-    client.finish_call(call1, None)
-    client.finish_call(call0, None)
+    client._finish_call(call2, None)
+    client._finish_call(call1, None)
+    client._finish_call(call0, None)
 
 
 def test_calls_delete(client):
@@ -260,10 +257,10 @@ def test_calls_delete(client):
     # Patch calls_delete with our fake middlewear
     client.server.calls_delete = patched_delete
 
-    call0 = client.create_call("x", {"a": 5, "b": 10})
-    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
-    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
-    call1 = client.create_call("y", {"a": 6, "b": 11})
+    call0 = client._create_call("x", {"a": 5, "b": 10})
+    call0_child1 = client._create_call("x", {"a": 5, "b": 11}, call0)
+    _call0_child2 = client._create_call("x", {"a": 5, "b": 12}, call0_child1)
+    call1 = client._create_call("y", {"a": 6, "b": 11})
 
     assert len(list(client.calls())) == 4
 
@@ -271,7 +268,7 @@ def test_calls_delete(client):
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
-    client.delete_call(call0_child1)
+    client._delete_call(call0_child1)
 
     result = list(client.calls(weave_client._CallsFilter(op_names=[call0.op_name])))
     assert len(result) == 1
@@ -280,7 +277,7 @@ def test_calls_delete(client):
     assert len(result) == 0
 
     # no-op if already deleted
-    client.delete_call(call0_child1)
+    client._delete_call(call0_child1)
     call1.delete()
     call1.delete()
 
@@ -329,7 +326,7 @@ def test_calls_delete_cascade(client):
     assert len(eval_call_children) == 3
 
     # delete the evaluation, should cascade to all the calls and sub-calls
-    client.delete_call(eval_call)
+    client._delete_call(eval_call)
 
     # check that all the calls are gone
     result = list(client.calls())
@@ -352,10 +349,10 @@ def test_call_display_name(client):
     # Patch call_update with our fake middlewear
     client.server.call_update = patched_update
 
-    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0 = client._create_call("x", {"a": 5, "b": 10})
 
     # Rename using the client method
-    client.set_call_display_name(call0, "updated_name")
+    client._set_call_display_name(call0, "updated_name")
     # same op_name
     result = list(client.calls())
     assert len(result) == 1
@@ -430,8 +427,8 @@ def test_dataset_calls(client):
         "my-dataset",
     )
     for row in ref.rows:
-        call = client.create_call("x", {"a": row["doc"]})
-        client.finish_call(call, None)
+        call = client._create_call("x", {"a": row["doc"]})
+        client._finish_call(call, None)
 
     calls = list(client.calls({"op_name": "x"}))
     assert calls[0].inputs["a"] == "xx"
@@ -483,9 +480,7 @@ def test_mutations(client):
             operation="setitem",
             args=("a", 12),
         ),
-        weave_client.MutationSetattr(
-            path=[], operation="setattr", args=("cows", "moo")
-        ),
+        weave_client.MutationSetattr(path=[], operation="setattr", args=("cows", "moo")),
     ]
     new_ref = dataset.save()
     new_ds = client.get(new_ref)
@@ -511,13 +506,13 @@ def test_stable_dataset_row_refs(client):
         ),
         "my-dataset",
     )
-    call = client.create_call("x", {"a": dataset.rows[0]["doc"]})
-    client.finish_call(call, "call1")
+    call = client._create_call("x", {"a": dataset.rows[0]["doc"]})
+    client._finish_call(call, "call1")
     dataset.rows.append({"doc": "zz", "label": "e"})
     dataset2_ref = dataset.save()
     dataset2 = client.get(dataset2_ref)
-    call = client.create_call("x", {"a": dataset2.rows[0]["doc"]})
-    client.finish_call(call, "call2")
+    call = client._create_call("x", {"a": dataset2.rows[0]["doc"]})
+    client._finish_call(call, "call2")
     x = client.calls({"ref": weave_client.get_ref(dataset.rows[0]["doc"])})
 
     assert len(list(x)) == 2
@@ -715,10 +710,7 @@ def test_evaluate(client):
 
     model_obj = child0.inputs["model"]
     assert isinstance(model_obj, Op)
-    assert (
-        weave_client.get_ref(model_obj).uri()
-        == weave_client.get_ref(model_predict).uri()
-    )
+    assert weave_client.get_ref(model_obj).uri() == weave_client.get_ref(model_predict).uri()
 
     example0_obj = child0.inputs["example"]
     assert example0_obj.ref.name == "Dataset"
@@ -867,13 +859,9 @@ def test_large_files(client):
 
 def test_server_file(client):
     f_bytes = b"0" * 10000005
-    res = client.server.file_create(
-        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
-    )
+    res = client.server.file_create(FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes))
 
-    read_res = client.server.file_content_read(
-        FileContentReadReq(project_id="shawn/test-project", digest=res.digest)
-    )
+    read_res = client.server.file_content_read(FileContentReadReq(project_id="shawn/test-project", digest=res.digest))
     assert f_bytes == read_res.content
 
 
@@ -950,13 +938,7 @@ def test_summary_tokens(client):
 
     @weave.op()
     def models(text):
-        return (
-            model_a(text)["result"]
-            + " "
-            + model_a(text)["result"]
-            + " "
-            + model_b(text)["result"]
-        )
+        return model_a(text)["result"] + " " + model_a(text)["result"] + " " + model_b(text)["result"]
 
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
@@ -992,15 +974,7 @@ def test_summary_descendents(client):
 
     @weave.op()
     def models(text):
-        return (
-            model_a(text)
-            + " "
-            + model_a(text)
-            + " "
-            + model_b(text)
-            + " "
-            + model_error_catch(text)
-        )
+        return model_a(text) + " " + model_a(text) + " " + model_b(text) + " " + model_error_catch(text)
 
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello error: hello"

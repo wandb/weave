@@ -168,7 +168,7 @@ class Call:
 
     def delete(self) -> bool:
         client = graph_client_context.require_graph_client()
-        return client.delete_call(call=self)
+        return client._delete_call(call=self)
 
     def set_display_name(self, name: Optional[str]) -> None:
         if name == "":
@@ -176,7 +176,7 @@ class Call:
         if name == self.display_name:
             return
         client = graph_client_context.require_graph_client()
-        client.set_call_display_name(call=self, display_name=name)
+        client._set_call_display_name(call=self, display_name=name)
         self.display_name = name
 
     def remove_display_name(self) -> None:
@@ -435,7 +435,7 @@ class WeaveClient:
         return op_def_ref
 
     @trace_sentry.global_trace_sentry.watch()
-    def create_call(
+    def _create_call(
         self,
         op: Union[str, Op],
         inputs: dict,
@@ -520,7 +520,7 @@ class WeaveClient:
         return call
 
     @trace_sentry.global_trace_sentry.watch()
-    def finish_call(self, call: Call, output: Any = None, exception: Optional[BaseException] = None) -> None:
+    def _finish_call(self, call: Call, output: Any = None, exception: Optional[BaseException] = None) -> None:
         self.save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
@@ -573,12 +573,12 @@ class WeaveClient:
         run_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
-    def fail_call(self, call: Call, exception: BaseException) -> None:
+    def _fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
-        return self.finish_call(call, exception=exception)
+        return self._finish_call(call, exception=exception)
 
     @trace_sentry.global_trace_sentry.watch()
-    def delete_call(self, call: Call) -> None:
+    def _delete_call(self, call: Call) -> None:
         self.server.calls_delete(
             CallsDeleteReq(
                 project_id=self._project_id(),
@@ -587,7 +587,7 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def set_call_display_name(self, call: Call, display_name: Optional[str] = None) -> None:
+    def _set_call_display_name(self, call: Call, display_name: Optional[str] = None) -> None:
         # Removing call display name, use "" for db representation
         if display_name is None:
             display_name = ""
@@ -600,7 +600,7 @@ class WeaveClient:
         )
 
     def remove_call_display_name(self, call: Call) -> None:
-        self.set_call_display_name(call, None)
+        self._set_call_display_name(call, None)
 
     def save_nested_objects(self, obj: Any, name: Optional[str] = None) -> Any:
         if get_ref(obj) is not None:

@@ -74,7 +74,7 @@ class Op:
         parent_run = run_context.get_current_run()
         client.save_nested_objects(inputs_with_defaults)
         attributes = call_attributes.get()
-        run = client.create_call(
+        run = client._create_call(
             self,
             inputs_with_defaults,
             parent_run,
@@ -88,7 +88,7 @@ class Op:
             nonlocal has_finished
             if has_finished:
                 raise ValueError("Should not call finish more than once")
-            client.finish_call(run, output, exception)
+            client._finish_call(run, output, exception)
             if not parent_run:
                 print_call_link(run)
 

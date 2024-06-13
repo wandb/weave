@@ -1667,23 +1667,23 @@ def test_call_stack_order_implicit_depth_first(client):
 
     # This version of the call sequence matches the happy path
     # without any out-of-order calls
-    call_1 = client.create_call("op", {})
-    call_2 = client.create_call("op", {})
-    call_3 = client.create_call("op", {})
-    client.finish_call(call_3)
-    call_4 = client.create_call("op", {})
-    client.finish_call(call_4)
-    client.finish_call(call_2)
-    call_5 = client.create_call("op", {})
-    call_6 = client.create_call("op", {})
-    client.finish_call(call_6)
-    call_7 = client.create_call("op", {})
-    client.finish_call(call_7)
-    client.finish_call(call_5)
-    client.finish_call(call_1)
+    call_1 = client._create_call("op", {})
+    call_2 = client._create_call("op", {})
+    call_3 = client._create_call("op", {})
+    client._finish_call(call_3)
+    call_4 = client._create_call("op", {})
+    client._finish_call(call_4)
+    client._finish_call(call_2)
+    call_5 = client._create_call("op", {})
+    call_6 = client._create_call("op", {})
+    client._finish_call(call_6)
+    call_7 = client._create_call("op", {})
+    client._finish_call(call_7)
+    client._finish_call(call_5)
+    client._finish_call(call_1)
 
-    terminal_root_call = client.create_call("op", {})
-    client.finish_call(terminal_root_call)
+    terminal_root_call = client._create_call("op", {})
+    client._finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -1713,23 +1713,23 @@ def test_call_stack_order_explicit_depth_first(client):
     # This version of the call sequence matches the happy path
     # without any out-of-order calls, but with explicit parentage
     # specified.
-    call_1 = client.create_call("op", {})
-    call_2 = client.create_call("op", {}, call_1)
-    call_3 = client.create_call("op", {}, call_2)
-    client.finish_call(call_3)
-    call_4 = client.create_call("op", {}, call_2)
-    client.finish_call(call_4)
-    client.finish_call(call_2)
-    call_5 = client.create_call("op", {}, call_1)
-    call_6 = client.create_call("op", {}, call_5)
-    client.finish_call(call_6)
-    call_7 = client.create_call("op", {}, call_5)
-    client.finish_call(call_7)
-    client.finish_call(call_5)
-    client.finish_call(call_1)
+    call_1 = client._create_call("op", {})
+    call_2 = client._create_call("op", {}, call_1)
+    call_3 = client._create_call("op", {}, call_2)
+    client._finish_call(call_3)
+    call_4 = client._create_call("op", {}, call_2)
+    client._finish_call(call_4)
+    client._finish_call(call_2)
+    call_5 = client._create_call("op", {}, call_1)
+    call_6 = client._create_call("op", {}, call_5)
+    client._finish_call(call_6)
+    call_7 = client._create_call("op", {}, call_5)
+    client._finish_call(call_7)
+    client._finish_call(call_5)
+    client._finish_call(call_1)
 
-    terminal_root_call = client.create_call("op", {})
-    client.finish_call(terminal_root_call)
+    terminal_root_call = client._create_call("op", {})
+    client._finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -1758,27 +1758,27 @@ def test_call_stack_order_langchain_batch(client):
     #
     # This sequence is pretty much exactly what langchain does when handling
     # a batch of calls. Specifically (prompt | llm).batch([1,2])
-    call_1 = client.create_call("op", {})  # <- Implicit Parent, no stack = root
-    call_2 = client.create_call("op", {}, call_1)  # <- RunnableSequence1
-    call_5 = client.create_call("op", {}, call_1)  # <- RunnableSequence2
-    call_3 = client.create_call("op", {}, call_2)  # <- Prompt1
-    client.finish_call(call_3)
-    call_4 = client.create_call("op", {}, call_2)  # <- LLM1
-    call_4gpt = client.create_call("op", {})  # <- Openai
-    client.finish_call(call_4gpt)
-    client.finish_call(call_4)
-    call_6 = client.create_call("op", {}, call_5)  # <- Prompt2
-    client.finish_call(call_6)
-    call_7 = client.create_call("op", {}, call_5)  # <- LLM2
-    call_7gpt = client.create_call("op", {})  # <- Openai
-    client.finish_call(call_7gpt)
-    client.finish_call(call_7)
-    client.finish_call(call_2)
-    client.finish_call(call_5)
-    client.finish_call(call_1)
+    call_1 = client._create_call("op", {})  # <- Implicit Parent, no stack = root
+    call_2 = client._create_call("op", {}, call_1)  # <- RunnableSequence1
+    call_5 = client._create_call("op", {}, call_1)  # <- RunnableSequence2
+    call_3 = client._create_call("op", {}, call_2)  # <- Prompt1
+    client._finish_call(call_3)
+    call_4 = client._create_call("op", {}, call_2)  # <- LLM1
+    call_4gpt = client._create_call("op", {})  # <- Openai
+    client._finish_call(call_4gpt)
+    client._finish_call(call_4)
+    call_6 = client._create_call("op", {}, call_5)  # <- Prompt2
+    client._finish_call(call_6)
+    call_7 = client._create_call("op", {}, call_5)  # <- LLM2
+    call_7gpt = client._create_call("op", {})  # <- Openai
+    client._finish_call(call_7gpt)
+    client._finish_call(call_7)
+    client._finish_call(call_2)
+    client._finish_call(call_5)
+    client._finish_call(call_1)
 
-    terminal_root_call = client.create_call("op", {})
-    client.finish_call(terminal_root_call)
+    terminal_root_call = client._create_call("op", {})
+    client._finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -1810,28 +1810,28 @@ def test_call_stack_order_out_of_order_pop(client):
     #
     # This ordering is a specifically challenging case where we return to
     # a parent that that was not the top of stack
-    call_1 = client.create_call("op", {})
-    call_2 = client.create_call("op", {})
-    call_3 = client.create_call("op", {})
+    call_1 = client._create_call("op", {})
+    call_2 = client._create_call("op", {})
+    call_3 = client._create_call("op", {})
     # Purposely swap 4 & 5
-    call_5 = client.create_call("op", {}, call_1)  # <- Explicit Parent (call_1)
-    call_4 = client.create_call("op", {}, call_2)  # <- Explicit Parent (call_2)
-    call_6 = client.create_call("op", {}, call_5)  # <- Explicit Parent (call_5)
-    client.finish_call(call_6)  # <- Finish call_6
+    call_5 = client._create_call("op", {}, call_1)  # <- Explicit Parent (call_1)
+    call_4 = client._create_call("op", {}, call_2)  # <- Explicit Parent (call_2)
+    call_6 = client._create_call("op", {}, call_5)  # <- Explicit Parent (call_5)
+    client._finish_call(call_6)  # <- Finish call_6
     # (should change stack to call_6.parent which is call_5)
-    call_7 = client.create_call("op", {})  # <- Implicit Parent (call_5)
+    call_7 = client._create_call("op", {})  # <- Implicit Parent (call_5)
     # (current stack implementation will think this is 4)
 
     # Finish them in completely reverse order, because why not?
-    client.finish_call(call_1)
-    client.finish_call(call_2)
-    client.finish_call(call_3)
-    client.finish_call(call_4)
-    client.finish_call(call_5)
-    client.finish_call(call_7)
+    client._finish_call(call_1)
+    client._finish_call(call_2)
+    client._finish_call(call_3)
+    client._finish_call(call_4)
+    client._finish_call(call_5)
+    client._finish_call(call_7)
 
-    terminal_root_call = client.create_call("op", {})
-    client.finish_call(terminal_root_call)
+    terminal_root_call = client._create_call("op", {})
+    client._finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -1881,24 +1881,24 @@ def test_call_stack_order_height_ordering(client):
     #
     #
     # This ordering calls ops in the order of their height in the tree
-    call_1 = client.create_call("op", {})
-    call_2 = client.create_call("op", {}, call_1)
-    call_5 = client.create_call("op", {}, call_1)
-    call_3 = client.create_call("op", {}, call_2)
-    call_6 = client.create_call("op", {}, call_5)
-    call_4 = client.create_call("op", {}, call_2)
-    call_7 = client.create_call("op", {}, call_5)
+    call_1 = client._create_call("op", {})
+    call_2 = client._create_call("op", {}, call_1)
+    call_5 = client._create_call("op", {}, call_1)
+    call_3 = client._create_call("op", {}, call_2)
+    call_6 = client._create_call("op", {}, call_5)
+    call_4 = client._create_call("op", {}, call_2)
+    call_7 = client._create_call("op", {}, call_5)
 
     # Finish them in completely reverse order
-    client.finish_call(call_1)
-    client.finish_call(call_2)
-    client.finish_call(call_3)
-    client.finish_call(call_4)
-    client.finish_call(call_5)
-    client.finish_call(call_7)
+    client._finish_call(call_1)
+    client._finish_call(call_2)
+    client._finish_call(call_3)
+    client._finish_call(call_4)
+    client._finish_call(call_5)
+    client._finish_call(call_7)
 
-    terminal_root_call = client.create_call("op", {})
-    client.finish_call(terminal_root_call)
+    terminal_root_call = client._create_call("op", {})
+    client._finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -1926,22 +1926,22 @@ def test_call_stack_order_mixed(client):
     #
     #
     # This ordering is as mixed up as I could make it
-    call_1 = client.create_call("op", {})
-    call_5 = client.create_call("op", {}, call_1)
-    call_7 = client.create_call("op", {}, call_5)
-    client.finish_call(call_7)
-    call_6 = client.create_call("op", {}, call_5)
-    client.finish_call(call_5)
-    call_2 = client.create_call("op", {}, call_1)
-    client.finish_call(call_1)
-    call_4 = client.create_call("op", {}, call_2)
-    call_3 = client.create_call("op", {}, call_2)
-    client.finish_call(call_2)
-    client.finish_call(call_3)
-    client.finish_call(call_4)
+    call_1 = client._create_call("op", {})
+    call_5 = client._create_call("op", {}, call_1)
+    call_7 = client._create_call("op", {}, call_5)
+    client._finish_call(call_7)
+    call_6 = client._create_call("op", {}, call_5)
+    client._finish_call(call_5)
+    call_2 = client._create_call("op", {}, call_1)
+    client._finish_call(call_1)
+    call_4 = client._create_call("op", {}, call_2)
+    call_3 = client._create_call("op", {}, call_2)
+    client._finish_call(call_2)
+    client._finish_call(call_3)
+    client._finish_call(call_4)
 
-    terminal_root_call = client.create_call("op", {})
-    client.finish_call(terminal_root_call)
+    terminal_root_call = client._create_call("op", {})
+    client._finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
