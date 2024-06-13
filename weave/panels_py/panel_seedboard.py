@@ -1,8 +1,8 @@
 import typing
 
 import weave
-from .. import weave_internal
-from .generator_templates import template_registry
+from weave import weave_internal
+from weave.panels_py.generator_templates import template_registry
 
 
 @weave.type()

@@ -1,7 +1,7 @@
 """
 Contains the TemplateRegistry class, which is used to register
 templates for the PyBoard generator. I think we might want to make
-this even more generic and allow any panel to be a generator, but for 
+this even more generic and allow any panel to be a generator, but for
 now this is a simple abstraction that will work for basic use cases.
 
 # TODO: Generalize this to work with panels like /weave/ecosystem/wandb/panel_time_series.py
@@ -15,14 +15,10 @@ now this is a simple abstraction that will work for basic use cases.
 However, this current implementation is simple and easy to refactor.
 """
 
-
 import dataclasses
 import typing
 
-from .. import graph
-from .. import weave_types
-from .. import registry_mem
-from .. import decorator_op
+from weave import decorator_op, graph, registry_mem, weave_types
 
 
 @dataclasses.dataclass

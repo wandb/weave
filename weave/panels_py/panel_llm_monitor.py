@@ -2,16 +2,12 @@ import os
 import typing
 
 import weave
-from .. import util
-from .. import dispatch
-from .. import weave_internal as internal
-from .. import weave_types as types
-from .. import weave_internal
-from ..panels import panel_group
-from ..panels import panel_board
-from ..panels_py import panel_autoboard
-from .generator_templates import template_registry
-
+from weave import dispatch, util, weave_internal
+from weave import weave_internal as internal
+from weave import weave_types as types
+from weave.panels import panel_board, panel_group
+from weave.panels_py import panel_autoboard
+from weave.panels_py.generator_templates import template_registry
 
 panels = weave.panels
 ops = weave.ops
@@ -355,11 +351,13 @@ def board(
         filtered_window_data["summary.completion_tokens"].avg(),  # type: ignore
         layout=weave.panels.GroupPanelLayout(x=12, y=height * 2, w=6, h=3),
     )
-    overview_tab.add(
-        "avg_total_tokens_per_req",
-        filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
-        layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=3),
-    ),
+    (
+        overview_tab.add(
+            "avg_total_tokens_per_req",
+            filtered_window_data["summary.total_tokens"].avg(),  # type: ignore
+            layout=weave.panels.GroupPanelLayout(x=18, y=height * 2, w=6, h=3),
+        ),
+    )
 
     # Show a plot for each attribute.
     # TODO: This doesn't really work yet (needs some manual UI configuration currently,

@@ -1,8 +1,7 @@
 import weave
-from .. import weave_internal as internal
-from .. import weave_types as types
-from .generator_templates import template_registry
-
+from weave import weave_internal as internal
+from weave import weave_types as types
+from weave.panels_py.generator_templates import template_registry
 
 # IMPORTANT: To enable this (or any template), it must be imported in
 # weave/panels_py/__init__.py This example is explicitly commented out since it
