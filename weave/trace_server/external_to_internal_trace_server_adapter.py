@@ -1,10 +1,14 @@
 import abc
+
 # import io
 # import json
 # import sys
 from typing import Callable, Iterator, TypeVar
 
-from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
+from weave.trace_server.trace_server_converter import (
+    universal_ext_to_int_ref_converter,
+    universal_int_to_ext_ref_converter,
+)
 
 # from pydantic import BaseModel
 
@@ -39,8 +43,10 @@ class IdConverter:
     # def convert_int_to_ext_user_id(self, user_id: str) -> str:
     #     ...
 
+
 A = TypeVar("A")
 B = TypeVar("B")
+
 
 class ExternalTraceServer(tsi.TraceServerInterface):
     _internal_trace_server: tsi.TraceServerInterface
@@ -54,24 +60,41 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         self._id_converter = id_converter
 
     def _apply(self, method: Callable[[A], B], req: A) -> B:
-        return universal_ext_to_int_ref_converter(
-            method(universal_ext_to_int_ref_converter(req, self._id_converter.convert_ext_to_int_project_id)),
-        self._id_converter.convert_int_to_ext_project_id)
-    
-    def _stream_apply(self, method: Callable[[A], B], req: A) -> Iterator[B]:
-        res = method(universal_ext_to_int_ref_converter(req, self._id_converter.convert_ext_to_int_project_id))
+        req_conv = universal_ext_to_int_ref_converter(
+            req, self._id_converter.convert_ext_to_int_project_id
+        )
+        res = method(req_conv)
+        res_conv = universal_int_to_ext_ref_converter(
+            res,
+            self._id_converter.convert_int_to_ext_project_id,
+        )
+        return res_conv
+
+    def _stream_apply(self, method: Callable[[A], Iterator[B]], req: A) -> Iterator[B]:
+        req_conv = universal_ext_to_int_ref_converter(
+            req, self._id_converter.convert_ext_to_int_project_id
+        )
+        res = method(req_conv)
+
         int_to_ext_project_cache = {}
+
         def cached_int_to_ext_project_id(project_id: str) -> str:
             if project_id not in int_to_ext_project_cache:
-                int_to_ext_project_cache[project_id] = self._id_converter.convert_int_to_ext_project_id(project_id)
+                int_to_ext_project_cache[
+                    project_id
+                ] = self._id_converter.convert_int_to_ext_project_id(project_id)
             return int_to_ext_project_cache[project_id]
+
         for item in res:
-            yield self._id_converter.convert_int_to_ext_project_id(item, cached_int_to_ext_project_id)
+            yield universal_int_to_ext_ref_converter(
+                item,
+                cached_int_to_ext_project_id,
+            )
 
     # Standard API Below:
     def ensure_project_exists(self, entity: str, project: str) -> None:
         self._internal_trace_server.ensure_project_exists(entity, project)
-    
+
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         return self._apply(self._internal_trace_server.call_start, req)
 
@@ -83,7 +106,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         return self._apply(self._internal_trace_server.calls_query, req)
-    
+
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return self._stream_apply(self._internal_trace_server.calls_query_stream, req)
 

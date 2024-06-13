@@ -46,7 +46,7 @@ def universal_ext_to_int_ref_converter(
 
     def mapper(obj: B) -> B:
         if isinstance(obj, str) and obj.startswith(weave_prefix):
-            return replace_ref(obj)
+            return typing.cast(B, replace_ref(obj))
         return obj
 
     return _map_values(obj, mapper)
@@ -95,7 +95,7 @@ def universal_int_to_ext_ref_converter(
 
     def mapper(obj: D) -> D:
         if isinstance(obj, str) and obj.startswith(weave_internal_prefix):
-            return replace_ref(obj)
+            return typing.cast(D, replace_ref(obj))
         return obj
 
     return _map_values(obj, mapper)
@@ -105,7 +105,7 @@ E = typing.TypeVar("E")
 F = typing.TypeVar("F")
 
 
-def _map_values(obj: E, func: typing.Callable[[F], F]) -> E:
+def _map_values(obj: E, func: typing.Callable[[E], E]) -> E:
     if isinstance(obj, BaseModel):
         # `by_alias` is required since we have Mongo-style properties in the
         # query models that are aliased to conform to start with `$`. Without
@@ -115,11 +115,11 @@ def _map_values(obj: E, func: typing.Callable[[F], F]) -> E:
         new = _map_values(orig, func)
         return obj.model_validate(new)
     if isinstance(obj, dict):
-        return {k: _map_values(v, func) for k, v in obj.items()}
+        return typing.cast(E, {k: _map_values(v, func) for k, v in obj.items()})
     if isinstance(obj, list):
-        return [_map_values(v, func) for v in obj]
+        return typing.cast(E, [_map_values(v, func) for v in obj])
     if isinstance(obj, tuple):
-        return tuple(_map_values(v, func) for v in obj)
+        return typing.cast(E, tuple(_map_values(v, func) for v in obj))
     if isinstance(obj, set):
-        return {_map_values(v, func) for v in obj}
+        return typing.cast(E, {_map_values(v, func) for v in obj})
     return func(obj)

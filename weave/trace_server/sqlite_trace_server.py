@@ -1,6 +1,6 @@
 # Sqlite Trace Server
 
-from typing import cast, Optional, Any, Union
+from typing import Iterator, cast, Optional, Any, Union
 import threading
 
 import contextvars
@@ -450,7 +450,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> t.Iterator[tsi.CallSchema]:
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
