@@ -7,7 +7,7 @@ from rich.table import Table
 
 from . import graph_client_context
 from . import util
-from weave import pydantic_util
+from weave import rich_pydantic_util
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 from weave.trace.refs import parse_uri
@@ -80,10 +80,10 @@ class Feedbacks:
         if cycle:
             p.text("Feedbacks(...)")
         elif len(self) == 1:
-            p.text(pydantic_util.model_to_str(self.items[0]))
+            p.text(rich_pydantic_util.model_to_str(self.items[0]))
         else:
             table = self.as_rich_table()
-            p.text(pydantic_util.table_to_str(table))
+            p.text(rich_pydantic_util.table_to_str(table))
 
 
 class RefFeedback:
@@ -238,4 +238,4 @@ class RefFeedback:
             self._maybe_fetch()
             assert self.items is not None
             table = Feedbacks(self.items).as_rich_table(include_ref=False)
-            p.text(pydantic_util.table_to_str(table))
+            p.text(rich_pydantic_util.table_to_str(table))

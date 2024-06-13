@@ -651,6 +651,26 @@ class WeaveClient:
         offset: int = 0,
         limit: int = 100,
     ) -> Feedbacks:
+        """Query for feedback.
+
+        Examples:
+            # Fetch a specific feedback object.
+            # Note that this still returns a collection, which is expected
+            # to contain zero or one item(s).
+            client.feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+
+            # Find all feedback objects with a specific reaction.
+            client.feedback(reaction="👍", limit=10)
+
+        Args:
+            query: A mongo-style query expression. For convenience, also accepts a feedback UUID string.
+            reaction: For convenience, filter by a particular reaction emoji.
+            offset: The offset to start fetching feedback objects from.
+            limit: The maximum number of feedback objects to fetch.
+
+        Returns:
+            A collection of Feedback objects.
+        """
         expr: dict[str, Any] = {
             "$eq": [
                 {"$literal": "1"},
