@@ -66,6 +66,7 @@ filterwarnings = ["error"]
 [tool.autopep8]
 max_line_length = 180
 ignore = "E714"
+exclude = ["weave/api.py", "weave/__init__.py"]
 
 [tool.ruff]
 line-length = 180
@@ -75,6 +76,8 @@ select = [
   "FIX003",
   "F541",
 ]
+exclude = ["weave/api.py", "weave/__init__.py"]
 
 [tool.flake8]
 max-line-length = 180
+exclude = ["weave/api.py", "weave/__init__.py"]

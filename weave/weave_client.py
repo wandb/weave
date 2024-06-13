@@ -285,44 +285,6 @@ class WeaveClient:
         if ensure_project_exists:
             self.server.ensure_project_exists(entity, project)
 
-    def _ref_is_own(self, ref: Ref) -> bool:
-        return isinstance(ref, Ref)
-
-    def _project_id(self) -> str:
-        return f"{self.entity}/{self.project}"
-
-    # This is used by tests and op_execute still, but the save() interface
-    # is nicer for clients I think?
-    @trace_sentry.global_trace_sentry.watch()
-    def save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        self._save_nested_objects(val, name=name)
-        return self._save_object(val, name, branch)
-
-    def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
-        is_opdef = isinstance(val, Op)
-        val = map_to_refs(val)
-        if isinstance(val, ObjectRef):
-            return val
-        json_val = to_json(val, self._project_id(), self.server)
-
-        response = self.server.obj_create(
-            ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
-                )
-            )
-        )
-        ref: Ref
-        if is_opdef:
-            ref = OpRef(self.entity, self.project, name, response.digest)
-        else:
-            ref = ObjectRef(self.entity, self.project, name, response.digest)
-        # TODO: Try to put a ref onto val? Or should user code use a style like
-        # save instead?
-        return ref
-
     @trace_sentry.global_trace_sentry.watch()
     def save(self, val: Any, name: str, branch: str = "latest") -> Any:
         ref = self.save_object(val, name, branch)
@@ -377,11 +339,6 @@ class WeaveClient:
         return make_trace_obj(val, ref, self.server, None)
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_table(self, table: Table) -> TableRef:
-        response = self.server.table_create(TableCreateReq(table=TableSchemaForInsert(project_id=self._project_id(), rows=table.rows)))
-        return TableRef(entity=self.entity, project=self.project, digest=response.digest)
-
-    @trace_sentry.global_trace_sentry.watch()
     def calls(self, filter: Optional[_CallsFilter] = None) -> CallsIter:
         if filter is None:
             filter = _CallsFilter()
@@ -401,12 +358,12 @@ class WeaveClient:
         response_call = response.calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
 
+    # This is used by tests and op_execute still, but the save() interface
+    # is nicer for clients I think?
     @trace_sentry.global_trace_sentry.watch()
-    def _op_calls(self, op: Op) -> CallsIter:
-        op_ref = get_ref(op)
-        if op_ref is None:
-            raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
+    def save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
+        self._save_nested_objects(val, name=name)
+        return self._save_object(val, name, branch)
 
     @trace_sentry.global_trace_sentry.watch()
     def objects(self, filter: Optional[_ObjectVersionFilter] = None) -> list[ObjSchema]:
@@ -424,6 +381,55 @@ class WeaveClient:
             )
         )
         return response.objs
+
+    def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
+        raise NotImplementedError()
+
+    def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
+        raise NotImplementedError()
+
+    def _ref_is_own(self, ref: Ref) -> bool:
+        return isinstance(ref, Ref)
+
+    def _project_id(self) -> str:
+        return f"{self.entity}/{self.project}"
+
+    def _save_object(self, val: Any, name: str, branch: str = "latest") -> ObjectRef:
+        is_opdef = isinstance(val, Op)
+        val = map_to_refs(val)
+        if isinstance(val, ObjectRef):
+            return val
+        json_val = to_json(val, self._project_id(), self.server)
+
+        response = self.server.obj_create(
+            ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
+                )
+            )
+        )
+        ref: Ref
+        if is_opdef:
+            ref = OpRef(self.entity, self.project, name, response.digest)
+        else:
+            ref = ObjectRef(self.entity, self.project, name, response.digest)
+        # TODO: Try to put a ref onto val? Or should user code use a style like
+        # save instead?
+        return ref
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _save_table(self, table: Table) -> TableRef:
+        response = self.server.table_create(TableCreateReq(table=TableSchemaForInsert(project_id=self._project_id(), rows=table.rows)))
+        return TableRef(entity=self.entity, project=self.project, digest=response.digest)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def _op_calls(self, op: Op) -> CallsIter:
+        op_ref = get_ref(op)
+        if op_ref is None:
+            raise ValueError(f"Can't get runs for unpublished op: {op}")
+        return self.calls(_CallsFilter(op_names=[op_ref.uri()]))
 
     def _save_op(self, op: Op, name: Optional[str] = None) -> Ref:
         if op.ref is not None:
@@ -639,12 +645,6 @@ class WeaveClient:
         raise NotImplementedError()
 
     def _ref_output_of(self, ref: ObjectRef) -> typing.Optional[Call]:
-        raise NotImplementedError()
-
-    def add_feedback(self, run_id: str, feedback: typing.Any) -> None:
-        raise NotImplementedError()
-
-    def run_feedback(self, run_id: str) -> Sequence[dict[str, typing.Any]]:
         raise NotImplementedError()
 
     def _op_runs(self, op_def: Op) -> Sequence[Call]:
