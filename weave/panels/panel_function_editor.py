@@ -2,9 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from .. import panel
-from .. import graph
-
+from weave import graph, panel
 
 ExpressionType = typing.TypeVar("ExpressionType")
 

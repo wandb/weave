@@ -1,5 +1,5 @@
 import weave
-from .. import panel
+from weave import panel
 
 
 # Currently Auto is not a real panel, the system handles it.

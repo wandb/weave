@@ -1,5 +1,5 @@
 import weave
-from .. import panel
+from weave import panel
 
 
 @weave.type(__override_name="wb_trace_tree-traceViewer")  # type: ignore

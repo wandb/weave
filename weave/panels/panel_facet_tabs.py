@@ -1,11 +1,9 @@
 import dataclasses
 import typing
+
 import weave
-
-from .. import panel
-from .. import graph
-
-from .panel_group import PanelBankSectionConfig
+from weave import graph, panel
+from weave.panels.panel_group import PanelBankSectionConfig
 
 RenderType = typing.TypeVar("RenderType")
 

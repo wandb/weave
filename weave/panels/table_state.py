@@ -1,19 +1,14 @@
 import contextlib
 import contextvars
+import copy
 import dataclasses
 import inspect
 import random
 import string
-import copy
 import typing
 
-from .. import graph
-from .. import weave_internal
-from .. import ops
-from .. import panel
-from .. import decorator_type
-from .. import weave_types
-from ..language_features.tagging import tagged_value_type
+from weave import decorator_type, graph, ops, panel, weave_internal, weave_types
+from weave.language_features.tagging import tagged_value_type
 
 
 @decorator_type.type()

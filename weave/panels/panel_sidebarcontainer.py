@@ -1,5 +1,5 @@
-from . import panel
-from .. import graph
+from weave import graph
+from weave.panels import panel
 
 
 class VerticalContainerConfig:

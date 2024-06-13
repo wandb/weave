@@ -2,10 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from .. import weave_internal
-from .. import panel
-from .. import graph
-
+from weave import graph, panel, weave_internal
 
 ChoiceType = typing.TypeVar("ChoiceType")
 

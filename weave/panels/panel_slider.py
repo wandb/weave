@@ -2,8 +2,7 @@ import dataclasses
 import typing
 
 import weave
-from .. import panel
-from .. import weave_internal
+from weave import panel, weave_internal
 
 
 @weave.type()

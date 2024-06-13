@@ -1,9 +1,5 @@
 import weave
-
-from .. import panel
-from .. import panel_util
-from .. import ops
-from .. import graph
+from weave import graph, ops, panel, panel_util
 
 
 @weave.type()

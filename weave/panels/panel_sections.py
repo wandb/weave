@@ -1,11 +1,9 @@
 import dataclasses
 import typing
+
 import weave
-
-from .. import panel
-from .. import graph
-
-from .panel_group import PanelBankSectionConfig
+from weave import graph, panel
+from weave.panels.panel_group import PanelBankSectionConfig
 
 RenderType = typing.TypeVar("RenderType")
 
@@ -15,9 +13,7 @@ class SectionsConfig(typing.Generic[RenderType]):
     section: weave.Node[typing.Optional[typing.Any]] = dataclasses.field(
         default_factory=lambda: weave.graph.VoidNode()
     )
-    panel: RenderType = dataclasses.field(
-        default_factory=lambda: graph.VoidNode()
-    )  # type: ignore
+    panel: RenderType = dataclasses.field(default_factory=lambda: graph.VoidNode())  # type: ignore
 
 
 @weave.type()

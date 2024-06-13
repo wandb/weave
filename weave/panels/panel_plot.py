@@ -1,20 +1,14 @@
 # TODO: types are all messed up after panel_composition branch
 import copy
-import typing
-import weave
-from weave import codifiable_value_mixin
-from weave import codify
-
-from .. import panel
-from . import table_state
-from . import panel_table
 import dataclasses
+import typing
 
-from .. import graph
-from .. import errors
-from .. import weave_internal
-from .. import weave_types as types
-from ..ops_primitives import list_, dict as dict_, boolean
+import weave
+from weave import codifiable_value_mixin, codify, errors, graph, panel, weave_internal
+from weave import weave_types as types
+from weave.ops_primitives import boolean, list_
+from weave.ops_primitives import dict as dict_
+from weave.panels import panel_table, table_state
 
 
 @weave.type()

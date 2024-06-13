@@ -2,14 +2,10 @@ import dataclasses
 import typing
 
 import weave
-from weave import weave_internal
-from weave import codify
-from weave import codifiable_value_mixin
+from weave import codifiable_value_mixin, codify, panel, weave_internal
 from weave.graph import ConstNode, Node, OutputNode, VoidNode
-from .. import panel
-from . import table_state
-
-from .panel_query import Query
+from weave.panels import table_state
+from weave.panels.panel_query import Query
 
 
 @weave.type("tablePanelConfig")
@@ -254,11 +250,10 @@ def _get_rows_node(self: Table, apply_sort: bool = True) -> Node:
                         col_def["columnSelectFunction"], {"row": row, "index": index}
                     )
                     if col_id not in group_ids
-                    else
                     # Here, we materialize the groupkey tags as columns. This is nicer for downstream
                     # consumers, to be able to directly fetch the col by name, even if it
                     # was the grouping column. I (Tim) took this design liberty, easy to change.
-                    row.groupkey()[col_def["columnName"]]
+                    else row.groupkey()[col_def["columnName"]]
                 )
                 for col_id, col_def in columns.items()
             }

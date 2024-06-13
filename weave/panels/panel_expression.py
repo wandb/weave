@@ -1,5 +1,5 @@
 import weave
-from .. import panel
+from weave import panel
 
 
 @weave.type()

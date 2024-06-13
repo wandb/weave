@@ -1,19 +1,20 @@
-import dataclasses
 import copy
+import dataclasses
 import typing
+
 import weave
-from weave import codifiable_value_mixin
-from weave import codify
-
-from .. import weave_internal
-from .. import graph
-from .. import panel
-from .. import panel_util
-from .. import errors
-from .. import dispatch
-from .bank import default_panel_bank_flow_section_config, flow_layout
-
-from .panel_group_panel_info import PanelInfo
+from weave import (
+    codifiable_value_mixin,
+    codify,
+    dispatch,
+    errors,
+    graph,
+    panel,
+    panel_util,
+    weave_internal,
+)
+from weave.panels.bank import default_panel_bank_flow_section_config, flow_layout
+from weave.panels.panel_group_panel_info import PanelInfo
 
 ItemsType = typing.TypeVar("ItemsType")
 
