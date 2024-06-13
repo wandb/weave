@@ -78,7 +78,9 @@ class ParamBuilder:
 
 
 Value: TypeAlias = typing.Optional[
-    typing.Union[str, float, datetime.datetime, list[str], list[float]]
+    typing.Union[
+        str, float, datetime.datetime, list[str], list[float], dict[str, typing.Any]
+    ]
 ]
 Row: TypeAlias = dict[str, Value]
 Rows: TypeAlias = list[Row]
@@ -169,12 +171,12 @@ class Table:
         if database_type == "sqlite":
             return f"DELETE FROM {self.name}"
 
-    def tuple_to_row(self, tuple: typing.Tuple, fields: list[str]) -> Row:
+    def tuple_to_row(self, tup: typing.Tuple, fields: list[str]) -> Row:
         d = {}
         for i, field in enumerate(fields):
             if field.endswith("_dump"):
                 field = field[:-5]
-            value = tuple[i]
+            value = tup[i]
             if field in self.col_types and self.col_types[field] == "json":
                 d[field] = json.loads(value)
             else:
