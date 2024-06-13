@@ -1,23 +1,19 @@
-from typing import Callable, Any, Mapping, Optional
-import inspect
 import functools
+import inspect
 import typing
-from typing import TYPE_CHECKING, TypeVar, Callable, Optional, Coroutine, Dict
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Mapping, Optional, TypeVar
+
 from typing_extensions import ParamSpec
 
+from weave import box, context_state, graph_client_context, run_context
+from weave.trace.context import call_attributes
 from weave.trace.errors import OpCallError
 from weave.trace.refs import ObjectRef
-from weave.trace.context import call_attributes
-from weave import graph_client_context
-from weave import run_context
-from weave import box
-
-from weave import context_state
 
 from .constants import TRACE_CALL_EMOJI
 
 if TYPE_CHECKING:
-    from weave.weave_client import Call, WeaveClient, CallsIter
+    from weave.weave_client import Call, CallsIter, WeaveClient
 
 
 def print_call_link(call: "Call") -> None:
@@ -54,9 +50,7 @@ class Op:
         self._on_output_handler = None
         self.display_name = None
 
-    def __get__(
-        self, obj: Optional[object], objtype: Optional[type[object]] = None
-    ) -> "BoundOp":
+    def __get__(self, obj: Optional[object], objtype: Optional[type[object]] = None) -> "BoundOp":
         return BoundOp(obj, objtype, self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -90,9 +84,7 @@ class Op:
 
         has_finished = False
 
-        def finish(
-            output: Any = None, exception: Optional[BaseException] = None
-        ) -> None:
+        def finish(output: Any = None, exception: Optional[BaseException] = None) -> None:
             nonlocal has_finished
             if has_finished:
                 raise ValueError("Should not call finish more than once")
@@ -149,7 +141,7 @@ class Op:
 
     def calls(self) -> "CallsIter":
         client = graph_client_context.require_graph_client()
-        return client.op_calls(self)
+        return client._op_calls(self)
 
     def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
         """This is an experimental API and may change in the future intended for use by internal Weave code."""
@@ -162,9 +154,7 @@ class BoundOp(Op):
     arg0: Any
     op: Op
 
-    def __init__(
-        self, arg0: object, arg0_class: Optional[type[object]], op: Op
-    ) -> None:
+    def __init__(self, arg0: object, arg0_class: Optional[type[object]], op: Op) -> None:
         self.arg0 = arg0
         self.op = op  # type: ignore
         if arg0_class is None:
@@ -214,9 +204,7 @@ def op(*args: Any, **kwargs: Any) -> Callable[[Callable[P, R]], Callable[P, R]]:
     return wrap
 
 
-def _apply_fn_defaults_to_inputs(
-    fn: typing.Callable, inputs: Mapping[str, typing.Any]
-) -> dict[str, typing.Any]:
+def _apply_fn_defaults_to_inputs(fn: typing.Callable, inputs: Mapping[str, typing.Any]) -> dict[str, typing.Any]:
     inputs = {**inputs}
     sig = inspect.signature(fn)
     for param_name, param in sig.parameters.items():
