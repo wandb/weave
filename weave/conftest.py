@@ -314,22 +314,22 @@ def strict_op_saving():
 
 
 class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
-    def convert_ext_to_int_project_id(self, project_id: str) -> str:
+    def ext_to_int_project_id(self, project_id: str) -> str:
         return "___".join(project_id.split("/"))
 
-    def convert_int_to_ext_project_id(self, project_id: str) -> str:
+    def int_to_ext_project_id(self, project_id: str) -> str:
         return "/".join(project_id.split("___"))
 
-    # def convert_ext_to_int_run_id(self, run_id: str) -> str:
+    # def ext_to_int_run_id(self, run_id: str) -> str:
     #     return run_id
 
-    # def convert_int_to_ext_run_id(self, run_id: str) -> str:
+    # def int_to_ext_run_id(self, run_id: str) -> str:
     #     return run_id
 
-    # def convert_ext_to_int_user_id(self, user_id: str) -> str:
+    # def ext_to_int_user_id(self, user_id: str) -> str:
     #     return user_id
 
-    # def convert_int_to_ext_user_id(self, user_id: str) -> str:
+    # def int_to_ext_user_id(self, user_id: str) -> str:
     #     return user_id
 
 
