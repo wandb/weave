@@ -61,7 +61,9 @@ def test_simple_op(client):
     assert len(calls) == 1
     fetched_call = calls[0]
     digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
-    expected_name = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
+    expected_name = (
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
+    )
     assert fetched_call == weave_client.Call(
         op_name=expected_name,
         project_id=f"{client.entity}/{client.project}",
@@ -93,7 +95,8 @@ def test_trace_server_call_start_and_end(client):
         op_name="test_name",
         trace_id="test_trace_id",
         parent_id="test_parent_id",
-        started_at=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=1),
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+        - datetime.timedelta(seconds=1),
         attributes={"a": 5},
         inputs={"b": 5},
     )
@@ -106,7 +109,9 @@ def test_trace_server_call_start_and_end(client):
         )
     )
 
-    exp_started_at = datetime.datetime.fromisoformat(start.started_at.isoformat(timespec="milliseconds"))
+    exp_started_at = datetime.datetime.fromisoformat(
+        start.started_at.isoformat(timespec="milliseconds")
+    )
 
     class FuzzyDateTimeMatcher:
         def __init__(self, dt):
@@ -160,7 +165,9 @@ def test_trace_server_call_start_and_end(client):
         )
     )
 
-    exp_ended_at = datetime.datetime.fromisoformat(end.ended_at.isoformat(timespec="milliseconds"))
+    exp_ended_at = datetime.datetime.fromisoformat(
+        end.ended_at.isoformat(timespec="milliseconds")
+    )
 
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
@@ -232,7 +239,9 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
         return Number(value=a.value - b)
 
     @weave.op()
-    def multiplier(a: Number, b) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+    def multiplier(
+        a: Number, b
+    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op()
@@ -307,7 +316,9 @@ def test_trace_call_query_filter_op_version_refs(client):
     # This is just a string representation of the ref
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
-    assert ref_str(call_summaries["adder"].op).startswith(f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder:")
+    assert ref_str(call_summaries["adder"].op).startswith(
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder:"
+    )
     wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
 
     for i, (op_version_refs, exp_count) in enumerate(
@@ -329,17 +340,21 @@ def test_trace_call_query_filter_op_version_refs(client):
                     ref_str(call_summaries["adder"].op),
                     ref_str(call_summaries["subtractor"].op),
                 ],
-                call_summaries["adder"].num_calls + call_summaries["subtractor"].num_calls,
+                call_summaries["adder"].num_calls
+                + call_summaries["subtractor"].num_calls,
             ),
             # Test the wildcard case
             (
                 [wildcard_adder_ref_str],
-                call_summaries["adder"].num_calls + call_summaries["adder_v0"].num_calls,
+                call_summaries["adder"].num_calls
+                + call_summaries["adder_v0"].num_calls,
             ),
             # Test the wildcard case and specific case
             (
                 [wildcard_adder_ref_str, ref_str(call_summaries["subtractor"].op)],
-                call_summaries["adder"].num_calls + call_summaries["adder_v0"].num_calls + call_summaries["subtractor"].num_calls,
+                call_summaries["adder"].num_calls
+                + call_summaries["adder_v0"].num_calls
+                + call_summaries["subtractor"].num_calls,
             ),
         ]
     ):
@@ -362,7 +377,9 @@ def unique_vals(list_a: typing.List[str]) -> typing.List[str]:
     return list(set(list_a))
 
 
-def get_all_calls_asserting_finished(client: ClientType, call_spec: OpCallSpec) -> tsi.CallsQueryRes:
+def get_all_calls_asserting_finished(
+    client: ClientType, call_spec: OpCallSpec
+) -> tsi.CallsQueryRes:
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
@@ -378,7 +395,9 @@ def test_trace_call_query_filter_input_object_version_refs(client):
 
     res = get_all_calls_asserting_finished(client, call_spec)
 
-    input_object_version_refs = unique_vals([ref for call in res.calls for ref in extract_refs_from_values(call.inputs)])
+    input_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+    )
     assert len(input_object_version_refs) > 3
 
     for input_object_version_refs, exp_count in [
@@ -430,7 +449,9 @@ def test_trace_call_query_filter_output_object_version_refs(client):
 
     res = get_all_calls_asserting_finished(client, call_spec)
 
-    output_object_version_refs = unique_vals([ref for call in res.calls for ref in extract_refs_from_values(call.output)])
+    output_object_version_refs = unique_vals(
+        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+    )
     assert len(output_object_version_refs) > 3
 
     for output_object_version_refs, exp_count in [
@@ -482,7 +503,9 @@ def test_trace_call_query_filter_parent_ids(client):
 
     res = get_all_calls_asserting_finished(client, call_spec)
 
-    parent_ids = unique_vals([call.parent_id for call in res.calls if call.parent_id is not None])
+    parent_ids = unique_vals(
+        [call.parent_id for call in res.calls if call.parent_id is not None]
+    )
     assert len(parent_ids) > 3
 
     for parent_ids, exp_count in [
@@ -786,7 +809,10 @@ def test_trace_call_filter(client):
         ),
         # not gt = lte
         (
-            6 + (1 if is_sql_lite else 0),  # SQLite casting transforms strings to 0, instead of NULL
+            6
+            + (
+                1 if is_sql_lite else 0
+            ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
                     {
@@ -805,7 +831,10 @@ def test_trace_call_filter(client):
         ),
         # not gte = lt
         (
-            5 + (1 if is_sql_lite else 0),  # SQLite casting transforms strings to 0, instead of NULL
+            5
+            + (
+                1 if is_sql_lite else 0
+            ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
                     {
@@ -824,7 +853,10 @@ def test_trace_call_filter(client):
         ),
         # like all
         (
-            13 + (-2 if is_sql_lite else 0),  # SQLite returns NULL for non-existent fields rather than ''.
+            13
+            + (
+                -2 if is_sql_lite else 0
+            ),  # SQLite returns NULL for non-existent fields rather than ''.
             {
                 "$contains": {
                     "input": {"$getField": "inputs.in_val.str"},
@@ -872,7 +904,9 @@ def test_trace_call_filter(client):
                                 "$gt": [
                                     {
                                         "$convert": {
-                                            "input": {"$getField": "inputs.in_val.prim"},
+                                            "input": {
+                                                "$getField": "inputs.in_val.prim"
+                                            },
                                             "to": "int",
                                         }
                                     },
@@ -897,7 +931,10 @@ def test_trace_call_filter(client):
         ),
         # or
         (
-            5 + (1 if is_sql_lite else 0),  # SQLite casting transforms strings to 0, instead of NULL
+            5
+            + (
+                1 if is_sql_lite else 0
+            ),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$or": [
                     {
@@ -906,7 +943,9 @@ def test_trace_call_filter(client):
                                 "$gt": [
                                     {
                                         "$convert": {
-                                            "input": {"$getField": "inputs.in_val.prim"},
+                                            "input": {
+                                                "$getField": "inputs.in_val.prim"
+                                            },
                                             "to": "int",
                                         }
                                     },
@@ -966,7 +1005,9 @@ def test_trace_call_filter(client):
                 "$gt": [
                     {
                         "$convert": {
-                            "input": {"$getField": "inputs.in_val.list.0"},  # changing this to a dot instead of [0]
+                            "input": {
+                                "$getField": "inputs.in_val.list.0"
+                            },  # changing this to a dot instead of [0]
                             "to": "int",
                         }
                     },
@@ -1037,7 +1078,9 @@ def test_trace_call_filter(client):
         )
 
         if len(inner_res.calls) != count:
-            failed_cases.append(f"(ALL) Query {query} expected {count}, but found {len(inner_res.calls)}")
+            failed_cases.append(
+                f"(ALL) Query {query} expected {count}, but found {len(inner_res.calls)}"
+            )
         inner_res = get_client_trace_server(client).calls_query_stats(
             tsi.CallsQueryStatsReq.model_validate(
                 dict(
@@ -1048,10 +1091,14 @@ def test_trace_call_filter(client):
         )
 
         if inner_res.count != count:
-            failed_cases.append(f"(Stats) Query {query} expected {count}, but found {inner_res.count}")
+            failed_cases.append(
+                f"(Stats) Query {query} expected {count}, but found {inner_res.count}"
+            )
 
     if failed_cases:
-        raise AssertionError(f"Failed {len(failed_cases)} cases:\n" + "\n".join(failed_cases))
+        raise AssertionError(
+            f"Failed {len(failed_cases)} cases:\n" + "\n".join(failed_cases)
+        )
 
 
 def test_ops_with_default_params(client):
@@ -1188,7 +1235,10 @@ def test_dataclass_support(client):
         "a": "weave:///shawn/test-project/object/MyDataclass:qDo5jHFme5xIM1LwgeiXXVxYoGnp4LQ9hulqkX5zunY",
         "b": "weave:///shawn/test-project/object/MyDataclass:We1slmdrWzi2NYSWObBsLybTTNSP4M9zfQbCMf8rQMc",
     }
-    assert res.calls[0].output == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
+    assert (
+        res.calls[0].output
+        == "weave:///shawn/test-project/object/MyDataclass:2exnZIHkq8DyHTbJzhL0m5Ew1XrqIBCstZWilQS6Lpo"
+    )
 
 
 def test_op_retrieval(client):
@@ -1332,7 +1382,9 @@ def test_named_reuse(client):
     res = get_client_trace_server(client).objs_query(
         tsi.ObjQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi._ObjectVersionFilter(is_op=False, latest_only=True, base_object_classes=["Dataset"]),
+            filter=tsi._ObjectVersionFilter(
+                is_op=False, latest_only=True, base_object_classes=["Dataset"]
+            ),
         )
     )
 
@@ -1355,7 +1407,9 @@ def test_unknown_input_and_output_types(client):
             self.b_val = b_val
 
     @weave.op()
-    def op_with_unknown_types(a: MyUnserializableClassA, b: float) -> MyUnserializableClassB:
+    def op_with_unknown_types(
+        a: MyUnserializableClassA, b: float
+    ) -> MyUnserializableClassB:
         return MyUnserializableClassB(a.a_val + b)
 
     a = MyUnserializableClassA(3)

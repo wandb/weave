@@ -4,7 +4,18 @@ import inspect
 import math
 import typing
 
-from . import artifact_fs, box, errors, graph_client_context, mappers, mappers_python, mappers_weave, ref_base, storage, val_const
+from . import (
+    artifact_fs,
+    box,
+    errors,
+    graph_client_context,
+    mappers,
+    mappers_python,
+    mappers_weave,
+    ref_base,
+    storage,
+    val_const,
+)
 from . import timestamp as weave_timestamp
 from . import weave_types as types
 from .language_features.tagging import tagged_value_type
@@ -79,7 +90,11 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
         # deserialize op methods separately
         op_methods = {}
         for k, serializer in self._property_serializers.items():
-            if obj.get(k) is not None and isinstance(serializer, DefaultFromPy) and serializer.type == OpDefType():
+            if (
+                obj.get(k) is not None
+                and isinstance(serializer, DefaultFromPy)
+                and serializer.type == OpDefType()
+            ):
                 op_methods[k] = serializer.apply(obj.get(k))
 
         if "artifact" in constructor_sig.parameters and "artifact" not in result:
@@ -101,7 +116,9 @@ class ObjectDictToObject(mappers_weave.ObjectMapper):
             else:
                 return instance_class(**result)
         except:
-            err = errors.WeaveSerializeError("Failed to construct %s with %s" % (instance_class, result))
+            err = errors.WeaveSerializeError(
+                "Failed to construct %s with %s" % (instance_class, result)
+            )
             err.fingerprint = ["failed-to-construct", instance_class, result]
             raise err
 
@@ -130,9 +147,13 @@ class ListToPyList(mappers_weave.ListMapper):
 class UnionToPyUnion(mappers_weave.UnionMapper):
     def apply(self, obj):
         obj_type = types.type_of_with_refs(obj)
-        for i, (member_type, member_mapper) in enumerate(zip(self.type.members, self._member_mappers)):
+        for i, (member_type, member_mapper) in enumerate(
+            zip(self.type.members, self._member_mappers)
+        ):
             # TODO: Should types.TypeRegistry.type_of always return a const type??
-            if isinstance(member_type, types.Const) and not isinstance(obj_type, types.Const):
+            if isinstance(member_type, types.Const) and not isinstance(
+                obj_type, types.Const
+            ):
                 obj_type = types.Const(obj_type, obj)
 
             # TODO: assignment isn't right here (a dict with 'a', 'b' int keys is
@@ -142,7 +163,9 @@ class UnionToPyUnion(mappers_weave.UnionMapper):
             # Later (3/8/23): This is even more ridiculous now. First we check
             # assignablility, then mergability. The ecosystem notebook now fails
             # without the merge check.
-            if member_type.assign_type(obj_type) or not isinstance(types.merge_types(obj_type, member_type), types.UnionType):
+            if member_type.assign_type(obj_type) or not isinstance(
+                types.merge_types(obj_type, member_type), types.UnionType
+            ):
                 result = member_mapper.apply(obj)
                 if isinstance(result, dict):
                     result["_union_id"] = i
@@ -227,7 +250,9 @@ class PyTimestampToTimestamp(mappers.Mapper):
         # RFC 3339 formatted strings
         if isinstance(obj, dict):
             if obj.get("type") != "date":
-                raise errors.WeaveInternalError(f'expected object with type date but got "{obj}"')
+                raise errors.WeaveInternalError(
+                    f'expected object with type date but got "{obj}"'
+                )
             return datetime.datetime.strptime(obj["val"], "%Y-%m-%dT%H:%M:%S.%fZ")
         else:
             return weave_timestamp.ms_to_python_datetime(obj)
@@ -248,7 +273,9 @@ class UnknownToPyUnknown(mappers.Mapper):
 
 
 class RefToPyRef(mappers_weave.RefMapper):
-    def __init__(self, type_: types.Type, mapper, artifact, path=[], use_stable_refs=True):
+    def __init__(
+        self, type_: types.Type, mapper, artifact, path=[], use_stable_refs=True
+    ):
         super().__init__(type_, mapper, artifact, path)
         self._use_stable_refs = use_stable_refs
 
@@ -259,7 +286,9 @@ class RefToPyRef(mappers_weave.RefMapper):
             # object instead of a copy of the object.
             obj = ref_base.get_ref(obj)
             if obj is None:
-                raise errors.WeaveSerializeError("Ref mapper cannot serialize non-ref object %s" % obj)
+                raise errors.WeaveSerializeError(
+                    "Ref mapper cannot serialize non-ref object %s" % obj
+                )
 
         try:
             if self._use_stable_refs:
@@ -294,7 +323,9 @@ class ConstToPyConst(mappers_weave.ConstMapper):
 
 
 class DefaultToPy(mappers.Mapper):
-    def __init__(self, type_: types.Type, mapper, artifact, path=[], use_stable_refs=True):
+    def __init__(
+        self, type_: types.Type, mapper, artifact, path=[], use_stable_refs=True
+    ):
         self.type = type_
         self._artifact = artifact
         self._path = path
@@ -318,7 +349,8 @@ class DefaultToPy(mappers.Mapper):
                 # If we have a graph_client (weaveflow), only save
                 # a nested ref here if it is a ref to the same storage
                 # engine.
-                not gc or (gc and gc._ref_is_own(existing_ref))
+                not gc
+                or (gc and gc._ref_is_own(existing_ref))
             ) and existing_ref.is_saved:
                 if self._use_stable_refs:
                     uri = existing_ref.uri
@@ -441,7 +473,9 @@ def map_to_python_(type, mapper, artifact, path=[], mapper_options=None):
         for m in _additional_mappers:
             if isinstance(type, m.type_class):
                 return m.to_mapper(type, mapper, artifact, path)
-        return DefaultToPy(type, mapper, artifact, path, use_stable_refs=use_stable_refs)
+        return DefaultToPy(
+            type, mapper, artifact, path, use_stable_refs=use_stable_refs
+        )
 
 
 def map_from_python_(type: types.Type, mapper, artifact, path=[], mapper_options=None):

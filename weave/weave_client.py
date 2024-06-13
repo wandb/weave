@@ -172,7 +172,9 @@ class Call:
 
     def set_display_name(self, name: Optional[str]) -> None:
         if name == "":
-            raise ValueError("Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name.")
+            raise ValueError(
+                "Display name cannot be empty. To remove the display_name, set name=None or use remove_display_name."
+            )
         if name == self.display_name:
             return
         client = graph_client_context.require_graph_client()
@@ -187,7 +189,9 @@ class CallsIter:
     server: TraceServerInterface
     filter: _CallsFilter
 
-    def __init__(self, server: TraceServerInterface, project_id: str, filter: _CallsFilter) -> None:
+    def __init__(
+        self, server: TraceServerInterface, project_id: str, filter: _CallsFilter
+    ) -> None:
         self.server = server
         self.project_id = project_id
         self.filter = filter
@@ -224,7 +228,9 @@ class CallsIter:
             page_index += 1
 
 
-def make_client_call(entity: str, project: str, server_call: CallSchema, server: TraceServerInterface) -> TraceObject:
+def make_client_call(
+    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
+) -> TraceObject:
     output = server_call.output
     call = Call(
         op_name=server_call.op_name,
@@ -325,7 +331,9 @@ class WeaveClient:
         # let the server resolve it.
         if ref.extra:
             try:
-                ref_read_res = self.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri()]))
+                ref_read_res = self.server.refs_read_batch(
+                    RefsReadBatchReq(refs=[ref.uri()])
+                )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
                     raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -421,8 +429,16 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table) -> TableRef:
-        response = self.server.table_create(TableCreateReq(table=TableSchemaForInsert(project_id=self._project_id(), rows=table.rows)))
-        return TableRef(entity=self.entity, project=self.project, digest=response.digest)
+        response = self.server.table_create(
+            TableCreateReq(
+                table=TableSchemaForInsert(
+                    project_id=self._project_id(), rows=table.rows
+                )
+            )
+        )
+        return TableRef(
+            entity=self.entity, project=self.project, digest=response.digest
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
@@ -526,7 +542,9 @@ class WeaveClient:
         return call
 
     @trace_sentry.global_trace_sentry.watch()
-    def _finish_call(self, call: Call, output: Any = None, exception: Optional[BaseException] = None) -> None:
+    def _finish_call(
+        self, call: Call, output: Any = None, exception: Optional[BaseException] = None
+    ) -> None:
         self._save_nested_objects(output)
         original_output = output
         output = map_to_refs(original_output)
@@ -593,7 +611,9 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def _set_call_display_name(self, call: Call, display_name: Optional[str] = None) -> None:
+    def _set_call_display_name(
+        self, call: Call, display_name: Optional[str] = None
+    ) -> None:
         # Removing call display name, use "" for db representation
         if display_name is None:
             display_name = ""
@@ -669,7 +689,9 @@ def safe_current_wb_run_id() -> Optional[str]:
         return None
 
 
-def check_wandb_run_matches(wandb_run_id: Optional[str], weave_entity: str, weave_project: str) -> None:
+def check_wandb_run_matches(
+    wandb_run_id: Optional[str], weave_entity: str, weave_project: str
+) -> None:
     if wandb_run_id:
         # ex: "entity/project/run_id"
         wandb_entity, wandb_project, _ = wandb_run_id.split("/")

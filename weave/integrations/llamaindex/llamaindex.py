@@ -16,7 +16,9 @@ except ImportError:
 except Exception:
     # This occurs if llama_index is installed but there is an error in the import or some other error occured in the interaction between packages.
     import_failed = True
-    print("Failed to autopatch llama_index. If you are tracing Llama calls, please upgrade llama_index to be version>=0.10.35")
+    print(
+        "Failed to autopatch llama_index. If you are tracing Llama calls, please upgrade llama_index to be version>=0.10.35"
+    )
 
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -37,7 +39,9 @@ if not import_failed:
 
             # Everything below here is just boilerplate for inheriting from
             # BaseCallbackHandler.
-            event_starts_to_ignore = event_starts_to_ignore if event_starts_to_ignore else []
+            event_starts_to_ignore = (
+                event_starts_to_ignore if event_starts_to_ignore else []
+            )
             event_ends_to_ignore = event_ends_to_ignore if event_ends_to_ignore else []
             super().__init__(
                 event_starts_to_ignore=event_starts_to_ignore,
@@ -76,7 +80,9 @@ if not import_failed:
                 # Check if the event is a valid root event or child event.
                 # Here, we only allow a subset of event types as the root since not
                 # all event types are meaningful in the weave context.
-                is_valid_root = parent_id == "root" and event_type in ALLOWED_ROOT_EVENT_TYPES
+                is_valid_root = (
+                    parent_id == "root" and event_type in ALLOWED_ROOT_EVENT_TYPES
+                )
                 # Since we don't track all calls, it is possible that the parent_id
                 # is not in the call map. In this case, we don't want to track the child event.
                 is_valid_child = parent_id != "root" and parent_id in self._call_map
@@ -127,7 +133,9 @@ if not import_failed:
             # Not implemented - required by interface.
             pass
 
-    def process_payload(payload: Optional[Dict[EventPayload, Any]] = None) -> Optional[Dict[EventPayload, Any]]:
+    def process_payload(
+        payload: Optional[Dict[EventPayload, Any]] = None
+    ) -> Optional[Dict[EventPayload, Any]]:
         if payload is None:
             return None
         res = {}
